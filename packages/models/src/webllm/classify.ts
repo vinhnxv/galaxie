@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { WebLLMUnavailableReason } from '../errors.js';
+import type { ModelUnavailableReason } from '../errors.js';
 
 export type WebLLMFailure =
-  | { readonly code: 'unavailable'; readonly reason: WebLLMUnavailableReason }
+  | { readonly code: 'unavailable'; readonly reason: ModelUnavailableReason }
   | { readonly code: 'invalid' };
 
 /** Engine rejections cross the worker as strings. Return only allowlisted classifications. */
@@ -12,7 +12,7 @@ export function classifyWebLLMError(error: unknown): WebLLMFailure | undefined {
   const text = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   const name =
     error instanceof Error && error.name !== 'Error' ? error.name : text.split(':', 1)[0];
-  const reasons: Readonly<Record<string, WebLLMUnavailableReason>> = {
+  const reasons: Readonly<Record<string, ModelUnavailableReason>> = {
     WebGPUNotAvailableError: 'no_webgpu',
     ShaderF16SupportError: 'no_shader_f16',
     FeatureSupportError: 'no_shader_f16',
@@ -23,7 +23,7 @@ export function classifyWebLLMError(error: unknown): WebLLMFailure | undefined {
   };
   if (name === 'ContextWindowSizeExceededError') return { code: 'invalid' };
   if (name !== undefined && Object.hasOwn(reasons, name))
-    return { code: 'unavailable', reason: reasons[name] as WebLLMUnavailableReason };
+    return { code: 'unavailable', reason: reasons[name] as ModelUnavailableReason };
   const message = text.replace(/^Error: /, '');
   if (message.startsWith('Unable to find a compatible GPU'))
     return { code: 'unavailable', reason: 'no_adapter' };

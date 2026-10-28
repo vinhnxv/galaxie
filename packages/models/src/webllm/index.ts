@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export { WebLLMError, type WebLLMErrorCode, type WebLLMUnavailableReason } from '../errors.js';
+export { ModelError, type ModelErrorCode, type ModelUnavailableReason } from '../errors.js';
 export {
   type WebLLMCallOptions,
   WebLLMChatModel,

@@ -401,8 +401,8 @@ describe('WebLLM FIFO requests and cancellation', () => {
     });
     const error = await drain(handle.stream(request)).catch((value: unknown) => value);
     expect(error).toMatchObject({
-      name: 'WebLLMProviderError',
-      message: 'The WebLLM provider failed.',
+      name: 'ModelProviderError',
+      message: 'The model provider failed.',
     });
     expect(error).not.toHaveProperty('cause');
     expect(JSON.stringify(error)).not.toContain('private');
