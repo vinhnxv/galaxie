@@ -15,6 +15,9 @@ import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test, vi } from 'vitest';
 import { MockChatModel } from '../../models/src/mock.js';
+import { WebLLMChatModel } from '../../models/src/webllm/chat-model.js';
+import { createWebLLMEngine } from '../../models/src/webllm/engine.js';
+import { createFakeWebLLM, FakeWebLLMStream } from '../../models/test/support/fake-webllm.js';
 import { RoutedChatModel } from '../src/routed-chat-model.js';
 import { LangGraphTraceHandler } from '../src/trace-handler.js';
 
@@ -114,6 +117,65 @@ function routed(
     handler,
   };
 }
+
+test('WebLLM streaming settles reported usage exactly once through the routed model', async () => {
+  const fake = createFakeWebLLM();
+  const handle = await createWebLLMEngine(
+    { worker: fake.worker },
+    { gpu: fake.gpu, loadModule: async () => fake.module },
+  );
+  const fixture = routed(new WebLLMChatModel(handle));
+  try {
+    const chunks = [];
+    for await (const chunk of await fixture.model.stream('hello')) chunks.push(chunk);
+    expect(chunks.map((chunk) => chunk.content).join('')).toBe('hello world');
+    expect(fixture.end).toHaveBeenCalledExactlyOnceWith({ inputTokens: 12, outputTokens: 5 });
+    expect(fixture.fail).not.toHaveBeenCalled();
+    fake.engine.assertClosed();
+  } finally {
+    await handle.dispose();
+  }
+});
+
+test('WebLLM cancellation fails the routed lease without settling partial usage', async () => {
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const fake = createFakeWebLLM({
+    create: async () =>
+      new FakeWebLLMStream(undefined, {
+        beforeNext: async (index) => {
+          if (index === 1) {
+            entered.resolve();
+            await release.promise;
+          }
+        },
+      }),
+  });
+  const handle = await createWebLLMEngine(
+    { worker: fake.worker },
+    { gpu: fake.gpu, loadModule: async () => fake.module },
+  );
+  const fixture = routed(new WebLLMChatModel(handle));
+  const controller = new AbortController();
+  const reason = new Error('host cancellation');
+  try {
+    const stream = await fixture.model.stream('hello', { signal: controller.signal });
+    const iterator = stream[Symbol.asyncIterator]();
+    expect((await iterator.next()).value?.content).toBe('hello ');
+    const pending = iterator.next();
+    const rejected = expect(pending).rejects.toBe(reason);
+    await entered.promise;
+    controller.abort(reason);
+    await rejected;
+    expect(fixture.fail).toHaveBeenCalledTimes(1);
+    expect(fixture.end).not.toHaveBeenCalled();
+    expect(fake.engine.interrupts).toBe(1);
+    fake.engine.assertClosed();
+  } finally {
+    release.resolve();
+    await handle.dispose();
+  }
+});
 
 test('invoke routes once and emits one LangChain model run with selected provider metadata', async () => {
   const fixture = routed(
