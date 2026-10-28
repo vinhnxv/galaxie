@@ -3,7 +3,8 @@
 - **Status:** Proposed
 - **Date:** 2026-10-28
 - **Related:** brief §4.3, §11; ADR-0004, ADR-0012
-- **Revisions:** 2026-10-28, with brief 0.3: Spike C runs before M2 instead of in M0.
+- **Revisions:**
+  - 2026-10-28, with brief 0.3: Spike C runs before M2 instead of in M0.
   - 2026-10-29: recorded Spike C browser evidence; status remains Proposed.
 
 ## Context

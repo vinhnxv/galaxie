@@ -3,7 +3,8 @@
 - **Status:** Proposed
 - **Date:** 2026-10-28
 - **Related:** brief §11.3, §12.1, §12.2; ADR-0001, ADR-0005, ADR-0009, ADR-0016
-- **Revisions:** 2026-10-28, with brief 0.3: Spike A's checks move to the M1 conformance suite (ADR-0016); Spike C runs before M2.
+- **Revisions:**
+  - 2026-10-28, with brief 0.3: Spike A's checks move to the M1 conformance suite (ADR-0016); Spike C runs before M2.
   - 2026-10-29: recorded Spike C browser evidence; status remains Proposed.
 
 ## Context
