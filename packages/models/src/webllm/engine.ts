@@ -99,7 +99,6 @@ export interface LoadWebLLMEngineOptions {
 
 class EngineLifetime {
   readonly #worker: WebLLMWorker;
-  readonly #failure = Promise.withResolvers<never>();
   #failed = false;
   #error: unknown;
   #terminated = false;
@@ -107,8 +106,6 @@ class EngineLifetime {
 
   constructor(worker: WebLLMWorker) {
     this.#worker = worker;
-    // A worker can fail between calls, when no race is currently consuming the rejection.
-    void this.#failure.promise.catch(() => {});
     worker.onerror = (event): void => {
       event.preventDefault();
       this.fail(new WebLLMError('unavailable', 'worker_failed'));
@@ -131,18 +128,40 @@ class EngineLifetime {
     if (this.#failed) return;
     this.#failed = true;
     this.#error = error;
-    this.#failure.reject(error);
     for (const listener of this.#listeners) listener();
+    this.#listeners.clear();
   }
 
   subscribe(listener: () => void): () => void {
+    if (this.#failed) {
+      listener();
+      return () => {};
+    }
     this.#listeners.add(listener);
-    if (this.#failed) listener();
     return () => this.#listeners.delete(listener);
   }
 
-  async race<T>(operation: Promise<T>): Promise<T> {
-    return Promise.race([this.#failure.promise, operation]);
+  // A shared pending failure promise would retain every completed chunk until disposal.
+  race<T>(operation: Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const onFailure = (): void => {
+        this.#listeners.delete(onFailure);
+        reject(this.#error);
+      };
+      if (this.#failed) onFailure();
+      else this.#listeners.add(onFailure);
+      // Consume late engine rejections even after failure has already won.
+      operation.then(
+        (value) => {
+          this.#listeners.delete(onFailure);
+          resolve(value);
+        },
+        (error: unknown) => {
+          this.#listeners.delete(onFailure);
+          reject(error);
+        },
+      );
+    });
   }
 
   terminate(): void {
@@ -178,7 +197,6 @@ export class WebLLMEngineHandle {
     signal?.throwIfAborted();
     const previous = this.#tail;
     const released = Promise.withResolvers<void>();
-    // An aborted queued job can release immediately without allowing its successor to overtake.
     this.#tail = previous.then(() => released.promise);
     const aborted = Promise.withResolvers<never>();
     void aborted.promise.catch(() => {});
@@ -200,9 +218,7 @@ export class WebLLMEngineHandle {
       if (!running) return;
       try {
         this.#engine.interruptGenerate();
-      } catch {
-        /* Abort still closes the stream. */
-      }
+      } catch {}
       if (iterator !== undefined) void close().then(released.resolve, released.resolve);
     };
     signal?.addEventListener('abort', onAbort, { once: true });
@@ -270,7 +286,6 @@ export class WebLLMEngineHandle {
       try {
         await this.#lifetime.race(this.#engine.unload());
       } catch {
-        /* The failed lifetime bounds unload without retaining engine errors. */
       } finally {
         this.#lifetime.terminate();
       }
@@ -356,9 +371,7 @@ export async function createWebLLMEngine(
     if (engine !== undefined) {
       try {
         await lifetime.race(engine.unload());
-      } catch {
-        /* Cleanup is bounded by the already-settled failure promise. */
-      }
+      } catch {}
     }
     lifetime.terminate();
     throw failure;

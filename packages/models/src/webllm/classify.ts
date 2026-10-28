@@ -10,7 +10,8 @@ export type WebLLMFailure =
 /** Engine rejections cross the worker as strings. Return only allowlisted classifications. */
 export function classifyWebLLMError(error: unknown): WebLLMFailure | undefined {
   const text = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
-  const name = text.split(':', 1)[0];
+  const name =
+    error instanceof Error && error.name !== 'Error' ? error.name : text.split(':', 1)[0];
   const reasons: Readonly<Record<string, WebLLMUnavailableReason>> = {
     WebGPUNotAvailableError: 'no_webgpu',
     ShaderF16SupportError: 'no_shader_f16',

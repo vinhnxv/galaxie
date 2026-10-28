@@ -56,7 +56,7 @@ export const defaultWebLLMModel: WebLLMModelRecord = Object.freeze({
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
-function validUrl(value: unknown): value is string {
+function validUrl(value: unknown, allowSearch = false): value is string {
   if (
     typeof value !== 'string' ||
     (!value.startsWith('/') && !/^https?:\/\//.test(value)) ||
@@ -69,7 +69,7 @@ function validUrl(value: unknown): value is string {
       ['http:', 'https:'].includes(url.protocol) &&
       !url.username &&
       !url.password &&
-      !url.search &&
+      (allowSearch || !url.search) &&
       !url.hash
     );
   } catch {
@@ -93,7 +93,7 @@ export function validateModelRecord(value: unknown): asserts value is WebLLMMode
     !/\/resolve\/[a-fA-F0-9]{40}\//.test(
       new URL(value['modelUrl'], 'https://validation.invalid/').pathname,
     ) ||
-    !validUrl(value['libraryUrl']) ||
+    !validUrl(value['libraryUrl'], true) ||
     !Number.isSafeInteger(value['contextWindow']) ||
     (value['contextWindow'] as number) <= 0 ||
     !Number.isSafeInteger(value['weightBytes']) ||

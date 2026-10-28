@@ -8,6 +8,8 @@ import ts from '@typescript/typescript6';
 interface ImportReference {
   readonly specifier: string;
   readonly typeOnly: boolean;
+  readonly hasTypes: boolean;
+  readonly dynamic: boolean;
 }
 
 const problems: string[] = [];
@@ -26,8 +28,9 @@ function imports(file: string): ImportReference[] {
     true,
   );
   const references: ImportReference[] = [];
-  const add = (node: ts.Node, typeOnly: boolean): void => {
-    if (ts.isStringLiteralLike(node)) references.push({ specifier: node.text, typeOnly });
+  const add = (node: ts.Node, typeOnly: boolean, hasTypes = typeOnly, dynamic = false): void => {
+    if (ts.isStringLiteralLike(node))
+      references.push({ specifier: node.text, typeOnly, hasTypes, dynamic });
     else problems.push(`${file}: import specifiers must be string literals`);
   };
   const visit = (node: ts.Node): void => {
@@ -41,7 +44,14 @@ function imports(file: string): ImportReference[] {
           ts.isNamedImports(named) &&
           named.elements.length > 0 &&
           named.elements.every((element) => element.isTypeOnly));
-      add(node.moduleSpecifier, typeOnly);
+      add(
+        node.moduleSpecifier,
+        typeOnly,
+        typeOnly ||
+          (named !== undefined &&
+            ts.isNamedImports(named) &&
+            named.elements.some((element) => element.isTypeOnly)),
+      );
     } else if (ts.isExportDeclaration(node) && node.moduleSpecifier !== undefined) {
       const typeOnly =
         node.isTypeOnly ||
@@ -49,13 +59,20 @@ function imports(file: string): ImportReference[] {
           ts.isNamedExports(node.exportClause) &&
           node.exportClause.elements.length > 0 &&
           node.exportClause.elements.every((element) => element.isTypeOnly));
-      add(node.moduleSpecifier, typeOnly);
+      add(
+        node.moduleSpecifier,
+        typeOnly,
+        typeOnly ||
+          (node.exportClause !== undefined &&
+            ts.isNamedExports(node.exportClause) &&
+            node.exportClause.elements.some((element) => element.isTypeOnly)),
+      );
     } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
       add(node.argument.literal, true);
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const argument = node.arguments[0];
       if (argument === undefined) problems.push(`${file}: dynamic imports require a specifier`);
-      else add(argument, false);
+      else add(argument, false, false, true);
     }
     ts.forEachChild(node, visit);
   };
@@ -130,16 +147,15 @@ for (const field of [
 }
 
 for (const file of files('packages/models/src', '.ts')) {
-  for (const { specifier, typeOnly } of imports(file)) {
+  for (const { specifier, hasTypes, dynamic } of imports(file)) {
     if (
       specifier.startsWith('./') ||
       specifier.startsWith('../') ||
       specifier.startsWith('@langchain/core/') ||
       (specifier === '@mlc-ai/web-llm' &&
-        !typeOnly &&
-        ['packages/models/src/webllm/engine.ts', 'packages/models/src/webllm/worker.ts'].includes(
-          file,
-        ))
+        !hasTypes &&
+        ((file === 'packages/models/src/webllm/engine.ts' && dynamic) ||
+          (file === 'packages/models/src/webllm/worker.ts' && !dynamic)))
     )
       continue;
     problems.push(`${file}: forbidden models import ${specifier}`);

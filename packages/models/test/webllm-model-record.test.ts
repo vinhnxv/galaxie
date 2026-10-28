@@ -89,6 +89,11 @@ describe('WebLLM model record and content-free errors', () => {
     const expected = reason === undefined ? { code } : { code, reason };
     expect(classifyWebLLMError(text)).toEqual(expected);
     expect(classifyWebLLMError(new Error(text))).toEqual(expected);
+    if (/^\w+Error$/.test(prefix)) {
+      const named = new Error('private prompt sentence');
+      named.name = prefix;
+      expect(classifyWebLLMError(named)).toEqual(expected);
+    }
     expect(JSON.stringify(classifyWebLLMError(text))).not.toContain('private');
   });
 
@@ -104,4 +109,13 @@ describe('WebLLM model record and content-free errors', () => {
       expect(error.message).not.toContain('private');
     }
   });
+
+  it.each(['https://assets.example.test/library.wasm?revision=1', '/library.wasm?revision=1'])(
+    'keeps an integrity-protected library URL query: %s',
+    (libraryUrl) => {
+      const config = buildAppConfig({ ...defaultWebLLMModel, libraryUrl });
+      expect(config.model_list[0]?.model_lib).toBe(libraryUrl);
+      expect(config.model_list[0]?.integrity.onFailure).toBe('error');
+    },
+  );
 });
