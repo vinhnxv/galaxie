@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { CapabilityBinding, CapabilityRequest, CapabilityRequests } from './capabilities.js';
+import type {
+  CapabilityBinding,
+  CapabilityName,
+  CapabilityRequest,
+  CapabilityRequests,
+} from './capabilities.js';
 import type { AgentId } from './ids.js';
 import type { UiRequirements } from './interactions.js';
 import type { ModelRoleName, ModelRoleRequirements } from './models.js';
@@ -26,8 +31,22 @@ export interface AgentDefinition {
   readonly skills?: readonly string[];
 }
 
+/**
+ * Maps every requested capability whose name lacks an `@<version>` suffix to `never` (ADR-0008).
+ * The `AgentDefinition` constraint alone lets such a name through as an extra property.
+ */
+type VersionedRequests<R> = {
+  readonly [Name in keyof R]: Name extends CapabilityName ? R[Name] : never;
+};
+
+type VersionedCapabilities<D> = D extends { readonly capabilities: infer C }
+  ? { readonly capabilities: { readonly [Group in keyof C]: VersionedRequests<C[Group]> } }
+  : unknown;
+
 /** Declares an agent definition and keeps its literal types, so host bindings can be checked against it. */
-export function defineAgentDefinition<const D extends AgentDefinition>(definition: D): D {
+export function defineAgentDefinition<const D extends AgentDefinition>(
+  definition: D & VersionedCapabilities<D>,
+): D {
   return definition;
 }
 

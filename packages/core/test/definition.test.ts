@@ -65,3 +65,22 @@ test('a binding must match the capability schemas', () => {
   expectTypeOf<{ 'lessons.get@1': NeedsMoreInput }>().not.toExtend<TutorBindings>();
   expectTypeOf<{ 'lessons.get@1': WrongOutput }>().not.toExtend<TutorBindings>();
 });
+
+test('a capability name must carry an @<version> suffix (ADR-0008)', () => {
+  defineAgentDefinition({
+    id: 'galaxie.examples/unversioned',
+    version: '0.1.0',
+    executor: 'langgraph-js',
+    input: z.object({}),
+    capabilities: {
+      required: {
+        // @ts-expect-error -- `lessons.get` has no `@<version>` suffix.
+        'lessons.get': {
+          input: z.object({ lessonId: z.string() }),
+          output: z.object({ title: z.string() }),
+          kind: 'read',
+        },
+      },
+    },
+  });
+});
