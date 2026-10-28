@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { ReadableSpan } from '@opentelemetry/sdk-trace';
+import {
+  InMemorySpanExporter,
+  type ReadableSpan,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from '@opentelemetry/sdk-trace';
 import { expect } from 'vitest';
 import metadata from '../package.json' with { type: 'json' };
 
@@ -95,4 +100,14 @@ export function assertSpanTree(spans: readonly ReadableSpan[]): SpanTree {
   const root = roots[0];
   if (!root) throw new Error('The run span is missing.');
   return build(root);
+}
+
+/** Shares the SDK already installed for core tests with adapter tests. */
+export function createSpanRecorder(): {
+  readonly exporter: InMemorySpanExporter;
+  readonly provider: TracerProvider;
+} {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  return { exporter, provider };
 }
