@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { type TracerProvider, trace } from '@opentelemetry/api';
 import { createAgentInstance } from './agent-instance.js';
 import type { AgentDefinition } from './definition.js';
 import { GalaxieError } from './errors.js';
@@ -8,6 +9,7 @@ import type { ExecutorAdapter } from './executor.js';
 import type { AppId, InstanceId, PrincipalScope, RunId } from './ids.js';
 import type { AgentInstance } from './instance.js';
 import type { InferInput } from './schema.js';
+import { VERSION } from './version.js';
 
 export interface DiagnosticEvent {
   readonly kind:
@@ -38,6 +40,7 @@ export interface RuntimeOptions<
   readonly appId: AppId;
   readonly executors: Adapters;
   readonly diagnostics?: (event: DiagnosticEvent) => void;
+  readonly tracerProvider?: TracerProvider;
 }
 
 type MatchingAdapter<
@@ -86,6 +89,10 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
     throw new GalaxieError('unsupported', 'The runtime requires crypto.randomUUID.');
   }
   const instances = new Set<AgentInstance<unknown, unknown>>();
+  const tracer = (options.tracerProvider ?? trace.getTracerProvider()).getTracer(
+    '@galaxie/core',
+    VERSION,
+  );
   let disposal: Promise<void> | undefined;
   return {
     async create(definition, createOptions) {
@@ -98,6 +105,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
         definition,
         executor,
         createOptions,
+        { appId: options.appId, tracer },
         options.diagnostics,
       );
       instances.add(instance);

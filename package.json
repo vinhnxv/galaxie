@@ -15,8 +15,8 @@
     "format": "biome check --write .",
     "lint": "biome check .",
     "test": "vitest run --dir packages",
-    "typecheck": "tsc -p packages/core && tsc -p scripts",
-    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p scripts"
+    "typecheck": "tsc -p packages/core && tsc -p packages/core/test && tsc -p scripts",
+    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p scripts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

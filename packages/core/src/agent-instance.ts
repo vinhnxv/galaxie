@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { type Context, context, type Tracer } from '@opentelemetry/api';
 import type { AgentDefinition } from './definition.js';
 import { type ErrorInfo, GalaxieError, isGalaxieError, toErrorInfo } from './errors.js';
 import type { ExecutorEvent } from './events.js';
@@ -11,10 +12,9 @@ import type { PendingInteraction } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
-import type { RunTrace } from './trace.js';
+import { type RunInstrumentation, startRunTrace } from './tracing.js';
 
 const SETTLE_TIMEOUT_MS = 10_000;
-const NOOP_TRACE: RunTrace = { start: () => ({ end: () => {} }) };
 
 interface RunRecord {
   readonly runId: RunId;
@@ -25,6 +25,7 @@ interface RunRecord {
   status: RunStatus;
   pending?: PendingInteraction;
   error?: ErrorInfo;
+  tracing?: RunInstrumentation;
 }
 
 function terminal(run: RunRecord): boolean {
@@ -56,6 +57,7 @@ export function createAgentInstance(
   definition: AgentDefinition,
   adapter: ExecutorAdapter<unknown, unknown>,
   options: CreateOptions,
+  instrumentation: { readonly appId: string; readonly tracer: Tracer },
   diagnostics?: (event: DiagnosticEvent) => void,
 ): AgentInstance<unknown, unknown> {
   const instanceId = globalThis.crypto.randomUUID() as InstanceId;
@@ -141,6 +143,7 @@ export function createAgentInstance(
     run.status = 'cancelled';
     delete run.pending;
     run.events.append({ type: 'cancelled' });
+    run.tracing?.finish('cancelled');
   };
   const failRun = (run: RunRecord, error: ErrorInfo): void => {
     run.status = 'failed';
@@ -187,6 +190,7 @@ export function createAgentInstance(
     run: RunRecord,
     predecessor: Promise<void>,
     input: unknown,
+    parent: Context,
   ): Promise<void> => {
     try {
       const ready = await waitForSettlement(predecessor, run.controller.signal);
@@ -201,13 +205,23 @@ export function createAgentInstance(
       publish();
       // A synchronous listener may cancel or dispose before the executor is entered.
       if (terminal(run)) return;
+      run.tracing = startRunTrace(instrumentation.tracer, parent, {
+        appId: instrumentation.appId,
+        agentId: definition.id,
+        agentVersion: definition.version,
+        instanceId,
+        sessionId,
+        runId: run.runId,
+        executorId: adapter.id,
+        executorVersion: adapter.version,
+      });
       const iterator = agent
         .run({
           runId: run.runId,
           sessionId,
           command: { type: 'start', input },
           signal: run.controller.signal,
-          trace: NOOP_TRACE,
+          trace: run.tracing.recorder,
         })
         [Symbol.asyncIterator]();
       // Never use for-await here: its early exit calls return() and can hide live engine work.
@@ -229,6 +243,7 @@ export function createAgentInstance(
         report({ kind: 'late_event', runId: run.runId, error });
       }
     } finally {
+      run.tracing?.finish(run.status, run.error);
       run.settle();
     }
   };
@@ -305,6 +320,7 @@ export function createAgentInstance(
         return Promise.reject(error);
       }
       claimingSlot = true;
+      const parent = context.active();
       return (async () => {
         let value: unknown;
         try {
@@ -336,7 +352,7 @@ export function createAgentInstance(
         current = run;
         claimingSlot = false;
         publish();
-        void execute(run, predecessor, value);
+        void execute(run, predecessor, value, parent);
         return { runId };
       })();
     },
