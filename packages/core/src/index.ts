@@ -76,5 +76,12 @@ export type {
   DestinationPreset,
   FieldAnnotation,
 } from './policy.js';
+export {
+  type CreateOptions,
+  createRuntime,
+  type DiagnosticEvent,
+  type Runtime,
+  type RuntimeOptions,
+} from './runtime.js';
 export type { Infer, InferInput, Schema } from './schema.js';
 export type { RunTrace, TraceHandle, TraceResult, TraceStep } from './trace.js';
