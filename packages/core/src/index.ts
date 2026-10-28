@@ -64,10 +64,13 @@ export type {
   ComponentId,
   DispatchReceipt,
   InboxStatus,
+  InteractionRequest,
   PendingInteraction,
+  Submission,
   UiRequirements,
   UserInteractionEvent,
 } from './interactions.js';
+export { parseInteractionRequest } from './interactions.js';
 export {
   INSTANCE_TRANSITIONS,
   type InstanceState,

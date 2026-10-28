@@ -20,7 +20,12 @@ export interface ExecutorFeatures {
 /** Starts a run, or resumes it with a submission taken from the inbox (ADR-0004). */
 export type RunCommand =
   | { readonly type: 'start'; readonly input: unknown }
-  | { readonly type: 'resume'; readonly interactionId: InteractionId; readonly payload: unknown };
+  | {
+      readonly type: 'resume';
+      readonly interactionId: InteractionId;
+      readonly action: string;
+      readonly payload: unknown;
+    };
 
 /** One call into an executor. The runtime creates every ID (brief §8.2). */
 export interface RunRequest {
