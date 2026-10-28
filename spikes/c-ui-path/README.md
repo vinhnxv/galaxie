@@ -87,6 +87,8 @@ Determined by the shim design:
 
 ## Limits
 
+The page requires the Vite dev server for its resolver diagnostic endpoint. `vite build` checks compilation and physical dependency resolution; serving `dist/` alone is outside this spike. Malformed-submission recovery was not exercised.
+
 The grading key sits in historical `sessionStorage` checkpoints and in raw `values` stream events that page code can read. R2 establishes separation from props, snapshots, non-stream events and the DOM, not that client-side grading cannot be inspected. Authoritative grades need a host-controlled server.
 
 This is a single-tab reload demonstration, with no crash injection, IndexedDB, durable inbox, multi-tab locking, epoch, model, grants, labels or consumed-budget recovery. It does not establish exactly-once side effects. The URL variant renders a URL as text and never fetches it. The registry's schema-declared URL validation remains M2 work.

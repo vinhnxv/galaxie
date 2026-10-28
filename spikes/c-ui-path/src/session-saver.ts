@@ -6,7 +6,6 @@ import { MemorySaver } from '@langchain/langgraph/web';
 export const SAVER_KEY = 'spike-c-checkpoints';
 export const THREAD_KEY = 'spike-c-thread';
 
-// Throwaway MemorySaver mirror. M3 replaces it with the IndexedDB saver.
 export class SessionSaver extends MemorySaver {
   constructor() {
     super();

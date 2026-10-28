@@ -9,7 +9,6 @@ import { defineConfig, type Plugin } from 'vite';
 const root = fileURLToPath(new URL('.', import.meta.url));
 const packages = ['@langchain/core', '@langchain/langgraph', '@langchain/langgraph-checkpoint'];
 
-// Assert actual resolver results, including imports originating in aliased package source.
 function singleCopy(): Plugin {
   const resolutions = new Map<string, string>();
   const allowed = realpathSync(`${root}node_modules`);
@@ -60,7 +59,6 @@ export default defineConfig({
   server: { host: '127.0.0.1', port: 4176, strictPort: true },
   optimizeDeps: {
     force: true,
-    // Audit transitive imports during prebundling as well as page/build imports.
     rolldownOptions: { plugins: [audit] },
     include: [
       '@langchain/langgraph/web',
