@@ -1,0 +1,60 @@
+# ADR-0004: Checkpoint interrupt is the source of truth for pending interactions
+
+- **Status:** Proposed
+- **Date:** 2026-10-28
+- **Related:** brief §11.3, §12.1, §12.2; ADR-0001, ADR-0005, ADR-0009
+
+## Context
+
+The v0.1 brief stored a pending interaction in two places: the LangGraph checkpoint and a host "UI projection" record. Because both could not be written in one transaction, it needed a reconciliation step. Two sources of truth for the same fact is how a reload ends up showing a different quiz.
+
+LangGraph already persists pending interrupts in the checkpoint:
+
+- `interrupt(value)` stores `value`.
+- `graph.getState(config)` exposes pending interrupts (`tasks[].interrupts`).
+- `graph.invoke(new Command({ resume }), config)` continues.
+- On resume, the node that called `interrupt()` re-executes from its start. For an interrupt inside a subgraph, the parent node that called the subgraph also re-executes.
+
+An external review pointed out a second crash window that the projection removal does not solve: between accepting a submission and the resumed checkpoint commit. If the receipt is saved after resuming, a crash can apply the answer twice. If it is saved before, a crash can leave an accepted answer that never advances.
+
+## Decision
+
+- The interrupt payload in the checkpoint is the single source of truth for what is pending.
+- The node that waits for the user builds its display payload deterministically from committed state and passes it to `interrupt(payload)`.
+- The host renders from `graph.getState(config)`, including after a reload. Any host-side projection is a cache that can be rebuilt.
+- **Submission inbox.**
+  - The host validates a user event against the interrupt payload: identity, `interactionId`, `viewRevision` and payload schema.
+  - In one IndexedDB transaction that also checks the owner epoch, it writes the event to an inbox keyed by `interactionId`, with status `accepted`. A second event for the same `interactionId` is rejected there.
+  - A single inbox processor calls `Command({ resume })`.
+  - When the resumed checkpoint is durably committed, the entry becomes `consumed`.
+- **Recovery** reconciles the inbox with the checkpoint:
+  - `accepted` and the interrupt still pending → resume again with the stored payload;
+  - `accepted` and the interrupt resolved → mark the entry `consumed`;
+  - no entry → show the interrupt again.
+- Effect IDs after resume are derived from `interactionId`, so a repeated resume reuses them through the effect journal.
+- `interactionId` comes from the engine's interrupt ID, or from a deterministic host ID derived from the checkpoint. It never comes from the LLM, and it is never regenerated in the re-executed node.
+- Code before `interrupt()` is deterministic and side-effect free. This applies to the interrupting node and to any parent node of an interrupting subgraph.
+- MVP limit: one pending interrupt per run. Simultaneous interrupts get a typed `unsupported` error.
+
+## Alternatives considered
+
+- **Dual write with reconciliation (v0.1).** Rejected: two sources of truth for the UI.
+- **Receipt after resume, no inbox.** Rejected: a crash can apply an answer twice.
+- **Host record as the only source, with the graph polling it.** Rejected: fights the engine's own interrupt model.
+- **Promise held in memory until submit.** Rejected: not durable.
+
+## Consequences
+
+- The host stores submissions in the inbox, not a second copy of the UI.
+- Node authors must follow the "nothing before `interrupt()`" rule. The ESLint plugin and docs flag it where possible.
+- Parallel interrupts need a later design: interrupt-ID routing and surface arbitration.
+
+## Verification
+
+- Spike A:
+  - node and parent re-execution on resume;
+  - interrupt IDs;
+  - how resume values are persisted;
+  - whether a repeated resume after a crash is safe.
+- Spike C: render from the interrupt payload; reload mid-quiz.
+- AT-07, AT-08, AT-09, AT-15, AT-31, AT-35.
