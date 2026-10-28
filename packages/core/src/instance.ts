@@ -12,7 +12,7 @@ import type {
   UserInteractionEvent,
 } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
-import type { SelectedModelRoute } from './models.js';
+import type { PublishedModelRoute } from './models.js';
 import type { DataLabel } from './policy.js';
 
 /** The current run, as a snapshot shows it. */
@@ -34,7 +34,7 @@ export interface AgentSnapshot<View> {
   readonly prepareError?: ErrorInfo;
   readonly run?: RunSnapshot;
   /** Latest dispatched route per role; absent before the first call (ADR-0006). */
-  readonly routes?: Readonly<Record<string, SelectedModelRoute>>;
+  readonly routes?: Readonly<Record<string, PublishedModelRoute>>;
   /** The agent's public projection of its state. */
   readonly view?: View;
 }

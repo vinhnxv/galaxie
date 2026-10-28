@@ -65,6 +65,32 @@ export interface SelectedModelRoute {
   readonly destination: DestinationClass;
 }
 
+/** Published selection, including a destination-class notice (ADR-0006). */
+export interface PublishedModelRoute extends SelectedModelRoute {
+  /** Instance-wide previous class, only when the destination changes (ADR-0006). */
+  readonly changedFrom?: DestinationClass;
+}
+
+/** Validated readiness reported by the host without starting a download (ADR-0006). */
+export type ModelAvailability =
+  | { readonly status: 'available' }
+  | { readonly status: 'unavailable' }
+  | { readonly status: 'downloadable'; readonly bytes?: number; readonly siteStorage: boolean };
+
+/** A readiness probe carries no model input (ADR-0006). */
+export interface ModelAvailabilityRequest {
+  readonly role: ModelRoleName;
+  readonly providerId: ModelProviderId;
+  readonly signal: AbortSignal;
+}
+
+/** The host obtains consent and completes the download before returning true (ADR-0006). */
+export interface ModelDownloadRequest extends ModelAvailabilityRequest {
+  readonly bytes?: number;
+  /** Request site persistence after acceptance, before downloading (ADR-0006). */
+  readonly persist?: () => Promise<boolean>;
+}
+
 /** One instance-wide consent decision for a role and destination class (ADR-0006). */
 export interface ModelConsentRequest {
   /** Role asking to send data (ADR-0006). */
@@ -95,6 +121,12 @@ export interface ModelRouting {
   readonly roles: Readonly<Record<ModelRoleName, ModelRoute>>;
   /** Approval before any non-browser destination is used (ADR-0006). */
   readonly consent?: (request: ModelConsentRequest) => boolean | Promise<boolean>;
+  /** Probe readiness on each call; absence means available (ADR-0006). */
+  readonly availability?: (
+    request: ModelAvailabilityRequest,
+  ) => ModelAvailability | Promise<ModelAvailability>;
+  /** Shared download decision; absence means refusal (ADR-0006). */
+  readonly download?: (request: ModelDownloadRequest) => boolean | Promise<boolean>;
   /** Per-call credential; never persisted by galaxie (ADR-0006). */
   readonly getCredential?: (request: ModelCredentialRequest) => string | Promise<string>;
 }
@@ -120,7 +152,10 @@ export interface ModelCall extends SelectedModelRoute {
 /** Framework-neutral, run-bound model policy boundary (ADR-0006, ADR-0017). */
 export interface ModelPort {
   /** Selects, obtains consent and reserves before dispatch (ADR-0006). */
-  begin(role: ModelRoleName, options?: { readonly signal?: AbortSignal }): Promise<ModelCall>;
+  begin(
+    role: ModelRoleName,
+    options?: { readonly signal?: AbortSignal; readonly requires?: readonly ModelFeature[] },
+  ): Promise<ModelCall>;
 }
 
 /** Implementation requirements disclosed to an executor at prepare (ADR-0006). */
