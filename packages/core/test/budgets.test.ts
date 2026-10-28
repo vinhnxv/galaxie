@@ -8,6 +8,7 @@ import {
 } from '@opentelemetry/sdk-trace';
 import { afterEach, expect, test, vi } from 'vitest';
 import { z } from 'zod';
+import { budgetLimits, RunBudget } from '../src/budgets.js';
 import { createRuntime, DEFAULT_BUDGETS } from '../src/index.js';
 import {
   binding,
@@ -176,4 +177,33 @@ test('executor budget events preserve the recursion type and record the steps bu
     'galaxie.budget.name': 'steps',
     'error.type': 'GraphRecursionError',
   });
+});
+
+test('model reservations check tokens first and release atomically when cost cannot fit', () => {
+  const budget = new RunBudget(budgetLimits({ tokens: 10, cost: 5 }));
+  expect(() => budget.reserveModel(11, 6)).toThrowError(
+    expect.objectContaining({ budget: 'tokens' }),
+  );
+  expect(() => budget.reserveModel(10, 6)).toThrowError(
+    expect.objectContaining({ budget: 'cost' }),
+  );
+  const reservation = budget.reserveModel(10, 5);
+  reservation.release();
+  reservation.release();
+  expect(() => budget.reserveModel(10, 5)).not.toThrow();
+});
+test('model settlement replaces a reservation with its actual charge only once', () => {
+  const budget = new RunBudget(budgetLimits({ tokens: 10, cost: 5 }));
+  const first = budget.reserveModel(8, 4);
+  first.settle(2, 1);
+  first.settle(8, 4);
+  first.release();
+  expect(() => budget.reserveModel(8, 4)).not.toThrow();
+});
+test('model cost accounting compares the unrounded float charge', () => {
+  const budget = new RunBudget(budgetLimits({ cost: 0.3 }));
+  const reservation = budget.reserveModel(1, 0.1);
+  expect(() => reservation.settle(1, 0.1 + 0.2)).toThrowError(
+    expect.objectContaining({ budget: 'cost' }),
+  );
 });

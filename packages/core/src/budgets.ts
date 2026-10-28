@@ -28,16 +28,51 @@ export function budgetLimits(overrides: Partial<BudgetLimits> = {}): BudgetLimit
   return Object.freeze(limits);
 }
 
+/** One model reservation, released before dispatch or replaced with a charge (ADR-0006). */
+export interface ModelReservation {
+  release(): void;
+  settle(tokens: number, cost: number): void;
+}
+
 /** Per-run accounting. The instance owns terminal transitions and the wall-clock timer. */
 export class RunBudget {
   readonly limits: BudgetLimits;
   #toolCalls = 0;
+  readonly #committed = { tokens: 0, cost: 0 };
+  readonly #reserved = { tokens: 0, cost: 0 };
   constructor(limits: BudgetLimits) {
     this.limits = limits;
   }
   reserveToolCall(): void {
     if (this.#toolCalls >= this.limits.toolCalls) throw new BudgetExceeded('toolCalls');
     this.#toolCalls++;
+  }
+  /** Reserve both dimensions atomically; token exhaustion takes precedence (ADR-0006). */
+  reserveModel(tokens: number, cost: number): ModelReservation {
+    const amounts = { tokens, cost };
+    for (const name of ['tokens', 'cost'] as const)
+      if (this.#committed[name] + this.#reserved[name] + amounts[name] > this.limits[name])
+        throw new BudgetExceeded(name);
+    this.#reserved.tokens += tokens;
+    this.#reserved.cost += cost;
+    let open = true;
+    const release = (): void => {
+      if (!open) return;
+      open = false;
+      this.#reserved.tokens -= tokens;
+      this.#reserved.cost -= cost;
+    };
+    return {
+      release,
+      settle: (chargedTokens, chargedCost) => {
+        if (!open) return;
+        release();
+        this.#committed.tokens += chargedTokens;
+        this.#committed.cost += chargedCost;
+        for (const name of ['tokens', 'cost'] as const)
+          if (this.#committed[name] > this.limits[name]) throw new BudgetExceeded(name);
+      },
+    };
   }
   payload(value: unknown): void {
     let json: string | undefined;
