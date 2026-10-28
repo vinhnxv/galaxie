@@ -2,11 +2,19 @@
   "name": "@galaxie/models",
   "version": "0.0.0",
   "private": true,
-  "description": "Deterministic mock model provider for galaxie.",
+  "description": "Mock and worker-based WebLLM model providers for galaxie.",
   "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./webllm": {
+      "types": "./dist/webllm/index.d.ts",
+      "default": "./dist/webllm/index.js"
+    },
+    "./webllm/worker": {
+      "types": "./dist/webllm/worker.d.ts",
+      "default": "./dist/webllm/worker.js"
+    },
     "./mock": {
       "types": "./dist/mock.d.ts",
       "default": "./dist/mock.js"
@@ -16,9 +24,17 @@
     "dist"
   ],
   "peerDependencies": {
-    "@langchain/core": "~1.2.20"
+    "@langchain/core": "~1.2.20",
+    "@mlc-ai/web-llm": "0.2.86"
+  },
+  "peerDependenciesMeta": {
+    "@mlc-ai/web-llm": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "@langchain/core": "1.2.20"
+    "@langchain/core": "1.2.20",
+    "@mlc-ai/web-llm": "0.2.86",
+    "zod": "4.6.7"
   }
 }
