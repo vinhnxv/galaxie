@@ -2,11 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
-import { createRuntime, defineAgentDefinition, GalaxieError, httpCapability } from '@galaxie/core';
+import {
+  createRuntime,
+  defineAgentDefinition,
+  GalaxieError,
+  galaxieField,
+  httpCapability,
+} from '@galaxie/core';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test } from 'vitest';
 import { z } from 'zod';
-import { binding, collect } from '../../packages/core/test/fake-executor.js';
+import { binding, brokerFixture, collect } from '../../packages/core/test/fake-executor.js';
 
 test('classic Zod exposes Standard JSON Schema in this runtime', () => {
   const standard = z.string()['~standard'].jsonSchema;
@@ -91,5 +97,55 @@ test('a real graph calls bound capabilities, denies an unbound call and attribut
     expect(requests[0]?.headers.get('x-galaxie-run')).toBe(runId);
   } finally {
     await runtime.dispose();
+  }
+});
+
+test('A2 invalid capability inputs never execute and invalid outputs never return or add labels', async () => {
+  let calls = 0;
+  const fixture = await brokerFixture({
+    requests: {
+      'echo@1': {
+        input: z.string(),
+        output: z.string().meta(galaxieField({ label: 'private-user' })),
+        kind: 'read',
+      },
+    },
+    bindings: {
+      'echo@1': binding({
+        invoke: async () => {
+          calls++;
+          return { secret: 'invalid-output-canary' };
+        },
+      }),
+    },
+    scripts: [
+      async function* ({ capabilities }) {
+        await expect(capabilities.call('echo@1', 1)).rejects.toMatchObject({ code: 'invalid' });
+        expect(calls).toBe(0);
+        await expect(capabilities.call('echo@1', 'query')).rejects.toMatchObject({
+          code: 'invalid',
+        });
+        yield { type: 'output', output: null };
+      },
+    ],
+  });
+  try {
+    const { runId } = await fixture.instance.start('input');
+    const events = await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    expect(calls).toBe(1);
+    expect(fixture.instance.getSnapshot().run).toMatchObject({
+      status: 'succeeded',
+      labels: ['app'],
+    });
+    expect(
+      JSON.stringify({
+        events,
+        snapshot: fixture.instance.getSnapshot(),
+        diagnostics: fixture.diagnostics,
+      }),
+    ).not.toContain('invalid-output-canary');
+  } finally {
+    await fixture.runtime.dispose();
   }
 });
