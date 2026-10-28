@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>B0 WebGPU smoke test</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "@huggingface/jinja": "/node_modules/@huggingface/jinja/dist/index.js",
+          "@huggingface/tokenizers": "/node_modules/@huggingface/tokenizers/dist/tokenizers.mjs",
+          "onnxruntime-web/webgpu": "/node_modules/onnxruntime-web/dist/ort.webgpu.bundle.min.mjs"
+        }
+      }
+    </script>
+    <style>
+      body {
+        font: 14px/1.45 system-ui, sans-serif;
+        margin: 16px;
+        max-width: 960px;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        background: #f3f3f3;
+        padding: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>B0: LFM3-1.7B-ONNX on WebGPU</h1>
+    <p>
+      M0 spike (throwaway). The first run downloads about 1.40 GB from huggingface.co
+      (LiquidAI/LFM3-1.7B-ONNX at a pinned revision) and keeps it in this origin's Cache Storage.
+      Later runs read the cache. Every file is checked against the hash the Hub lists.
+    </p>
+    <button id="run" type="button">Run smoke test</button>
+    <p id="status">Idle.</p>
+    <h2>Log</h2>
+    <pre id="log"></pre>
+    <h2>Result</h2>
+    <pre id="result"></pre>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
