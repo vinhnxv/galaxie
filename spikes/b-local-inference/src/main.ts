@@ -4,6 +4,7 @@
 import { MockArm } from './arms/mock.js';
 import { OrtArm } from './arms/ort/index.js';
 import type { Arm } from './arms/types.js';
+import { WebLLMArm } from './arms/webllm.js';
 import { deviceInfo, gpuProbe, promptAvailability } from './device.js';
 import { armResult, runArm, selectedArms } from './harness.js';
 import { downloadResults, emptyChatCheck, type ResultsV1, resultsSchema } from './results.js';
@@ -41,8 +42,9 @@ const mock = new MockArm(params.get('mockFail'));
 const arms: Arm[] = [
   mock,
   new OrtArm(),
+  new WebLLMArm(),
   ...armOrder
-    .filter((id) => id !== 'mock' && id !== 'ort-own-loop')
+    .filter((id) => id !== 'mock' && id !== 'ort-own-loop' && id !== 'webllm')
     .map((id) => ({
       id,
       model: { id: 'pending', revision: null },
