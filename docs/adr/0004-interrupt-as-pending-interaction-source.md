@@ -52,11 +52,14 @@ An external review pointed out a second crash window that the projection removal
 
 ## Verification
 
-- The M1 conformance suite, on Node and in Chrome (ADR-0016):
-  - node and parent re-execution on resume;
-  - interrupt IDs;
-  - how resume values are persisted;
-  - whether a repeated resume after a crash is safe.
-- M3: the same cases with the IndexedDB saver.
+- M1 conformance on LangGraph.js 1.5.1 passes on native Node, galaxie Node and Chromium:
+  - pending interrupt IDs and request values are read from checkpoint `tasks[].interrupts`; sequence cases observe two distinct IDs;
+  - the interrupted node re-executes, while preceding completed nodes do not (`prepare: 1`, `ask: 2`);
+  - an interrupting subgraph re-executes the calling parent and its interrupted node, retaining completed child work (`callSub: 2`, `s1: 1`, `sask: 2`);
+  - ID-map resumes deliver `{ action, payload }` to the node, including a `false` payload;
+  - pause/final checkpoint history lengths are 3/5 for `async` and `sync`, and 1/2 for `exit` in the `prepare → ask → finish` case.
+- M1 enforces one request per node: a second pause with the answered ID fails with `unsupported`, because calls in one node share an interrupt ID. Split sequential interactions across nodes. Parallel interrupts, static breakpoints and ID-less interrupts are also unsupported.
+- M1's inbox is in memory. Its entry becomes `consumed` on a resume segment's executor outcome; this does not establish durable checkpoint consumption or crash safety.
+- M3 remains unverified: how resume values are persisted, whether repeating an accepted resume after a crash is safe, and the same conformance cases with the IndexedDB saver. The M1 transcripts observe values reaching the node, not the crash/recovery protocol.
 - Spike C, before M2: render from the interrupt payload; reload mid-quiz.
 - AT-07, AT-08, AT-09, AT-15, AT-31, AT-35.
