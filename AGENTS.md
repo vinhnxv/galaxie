@@ -4,7 +4,7 @@ Guidance for coding agents (Claude Code, Codex and others) working in this repos
 
 ## Project status
 
-galaxie has its first M1 runtime slice: `packages/core` provides lifecycle, identity, cancellation, replayable in-memory events and allowlisted OpenTelemetry spans; `packages/adapter-langgraph` runs native graphs, with conformance tests on Node and Chromium. The broker, router, budgets, persistence and UI remain unimplemented. Spikes run only when a milestone needs their answer (brief §16.2). Spike code is throwaway: keep it out of `packages/` and never promote it to package code.
+galaxie has its first two M1 runtime slices: `packages/core` provides lifecycle, identity, cancellation, replayable in-memory events and allowlisted OpenTelemetry spans, a capability broker with grants and validation, sticky data labels and argument shapes, and finite budgets for steps, tool calls, wall clock and payloads; `packages/adapter-langgraph` runs native graphs with capability access and Node/Chromium conformance tests. The model router, persistence and UI remain unimplemented. Spikes run only when a milestone needs their answer (brief §16.2). Spike code is throwaway: keep it out of `packages/` and never promote it to package code.
 
 ## Read first
 

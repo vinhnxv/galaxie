@@ -17,7 +17,7 @@ The runtime is designed to add what the browser lacks:
 - **A mandatory security baseline** on every path the SDK controls.
 - **Development tracing:** OpenTelemetry spans that a tool such as Langfuse can show, through an exporter the host registers.
 
-> **Status: first M1 runtime slice.** The workspace now includes instance and run lifecycles, cancellation, replayable in-memory events, a LangGraph.js adapter, Node/Chromium parity tests and allowlisted OpenTelemetry spans. Packages remain private and unpublished. The capability broker, model router, budgets, durable storage and UI integration remain unimplemented.
+> **Status: M1 runtime slices 1 and 2.** The workspace includes instance and run lifecycles, cancellation, replayable in-memory events, a LangGraph.js adapter, a capability broker with grants and validation, sticky data labels and argument shapes, finite step/tool-call/wall-clock/payload budgets, and allowlisted OpenTelemetry spans. Seven graph cases run on native Node, galaxie Node and Chromium. Packages remain private and unpublished. The model router, durable storage and UI integration remain unimplemented.
 
 ## Intended use and disclaimer
 
