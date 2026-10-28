@@ -13,7 +13,7 @@ import {
   toErrorInfo,
 } from './errors.js';
 import type { ExecutorEvent } from './events.js';
-import type { ExecutorAdapter, ExecutorAgent } from './executor.js';
+import type { ExecutorAdapter, ExecutorAgent, RunCommand } from './executor.js';
 import type { InstanceId, RunId, SessionId } from './ids.js';
 import type { AgentInstance, AgentSnapshot, RunSnapshot } from './instance.js';
 import type { PendingInteraction } from './interactions.js';
@@ -34,13 +34,19 @@ interface RunRecord {
   readonly labels: Set<DataLabel>;
   readonly privateValues: Set<string>;
   readonly grants: ReadonlySet<string>;
-  budget?: RunBudget;
-  clearWallClock?: () => void;
+  readonly budget: RunBudget;
+  segment?: SegmentRecord;
   readonly events: RunEvents;
-  readonly settle: () => void;
   status: RunStatus;
   pending?: PendingInteraction;
   error?: ErrorInfo;
+}
+
+interface SegmentRecord {
+  readonly index: number;
+  readonly settle: () => void;
+  outcome?: RunStatus;
+  clearWallClock?: () => void;
   tracing?: RunInstrumentation;
 }
 
@@ -48,8 +54,8 @@ function terminal(run: RunRecord): boolean {
   return run.status === 'succeeded' || run.status === 'failed' || run.status === 'cancelled';
 }
 
-function hasOutcome(run: RunRecord): boolean {
-  return terminal(run) || run.status === 'waiting_input';
+function active(run: RunRecord, segment: SegmentRecord): boolean {
+  return !terminal(run) && segment.outcome === undefined;
 }
 
 function waitForSettlement(settled: Promise<void>, signal?: AbortSignal): Promise<boolean> {
@@ -174,11 +180,20 @@ export function createAgentInstance(
     run.status = 'cancelled';
     delete run.pending;
     run.events.append({ type: 'cancelled' });
-    run.tracing?.setLabels([...run.labels]);
-    run.tracing?.finish('cancelled');
+    const segment = run.segment;
+    if (segment !== undefined && segment.outcome === undefined) {
+      segment.outcome = 'cancelled';
+      segment.clearWallClock?.();
+      segment.tracing?.setLabels([...run.labels]);
+      segment.tracing?.finish('cancelled');
+    }
     run.privateValues.clear();
   };
   const failRun = (run: RunRecord, error: ErrorInfo): void => {
+    if (run.segment !== undefined) {
+      run.segment.outcome = 'failed';
+      run.segment.clearWallClock?.();
+    }
     run.status = 'failed';
     run.error = Object.freeze(error);
     delete run.pending;
@@ -188,23 +203,26 @@ export function createAgentInstance(
   };
   const failRunForBudget = (
     run: RunRecord,
+    segment: SegmentRecord,
     name: keyof BudgetLimits,
     error: ErrorInfo = toErrorInfo('budget_exceeded'),
   ): void => {
-    if (terminal(run)) return;
-    run.tracing?.recordBudget(name);
+    if (!active(run, segment)) return;
+    segment.tracing?.recordBudget(name);
     failRun(run, error);
     run.controller.abort();
-    run.tracing?.setLabels([...run.labels]);
-    run.tracing?.finish('failed', run.error);
+    segment.tracing?.setLabels([...run.labels]);
+    segment.tracing?.finish('failed', run.error);
   };
-  const acceptEvent = (run: RunRecord, event: ExecutorEvent): void => {
-    if (terminal(run)) {
-      report({ kind: 'late_event', runId: run.runId, error: event });
+  const acceptEvent = (run: RunRecord, segment: SegmentRecord, event: ExecutorEvent): void => {
+    if (!active(run, segment)) {
+      report({ kind: 'late_event', runId: run.runId });
       return;
     }
     switch (event.type) {
       case 'output':
+        segment.outcome = 'succeeded';
+        segment.clearWallClock?.();
         run.status = 'succeeded';
         run.privateValues.clear();
         delete run.pending;
@@ -217,7 +235,7 @@ export function createAgentInstance(
             event.error.type === undefined ? undefined : { name: event.error.type },
           ),
         );
-        if (error.code === 'budget_exceeded') failRunForBudget(run, 'steps', error);
+        if (error.code === 'budget_exceeded') failRunForBudget(run, segment, 'steps', error);
         else failRun(run, error);
         if (!knownCode)
           report({ kind: 'protocol_violation', runId: run.runId, error: event.error });
@@ -232,6 +250,8 @@ export function createAgentInstance(
         return;
       }
       case 'interaction':
+        segment.outcome = 'waiting_input';
+        segment.clearWallClock?.();
         run.status = 'waiting_input';
         run.pending = event.interaction;
         break;
@@ -243,13 +263,14 @@ export function createAgentInstance(
   };
   const execute = async (
     run: RunRecord,
+    segment: SegmentRecord,
     predecessor: Promise<void>,
-    input: unknown,
+    command: RunCommand,
     parent: Context,
   ): Promise<void> => {
     try {
       const ready = await waitForSettlement(predecessor, run.controller.signal);
-      if (terminal(run)) return;
+      if (!active(run, segment)) return;
       if (!ready) {
         failRun(run, toErrorInfo('timeout'));
         return;
@@ -257,20 +278,20 @@ export function createAgentInstance(
       const agent = executor;
       if (agent === undefined) throw new Error('The prepared executor is unavailable.');
       run.status = 'running';
-      run.budget = new RunBudget(instrumentation.limits);
-      run.clearWallClock = deadlineTimer(instrumentation.limits.wallClockMs, () =>
-        failRunForBudget(run, 'wallClockMs'),
+      segment.clearWallClock = deadlineTimer(instrumentation.limits.wallClockMs, () =>
+        failRunForBudget(run, segment, 'wallClockMs'),
       );
       publish();
       // A synchronous listener may cancel or dispose before the executor is entered.
-      if (terminal(run)) return;
-      run.tracing = startRunTrace(instrumentation.tracer, parent, {
+      if (!active(run, segment)) return;
+      segment.tracing = startRunTrace(instrumentation.tracer, parent, {
         appId: instrumentation.appId,
         agentId: definition.id,
         agentVersion: definition.version,
         instanceId,
         sessionId,
         runId: run.runId,
+        segment: segment.index,
         executorId: adapter.id,
         executorVersion: adapter.version,
       });
@@ -281,16 +302,17 @@ export function createAgentInstance(
         privateValues: run.privateValues,
         grants: run.grants,
         budget: run.budget,
-        tracing: run.tracing,
-        active: () => !terminal(run),
+        tracing: segment.tracing,
+        active: () => active(run, segment),
         labelsChanged: () => {
-          if (!terminal(run)) {
-            run.tracing?.setLabels([...run.labels]);
+          if (active(run, segment)) {
+            segment.tracing?.setLabels([...run.labels]);
             publish();
           }
         },
-        failBudget: (name: keyof BudgetLimits) => failRunForBudget(run, name),
+        failBudget: (name: keyof BudgetLimits) => failRunForBudget(run, segment, name),
         selectedRouteChanged: (role: string, selected: SelectedModelRoute) => {
+          if (!active(run, segment)) return;
           const previous = routes.get(role);
           if (
             previous?.providerId === selected.providerId &&
@@ -306,9 +328,9 @@ export function createAgentInstance(
         .run({
           runId: run.runId,
           sessionId,
-          command: { type: 'start', input },
+          command,
           signal: run.controller.signal,
-          trace: run.tracing.recorder,
+          trace: segment.tracing.recorder,
           limits: { steps: instrumentation.limits.steps },
           capabilities: broker.port(ports),
           models: router.port(ports),
@@ -318,27 +340,36 @@ export function createAgentInstance(
       while (true) {
         const result = await iterator.next();
         if (result.done) break;
-        acceptEvent(run, result.value);
+        acceptEvent(run, segment, result.value);
       }
-      if (!hasOutcome(run)) {
+      if (active(run, segment)) {
         const error = { name: 'ProtocolViolation' };
         failRun(run, toErrorInfo('executor_error', error));
         report({ kind: 'protocol_violation', runId: run.runId, error });
       }
     } catch (error) {
-      if (!terminal(run)) {
+      if (active(run, segment)) {
         failRun(run, toErrorInfo('executor_error', error));
         report({ kind: 'run_failed', runId: run.runId, error });
       } else {
-        report({ kind: 'late_event', runId: run.runId, error });
+        report({ kind: 'late_event', runId: run.runId });
       }
     } finally {
-      run.clearWallClock?.();
-      run.privateValues.clear();
-      run.tracing?.setLabels([...run.labels]);
-      run.tracing?.finish(run.status, run.error);
-      run.settle();
+      segment.clearWallClock?.();
+      if (terminal(run)) run.privateValues.clear();
+      segment.tracing?.setLabels([...run.labels]);
+      segment.tracing?.finish(segment.outcome ?? run.status, run.error);
+      segment.settle();
     }
+  };
+
+  const startSegment = (run: RunRecord, command: RunCommand, parent: Context): void => {
+    const { promise: settled, resolve: settle } = Promise.withResolvers<void>();
+    const segment: SegmentRecord = { index: (run.segment?.index ?? -1) + 1, settle };
+    const predecessor = settlement;
+    settlement = Promise.all([predecessor, settled]).then(() => {});
+    run.segment = segment;
+    void execute(run, segment, predecessor, command, parent);
   };
 
   return {
@@ -436,7 +467,6 @@ export function createAgentInstance(
           throw error;
         }
         const runId = globalThis.crypto.randomUUID() as RunId;
-        const { promise: settled, resolve: settle } = Promise.withResolvers<void>();
         const run: RunRecord = {
           runId,
           controller: new AbortController(),
@@ -445,16 +475,14 @@ export function createAgentInstance(
           privateValues: new Set(),
           grants,
           events: new RunEvents(runId),
-          settle,
+          budget: new RunBudget(instrumentation.limits),
           status: 'queued',
         };
         registerPrivate(broker.input.privateStrings(value), run.privateValues);
-        const predecessor = settlement;
-        settlement = Promise.all([predecessor, settled]).then(() => {});
         current = run;
         claimingSlot = false;
         publish();
-        void execute(run, predecessor, value, parent);
+        startSegment(run, { type: 'start', input: value }, parent);
         return { runId };
       })();
     },

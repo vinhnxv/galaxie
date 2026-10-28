@@ -598,3 +598,42 @@ test('a running listener can cancel before executor entry with one terminal even
   expect(await collect(instance.events(runId))).toMatchObject([{ type: 'cancelled', sequence: 0 }]);
   await runtime.dispose();
 });
+
+test('events after an interaction are dropped while the journal stays open', async () => {
+  const interaction: PendingInteraction = {
+    interactionId: 'ask' as InteractionId,
+    surfaceId: 'main',
+    viewRevision: 'r1' as ViewRevision,
+    component: 'tests.Question/v1',
+    props: {},
+  };
+  const executor = new FakeExecutor([
+    [{ type: 'interaction', interaction }, stream('late-data-canary')],
+  ]);
+  const diagnostics: DiagnosticEvent[] = [];
+  const runtime = createRuntime({
+    appId: 'tests',
+    executors: [executor],
+    diagnostics: (event) => diagnostics.push(event),
+  });
+  const instance = await runtime.create(definition, { principalScope: 'user', agent: {} });
+  await instance.prepare();
+  const { runId } = await instance.start('input');
+  await flush();
+  const events = instance.events(runId)[Symbol.asyncIterator]();
+  expect((await events.next()).value).toMatchObject({ type: 'interaction', sequence: 0 });
+  let nextSettled = false;
+  const next = events.next().then((value) => {
+    nextSettled = true;
+    return value;
+  });
+  await flush();
+  expect(nextSettled).toBe(false);
+  expect(diagnostics.filter((event) => event.kind === 'late_event')).toHaveLength(1);
+  expect(JSON.stringify(diagnostics)).not.toContain('late-data-canary');
+  await instance.cancel(runId);
+  expect((await next).value).toMatchObject({ type: 'cancelled', sequence: 1 });
+  expect(executor.requests).toHaveLength(1);
+  await runtime.dispose();
+  expect(executor.disposeCalls).toBe(1);
+});

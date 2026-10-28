@@ -493,3 +493,41 @@ test('a route known at model start survives the run closing before the model cal
     exporter.getFinishedSpans().find((span) => span.name === 'chat closing')?.attributes,
   ).toMatchObject({ 'galaxie.model.provider': 'local', 'galaxie.destination.class': 'in-browser' });
 });
+
+test('a paused segment ends with its own status and no error', async () => {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const executor = new FakeExecutor([
+    [
+      {
+        type: 'interaction',
+        interaction: {
+          interactionId: 'ask' as import('../src/index.js').InteractionId,
+          surfaceId: 'main',
+          viewRevision: 'r1' as import('../src/index.js').ViewRevision,
+          component: 'tests.Question/v1',
+          props: {},
+        },
+      },
+    ],
+  ]);
+  const runtime = createRuntime({
+    appId: 'tests',
+    executors: [executor],
+    tracerProvider: provider,
+  });
+  const instance = await runtime.create(definition, { principalScope: 'user', agent: {} });
+  await instance.prepare();
+  await instance.start('input');
+  await flush();
+  const root = exporter.getFinishedSpans().find((span) => span.name.startsWith('invoke_agent'));
+  expect(root?.attributes).toMatchObject({
+    'galaxie.run.status': 'waiting_input',
+    'galaxie.run.segment': 0,
+  });
+  expect(root?.status.code).toBe(SpanStatusCode.UNSET);
+  await runtime.dispose();
+  expect(executor.requests).toHaveLength(1);
+  expect(executor.disposeCalls).toBe(1);
+  await provider.shutdown();
+});

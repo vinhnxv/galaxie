@@ -48,6 +48,7 @@ const ALLOWED = new Set([
   'galaxie.instance.id',
   'galaxie.session.id',
   'galaxie.run.id',
+  'galaxie.run.segment',
   'galaxie.executor.id',
   'galaxie.executor.version',
   'galaxie.run.status',
@@ -77,6 +78,10 @@ export function assertSpanTree(spans: readonly ReadableSpan[]): SpanTree {
     expect(span.ended).toBe(true);
     for (const [key, value] of Object.entries(span.attributes)) {
       expect(ALLOWED.has(key), key).toBe(true);
+      if (key === 'galaxie.run.segment') {
+        expect(Number.isInteger(value)).toBe(true);
+        expect(value).toBeGreaterThanOrEqual(0);
+      }
       const values = Array.isArray(value) ? value : [value];
       for (const item of values) {
         expect(['string', 'number', 'boolean']).toContain(typeof item);

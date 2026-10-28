@@ -32,6 +32,7 @@ const ALLOWED = new Set([
   'galaxie.instance.id',
   'galaxie.session.id',
   'galaxie.run.id',
+  'galaxie.run.segment',
   'galaxie.executor.id',
   'galaxie.executor.version',
   'galaxie.run.status',
@@ -86,6 +87,7 @@ export interface RunMetadata {
   readonly instanceId: string;
   readonly sessionId: string;
   readonly runId: string;
+  readonly segment?: number;
   readonly executorId: string;
   readonly executorVersion: string;
 }
@@ -137,6 +139,7 @@ export function startRunTrace(
         'galaxie.instance.id': metadata.instanceId,
         'galaxie.session.id': metadata.sessionId,
         'galaxie.run.id': metadata.runId,
+        'galaxie.run.segment': metadata.segment ?? 0,
         'galaxie.executor.id': metadata.executorId,
         'galaxie.executor.version': metadata.executorVersion,
       }),
