@@ -1,0 +1,769 @@
+{
+  "schema": "galaxie.spike-b.results/v1",
+  "createdAt": "2026-10-28T20:36:28.196Z",
+  "page": {
+    "origin": "http://127.0.0.1:4173"
+  },
+  "device": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+    "chromeVersion": "156.0.8078.4",
+    "logicalCores": 15,
+    "webgpu": {
+      "adapter": null
+    }
+  },
+  "armOrder": ["mock", "ort-own-loop", "webllm", "transformers-js", "prompt-api"],
+  "runs": 5,
+  "arms": [
+    {
+      "id": "mock",
+      "model": {
+        "id": "deterministic-mock",
+        "revision": "v1"
+      },
+      "engineVersion": "1",
+      "inWorker": true,
+      "decoding": "greedy",
+      "schemaMechanism": "deterministic schema fixture",
+      "fallbacks": [],
+      "sameCheckpointAs": null,
+      "sessionIsolation": "harness_history_replay",
+      "availability": {
+        "status": "available"
+      },
+      "checks": {
+        "loads": {
+          "status": "passed",
+          "reason": "two_loads_completed"
+        },
+        "streams": {
+          "status": "passed",
+          "reason": "chunks_before_final_8"
+        },
+        "cancels": {
+          "status": "passed",
+          "reason": "abort_observed_after_second_chunk"
+        },
+        "worker": {
+          "status": "passed",
+          "reason": "generation_scope_observed"
+        },
+        "resetPerSession": {
+          "status": "passed",
+          "reason": "positive_control_and_isolation_observed"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "passed",
+          "reason": "constrained_value_observed",
+          "constrained": true
+        },
+        "schemaCoverage": {
+          "status": "passed",
+          "reason": "coverage_probe",
+          "constrained": true
+        }
+      },
+      "loads": [
+        {
+          "loadKind": "warm",
+          "elapsedMs": 10.5,
+          "reason": null,
+          "reportedBytes": 0
+        },
+        {
+          "loadKind": "warm",
+          "elapsedMs": 4,
+          "reason": null,
+          "reportedBytes": 0
+        }
+      ],
+      "coldLoadMs": null,
+      "coldLoadReason": "already_cached",
+      "warmLoadMs": 4,
+      "download": {
+        "storageDeltaBytes": 0,
+        "reportedBytes": 0,
+        "reason": null
+      },
+      "cancel": {
+        "chunksAtAbort": 2,
+        "abortToSettleMs": 6.299999952316284,
+        "chunksAfterSettle": 0,
+        "nextRequestSucceeded": true,
+        "nextRequestTtftMs": 6.200000047683716,
+        "medianFeedbackTtftMs": 6.1000001430511475
+      },
+      "tasks": [
+        {
+          "id": "quiz",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 172,
+          "runs": [
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 175,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.20000004768371582,
+              "ttftMs": null,
+              "totalMs": 178.79999995231628,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 168.20000004768372,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 173.19999980926514,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 168.20000004768372,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 168.20000004768372,
+              "p50": 173.19999980926514,
+              "p95": null,
+              "max": 178.79999995231628,
+              "p95Reason": "fewer_than_20_runs"
+            },
+            "ttftMs": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "length": {
+              "min": 243,
+              "p50": 243,
+              "p95": null,
+              "max": 243,
+              "p95Reason": "fewer_than_20_runs"
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": 5,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-en",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 48.40000009536743,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6,
+              "totalMs": 42.799999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.1000001430511475,
+              "totalMs": 43.200000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.099999904632568,
+              "totalMs": 46.90000009536743,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 48.200000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 45.299999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 42.799999952316284,
+              "p50": 45.299999952316284,
+              "p95": null,
+              "max": 48.200000047683716,
+              "p95Reason": "fewer_than_20_runs"
+            },
+            "ttftMs": {
+              "min": 6,
+              "p50": 6.1000001430511475,
+              "p95": null,
+              "max": 6.200000047683716,
+              "p95Reason": "fewer_than_20_runs"
+            },
+            "length": {
+              "min": 64,
+              "p50": 64,
+              "p95": null,
+              "max": 64,
+              "p95Reason": "fewer_than_20_runs"
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-vi",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 42.90000009536743,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 46.200000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.799999952316284,
+              "totalMs": 44.799999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.200000047683716,
+              "totalMs": 46.40000009536743,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 4.599999904632568,
+              "totalMs": 46.5,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 4.199999809265137,
+              "totalMs": 44.59999990463257,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 44.59999990463257,
+              "p50": 46.200000047683716,
+              "p95": null,
+              "max": 46.5,
+              "p95Reason": "fewer_than_20_runs"
+            },
+            "ttftMs": {
+              "min": 4.199999809265137,
+              "p50": 4.599999904632568,
+              "p95": null,
+              "max": 6.200000047683716,
+              "p95Reason": "fewer_than_20_runs"
+            },
+            "length": {
+              "min": 64,
+              "p50": 64,
+              "p95": null,
+              "max": 64,
+              "p95Reason": "fewer_than_20_runs"
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        }
+      ],
+      "longTasks": {
+        "count": 0,
+        "longestMs": 0,
+        "reason": null
+      },
+      "error": null
+    },
+    {
+      "id": "ort-own-loop",
+      "model": {
+        "id": "LiquidAI/LFM3-1.7B-ONNX",
+        "revision": "189271ef61b9e7fdd4a8b5b0891bcacad37700f8"
+      },
+      "engineVersion": "1.31.0-dev.20260914-8d85527a0",
+      "inWorker": true,
+      "decoding": "greedy",
+      "schemaMechanism": "copied JSON guide during decoding",
+      "fallbacks": [],
+      "sameCheckpointAs": null,
+      "sessionIsolation": "harness_history_replay",
+      "availability": {
+        "status": "unavailable",
+        "reason": "no_webgpu_adapter"
+      },
+      "checks": {
+        "loads": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "streams": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "cancels": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "worker": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "resetPerSession": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "schemaCoverage": {
+          "status": "not_run",
+          "reason": "probe_only"
+        }
+      },
+      "loads": [],
+      "coldLoadMs": null,
+      "coldLoadReason": null,
+      "warmLoadMs": null,
+      "download": {
+        "storageDeltaBytes": null,
+        "reportedBytes": null,
+        "reason": null
+      },
+      "cancel": null,
+      "tasks": [],
+      "longTasks": {
+        "count": null,
+        "longestMs": null,
+        "reason": "not_run"
+      },
+      "error": null
+    },
+    {
+      "id": "webllm",
+      "model": {
+        "id": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+        "revision": "9bd564b064631febf14deadcac492efb761d60c3"
+      },
+      "engineVersion": "0.2.86",
+      "inWorker": true,
+      "decoding": "greedy",
+      "schemaMechanism": "XGrammar json_object with serialized schema",
+      "fallbacks": [],
+      "sameCheckpointAs": null,
+      "sessionIsolation": "harness_history_replay",
+      "availability": {
+        "status": "unavailable",
+        "reason": "no_webgpu_adapter"
+      },
+      "checks": {
+        "loads": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "streams": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "cancels": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "worker": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "resetPerSession": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "schemaCoverage": {
+          "status": "not_run",
+          "reason": "probe_only"
+        }
+      },
+      "loads": [],
+      "coldLoadMs": null,
+      "coldLoadReason": null,
+      "warmLoadMs": null,
+      "download": {
+        "storageDeltaBytes": null,
+        "reportedBytes": null,
+        "reason": null
+      },
+      "cancel": null,
+      "tasks": [],
+      "longTasks": {
+        "count": null,
+        "longestMs": null,
+        "reason": "not_run"
+      },
+      "error": null
+    },
+    {
+      "id": "transformers-js",
+      "model": {
+        "id": "onnx-community/Qwen2.5-1.5B-Instruct",
+        "revision": "d54957e3af1be04546436e874a60fe386041b244"
+      },
+      "engineVersion": "4.3.1",
+      "inWorker": true,
+      "decoding": "greedy",
+      "schemaMechanism": "StructuredOutputProcessor logits processor 4.3.1",
+      "fallbacks": [],
+      "sameCheckpointAs": null,
+      "sessionIsolation": "harness_history_replay",
+      "availability": {
+        "status": "unavailable",
+        "reason": "no_webgpu_adapter"
+      },
+      "checks": {
+        "loads": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "streams": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "cancels": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "worker": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "resetPerSession": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "schemaCoverage": {
+          "status": "not_run",
+          "reason": "probe_only"
+        }
+      },
+      "loads": [],
+      "coldLoadMs": null,
+      "coldLoadReason": null,
+      "warmLoadMs": null,
+      "download": {
+        "storageDeltaBytes": null,
+        "reportedBytes": null,
+        "reason": null
+      },
+      "cancel": null,
+      "tasks": [],
+      "longTasks": {
+        "count": null,
+        "longestMs": null,
+        "reason": "not_run"
+      },
+      "error": null
+    },
+    {
+      "id": "prompt-api",
+      "model": {
+        "id": "browser-managed LanguageModel",
+        "revision": null
+      },
+      "engineVersion": "browser-managed",
+      "inWorker": false,
+      "decoding": "browser-default",
+      "schemaMechanism": "responseConstraint",
+      "fallbacks": [],
+      "sameCheckpointAs": null,
+      "sessionIsolation": "native_session",
+      "availability": {
+        "status": "downloadable",
+        "raw": "downloadable"
+      },
+      "checks": {
+        "loads": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "streams": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "cancels": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "worker": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "resetPerSession": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "not_run",
+          "reason": "probe_only"
+        },
+        "schemaCoverage": {
+          "status": "not_run",
+          "reason": "probe_only"
+        }
+      },
+      "loads": [],
+      "coldLoadMs": null,
+      "coldLoadReason": null,
+      "warmLoadMs": null,
+      "download": {
+        "storageDeltaBytes": null,
+        "reportedBytes": null,
+        "reason": null
+      },
+      "cancel": null,
+      "tasks": [],
+      "longTasks": {
+        "count": null,
+        "longestMs": null,
+        "reason": "not_run"
+      },
+      "error": null
+    }
+  ],
+  "chatWebLLM": {
+    "status": "not_run",
+    "reason": "probe_only",
+    "engineInjection": "protected-field-overwrite",
+    "constructionStartedInThread": null,
+    "invoke": {
+      "status": "not_run",
+      "reason": "probe_only"
+    },
+    "stream": {
+      "status": "not_run",
+      "reason": "probe_only"
+    },
+    "temperatureReachedEngine": null,
+    "schemaReachedEngine": null,
+    "abortSignalReachedEngine": null,
+    "schemaAccepted": null,
+    "resetPerSession": {
+      "status": "not_run",
+      "reason": "probe_only"
+    }
+  },
+  "promptApiAvailability": {
+    "en": "downloadable",
+    "vi": "unavailable",
+    "enToVi": "unavailable",
+    "reason": null
+  }
+}
