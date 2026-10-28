@@ -12,10 +12,6 @@ import {
   type LangSmithParams,
 } from '@langchain/core/language_models/chat_models';
 import {
-  assembleStructuredOutputPipeline,
-  createContentParser,
-} from '@langchain/core/language_models/structured_output';
-import {
   AIMessage,
   AIMessageChunk,
   type BaseMessage,
@@ -23,11 +19,10 @@ import {
   type UsageMetadata,
 } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
-import { type Runnable, RunnableLambda } from '@langchain/core/runnables';
-import { toJsonSchema } from '@langchain/core/utils/json_schema';
-import type { SerializableSchema } from '@langchain/core/utils/standard_schema';
-import type { InteropZodType } from '@langchain/core/utils/types';
-import { WebLLMError, WebLLMProviderError } from '../errors.js';
+import type { Runnable } from '@langchain/core/runnables';
+import { ModelError } from '../errors.js';
+import { mapMessages } from '../messages.js';
+import { type OutputSchema, structuredOutput } from '../structured-output.js';
 import type { WebLLMEngineHandle, WebLLMRequest } from './engine.js';
 
 export interface WebLLMCallOptions extends BaseChatModelCallOptions {
@@ -41,54 +36,14 @@ export interface WebLLMChatModelOptions {
   readonly temperature?: number;
 }
 
-type OutputSchema<Output extends Record<string, unknown>> =
-  | SerializableSchema<Output>
-  | InteropZodType<Output>
-  | Record<string, unknown>;
-
-function textContent(message: BaseMessage): string {
-  if (typeof message.content === 'string') return message.content;
-  if (message.content.every((block) => block.type === 'text' && typeof block.text === 'string'))
-    return message.content.map((block) => block.text).join('');
-  throw new WebLLMError('invalid');
-}
-
-function mapMessages(messages: BaseMessage[]): WebLLMRequest['messages'] {
-  if (messages.length === 0 || messages.at(-1)?.type !== 'human') throw new WebLLMError('invalid');
-  return messages.map((message, index) => {
-    if (
-      (message.type === 'system' && index !== 0) ||
-      ('tool_calls' in message &&
-        Array.isArray(message.tool_calls) &&
-        message.tool_calls.length > 0) ||
-      ('invalid_tool_calls' in message &&
-        Array.isArray(message.invalid_tool_calls) &&
-        message.invalid_tool_calls.length > 0) ||
-      message.additional_kwargs['tool_calls'] !== undefined ||
-      message.additional_kwargs['function_call'] !== undefined
-    )
-      throw new WebLLMError('invalid');
-    const role =
-      message.type === 'human'
-        ? 'user'
-        : message.type === 'ai'
-          ? 'assistant'
-          : message.type === 'system'
-            ? 'system'
-            : undefined;
-    if (role === undefined) throw new WebLLMError('invalid');
-    return { role, content: textContent(message) };
-  });
-}
-
 function responseFormat(schema: WebLLMCallOptions['jsonSchema']): WebLLMRequest['response_format'] {
   if (schema === undefined) return undefined;
   try {
     if (schema === null || typeof schema !== 'object' || Array.isArray(schema))
-      throw new WebLLMError('invalid');
+      throw new ModelError('invalid');
     return { type: 'json_object', schema: JSON.stringify(schema) };
   } catch {
-    throw new WebLLMError('invalid');
+    throw new ModelError('invalid');
   }
 }
 
@@ -215,28 +170,6 @@ export class WebLLMChatModel extends BaseChatModel<WebLLMCallOptions> {
   ):
     | Runnable<BaseLanguageModelInput, RunOutput>
     | Runnable<BaseLanguageModelInput, { raw: BaseMessage; parsed: RunOutput }> {
-    if (config?.method !== undefined && config.method !== 'jsonSchema')
-      throw new WebLLMError('unsupported');
-    let jsonSchema: Readonly<Record<string, unknown>>;
-    try {
-      jsonSchema = toJsonSchema(schema as Parameters<typeof toJsonSchema>[0]);
-    } catch {
-      throw new WebLLMError('invalid');
-    }
-    const parser = createContentParser<RunOutput>(schema);
-    const safeParser = RunnableLambda.from<BaseMessage, RunOutput>(async (message) => {
-      try {
-        if (typeof message.content !== 'string') throw new WebLLMProviderError();
-        // Avoid invoking parser callbacks with its content-bearing OutputParserException.
-        return await parser.parseResult([{ text: message.content }]);
-      } catch {
-        throw new WebLLMProviderError();
-      }
-    });
-    return assembleStructuredOutputPipeline(
-      this.withConfig({ jsonSchema }),
-      safeParser,
-      config?.includeRaw,
-    );
+    return structuredOutput(this, schema, config);
   }
 }

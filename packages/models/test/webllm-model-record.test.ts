@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { describe, expect, it } from 'vitest';
-import { WebLLMError, WebLLMProviderError } from '../src/errors.js';
+import { ModelError, ModelProviderError } from '../src/errors.js';
 import { classifyWebLLMError } from '../src/webllm/classify.js';
 import {
   buildAppConfig,
@@ -53,7 +53,7 @@ describe('WebLLM model record and content-free errors', () => {
     expect(error).toMatchObject({
       name: 'GalaxieError',
       code: 'invalid',
-      message: 'The WebLLM request is invalid.',
+      message: 'The model request is invalid.',
     });
     expect(error).not.toHaveProperty('cause');
     expect(JSON.stringify(error)).not.toContain('example.test');
@@ -102,10 +102,10 @@ describe('WebLLM model record and content-free errors', () => {
   it('uses fixed error messages without causes', () => {
     expect(classifyWebLLMError('unknown private sentence')).toBeUndefined();
     for (const error of [
-      new WebLLMError('invalid'),
-      new WebLLMError('unsupported'),
-      new WebLLMError('unavailable', 'integrity'),
-      new WebLLMProviderError(),
+      new ModelError('invalid'),
+      new ModelError('unsupported'),
+      new ModelError('unavailable', 'integrity'),
+      new ModelProviderError(),
     ]) {
       expect(error).not.toHaveProperty('cause');
       expect(error.message).not.toContain('private');

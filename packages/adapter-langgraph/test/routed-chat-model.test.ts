@@ -14,9 +14,14 @@ import {
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test, vi } from 'vitest';
+import { BuiltInAIChatModel } from '../../models/src/builtin-ai/chat-model.js';
 import { MockChatModel } from '../../models/src/mock.js';
 import { WebLLMChatModel } from '../../models/src/webllm/chat-model.js';
 import { createWebLLMEngine } from '../../models/src/webllm/engine.js';
+import {
+  FakeLanguageModel,
+  installLanguageModel,
+} from '../../models/test/support/fake-language-model.js';
 import { createFakeWebLLM, FakeWebLLMStream } from '../../models/test/support/fake-webllm.js';
 import { RoutedChatModel } from '../src/routed-chat-model.js';
 import { LangGraphTraceHandler } from '../src/trace-handler.js';
@@ -117,6 +122,24 @@ function routed(
     handler,
   };
 }
+
+test('Built-in AI streaming settles without usage so core charges the reservation', async () => {
+  const fake = new FakeLanguageModel();
+  const restore = installLanguageModel(fake);
+  const fixture = routed(
+    new BuiltInAIChatModel({ inputLanguages: ['en'], outputLanguages: ['en'] }),
+  );
+  try {
+    const chunks = [];
+    for await (const chunk of await fixture.model.stream('hello')) chunks.push(chunk);
+    expect(chunks.map((chunk) => chunk.content).join('')).toBe('hello world');
+    expect(fixture.end).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(fixture.fail).not.toHaveBeenCalled();
+    expect(fake.sessions[0]?.destroys).toBe(1);
+  } finally {
+    restore();
+  }
+});
 
 test('WebLLM streaming settles reported usage exactly once through the routed model', async () => {
   const fake = createFakeWebLLM();

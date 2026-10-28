@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { WebLLMError } from '../errors.js';
+import { ModelError } from '../errors.js';
 
 export interface WebLLMModelRecord {
   readonly modelId: string;
@@ -112,7 +112,7 @@ export function validateModelRecord(value: unknown): asserts value is WebLLMMode
     !sri(value['integrity']['library']) ||
     !sri(value['integrity']['tokenizer'])
   )
-    throw new WebLLMError('invalid');
+    throw new ModelError('invalid');
 }
 
 export function buildAppConfig(
@@ -124,7 +124,7 @@ export function buildAppConfig(
   try {
     model = new URL(record.modelUrl, pageUrl).href;
   } catch {
-    throw new WebLLMError('invalid');
+    throw new ModelError('invalid');
   }
   return {
     cacheBackend: 'cache',

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { WebLLMError, WebLLMProviderError, type WebLLMUnavailableReason } from '../errors.js';
+import { ModelError, ModelProviderError, type ModelUnavailableReason } from '../errors.js';
 import { classifyWebLLMError } from './classify.js';
 import {
   buildAppConfig,
@@ -108,11 +108,11 @@ class EngineLifetime {
     this.#worker = worker;
     worker.onerror = (event): void => {
       event.preventDefault();
-      this.fail(new WebLLMError('unavailable', 'worker_failed'));
+      this.fail(new ModelError('unavailable', 'worker_failed'));
       this.terminate();
     };
     worker.onmessageerror = (): void => {
-      this.fail(new WebLLMError('unavailable', 'worker_failed'));
+      this.fail(new ModelError('unavailable', 'worker_failed'));
       this.terminate();
     };
   }
@@ -233,8 +233,8 @@ export class WebLLMEngineHandle {
       if (this.#lifetime.failed) return this.#lifetime.error;
       if (signal?.aborted) return signal.reason;
       const classified = classifyWebLLMError(error);
-      if (classified === undefined) return new WebLLMProviderError();
-      const mapped = new WebLLMError(
+      if (classified === undefined) return new ModelProviderError();
+      const mapped = new ModelError(
         classified.code,
         classified.code === 'unavailable' ? classified.reason : undefined,
       );
@@ -281,7 +281,7 @@ export class WebLLMEngineHandle {
   dispose(): Promise<void> {
     if (this.#disposal !== undefined) return this.#disposal;
     // Settle pending engine operations before unload; the worker may never answer them.
-    this.#lifetime.fail(new WebLLMError('unavailable', 'disposed'));
+    this.#lifetime.fail(new ModelError('unavailable', 'disposed'));
     this.#disposal = (async (): Promise<void> => {
       try {
         await this.#lifetime.race(this.#engine.unload());
@@ -306,11 +306,11 @@ function progressPhase(text: string): WebLLMProgress['phase'] {
   return 'unknown';
 }
 
-function loadFailure(error: unknown): WebLLMError {
+function loadFailure(error: unknown): ModelError {
   const classification = classifyWebLLMError(error);
-  const reason: WebLLMUnavailableReason =
+  const reason: ModelUnavailableReason =
     classification?.code === 'unavailable' ? classification.reason : 'load_failed';
-  return new WebLLMError('unavailable', reason);
+  return new ModelError('unavailable', reason);
 }
 
 /** Internal injection factory: tests supply a fake module, never the real engine bundle. */
@@ -330,13 +330,13 @@ export async function createWebLLMEngine(
   try {
     if (options.signal?.aborted) onAbort();
     if (lifetime.failed) throw lifetime.error;
-    if (dependencies.gpu === undefined) throw new WebLLMError('unavailable', 'no_webgpu');
+    if (dependencies.gpu === undefined) throw new ModelError('unavailable', 'no_webgpu');
     const adapter = await lifetime.race(
       dependencies.gpu.requestAdapter({ powerPreference: 'high-performance' }),
     );
-    if (adapter === null) throw new WebLLMError('unavailable', 'no_adapter');
+    if (adapter === null) throw new ModelError('unavailable', 'no_adapter');
     if (model.requiredFeatures?.includes('shader-f16') && !adapter.features.has('shader-f16'))
-      throw new WebLLMError('unavailable', 'no_shader_f16');
+      throw new ModelError('unavailable', 'no_shader_f16');
     const module = await lifetime.race(dependencies.loadModule());
     if (lifetime.failed) throw lifetime.error;
     engine = new module.WebWorkerMLCEngine(options.worker, {
@@ -364,7 +364,7 @@ export async function createWebLLMEngine(
       ? options.signal.reason
       : lifetime.failed
         ? lifetime.error
-        : error instanceof WebLLMError
+        : error instanceof ModelError
           ? error
           : loadFailure(error);
     lifetime.fail(failure);

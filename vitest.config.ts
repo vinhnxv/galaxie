@@ -6,6 +6,9 @@ import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
 const alias = {
+  '@galaxie/models/builtin-ai': fileURLToPath(
+    new URL('./packages/models/src/builtin-ai/index.ts', import.meta.url),
+  ),
   '@galaxie/models/webllm/worker': fileURLToPath(
     new URL('./packages/models/src/webllm/worker.ts', import.meta.url),
   ),

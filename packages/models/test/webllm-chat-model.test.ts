@@ -245,8 +245,8 @@ describe('WebLLM structured output', () => {
         error = caught;
       }
       expect(error).toMatchObject({
-        name: 'WebLLMProviderError',
-        message: 'The WebLLM provider failed.',
+        name: 'ModelProviderError',
+        message: 'The model provider failed.',
       });
       expect(error).not.toHaveProperty('cause');
       expect(JSON.stringify(error)).not.toContain(canary);
