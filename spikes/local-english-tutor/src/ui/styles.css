@@ -1,0 +1,362 @@
+/* SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh */
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --border: #d9dde3;
+  --text: #1c2024;
+  --muted: #5d6670;
+  --accent: #2756c5;
+  --accent-text: #ffffff;
+  --accent-soft: #e3ebfb;
+  --ok-soft: #dcf2e3;
+  --ok-text: #1d6b39;
+  --warn-soft: #fbedd0;
+  --warn-text: #7a5300;
+  --info-soft: #e8e4f8;
+  --info-text: #4a3a8c;
+  --danger: #b42318;
+  --code-bg: #f0f2f5;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121417;
+    --surface: #1b1e22;
+    --surface-2: #252a30;
+    --border: #343a42;
+    --text: #e6e9ed;
+    --muted: #9aa3ad;
+    --accent: #7ea2f7;
+    --accent-text: #0d1424;
+    --accent-soft: #24324f;
+    --ok-soft: #1d3a27;
+    --ok-text: #8fdba8;
+    --warn-soft: #3d3218;
+    --warn-text: #f0c96a;
+    --info-soft: #2d2847;
+    --info-text: #c3b7f5;
+    --danger: #f97066;
+    --code-bg: #15181b;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px / 1.55 system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+main {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+}
+
+h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+h3 {
+  margin: 14px 0 4px;
+  font-size: 0.95rem;
+}
+
+.page-head p,
+.hint,
+.caveat,
+.pending,
+.vi,
+.dictionary-forms {
+  color: var(--muted);
+}
+
+.card {
+  margin: 16px 0;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button[type="submit"],
+.engine button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.engine p {
+  margin: 0 0 10px;
+}
+
+.engine p:last-child {
+  margin-bottom: 0;
+}
+
+.engine.ready {
+  color: var(--ok-text);
+}
+
+.engine.failed {
+  border-color: var(--danger);
+}
+
+progress {
+  width: 100%;
+}
+
+.ask label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.ask-row {
+  display: flex;
+  gap: 8px;
+}
+
+.ask-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.hint {
+  margin: 10px 0 6px;
+  font-size: 0.9rem;
+}
+
+.samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.samples button {
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.lesson-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.sentence {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.7;
+}
+
+button.word {
+  padding: 0 1px;
+  border: 0;
+  border-bottom: 1px dashed var(--muted);
+  border-radius: 2px;
+  background: none;
+}
+
+button.word[aria-pressed="true"],
+tr.selected {
+  background: var(--accent-soft);
+}
+
+.speak,
+.actions button {
+  padding: 2px 10px;
+  font-size: 0.85rem;
+}
+
+.run-error,
+.failed,
+.failed-row {
+  color: var(--danger);
+}
+
+.translation {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.tag,
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.tag {
+  margin: 0;
+  background: var(--surface-2);
+}
+
+.tips li,
+.sentences li {
+  margin-bottom: 10px;
+}
+
+.phrases dt {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.phrases dd {
+  margin: 2px 0 12px;
+}
+
+.sentences {
+  padding-left: 1.2rem;
+}
+
+.sentences p {
+  margin: 0;
+}
+
+.sentences .actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.failed .detail {
+  white-space: pre-wrap;
+}
+
+pre {
+  overflow: auto;
+  max-height: 15rem;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--code-bg);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+pre.raw {
+  max-height: 8rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+th,
+td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+thead th {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ipa {
+  white-space: nowrap;
+}
+
+.badge {
+  margin-left: 6px;
+}
+
+.badge.kept {
+  background: var(--ok-soft);
+  color: var(--ok-text);
+}
+
+.badge.changed {
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+
+.badge.own {
+  background: var(--info-soft);
+  color: var(--info-text);
+}
+
+.dictionary-forms {
+  display: block;
+  font-size: 0.75rem;
+}
+
+.caveat {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 560px) {
+  .ask-row {
+    flex-direction: column;
+  }
+
+  .sentence {
+    font-size: 1.15rem;
+  }
+}
