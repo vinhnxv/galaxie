@@ -2,13 +2,20 @@
 
 A browser-first agent runtime SDK for web apps.
 
-galaxie lets a web application host AI agents as first-class parts of the app. Each agent has an identity, state, a lifecycle, permissions, a UI region and a recovery story. Agent logic stays in the frameworks developers already use, such as LangGraph.js. The runtime is designed to add what the browser lacks:
+galaxie lets a web application host AI agents as first-class parts of the app. Each agent has an identity, state, a lifecycle, permissions, a UI region and a recovery story.
 
-- **Model routing:** local models in the browser (WebGPU), Chrome Built-in AI, or an OpenAI-compatible endpoint chosen by the app or the user, under a per-role policy.
+The agent pipeline (a single agent, a multi-agent system, or the harness around them) runs in the browser on the user's own device, so the developer deploys no agent backend and no container for it. The app's backend keeps its APIs, MCP servers, databases and tools.
+
+Agent logic stays in the frameworks developers already use, such as LangGraph.js, and the goal is parity: code written with LangChain and LangGraph should behave in the browser as it does natively on a server. galaxie's contracts are framework-neutral, so other frameworks can follow through adapters.
+
+The runtime is designed to add what the browser lacks:
+
+- **Model routing:** local models in the browser (WebGPU), Chrome Built-in AI, a model server on the user's machine, or an OpenAI-compatible endpoint chosen by the app or the user, under a per-role policy.
 - **A capability broker:** agents act only within the app's own permissions, deny-by-default.
-- **UI through the app's own components:** the agent drives an assigned UI region; the host owns the DOM.
+- **UI through the app's own components:** the agent drives an assigned UI region, provides data to the app and asks it to act, such as navigating, through capabilities the host binds; the host owns the DOM.
 - **Recovery:** a reload, a second tab or a double click does not repeat a side effect or lose a pending answer.
 - **A mandatory security baseline** on every path the SDK controls.
+- **Development tracing:** OpenTelemetry spans that a tool such as Langfuse can show, through an exporter the host registers.
 
 > **Status: design phase.** There is no package to install yet. This repository holds the project brief, the architecture decisions, the system design, and a toolchain skeleton whose only package, `packages/core`, contains draft contract types.
 
@@ -40,13 +47,12 @@ No test suite or review proves that software is secure. The known limits are lis
 
 | Milestone | Focus |
 | --- | --- |
-| M0 | Feasibility spikes: engine and persistence, local inference, UI path, remote providers and MCP |
-| M1 | Headless host, adapter, capability broker and security skeleton |
+| M1 | Headless host, adapter, capability broker, security skeleton, the parity conformance suite and OpenTelemetry spans |
 | M2 | Local models and the English Tutor vertical slice |
 | M3 | Durable interaction and recovery |
 | M4 | Remote integration, reuse and the MVP release gate |
 
-Details are in [brief §16](docs/galaxie-project-brief.md#16-roadmap).
+Spikes run when a milestone needs their answer: local inference and the UI path before M2, remote providers and MCP before M4. Details are in [brief §16](docs/galaxie-project-brief.md#16-roadmap).
 
 ## Development
 

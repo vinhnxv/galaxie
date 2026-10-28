@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** brief §6.1, §6.2, §18; ADR-0001, ADR-0009
+- **Related:** brief §6.1, §6.2, §18; ADR-0001, ADR-0009, ADR-0016
+- **Revisions:** 2026-10-28, with brief 0.3: the M1 conformance suite replaces Spike A; the long-task trigger is watched from M2, when real inference runs (ADR-0016).
 
 ## Context
 
@@ -35,5 +36,5 @@ Host capabilities hold the app's session and live on the main thread. In a worke
 
 ## Verification
 
-- Spike A runs on the main thread.
-- M2 and M3 measure main-thread long tasks during inference (brief §18). If the threshold is breached, write a superseding ADR with the measurement.
+- The M1 conformance suite runs the executor on the browser main thread.
+- From M2, when real inference runs, M2 and M3 watch main-thread long tasks (brief §18). If the trigger fires, write a superseding ADR with the measurement.

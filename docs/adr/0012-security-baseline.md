@@ -2,14 +2,16 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-28
-- **Related:** brief §5.4, §9.6–§9.9, §17; ADR-0002, ADR-0006, ADR-0011, ADR-0014
-- **Revisions:** 2026-10-28, after an external read-only review and before any implementation:
-  - guarantees scoped to SDK-controlled paths;
-  - trace allowlist instead of redaction;
-  - approvals bound to parameters;
-  - attribution header is not authorization;
-  - logout invalidation generation;
-  - B10 and B11 added.
+- **Related:** brief §5.4, §9.6–§9.9, §17; ADR-0002, ADR-0006, ADR-0011, ADR-0014, ADR-0016
+- **Revisions:**
+  - 2026-10-28, after an external read-only review and before any implementation:
+    - guarantees scoped to SDK-controlled paths;
+    - trace allowlist instead of redaction;
+    - approvals bound to parameters;
+    - attribution header is not authorization;
+    - logout invalidation generation;
+    - B10 and B11 added.
+  - 2026-10-28, with brief 0.3: B3 also covers tracing credentials, because spans leave through an exporter the host registers (ADR-0016).
 
 ## Context
 
@@ -35,7 +37,7 @@ The baseline in brief §9.7 is mandatory and a release condition:
 - **B. Host developer obligations:**
   1. server-side authorization on every request;
   2. strict CSP with Trusted Types;
-  3. no provider keys in bundles;
+  3. no provider keys or tracing credentials in bundles;
   4. narrow capabilities with idempotency keys;
   5. no password or payment components in a catalog;
   6. MCP only through servers the host controls;

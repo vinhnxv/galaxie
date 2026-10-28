@@ -36,6 +36,8 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0013](0013-typescript-first-implementation.md) | TypeScript-first implementation language | Accepted |
 | [0014](0014-data-labels-and-argument-shapes.md) | Run-level data labels and argument shapes | Proposed |
 | [0015](0015-licensing-agpl-with-commercial-license.md) | License: AGPL-3.0 with a commercial license | Accepted |
+| [0016](0016-parity-demonstrations-and-otel-traces.md) | Parity is the verdict, metrics are demonstrations, traces are OpenTelemetry spans | Accepted |
+| [0017](0017-framework-neutral-contracts.md) | Framework-neutral contracts, with an adapter per framework | Accepted |
 
 ## Template
 

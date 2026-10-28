@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** brief §12.1, §12.2, §12.4; ADR-0001, ADR-0004, ADR-0009
+- **Related:** brief §12.1, §12.2, §12.4; ADR-0001, ADR-0004, ADR-0009, ADR-0016
+- **Revisions:** 2026-10-28, with brief 0.3: the M1 conformance suite records the durability modes; the saver itself is verified in M3 (ADR-0016).
 
 ## Context
 
@@ -26,7 +27,7 @@ Correctness depends on more than implementing the methods:
 - Use the saver's serializer and never store live objects.
 - **Durability barrier.**
   - `put` and `putWrites` resolve only after their IndexedDB transaction completes.
-  - Use LangGraph's synchronous durability mode where the pinned version offers it (Spike A verifies the modes).
+  - Use LangGraph's synchronous durability mode where the pinned version offers it (the M1 conformance suite records which modes it offers).
   - The UI never shows a state as committed before its checkpoint is.
 - **Namespacing and deletion.**
   - Storage is namespaced per `appId` and principal.
@@ -53,5 +54,5 @@ Correctness depends on more than implementing the methods:
 
 ## Verification
 
-- Spike A prototype passes the conformance tests, and its durability mode is recorded.
+- M3: the saver passes the checkpointer conformance tests and the persistence cases of the M1 conformance suite, and its durability mode is recorded.
 - AT-08, AT-14, AT-31, AT-34; fault injection in M3.

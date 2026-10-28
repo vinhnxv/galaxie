@@ -5,12 +5,13 @@
 > This document maps the [project brief](galaxie-project-brief.md) and the [ADRs](adr/README.md) onto components, packages, contracts and runtime flows. It does not repeat their reasons.
 >
 > - When this document and the brief disagree, the brief wins and this document is fixed.
-> - Proposed ADRs are working defaults until M0 or a later milestone confirms them. So is every part of this document that depends on them.
+> - Proposed ADRs are working defaults until a spike or a milestone confirms them. So is every part of this document that depends on them.
 
 ## 1. What exists today
 
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
 - **`packages/core`:** draft contracts only: types plus three fixed transition tables, with no runtime behavior (§6).
+- **`spikes/`:** two throwaway spikes, B0 (a 1.7B model on WebGPU) and the local English tutor (a LangGraph.js agent on that model in Chrome). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
 
 ## 2. System context and trust boundaries
@@ -27,14 +28,14 @@ flowchart LR
         Builtin["Chrome Built-in AI"]
         Local["Ollama or LM Studio on localhost"]
     end
-    Backend["Host backend: APIs, LLM proxy, MCP gateway"]
+    Backend["Host backend: APIs, LLM proxy, MCP gateway, trace collector"]
     Endpoint["Endpoint the user configured"]
     Provider["External model provider"]
     Page -- "data only" --> Worker
     Page --> Builtin
     Page <--> Store
     Page <-- "Web Locks, BroadcastChannel" --> Tabs
-    Page -- "capabilities, MCP, host-proxy LLM" --> Backend
+    Page -- "capabilities, MCP, host-proxy LLM, spans" --> Backend
     Backend -- "forwards" --> Provider
     Page --> Local
     Page --> Endpoint
@@ -62,7 +63,7 @@ Trust rules:
 | Component | Responsibility | Package | Decisions |
 | --- | --- | --- | --- |
 | Runtime host | Instance and run lifecycle, identity, snapshots, budgets, the inbox processor | `core` | brief §8, §9.4 |
-| Executor adapter | Runs LangGraph.js itself on the main thread; maps checkpoints, interrupts and events; exposes the model router to graphs as LangChain chat models | `adapter-langgraph` | [ADR-0001](adr/0001-langgraph-adapter-not-engine.md), [ADR-0003](adr/0003-executor-execution-context.md) |
+| Executor adapter | Runs LangGraph.js itself on the main thread; maps checkpoints, interrupts and events; exposes the model router to graphs as LangChain chat models. Other frameworks get their own adapters | `adapter-langgraph` | [ADR-0001](adr/0001-langgraph-adapter-not-engine.md), [ADR-0003](adr/0003-executor-execution-context.md), [ADR-0017](adr/0017-framework-neutral-contracts.md) |
 | Model router | Per-role provider lists, destination classes, data labels, consent, first-run order | `core` | [ADR-0006](adr/0006-model-providers-and-routing.md), [ADR-0014](adr/0014-data-labels-and-argument-shapes.md) |
 | Model providers | The in-browser engine in a worker, Built-in AI from the page, OpenAI-compatible, mock | `models` | ADR-0006 |
 | Capability broker | Grants, schema validation, argument shapes, confirmations, attribution header, effect journal | `core` | brief §9.2, [ADR-0012](adr/0012-security-baseline.md), ADR-0014 |
@@ -71,6 +72,7 @@ Trust rules:
 | Ownership | One owner tab per app, handover, takeover, logout generation | `core` | [ADR-0009](adr/0009-multi-tab-ownership.md) |
 | UI | Hooks, surfaces, typed registry, headless reference components | `react` | [ADR-0007](adr/0007-typed-ui-registry-for-mvp.md) |
 | Agent definitions | Code-first definitions; a build script generates the manifest | `core` (types) | [ADR-0008](adr/0008-code-first-agent-definition.md) |
+| Tracing | OpenTelemetry spans for runs, nodes, model calls and capability calls; every value galaxie records is filtered, and span content follows the data labels; no exporter | `core` | [ADR-0016](adr/0016-parity-demonstrations-and-otel-traces.md), brief §14.4 |
 
 ## 4. Packages and dependency rules
 
@@ -86,7 +88,7 @@ flowchart TD
 
 Proposed rules; M1 confirms them:
 
-1. `core` has no runtime dependencies. It uses Zod v4 types (a peer dependency) and touches no engine, UI framework or browser API when it is imported (`sideEffects: false`).
+1. `core` has one runtime dependency, the OpenTelemetry API (`@opentelemetry/api`), whose calls do nothing until the host registers an SDK (ADR-0016). It uses Zod v4 types (a peer dependency), imports no agent framework (ADR-0017), and touches no engine, UI framework or browser API when it is imported (`sideEffects: false`).
 2. Every other package depends on `core` and on its own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
 3. Agent packages depend on `core` and their engine, never on a host package. From M4 the ESLint plugin flags direct `fetch`, storage, DOM and `eval` use (brief §9.7 C).
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
@@ -104,6 +106,7 @@ galaxie/
 │   └── core/                  draft contracts (§6)
 ├── scripts/
 │   └── check-license.ts       SPDX headers and package license fields (ADR-0015)
+├── spikes/                    throwaway spike code, outside the root workspace (brief §16.2)
 ├── biome.json  package.json  pnpm-workspace.yaml  tsconfig.base.json
 └── AGENTS.md  COMMERCIAL-LICENSE.md  LICENSE  README.md
 ```
@@ -121,10 +124,11 @@ Target (brief §15), with the milestone that first needs each path:
 | `examples/english-tutor/` | M2 |
 | `examples/host-local/`, `examples/host-http/` | M2 (first host, CSP), M4 (second host, host proxy, MCP) |
 | `examples/mcp-server/` | M4 |
+| `tests/conformance/` | M1 |
 | `tests/fixtures/` | M1 |
 | `tests/injection-corpus/` | M4 |
 
-M0 spike code is throwaway. Keep it out of `packages/` and never promote it to package code (brief §16.2).
+Spike code is throwaway. Keep it out of `packages/` and never promote it to package code (brief §16.2).
 
 ## 6. Core contracts (draft)
 
@@ -154,7 +158,7 @@ Choices the draft makes where the brief leaves room:
 - **Run status belongs to the runtime.** An executor reports events; the runtime derives the run status from them and creates every ID.
 - **Open for M1:** how a schema field carries its data label and argument shape (`FieldAnnotation`), for example through Zod metadata (ADR-0014).
 
-Not in `core` yet: `createRuntime`, the broker, the router, budget enforcement, ownership and tracing. They are M1 work (brief §16.3).
+Not in `core` yet: `createRuntime`, the broker, the router, budget enforcement and tracing spans, which are M1 work (brief §16.3), and multi-tab ownership, which is M3 work (brief §16.5). Unit tests cover the broker, the router and the budgets, and AT-36 covers the spans. The conformance suite (AT-15) checks that the same graphs behave alike on Node and in Chrome (ADR-0016).
 
 ## 7. Runtime topology
 
@@ -237,7 +241,7 @@ flowchart TD
     Inbox -- "none" --> Render["Render the interaction from the checkpoint payload"]
 ```
 
-There is one render path: after a reload the host renders from the checkpoint exactly as it did before (brief §12.2). Spike A confirms how the pinned LangGraph.js version persists resume values and whether a repeated resume is safe.
+There is one render path: after a reload the host renders from the checkpoint exactly as it did before (brief §12.2). The M1 conformance suite records how the pinned LangGraph.js version persists resume values and whether a repeated resume is safe; M3 runs those cases again with the IndexedDB saver.
 
 ### 8.3. A capability call
 
@@ -282,7 +286,8 @@ flowchart TD
     Send -- "localhost or LAN endpoint fails" --> Unreachable["Typed error: unreachable, no fallback"]
 ```
 
-- First-run order: Built-in AI if it is available and passes the role eval, then the cached in-browser model, then a download after consent with the size shown, then a remote provider if the role allows it and the user consents (ADR-0006).
+- First-run order: Built-in AI if it is available and the host lists it for the role, then the cached in-browser model, then a download after consent with the size shown, then a remote provider if the role allows it and the user consents (ADR-0006).
+- Where the provider can enforce a JSON Schema while it decodes, structured output uses it (brief §10.6).
 - Built-in AI is eligible for a role only when `availability()` supports the role's input and output languages.
 - Labels are sticky for the run. To shed one, the host starts a new run (ADR-0014).
 - Provider keys come from the host's `getCredential()` callback for each request. galaxie never stores them (ADR-0006).
@@ -324,7 +329,7 @@ Logout bumps an invalidation generation that every tab sees, wipes the principal
 | A1. No model-produced HTML or JS; URL allowlist; no auto-loaded resources | Registry renderer | `react` |
 | A2. Deny by default; validate request and response | Capability broker | `core` |
 | A3. No generic `fetch`, SQL or shell | Capability broker | `core` |
-| A4. Credentials never in prompts, state, checkpoints, traces or exports; allowlisted trace fields | Router, providers, trace, storage | `core`, `models`, `storage-indexeddb` |
+| A4. Credentials never in prompts, state, checkpoints, traces or exports; allowlisted trace fields | Router, providers, tracing, storage | `core`, `models`, `storage-indexeddb` |
 | A5. Host-rendered, single-use confirmations bound to the call | Broker and the host's confirmation surface | `core`, `react` |
 | A6. No silent destination change; data labels | Model router, broker | `core` |
 | A7. Finite budgets | Runtime | `core` |
@@ -355,13 +360,15 @@ M1 must cover A1–A4, A7 and A8 with tests (brief §16.3). The others are teste
 | `pnpm test` | Vitest |
 | `pnpm build` | `packages/core/dist` |
 
-## 11. What M0 must confirm
+## 11. What confirms this design, and when
 
-| Spike | Parts of this design it confirms or revises |
-| --- | --- |
-| A: engine and persistence | The executor contract (`executor.ts`), interrupt IDs, re-execution on resume, resume-value persistence and repeated resume (§8.1, §8.2); ADR-0001, 0003, 0004, 0005 |
-| B: local inference | The in-browser engine to ship, Built-in AI language support, `ChatWebLLM` with a worker engine (§7, §8.4); ADR-0006. The founder first freezes the reference devices, eval datasets and thresholds (brief §18). |
-| C: UI path | Rendering from an interrupt payload, stale-event rejection, reload (§8.1, §8.2); ADR-0004, 0007 |
-| D: remote paths | Host proxy and `localhost` endpoints under Local Network Access, CORS, the credential callback, the MCP profile (§8.4); ADR-0006, 0011 |
+Spikes run when a milestone needs them (brief §16.2, ADR-0016).
 
-Later milestones confirm the rest: ADR-0014 in M1 and M2 (AT-04, AT-32), ADR-0009 in M3 (AT-18), and ADR-0008 and ADR-0010 in M4 (brief §16.2).
+| Check | When | Parts of this design it confirms or revises |
+| --- | --- | --- |
+| Conformance suite (replaces Spike A) | M1; persistence cases again in M3 | The executor contract (`executor.ts`), interrupt IDs, re-execution on resume, resume-value persistence and repeated resume (§8.1, §8.2), compared between Node and Chrome; ADR-0001, 0003, 0004, 0005 |
+| Spike B: local inference | Before M2 | The in-browser engine to ship, whether it enforces a JSON Schema while decoding, Built-in AI language support, `ChatWebLLM` with a worker engine (§7, §8.4); ADR-0006. Its numbers are demonstrations, not thresholds (brief §18). |
+| Spike C: UI path | Before M2 | Rendering from an interrupt payload, stale-event rejection, reload (§8.1, §8.2); ADR-0004, 0007 |
+| Spike D: remote paths | Before M4 | Host proxy and `localhost` endpoints under Local Network Access, CORS, the credential callback, the MCP profile (§8.4); ADR-0006, 0011 |
+
+Milestones confirm the rest: the tracing spans in M1 (AT-36); ADR-0017's framework-neutral `core` in M1, through a CI dependency check; ADR-0014 in M1, M2 and M4 (AT-36, AT-04, AT-32); ADR-0009 in M3 (AT-18); and ADR-0008 and ADR-0010 in M4 (brief §16.2).
