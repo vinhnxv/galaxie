@@ -75,7 +75,11 @@ const load = z.strictObject({
 });
 export const armResultSchema = z.strictObject({
   id: armId,
-  model: z.strictObject({ id: z.string(), revision: z.string().nullable() }),
+  model: z.strictObject({
+    id: z.string(),
+    revision: z.string().nullable(),
+    dtype: z.string().optional(),
+  }),
   engineVersion: z.string(),
   inWorker: z.boolean(),
   decoding: z.enum(['greedy', 'browser-default']),

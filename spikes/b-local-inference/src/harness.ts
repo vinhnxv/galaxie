@@ -364,12 +364,14 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
         const observation = longTasks();
         const timing = { openMs: 0, start: 0, end: 0 };
         let first: number | null = null;
+        let chunks = 0;
         let reply: GenerationResult;
         try {
           reply = await once(
             task,
             () => {
               first ??= performance.now();
+              chunks++;
             },
             timing,
           );
@@ -394,7 +396,12 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
           forcedTokens: reply.forcedTokens ?? null,
           modelChosenTokens: reply.modelChosenTokens ?? null,
           tokensPerSecond:
-            unconstrained && outputTokens !== undefined && first !== null && end > first
+            // A single chunk has no decode interval to divide by.
+            unconstrained &&
+            outputTokens !== undefined &&
+            first !== null &&
+            chunks >= 2 &&
+            end > first
               ? Math.max(0, outputTokens - 1) / ((end - first) / 1000)
               : null,
           longTasks: observation.finish(),

@@ -100,7 +100,9 @@ export const schemaCoverage = {
   maxTokens: 160,
 };
 export const resetRemember: Message[] = [
-  { role: 'user', content: `Remember the code word ${codeWord}.` },
+  // An instruction to repeat, not to remember: Qwen2.5-1.5B on WebLLM answered "remember" with a
+  // refusal, which failed the positive control without testing isolation.
+  { role: 'user', content: `Repeat exactly this code word: ${codeWord}` },
 ];
 export const resetRecall: Message[] = [
   { role: 'user', content: 'What code word did I tell you? If none, say unknown.' },

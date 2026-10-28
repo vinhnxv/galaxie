@@ -36,10 +36,19 @@ const candidates = [
   { id: 'onnx-community/LFM2-1.2B-ONNX', revision: 'dd095948cf23919ef2fcb635a156ce59975f35ff' },
 ];
 let generator: TextGenerationPipeline | undefined;
+// Error name plus a short message, so a CSP block, a network error or an unsupported model can be
+// told apart; model text never reaches these messages.
+function errorClass(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message.slice(0, 160)}` : 'unknown';
+}
 serveWorker({
   async load(progress) {
     const fallbacks: string[] = [];
-    const pinned = self.name ? (JSON.parse(self.name) as ModelInfo) : null;
+    const causes: string[] = [];
+    const { pinned, dtype } = JSON.parse(self.name) as {
+      pinned: ModelInfo | null;
+      dtype: 'q4f16' | 'q4';
+    };
     const models = pinned
       ? candidates.filter((model) => model.id === pinned.id && model.revision === pinned.revision)
       : candidates;
@@ -72,7 +81,7 @@ serveWorker({
       try {
         generator = await pipeline('text-generation', selected.id, {
           device: 'webgpu',
-          dtype: 'q4f16',
+          dtype,
           revision: selected.revision,
           progress_callback: (event) => {
             if (event.status === 'progress') {
@@ -88,13 +97,14 @@ serveWorker({
           selected,
           fallbacks,
         };
-      } catch {
+      } catch (error) {
         await generator?.dispose();
         generator = undefined;
         fallbacks.push(selected.id);
+        causes.push(`${selected.id}: ${errorClass(error)}`);
       }
     }
-    throw new Error('all_model_candidates_failed');
+    throw new Error(`all_model_candidates_failed (${causes.join('; ')})`);
   },
   async generate(request, history, signal, emit) {
     const model = generator;

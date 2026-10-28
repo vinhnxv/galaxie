@@ -18,6 +18,7 @@ export interface Availability {
 export interface ModelInfo {
   id: string;
   revision: string | null;
+  dtype?: string;
 }
 export interface Message {
   role: 'system' | 'user' | 'assistant';

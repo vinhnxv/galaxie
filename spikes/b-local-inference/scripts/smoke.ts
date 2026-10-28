@@ -339,7 +339,9 @@ try {
               onerror: ((event: ErrorEvent) => void) | null = null;
               readonly selected: ModelInfo | null;
               constructor(_url: unknown, options?: WorkerOptions) {
-                this.selected = options?.name ? (JSON.parse(options.name) as ModelInfo) : null;
+                this.selected = options?.name
+                  ? (JSON.parse(options.name) as { pinned: ModelInfo | null }).pinned
+                  : null;
               }
               postMessage(command: { id: number; op: string }): void {
                 if (command.op === 'load') {

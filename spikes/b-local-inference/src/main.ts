@@ -50,6 +50,9 @@ function createPromptWithActivation(create: () => Promise<PromptSession>): Promi
       'click',
       () => {
         runButton.disabled = true;
+        render(
+          'Prompt API: creating the session; the first use after a download can take minutes.',
+        );
         void create().then(resolve, reject);
       },
       { once: true },
@@ -61,7 +64,7 @@ const arms: Arm[] = [
   mock,
   new OrtArm(),
   new WebLLMArm(),
-  new TransformersArm(),
+  new TransformersArm(params.get('tjDtype') === 'q4' ? 'q4' : 'q4f16'),
   new PromptArm(createPromptWithActivation),
 ];
 for (const id of armOrder) {
