@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { RunTrace, TraceHandle } from '@galaxie/core';
+import type { RunTrace, SelectedModelRoute, TraceHandle } from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { LLMResult } from '@langchain/core/outputs';
+import { selectedRouteFromOptions } from './routed-chat-model.js';
 
 interface ChainTrace {
   readonly handle: TraceHandle | undefined;
@@ -17,6 +18,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
   readonly #trace: RunTrace;
   readonly #chains: Map<string, ChainTrace> = new Map();
   readonly #models: Map<string, TraceHandle> = new Map();
+  readonly #routes = new Map<string, SelectedModelRoute>();
   readonly #settlement: PromiseWithResolvers<void> = Promise.withResolvers<void>();
   #root: string | undefined;
 
@@ -27,6 +29,14 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
 
   handleFor(runId: string): TraceHandle | undefined {
     return this.#chains.get(runId)?.handle;
+  }
+
+  setModelRoute(runId: string, selected: SelectedModelRoute): void {
+    if (this.#models.has(runId))
+      this.#routes.set(runId, {
+        providerId: selected.providerId,
+        destination: selected.destination,
+      });
   }
 
   async settled(): Promise<void> {
@@ -80,12 +90,13 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     _messages: BaseMessage[][],
     runId: string,
     parentRunId?: string,
-    _extraParams?: Record<string, unknown>,
+    extraParams?: Record<string, unknown>,
     _tags?: string[],
     metadata?: Record<string, unknown>,
   ): void {
     const provider = metadata?.['ls_provider'];
     const model = metadata?.['ls_model_name'];
+    const route = selectedRouteFromOptions(extraParams?.['options']);
     this.#models.set(
       runId,
       this.#trace.start(
@@ -93,6 +104,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
           kind: 'model',
           ...(typeof provider === 'string' ? { provider } : {}),
           ...(typeof model === 'string' ? { model } : {}),
+          ...(route === undefined ? {} : { route }),
         },
         parentRunId === undefined ? undefined : this.#chains.get(parentRunId)?.handle,
       ),
@@ -100,6 +112,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
   }
 
   override handleLLMEnd(output: LLMResult, runId: string): void {
+    const route = this.#routes.get(runId);
     const generation = output.generations[0]?.[0];
     const message =
       generation !== undefined && 'message' in generation ? generation.message : undefined;
@@ -117,16 +130,24 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
         : undefined;
     this.#models.get(runId)?.end({
       status: 'ok',
+      ...(route === undefined ? {} : { route }),
       usage: {
         ...(typeof input === 'number' ? { inputTokens: input } : {}),
         ...(typeof outputTokens === 'number' ? { outputTokens } : {}),
       },
     });
     this.#models.delete(runId);
+    this.#routes.delete(runId);
   }
 
   override handleLLMError(error: Error, runId: string): void {
-    this.#models.get(runId)?.end({ status: 'error', errorType: error.name });
+    const route = this.#routes.get(runId);
+    this.#models.get(runId)?.end({
+      status: 'error',
+      errorType: error.name,
+      ...(route === undefined ? {} : { route }),
+    });
     this.#models.delete(runId);
+    this.#routes.delete(runId);
   }
 }

@@ -15,7 +15,13 @@ export interface TraceHandle {
 
 export type TraceStep =
   | { readonly kind: 'node'; readonly name: string; readonly step?: number }
-  | { readonly kind: 'model'; readonly provider?: string; readonly model?: string };
+  | {
+      readonly kind: 'model';
+      readonly provider?: string;
+      readonly model?: string;
+      /** Known before dispatch, including when the run closes before end callbacks (ADR-0006). */
+      readonly route?: SelectedModelRoute;
+    };
 
 export type TraceResult =
   | {

@@ -39,6 +39,7 @@ const ALLOWED = new Set([
   'gen_ai.tool.name',
   'galaxie.capability.kind',
   'galaxie.destination.class',
+  'galaxie.model.provider',
   'galaxie.run.labels',
   'galaxie.budget.name',
   'gen_ai.agent.name',

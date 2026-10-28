@@ -15,6 +15,7 @@ import {
   type RunRequest,
 } from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage } from '@langchain/core/messages';
 import {
   Annotation,
@@ -36,6 +37,7 @@ import { z } from 'zod';
 import adapterMetadata from '../../packages/adapter-langgraph/package.json' with { type: 'json' };
 import { collect, deferred, flush } from '../../packages/core/test/fake-executor.js';
 import { assertSpanTree, serializeSpans } from '../../packages/core/test/span-tree.js';
+import { assistantRoles, assistantRouting } from './support/routing.js';
 import {
   createModelLatch,
   FixtureModelError,
@@ -62,11 +64,16 @@ async function ready(
     tracerProvider: provider,
     ...(diagnostics ? { diagnostics } : {}),
   });
-  const instance = await runtime.create(definition, {
-    principalScope: 'private-principal',
-    agent,
-    ...(services ? { services } : {}),
-  });
+  const routed = services !== undefined && Object.hasOwn(services.chatModels, 'assistant');
+  const instance = await runtime.create(
+    { ...definition, ...(routed ? { models: assistantRoles } : {}) },
+    {
+      ...(routed ? { models: assistantRouting() } : {}),
+      principalScope: 'private-principal',
+      agent,
+      ...(services ? { services } : {}),
+    },
+  );
   await instance.prepare();
   return { runtime, instance, exporter, provider };
 }
@@ -437,7 +444,7 @@ class RootObserver extends BaseCallbackHandler {
 }
 
 function cancellationGraph(
-  model: ScriptedChatModel,
+  model: BaseChatModel,
   saver: BaseCheckpointSaver,
   observer: RootObserver,
 ) {
@@ -474,11 +481,17 @@ test('keeps a successor queued until abort callbacks and checkpoint writes settl
       usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
     },
   });
-  const graph = cancellationGraph(model, saver, observer);
-  const fixture = await ready(() => graph, {
-    chatModels: { assistant: model },
-    checkpointer: saver,
-  });
+  let graph!: ReturnType<typeof cancellationGraph>;
+  const fixture = await ready(
+    (host) => {
+      graph = cancellationGraph(host.langchain.chatModel('assistant'), saver, observer);
+      return graph;
+    },
+    {
+      chatModels: { assistant: model },
+      checkpointer: saver,
+    },
+  );
   const first = await fixture.instance.start({ value: 1 });
   await Promise.all([latch.entered, saver.blocked.promise]);
   const firstEvents = collect(fixture.instance.events(first.runId));
@@ -541,10 +554,13 @@ test('core alone bounds a never-settled predecessor and disposal at ten seconds'
         wait: latch,
       },
     });
-    const fixture = await ready(() => cancellationGraph(model, saver, observer), {
-      chatModels: { assistant: model },
-      checkpointer: saver,
-    });
+    const fixture = await ready(
+      (host) => cancellationGraph(host.langchain.chatModel('assistant'), saver, observer),
+      {
+        chatModels: { assistant: model },
+        checkpointer: saver,
+      },
+    );
     const first = await fixture.instance.start({ value: 1 });
     await Promise.all([latch.entered, saver.blocked.promise]);
     await fixture.instance.cancel(first.runId);

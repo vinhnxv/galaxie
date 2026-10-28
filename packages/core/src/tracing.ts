@@ -206,6 +206,8 @@ export function startRunTrace(
                     'gen_ai.operation.name': 'chat',
                     'gen_ai.provider.name': step.provider ?? '_OTHER',
                     'gen_ai.request.model': step.model,
+                    'galaxie.destination.class': step.route?.destination,
+                    'galaxie.model.provider': step.route?.providerId,
                   },
             ),
           },

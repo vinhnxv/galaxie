@@ -478,3 +478,18 @@ test.each(['ok', 'error'] as const)(
     expect(plain?.attributes).not.toHaveProperty('galaxie.destination.class');
   },
 );
+
+test('a route known at model start survives the run closing before the model callback', async () => {
+  const exporter = await recorded(async function* ({ trace: recorder }) {
+    recorder.start({
+      kind: 'model',
+      model: 'closing',
+      route: { providerId: 'local', destination: 'in-browser' },
+    });
+    yield { type: 'stream', executor: 'fake', path: [], mode: 'values', data: null };
+    throw new Error('private');
+  });
+  expect(
+    exporter.getFinishedSpans().find((span) => span.name === 'chat closing')?.attributes,
+  ).toMatchObject({ 'galaxie.model.provider': 'local', 'galaxie.destination.class': 'in-browser' });
+});
