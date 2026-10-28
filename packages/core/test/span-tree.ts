@@ -31,6 +31,11 @@ export function serializeSpans(spans: readonly ReadableSpan[]): string {
 
 const ALLOWED = new Set([
   'gen_ai.operation.name',
+  'gen_ai.tool.name',
+  'galaxie.capability.kind',
+  'galaxie.destination.class',
+  'galaxie.run.labels',
+  'galaxie.budget.name',
   'gen_ai.agent.name',
   'galaxie.app.id',
   'galaxie.agent.version',

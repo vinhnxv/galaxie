@@ -4,7 +4,12 @@
 import { z } from 'zod';
 import {
   type AgentInstance,
+  type BudgetLimits,
+  type CapabilityBinding,
+  type CapabilityRequests,
   createRuntime,
+  type DataPolicy,
+  type DiagnosticEvent,
   defineAgentDefinition,
   type ExecutorAdapter,
   type ExecutorAgent,
@@ -12,6 +17,7 @@ import {
   type ExecutorFeatures,
   type RunRequest,
   type Runtime,
+  type Schema,
 } from '../src/index.js';
 
 export interface Deferred<Value> {
@@ -145,4 +151,76 @@ export async function collect<Value>(events: AsyncIterable<Value>): Promise<Valu
 
 export function stream(data: unknown): ExecutorEvent {
   return { type: 'stream', executor: 'fake', path: [], mode: 'values', data };
+}
+
+export function binding(overrides: Partial<CapabilityBinding> = {}): CapabilityBinding {
+  return {
+    kind: 'read',
+    destination: 'in-browser',
+    timeoutMs: 1000,
+    concurrency: 1,
+    grantScope: 'instance',
+    approval: 'none',
+    retry: 'none',
+    invoke: async (input) => input,
+    ...overrides,
+  };
+}
+
+export async function brokerFixture(
+  options: {
+    readonly input?: Schema;
+    readonly requests?: CapabilityRequests;
+    readonly bindings?: Readonly<Record<string, CapabilityBinding>>;
+    readonly scripts?: Script[];
+    readonly budgets?: Partial<BudgetLimits>;
+    readonly dataPolicy?: DataPolicy;
+  } = {},
+): Promise<{
+  readonly runtime: Runtime<readonly [FakeExecutor]>;
+  readonly executor: FakeExecutor;
+  readonly instance: AgentInstance<unknown, unknown>;
+  readonly diagnostics: DiagnosticEvent[];
+  readonly scriptErrors: unknown[];
+}> {
+  const scriptErrors: unknown[] = [];
+  const scripts = options.scripts?.map((script) =>
+    typeof script !== 'function'
+      ? script
+      : async function* (request: RunRequest): AsyncGenerator<ExecutorEvent> {
+          try {
+            yield* script(request);
+          } catch (error) {
+            scriptErrors.push(error);
+            throw error;
+          }
+        },
+  );
+  const executor = new FakeExecutor(scripts);
+  const diagnostics: DiagnosticEvent[] = [];
+  const runtime = createRuntime({
+    appId: 'broker-tests',
+    executors: [executor],
+    diagnostics: (event) => diagnostics.push(event),
+    ...(options.budgets === undefined ? {} : { budgets: options.budgets }),
+    ...(options.dataPolicy === undefined ? {} : { dataPolicy: options.dataPolicy }),
+  });
+  const instance = await runtime.create(
+    {
+      ...definition,
+      input: options.input ?? z.string(),
+      capabilities: {
+        optional: options.requests ?? {
+          'echo@1': { input: z.string(), output: z.string(), kind: 'read' },
+        },
+      },
+    },
+    {
+      principalScope: 'test-user',
+      agent: {},
+      bindings: options.bindings ?? { 'echo@1': binding() },
+    },
+  );
+  await instance.prepare();
+  return { runtime, executor, instance, diagnostics, scriptErrors };
 }

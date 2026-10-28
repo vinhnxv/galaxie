@@ -3,7 +3,9 @@
 
 import { type TracerProvider, trace } from '@opentelemetry/api';
 import { createAgentInstance } from './agent-instance.js';
+import { budgetLimits } from './budgets.js';
 import type { CapabilityBinding } from './capabilities.js';
+import { dataPolicy } from './capability-broker.js';
 import type { AgentDefinition, BindingsFor } from './definition.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
@@ -91,6 +93,8 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
   options: RuntimeOptions<Adapters>,
 ): Runtime<Adapters> {
   if (options.appId === '') throw new GalaxieError('invalid', 'An application ID is required.');
+  const limits = budgetLimits(options.budgets);
+  const policy = dataPolicy(options.dataPolicy);
   const executors = new Map<string, ExecutorAdapter<unknown, unknown>>();
   for (const executor of options.executors) {
     if (executors.has(executor.id)) {
@@ -118,7 +122,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
         definition,
         executor,
         createOptions,
-        { appId: options.appId, tracer },
+        { appId: options.appId, tracer, limits, policy },
         () => instances.delete(instance),
         options.diagnostics,
       );
