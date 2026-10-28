@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": true
+    "ignoreUnknown": true,
+    "includes": ["**", "!tests/conformance/golden"]
   },
   "formatter": {
     "indentStyle": "space",

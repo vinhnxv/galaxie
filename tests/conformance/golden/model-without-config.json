@@ -1,0 +1,190 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "answer": "implicit response"
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "implicit": {
+            "answer": "implicit response"
+          }
+        }
+      }
+    ],
+    "messages": [
+      {
+        "path": [
+          "implicit:<uuid:1>"
+        ],
+        "data": [
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "AIMessageChunk"
+            ],
+            "kwargs": {
+              "id": "reply-implicit",
+              "content": "implicit ",
+              "tool_calls": [],
+              "invalid_tool_calls": [],
+              "tool_call_chunks": [],
+              "additional_kwargs": {},
+              "response_metadata": {}
+            }
+          },
+          {
+            "tags": [],
+            "ls_integration": "langchain_chat_model",
+            "thread_id": "<uuid:2>",
+            "langgraph_step": 1,
+            "langgraph_node": "implicit",
+            "langgraph_triggers": [
+              "branch:to:implicit"
+            ],
+            "langgraph_path": [
+              "__pregel_pull",
+              "implicit"
+            ],
+            "langgraph_checkpoint_ns": "implicit:<uuid:1>",
+            "checkpoint_ns": "implicit:<uuid:1>",
+            "ls_model_type": "chat",
+            "ls_provider": "galaxie-fixture",
+            "ls_model_name": "fixture-1",
+            "versions": {
+              "@langchain/core": "1.2.20"
+            }
+          }
+        ]
+      },
+      {
+        "path": [
+          "implicit:<uuid:1>"
+        ],
+        "data": [
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "AIMessageChunk"
+            ],
+            "kwargs": {
+              "id": "reply-implicit",
+              "content": "response",
+              "usage_metadata": {
+                "input_tokens": 2,
+                "output_tokens": 2,
+                "total_tokens": 4
+              },
+              "tool_calls": [],
+              "invalid_tool_calls": [],
+              "tool_call_chunks": [],
+              "additional_kwargs": {},
+              "response_metadata": {}
+            }
+          },
+          {
+            "tags": [],
+            "ls_integration": "langchain_chat_model",
+            "thread_id": "<uuid:2>",
+            "langgraph_step": 1,
+            "langgraph_node": "implicit",
+            "langgraph_triggers": [
+              "branch:to:implicit"
+            ],
+            "langgraph_path": [
+              "__pregel_pull",
+              "implicit"
+            ],
+            "langgraph_checkpoint_ns": "implicit:<uuid:1>",
+            "checkpoint_ns": "implicit:<uuid:1>",
+            "ls_model_type": "chat",
+            "ls_provider": "galaxie-fixture",
+            "ls_model_name": "fixture-1",
+            "versions": {
+              "@langchain/core": "1.2.20"
+            }
+          }
+        ]
+      }
+    ],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "messages",
+    "messages",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 1,
+    "answer": "implicit response"
+  },
+  "state": {
+    "values": {
+      "value": 1,
+      "answer": "implicit response"
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "implicit"
+      ],
+      "values": {
+        "value": 1
+      },
+      "parentCheckpointId": "<uuid:3>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 1,
+        "answer": "implicit response"
+      },
+      "parentCheckpointId": "<uuid:4>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  }
+}

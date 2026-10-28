@@ -1,0 +1,113 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 3
+        }
+      },
+      {
+        "path": [
+          "child:<uuid:1>"
+        ],
+        "data": {
+          "value": 3
+        }
+      },
+      {
+        "path": [
+          "child:<uuid:1>"
+        ],
+        "data": {
+          "value": 4
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 4
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [
+          "child:<uuid:1>"
+        ],
+        "data": {
+          "increment": {
+            "value": 4
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "child": {
+            "value": 4
+          }
+        }
+      }
+    ],
+    "messages": [],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 4
+  },
+  "state": {
+    "values": {
+      "value": 4
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "child"
+      ],
+      "values": {
+        "value": 3
+      },
+      "parentCheckpointId": "<uuid:2>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 4
+      },
+      "parentCheckpointId": "<uuid:3>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  }
+}

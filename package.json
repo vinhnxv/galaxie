@@ -16,7 +16,8 @@
     "lint": "biome check .",
     "test": "vitest run",
     "typecheck": "tsc -p packages/core && tsc -p packages/core/test && tsc -p packages/adapter-langgraph && tsc -p packages/adapter-langgraph/test && tsc -p tests/conformance && tsc -p scripts",
-    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p packages/adapter-langgraph && tsc6 -p packages/adapter-langgraph/test && tsc6 -p tests/conformance && tsc6 -p scripts"
+    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p packages/adapter-langgraph && tsc6 -p packages/adapter-langgraph/test && tsc6 -p tests/conformance && tsc6 -p scripts",
+    "conformance:update": "vitest run --project node tests/conformance/native.node.test.ts --update"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
