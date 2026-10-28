@@ -45,4 +45,7 @@ Facts that shape the answer:
 ## Verification
 
 - M0 records the TypeScript versions and the tools that still need 6.x.
+  - Done (2026-10-28): the workspace pins TypeScript 7.0.2 (`tsc`) and TypeScript 6.0.3 through `@typescript/typescript6` 6.0.2 (`tsc6`). CI type-checks with both.
+  - No tool in the toolchain needs the compiler API yet. Biome lints and formats without it, and Vitest runs TypeScript through Vite's own transformer.
+  - The first tool that will need 6.x is typescript-eslint, for the agent-package ESLint plugin in M4: version 8.72 supports TypeScript only below 6.1.
 - Revisit when Phase 7 isolation work starts, or when profiling shows a hot path.

@@ -1,8 +1,9 @@
 # macOS
 .DS_Store
 
-# Dependencies
+# Dependencies and build output
 node_modules/
+dist/
 
 # Local environment files and secrets
 .env
@@ -11,3 +12,7 @@ node_modules/
 
 # Maintainer-only notes (see AGENTS.md); never committed
 /internal/
+
+# Local tool data on the maintainer's machine (see AGENTS.md): the CodeGraph index and the Beads backlog
+/.codegraph/
+/.beads/
