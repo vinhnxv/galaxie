@@ -1,0 +1,33 @@
+{
+  "name": "galaxie-spike-b-local-inference",
+  "private": true,
+  "description": "Throwaway spike: compare in-browser inference engines with one measurement harness.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "vite",
+    "start:lan": "VITE_LAN=1 vite",
+    "smoke": "node scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "0.2.86",
+    "@huggingface/transformers": "4.3.1",
+    "@huggingface/transformers-structured-output": "4.3.1",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
+    "@huggingface/tokenizers": "0.2.0",
+    "@huggingface/jinja": "0.5.10",
+    "@langchain/core": "1.2.20",
+    "@langchain/community": "1.1.29",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vite": "8.3.4",
+    "@vitejs/plugin-basic-ssl": "2.3.0",
+    "playwright": "1.64.1",
+    "typescript": "7.0.2"
+  }
+}
