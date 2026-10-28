@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type {
+  WebLLMChunk,
   WebLLMClient,
   WebLLMEngineConfig,
   WebLLMGPU,
   WebLLMModule,
+  WebLLMRequest,
   WebLLMWorker,
 } from '../../src/webllm/engine.js';
 
@@ -31,17 +33,88 @@ export class FakeWebLLMWorker implements WebLLMWorker {
 export interface FakeWebLLMOptions {
   readonly reload?: () => Promise<void>;
   readonly unload?: () => Promise<void>;
+  readonly reset?: () => Promise<void>;
+  readonly create?: (request: WebLLMRequest) => Promise<FakeWebLLMStream>;
+}
+
+export const fakeWebLLMChunks: readonly WebLLMChunk[] = [
+  { choices: [{ delta: { content: 'hello ' }, finish_reason: null }] },
+  { choices: [{ delta: { content: 'world' }, finish_reason: null }] },
+  { choices: [{ delta: {}, finish_reason: 'stop' }] },
+  { choices: [], usage: { prompt_tokens: 12, completion_tokens: 5, total_tokens: 17 } },
+];
+
+/** A stream can emit a late result even after return, like an outstanding worker request. */
+export class FakeWebLLMStream implements AsyncIterableIterator<WebLLMChunk> {
+  readonly chunks: readonly WebLLMChunk[];
+  readonly #options: {
+    readonly beforeNext?: (index: number) => Promise<void>;
+    readonly beforeReturn?: () => Promise<void>;
+  };
+  nexts = 0;
+  returns = 0;
+  closed = false;
+  onClose: (() => void) | undefined;
+
+  constructor(
+    chunks: readonly WebLLMChunk[] = fakeWebLLMChunks,
+    options: {
+      readonly beforeNext?: (index: number) => Promise<void>;
+      readonly beforeReturn?: () => Promise<void>;
+    } = {},
+  ) {
+    this.chunks = chunks;
+    this.#options = options;
+  }
+  [Symbol.asyncIterator](): AsyncIterableIterator<WebLLMChunk> {
+    return this;
+  }
+  async next(): Promise<IteratorResult<WebLLMChunk>> {
+    const index = this.nexts++;
+    await this.#options.beforeNext?.(index);
+    const chunk = this.chunks[index];
+    return chunk === undefined ? { done: true, value: undefined } : { done: false, value: chunk };
+  }
+  async return(): Promise<IteratorResult<WebLLMChunk>> {
+    this.returns++;
+    await this.#options.beforeReturn?.();
+    this.closed = true;
+    this.onClose?.();
+    return { done: true, value: undefined };
+  }
 }
 
 export class FakeWebLLMClient implements WebLLMClient {
   readonly config: WebLLMEngineConfig;
   reloads: string[] = [];
   unloads = 0;
+  resets = 0;
+  interrupts = 0;
+  readonly requests: WebLLMRequest[] = [];
+  readonly streams: FakeWebLLMStream[] = [];
+  readonly events: string[] = [];
+  readonly chat: {
+    completions: { create: (request: WebLLMRequest) => Promise<AsyncIterable<WebLLMChunk>> };
+  };
   readonly #options: FakeWebLLMOptions;
 
   constructor(config: WebLLMEngineConfig, options: FakeWebLLMOptions) {
     this.config = config;
     this.#options = options;
+    this.chat = {
+      completions: {
+        create: async (request) => {
+          this.events.push('create');
+          this.requests.push(request);
+          const stream = (await this.#options.create?.(request)) ?? new FakeWebLLMStream();
+          this.streams.push(stream);
+          stream.onClose = () => {
+            this.events.push('closed');
+          };
+          return stream;
+        },
+      },
+    };
   }
   async reload(modelId: string): Promise<void> {
     this.reloads.push(modelId);
@@ -50,6 +123,18 @@ export class FakeWebLLMClient implements WebLLMClient {
   async unload(): Promise<void> {
     this.unloads++;
     await this.#options.unload?.();
+  }
+  async resetChat(): Promise<void> {
+    this.events.push('reset');
+    this.resets++;
+    await this.#options.reset?.();
+  }
+  interruptGenerate(): void {
+    this.interrupts++;
+  }
+  assertClosed(): void {
+    if (this.streams.some((stream) => !stream.closed))
+      throw new Error('A fake WebLLM stream is still open.');
   }
 }
 

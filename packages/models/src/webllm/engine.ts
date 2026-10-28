@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { WebLLMError, type WebLLMUnavailableReason } from '../errors.js';
+import { WebLLMError, WebLLMProviderError, type WebLLMUnavailableReason } from '../errors.js';
 import { classifyWebLLMError } from './classify.js';
 import {
   buildAppConfig,
@@ -51,6 +51,36 @@ export interface WebLLMEngineConfig {
 export interface WebLLMClient {
   reload(modelId: string): Promise<void>;
   unload(): Promise<void>;
+  resetChat(): Promise<void>;
+  interruptGenerate(): void;
+  readonly chat: {
+    readonly completions: { create(request: WebLLMRequest): Promise<AsyncIterable<WebLLMChunk>> };
+  };
+}
+
+export interface WebLLMRequest {
+  readonly messages: readonly {
+    readonly role: 'system' | 'user' | 'assistant';
+    readonly content: string;
+  }[];
+  readonly stream: true;
+  readonly stream_options: { readonly include_usage: true };
+  readonly max_tokens: number;
+  readonly temperature: number;
+  readonly response_format?: { readonly type: 'json_object'; readonly schema: string };
+}
+
+export interface WebLLMChunk {
+  readonly id?: string;
+  readonly choices: readonly {
+    readonly delta: { readonly content?: string | null };
+    readonly finish_reason: string | null;
+  }[];
+  readonly usage?: {
+    readonly prompt_tokens: number;
+    readonly completion_tokens: number;
+    readonly total_tokens?: number;
+  } | null;
 }
 
 export interface WebLLMModule {
@@ -73,6 +103,7 @@ class EngineLifetime {
   #failed = false;
   #error: unknown;
   #terminated = false;
+  readonly #listeners = new Set<() => void>();
 
   constructor(worker: WebLLMWorker) {
     this.#worker = worker;
@@ -101,6 +132,13 @@ class EngineLifetime {
     this.#failed = true;
     this.#error = error;
     this.#failure.reject(error);
+    for (const listener of this.#listeners) listener();
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.#listeners.add(listener);
+    if (this.#failed) listener();
+    return () => this.#listeners.delete(listener);
   }
 
   async race<T>(operation: Promise<T>): Promise<T> {
@@ -120,6 +158,7 @@ export class WebLLMEngineHandle {
   readonly #engine: WebLLMClient;
   readonly #lifetime: EngineLifetime;
   #disposal: Promise<void> | undefined;
+  #tail: Promise<void> = Promise.resolve();
 
   constructor(
     engine: WebLLMClient,
@@ -131,6 +170,96 @@ export class WebLLMEngineHandle {
     this.#lifetime = lifetime;
     this.modelId = modelId;
     this.device = Object.freeze(device);
+  }
+
+  /** One shared turn covers reset, creation, every pull and the stream's final return. */
+  async *stream(request: WebLLMRequest, signal?: AbortSignal): AsyncGenerator<WebLLMChunk> {
+    if (this.#lifetime.failed) throw this.#lifetime.error;
+    signal?.throwIfAborted();
+    const previous = this.#tail;
+    const released = Promise.withResolvers<void>();
+    // An aborted queued job can release immediately without allowing its successor to overtake.
+    this.#tail = previous.then(() => released.promise);
+    const aborted = Promise.withResolvers<never>();
+    void aborted.promise.catch(() => {});
+    let running = false;
+    let iterator: AsyncIterator<WebLLMChunk> | undefined;
+    let closing: Promise<void> | undefined;
+    let failed = false;
+    const close = (): Promise<void> => {
+      if (iterator === undefined) return Promise.resolve();
+      closing ??= this.#lifetime.race(
+        Promise.resolve().then(async () => {
+          await iterator?.return?.();
+        }),
+      );
+      return closing;
+    };
+    const onAbort = (): void => {
+      aborted.reject(signal?.reason);
+      if (!running) return;
+      try {
+        this.#engine.interruptGenerate();
+      } catch {
+        /* Abort still closes the stream. */
+      }
+      if (iterator !== undefined) void close().then(released.resolve, released.resolve);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    const unsubscribe = this.#lifetime.subscribe(() => {
+      if (iterator !== undefined) void close().then(released.resolve, released.resolve);
+    });
+    const check = (): void => {
+      if (this.#lifetime.failed) throw this.#lifetime.error;
+      signal?.throwIfAborted();
+    };
+    const failure = (error: unknown): unknown => {
+      if (this.#lifetime.failed) return this.#lifetime.error;
+      if (signal?.aborted) return signal.reason;
+      const classified = classifyWebLLMError(error);
+      if (classified === undefined) return new WebLLMProviderError();
+      const mapped = new WebLLMError(
+        classified.code,
+        classified.code === 'unavailable' ? classified.reason : undefined,
+      );
+      if (classified.code === 'unavailable') this.#lifetime.fail(mapped);
+      return mapped;
+    };
+    const cleanup = async (): Promise<void> => {
+      try {
+        await close();
+      } catch (error) {
+        if (!failed) throw failure(error);
+      } finally {
+        signal?.removeEventListener('abort', onAbort);
+        unsubscribe();
+        released.resolve();
+      }
+    };
+    try {
+      if (signal?.aborted) onAbort();
+      await this.#lifetime.race(Promise.race([previous, aborted.promise]));
+      check();
+      running = true;
+      await this.#lifetime.race(this.#engine.resetChat());
+      check();
+      // Creation must settle before releasing the turn, so an abort cannot orphan a late stream.
+      const stream = await this.#lifetime.race(this.#engine.chat.completions.create(request));
+      iterator = stream[Symbol.asyncIterator]();
+      check();
+      while (true) {
+        check();
+        const next = await this.#lifetime.race(Promise.race([iterator.next(), aborted.promise]));
+        check();
+        if (next.done) break;
+        yield next.value;
+      }
+    } catch (error) {
+      failed = true;
+      throw failure(error);
+    } finally {
+      await cleanup();
+    }
   }
 
   dispose(): Promise<void> {

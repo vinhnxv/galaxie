@@ -2,9 +2,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { describe, expect, it, vi } from 'vitest';
-import { createWebLLMEngine, loadWebLLMEngine, type WebLLMProgress } from '../src/webllm/engine.js';
+import {
+  createWebLLMEngine,
+  loadWebLLMEngine,
+  type WebLLMProgress,
+  type WebLLMRequest,
+} from '../src/webllm/engine.js';
 import { defaultWebLLMModel } from '../src/webllm/model-record.js';
-import { createFakeWebLLM } from './support/fake-webllm.js';
+import {
+  createFakeWebLLM,
+  type FakeWebLLMOptions,
+  FakeWebLLMStream,
+} from './support/fake-webllm.js';
 
 describe('WebLLM engine loading and lifetime', () => {
   it('public loading without WebGPU never loads the real engine bundle', async () => {
@@ -178,5 +187,245 @@ describe('WebLLM engine loading and lifetime', () => {
     await handle.dispose();
     expect(fake.engine.unloads).toBe(1);
     expect(fake.worker.terminations).toBe(1);
+  });
+});
+
+const request: WebLLMRequest = {
+  messages: [{ role: 'user', content: 'queue request' }],
+  stream: true,
+  stream_options: { include_usage: true },
+  max_tokens: 64,
+  temperature: 0,
+};
+async function queuedEngine(options: FakeWebLLMOptions = {}) {
+  const fake = createFakeWebLLM(options);
+  const handle = await createWebLLMEngine(
+    { worker: fake.worker },
+    { gpu: fake.gpu, loadModule: async () => fake.module },
+  );
+  return { ...fake, engine: fake.engine, handle };
+}
+async function drain(iterator: AsyncIterable<unknown>): Promise<unknown[]> {
+  const chunks: unknown[] = [];
+  for await (const chunk of iterator) chunks.push(chunk);
+  return chunks;
+}
+
+describe('WebLLM FIFO requests and cancellation', () => {
+  it('resets before each request and waits for stream closure before the next reset', async () => {
+    const returning = Promise.withResolvers<void>();
+    const returned = Promise.withResolvers<void>();
+    const firstStream = new FakeWebLLMStream([], {
+      beforeReturn: async () => {
+        returning.resolve();
+        await returned.promise;
+      },
+    });
+    let created = 0;
+    const { engine, handle } = await queuedEngine({
+      create: async () => (created++ === 0 ? firstStream : new FakeWebLLMStream()),
+    });
+    const first = drain(handle.stream(request));
+    const second = drain(handle.stream(request));
+    await returning.promise;
+    expect(engine.events).toEqual(['reset', 'create']);
+    returned.resolve();
+    await Promise.all([first, second]);
+    expect(engine.events).toEqual(['reset', 'create', 'closed', 'reset', 'create', 'closed']);
+    expect(engine.requests).toEqual([request, request]);
+    engine.assertClosed();
+    await handle.dispose();
+  });
+
+  it('removes queued aborts without dispatch and preserves the next turn', async () => {
+    const entered = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<void>();
+    const firstStream = new FakeWebLLMStream([], {
+      beforeNext: async () => {
+        entered.resolve();
+        await gate.promise;
+      },
+    });
+    let created = 0;
+    const { engine, handle } = await queuedEngine({
+      create: async () => (created++ === 0 ? firstStream : new FakeWebLLMStream()),
+    });
+    const first = drain(handle.stream(request));
+    await entered.promise;
+    const controller = new AbortController();
+    const aborted = drain(handle.stream(request, controller.signal));
+    const rejected = expect(aborted).rejects.toBe('queued-abort');
+    const last = drain(handle.stream(request));
+    controller.abort('queued-abort');
+    await rejected;
+    expect(engine.resets).toBe(1);
+    gate.resolve();
+    await Promise.all([first, last]);
+    expect(engine.resets).toBe(2);
+    engine.assertClosed();
+    await handle.dispose();
+  });
+
+  it('interrupts and closes once after two chunks, dropping all late chunks and usage', async () => {
+    const { engine, handle } = await queuedEngine();
+    const controller = new AbortController();
+    const iterator = handle.stream(request, controller.signal);
+    expect((await iterator.next()).done).toBe(false);
+    expect((await iterator.next()).done).toBe(false);
+    controller.abort('running-abort');
+    await expect(iterator.next()).rejects.toBe('running-abort');
+    expect(engine.interrupts).toBe(1);
+    expect(engine.streams[0]?.returns).toBe(1);
+    engine.assertClosed();
+    await handle.dispose();
+  });
+
+  it('returns a stream aborted during create without ever pulling its first chunk', async () => {
+    const entered = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<void>();
+    const stream = new FakeWebLLMStream();
+    const { engine, handle } = await queuedEngine({
+      create: async () => {
+        entered.resolve();
+        await gate.promise;
+        return stream;
+      },
+    });
+    const controller = new AbortController();
+    const running = drain(handle.stream(request, controller.signal));
+    const rejected = expect(running).rejects.toBe('early-abort');
+    await entered.promise;
+    controller.abort('early-abort');
+    const next = drain(handle.stream(request));
+    expect(engine.requests).toHaveLength(1);
+    gate.resolve();
+    await rejected;
+    expect(stream.nexts).toBe(0);
+    expect(stream.returns).toBe(1);
+    await next;
+    engine.assertClosed();
+    await handle.dispose();
+  });
+
+  it('closes when the consumer stops early', async () => {
+    const { engine, handle } = await queuedEngine();
+    for await (const _chunk of handle.stream(request)) break;
+    expect(engine.streams[0]?.returns).toBe(1);
+    engine.assertClosed();
+    await handle.dispose();
+  });
+
+  it('drops an outstanding late finish chunk after abort without waiting for it', async () => {
+    const entered = Promise.withResolvers<void>();
+    const late = Promise.withResolvers<void>();
+    const stream = new FakeWebLLMStream(undefined, {
+      beforeNext: async (index) => {
+        if (index === 2) {
+          entered.resolve();
+          await late.promise;
+        }
+      },
+    });
+    const { engine, handle } = await queuedEngine({ create: async () => stream });
+    const controller = new AbortController();
+    const iterator = handle.stream(request, controller.signal);
+    await iterator.next();
+    await iterator.next();
+    const pending = iterator.next();
+    const rejected = expect(pending).rejects.toBe('late-abort');
+    await entered.promise;
+    controller.abort('late-abort');
+    await rejected;
+    expect(engine.interrupts).toBe(1);
+    expect(stream.returns).toBe(1);
+    late.resolve();
+    expect(await iterator.next()).toEqual({ done: true, value: undefined });
+    engine.assertClosed();
+    await handle.dispose();
+  });
+
+  it.each(['worker', 'dispose'] as const)(
+    '%s failure rejects running, queued and later requests without waiting for next',
+    async (kind) => {
+      const entered = Promise.withResolvers<void>();
+      const stream = new FakeWebLLMStream([], {
+        beforeNext: async () => {
+          entered.resolve();
+          await new Promise(() => {});
+        },
+      });
+      const { engine, handle, worker } = await queuedEngine({ create: async () => stream });
+      const running = drain(handle.stream(request));
+      const firstRejected = expect(running).rejects.toMatchObject({
+        code: 'unavailable',
+        reason: kind === 'worker' ? 'worker_failed' : 'disposed',
+      });
+      await entered.promise;
+      const queued = drain(handle.stream(request));
+      const secondRejected = expect(queued).rejects.toMatchObject({ code: 'unavailable' });
+      if (kind === 'worker') worker.fail();
+      else await handle.dispose();
+      await Promise.all([firstRejected, secondRejected]);
+      await expect(drain(handle.stream(request))).rejects.toMatchObject({ code: 'unavailable' });
+      expect(engine.requests).toHaveLength(1);
+      engine.assertClosed();
+      await handle.dispose();
+    },
+  );
+
+  it('maps prefill context failures to invalid and still runs the next queued request', async () => {
+    const stream = new FakeWebLLMStream([], {
+      beforeNext: async () => {
+        throw 'ContextWindowSizeExceededError: private engine text';
+      },
+    });
+    let created = 0;
+    const { engine, handle } = await queuedEngine({
+      create: async () => (created++ === 0 ? stream : new FakeWebLLMStream()),
+    });
+    const failed = drain(handle.stream(request));
+    const rejected = expect(failed).rejects.toMatchObject({ code: 'invalid' });
+    const next = drain(handle.stream(request));
+    await rejected;
+    await next;
+    expect(engine.resets).toBe(2);
+    engine.assertClosed();
+    await handle.dispose();
+  });
+
+  it('sanitizes unknown create failures', async () => {
+    const { engine, handle } = await queuedEngine({
+      create: async () => {
+        throw 'private engine text';
+      },
+    });
+    const error = await drain(handle.stream(request)).catch((value: unknown) => value);
+    expect(error).toMatchObject({
+      name: 'WebLLMProviderError',
+      message: 'The WebLLM provider failed.',
+    });
+    expect(error).not.toHaveProperty('cause');
+    expect(JSON.stringify(error)).not.toContain('private');
+    engine.assertClosed();
+    await handle.dispose();
+  });
+
+  it('makes device loss terminal for current and later requests', async () => {
+    const { engine, handle } = await queuedEngine({
+      create: async () => {
+        throw 'DeviceLostError: private engine text';
+      },
+    });
+    await expect(drain(handle.stream(request))).rejects.toMatchObject({
+      code: 'unavailable',
+      reason: 'device_lost',
+    });
+    await expect(drain(handle.stream(request))).rejects.toMatchObject({
+      code: 'unavailable',
+      reason: 'device_lost',
+    });
+    expect(engine.requests).toHaveLength(1);
+    engine.assertClosed();
+    await handle.dispose();
   });
 });
