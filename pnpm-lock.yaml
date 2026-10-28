@@ -58,6 +58,12 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  packages/models:
+    devDependencies:
+      '@langchain/core':
+        specifier: 1.2.20
+        version: 1.2.20(@opentelemetry/api@1.10.0)(ws@8.22.0)
+
   tests/conformance:
     dependencies:
       '@galaxie/adapter-langgraph':
@@ -66,6 +72,9 @@ importers:
       '@galaxie/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@galaxie/models':
+        specifier: workspace:*
+        version: link:../../packages/models
       '@langchain/core':
         specifier: 1.2.20
         version: 1.2.20(@opentelemetry/api@1.10.0)(ws@8.22.0)

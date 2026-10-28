@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { collect } from '../../packages/core/test/fake-executor.js';
 import { recordNetwork } from '../../packages/core/test/network-recorder.js';
 import { CASE_NAMES, cases } from './cases/index.js';
+import { assistantRoles, assistantRouting } from './support/routing.js';
 import {
   createModelLatch,
   FixtureModelError,
@@ -23,6 +24,7 @@ const definition = defineAgentDefinition({
   version: '1.0.0',
   executor: 'langgraph-js',
   input: z.object({ request: z.string() }),
+  models: assistantRoles,
 });
 
 test('network recording preserves runner-origin fetch and WebSocket APIs while recording other origins', async () => {
@@ -101,6 +103,7 @@ test('a real adapter success, failure and cancellation lifecycle makes no outbou
       const instance = await runtime.create(definition, {
         principalScope: 'conformance',
         services: { chatModels: { assistant: model } },
+        models: assistantRouting(),
         agent: (host) => {
           const state = Annotation.Root({
             request: Annotation<string>,

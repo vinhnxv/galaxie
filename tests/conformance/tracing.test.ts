@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { collect } from '../../packages/core/test/fake-executor.js';
 import { assertSpanTree, serializeSpans } from '../../packages/core/test/span-tree.js';
 import { cases } from './cases/index.js';
+import { assistantRoles, assistantRouting } from './support/routing.js';
 import { FixtureModelError, ScriptedChatModel } from './support/scripted-chat-model.js';
 import type { ConformanceCase } from './support/transcript.js';
 
@@ -24,6 +25,7 @@ const definition = defineAgentDefinition({
   version: '1.0.0',
   executor: 'langgraph-js',
   input: z.unknown(),
+  models: assistantRoles,
 });
 
 async function ready(
@@ -41,6 +43,7 @@ async function ready(
   });
   const instance = await runtime.create(definition, {
     principalScope: 'canary-principal',
+    models: assistantRouting(),
     services: { chatModels: { assistant: model } },
     agent: (host) =>
       fixture.factory(web, host.langchain.chatModel('assistant'), host.langchain.checkpointer()),

@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { RunTrace, TraceHandle } from '@galaxie/core';
+import type { RunTrace, SelectedModelRoute, TraceHandle } from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { LLMResult } from '@langchain/core/outputs';
+import { selectedRouteFromOptions } from './routed-chat-model.js';
 
 interface ChainTrace {
   readonly handle: TraceHandle | undefined;
@@ -17,6 +18,8 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
   readonly #trace: RunTrace;
   readonly #chains: Map<string, ChainTrace> = new Map();
   readonly #models: Map<string, TraceHandle> = new Map();
+  readonly #routes = new Map<string, SelectedModelRoute>();
+  readonly #credentialFailures = new Set<unknown>();
   readonly #settlement: PromiseWithResolvers<void> = Promise.withResolvers<void>();
   #root: string | undefined;
 
@@ -29,8 +32,34 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     return this.#chains.get(runId)?.handle;
   }
 
+  setModelRoute(runId: string, selected: SelectedModelRoute): void {
+    if (this.#models.has(runId))
+      this.#routes.set(runId, {
+        providerId: selected.providerId,
+        destination: selected.destination,
+      });
+  }
+
+  /** Classify errors without changing the graph-facing object or storing the credential (ADR-0012). */
+  recordCredentialFailure(error: unknown): void {
+    this.#credentialFailures.add(error);
+  }
+
+  isCredentialFailure(error: unknown): boolean {
+    const seen = new Set<unknown>();
+    let current = error;
+    while (!seen.has(current)) {
+      if (this.#credentialFailures.has(current)) return true;
+      if (typeof current !== 'object' || current === null || !('cause' in current)) return false;
+      seen.add(current);
+      current = current.cause;
+    }
+    return false;
+  }
+
   async settled(): Promise<void> {
     if (this.#root !== undefined) await this.#settlement.promise;
+    this.#credentialFailures.clear();
   }
 
   override handleChainStart(
@@ -70,7 +99,11 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
 
   override handleChainError(error: Error, runId: string): void {
     const chain = this.#chains.get(runId);
-    if (chain?.owned) chain.handle?.end({ status: 'error', errorType: error.name });
+    if (chain?.owned)
+      chain.handle?.end({
+        status: 'error',
+        errorType: this.isCredentialFailure(error) ? 'Error' : error.name,
+      });
     this.#chains.delete(runId);
     if (runId === this.#root) this.#settlement.resolve();
   }
@@ -80,12 +113,13 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     _messages: BaseMessage[][],
     runId: string,
     parentRunId?: string,
-    _extraParams?: Record<string, unknown>,
+    extraParams?: Record<string, unknown>,
     _tags?: string[],
     metadata?: Record<string, unknown>,
   ): void {
     const provider = metadata?.['ls_provider'];
     const model = metadata?.['ls_model_name'];
+    const route = selectedRouteFromOptions(extraParams?.['options']);
     this.#models.set(
       runId,
       this.#trace.start(
@@ -93,6 +127,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
           kind: 'model',
           ...(typeof provider === 'string' ? { provider } : {}),
           ...(typeof model === 'string' ? { model } : {}),
+          ...(route === undefined ? {} : { route }),
         },
         parentRunId === undefined ? undefined : this.#chains.get(parentRunId)?.handle,
       ),
@@ -100,6 +135,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
   }
 
   override handleLLMEnd(output: LLMResult, runId: string): void {
+    const route = this.#routes.get(runId);
     const generation = output.generations[0]?.[0];
     const message =
       generation !== undefined && 'message' in generation ? generation.message : undefined;
@@ -117,16 +153,24 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
         : undefined;
     this.#models.get(runId)?.end({
       status: 'ok',
+      ...(route === undefined ? {} : { route }),
       usage: {
         ...(typeof input === 'number' ? { inputTokens: input } : {}),
         ...(typeof outputTokens === 'number' ? { outputTokens } : {}),
       },
     });
     this.#models.delete(runId);
+    this.#routes.delete(runId);
   }
 
   override handleLLMError(error: Error, runId: string): void {
-    this.#models.get(runId)?.end({ status: 'error', errorType: error.name });
+    const route = this.#routes.get(runId);
+    this.#models.get(runId)?.end({
+      status: 'error',
+      errorType: this.isCredentialFailure(error) ? 'Error' : error.name,
+      ...(route === undefined ? {} : { route }),
+    });
     this.#models.delete(runId);
+    this.#routes.delete(runId);
   }
 }

@@ -11,6 +11,7 @@ import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
 import type { AppId, InstanceId, PrincipalScope, RunId } from './ids.js';
 import type { AgentInstance } from './instance.js';
+import type { ModelRouting } from './models.js';
 import type { BudgetLimits, DataPolicy } from './policy.js';
 import type { InferInput } from './schema.js';
 import { VERSION } from './version.js';
@@ -24,7 +25,8 @@ export interface DiagnosticEvent {
     | 'protocol_violation'
     | 'listener_threw'
     | 'late_result'
-    | 'capability_failed';
+    | 'capability_failed'
+    | 'model_failed';
   readonly instanceId: InstanceId;
   readonly runId?: RunId;
   /** Host-only evidence, possibly including binding-supplied private content. Never forward it
@@ -37,6 +39,8 @@ export interface CreateOptions<Agent = unknown, Services = unknown> {
   readonly agent: Agent;
   readonly services?: Services;
   readonly bindings?: Readonly<Record<string, CapabilityBinding<never, unknown>>>;
+  /** Per-role providers, consent and ephemeral credentials (ADR-0006). */
+  readonly models?: ModelRouting;
 }
 
 export interface RuntimeOptions<

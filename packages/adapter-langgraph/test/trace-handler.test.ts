@@ -178,3 +178,15 @@ test('handleFor resolves live node and inherited wrapper handles only', () => {
   handler.handleChainEnd({}, 'node');
   expect(handler.handleFor('node')).toBeUndefined();
 });
+
+test.each(['ok', 'error'] as const)('model %s end includes the selected route', (status) => {
+  const { handler, steps } = recording();
+  handler.handleChatModelStart({}, [], 'routed');
+  handler.setModelRoute('routed', { providerId: 'local', destination: 'in-browser' });
+  if (status === 'ok') handler.handleLLMEnd({ generations: [] }, 'routed');
+  else handler.handleLLMError(new Error('private'), 'routed');
+  expect(steps[0]?.results[0]).toMatchObject({
+    status,
+    route: { providerId: 'local', destination: 'in-browser' },
+  });
+});

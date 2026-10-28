@@ -7,6 +7,7 @@ import {
   type ExecutorEvent,
   GalaxieError,
   isGalaxieError,
+  type ModelPort,
   toErrorInfo,
 } from '@galaxie/core';
 import { GraphRecursionError, isGraphInterrupt } from '@langchain/langgraph/web';
@@ -39,32 +40,42 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
       streaming: true,
       subgraphs: true,
     },
-    async prepare(agent, services, _options) {
+    async prepare(agent, services, options) {
       services = services === undefined ? { chatModels: {} } : services;
       if (typeof agent !== 'function' || !validServices(services))
         throw new GalaxieError('invalid', 'The LangGraph factory and services must be valid.');
       let active:
-        | { readonly capabilities: CapabilityPort; readonly handler: LangGraphTraceHandler }
+        | {
+            readonly capabilities: CapabilityPort;
+            readonly models: ModelPort;
+            readonly handler: LangGraphTraceHandler;
+          }
         | undefined;
-      let host: LangGraphHost | undefined = createHost(services, {
-        async call(name, input, config): Promise<unknown> {
-          const run = active;
-          if (run === undefined) throw new GalaxieError('invalid', toErrorInfo('invalid').message);
-          const callbacks = config?.callbacks;
-          const parentId =
-            callbacks !== undefined &&
-            !Array.isArray(callbacks) &&
-            'getParentRunId' in callbacks &&
-            typeof callbacks.getParentRunId === 'function'
-              ? callbacks.getParentRunId()
-              : undefined;
-          const parent = parentId === undefined ? undefined : run.handler.handleFor(parentId);
-          return run.capabilities.call(name, input, {
-            ...(config?.signal === undefined ? {} : { signal: config.signal }),
-            ...(parent === undefined ? {} : { parent }),
-          });
+      let host: LangGraphHost | undefined = createHost(
+        services,
+        {
+          async call(name, input, config): Promise<unknown> {
+            const run = active;
+            if (run === undefined)
+              throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+            const callbacks = config?.callbacks;
+            const parentId =
+              callbacks !== undefined &&
+              !Array.isArray(callbacks) &&
+              'getParentRunId' in callbacks &&
+              typeof callbacks.getParentRunId === 'function'
+                ? callbacks.getParentRunId()
+                : undefined;
+            const parent = parentId === undefined ? undefined : run.handler.handleFor(parentId);
+            return run.capabilities.call(name, input, {
+              ...(config?.signal === undefined ? {} : { signal: config.signal }),
+              ...(parent === undefined ? {} : { parent }),
+            });
+          },
         },
-      });
+        options.models,
+        () => active,
+      );
       let graph: LangGraphGraph | undefined = agent(host);
       if (typeof graph !== 'object' || graph === null || typeof graph.stream !== 'function')
         throw new GalaxieError('invalid', 'The factory must return a LangGraph stream.');
@@ -82,7 +93,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           if (graph === undefined)
             throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');
           const handler = new LangGraphTraceHandler(request.trace);
-          active = { capabilities: request.capabilities, handler };
+          active = { capabilities: request.capabilities, models: request.models, handler };
           let output: unknown;
           let interrupted = false;
           try {
@@ -138,7 +149,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
                   error instanceof GraphRecursionError
                     ? 'budget_exceeded'
                     : (cause?.code ?? (isGraphInterrupt(error) ? 'unsupported' : 'executor_error')),
-                  error,
+                  handler.isCredentialFailure(error) ? { name: 'Error' } : error,
                 ),
               };
           } finally {

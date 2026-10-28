@@ -21,6 +21,7 @@ import type {
 } from '@langchain/langgraph/web';
 import * as web from '@langchain/langgraph/web';
 import { z } from 'zod';
+import { assistantRoles, assistantRouting } from './routing.js';
 import { type ModelScript, ScriptedChatModel } from './scripted-chat-model.js';
 
 export type LangGraphModule = typeof import('@langchain/langgraph/web');
@@ -156,6 +157,7 @@ const definition = defineAgentDefinition({
   version: '1.0.0',
   executor: 'langgraph-js',
   input: z.unknown(),
+  models: assistantRoles,
 });
 
 export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> {
@@ -187,6 +189,7 @@ export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> 
     { ...definition, capabilities: { required: requests } },
     {
       bindings,
+      models: assistantRouting(),
       principalScope: 'conformance',
       services: {
         chatModels: { assistant: new ScriptedChatModel(fixture.script) },

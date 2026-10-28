@@ -450,3 +450,46 @@ test('run finish ends an open capability span without accepting a later end', ()
   expect(serializeSpans(exporter.getFinishedSpans())).toBe(before);
   assertSpanTree(exporter.getFinishedSpans());
 });
+
+test.each(['ok', 'error'] as const)(
+  'model %s results record filtered route attributes only when supplied',
+  async (status) => {
+    const exporter = await recorded(async function* ({ trace: recorder }) {
+      recorder
+        .start({ kind: 'model', model: 'routed' })
+        .end({ status, route: { providerId: 'local', destination: 'in-browser' } });
+      recorder
+        .start({ kind: 'model', model: 'unsafe' })
+        .end({ status, route: { providerId: 'unsafe\nprovider', destination: 'host-server' } });
+      recorder.start({ kind: 'model', model: 'plain' }).end({ status });
+      yield { type: 'output', output: null };
+    });
+    const spans = exporter.getFinishedSpans();
+    expect(spans.find((span) => span.name === 'chat routed')?.attributes).toMatchObject({
+      'galaxie.model.provider': 'local',
+      'galaxie.destination.class': 'in-browser',
+    });
+    expect(spans.find((span) => span.name === 'chat unsafe')?.attributes).toMatchObject({
+      'galaxie.model.provider': '_OTHER',
+      'galaxie.destination.class': 'host-server',
+    });
+    const plain = spans.find((span) => span.name === 'chat plain');
+    expect(plain?.attributes).not.toHaveProperty('galaxie.model.provider');
+    expect(plain?.attributes).not.toHaveProperty('galaxie.destination.class');
+  },
+);
+
+test('a route known at model start survives the run closing before the model callback', async () => {
+  const exporter = await recorded(async function* ({ trace: recorder }) {
+    recorder.start({
+      kind: 'model',
+      model: 'closing',
+      route: { providerId: 'local', destination: 'in-browser' },
+    });
+    yield { type: 'stream', executor: 'fake', path: [], mode: 'values', data: null };
+    throw new Error('private');
+  });
+  expect(
+    exporter.getFinishedSpans().find((span) => span.name === 'chat closing')?.attributes,
+  ).toMatchObject({ 'galaxie.model.provider': 'local', 'galaxie.destination.class': 'in-browser' });
+});

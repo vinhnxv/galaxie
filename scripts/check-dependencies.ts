@@ -103,7 +103,23 @@ for (const file of files('packages/adapter-langgraph/src', '.ts')) {
   }
 }
 
-for (const directory of ['packages/core/dist', 'packages/adapter-langgraph/dist']) {
+for (const file of files('packages/models/src', '.ts')) {
+  for (const { specifier } of imports(file)) {
+    if (
+      specifier.startsWith('./') ||
+      specifier.startsWith('../') ||
+      specifier.startsWith('@langchain/core/')
+    )
+      continue;
+    problems.push(`${file}: forbidden models import ${specifier}`);
+  }
+}
+
+for (const directory of [
+  'packages/core/dist',
+  'packages/adapter-langgraph/dist',
+  'packages/models/dist',
+]) {
   for (const file of files(directory, '.js')) {
     if (readFileSync(file, 'utf8').includes('async_hooks'))
       problems.push(`${file}: built packages must not contain async_hooks`);

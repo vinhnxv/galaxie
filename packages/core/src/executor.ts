@@ -5,6 +5,7 @@ import type { CapabilityPort } from './capabilities.js';
 import type { ExecutorEvent } from './events.js';
 import type { InteractionId, RunId, SessionId } from './ids.js';
 import type { PendingInteraction } from './interactions.js';
+import type { ModelPort, ModelPreparation } from './models.js';
 import type { RunTrace } from './trace.js';
 
 /** What an executor supports, so the runtime never pretends it can pause or resume (brief §7.5). */
@@ -30,6 +31,8 @@ export interface RunRequest {
   readonly signal: AbortSignal;
   readonly trace: RunTrace;
   readonly capabilities: CapabilityPort;
+  /** Every model call is authorized and reserved through this run's router (ADR-0006). */
+  readonly models: ModelPort;
   readonly limits: { readonly steps: number };
 }
 
@@ -60,6 +63,10 @@ export interface ExecutorAdapter<Agent, Services> {
   prepare(
     agent: Agent,
     services: Services,
-    options: { readonly signal: AbortSignal },
+    options: {
+      readonly signal: AbortSignal;
+      /** Routed implementations required by this instance (ADR-0006). */
+      readonly models?: ModelPreparation;
+    },
   ): Promise<ExecutorAgent>;
 }

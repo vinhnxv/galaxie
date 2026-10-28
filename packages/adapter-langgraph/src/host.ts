@@ -1,13 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { GalaxieError } from '@galaxie/core';
+import { GalaxieError, type ModelPort, type ModelPreparation } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
   type BaseCheckpointSaver,
   type LangGraphRunnableConfig,
   MemorySaver,
 } from '@langchain/langgraph/web';
+import { RoutedChatModel } from './routed-chat-model.js';
+import type { LangGraphTraceHandler } from './trace-handler.js';
 
 type StreamOptions = LangGraphRunnableConfig & {
   streamMode: Array<'values' | 'updates' | 'messages' | 'custom'>;
@@ -23,8 +25,14 @@ export interface LangGraphGraph {
 
 export type LangGraphAgent = (host: LangGraphHost) => LangGraphGraph;
 
+/** Credential providers are constructed per call; credentials never enter call options (ADR-0006). */
+export type LangGraphChatModel =
+  | BaseChatModel
+  | ((options: { readonly credential: string }) => BaseChatModel);
+
 export interface LangGraphServices {
-  readonly chatModels: Readonly<Record<string, BaseChatModel>>;
+  /** Provider IDs, rather than role names (ADR-0006). */
+  readonly chatModels: Readonly<Record<string, LangGraphChatModel>>;
   readonly checkpointer?: BaseCheckpointSaver;
 }
 
@@ -41,15 +49,28 @@ export interface LangGraphHost {
 export function createHost(
   services: LangGraphServices,
   capabilities: LangGraphHost['capabilities'],
+  models: ModelPreparation | undefined,
+  active: () => { readonly models: ModelPort; readonly handler: LangGraphTraceHandler } | undefined,
 ): LangGraphHost {
+  for (const [providerId, descriptor] of Object.entries(models?.providers ?? {})) {
+    const provider = Object.hasOwn(services.chatModels, providerId)
+      ? services.chatModels[providerId]
+      : undefined;
+    if (provider === undefined || (typeof provider === 'function') !== descriptor.credential)
+      throw new GalaxieError('invalid', 'The routed model implementations must be valid.');
+  }
+  const routed = new Map(
+    (models?.roles ?? []).map((role) => [
+      role,
+      new RoutedChatModel(role, services.chatModels, active),
+    ]),
+  );
   const checkpointer = services.checkpointer ?? new MemorySaver();
   return {
     capabilities,
     langchain: {
       chatModel(role) {
-        const model = Object.hasOwn(services.chatModels, role)
-          ? services.chatModels[role]
-          : undefined;
+        const model = routed.get(role);
         if (model === undefined)
           throw new GalaxieError('unavailable', 'The requested model role is unavailable.');
         return model;
@@ -66,10 +87,11 @@ export function validServices(value: unknown): value is LangGraphServices {
   if (
     !Object.values(models).every(
       (model: unknown) =>
-        typeof model === 'object' &&
-        model !== null &&
-        'invoke' in model &&
-        typeof model.invoke === 'function',
+        typeof model === 'function' ||
+        (typeof model === 'object' &&
+          model !== null &&
+          'invoke' in model &&
+          typeof model.invoke === 'function'),
     )
   )
     return false;

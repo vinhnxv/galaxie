@@ -6,7 +6,8 @@
     "resolveJsonModule": true,
     "paths": {
       "@galaxie/core": ["../../packages/core/src/index.ts"],
-      "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"]
+      "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
+      "@galaxie/models/mock": ["../../packages/models/src/mock.ts"]
     }
   },
   "include": ["."]
