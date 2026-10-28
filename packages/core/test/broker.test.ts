@@ -410,3 +410,30 @@ test('finite long timeouts are not truncated to one millisecond', async () => {
   await fixture.runtime.dispose();
   expect(fixture.scriptErrors).toEqual([]);
 });
+test('a binding that throws budget_exceeded cannot fail the run through a galaxie budget', async () => {
+  const codes: ErrorCode[] = [];
+  const fixture = await brokerFixture({
+    requests: { 'echo@1': request },
+    bindings: {
+      'echo@1': binding({
+        invoke: async () => {
+          throw new GalaxieError('budget_exceeded', 'host budget');
+        },
+      }),
+    },
+    scripts: [
+      async function* ({ capabilities }) {
+        await capabilities.call('echo@1', 'text').catch((error: GalaxieError) => {
+          codes.push(error.code);
+        });
+        yield { type: 'output', output: null };
+      },
+    ],
+  });
+  const { runId } = await fixture.instance.start('input');
+  await collect(fixture.instance.events(runId));
+  expect(codes).toEqual(['unavailable']);
+  expect(fixture.instance.getSnapshot().run?.status).toBe('succeeded');
+  await fixture.runtime.dispose();
+  expect(fixture.scriptErrors).toEqual([]);
+});

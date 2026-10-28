@@ -339,6 +339,13 @@ export class CapabilityBroker {
                   },
                   (error: unknown) => {
                     this.#report({ kind: 'capability_failed', runId: run.runId, error });
+                    // Only galaxie's own accounting may claim a run budget; host code cannot.
+                    if (
+                      isGalaxieError(error) &&
+                      error.code === 'budget_exceeded' &&
+                      !(error instanceof BudgetExceeded)
+                    )
+                      throw failure('unavailable');
                     throw error;
                   },
                 )
@@ -360,14 +367,8 @@ export class CapabilityBroker {
             }
           };
           const operation = perform().catch((error: unknown) => {
-            if (
-              !stopped &&
-              run.active() &&
-              (error instanceof BudgetExceeded ||
-                (isGalaxieError(error) && error.code === 'budget_exceeded'))
-            ) {
-              budgetFailure =
-                error instanceof BudgetExceeded ? error : new BudgetExceeded('payloadBytes');
+            if (!stopped && run.active() && error instanceof BudgetExceeded) {
+              budgetFailure = error;
               span.end({ status: 'error', code: 'budget_exceeded' });
               run.failBudget(budgetFailure.budget);
             }
