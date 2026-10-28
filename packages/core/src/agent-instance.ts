@@ -20,7 +20,6 @@ interface RunRecord {
   readonly runId: RunId;
   readonly controller: AbortController;
   readonly events: RunEvents;
-  readonly settled: Promise<void>;
   readonly settle: () => void;
   status: RunStatus;
   pending?: PendingInteraction;
@@ -52,7 +51,6 @@ function waitForSettlement(settled: Promise<void>, signal?: AbortSignal): Promis
   });
 }
 
-/** Internal implementation; the public contract is AgentInstance. */
 export function createAgentInstance(
   definition: AgentDefinition,
   adapter: ExecutorAdapter<unknown, unknown>,
@@ -265,11 +263,8 @@ export function createAgentInstance(
       if (preparation !== undefined) return preparation;
       const controller = new AbortController();
       prepareController = controller;
-      let resolvePreparation: () => void = () => {};
-      const promise = new Promise<void>((resolve, reject) => {
-        resolvePreparation = resolve;
-        rejectPreparation = reject;
-      });
+      const { promise, resolve: resolvePreparation, reject } = Promise.withResolvers<void>();
+      rejectPreparation = reject;
       preparation = promise;
       prepareError = undefined;
       state = 'preparing';
@@ -335,15 +330,11 @@ export function createAgentInstance(
           throw new GalaxieError('invalid', 'The run input failed validation.');
         }
         const runId = globalThis.crypto.randomUUID() as RunId;
-        let settle: () => void = () => {};
-        const settled = new Promise<void>((resolve) => {
-          settle = resolve;
-        });
+        const { promise: settled, resolve: settle } = Promise.withResolvers<void>();
         const run: RunRecord = {
           runId,
           controller: new AbortController(),
           events: new RunEvents(runId),
-          settled,
           settle,
           status: 'queued',
         };
@@ -384,10 +375,8 @@ export function createAgentInstance(
     dispose(): Promise<void> {
       if (disposal !== undefined) return disposal;
       disposing = true;
-      let resolveDisposal: () => void = () => {};
-      disposal = new Promise<void>((resolve) => {
-        resolveDisposal = resolve;
-      });
+      const { promise, resolve: resolveDisposal } = Promise.withResolvers<void>();
+      disposal = promise;
       state = 'disposing';
       rejectPreparation?.(new GalaxieError('cancelled', 'Preparation was cancelled.'));
       const run = current;

@@ -44,7 +44,6 @@ function safeName(value: string): string {
   return value.length >= 1 && value.length <= 128 && !/\p{Cc}/u.test(value) ? value : '_OTHER';
 }
 
-/** One gate for every start and end attribute map; no arbitrary metadata is copied. */
 function attributes(values: Readonly<Record<string, unknown>>): Attributes {
   const filtered: Attributes = {};
   for (const [key, value] of Object.entries(values)) {
@@ -200,7 +199,9 @@ export function startRunTrace(
           : status === 'failed'
             ? { status: 'error' as const, errorType: errorType(error?.type) }
             : { status: 'ok' as const };
-      for (const record of [...steps.values()].sort((a, b) => b.depth - a.depth))
+      for (const record of [...steps.values()]
+        .filter((record) => !record.ended)
+        .sort((a, b) => b.depth - a.depth))
         end(record, result);
       root.setAttributes(
         attributes({
@@ -212,6 +213,7 @@ export function startRunTrace(
       );
       if (status === 'failed') root.setStatus({ code: SpanStatusCode.ERROR });
       root.end();
+      steps.clear();
     },
   };
 }
