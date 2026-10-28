@@ -5,6 +5,7 @@ import type { RunTrace, SelectedModelRoute, TraceHandle } from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { LLMResult } from '@langchain/core/outputs';
+import { isGraphInterrupt } from '@langchain/langgraph/web';
 import { selectedRouteFromOptions } from './routed-chat-model.js';
 
 interface ChainTrace {
@@ -100,10 +101,12 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
   override handleChainError(error: Error, runId: string): void {
     const chain = this.#chains.get(runId);
     if (chain?.owned)
-      chain.handle?.end({
-        status: 'error',
-        errorType: this.isCredentialFailure(error) ? 'Error' : error.name,
-      });
+      chain.handle?.end(
+        // A pause unwinds the interrupting node and its parents; it is not a node failure.
+        isGraphInterrupt(error)
+          ? { status: 'ok' }
+          : { status: 'error', errorType: this.isCredentialFailure(error) ? 'Error' : error.name },
+      );
     this.#chains.delete(runId);
     if (runId === this.#root) this.#settlement.resolve();
   }

@@ -275,6 +275,13 @@ export function createAgentInstance(
         return;
       }
       case 'interaction':
+        if (run.inbox.has(event.interaction.interactionId)) {
+          // An answered interaction can never pause again: dispatch would only report duplicate.
+          const error = { name: 'ProtocolViolation' };
+          failRun(run, toErrorInfo('unsupported', error));
+          report({ kind: 'protocol_violation', runId: run.runId, error });
+          return;
+        }
         segment.outcome = 'waiting_input';
         segment.clearWallClock?.();
         run.status = 'waiting_input';
@@ -371,6 +378,7 @@ export function createAgentInstance(
       }
       if (active(run, segment)) {
         const error = { name: 'ProtocolViolation' };
+        if (segment.submission !== undefined) segment.submission.status = 'consumed';
         failRun(run, toErrorInfo('executor_error', error));
         report({ kind: 'protocol_violation', runId: run.runId, error });
       }
@@ -576,7 +584,7 @@ export function createAgentInstance(
           publish();
           return { status: 'accepted', interactionId };
         } catch (error) {
-          report({ kind: 'run_failed', runId: run.runId, error });
+          report({ kind: 'dispatch_failed', runId: run.runId, error });
           return rejected('executor_error');
         } finally {
           delete run.dispatching;

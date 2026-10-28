@@ -286,6 +286,15 @@ export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> 
           const resume = fixture.resumes?.[resumeIndex++];
           if (pending === undefined || resume === undefined)
             throw new Error('The conformance case has no remaining resume.');
+          // The host sees run.pending, so it must match the committed interrupt exactly.
+          const { interactionId, ...request } = pending;
+          const committed = pause.interrupts[0];
+          if (
+            committed === undefined ||
+            interactionId !== committed.id ||
+            JSON.stringify(request) !== JSON.stringify(committed.value)
+          )
+            throw new Error('The pending interaction differs from the committed interrupt.');
           const receipt = await instance.dispatch({
             instanceId: instance.instanceId,
             runId,

@@ -215,7 +215,10 @@ test('a committed-state read failure returns fixed text and releases the claim',
     error: { code: 'executor_error', message: 'The executor or agent code failed.' },
   });
   expect(JSON.stringify(receipt)).not.toContain('private-pending-canary');
-  expect(diagnostics).toContainEqual(expect.objectContaining({ error: raw }));
+  expect(diagnostics).toContainEqual(
+    expect.objectContaining({ kind: 'dispatch_failed', error: raw }),
+  );
+  expect(diagnostics.map(({ kind }) => kind)).not.toContain('run_failed');
   expect(instance.getSnapshot().run?.status).toBe('waiting_input');
   executor.agent.pending = async () => interaction;
   await expect(instance.dispatch(event)).resolves.toMatchObject({ status: 'accepted' });
@@ -548,5 +551,36 @@ test('a new segment receives a fresh wall-clock allowance after a long human wai
   await flush();
   expect(instance.getSnapshot().run?.status).toBe('succeeded');
   expect(executor.requests.map((request) => request.limits.steps)).toEqual([25, 25]);
+  await runtime.dispose();
+});
+
+test('a resume that pauses again on the answered interaction fails as unsupported', async () => {
+  const { instance, runtime, event, diagnostics } = await waiting({
+    scripts: [[{ type: 'interaction', interaction }], [{ type: 'interaction', interaction }]],
+  });
+  await expect(instance.dispatch(event)).resolves.toMatchObject({ status: 'accepted' });
+  await flush();
+  expect(instance.getSnapshot().run).toMatchObject({
+    status: 'failed',
+    error: { code: 'unsupported' },
+    submission: { status: 'consumed' },
+  });
+  expect(instance.getSnapshot().run?.pending).toBeUndefined();
+  expect(diagnostics).toContainEqual(expect.objectContaining({ kind: 'protocol_violation' }));
+  await runtime.dispose();
+});
+
+test('a resume iterator that ends without an outcome consumes the submission', async () => {
+  const { instance, runtime, event, diagnostics } = await waiting({
+    scripts: [[{ type: 'interaction', interaction }], []],
+  });
+  await instance.dispatch(event);
+  await flush();
+  expect(instance.getSnapshot().run).toMatchObject({
+    status: 'failed',
+    error: { code: 'executor_error' },
+    submission: { status: 'consumed' },
+  });
+  expect(diagnostics).toContainEqual(expect.objectContaining({ kind: 'protocol_violation' }));
   await runtime.dispose();
 });

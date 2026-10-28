@@ -30,6 +30,7 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph/web';
+import { SpanStatusCode } from '@opentelemetry/api';
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
@@ -643,6 +644,15 @@ test('pauses after await and resumes the same checkpoint with a false submission
     expect(fixture.instance.getSnapshot().run?.pending).toBeUndefined();
     expect({ prepare, ask }).toEqual({ prepare: 1, ask: 2 });
     expect(await executor?.pending(thread as SessionId)).toBeUndefined();
+    // The pause unwinds the node with GraphInterrupt; its span must not read as a failure.
+    const asks = fixture.exporter
+      .getFinishedSpans()
+      .filter(({ name }) => name === 'galaxie.node ask');
+    expect(asks).toHaveLength(2);
+    for (const span of asks) {
+      expect(span.status.code).not.toBe(SpanStatusCode.ERROR);
+      expect(span.attributes['error.type']).toBeUndefined();
+    }
   } finally {
     await fixture.runtime.dispose();
     await fixture.provider.shutdown();

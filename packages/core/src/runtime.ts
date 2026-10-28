@@ -20,6 +20,7 @@ export interface DiagnosticEvent {
   readonly kind:
     | 'prepare_failed'
     | 'run_failed'
+    | 'dispatch_failed'
     | 'executor_dispose_failed'
     | 'late_event'
     | 'protocol_violation'
