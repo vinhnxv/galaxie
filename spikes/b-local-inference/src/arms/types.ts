@@ -49,6 +49,7 @@ export interface Session {
   close(): Promise<void>;
 }
 export interface Arm {
+  fallbacks?: string[];
   id: ArmId;
   model: ModelInfo;
   engineVersion: string;

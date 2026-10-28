@@ -79,6 +79,7 @@ export const armResultSchema = z.strictObject({
   inWorker: z.boolean(),
   decoding: z.enum(['greedy', 'browser-default']),
   schemaMechanism: z.string(),
+  fallbacks: z.array(z.string()),
   sameCheckpointAs: armId.nullable(),
   availability: z.strictObject({
     status: z.enum(['available', 'downloadable', 'unavailable']),

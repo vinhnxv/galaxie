@@ -3,6 +3,7 @@
 
 import { MockArm } from './arms/mock.js';
 import { OrtArm } from './arms/ort/index.js';
+import { TransformersArm } from './arms/transformers.js';
 import type { Arm } from './arms/types.js';
 import { WebLLMArm } from './arms/webllm.js';
 import { deviceInfo, gpuProbe, promptAvailability } from './device.js';
@@ -43,8 +44,11 @@ const arms: Arm[] = [
   mock,
   new OrtArm(),
   new WebLLMArm(),
+  new TransformersArm(),
   ...armOrder
-    .filter((id) => id !== 'mock' && id !== 'ort-own-loop' && id !== 'webllm')
+    .filter(
+      (id) => id !== 'mock' && id !== 'ort-own-loop' && id !== 'webllm' && id !== 'transformers-js',
+    )
     .map((id) => ({
       id,
       model: { id: 'pending', revision: null },

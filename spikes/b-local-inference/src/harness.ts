@@ -35,6 +35,7 @@ export function armResult(arm: Arm): ArmResult {
     inWorker: arm.inWorker,
     decoding: arm.decoding,
     schemaMechanism: arm.schemaMechanism,
+    fallbacks: arm.fallbacks ?? [],
     sameCheckpointAs: arm.sameCheckpointAs,
     availability: { status: 'unavailable', reason: 'not_implemented' },
     checks: Object.fromEntries(
@@ -169,6 +170,8 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
       const info = await arm.load(() => {});
       const elapsedMs = performance.now() - started;
       result.loads.push({ ...info, elapsedMs, reason: info.reason ?? null });
+      result.model = { ...arm.model };
+      result.sameCheckpointAs = arm.sameCheckpointAs;
       if (i === 0) {
         if (info.loadKind === 'cold') result.coldLoadMs = elapsedMs;
         else
