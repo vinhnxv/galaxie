@@ -6,6 +6,7 @@ import type { AgentDefinition } from './definition.js';
 import { type ErrorCode, GalaxieError, toErrorInfo } from './errors.js';
 import type { RunId } from './ids.js';
 import type {
+  ModelAvailability,
   ModelCall,
   ModelDescriptor,
   ModelPort,
@@ -26,12 +27,14 @@ import {
 } from './policy.js';
 import type { DiagnosticEvent } from './runtime.js';
 
+const MODEL_FEATURES = ['streaming', 'structured-output', 'tool-calling', 'cancellation'];
+
 type Policy = Readonly<Record<DataLabel, DestinationAllowlist>>;
 interface CompiledRole {
   readonly requirements: ModelRoleRequirements;
   readonly route: ModelRoute;
 }
-interface PendingConsent {
+interface PendingDecision {
   readonly controller: AbortController;
   promise: Promise<boolean>;
   waiters: number;
@@ -99,11 +102,14 @@ export class ModelRouter {
   readonly #providers = new Map<string, ModelDescriptor>();
   readonly #roles = new Map<string, CompiledRole>();
   readonly #answered = new Map<string, boolean>();
-  readonly #pending = new Map<string, PendingConsent>();
+  readonly #pending = new Map<string, PendingDecision>();
   readonly #selected = new Map<string, SelectedModelRoute>();
   readonly #policy: Policy;
   readonly #report: (event: Omit<DiagnosticEvent, 'instanceId'>) => void;
   readonly #consent: ModelRouting['consent'];
+  readonly #availability: ModelRouting['availability'];
+  readonly #download: ModelRouting['download'];
+  #persistence: Promise<boolean> | undefined;
   readonly #getCredential: ModelRouting['getCredential'];
   #disposed = false;
 
@@ -122,12 +128,15 @@ export class ModelRouter {
       throw failure('invalid');
     this.#consent = routing?.consent;
     this.#getCredential = routing?.getCredential;
+    this.#availability = routing?.availability;
+    this.#download = routing?.download;
     if (
       (this.#consent !== undefined && typeof this.#consent !== 'function') ||
+      (this.#availability !== undefined && typeof this.#availability !== 'function') ||
+      (this.#download !== undefined && typeof this.#download !== 'function') ||
       (this.#getCredential !== undefined && typeof this.#getCredential !== 'function')
     )
       throw failure('invalid');
-    const features = ['streaming', 'structured-output', 'tool-calling', 'cancellation'];
     for (const [providerId, descriptor] of Object.entries(routing?.providers ?? {})) {
       if (
         !/^[A-Za-z0-9._-]{1,64}$/.test(providerId) ||
@@ -135,7 +144,7 @@ export class ModelRouter {
         !DESTINATIONS.includes(descriptor.destination) ||
         descriptor.modality !== 'text' ||
         !strings(descriptor.features) ||
-        !descriptor.features.every((feature) => features.includes(feature)) ||
+        !descriptor.features.every((feature) => MODEL_FEATURES.includes(feature)) ||
         (descriptor.languages !== undefined && !strings(descriptor.languages)) ||
         (descriptor.credential !== undefined && typeof descriptor.credential !== 'boolean') ||
         (descriptor.credential === true && this.#getCredential === undefined)
@@ -223,55 +232,45 @@ export class ModelRouter {
     this.#selected.clear();
   }
 
-  async #approval(
-    role: string,
-    destination: DestinationClass,
-    route: ModelRoute,
+  async #decision(
+    key: string,
     run: ModelRun,
     signal: AbortSignal,
+    decide: (signal: AbortSignal) => boolean | Promise<boolean>,
+    memory: 'answers' | 'refusals',
   ): Promise<boolean> {
-    if (destination === 'in-browser') return true;
-    const key = JSON.stringify([role, destination]);
     const answered = this.#answered.get(key);
     if (answered !== undefined) return answered;
-    if (this.#consent === undefined) {
-      this.#answered.set(key, false);
-      return false;
-    }
     let pending = this.#pending.get(key);
     if (pending === undefined) {
-      const entry: PendingConsent = {
+      const entry: PendingDecision = {
         controller: new AbortController(),
         promise: Promise.resolve(false),
         waiters: 0,
         settled: false,
       };
-      const previous = this.#selected.get(role);
-      entry.promise = Promise.resolve()
-        .then(() =>
-          this.#consent?.({
-            role,
-            destination,
-            providers: Object.freeze(
-              route.providers.filter((id) => this.#providers.get(id)?.destination === destination),
-            ),
-            ...(previous === undefined ? {} : { previous }),
-            signal: entry.controller.signal,
-          }),
+      const remember = (answer: boolean): boolean => {
+        if (
+          this.#pending.get(key) === entry &&
+          !entry.controller.signal.aborted &&
+          (memory === 'answers' || !answer)
         )
+          this.#answered.set(key, answer);
+        return answer;
+      };
+      entry.promise = Promise.resolve()
+        .then(() => decide(entry.controller.signal))
         .then(
           (answer) => {
             if (typeof answer !== 'boolean') {
               this.#report({ kind: 'model_failed', runId: run.runId });
-              return false;
+              return memory === 'refusals' ? remember(false) : false;
             }
-            if (this.#pending.get(key) === entry && !entry.controller.signal.aborted)
-              this.#answered.set(key, answer);
-            return answer;
+            return remember(answer);
           },
           (error) => {
             this.#report({ kind: 'model_failed', runId: run.runId, error });
-            return false;
+            return memory === 'refusals' ? remember(false) : false;
           },
         )
         .finally(() => {
@@ -305,6 +304,121 @@ export class ModelRouter {
     }
   }
 
+  async #approval(
+    role: string,
+    destination: DestinationClass,
+    route: ModelRoute,
+    run: ModelRun,
+    signal: AbortSignal,
+  ): Promise<boolean> {
+    if (destination === 'in-browser') return true;
+    return this.#decision(
+      JSON.stringify(['consent', role, destination]),
+      run,
+      signal,
+      (decisionSignal) => {
+        const previous = this.#selected.get(role);
+        return this.#consent === undefined
+          ? false
+          : this.#consent({
+              role,
+              destination,
+              providers: Object.freeze(
+                route.providers.filter(
+                  (id) => this.#providers.get(id)?.destination === destination,
+                ),
+              ),
+              ...(previous === undefined ? {} : { previous }),
+              signal: decisionSignal,
+            });
+      },
+      'answers',
+    );
+  }
+
+  async #probe(
+    role: string,
+    providerId: string,
+    run: ModelRun,
+    signal: AbortSignal,
+  ): Promise<ModelAvailability> {
+    if (this.#availability === undefined) return { status: 'available' };
+    const result = await waitForHostOrAbort(
+      Promise.resolve()
+        .then(() => this.#availability?.({ role, providerId, signal }))
+        .then(
+          (value): ModelAvailability => {
+            if (record(value)) {
+              if (value.status === 'available' || value.status === 'unavailable')
+                return { status: value.status };
+              if (
+                value.status === 'downloadable' &&
+                typeof value.siteStorage === 'boolean' &&
+                (value.bytes === undefined ||
+                  (typeof value.bytes === 'number' &&
+                    Number.isSafeInteger(value.bytes) &&
+                    value.bytes >= 0))
+              ) {
+                return {
+                  status: 'downloadable',
+                  siteStorage: value.siteStorage,
+                  ...(value.bytes === undefined ? {} : { bytes: value.bytes }),
+                };
+              }
+            }
+            this.#report({ kind: 'model_failed', runId: run.runId });
+            return { status: 'unavailable' };
+          },
+          (error): ModelAvailability => {
+            this.#report({ kind: 'model_failed', runId: run.runId, error });
+            return { status: 'unavailable' };
+          },
+        ),
+      signal,
+    );
+    return result;
+  }
+
+  async #persist(signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted) return false;
+    this.#persistence ??= Promise.resolve()
+      .then(() => globalThis.navigator?.storage?.persist?.())
+      .then(
+        (answer) => answer === true,
+        () => false,
+      );
+    try {
+      return await waitForHostOrAbort(this.#persistence, signal);
+    } catch {
+      return false;
+    }
+  }
+
+  async #downloadApproval(
+    role: string,
+    providerId: string,
+    availability: Extract<ModelAvailability, { status: 'downloadable' }>,
+    run: ModelRun,
+    signal: AbortSignal,
+  ): Promise<boolean> {
+    return this.#decision(
+      JSON.stringify(['download', providerId]),
+      run,
+      signal,
+      (decisionSignal) =>
+        this.#download === undefined
+          ? false
+          : this.#download({
+              role,
+              providerId,
+              signal: decisionSignal,
+              ...(availability.bytes === undefined ? {} : { bytes: availability.bytes }),
+              ...(availability.siteStorage ? { persist: () => this.#persist(decisionSignal) } : {}),
+            }),
+      'refusals',
+    );
+  }
+
   port(run: ModelRun): ModelPort {
     return {
       begin: async (role, options) => {
@@ -319,33 +433,36 @@ export class ModelRouter {
         const compiled = this.#roles.get(role);
         if (compiled === undefined) throw failure('unavailable');
         const { route, requirements } = compiled;
-        let usable = false;
+        const requires = options?.requires;
+        if (
+          requires !== undefined &&
+          (!strings(requires) || !requires.every((feature) => MODEL_FEATURES.includes(feature)))
+        )
+          throw failure('invalid');
+        let denied = false;
         const refused = new Set<DestinationClass>();
-        for (const providerId of route.providers) {
+        const allowed = (destination: DestinationClass): boolean => {
+          if (!labelsAllow(this.#policy, run.labels, destination) || refused.has(destination)) {
+            denied = true;
+            return false;
+          }
+          return true;
+        };
+        const attempt = async (
+          providerId: string,
+          descriptor: ModelDescriptor,
+        ): Promise<ModelCall | undefined> => {
           assertActive();
-          const descriptor = this.#providers.get(providerId);
-          if (
-            descriptor === undefined ||
-            requirements.requires?.some((feature) => !descriptor.features.includes(feature)) ||
-            requirements.languages?.some(
-              (language) =>
-                !descriptor.languages?.some(
-                  (supported) => primary(supported) === primary(language),
-                ),
-            )
-          )
-            continue;
-          usable = true;
           const destination = descriptor.destination;
-          if (!labelsAllow(this.#policy, run.labels, destination) || refused.has(destination))
-            continue;
+          if (!allowed(destination)) return undefined;
           if (!(await this.#approval(role, destination, route, run, signal))) {
             assertActive();
             refused.add(destination);
-            continue;
+            denied = true;
+            return undefined;
           }
           assertActive();
-          if (!labelsAllow(this.#policy, run.labels, destination)) continue;
+          if (!allowed(destination)) return undefined;
           const pricing = descriptor.pricing;
           const cost =
             pricing === 'unknown'
@@ -379,7 +496,8 @@ export class ModelRouter {
             if (!labelsAllow(this.#policy, run.labels, destination)) {
               reservation.release();
               credential = undefined;
-              continue;
+              denied = true;
+              return undefined;
             }
             const selected = Object.freeze({ providerId, destination });
             this.#selected.set(role, selected);
@@ -417,8 +535,67 @@ export class ModelRouter {
             credential = undefined;
             throw error;
           }
+        };
+        const deferred: Array<{
+          providerId: string;
+          descriptor: ModelDescriptor;
+          availability: ModelAvailability;
+        }> = [];
+        const seen = new Set<string>();
+        let downloadSeen = false;
+        for (const providerId of route.providers) {
+          assertActive();
+          if (seen.has(providerId)) continue;
+          seen.add(providerId);
+          const descriptor = this.#providers.get(providerId);
+          if (
+            descriptor === undefined ||
+            requirements.requires?.some((feature) => !descriptor.features.includes(feature)) ||
+            requires?.some((feature) => !descriptor.features.includes(feature)) ||
+            requirements.languages?.some(
+              (language) =>
+                !descriptor.languages?.some(
+                  (supported) => primary(supported) === primary(language),
+                ),
+            )
+          )
+            continue;
+          if (!allowed(descriptor.destination)) continue;
+          const availability = await this.#probe(role, providerId, run, signal);
+          assertActive();
+          if (!allowed(descriptor.destination) || availability.status === 'unavailable') continue;
+          if (availability.status === 'downloadable') {
+            if (descriptor.destination !== 'in-browser') continue;
+            downloadSeen = true;
+          }
+          if (
+            availability.status === 'downloadable' ||
+            (downloadSeen && descriptor.destination !== 'in-browser')
+          ) {
+            deferred.push({ providerId, descriptor, availability });
+            continue;
+          }
+          const call = await attempt(providerId, descriptor);
+          if (call !== undefined) return call;
         }
-        throw failure(usable ? 'denied' : 'unavailable');
+        for (const { providerId, descriptor, availability } of deferred) {
+          assertActive();
+          if (!allowed(descriptor.destination)) continue;
+          if (availability.status === 'downloadable') {
+            if (!(await this.#downloadApproval(role, providerId, availability, run, signal))) {
+              assertActive();
+              denied = true;
+              continue;
+            }
+            assertActive();
+            const ready = await this.#probe(role, providerId, run, signal);
+            assertActive();
+            if (ready.status !== 'available') continue;
+          }
+          const call = await attempt(providerId, descriptor);
+          if (call !== undefined) return call;
+        }
+        throw failure(denied ? 'denied' : 'unavailable');
       },
     };
   }
