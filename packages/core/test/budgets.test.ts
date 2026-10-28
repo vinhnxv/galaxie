@@ -207,3 +207,22 @@ test('model cost accounting compares the unrounded float charge', () => {
     expect.objectContaining({ budget: 'cost' }),
   );
 });
+
+test('released fractional reservations leave exactly the remaining live cost', () => {
+  const budget = new RunBudget(budgetLimits({ cost: 0.31 }));
+  const first = budget.reserveModel(1, 0.1);
+  const second = budget.reserveModel(1, 0.2);
+  first.release();
+  const third = budget.reserveModel(1, 0.11);
+  second.release();
+  third.release();
+  expect(() => budget.reserveModel(1, 0.31)).not.toThrow();
+});
+test('all released fractional reservations permit the exact full budget again', () => {
+  const budget = new RunBudget(budgetLimits({ cost: 0.31 }));
+  const first = budget.reserveModel(1, 0.1);
+  const second = budget.reserveModel(1, 0.2);
+  first.release();
+  second.release();
+  expect(() => budget.reserveModel(1, 0.31)).not.toThrow();
+});

@@ -149,7 +149,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
                   error instanceof GraphRecursionError
                     ? 'budget_exceeded'
                     : (cause?.code ?? (isGraphInterrupt(error) ? 'unsupported' : 'executor_error')),
-                  error,
+                  handler.isCredentialFailure(error) ? { name: 'Error' } : error,
                 ),
               };
           } finally {

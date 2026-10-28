@@ -347,3 +347,17 @@ test('calls outside an active run reject invalid', async () => {
   const model = new RoutedChatModel('assistant', {}, () => undefined);
   await expect(model.invoke('hello')).rejects.toMatchObject({ code: 'invalid' });
 });
+
+test('a provider with disableStreaming uses generation even through routed stream', async () => {
+  const provider = new MockChatModel({ hello: { id: 'reply', text: 'hello world' } });
+  provider.disableStreaming = true;
+  const generate = vi.spyOn(provider, '_generate');
+  const stream = vi.spyOn(provider, '_streamResponseChunks');
+  const fixture = routed(provider);
+  const chunks = [];
+  for await (const chunk of await fixture.model.stream('hello')) chunks.push(chunk.content);
+  expect(chunks).toEqual(['hello world']);
+  expect(generate).toHaveBeenCalledTimes(1);
+  expect(stream).not.toHaveBeenCalled();
+  expect(fixture.end).toHaveBeenCalledTimes(1);
+});

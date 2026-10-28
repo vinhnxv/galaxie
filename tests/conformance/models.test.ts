@@ -469,3 +469,77 @@ test.each(['batch', 'streamEvents'] as const)(
     });
   },
 );
+
+test.each(['provider', 'factory', 'metadata'] as const)(
+  'AE5 %s credential failure preserves graph error identity and omits raw diagnostic messages and causes',
+  async (origin) => {
+    const canary = 'canary-credential-diagnostic';
+    const raw = new Error(canary);
+    let caught: unknown;
+    const result = await run({
+      models: routing(
+        { credentialed: { ...local, destination: 'host-server', credential: true } },
+        { providers: ['credentialed'], allow: ['host-server'], maxTokens: 1000 },
+        { consent: () => true, getCredential: () => canary },
+      ),
+      chatModels: {
+        credentialed: () => {
+          if (origin === 'factory') throw raw;
+          const model =
+            origin === 'provider' ? new MockChatModel({ [PROMPT]: { error: raw } }) : mock();
+          if (origin === 'metadata')
+            model.getLsParams = () => {
+              throw raw;
+            };
+          return model;
+        },
+      },
+      agent: (host) =>
+        new StateGraph(state)
+          .addNode('respond', async ({ text }, config) => {
+            try {
+              await host.langchain.chatModel(ROLE).invoke([new HumanMessage(text)], config);
+            } catch (error) {
+              caught = error;
+              throw error;
+            }
+            return {};
+          })
+          .addEdge(START, 'respond')
+          .addEdge('respond', END)
+          .compile(),
+    });
+    expect(caught).toBe(raw);
+    expect(result.events.at(-1)?.type).toBe('error');
+    const diagnostics = result.diagnostics
+      .flatMap(({ error }) => [
+        String(error),
+        typeof error === 'object' && error !== null && 'cause' in error ? String(error.cause) : '',
+      ])
+      .join('\n');
+    expect(diagnostics).not.toContain(canary);
+    expect(result.diagnostics.find((event) => event.kind === 'run_failed')?.error).not.toBe(raw);
+  },
+);
+
+test('an unrelated failure retains its raw diagnostic identity after a credentialed model call', async () => {
+  const raw = new Error('unrelated node failure');
+  const result = await run({
+    models: routing(
+      { credentialed: { ...local, destination: 'host-server', credential: true } },
+      { providers: ['credentialed'], allow: ['host-server'], maxTokens: 1000 },
+      { consent: () => true, getCredential: () => 'canary-credential-unrelated' },
+    ),
+    chatModels: { credentialed: () => mock() },
+    agent: (host) =>
+      new StateGraph(state)
+        .addNode('respond', async ({ text }, config) => {
+          await host.langchain.chatModel(ROLE).invoke([new HumanMessage(text)], config);
+          throw raw;
+        })
+        .addEdge(START, 'respond')
+        .addEdge('respond', END)
+        .compile(),
+  });
+  expect(result.diagnostics.find((event) => event.kind === 'run_failed')?.error).toBe(raw);
+});

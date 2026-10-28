@@ -19,6 +19,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
   readonly #chains: Map<string, ChainTrace> = new Map();
   readonly #models: Map<string, TraceHandle> = new Map();
   readonly #routes = new Map<string, SelectedModelRoute>();
+  readonly #credentialFailures = new Set<unknown>();
   readonly #settlement: PromiseWithResolvers<void> = Promise.withResolvers<void>();
   #root: string | undefined;
 
@@ -39,8 +40,26 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
       });
   }
 
+  /** Classify errors without changing the graph-facing object or storing the credential (ADR-0012). */
+  recordCredentialFailure(error: unknown): void {
+    this.#credentialFailures.add(error);
+  }
+
+  isCredentialFailure(error: unknown): boolean {
+    const seen = new Set<unknown>();
+    let current = error;
+    while (!seen.has(current)) {
+      if (this.#credentialFailures.has(current)) return true;
+      if (typeof current !== 'object' || current === null || !('cause' in current)) return false;
+      seen.add(current);
+      current = current.cause;
+    }
+    return false;
+  }
+
   async settled(): Promise<void> {
     if (this.#root !== undefined) await this.#settlement.promise;
+    this.#credentialFailures.clear();
   }
 
   override handleChainStart(
@@ -80,7 +99,11 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
 
   override handleChainError(error: Error, runId: string): void {
     const chain = this.#chains.get(runId);
-    if (chain?.owned) chain.handle?.end({ status: 'error', errorType: error.name });
+    if (chain?.owned)
+      chain.handle?.end({
+        status: 'error',
+        errorType: this.isCredentialFailure(error) ? 'Error' : error.name,
+      });
     this.#chains.delete(runId);
     if (runId === this.#root) this.#settlement.resolve();
   }
@@ -144,7 +167,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     const route = this.#routes.get(runId);
     this.#models.get(runId)?.end({
       status: 'error',
-      errorType: error.name,
+      errorType: this.isCredentialFailure(error) ? 'Error' : error.name,
       ...(route === undefined ? {} : { route }),
     });
     this.#models.delete(runId);

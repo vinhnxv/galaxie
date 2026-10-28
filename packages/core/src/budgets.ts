@@ -39,7 +39,7 @@ export class RunBudget {
   readonly limits: BudgetLimits;
   #toolCalls = 0;
   readonly #committed = { tokens: 0, cost: 0 };
-  readonly #reserved = { tokens: 0, cost: 0 };
+  readonly #reservations = new Set<{ readonly tokens: number; readonly cost: number }>();
   constructor(limits: BudgetLimits) {
     this.limits = limits;
   }
@@ -50,17 +50,18 @@ export class RunBudget {
   /** Reserve both dimensions atomically; token exhaustion takes precedence (ADR-0006). */
   reserveModel(tokens: number, cost: number): ModelReservation {
     const amounts = { tokens, cost };
-    for (const name of ['tokens', 'cost'] as const)
-      if (this.#committed[name] + this.#reserved[name] + amounts[name] > this.limits[name])
+    for (const name of ['tokens', 'cost'] as const) {
+      let reserved = 0;
+      for (const reservation of this.#reservations) reserved += reservation[name];
+      if (this.#committed[name] + reserved + amounts[name] > this.limits[name])
         throw new BudgetExceeded(name);
-    this.#reserved.tokens += tokens;
-    this.#reserved.cost += cost;
+    }
+    this.#reservations.add(amounts);
     let open = true;
     const release = (): void => {
       if (!open) return;
       open = false;
-      this.#reserved.tokens -= tokens;
-      this.#reserved.cost -= cost;
+      this.#reservations.delete(amounts);
     };
     return {
       release,

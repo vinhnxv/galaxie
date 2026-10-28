@@ -66,6 +66,9 @@ function finish(call: CallState, successful: boolean, reported?: ModelUsage): vo
   if (successful) call.lease.end(reported);
   else call.lease.fail();
 }
+function recordFailure(call: CallState, error: unknown): void {
+  if (call.lease.credential !== undefined) call.handler.recordCredentialFailure(error);
+}
 export function selectedRouteFromOptions(options: unknown): SelectedModelRoute | undefined {
   if (typeof options !== 'object' || options === null) return undefined;
   const carrier: unknown = Reflect.get(options, LEASE);
@@ -117,6 +120,7 @@ export class RoutedChatModel extends BaseChatModel {
           : implementation;
       return { lease, provider, handler: run.handler, settled: false };
     } catch (error) {
+      if (lease.credential !== undefined) run.handler.recordCredentialFailure(error);
       lease.fail();
       throw error;
     }
@@ -153,6 +157,9 @@ export class RoutedChatModel extends BaseChatModel {
     try {
       const result = await super.generate(messages, leasedOptions, callbacks);
       return result;
+    } catch (error) {
+      recordFailure(call, error);
+      throw error;
     } finally {
       calls.delete(carrier);
       finish(call, false);
@@ -173,6 +180,9 @@ export class RoutedChatModel extends BaseChatModel {
     const leasedOptions = { ...options, [LEASE]: carrier };
     try {
       yield* super._streamIterator(input, leasedOptions);
+    } catch (error) {
+      recordFailure(call, error);
+      throw error;
     } finally {
       calls.delete(carrier);
       finish(call, false);
@@ -194,6 +204,9 @@ export class RoutedChatModel extends BaseChatModel {
         result.generations[0] === undefined ? undefined : usage(result.generations[0].message),
       );
       return result;
+    } catch (error) {
+      recordFailure(call, error);
+      throw error;
     } finally {
       finish(call, false);
     }
@@ -209,6 +222,7 @@ export class RoutedChatModel extends BaseChatModel {
       if (runManager !== undefined) call.handler.setModelRoute(runManager.runId, call.lease);
       let reported: ModelUsage | undefined;
       const chunks =
+        call.provider.disableStreaming === true ||
         call.provider._streamResponseChunks === BaseChatModel.prototype._streamResponseChunks
           ? this.#generateChunk(call.provider, messages, options, runManager)
           : call.provider._streamResponseChunks(messages, options, runManager);
@@ -222,6 +236,9 @@ export class RoutedChatModel extends BaseChatModel {
         yield chunk;
       }
       finish(call, true, reported);
+    } catch (error) {
+      recordFailure(call, error);
+      throw error;
     } finally {
       finish(call, false);
     }
