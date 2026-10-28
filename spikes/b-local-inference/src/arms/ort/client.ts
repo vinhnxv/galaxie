@@ -26,6 +26,7 @@ export class EngineClient {
   readonly #pending = new Map<number, Pending>();
   readonly #controls = new Map<number, { resolve: () => void; reject: (error: Error) => void }>();
   #nextId = 1;
+  #failure: Error | undefined;
   #load:
     | {
         resolve: (info: EngineInfo) => void;
@@ -35,7 +36,9 @@ export class EngineClient {
     | undefined;
   constructor() {
     this.#worker.onmessage = (event: MessageEvent<FromWorker>) => this.#receive(event.data);
-    this.#worker.onerror = () => {
+    this.#worker.onerror = (event) => {
+      event.preventDefault();
+      this.#failure = new Error('worker_failed');
       const error = new Error('worker_failed');
       this.#load?.reject(error);
       for (const pending of this.#pending.values()) pending.reject(error);
@@ -51,6 +54,7 @@ export class EngineClient {
     });
   }
   async openSession(): Promise<number> {
+    if (this.#failure) return Promise.reject(this.#failure);
     const id = this.#nextId++;
     await this.#control('open-session', id);
     return id;
@@ -59,6 +63,7 @@ export class EngineClient {
     return this.#control('close-session', id);
   }
   #control(type: 'open-session' | 'close-session' | 'dispose', sessionId: number): Promise<void> {
+    if (this.#failure) return Promise.reject(this.#failure);
     const id = this.#nextId++;
     return new Promise((resolve, reject) => {
       this.#controls.set(id, { resolve, reject });
@@ -71,6 +76,7 @@ export class EngineClient {
     onText: (delta: string) => void,
     signal: AbortSignal,
   ): Promise<GenerateResult> {
+    if (this.#failure) return Promise.reject(this.#failure);
     const id = this.#nextId++;
     return new Promise((resolve, reject) => {
       const abort = (): void => this.#worker.postMessage({ type: 'abort', id } satisfies ToWorker);

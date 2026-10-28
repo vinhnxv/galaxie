@@ -7,6 +7,7 @@ export type UnavailableReason =
   | 'no_webgpu_adapter'
   | 'no_shader_f16'
   | 'api_missing'
+  | 'api_unavailable'
   | 'language_unsupported'
   | 'not_implemented';
 export interface Availability {

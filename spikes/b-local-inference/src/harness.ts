@@ -363,7 +363,7 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
       result.cancel.medianFeedbackTtftMs =
         result.tasks.find((task) => task.id === 'feedback-en')?.summary.ttftMs.p50 ?? null;
   } catch {
-    result.error = 'load_failed';
+    result.error = result.checks.loads.status === 'not_run' ? 'load_failed' : 'checks_failed';
     if (result.checks.loads.status === 'not_run')
       result.checks.loads = check(false, 'load_exception');
   } finally {

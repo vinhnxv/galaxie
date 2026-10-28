@@ -17,6 +17,7 @@ type Reply =
   | { id: number; kind: 'error' };
 export class WorkerClient {
   #next = 1;
+  #failure: Error | undefined;
   #pending = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
@@ -42,7 +43,9 @@ export class WorkerClient {
       if (reply.kind === 'error') pending?.reject(new Error('worker_request_failed'));
       else pending?.resolve(reply.value);
     };
-    worker.onerror = () => {
+    worker.onerror = (event) => {
+      event.preventDefault();
+      this.#failure = new Error('worker_failed');
       for (const pending of this.#pending.values()) pending.reject(new Error('worker_failed'));
       this.#pending.clear();
     };
@@ -52,6 +55,7 @@ export class WorkerClient {
     extra: { session?: number; request?: WireRequest } = {},
     request?: GenerationRequest,
   ): Promise<T> {
+    if (this.#failure) return Promise.reject(this.#failure);
     const id = this.#next++;
     return new Promise<T>((resolve, reject) => {
       const abort = (): void => this.worker.postMessage({ id, op: 'abort' } satisfies Command);

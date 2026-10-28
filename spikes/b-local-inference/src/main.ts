@@ -97,7 +97,8 @@ async function runAll(options: { runs?: number } = {}): Promise<void> {
             promptVi: prompt.vi,
             progress: render,
             beforeDispose: async (arm) => {
-              if (arm instanceof WebLLMArm) results.chatWebLLM = await chatWebLLMCheck(arm);
+              if (arm instanceof WebLLMArm)
+                results.chatWebLLM = await arm.guard(chatWebLLMCheck(arm));
             },
           }),
         );

@@ -72,6 +72,13 @@ serveWorker({
     const model = generator;
     if (!model) throw new Error('not_loaded');
     const stopping = new InterruptableStoppingCriteria();
+    let stopObserved = false;
+    const stop = stopping._call.bind(stopping);
+    stopping._call = (ids, scores) => {
+      const decision = stop(ids, scores);
+      if (decision.some(Boolean)) stopObserved = true;
+      return decision;
+    };
     const abort = (): void => stopping.interrupt();
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
@@ -104,7 +111,7 @@ serveWorker({
       const generated = output[0]?.generated_text;
       const text = typeof generated === 'string' ? generated : generated?.at(-1)?.content;
       if (typeof text !== 'string') throw new Error('unexpected_generation_shape');
-      return { text, outputTokens, constrained: Boolean(processor), aborted: signal.aborted };
+      return { text, outputTokens, constrained: Boolean(processor), aborted: stopObserved };
     } finally {
       signal.removeEventListener('abort', abort);
     }

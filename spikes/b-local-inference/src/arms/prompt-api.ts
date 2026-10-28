@@ -28,7 +28,7 @@ export class PromptArm implements Arm {
     if (raw.reason === 'api_missing')
       return { status: 'unavailable', reason: 'api_missing', raw: raw.en };
     return raw.en === 'unavailable'
-      ? { status: 'unavailable', reason: 'language_unsupported', raw: raw.en }
+      ? { status: 'unavailable', reason: 'api_unavailable', raw: raw.en }
       : { status: raw.en === 'available' ? 'available' : 'downloadable', raw: raw.en };
   }
   async load(_progress: (loaded: number, total?: number) => void): Promise<LoadInfo> {
@@ -83,7 +83,7 @@ export class PromptArm implements Arm {
           text,
           constrained: Boolean(request.schema),
           executedIn: globalThis.constructor.name,
-          aborted: aborted || request.signal.aborted,
+          aborted,
         };
       },
       close: async () => {

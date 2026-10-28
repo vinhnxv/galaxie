@@ -29,6 +29,10 @@ export class WebLLMArm implements Arm {
   readonly schemaMechanism = 'XGrammar json_object with serialized schema';
   sameCheckpointAs: 'transformers-js' | null = null;
   #engine: WebWorkerMLCEngine | undefined;
+  #failure: Promise<never> | undefined;
+  guard<T>(operation: Promise<T>): Promise<T> {
+    return this.#failure ? Promise.race([operation, this.#failure]) : operation;
+  }
   #worker: Worker | undefined;
   get engine(): WebWorkerMLCEngine | undefined {
     return this.#engine;
@@ -44,11 +48,21 @@ export class WebLLMArm implements Arm {
     const config = webllmConfig();
     const cached = await hasModelInCache(WEBLLM_MODEL, config);
     this.#worker = new Worker(new URL('./webllm.worker.ts', import.meta.url), { type: 'module' });
-    this.#engine = await CreateWebWorkerMLCEngine(
-      this.#worker,
-      WEBLLM_MODEL,
-      { appConfig: config, initProgressCallback: () => progress(0) },
-      { temperature: 0 },
+    const worker = this.#worker;
+    this.#failure = new Promise<never>((_resolve, reject) => {
+      worker.onerror = (event) => {
+        event.preventDefault();
+        worker.terminate();
+        reject(new Error('worker_failed'));
+      };
+    });
+    this.#engine = await this.guard(
+      CreateWebWorkerMLCEngine(
+        worker,
+        WEBLLM_MODEL,
+        { appConfig: config, initProgressCallback: () => progress(0) },
+        { temperature: 0 },
+      ),
     );
     return {
       loadKind: cached ? 'warm' : 'cold',
@@ -59,36 +73,43 @@ export class WebLLMArm implements Arm {
   async openSession(): Promise<Session> {
     const engine = this.#engine;
     if (!engine) throw new Error('not_loaded');
-    await engine.resetChat();
+    await this.guard(engine.resetChat());
     let history: Message[] = [];
     return {
       generate: async (request) => {
-        await engine.resetChat();
+        await this.guard(engine.resetChat());
         const messages = [...history, ...request.messages];
         const abort = (): void => engine.interruptGenerate();
         request.signal.addEventListener('abort', abort, { once: true });
         let text = '';
         let outputTokens: number | undefined;
         let executedIn = 'unobserved';
+        let aborted = false;
         try {
           if (request.signal.aborted)
             return { text, constrained: false, executedIn, aborted: true };
-          const stream = await engine.chat.completions.create({
-            messages,
-            stream: true,
-            stream_options: { include_usage: true },
-            temperature: 0,
-            max_tokens: request.maxTokens,
-            ...(request.schema
-              ? {
-                  response_format: {
-                    type: 'json_object' as const,
-                    schema: JSON.stringify(request.schema),
-                  },
-                }
-              : {}),
-          });
-          for await (const chunk of stream) {
+          const stream = await this.guard(
+            engine.chat.completions.create({
+              messages,
+              stream: true,
+              stream_options: { include_usage: true },
+              temperature: 0,
+              max_tokens: request.maxTokens,
+              ...(request.schema
+                ? {
+                    response_format: {
+                      type: 'json_object' as const,
+                      schema: JSON.stringify(request.schema),
+                    },
+                  }
+                : {}),
+            }),
+          );
+          const iterator = stream[Symbol.asyncIterator]();
+          while (true) {
+            const step = await this.guard(iterator.next());
+            if (step.done) break;
+            const chunk = step.value;
             const scope = (chunk as unknown as { executedIn?: string }).executedIn;
             if (scope) executedIn = scope;
             const delta = chunk.choices[0]?.delta.content ?? '';
@@ -96,6 +117,7 @@ export class WebLLMArm implements Arm {
               text += delta;
               request.onChunk(delta);
             }
+            if (chunk.choices.some((choice) => choice.finish_reason === 'abort')) aborted = true;
             if (chunk.usage) outputTokens = chunk.usage.completion_tokens;
           }
           if (!request.signal.aborted)
@@ -105,7 +127,7 @@ export class WebLLMArm implements Arm {
             ...(outputTokens === undefined ? {} : { outputTokens }),
             constrained: Boolean(request.schema),
             executedIn,
-            aborted: request.signal.aborted,
+            aborted,
           };
         } finally {
           request.signal.removeEventListener('abort', abort);
@@ -113,17 +135,18 @@ export class WebLLMArm implements Arm {
       },
       close: async () => {
         history = [];
-        await engine.resetChat();
+        await this.guard(engine.resetChat());
       },
     };
   }
   async dispose(): Promise<void> {
     try {
-      await this.#engine?.unload();
+      if (this.#engine) await this.guard(this.#engine.unload());
     } finally {
       this.#worker?.terminate();
       this.#engine = undefined;
       this.#worker = undefined;
+      this.#failure = undefined;
     }
   }
 }
