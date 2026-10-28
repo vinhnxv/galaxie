@@ -3,10 +3,11 @@
 
 import { MockArm } from './arms/mock.js';
 import { OrtArm } from './arms/ort/index.js';
+import { PromptArm } from './arms/prompt-api.js';
 import { TransformersArm } from './arms/transformers.js';
 import type { Arm } from './arms/types.js';
 import { WebLLMArm } from './arms/webllm.js';
-import { deviceInfo, gpuProbe, promptAvailability } from './device.js';
+import { deviceInfo, type PromptSession, promptAvailability } from './device.js';
 import { armResult, runArm, selectedArms } from './harness.js';
 import { downloadResults, emptyChatCheck, type ResultsV1, resultsSchema } from './results.js';
 
@@ -38,37 +39,29 @@ function render(message: string): void {
   if (statusLabel) statusLabel.textContent = message;
   if (output) output.textContent = JSON.stringify(resultsSchema.parse(results), null, 2);
 }
+function createPromptWithActivation(create: () => Promise<PromptSession>): Promise<PromptSession> {
+  if (navigator.userActivation.isActive) return create();
+  if (!runButton) return Promise.reject(new Error('run_button_missing'));
+  render('Prompt API download needs another click on Run after earlier arms used the activation.');
+  runButton.disabled = false;
+  return new Promise((resolve, reject) => {
+    runButton.addEventListener(
+      'click',
+      () => {
+        runButton.disabled = true;
+        void create().then(resolve, reject);
+      },
+      { once: true },
+    );
+  });
+}
 const mock = new MockArm(params.get('mockFail'));
-// Real arms are added in their implementation units; probes never load a model.
 const arms: Arm[] = [
   mock,
   new OrtArm(),
   new WebLLMArm(),
   new TransformersArm(),
-  ...armOrder
-    .filter(
-      (id) => id !== 'mock' && id !== 'ort-own-loop' && id !== 'webllm' && id !== 'transformers-js',
-    )
-    .map((id) => ({
-      id,
-      model: { id: 'pending', revision: null },
-      engineVersion: 'pending',
-      inWorker: id !== 'prompt-api',
-      decoding: id === 'prompt-api' ? ('browser-default' as const) : ('greedy' as const),
-      schemaMechanism: 'pending',
-      sameCheckpointAs: null,
-      probe: async () =>
-        id === 'prompt-api'
-          ? { status: 'unavailable' as const, reason: 'api_missing' as const, raw: prompt.en }
-          : gpuProbe(),
-      load: async () => {
-        throw new Error('not_implemented');
-      },
-      openSession: async () => {
-        throw new Error('not_implemented');
-      },
-      dispose: async () => {},
-    })),
+  new PromptArm(createPromptWithActivation),
 ];
 for (const id of armOrder) {
   const arm = arms.find((arm) => arm.id === id);
