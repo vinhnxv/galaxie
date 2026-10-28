@@ -40,6 +40,11 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
       let graph: LangGraphGraph | undefined = agent(host);
       if (typeof graph !== 'object' || graph === null || typeof graph.stream !== 'function')
         throw new GalaxieError('invalid', 'The factory must return a LangGraph stream.');
+      if (typeof graph.transform !== 'function')
+        throw new GalaxieError(
+          'unsupported',
+          'The graph must support native runnable transformation.',
+        );
       return {
         async *run(request): AsyncGenerator<ExecutorEvent> {
           if (request.command.type === 'resume') {
@@ -52,7 +57,13 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           let output: unknown;
           let interrupted = false;
           try {
-            const stream = await graph.stream(request.command.input, {
+            const input = request.command.input;
+            const source = async function* (): AsyncGenerator<unknown> {
+              yield input;
+            };
+            // LangChain 1.2.20 stream() can reject before resuming an aborted generator.
+            // transform() uses the same LangGraph engine and drains its settlement finally block.
+            const stream = graph.transform(source(), {
               streamMode: [...STREAM_MODES],
               subgraphs: true,
               signal: request.signal,

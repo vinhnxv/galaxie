@@ -9,5 +9,16 @@
       "$.modes"
     ],
     "reason": "The /web entry does not install async context, so model.invoke without config receives no stream callbacks. This removes messages and their positions from modes; their absence also shifts first-appearance UUID numbers for checkpoint parents."
+  },
+  {
+    "case": "model-without-config",
+    "lane": "galaxie-chromium",
+    "differences": [
+      "$.checkpoints[1].parentCheckpointId",
+      "$.checkpoints[2].parentCheckpointId",
+      "$.events.messages",
+      "$.modes"
+    ],
+    "reason": "The browser /web entry has no implicit async context, so model.invoke without config receives no stream callbacks. This removes messages and their positions from modes; their absence also shifts first-appearance UUID numbers for checkpoint parents. All other observed transcript fields match the native baseline."
   }
 ]

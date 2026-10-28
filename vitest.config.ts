@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { playwright } from '@vitest/browser-playwright';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 const alias = {
   '@galaxie/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
@@ -20,6 +21,32 @@ export default defineConfig({
           name: 'node',
           include: ['packages/*/test/**/*.test.ts', 'tests/conformance/**/*.test.ts'],
           setupFiles: ['tests/conformance/support/clean-env.node.ts'],
+        },
+      },
+      {
+        root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
+        resolve: { alias },
+        optimizeDeps: {
+          include: [
+            '@langchain/langgraph/web',
+            '@langchain/core/callbacks/base',
+            '@langchain/core/language_models/chat_models',
+            '@langchain/core/messages',
+            '@langchain/core/outputs',
+            '@opentelemetry/sdk-trace',
+            'zod',
+          ],
+        },
+        test: {
+          name: 'browser',
+          include: ['**/*.test.ts'],
+          exclude: [...configDefaults.exclude, '**/*.node.test.ts'],
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            headless: true,
+            instances: [{ browser: 'chromium', name: 'browser (chromium)' }],
+          },
         },
       },
     ],

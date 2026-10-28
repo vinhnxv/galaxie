@@ -9,15 +9,15 @@ import {
   MemorySaver,
 } from '@langchain/langgraph/web';
 
-/** Only LangGraph's stream boundary is required; the graph keeps its native types. */
+type StreamOptions = LangGraphRunnableConfig & {
+  streamMode: Array<'values' | 'updates' | 'messages' | 'custom'>;
+  subgraphs: true;
+};
+
+/** Native runnable boundaries; transform permits draining the engine after abort. */
 export interface LangGraphGraph {
-  stream(
-    input: unknown,
-    options: LangGraphRunnableConfig & {
-      streamMode: Array<'values' | 'updates' | 'messages' | 'custom'>;
-      subgraphs: true;
-    },
-  ): Promise<AsyncIterable<unknown>>;
+  stream(input: unknown, options: StreamOptions): Promise<AsyncIterable<unknown>>;
+  transform(input: AsyncGenerator<unknown>, options: StreamOptions): AsyncIterable<unknown>;
 }
 
 export type LangGraphAgent = (host: LangGraphHost) => LangGraphGraph;

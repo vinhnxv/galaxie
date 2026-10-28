@@ -11,6 +11,7 @@ import {
   createRuntime,
   type DiagnosticEvent,
   defineAgentDefinition,
+  type ExecutorAdapter,
   type RunRequest,
 } from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
@@ -293,6 +294,9 @@ test('reports NodeInterrupt and resume as unsupported', async () => {
       stream: async () => {
         throw new Error('must not run');
       },
+      transform: () => {
+        throw new Error('must not run');
+      },
     }),
     { chatModels: {} },
     { signal: new AbortController().signal },
@@ -305,6 +309,20 @@ test('reports NodeInterrupt and resume as unsupported', async () => {
     { type: 'error', error: expect.objectContaining({ code: 'unsupported' }) },
   ]);
   await agent.dispose();
+});
+
+test('rejects stream-only facades without a drainable native transform', async () => {
+  const adapter: ExecutorAdapter<unknown, LangGraphServices> = createLangGraphAdapter();
+  const factory = () => ({
+    stream: async () => ({
+      async *[Symbol.asyncIterator]() {
+        yield [];
+      },
+    }),
+  });
+  await expect(
+    adapter.prepare(factory, { chatModels: {} }, { signal: new AbortController().signal }),
+  ).rejects.toMatchObject({ code: 'unsupported' });
 });
 
 test.each(['node', 'model', 'abort-name'] as const)(
