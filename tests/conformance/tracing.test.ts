@@ -11,6 +11,7 @@ import {
   defineAgentDefinition,
   galaxieField,
 } from '@galaxie/core';
+import { MockChatModel } from '@galaxie/models/mock';
 import type { BaseChatModel, LangSmithParams } from '@langchain/core/language_models/chat_models';
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import * as web from '@langchain/langgraph/web';
@@ -592,3 +593,172 @@ test('queued capability arguments wait for the second policy check', async () =>
     await provider.shutdown();
   }
 });
+
+const treeCredential = 'at36-credential-canary';
+const treeError = 'at36-error-message-canary';
+const treePrompt = 'at36 model input';
+
+async function completeSpanTree(failed: boolean, text: boolean) {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const credentials: string[] = [];
+  const getCredential = (): string => treeCredential;
+  const runtime = createRuntime({
+    appId: 'complete-span-tree',
+    executors: [createLangGraphAdapter()],
+    tracerProvider: provider,
+    ...(text ? { developmentTraceText: { destination: 'third-party' as const } } : {}),
+  });
+  const model = new MockChatModel({
+    [treePrompt]: failed
+      ? { error: new Error(treeError) }
+      : {
+          id: 'at36-reply',
+          text: 'at36 model output',
+          usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
+        },
+  });
+  const instance = await runtime.create(
+    defineAgentDefinition({
+      id: 'conformance/complete-tree',
+      version: '1.0.0',
+      executor: 'langgraph-js',
+      input: z.object({ value: z.string().meta(galaxieField({ label: 'public' })) }),
+      models: assistantRoles,
+      capabilities: {
+        optional: {
+          'lookup@1': {
+            input: z.object({ query: z.string() }),
+            output: z.string().meta(galaxieField({ label: 'public' })),
+            kind: 'read',
+          },
+        },
+      },
+    }),
+    {
+      principalScope: 'fixture',
+      models: {
+        providers: {
+          assistant: {
+            destination: 'host-server',
+            modality: 'text',
+            features: ['streaming', 'cancellation'],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+            credential: true,
+          },
+        },
+        roles: { assistant: { providers: ['assistant'], allow: ['host-server'], maxTokens: 1000 } },
+        consent: () => true,
+        getCredential,
+      },
+      services: {
+        chatModels: {
+          assistant: ({ credential }) => {
+            credentials.push(credential);
+            return model;
+          },
+        },
+      },
+      bindings: {
+        'lookup@1': {
+          ...binding(),
+          invoke: async () => {
+            credentials.push(getCredential());
+            if (failed) throw new Error(treeError);
+            return 'at36 capability output';
+          },
+        },
+      },
+      agent: (host) => {
+        const state = web.Annotation.Root({ value: web.Annotation<string> });
+        return new web.StateGraph(state)
+          .addNode('a', async (_state, config) => {
+            try {
+              await host.langchain
+                .chatModel('assistant')
+                .invoke([new HumanMessage({ content: treePrompt })], config);
+            } catch (error) {
+              if (!failed) throw error;
+            }
+            return {};
+          })
+          .addNode('b', async (_state, config) => {
+            await host.capabilities.call('lookup@1', { query: 'at36 capability argument' }, config);
+            return {};
+          })
+          .addEdge(web.START, 'a')
+          .addEdge('a', 'b')
+          .addEdge('b', web.END)
+          .compile();
+      },
+    },
+  );
+  try {
+    await instance.prepare();
+    const { runId } = await instance.start({ value: 'public input' });
+    const events = await collect(instance.events(runId));
+    const snapshot = instance.getSnapshot();
+    await runtime.dispose();
+    await provider.forceFlush();
+    expect(credentials).toEqual([treeCredential, treeCredential]);
+    expect(model.calls).toBe(1);
+    expect(snapshot.run?.status).toBe(failed ? 'failed' : 'succeeded');
+    return { spans: exporter.getFinishedSpans(), snapshot, events };
+  } finally {
+    await runtime.dispose();
+    await provider.shutdown();
+  }
+}
+
+test('AT-36 one real graph contains run, node, routed model and capability spans in one tree', async () => {
+  const { spans } = await completeSpanTree(false, false);
+  expect(assertSpanTree(spans)).toEqual({
+    name: 'invoke_agent conformance/complete-tree',
+    children: [
+      { name: 'galaxie.node a', children: [{ name: 'chat mock-1', children: [] }] },
+      { name: 'galaxie.node b', children: [{ name: 'execute_tool lookup@1', children: [] }] },
+    ],
+  });
+  expect(new Set(spans.map((span) => span.spanContext().traceId)).size).toBe(1);
+  expect(
+    spans.find((span) => span.name.startsWith('invoke_agent'))?.parentSpanContext,
+  ).toBeUndefined();
+  for (const span of spans) expect(span.status.code).toBe(SpanStatusCode.UNSET);
+  expect(serializeSpans(spans)).not.toMatch(
+    /at36-(credential|error-message)-canary|at36 model|at36 capability/,
+  );
+});
+
+test.each([false, true])(
+  'AT-36 failed model and capability spans omit errors and credentials with text opt-in %s',
+  async (text) => {
+    const { spans, snapshot, events } = await completeSpanTree(true, text);
+    expect(assertSpanTree(spans, text ? { text: 'allowed' } : undefined)).toEqual({
+      name: 'invoke_agent conformance/complete-tree',
+      children: [
+        { name: 'galaxie.node a', children: [{ name: 'chat mock-1', children: [] }] },
+        { name: 'galaxie.node b', children: [{ name: 'execute_tool lookup@1', children: [] }] },
+      ],
+    });
+    const model = spans.find((span) => span.name === 'chat mock-1');
+    const capability = spans.find((span) => span.name === 'execute_tool lookup@1');
+    const root = spans.find((span) => span.name.startsWith('invoke_agent'));
+    for (const span of [model, capability, root]) {
+      expect(span?.status.code).toBe(SpanStatusCode.ERROR);
+      expect(span?.attributes['error.type']).toBeDefined();
+      expect(span?.status.message).toBeUndefined();
+      expect(span?.events).toEqual([]);
+    }
+    expect(model?.attributes['galaxie.error.code']).toBeUndefined();
+    expect(capability?.attributes['galaxie.error.code']).toBe('unavailable');
+    expect(root?.attributes['galaxie.error.code']).toBe('unavailable');
+    expect(root?.attributes['galaxie.run.status']).toBe('failed');
+    expect(model?.attributes['gen_ai.input.messages'] !== undefined).toBe(text);
+    expect(model?.attributes['gen_ai.output.messages']).toBeUndefined();
+    expect(capability?.attributes['gen_ai.tool.call.arguments'] !== undefined).toBe(text);
+    if (!text) expectNoText(spans);
+    expect(serializeSpans(spans) + JSON.stringify({ snapshot, events })).not.toMatch(
+      /at36-(credential|error-message)-canary/,
+    );
+  },
+);
