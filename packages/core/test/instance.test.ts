@@ -232,7 +232,7 @@ test('disposed instances reject operations and never notify listeners again', as
   expect(executor.disposeCalls).toBe(1);
 });
 
-test('dispatch rejects unsupported in this slice', async () => {
+test('dispatch rejects a stale identity with a receipt', async () => {
   const { instance, runtime } = await ready();
   await expect(
     instance.dispatch({
@@ -244,6 +244,6 @@ test('dispatch rejects unsupported in this slice', async () => {
       action: 'submit',
       payload: {},
     }),
-  ).rejects.toMatchObject({ code: 'unsupported' });
+  ).resolves.toMatchObject({ status: 'rejected', error: { code: 'stale' } });
   await runtime.dispose();
 });

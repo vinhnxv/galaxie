@@ -6,6 +6,7 @@ import { deadlineTimer, RunBudget } from './budgets.js';
 import { CapabilityBroker, registerPrivate } from './capability-broker.js';
 import type { AgentDefinition } from './definition.js';
 import {
+  type ErrorCode,
   type ErrorInfo,
   GalaxieError,
   isErrorCode,
@@ -14,9 +15,14 @@ import {
 } from './errors.js';
 import type { ExecutorEvent } from './events.js';
 import type { ExecutorAdapter, ExecutorAgent, RunCommand } from './executor.js';
-import type { InstanceId, RunId, SessionId } from './ids.js';
+import type { InstanceId, InteractionId, RunId, SessionId } from './ids.js';
 import type { AgentInstance, AgentSnapshot, RunSnapshot } from './instance.js';
-import type { PendingInteraction } from './interactions.js';
+import type {
+  DispatchReceipt,
+  InboxStatus,
+  PendingInteraction,
+  Submission,
+} from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
 import type { SelectedModelRoute } from './models.js';
@@ -35,6 +41,9 @@ interface RunRecord {
   readonly privateValues: Set<string>;
   readonly grants: ReadonlySet<string>;
   readonly budget: RunBudget;
+  readonly inbox: Map<InteractionId, InboxEntry>;
+  dispatching?: InteractionId;
+  submission?: InboxEntry;
   segment?: SegmentRecord;
   readonly events: RunEvents;
   status: RunStatus;
@@ -42,9 +51,15 @@ interface RunRecord {
   error?: ErrorInfo;
 }
 
+interface InboxEntry extends Submission {
+  readonly interactionId: InteractionId;
+  status: InboxStatus;
+}
+
 interface SegmentRecord {
   readonly index: number;
   readonly settle: () => void;
+  readonly submission?: InboxEntry;
   outcome?: RunStatus;
   clearWallClock?: () => void;
   tracing?: RunInstrumentation;
@@ -104,6 +119,7 @@ export function createAgentInstance(
   let claimingSlot = false;
   let current: RunRecord | undefined;
   let settlement: Promise<void> = Promise.resolve();
+  const dispatchChecks = new Set<Promise<DispatchReceipt>>();
 
   const report = (event: Omit<DiagnosticEvent, 'instanceId'>): void => {
     try {
@@ -134,6 +150,14 @@ export function createAgentInstance(
             status: current.status,
             labels: Object.freeze([...current.labels].sort()),
             ...(current.pending === undefined ? {} : { pending: current.pending }),
+            ...(current.submission === undefined
+              ? {}
+              : {
+                  submission: Object.freeze({
+                    interactionId: current.submission.interactionId,
+                    status: current.submission.status,
+                  }),
+                }),
             ...(current.error === undefined ? {} : { error: current.error }),
           });
     snapshot = Object.freeze({
@@ -219,6 +243,8 @@ export function createAgentInstance(
       report({ kind: 'late_event', runId: run.runId });
       return;
     }
+    if (event.type !== 'stream' && segment.submission !== undefined)
+      segment.submission.status = 'consumed';
     switch (event.type) {
       case 'output':
         segment.outcome = 'succeeded';
@@ -268,6 +294,7 @@ export function createAgentInstance(
     command: RunCommand,
     parent: Context,
   ): Promise<void> => {
+    let entered = false;
     try {
       const ready = await waitForSettlement(predecessor, run.controller.signal);
       if (!active(run, segment)) return;
@@ -324,6 +351,7 @@ export function createAgentInstance(
           publish();
         },
       };
+      entered = true;
       const iterator = agent
         .run({
           runId: run.runId,
@@ -349,6 +377,7 @@ export function createAgentInstance(
       }
     } catch (error) {
       if (active(run, segment)) {
+        if (entered && segment.submission !== undefined) segment.submission.status = 'consumed';
         failRun(run, toErrorInfo('executor_error', error));
         report({ kind: 'run_failed', runId: run.runId, error });
       } else {
@@ -365,7 +394,12 @@ export function createAgentInstance(
 
   const startSegment = (run: RunRecord, command: RunCommand, parent: Context): void => {
     const { promise: settled, resolve: settle } = Promise.withResolvers<void>();
-    const segment: SegmentRecord = { index: (run.segment?.index ?? -1) + 1, settle };
+    const submission = command.type === 'resume' ? run.inbox.get(command.interactionId) : undefined;
+    const segment: SegmentRecord = {
+      index: (run.segment?.index ?? -1) + 1,
+      settle,
+      ...(submission === undefined ? {} : { submission }),
+    };
     const predecessor = settlement;
     settlement = Promise.all([predecessor, settled]).then(() => {});
     run.segment = segment;
@@ -476,6 +510,7 @@ export function createAgentInstance(
           grants,
           events: new RunEvents(runId),
           budget: new RunBudget(instrumentation.limits),
+          inbox: new Map(),
           status: 'queued',
         };
         registerPrivate(broker.input.privateStrings(value), run.privateValues);
@@ -486,9 +521,70 @@ export function createAgentInstance(
         return { runId };
       })();
     },
-    async dispatch() {
-      assertUsable();
-      throw new GalaxieError('unsupported', 'Interaction dispatch is not implemented.');
+    dispatch(event): Promise<DispatchReceipt> {
+      try {
+        assertUsable();
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      const rejected = (code: ErrorCode): DispatchReceipt => ({
+        status: 'rejected',
+        error: toErrorInfo(code),
+      });
+      const run = current;
+      if (event.instanceId !== instanceId || run === undefined || event.runId !== run.runId)
+        return Promise.resolve(rejected('stale'));
+      if (run.inbox.has(event.interactionId) || run.dispatching === event.interactionId)
+        return Promise.resolve(rejected('duplicate'));
+      const pending = run.pending;
+      if (
+        run.status !== 'waiting_input' ||
+        pending === undefined ||
+        event.interactionId !== pending.interactionId ||
+        event.surfaceId !== pending.surfaceId ||
+        event.viewRevision !== pending.viewRevision
+      )
+        return Promise.resolve(rejected('stale'));
+      if (!adapter.features.resume) return Promise.resolve(rejected('unsupported'));
+      if (typeof event.action !== 'string' || event.action.length === 0)
+        return Promise.resolve(rejected('invalid'));
+      try {
+        run.budget.payload(event.payload);
+      } catch (error) {
+        return Promise.resolve(rejected(isGalaxieError(error) ? error.code : 'invalid'));
+      }
+      const { interactionId, action, payload } = event;
+      const parent = context.active();
+      run.dispatching = interactionId;
+      const checking = (async (): Promise<DispatchReceipt> => {
+        try {
+          const committed = await executor?.pending(sessionId);
+          if (
+            disposing ||
+            current !== run ||
+            run.status !== 'waiting_input' ||
+            committed?.interactionId !== interactionId
+          )
+            return rejected('stale');
+          const entry: InboxEntry = { interactionId, action, payload, status: 'accepted' };
+          run.inbox.set(interactionId, entry);
+          run.submission = entry;
+          run.status = 'running';
+          delete run.pending;
+          // Register settlement before publishing: a listener may dispose synchronously.
+          startSegment(run, { type: 'resume', interactionId, action, payload }, parent);
+          publish();
+          return { status: 'accepted', interactionId };
+        } catch (error) {
+          report({ kind: 'run_failed', runId: run.runId, error });
+          return rejected('executor_error');
+        } finally {
+          delete run.dispatching;
+        }
+      })();
+      dispatchChecks.add(checking);
+      void checking.then(() => dispatchChecks.delete(checking));
+      return checking;
     },
     async cancel(runId) {
       assertUsable();
@@ -527,7 +623,7 @@ export function createAgentInstance(
         router.dispose();
       });
       void (async () => {
-        await waitForSettlement(settlement);
+        await waitForSettlement(Promise.all([settlement, ...dispatchChecks]).then(() => {}));
         await disposeExecutor();
         state = 'disposed';
         publish();
