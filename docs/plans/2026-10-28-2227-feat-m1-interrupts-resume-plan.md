@@ -17,7 +17,7 @@ execution: code
   - The conformance suite proves on native Node, galaxie Node and galaxie Chromium that interrupt, resume, node re-execution, interrupt IDs, resume values and durability modes behave as native LangGraph 1.5.1 does.
 - **Means:**
   - Core runs each run as one or more segments and gains an in-memory submission inbox behind `AgentInstance.dispatch` (KTD3 to KTD7).
-  - The LangGraph adapter ships a `requestInteraction(request, config)` helper that works anywhere in a node (KTD1). It installs async context when none exists: a real `AsyncLocalStorage` on Node, and a synchronous shim elsewhere, under which stock `interrupt()` works only in a node's synchronous prefix (KTD2). It reads the pending interaction with `getState` and resumes with `Command({ resume })` (KTD8 to KTD10).
+  - The LangGraph adapter ships a `requestInteraction(request, config)` helper that works anywhere in a node (KTD1). It installs a synchronous context shim when no async context exists, under which stock `interrupt()` works only in a node's synchronous prefix (KTD2). It reads the pending interaction with `getState` and resumes with `Command({ resume })` (KTD8 to KTD10).
 - **Authority, highest first:**
   1. `AGENTS.md` repository rules.
   2. Accepted ADRs in `docs/adr/`. ADR-0001, ADR-0012, ADR-0015, ADR-0016 and ADR-0017 bind this slice.
@@ -158,11 +158,12 @@ Research against the installed packages found a harder problem. LangGraph's `int
 ### Key Technical Decisions
 
 - KTD1. **`requestInteraction(request, config)` wraps stock `interrupt()`.** It validates the request (R2), then calls `interrupt(request)` from `@langchain/langgraph/web` inside `AsyncLocalStorageProviderSingleton.runWithConfig(config, ...)` from `@langchain/core/singletons`. `interrupt()` is synchronous and reads exactly that store. The helper never catches the `GraphInterrupt` it throws. Reimplementing `interrupt()` from `config.configurable` internals was rejected: it copies upstream logic, which `AGENTS.md` forbids, and depends on more internals.
-- KTD2. **The adapter installs async context at `prepare` when none exists.** `installContext()` passes an instance to `AsyncLocalStorageProviderSingleton.initializeGlobalInstance`, which writes only when no global instance exists, so an instance installed earlier is always kept.
-  - **On Node** (`globalThis.process?.getBuiltinModule` is a function), the instance is `new AsyncLocalStorage()` from `process.getBuiltinModule('node:async_hooks')`. This is what importing the root `@langchain/langgraph` entry installs, so the galaxie Node lane gets native behavior: stock `interrupt()`, `getConfig()` and implicit model config work anywhere in a node, and the host's own LangChain code is not locked out of real async context. The adapter still imports only `/web`; this is a runtime feature check, not an import.
-  - **Elsewhere** (browsers), the instance is a synchronous shim with `getStore`, `run` and `enterWith`. Stock `interrupt()`, `getConfig()` and implicit model config then work only in a node's synchronous prefix, before its first `await`. First-writer-wins means the shim stays for the page's lifetime; browsers have no real `AsyncLocalStorage` for it to block.
+- KTD2. **The adapter installs a synchronous context shim at `prepare` when no async context exists.** `installContext()` passes an object with `getStore`, `run` and `enterWith` to `AsyncLocalStorageProviderSingleton.initializeGlobalInstance`, which writes only when no global instance exists.
+  - An instance installed earlier is kept. A Node host that imports the root `@langchain/langgraph` entry, `@langchain/core/context` or `langsmith/traceable` before the first `prepare` keeps its real `AsyncLocalStorage`, and stock `interrupt()` then works anywhere in a node.
+  - Otherwise the shim stays for the process or page lifetime, because first-writer-wins also blocks later installers. Stock `interrupt()`, `getConfig()` and implicit model config then work only in a node's synchronous prefix, before its first `await`, and other LangChain code in the same Node process loses async context after an `await`. `docs/system-design.md` must state this, and that such a Node host must initialize a real `AsyncLocalStorage` before the first `prepare`.
+  - A real `AsyncLocalStorage` cannot come from the adapter itself: `scripts/check-dependencies.ts` forbids `async_hooks` anywhere in built packages so they stay browser-safe, and that guard stays unchanged.
+  - The conformance galaxie lanes import only `/web`, so both run under the shim. The existing `model-without-config` matrix entries can shrink, so U5 re-measures them. Portable graph code uses `requestInteraction`, which works on every lane.
 
-  Either way the existing `model-without-config` matrix entries can shrink or disappear, so U5 re-measures them. Portable graph code uses `requestInteraction`, which works on every lane.
 - KTD3. **A run is a sequence of segments.** Each segment is one executor `run()` call: the start, then one per accepted submission. A segment owns its settlement promise, root span, wall-clock timer, step limit and an outcome flag. A resume segment calls `executor.run()` only after the previous segment has settled, within the existing `waitForSettlement` bound, because the previous iterator can still be finishing (the adapter awaits its trace handler in `finally`) after core already published `waiting_input`. The `RunRecord` owns `runId`, events, labels, private values, grants, `RunBudget`, the inbox and the status. The instance-level `settlement` chain appends every segment, so `start` and `dispose` wait for the latest segment. Private values are cleared only when the run becomes terminal.
 - KTD4. **Dispatch claims synchronously, then confirms against committed state.**
   1. Run checks 1 to 5 of R6 synchronously, in R6's order.
@@ -254,7 +255,7 @@ flowchart TB
   - the helper is named `requestInteraction` so it does not shadow LangGraph's `interrupt`;
   - the snapshot field is `run.submission`;
   - a pause ends its span without an error status, as it does today;
-  - the galaxie Node lane gets a real `AsyncLocalStorage` (native parity), and only browsers get the synchronous shim (KTD2).
+  - both galaxie lanes run under the synchronous shim, and the Node-host hazard is documented rather than solved in M1 (KTD2).
 - `@langchain/core` 1.2.20 keeps `runWithConfig` storing the config under its child key and `initializeGlobalInstance` as first-writer-wins. U4 adds a test that fails if either changes.
 - A subgraph interrupt bubbles to the root, so root `getState().tasks` lists it on the calling parent task with the same ID the stream reported. U5 and U7 verify this; if it is false, the adapter reads the ID from the stream instead and the PR body records why.
 - The probes behind this plan ran on Node 24 against the installed packages. Chromium behavior is assumed to match `/web` on a clean Node process. The galaxie Chromium lane confirms it.
@@ -387,7 +388,6 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8. U2 and U3 change core only 
   - The shim's `run(store, callback)` sets the current store, calls the callback, and restores the previous store in `finally`.
   - A malformed request throws `GalaxieError('invalid', ...)` with the fixed message, so the adapter's existing cause mapping fails the run with `invalid`.
 - **Test scenarios:**
-  - On Node, `installContext()` with no global instance installs an instance that keeps the store across an `await` inside `run()`.
   - `installContext()` keeps a pre-existing global instance. Save the existing value at `Symbol.for('ls:tracing_async_local_storage')`, set a sentinel, call the function, assert the sentinel remains, then restore.
   - Inside `runWithConfig(config, ...)` under the shim (constructed directly, not through `installContext()`), `AsyncLocalStorageProviderSingleton.getRunnableConfig()` returns that config. This guards the core 1.2.20 internals the helper relies on.
   - The shim restores the previous store after a callback throws.
@@ -406,7 +406,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8. U2 and U3 change core only 
   - `tests/conformance/compatibility-matrix.json`
 - **Approach:** implement KTD8, KTD9 and KTD10.
   - Call `installContext()` in `prepare` before calling the factory.
-  - Re-measure `model-without-config` on both galaxie lanes in this unit, because `installContext()` changes it and `galaxie.test.ts` requires the observed differences to equal the matrix exactly. Shrink each lane's matrix entry to the differences that remain, or delete an entry whose differences are now empty, and rewrite each remaining reason to match. Expect the galaxie Node entry to disappear (real `AsyncLocalStorage`) and the Chromium entry to shrink only if the model call sits in the synchronous prefix.
+  - Re-measure `model-without-config` on both galaxie lanes in this unit, because `installContext()` changes it and `galaxie.test.ts` requires the observed differences to equal the matrix exactly. Shrink each lane's matrix entry to the differences that remain, or delete an entry whose differences are now empty, and rewrite each remaining reason to match. Both lanes run under the shim, so expect both entries to change the same way.
   - Build the resume input as a one-item async generator, as starts do today, through `graph.transform`.
   - Keep `request.signal.aborted` suppression and the credential-failure mapping unchanged.
   - Rewrite the test "reports NodeInterrupt and resume as unsupported", and update the feature-flag assertion.
@@ -470,7 +470,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8. U2 and U3 change core only 
   - The pause history lengths are 3, 3 and 1 for `async`, `sync` and `exit`, and the final histories are 5, 5 and 2, matching Known Library Behavior. The native golden is authoritative.
   - `interaction-context.test.ts`, on the galaxie lanes:
     - `requestInteraction` after an `await` pauses the run on both lanes;
-    - stock `interrupt()` after an `await` pauses the run on galaxie Node and fails it with `executor_error` on galaxie Chromium;
+    - stock `interrupt()` after an `await` fails the run with `executor_error` on both lanes;
     - a model called without config inside a node's synchronous prefix emits `messages` events on both lanes.
 - **Verification:**
   - `native.node.test.ts` passes, and `git status` shows only new golden files.
@@ -487,7 +487,7 @@ U1 → U2 → U3 → U4 → U5 → U6 → U7 → U8. U2 and U3 change core only 
   - `AGENTS.md`
   - `docs/adr/0004-interrupt-as-pending-interaction-source.md`
 - **Approach:**
-  - Replace "Dispatch and resume remain unsupported" and the deferred interrupt/durability parity sentence in `docs/system-design.md` §6. State the segment model, the in-memory inbox, the `requestInteraction` requirement, the context installation from KTD2 (real `AsyncLocalStorage` on Node, the synchronous shim and its synchronous-prefix limit in browsers, first-writer-wins in both directions), and the M1 limits from R4.
+  - Replace "Dispatch and resume remain unsupported" and the deferred interrupt/durability parity sentence in `docs/system-design.md` §6. State the segment model, the in-memory inbox, the `requestInteraction` requirement, the synchronous context shim from KTD2, its synchronous-prefix limit, and the first-writer-wins hazard for Node hosts that use LangChain outside galaxie, and the M1 limits from R4.
   - Update the project-status paragraph in `AGENTS.md`.
   - In ADR-0004, add the M1 conformance results under its verification text without changing its status. Record only what the transcripts observe: interrupt IDs, node and parent re-execution, resume values reaching the node, and the single-interrupt-per-node rule. List how resume values are persisted, and whether a repeated resume after a crash is safe, as still unverified for M3.
   - Never describe galaxie as secure or compliant.
