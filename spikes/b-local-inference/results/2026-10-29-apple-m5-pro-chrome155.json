@@ -1,0 +1,5846 @@
+{
+  "schema": "galaxie.spike-b.results/v1",
+  "createdAt": "2026-10-28T21:15:41.548Z",
+  "page": {
+    "origin": "http://127.0.0.1:4173"
+  },
+  "device": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+    "chromeVersion": "155.0.8059.86",
+    "logicalCores": 15,
+    "webgpu": {
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "description": "",
+        "shaderF16": true
+      }
+    }
+  },
+  "armOrder": ["mock", "ort-own-loop", "webllm", "transformers-js", "prompt-api"],
+  "runs": 20,
+  "arms": [
+    {
+      "id": "mock",
+      "model": {
+        "id": "deterministic-mock",
+        "revision": "v1"
+      },
+      "engineVersion": "1",
+      "inWorker": true,
+      "decoding": "greedy",
+      "schemaMechanism": "deterministic schema fixture",
+      "fallbacks": [],
+      "sameCheckpointAs": null,
+      "sessionIsolation": "harness_history_replay",
+      "availability": {
+        "status": "available"
+      },
+      "checks": {
+        "loads": {
+          "status": "passed",
+          "reason": "two_loads_completed"
+        },
+        "streams": {
+          "status": "passed",
+          "reason": "chunks_before_final_8"
+        },
+        "cancels": {
+          "status": "passed",
+          "reason": "abort_observed_after_second_chunk"
+        },
+        "worker": {
+          "status": "passed",
+          "reason": "generation_scope_observed"
+        },
+        "resetPerSession": {
+          "status": "passed",
+          "reason": "positive_control_and_isolation_observed"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "passed",
+          "reason": "constrained_value_observed",
+          "constrained": true
+        },
+        "schemaCoverage": {
+          "status": "passed",
+          "reason": "coverage_probe",
+          "constrained": true
+        }
+      },
+      "loads": [
+        {
+          "loadKind": "warm",
+          "elapsedMs": 16.700000047683716,
+          "reason": null,
+          "reportedBytes": 0
+        },
+        {
+          "loadKind": "warm",
+          "elapsedMs": 4.5,
+          "reason": null,
+          "reportedBytes": 0
+        }
+      ],
+      "coldLoadMs": null,
+      "coldLoadReason": "already_cached",
+      "warmLoadMs": 4.5,
+      "download": {
+        "storageDeltaBytes": 0,
+        "reportedBytes": 0,
+        "reason": null
+      },
+      "cancel": {
+        "chunksAtAbort": 2,
+        "abortToSettleMs": 6.299999952316284,
+        "chunksAfterSettle": 0,
+        "nextRequestSucceeded": true,
+        "nextRequestTtftMs": 5.199999809265137,
+        "medianFeedbackTtftMs": 5.5
+      },
+      "tasks": [
+        {
+          "id": "quiz",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 173.79999995231628,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 171.20000004768372,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 170.09999990463257,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 171,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 172,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 177.79999995231628,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 168.39999985694885,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 172.20000004768372,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 169.40000009536743,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 178.20000004768372,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 172.79999995231628,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 171.29999995231628,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 171.90000009536743,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 174.79999995231628,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.20000004768371582,
+              "ttftMs": null,
+              "totalMs": 169.89999985694885,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 167.79999995231628,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 177.70000004768372,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 179,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 176.5,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 173.20000004768372,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 166,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 166,
+              "p50": 171.90000009536743,
+              "p95": 178.20000004768372,
+              "max": 179,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "length": {
+              "min": 243,
+              "p50": 243,
+              "p95": 243,
+              "max": 243,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": 20,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-en",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 44.700000047683716,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.299999952316284,
+              "totalMs": 45,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 6,
+              "totalMs": 48.5,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 5.5,
+              "totalMs": 46.10000014305115,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 44.90000009536743,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 4.3999998569488525,
+              "totalMs": 43.09999990463257,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 5.299999952316284,
+              "totalMs": 43.89999985694885,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.1000001430511475,
+              "totalMs": 42.80000019073486,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 6,
+              "totalMs": 45.299999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.599999904632568,
+              "totalMs": 40.39999985694885,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.300000190734863,
+              "totalMs": 44.90000009536743,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 4.8999998569488525,
+              "totalMs": 47.19999980926514,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 4.400000095367432,
+              "totalMs": 42.40000009536743,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 6.099999904632568,
+              "totalMs": 45.299999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 6.1000001430511475,
+              "totalMs": 43,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 5.200000047683716,
+              "totalMs": 43.5,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 47.30000019073486,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.1000001430511475,
+              "totalMs": 46.700000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 5.300000190734863,
+              "totalMs": 41.30000019073486,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 5.099999904632568,
+              "totalMs": 44.59999990463257,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 5.5,
+              "totalMs": 44.200000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 40.39999985694885,
+              "p50": 44.59999990463257,
+              "p95": 47.30000019073486,
+              "max": 48.5,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 4.300000190734863,
+              "p50": 5.5,
+              "p95": 6.200000047683716,
+              "max": 6.299999952316284,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 64,
+              "p50": 64,
+              "p95": 64,
+              "max": 64,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-vi",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 46.5,
+          "runs": [
+            {
+              "openSessionMs": 0.20000004768371582,
+              "ttftMs": 5.599999904632568,
+              "totalMs": 40,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.1000001430511475,
+              "totalMs": 40.90000009536743,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.599999904632568,
+              "totalMs": 41.59999990463257,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 4.799999952316284,
+              "totalMs": 45.799999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.299999952316284,
+              "totalMs": 47.89999985694885,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 43,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.400000095367432,
+              "totalMs": 42.700000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 5.5,
+              "totalMs": 44.39999985694885,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 43.5,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.20000004768371582,
+              "ttftMs": 4.299999952316284,
+              "totalMs": 44.799999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 47.200000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.5,
+              "totalMs": 44.299999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 6.200000047683716,
+              "totalMs": 44.40000009536743,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 5.5,
+              "totalMs": 42.700000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.199999809265137,
+              "totalMs": 47.19999980926514,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.20000004768371582,
+              "ttftMs": 6,
+              "totalMs": 46.09999990463257,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 5.099999904632568,
+              "totalMs": 44.5,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.200000047683716,
+              "totalMs": 44.200000047683716,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 6.199999809265137,
+              "totalMs": 46.5,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 4.099999904632568,
+              "totalMs": 44.299999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 40,
+              "p50": 44.299999952316284,
+              "p95": 47.200000047683716,
+              "max": 47.89999985694885,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 4.099999904632568,
+              "p50": 5.5,
+              "p95": 6.200000047683716,
+              "max": 6.299999952316284,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 64,
+              "p50": 64,
+              "p95": 64,
+              "max": 64,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        }
+      ],
+      "longTasks": {
+        "count": 0,
+        "longestMs": 0,
+        "reason": null
+      },
+      "error": null
+    },
+    {
+      "id": "ort-own-loop",
+      "model": {
+        "id": "LiquidAI/LFM3-1.7B-ONNX",
+        "revision": "189271ef61b9e7fdd4a8b5b0891bcacad37700f8"
+      },
+      "engineVersion": "1.31.0-dev.20260914-8d85527a0",
+      "inWorker": true,
+      "decoding": "greedy",
+      "schemaMechanism": "copied JSON guide during decoding",
+      "fallbacks": [],
+      "sameCheckpointAs": null,
+      "sessionIsolation": "harness_history_replay",
+      "availability": {
+        "status": "downloadable"
+      },
+      "checks": {
+        "loads": {
+          "status": "passed",
+          "reason": "two_loads_completed"
+        },
+        "streams": {
+          "status": "passed",
+          "reason": "chunks_before_final_110"
+        },
+        "cancels": {
+          "status": "passed",
+          "reason": "abort_observed_after_second_chunk"
+        },
+        "worker": {
+          "status": "passed",
+          "reason": "generation_scope_observed"
+        },
+        "resetPerSession": {
+          "status": "passed",
+          "reason": "positive_control_and_isolation_observed"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "passed",
+          "reason": "constrained_value_observed",
+          "constrained": true
+        },
+        "schemaCoverage": {
+          "status": "failed",
+          "reason": "check_exception"
+        }
+      },
+      "loads": [
+        {
+          "loadKind": "warm",
+          "elapsedMs": 1772.9000000953674,
+          "reason": null,
+          "reportedBytes": 1401135508
+        },
+        {
+          "loadKind": "warm",
+          "elapsedMs": 1767.7000000476837,
+          "reason": null,
+          "reportedBytes": 1401135508
+        }
+      ],
+      "coldLoadMs": null,
+      "coldLoadReason": "already_cached",
+      "warmLoadMs": 1767.7000000476837,
+      "download": {
+        "storageDeltaBytes": 0,
+        "reportedBytes": 1401135508,
+        "reason": null
+      },
+      "cancel": {
+        "chunksAtAbort": 2,
+        "abortToSettleMs": 12,
+        "chunksAfterSettle": 0,
+        "nextRequestSucceeded": true,
+        "nextRequestTtftMs": 147.20000004768372,
+        "medianFeedbackTtftMs": 134.5
+      },
+      "tasks": [
+        {
+          "id": "quiz",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 1167.0999999046326,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1174.8999998569489,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1177.2999999523163,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1165.7000000476837,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1163.5,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1171.3000001907349,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1169.7000000476837,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 1112.5,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1165.8999998569489,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1167.5999999046326,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1171,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 1364.4000000953674,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1172.0999999046326,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1182.2999999523163,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1157.7999999523163,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1157.3000001907349,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1202.9000000953674,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1159.2000000476837,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1172.6000001430511,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 2.0999999046325684,
+              "ttftMs": null,
+              "totalMs": 1179.6000001430511,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1164.2999999523163,
+              "length": 93,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": 40,
+              "modelChosenTokens": 53,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 1112.5,
+              "p50": 1169.7000000476837,
+              "p95": 1202.9000000953674,
+              "max": 1364.4000000953674,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "length": {
+              "min": 93,
+              "p50": 93,
+              "p95": 93,
+              "max": 93,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": 20,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-en",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 1845.8000001907349,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": 132,
+              "totalMs": 1818.5,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.27809072042692,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.09999990463257,
+              "totalMs": 1787,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 96.1945671188978,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 133.29999995231628,
+              "totalMs": 1799.2000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 95.44390419046627,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 135.5,
+              "totalMs": 1798,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 95.6390977443609,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 136,
+              "totalMs": 1862.6999998092651,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 92.08316442784704,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 137.89999985694885,
+              "totalMs": 1823.8999998569489,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.30604982206405,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 127.90000009536743,
+              "totalMs": 1806.1000001430511,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.74436896405805,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 134.5,
+              "totalMs": 1826.6999998092651,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.96052477125727,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 135.20000004768372,
+              "totalMs": 1843.5999999046326,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.06953875750041,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 136.39999985694885,
+              "totalMs": 1840.3999998569489,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.30985915492958,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.39999985694885,
+              "totalMs": 1782.1999998092651,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 96.49229275676727,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 135,
+              "totalMs": 1842.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.10768870150511,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 135.90000009536743,
+              "totalMs": 1876.5,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 91.34781110462576,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 135.10000014305115,
+              "totalMs": 1783.5,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 96.45717059803343,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 131.59999990463257,
+              "totalMs": 1776.2999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 96.67416549850442,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 128.90000009536743,
+              "totalMs": 1776.2999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 96.51572175173406,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 138.29999995231628,
+              "totalMs": 1826.5999999046326,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.17757507817967,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 137.59999990463257,
+              "totalMs": 1793.5,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 96.0202910748492,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.5,
+              "totalMs": 1835.3999998569489,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.47992240188864,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 131.70000004768372,
+              "totalMs": 1774.3999998569489,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 96.791867059391,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 1774.3999998569489,
+              "p50": 1806.1000001430511,
+              "p95": 1862.6999998092651,
+              "max": 1876.5,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 127.90000009536743,
+              "p50": 134.5,
+              "p95": 137.89999985694885,
+              "max": 138.29999995231628,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 160,
+              "p50": 160,
+              "p95": 160,
+              "max": 160,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": 91.34781110462576,
+              "p50": 94.30604982206405,
+              "p95": 96.67416549850442,
+              "max": 96.791867059391,
+              "p95Reason": null
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-vi",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 1799.6999998092651,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.60000014305115,
+              "totalMs": 1854.5,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 92.44723531206738,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.89999985694885,
+              "totalMs": 1884.3999998569489,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 90.88310945984567,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 135.29999995231628,
+              "totalMs": 1844,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.05319833532093,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.40000009536743,
+              "totalMs": 1851,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 92.62495631412874,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 132.89999985694885,
+              "totalMs": 1930.2000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 88.46603237251792,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 133.90000009536743,
+              "totalMs": 1845.9000000953674,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 92.87383177570094,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 131.79999995231628,
+              "totalMs": 1833.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.42499558792544,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 133.09999990463257,
+              "totalMs": 1859.2000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 92.11517292556795,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.90000009536743,
+              "totalMs": 1838.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.3208123045251,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.79999995231628,
+              "totalMs": 1789.5,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 96.08992566351489,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 135.70000004768372,
+              "totalMs": 1883,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 90.99753906274773,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 134.30000019073486,
+              "totalMs": 1815.6000001430511,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.569678227865,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 130.5,
+              "totalMs": 1807,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.84044139576498,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 134.39999985694885,
+              "totalMs": 1797.6999998092651,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 95.5930980608178,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 136.60000014305115,
+              "totalMs": 1812.9000000953674,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.85175684813153,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 136.29999995231628,
+              "totalMs": 1797.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 95.70241964058812,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 135.79999995231628,
+              "totalMs": 1774.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 97.01629140932809,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 136.10000014305115,
+              "totalMs": 1823.5,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.22780610020114,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 135.39999985694885,
+              "totalMs": 1829.5,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 93.85514431649484,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 131.90000009536743,
+              "totalMs": 1809.7999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 94.76130878690967,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 1774.7000000476837,
+              "p50": 1829.5,
+              "p95": 1884.3999998569489,
+              "max": 1930.2000000476837,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 130.5,
+              "p50": 134.60000014305115,
+              "p95": 136.29999995231628,
+              "max": 136.60000014305115,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 160,
+              "p50": 160,
+              "p95": 160,
+              "max": 160,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": 88.46603237251792,
+              "p50": 93.42499558792544,
+              "p95": 96.08992566351489,
+              "max": 97.01629140932809,
+              "p95Reason": null
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        }
+      ],
+      "longTasks": {
+        "count": 0,
+        "longestMs": 0,
+        "reason": null
+      },
+      "error": null
+    },
+    {
+      "id": "webllm",
+      "model": {
+        "id": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+        "revision": "9bd564b064631febf14deadcac492efb761d60c3"
+      },
+      "engineVersion": "0.2.86",
+      "inWorker": true,
+      "decoding": "greedy",
+      "schemaMechanism": "XGrammar json_object with serialized schema",
+      "fallbacks": [],
+      "sameCheckpointAs": "transformers-js",
+      "sessionIsolation": "harness_history_replay",
+      "availability": {
+        "status": "available"
+      },
+      "checks": {
+        "loads": {
+          "status": "passed",
+          "reason": "two_loads_completed"
+        },
+        "streams": {
+          "status": "passed",
+          "reason": "chunks_before_final_26"
+        },
+        "cancels": {
+          "status": "passed",
+          "reason": "abort_observed_after_second_chunk"
+        },
+        "worker": {
+          "status": "passed",
+          "reason": "generation_scope_observed"
+        },
+        "resetPerSession": {
+          "status": "not_applicable",
+          "reason": "positive_control_failed"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "passed",
+          "reason": "constrained_value_observed",
+          "constrained": true
+        },
+        "schemaCoverage": {
+          "status": "passed",
+          "reason": "coverage_probe",
+          "constrained": true
+        }
+      },
+      "loads": [
+        {
+          "loadKind": "warm",
+          "elapsedMs": 797.5,
+          "reason": "engine_reports_fraction_only",
+          "reportedBytes": null
+        },
+        {
+          "loadKind": "warm",
+          "elapsedMs": 730.7999999523163,
+          "reason": "engine_reports_fraction_only",
+          "reportedBytes": null
+        }
+      ],
+      "coldLoadMs": null,
+      "coldLoadReason": "already_cached",
+      "warmLoadMs": 730.7999999523163,
+      "download": {
+        "storageDeltaBytes": 0,
+        "reportedBytes": null,
+        "reason": null
+      },
+      "cancel": {
+        "chunksAtAbort": 2,
+        "abortToSettleMs": 0.2999999523162842,
+        "chunksAfterSettle": 0,
+        "nextRequestSucceeded": true,
+        "nextRequestTtftMs": 54,
+        "medianFeedbackTtftMs": 45.09999990463257
+      },
+      "tasks": [
+        {
+          "id": "quiz",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 1298.2000000476837,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1254.0999999046326,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 1273.5999999046326,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1239.3999998569489,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1244.2999999523163,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1267.6000001430511,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1272.5,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1243.5,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 1260.8999998569489,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1272.6000001430511,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 1270.9000000953674,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 1271,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1256.2999999523163,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1255.3999998569489,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1242.5999999046326,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1265.5,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1269.1000001430511,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 1247.7999999523163,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1270.1000001430511,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1263.2000000476837,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 1248.5,
+              "length": 128,
+              "lengthUnit": "tokens",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 1239.3999998569489,
+              "p50": 1260.8999998569489,
+              "p95": 1272.6000001430511,
+              "max": 1273.5999999046326,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "length": {
+              "min": 128,
+              "p50": 128,
+              "p95": 128,
+              "max": 128,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": 20,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-en",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 272.39999985694885,
+          "runs": [
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 45.39999985694885,
+              "totalMs": 266.2999999523163,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.7003168346547,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 43.69999980926514,
+              "totalMs": 284.19999980926514,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 108.10810810810811,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 46.799999952316284,
+              "totalMs": 263.89999985694885,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 119.7604790945244,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 47.39999985694885,
+              "totalMs": 270.2000000476837,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 116.69658876903901,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 43.59999990463257,
+              "totalMs": 267.90000009536743,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 115.91618358399796,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 46.700000047683716,
+              "totalMs": 269,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 116.9590643525733,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 46.299999952316284,
+              "totalMs": 265.59999990463257,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 118.55905155336679,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 46.89999985694885,
+              "totalMs": 266.89999985694885,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 118.18181818181819,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45.59999990463257,
+              "totalMs": 276.19999980926514,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 112.74934956961239,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 52.40000009536743,
+              "totalMs": 270.40000009536743,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 119.26605504587155,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45.40000009536743,
+              "totalMs": 267.2000000476837,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.22272319923181,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 44.10000014305115,
+              "totalMs": 264.60000014305115,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.91383219954649,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45.09999990463257,
+              "totalMs": 267.7000000476837,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 116.80143748109353,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 43.799999952316284,
+              "totalMs": 261.09999990463257,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 119.65025313256038,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 43.90000009536743,
+              "totalMs": 264.60000014305115,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.80697777246273,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 43.5,
+              "totalMs": 262.7999999523163,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 118.55905155336679,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 44,
+              "totalMs": 268.5,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 115.81291759465479,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 43.90000009536743,
+              "totalMs": 289,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 106.07915140806404,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45.09999990463257,
+              "totalMs": 262.89999985694885,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 119.37557394716379,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 46.5,
+              "totalMs": 263.89999985694885,
+              "length": 27,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 119.59521627004706,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 261.09999990463257,
+              "p50": 266.89999985694885,
+              "p95": 284.19999980926514,
+              "max": 289,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 43.5,
+              "p50": 45.09999990463257,
+              "p95": 47.39999985694885,
+              "max": 52.40000009536743,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 27,
+              "p50": 27,
+              "p95": 27,
+              "max": 27,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": 106.07915140806404,
+              "p50": 117.7003168346547,
+              "p95": 119.65025313256038,
+              "max": 119.7604790945244,
+              "p95Reason": null
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-vi",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 278.10000014305115,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": 43.799999952316284,
+              "totalMs": 273.39999985694885,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.59581886417601,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 46.39999985694885,
+              "totalMs": 276.19999980926514,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.4934726092364,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45.30000019073486,
+              "totalMs": 276.30000019073486,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 116.88311688311688,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 44.799999952316284,
+              "totalMs": 292.40000009536743,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 109.04684969467175,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 43.60000014305115,
+              "totalMs": 271.60000014305115,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 118.42105263157895,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 46.700000047683716,
+              "totalMs": 278.60000014305115,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 116.42949542430539,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 43.59999990463257,
+              "totalMs": 274.59999990463257,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 116.88311688311688,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 47,
+              "totalMs": 277.09999990463257,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.3402868804452,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 43.799999952316284,
+              "totalMs": 274.2999999523163,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.13665943600867,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 46.5,
+              "totalMs": 277.2000000476837,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.0351105089698,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45.30000019073486,
+              "totalMs": 274.90000009536743,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.59581886417601,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 46.5,
+              "totalMs": 296.90000009536743,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 107.82747599727143,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 43.200000047683716,
+              "totalMs": 273.90000009536743,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.0351105089698,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45,
+              "totalMs": 272.7000000476837,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 118.57707507398246,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45.5,
+              "totalMs": 274.2999999523163,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 118.00699303158659,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 43.200000047683716,
+              "totalMs": 274.2999999523163,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 116.83254007417577,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 48.200000047683716,
+              "totalMs": 275,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 119.04761907264829,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 45.90000009536743,
+              "totalMs": 274.80000019073486,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 117.95543900721229,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 46.5,
+              "totalMs": 292.59999990463257,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 109.71149943300651,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 43.60000014305115,
+              "totalMs": 277.60000014305115,
+              "length": 28,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": 115.38461538461537,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 271.60000014305115,
+              "p50": 274.90000009536743,
+              "p95": 292.59999990463257,
+              "max": 296.90000009536743,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 43.200000047683716,
+              "p50": 45.30000019073486,
+              "p95": 47,
+              "max": 48.200000047683716,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 28,
+              "p50": 28,
+              "p95": 28,
+              "max": 28,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": 107.82747599727143,
+              "p50": 117.0351105089698,
+              "p95": 118.57707507398246,
+              "max": 119.04761907264829,
+              "p95Reason": null
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        }
+      ],
+      "longTasks": {
+        "count": 0,
+        "longestMs": 0,
+        "reason": null
+      },
+      "error": null
+    },
+    {
+      "id": "transformers-js",
+      "model": {
+        "id": "onnx-community/Qwen2.5-1.5B-Instruct",
+        "revision": "d54957e3af1be04546436e874a60fe386041b244",
+        "dtype": "q4f16"
+      },
+      "engineVersion": "4.3.1",
+      "inWorker": true,
+      "decoding": "greedy",
+      "schemaMechanism": "StructuredOutputProcessor logits processor 4.3.1",
+      "fallbacks": [],
+      "sameCheckpointAs": "webllm",
+      "sessionIsolation": "harness_history_replay",
+      "availability": {
+        "status": "downloadable"
+      },
+      "checks": {
+        "loads": {
+          "status": "passed",
+          "reason": "two_loads_completed"
+        },
+        "streams": {
+          "status": "failed",
+          "reason": "chunks_before_final_1"
+        },
+        "cancels": {
+          "status": "failed",
+          "reason": "no_second_chunk"
+        },
+        "worker": {
+          "status": "passed",
+          "reason": "generation_scope_observed"
+        },
+        "resetPerSession": {
+          "status": "not_applicable",
+          "reason": "positive_control_failed"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "passed",
+          "reason": "constrained_value_observed",
+          "constrained": true
+        },
+        "schemaCoverage": {
+          "status": "failed",
+          "reason": "parse_error",
+          "constrained": true
+        }
+      },
+      "loads": [
+        {
+          "loadKind": "warm",
+          "elapsedMs": 3987.7000000476837,
+          "reason": null,
+          "reportedBytes": 1228919513
+        },
+        {
+          "loadKind": "warm",
+          "elapsedMs": 3800.2000000476837,
+          "reason": null,
+          "reportedBytes": 1228919513
+        }
+      ],
+      "coldLoadMs": null,
+      "coldLoadReason": "already_cached",
+      "warmLoadMs": 3800.2000000476837,
+      "download": {
+        "storageDeltaBytes": 0,
+        "reportedBytes": 1228919513,
+        "reason": null
+      },
+      "cancel": {
+        "chunksAtAbort": 0,
+        "abortToSettleMs": null,
+        "chunksAfterSettle": 0,
+        "nextRequestSucceeded": true,
+        "nextRequestTtftMs": 2626.300000190735,
+        "medianFeedbackTtftMs": 2694.5
+      },
+      "tasks": [
+        {
+          "id": "quiz",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 8808.100000143051,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8855.5,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 8836.400000095367,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8827.700000047684,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 8881.600000143051,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 8958,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8775.200000047684,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8926.5,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8943.700000047684,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8879.799999952316,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8934.599999904633,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8888.299999952316,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 8791.799999952316,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 5,
+              "ttftMs": null,
+              "totalMs": 8787.799999952316,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": null,
+              "totalMs": 8919.200000047684,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8965.600000143051,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8849.799999952316,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 8941.200000047684,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": null,
+              "totalMs": 9183.599999904633,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 4.900000095367432,
+              "ttftMs": null,
+              "totalMs": 8804.299999952316,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 8897.799999952316,
+              "length": 512,
+              "lengthUnit": "tokens",
+              "valid": false,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 8775.200000047684,
+              "p50": 8881.600000143051,
+              "p95": 8965.600000143051,
+              "max": 9183.599999904633,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "length": {
+              "min": 512,
+              "p50": 512,
+              "p95": 512,
+              "max": 512,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": 0,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-en",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 2743.7000000476837,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2719.2999999523163,
+              "totalMs": 2719.5999999046326,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 2733.5,
+              "totalMs": 2733.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2649.600000143051,
+              "totalMs": 2649.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2712.899999856949,
+              "totalMs": 2713.0999999046326,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2761.100000143051,
+              "totalMs": 2761.4000000953674,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2604.800000190735,
+              "totalMs": 2605,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 2693.0999999046326,
+              "totalMs": 2693.2999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2618.800000190735,
+              "totalMs": 2619.100000143051,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2727.100000143051,
+              "totalMs": 2727.2000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2599.9000000953674,
+              "totalMs": 2600.100000143051,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2715,
+              "totalMs": 2715.2000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2738.5,
+              "totalMs": 2738.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 2615.7999999523163,
+              "totalMs": 2616,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 2772.2000000476837,
+              "totalMs": 2772.4000000953674,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2618.600000143051,
+              "totalMs": 2618.800000190735,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2731.7000000476837,
+              "totalMs": 2731.9000000953674,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 2606.9000000953674,
+              "totalMs": 2607.100000143051,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2694.5,
+              "totalMs": 2694.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2732.5,
+              "totalMs": 2732.7000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2613.7000000476837,
+              "totalMs": 2613.7999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 2600.100000143051,
+              "p50": 2694.7000000476837,
+              "p95": 2761.4000000953674,
+              "max": 2772.4000000953674,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 2599.9000000953674,
+              "p50": 2694.5,
+              "p95": 2761.100000143051,
+              "max": 2772.2000000476837,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 160,
+              "p50": 160,
+              "p95": 160,
+              "max": 160,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        },
+        {
+          "id": "feedback-vi",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 2760.600000143051,
+          "runs": [
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2584.7999999523163,
+              "totalMs": 2585,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2707,
+              "totalMs": 2707.2000000476837,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2632.800000190735,
+              "totalMs": 2633,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2793.7000000476837,
+              "totalMs": 2793.899999856949,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 2748.600000143051,
+              "totalMs": 2748.7999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2599.2000000476837,
+              "totalMs": 2599.2999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2719.600000143051,
+              "totalMs": 2719.800000190735,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2599.699999809265,
+              "totalMs": 2599.899999856949,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 2700.2000000476837,
+              "totalMs": 2700.4000000953674,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2652.9000000953674,
+              "totalMs": 2653.0999999046326,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 2759.600000143051,
+              "totalMs": 2759.7999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2773.2000000476837,
+              "totalMs": 2773.399999856949,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2615.2000000476837,
+              "totalMs": 2615.2999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 2701.100000143051,
+              "totalMs": 2701.2999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2614.0999999046326,
+              "totalMs": 2614.2999999523163,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2728.7000000476837,
+              "totalMs": 2728.899999856949,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2605,
+              "totalMs": 2605.0999999046326,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2738.9000000953674,
+              "totalMs": 2739.0999999046326,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2731.7000000476837,
+              "totalMs": 2731.9000000953674,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0,
+              "ttftMs": 2596.7000000476837,
+              "totalMs": 2596.9000000953674,
+              "length": 160,
+              "lengthUnit": "tokens",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 2585,
+              "p50": 2700.4000000953674,
+              "p95": 2773.399999856949,
+              "max": 2793.899999856949,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 2584.7999999523163,
+              "p50": 2700.2000000476837,
+              "p95": 2773.2000000476837,
+              "max": 2793.7000000476837,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 160,
+              "p50": 160,
+              "p95": 160,
+              "max": 160,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": null,
+            "distinctOutputs": 1
+          }
+        }
+      ],
+      "longTasks": {
+        "count": 0,
+        "longestMs": 0,
+        "reason": null
+      },
+      "error": null
+    },
+    {
+      "id": "prompt-api",
+      "model": {
+        "id": "browser-managed LanguageModel",
+        "revision": null
+      },
+      "engineVersion": "browser-managed",
+      "inWorker": false,
+      "decoding": "browser-default",
+      "schemaMechanism": "responseConstraint",
+      "fallbacks": [],
+      "sameCheckpointAs": null,
+      "sessionIsolation": "native_session",
+      "availability": {
+        "status": "available",
+        "raw": "available"
+      },
+      "checks": {
+        "loads": {
+          "status": "passed",
+          "reason": "two_loads_completed"
+        },
+        "streams": {
+          "status": "passed",
+          "reason": "chunks_before_final_63"
+        },
+        "cancels": {
+          "status": "passed",
+          "reason": "abort_observed_after_second_chunk"
+        },
+        "worker": {
+          "status": "not_applicable",
+          "reason": "window_only_api"
+        },
+        "resetPerSession": {
+          "status": "passed",
+          "reason": "positive_control_and_isolation_observed"
+        },
+        "schemaEnforcedWhileDecoding": {
+          "status": "passed",
+          "reason": "constrained_value_observed",
+          "constrained": true
+        },
+        "schemaCoverage": {
+          "status": "failed",
+          "reason": "check_exception"
+        }
+      },
+      "loads": [
+        {
+          "loadKind": "warm",
+          "elapsedMs": 5053.200000047684,
+          "reason": "browser_managed_fraction_only",
+          "reportedBytes": null
+        },
+        {
+          "loadKind": "warm",
+          "elapsedMs": 0.7000000476837158,
+          "reason": "browser_managed_fraction_only",
+          "reportedBytes": null
+        }
+      ],
+      "coldLoadMs": null,
+      "coldLoadReason": "already_cached",
+      "warmLoadMs": 0.7000000476837158,
+      "download": {
+        "storageDeltaBytes": null,
+        "reportedBytes": null,
+        "reason": "browser_managed_fraction_only"
+      },
+      "cancel": {
+        "chunksAtAbort": 2,
+        "abortToSettleMs": 2.799999952316284,
+        "chunksAfterSettle": 0,
+        "nextRequestSucceeded": true,
+        "nextRequestTtftMs": 95.80000019073486,
+        "medianFeedbackTtftMs": 108.79999995231628
+      },
+      "tasks": [
+        {
+          "id": "quiz",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 4782.599999904633,
+          "runs": [
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 4389,
+              "length": 739,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 4582.299999952316,
+              "length": 811,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.5,
+              "ttftMs": null,
+              "totalMs": 4257.5,
+              "length": 749,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.39999985694885254,
+              "ttftMs": null,
+              "totalMs": 3619.2000000476837,
+              "length": 589,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.3000001907348633,
+              "ttftMs": null,
+              "totalMs": 2774.199999809265,
+              "length": 513,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": null,
+              "totalMs": 3898,
+              "length": 697,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": null,
+              "totalMs": 3066.5,
+              "length": 583,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.39999985694885254,
+              "ttftMs": null,
+              "totalMs": 4510.600000143051,
+              "length": 750,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 3592.2000000476837,
+              "length": 710,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 4592,
+              "length": 678,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": null,
+              "totalMs": 3363.7999999523163,
+              "length": 529,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 3643.199999809265,
+              "length": 633,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": null,
+              "totalMs": 3870.7000000476837,
+              "length": 668,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 4436.5,
+              "length": 775,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 2474.7000000476837,
+              "length": 426,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.3000001907348633,
+              "ttftMs": null,
+              "totalMs": 4181.5,
+              "length": 677,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 3453.399999856949,
+              "length": 720,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": null,
+              "totalMs": 3782.399999856949,
+              "length": 625,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.39999985694885254,
+              "ttftMs": null,
+              "totalMs": 3819.4000000953674,
+              "length": 583,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": null,
+              "totalMs": 2377.5999999046326,
+              "length": 422,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 2377.5999999046326,
+              "p50": 3782.399999856949,
+              "p95": 4582.299999952316,
+              "max": 4592,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "length": {
+              "min": 422,
+              "p50": 668,
+              "p95": 775,
+              "max": 811,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": 20,
+            "distinctOutputs": 20
+          }
+        },
+        {
+          "id": "feedback-en",
+          "status": "completed",
+          "reason": null,
+          "warmupMs": 1749.8000001907349,
+          "runs": [
+            {
+              "openSessionMs": 0.39999985694885254,
+              "ttftMs": 109,
+              "totalMs": 1170.1000001430511,
+              "length": 235,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.3000001907348633,
+              "ttftMs": 110.59999990463257,
+              "totalMs": 1517.7999999523163,
+              "length": 304,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 108.89999985694885,
+              "totalMs": 1589.2000000476837,
+              "length": 327,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 106.20000004768372,
+              "totalMs": 2809.600000143051,
+              "length": 577,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 109,
+              "totalMs": 1453.3999998569489,
+              "length": 298,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 108.70000004768372,
+              "totalMs": 1174.0999999046326,
+              "length": 231,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 110.10000014305115,
+              "totalMs": 2814.7000000476837,
+              "length": 590,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 105.40000009536743,
+              "totalMs": 1790.4000000953674,
+              "length": 357,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 112.20000004768372,
+              "totalMs": 1508.5,
+              "length": 302,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.39999985694885254,
+              "ttftMs": 109.10000014305115,
+              "totalMs": 2445.100000143051,
+              "length": 502,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": 107.09999990463257,
+              "totalMs": 1295.8999998569489,
+              "length": 277,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 110.29999995231628,
+              "totalMs": 887.0999999046326,
+              "length": 184,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": 108,
+              "totalMs": 1122.2000000476837,
+              "length": 224,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 109.29999995231628,
+              "totalMs": 1221.2000000476837,
+              "length": 276,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 110.79999995231628,
+              "totalMs": 1978.9000000953674,
+              "length": 429,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.2999999523162842,
+              "ttftMs": 106.09999990463257,
+              "totalMs": 1451.2999999523163,
+              "length": 309,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": 107.89999985694885,
+              "totalMs": 1694.0999999046326,
+              "length": 373,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.40000009536743164,
+              "ttftMs": 105.59999990463257,
+              "totalMs": 2098.0999999046326,
+              "length": 483,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.39999985694885254,
+              "ttftMs": 107.20000004768372,
+              "totalMs": 1063.4000000953674,
+              "length": 229,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.3000001907348633,
+              "ttftMs": 108.79999995231628,
+              "totalMs": 1591.1999998092651,
+              "length": 358,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            }
+          ],
+          "summary": {
+            "totalMs": {
+              "min": 887.0999999046326,
+              "p50": 1508.5,
+              "p95": 2809.600000143051,
+              "max": 2814.7000000476837,
+              "p95Reason": null
+            },
+            "ttftMs": {
+              "min": 105.40000009536743,
+              "p50": 108.79999995231628,
+              "p95": 110.79999995231628,
+              "max": 112.20000004768372,
+              "p95Reason": null
+            },
+            "length": {
+              "min": 184,
+              "p50": 304,
+              "p95": 577,
+              "max": 590,
+              "p95Reason": null
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": null,
+            "distinctOutputs": 20
+          }
+        },
+        {
+          "id": "feedback-vi",
+          "status": "not_run",
+          "reason": "language_unsupported",
+          "warmupMs": null,
+          "runs": [],
+          "summary": {
+            "totalMs": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "ttftMs": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "length": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "tokensPerSecond": {
+              "min": null,
+              "p50": null,
+              "p95": null,
+              "max": null,
+              "p95Reason": "no_runs"
+            },
+            "validRuns": null,
+            "distinctOutputs": 0
+          }
+        }
+      ],
+      "longTasks": {
+        "count": 0,
+        "longestMs": 0,
+        "reason": null
+      },
+      "error": null
+    }
+  ],
+  "chatWebLLM": {
+    "status": "completed",
+    "reason": "call_options_observed_at_worker_engine_boundary",
+    "engineInjection": "protected-field-overwrite",
+    "constructionStartedInThread": false,
+    "invoke": {
+      "status": "passed",
+      "reason": "worker_invoke_observed"
+    },
+    "stream": {
+      "status": "passed",
+      "reason": "worker_stream_observed"
+    },
+    "temperatureReachedEngine": false,
+    "schemaReachedEngine": false,
+    "abortSignalReachedEngine": false,
+    "schemaAccepted": false,
+    "resetPerSession": {
+      "status": "not_applicable",
+      "reason": "positive_control_failed"
+    }
+  },
+  "promptApiAvailability": {
+    "en": "available",
+    "vi": "unavailable",
+    "enToVi": "unavailable",
+    "reason": null
+  }
+}

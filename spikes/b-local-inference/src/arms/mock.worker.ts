@@ -32,7 +32,7 @@ serveWorker({
     const remembered = [...history, ...request.messages]
       .map((message) => message.content)
       .join(' ')
-      .match(/Remember the code word ([\w-]+)/)?.[1];
+      .match(/Repeat exactly this code word: ([\w-]+)/)?.[1];
     if (remembered) leakedWord = remembered;
     let text: string;
     if (request.schema) {

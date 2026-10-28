@@ -14,7 +14,7 @@ type Reply =
   | { id: number; kind: 'result'; value: unknown }
   | { id: number; kind: 'chunk'; text: string }
   | { id: number; kind: 'progress'; loaded: number; total?: number }
-  | { id: number; kind: 'error' };
+  | { id: number; kind: 'error'; message?: string };
 export class WorkerClient {
   #next = 1;
   #failure: Error | undefined;
@@ -40,7 +40,8 @@ export class WorkerClient {
       }
       const pending = this.#pending.get(reply.id);
       this.#pending.delete(reply.id);
-      if (reply.kind === 'error') pending?.reject(new Error('worker_request_failed'));
+      if (reply.kind === 'error')
+        pending?.reject(new Error(reply.message ?? 'worker_request_failed'));
       else pending?.resolve(reply.value);
     };
     worker.onerror = (event) => {
@@ -172,8 +173,15 @@ export function serveWorker(backend: WorkerBackend): void {
           }
         }
         scope.postMessage({ kind: 'result', id: command.id, value } satisfies Reply);
-      } catch {
-        scope.postMessage({ kind: 'error', id: command.id } satisfies Reply);
+      } catch (error) {
+        // Only load errors carry a message: generation errors could quote model text.
+        scope.postMessage({
+          kind: 'error',
+          id: command.id,
+          ...(command.op === 'load' && error instanceof Error
+            ? { message: error.message.slice(0, 600) }
+            : {}),
+        } satisfies Reply);
       } finally {
         controllers.delete(command.id);
       }

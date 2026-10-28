@@ -1,6 +1,6 @@
 {
   "schema": "galaxie.spike-b.results/v1",
-  "createdAt": "2026-10-28T20:36:28.196Z",
+  "createdAt": "2026-10-28T21:32:01.228Z",
   "page": {
     "origin": "http://127.0.0.1:4173"
   },
@@ -66,20 +66,20 @@
       "loads": [
         {
           "loadKind": "warm",
-          "elapsedMs": 10.5,
+          "elapsedMs": 7.400000095367432,
           "reason": null,
           "reportedBytes": 0
         },
         {
           "loadKind": "warm",
-          "elapsedMs": 4,
+          "elapsedMs": 4.599999904632568,
           "reason": null,
           "reportedBytes": 0
         }
       ],
       "coldLoadMs": null,
       "coldLoadReason": "already_cached",
-      "warmLoadMs": 4,
+      "warmLoadMs": 4.599999904632568,
       "download": {
         "storageDeltaBytes": 0,
         "reportedBytes": 0,
@@ -87,57 +87,23 @@
       },
       "cancel": {
         "chunksAtAbort": 2,
-        "abortToSettleMs": 6.299999952316284,
+        "abortToSettleMs": 5.099999904632568,
         "chunksAfterSettle": 0,
         "nextRequestSucceeded": true,
-        "nextRequestTtftMs": 6.200000047683716,
-        "medianFeedbackTtftMs": 6.1000001430511475
+        "nextRequestTtftMs": 6.1000001430511475,
+        "medianFeedbackTtftMs": 5.300000190734863
       },
       "tasks": [
         {
           "id": "quiz",
           "status": "completed",
           "reason": null,
-          "warmupMs": 172,
+          "warmupMs": 181.70000004768372,
           "runs": [
             {
-              "openSessionMs": 0.09999990463256836,
-              "ttftMs": null,
-              "totalMs": 175,
-              "length": 243,
-              "lengthUnit": "characters",
-              "valid": true,
-              "constrained": true,
-              "forcedTokens": null,
-              "modelChosenTokens": null,
-              "tokensPerSecond": null,
-              "longTasks": {
-                "count": 0,
-                "longestMs": 0,
-                "reason": null
-              }
-            },
-            {
-              "openSessionMs": 0.20000004768371582,
-              "ttftMs": null,
-              "totalMs": 178.79999995231628,
-              "length": 243,
-              "lengthUnit": "characters",
-              "valid": true,
-              "constrained": true,
-              "forcedTokens": null,
-              "modelChosenTokens": null,
-              "tokensPerSecond": null,
-              "longTasks": {
-                "count": 0,
-                "longestMs": 0,
-                "reason": null
-              }
-            },
-            {
               "openSessionMs": 0,
               "ttftMs": null,
-              "totalMs": 168.20000004768372,
+              "totalMs": 177,
               "length": 243,
               "lengthUnit": "characters",
               "valid": true,
@@ -152,9 +118,26 @@
               }
             },
             {
-              "openSessionMs": 0,
+              "openSessionMs": 0.10000014305114746,
               "ttftMs": null,
-              "totalMs": 173.19999980926514,
+              "totalMs": 170,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 177.29999995231628,
               "length": 243,
               "lengthUnit": "characters",
               "valid": true,
@@ -171,7 +154,24 @@
             {
               "openSessionMs": 0.09999990463256836,
               "ttftMs": null,
-              "totalMs": 168.20000004768372,
+              "totalMs": 174.70000004768372,
+              "length": 243,
+              "lengthUnit": "characters",
+              "valid": true,
+              "constrained": true,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": null,
+              "totalMs": 181.29999995231628,
               "length": 243,
               "lengthUnit": "characters",
               "valid": true,
@@ -188,10 +188,10 @@
           ],
           "summary": {
             "totalMs": {
-              "min": 168.20000004768372,
-              "p50": 173.19999980926514,
+              "min": 170,
+              "p50": 177,
               "p95": null,
-              "max": 178.79999995231628,
+              "max": 181.29999995231628,
               "p95Reason": "fewer_than_20_runs"
             },
             "ttftMs": {
@@ -223,28 +223,11 @@
           "id": "feedback-en",
           "status": "completed",
           "reason": null,
-          "warmupMs": 48.40000009536743,
+          "warmupMs": 44.69999980926514,
           "runs": [
             {
-              "openSessionMs": 0,
-              "ttftMs": 6,
-              "totalMs": 42.799999952316284,
-              "length": 64,
-              "lengthUnit": "characters",
-              "valid": null,
-              "constrained": false,
-              "forcedTokens": null,
-              "modelChosenTokens": null,
-              "tokensPerSecond": null,
-              "longTasks": {
-                "count": 0,
-                "longestMs": 0,
-                "reason": null
-              }
-            },
-            {
-              "openSessionMs": 0,
-              "ttftMs": 6.1000001430511475,
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 6.099999904632568,
               "totalMs": 43.200000047683716,
               "length": 64,
               "lengthUnit": "characters",
@@ -260,9 +243,9 @@
               }
             },
             {
-              "openSessionMs": 0,
-              "ttftMs": 6.099999904632568,
-              "totalMs": 46.90000009536743,
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 6.199999809265137,
+              "totalMs": 47.39999985694885,
               "length": 64,
               "lengthUnit": "characters",
               "valid": null,
@@ -278,8 +261,8 @@
             },
             {
               "openSessionMs": 0,
-              "ttftMs": 6.200000047683716,
-              "totalMs": 48.200000047683716,
+              "ttftMs": 4.5,
+              "totalMs": 42,
               "length": 64,
               "lengthUnit": "characters",
               "valid": null,
@@ -294,9 +277,26 @@
               }
             },
             {
-              "openSessionMs": 0,
-              "ttftMs": 6.200000047683716,
-              "totalMs": 45.299999952316284,
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 5.099999904632568,
+              "totalMs": 46,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 5.300000190734863,
+              "totalMs": 45.40000009536743,
               "length": 64,
               "lengthUnit": "characters",
               "valid": null,
@@ -313,17 +313,17 @@
           ],
           "summary": {
             "totalMs": {
-              "min": 42.799999952316284,
-              "p50": 45.299999952316284,
+              "min": 42,
+              "p50": 45.40000009536743,
               "p95": null,
-              "max": 48.200000047683716,
+              "max": 47.39999985694885,
               "p95Reason": "fewer_than_20_runs"
             },
             "ttftMs": {
-              "min": 6,
-              "p50": 6.1000001430511475,
+              "min": 4.5,
+              "p50": 5.300000190734863,
               "p95": null,
-              "max": 6.200000047683716,
+              "max": 6.199999809265137,
               "p95Reason": "fewer_than_20_runs"
             },
             "length": {
@@ -348,12 +348,46 @@
           "id": "feedback-vi",
           "status": "completed",
           "reason": null,
-          "warmupMs": 42.90000009536743,
+          "warmupMs": 43.200000047683716,
           "runs": [
+            {
+              "openSessionMs": 0.10000014305114746,
+              "ttftMs": 5.699999809265137,
+              "totalMs": 47.799999952316284,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
             {
               "openSessionMs": 0,
               "ttftMs": 6.200000047683716,
-              "totalMs": 46.200000047683716,
+              "totalMs": 48.40000009536743,
+              "length": 64,
+              "lengthUnit": "characters",
+              "valid": null,
+              "constrained": false,
+              "forcedTokens": null,
+              "modelChosenTokens": null,
+              "tokensPerSecond": null,
+              "longTasks": {
+                "count": 0,
+                "longestMs": 0,
+                "reason": null
+              }
+            },
+            {
+              "openSessionMs": 0.09999990463256836,
+              "ttftMs": 6.1000001430511475,
+              "totalMs": 46.80000019073486,
               "length": 64,
               "lengthUnit": "characters",
               "valid": null,
@@ -369,8 +403,8 @@
             },
             {
               "openSessionMs": 0,
-              "ttftMs": 4.799999952316284,
-              "totalMs": 44.799999952316284,
+              "ttftMs": 6,
+              "totalMs": 43.299999952316284,
               "length": 64,
               "lengthUnit": "characters",
               "valid": null,
@@ -386,42 +420,8 @@
             },
             {
               "openSessionMs": 0,
-              "ttftMs": 4.200000047683716,
-              "totalMs": 46.40000009536743,
-              "length": 64,
-              "lengthUnit": "characters",
-              "valid": null,
-              "constrained": false,
-              "forcedTokens": null,
-              "modelChosenTokens": null,
-              "tokensPerSecond": null,
-              "longTasks": {
-                "count": 0,
-                "longestMs": 0,
-                "reason": null
-              }
-            },
-            {
-              "openSessionMs": 0.10000014305114746,
-              "ttftMs": 4.599999904632568,
+              "ttftMs": 6.099999904632568,
               "totalMs": 46.5,
-              "length": 64,
-              "lengthUnit": "characters",
-              "valid": null,
-              "constrained": false,
-              "forcedTokens": null,
-              "modelChosenTokens": null,
-              "tokensPerSecond": null,
-              "longTasks": {
-                "count": 0,
-                "longestMs": 0,
-                "reason": null
-              }
-            },
-            {
-              "openSessionMs": 0.10000014305114746,
-              "ttftMs": 4.199999809265137,
-              "totalMs": 44.59999990463257,
               "length": 64,
               "lengthUnit": "characters",
               "valid": null,
@@ -438,15 +438,15 @@
           ],
           "summary": {
             "totalMs": {
-              "min": 44.59999990463257,
-              "p50": 46.200000047683716,
+              "min": 43.299999952316284,
+              "p50": 46.80000019073486,
               "p95": null,
-              "max": 46.5,
+              "max": 48.40000009536743,
               "p95Reason": "fewer_than_20_runs"
             },
             "ttftMs": {
-              "min": 4.199999809265137,
-              "p50": 4.599999904632568,
+              "min": 5.699999809265137,
+              "p50": 6.099999904632568,
               "p95": null,
               "max": 6.200000047683716,
               "p95Reason": "fewer_than_20_runs"
@@ -611,7 +611,8 @@
       "id": "transformers-js",
       "model": {
         "id": "onnx-community/Qwen2.5-1.5B-Instruct",
-        "revision": "d54957e3af1be04546436e874a60fe386041b244"
+        "revision": "d54957e3af1be04546436e874a60fe386041b244",
+        "dtype": "q4f16"
       },
       "engineVersion": "4.3.1",
       "inWorker": true,
