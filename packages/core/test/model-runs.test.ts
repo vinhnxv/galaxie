@@ -13,6 +13,7 @@ import {
   type DiagnosticEvent,
   galaxieField,
   type ModelRouting,
+  type RunRequest,
 } from '../src/index.js';
 import { binding, collect, definition, FakeExecutor } from './fake-executor.js';
 
@@ -114,7 +115,7 @@ test('routes publish only on first dispatch and changes, and prepare receives pr
   await runtime.dispose();
   expect(notices).toEqual([
     { assistant: { providerId: 'remote', destination: 'third-party' } },
-    { assistant: { providerId: 'local', destination: 'in-browser' } },
+    { assistant: { providerId: 'local', destination: 'in-browser', changedFrom: 'third-party' } },
   ]);
   expect(instance.getSnapshot().routes).toEqual(notices[1]);
   expect(Object.isFrozen(instance.getSnapshot().routes)).toBe(true);
@@ -165,4 +166,89 @@ test('AE4 model reservation failure closes the root with its budget before the e
   });
   expect(diagnostics.some((event) => event.kind === 'late_event')).toBe(true);
   await provider.shutdown();
+});
+
+test('provider changes within one class publish no class-change notice', async () => {
+  let first = true;
+  const executor = new FakeExecutor([
+    async function* ({ models }) {
+      (await models.begin('assistant')).end({ inputTokens: 1, outputTokens: 1 });
+      first = false;
+      (await models.begin('assistant')).end({ inputTokens: 1, outputTokens: 1 });
+      yield { type: 'output', output: null };
+    },
+  ]);
+  const runtime = createRuntime({ appId: 'test', executors: [executor] });
+  try {
+    const instance = await runtime.create(modelDefinition, {
+      principalScope: 'user',
+      agent: {},
+      models: {
+        providers: {
+          first: {
+            destination: 'in-browser',
+            modality: 'text',
+            features: [],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+          },
+          second: {
+            destination: 'in-browser',
+            modality: 'text',
+            features: [],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+          },
+        },
+        roles: {
+          assistant: { providers: ['first', 'second'], allow: ['in-browser'], maxTokens: 1000 },
+        },
+        availability: ({ providerId }) => ({
+          status: providerId === 'first' && !first ? 'unavailable' : 'available',
+        }),
+      },
+    });
+    await instance.prepare();
+    const { runId } = await instance.start('input');
+    await collect(instance.events(runId));
+    expect(instance.getSnapshot().routes).toEqual({
+      assistant: { providerId: 'second', destination: 'in-browser' },
+    });
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+test('class-change notices compare the previous run of the same instance', async () => {
+  let first = true;
+  const call = async function* ({ models }: RunRequest) {
+    (await models.begin('assistant')).end({ inputTokens: 1, outputTokens: 1 });
+    yield { type: 'output' as const, output: null };
+  };
+  const executor = new FakeExecutor([call, call]);
+  const runtime = createRuntime({ appId: 'test', executors: [executor] });
+  try {
+    const instance = await runtime.create(modelDefinition, {
+      principalScope: 'user',
+      agent: {},
+      models: {
+        ...models,
+        availability: ({ providerId }) => ({
+          status: providerId === 'remote' && !first ? 'unavailable' : 'available',
+        }),
+      },
+    });
+    await instance.prepare();
+    const initial = await instance.start('input');
+    await collect(instance.events(initial.runId));
+    expect(instance.getSnapshot().routes).toEqual({
+      assistant: { providerId: 'remote', destination: 'third-party' },
+    });
+    first = false;
+    const later = await instance.start('input');
+    await collect(instance.events(later.runId));
+    expect(instance.getSnapshot().routes).toEqual({
+      assistant: { providerId: 'local', destination: 'in-browser', changedFrom: 'third-party' },
+    });
+  } finally {
+    await runtime.dispose();
+  }
 });

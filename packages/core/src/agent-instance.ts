@@ -26,7 +26,7 @@ import type {
 import { checkInteractionUrls } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
-import type { SelectedModelRoute } from './models.js';
+import type { PublishedModelRoute, SelectedModelRoute } from './models.js';
 import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
@@ -123,8 +123,8 @@ export function createAgentInstance(
   let prepareError: ErrorInfo | undefined;
   let snapshot: AgentSnapshot<unknown> = Object.freeze({ instanceId, state });
   const listeners = new Set<() => void>();
-  const routes = new Map<string, SelectedModelRoute>();
-  let publishedRoutes: Readonly<Record<string, SelectedModelRoute>> | undefined;
+  const routes = new Map<string, PublishedModelRoute>();
+  let publishedRoutes: Readonly<Record<string, PublishedModelRoute>> | undefined;
   let executor: ExecutorAgent | undefined;
   let preparation: Promise<void> | undefined;
   let prepareController: AbortController | undefined;
@@ -394,7 +394,15 @@ export function createAgentInstance(
             previous.destination === selected.destination
           )
             return;
-          routes.set(role, selected);
+          routes.set(
+            role,
+            Object.freeze({
+              ...selected,
+              ...(previous !== undefined && previous.destination !== selected.destination
+                ? { changedFrom: previous.destination }
+                : {}),
+            }),
+          );
           publishedRoutes = Object.freeze(Object.fromEntries(routes));
           publish();
         },

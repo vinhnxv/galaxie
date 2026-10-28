@@ -195,12 +195,13 @@ test('AE1 and AE2 consent selects the first remote provider, then a capability l
   ].map((value) => JSON.parse(value));
   expect(routes).toEqual([
     { providerId: 'remote', destination: 'third-party' },
-    { providerId: 'local', destination: 'in-browser' },
+    { providerId: 'local', destination: 'in-browser', changedFrom: 'third-party' },
   ]);
   expect(result.snapshot.run?.labels).toEqual(['private-user', 'public']);
   expect(result.snapshot.routes?.[ROLE]).toEqual({
     providerId: 'local',
     destination: 'in-browser',
+    changedFrom: 'third-party',
   });
   assertSpanTree(result.spans);
 });
