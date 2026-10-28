@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
 import {
   createRuntime,
   type PendingInteraction,
@@ -11,20 +10,26 @@ import {
 import { type ReactElement, useSyncExternalStore } from 'react';
 import { definition, GENERATION_KEY, quizGraph } from './graph.js';
 import { renderInteraction, submit } from './registry.js';
+import { restoreAdapter } from './restore-adapter.js';
 import { SAVER_KEY, SessionSaver, THREAD_KEY } from './session-saver.js';
 import { Surface } from './surface.js';
 
+const restored = sessionStorage.getItem(THREAD_KEY) !== null;
+const urlVariant = location.search.includes('variant=url');
 const saver = new SessionSaver();
 const runtime = createRuntime({
   appId: 'spike-c',
-  executors: [createLangGraphAdapter()],
-  urlAllowlist: location.search.includes('variant=url') ? ['https://evil.example'] : [],
+  executors: [restoreAdapter()],
+  urlAllowlist: urlVariant && !restored ? ['https://evil.example'] : [],
 });
 export const instance = await runtime.create(definition, {
   principalScope: 'spike-c',
-  agent: quizGraph(location.search.includes('variant=url')),
+  agent: quizGraph(urlVariant),
   services: { chatModels: {}, checkpointer: saver },
 });
+const singleCopy = (await fetch('/__single-copy').then((response) => response.json())) as {
+  ok: boolean;
+};
 let score: number | undefined;
 let probe: PendingInteraction | undefined;
 let actionError: string | undefined;
@@ -44,7 +49,7 @@ instance.subscribe(() => {
   snapshots.push(instance.getSnapshot());
 });
 await instance.prepare();
-const { runId } = await instance.start({ topic: 'English' });
+const { runId } = await instance.start(restored ? { restore: true } : { topic: 'English' });
 void (async () => {
   for await (const event of instance.events(runId)) {
     if (event.type !== 'stream') events.push(event);
@@ -126,11 +131,11 @@ export function App(): ReactElement {
       }}
     >
       <h1>Spike C: UI path</h1>
-      <p data-testid="mode">Fresh</p>
+      <p data-testid="mode">{restored ? 'Restored' : 'Fresh'}</p>
       <p>
         Run: <span data-testid="run-id">{snapshot.run?.runId}</span>
       </p>
-      <p data-testid="single-copy">Single copy checked by the Vite resolver</p>
+      <p data-testid="single-copy">Single copy: {singleCopy.ok ? 'passed' : 'failed'}</p>
       <Surface instance={instance} score={score} />
       <section data-testid="probe">
         {rendered &&
