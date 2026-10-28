@@ -14,7 +14,7 @@
 - **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
 - **`packages/models`:** a deterministic scripted LangChain mock provider; real providers remain deferred.
 - **`tests/conformance`:** twelve graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix, plus dual-lane policy, lifecycle, budget and tracing tests. The [conformance README](../tests/conformance/README.md) lists the explicit-config APIs.
-- **`spikes/`:** two throwaway spikes, B0 (a 1.7B model on WebGPU) and the local English tutor (a LangGraph.js agent on that model in Chrome). Each has its own pnpm workspace (brief §16.2).
+- **`spikes/`:** three throwaway spikes, B0 (a 1.7B model on WebGPU) and the local English tutor (a LangGraph.js agent on that model in Chrome), and [Spike C](../spikes/c-ui-path/README.md) (typed interrupt UI and session-checkpoint reload). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
 
 ## 2. System context and trust boundaries
@@ -443,7 +443,7 @@ Spikes run when a milestone needs them (brief §16.2, ADR-0016).
 | --- | --- | --- |
 | Conformance suite (replaces Spike A) | M1 with the in-memory saver; reload persistence and repeated resume after a crash in M3 | The executor contract (`executor.ts`), interrupt IDs, re-execution on resume, resume values and durability modes compared between Node and Chrome. The IndexedDB saver adds durable inbox and crash-recovery evidence in M3 (§8.1, §8.2); ADR-0001, 0003, 0004, 0005 |
 | Spike B: local inference | Before M2 | The in-browser engine to ship, whether it enforces a JSON Schema while decoding, Built-in AI language support, `ChatWebLLM` with a worker engine (§7, §8.4); ADR-0006. Its numbers are demonstrations, not thresholds (brief §18). |
-| Spike C: UI path | Before M2 | Rendering from an interrupt payload, stale-event rejection, reload (§8.1, §8.2); ADR-0004, 0007 |
+| Spike C: UI path | Observed 2026-10-29, before M2 | [Chromium evidence](../spikes/c-ui-path/README.md): typed interrupt rendering, stale/duplicate rejection and reload through a session saver and spike-only restore shim; URL denial on restore (§8.1, §8.2). M3 durability remains unverified; ADR-0004, 0007 |
 | Spike D: remote paths | Before M4 | Host proxy and `localhost` endpoints under Local Network Access, CORS, the credential callback, the MCP profile (§8.4); ADR-0006, 0011 |
 
 Milestones confirm the rest: the tracing spans in M1 (AT-36); ADR-0017's framework-neutral `core` in M1, through a CI dependency check; ADR-0014 in M1, M2 and M4 (AT-36, AT-04, AT-32); ADR-0009 in M3 (AT-18); and ADR-0008 and ADR-0010 in M4 (brief §16.2).

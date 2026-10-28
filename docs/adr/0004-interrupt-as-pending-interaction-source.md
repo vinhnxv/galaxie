@@ -4,6 +4,7 @@
 - **Date:** 2026-10-28
 - **Related:** brief §11.3, §12.1, §12.2; ADR-0001, ADR-0005, ADR-0009, ADR-0016
 - **Revisions:** 2026-10-28, with brief 0.3: Spike A's checks move to the M1 conformance suite (ADR-0016); Spike C runs before M2.
+  - 2026-10-29: recorded Spike C browser evidence; status remains Proposed.
 
 ## Context
 
@@ -61,5 +62,5 @@ An external review pointed out a second crash window that the projection removal
 - M1 enforces one request per node: a second pause with the answered ID fails with `unsupported`, because calls in one node share an interrupt ID. Split sequential interactions across nodes. Parallel interrupts, static breakpoints and ID-less interrupts are also unsupported.
 - M1's inbox is in memory. Its entry becomes `consumed` on a resume segment's executor outcome; this does not establish durable checkpoint consumption or crash safety.
 - M3 remains unverified: how resume values are persisted, whether repeating an accepted resume after a crash is safe, and the same conformance cases with the IndexedDB saver. The M1 transcripts observe values reaching the node, not the crash/recovery protocol.
-- Spike C, before M2: render from the interrupt payload; reload mid-quiz.
+- Spike C (2026-10-29, `spikes/c-ui-path/`): [recorded Chromium evidence](../../spikes/c-ui-path/README.md) rendered the typed Quiz from the committed interrupt and restored identical interaction identity and props from a deserialized session checkpoint. Generation stayed at 1; forged and old-identity events were stale, simultaneous submits were accepted/duplicate, and resumed grading succeeded. Core denied the URL variant on restore. The spike shim creates a new run by design; this does not verify the M3 durable inbox or crash protocol.
 - AT-07, AT-08, AT-09, AT-15, AT-31, AT-35.

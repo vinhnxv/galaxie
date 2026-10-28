@@ -6,7 +6,7 @@
 - **Document version:** 0.3. A starting point for implementation and critique, not a specification validated by code.
 - **Date:** 2026-10-28, timezone Asia/Ho_Chi_Minh.
 - **Language:** English.
-- **Status:** four M1 slices implement the core lifecycle, LangGraph.js adapter, capability broker, model router with mock providers, sticky data labels and argument shapes, in-memory interrupt dispatch and resume, and finite step/tool-call/wall-clock/payload/token/cost budgets. The M1 exit controls add interaction URL policy and opt-in trace text filtered by live labels and destination, with twelve parity cases and additional Node/Chromium guarantee tests. Durable persistence and UI remain unimplemented. Two throwaway spikes have run (§16.2).
+- **Status:** four M1 slices implement the core lifecycle, LangGraph.js adapter, capability broker, model router with mock providers, sticky data labels and argument shapes, in-memory interrupt dispatch and resume, and finite step/tool-call/wall-clock/payload/token/cost budgets. The M1 exit controls add interaction URL policy and opt-in trace text filtered by live labels and destination, with twelve parity cases and additional Node/Chromium guarantee tests. Durable persistence and UI remain unimplemented. Three throwaway spikes have run (§16.2).
 - **Scope:** an SDK/runtime for developers, and the framework-neutral contracts it defines for browser agents (§7.6). The English Tutor is the reference application, not the whole product.
 - **Companion documents:** [framework overview](framework-overview.md) (role, direction, audiences, production readiness, public vs private) and [ADRs](adr/README.md).
 
@@ -1363,7 +1363,7 @@ These are module boundaries, not a demand to publish many npm packages at once. 
 
 ### 16.2. Spikes, run when a milestone needs them
 
-Version 0.2 of this brief ran every spike in an M0 phase before M1. Two spikes ran: B0 loaded a 1.7B model on WebGPU, and the local English tutor ran a LangGraph.js agent on it in Chrome (`spikes/`). In 0.3, M1 starts without the others, and each remaining spike runs when a milestone needs its answer. Spikes are throwaway code, not the first version of the packages. Each ends with a short report and an ADR update.
+Version 0.2 of this brief ran every spike in an M0 phase before M1. Three spikes have run: B0 loaded a 1.7B model on WebGPU, the local English tutor ran a LangGraph.js agent on it in Chrome, and [Spike C](../spikes/c-ui-path/README.md) rendered a typed interrupt UI and restored it through a session saver and spike-only adapter shim (2026-10-29). In 0.3, M1 starts without the others, and each remaining spike runs when a milestone needs its answer. Spikes are throwaway code, not the first version of the packages. Each ends with a short report and an ADR update.
 
 | Spike | Goal | When | Evidence required | ADRs |
 | --- | --- | --- | --- | --- |
