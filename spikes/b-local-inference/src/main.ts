@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { MockArm } from './arms/mock.js';
+import { OrtArm } from './arms/ort/index.js';
 import type { Arm } from './arms/types.js';
 import { deviceInfo, gpuProbe, promptAvailability } from './device.js';
 import { armResult, runArm, selectedArms } from './harness.js';
@@ -39,8 +40,9 @@ const mock = new MockArm(params.get('mockFail'));
 // Real arms are added in their implementation units; probes never load a model.
 const arms: Arm[] = [
   mock,
+  new OrtArm(),
   ...armOrder
-    .filter((id) => id !== 'mock')
+    .filter((id) => id !== 'mock' && id !== 'ort-own-loop')
     .map((id) => ({
       id,
       model: { id: 'pending', revision: null },
