@@ -2,9 +2,38 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { expect, test } from 'vitest';
+import { cases } from './cases/index.js';
 import { diff } from './support/diff.js';
 import { parseCompatibilityMatrix } from './support/matrix.js';
 import { normalize } from './support/normalize.js';
+import { runGalaxie } from './support/transcript.js';
+
+test('normalizes only observed interrupt IDs in first-appearance order, including keys', () => {
+  const first = '11111111111111111111111111111111';
+  const second = '22222222222222222222222222222222';
+  const unrelated = '33333333333333333333333333333333';
+  expect(
+    normalize({
+      events: { updates: [{ data: { __interrupt__: [{ id: first, value: {} }] } }] },
+      pauses: [
+        { interrupts: [{ id: first, value: {} }] },
+        { interrupts: [{ id: second, value: {} }] },
+      ],
+      state: { [second]: first, unrelated, uuid: '12345678-1234-1234-1234-123456789abc' },
+    }),
+  ).toEqual({
+    events: { updates: [{ data: { __interrupt__: [{ id: '<interrupt:1>', value: {} }] } }] },
+    pauses: [
+      { interrupts: [{ id: '<interrupt:1>', value: {} }] },
+      { interrupts: [{ id: '<interrupt:2>', value: {} }] },
+    ],
+    state: { '<interrupt:2>': '<interrupt:1>', unrelated, uuid: '<uuid:1>' },
+  });
+});
+
+test('a non-pausing transcript has no pauses field', async () => {
+  expect(await runGalaxie(cases.linear)).not.toHaveProperty('pauses');
+});
 
 test('normalizes repeated, distinct and embedded UUIDs in values and keys after JSON serialization', () => {
   const first = '12345678-1234-1234-1234-123456789abc';

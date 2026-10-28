@@ -6,11 +6,14 @@ import {
   type ExecutorAdapter,
   type ExecutorEvent,
   GalaxieError,
+  type InteractionId,
   isGalaxieError,
   type ModelPort,
+  type PendingInteraction,
+  parseInteractionRequest,
   toErrorInfo,
 } from '@galaxie/core';
-import { GraphRecursionError, isGraphInterrupt } from '@langchain/langgraph/web';
+import { Command, GraphRecursionError, isGraphInterrupt } from '@langchain/langgraph/web';
 import { adapterError } from './errors.js';
 import {
   createHost,
@@ -20,6 +23,7 @@ import {
   type LangGraphServices,
   validServices,
 } from './host.js';
+import { installContext } from './interaction.js';
 import { LangGraphTraceHandler } from './trace-handler.js';
 
 export const STREAM_MODES: readonly ['values', 'updates', 'messages', 'custom'] = [
@@ -34,9 +38,9 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
     id: 'langgraph-js',
     version: '0.0.0',
     features: {
-      interrupts: false,
-      resume: false,
-      checkpoints: false,
+      interrupts: true,
+      resume: true,
+      checkpoints: true,
       streaming: true,
       subgraphs: true,
     },
@@ -44,6 +48,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
       services = services === undefined ? { chatModels: {} } : services;
       if (typeof agent !== 'function' || !validServices(services))
         throw new GalaxieError('invalid', 'The LangGraph factory and services must be valid.');
+      installContext();
       let active:
         | {
             readonly capabilities: CapabilityPort;
@@ -84,12 +89,28 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           'unsupported',
           'The graph must support native runnable transformation.',
         );
+      if (typeof graph.getState !== 'function')
+        throw new GalaxieError(
+          'unsupported',
+          'The graph must support checkpoint state inspection.',
+        );
+      const pending = async (sessionId: string): Promise<PendingInteraction | undefined> => {
+        if (graph === undefined)
+          throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');
+        const state = await graph.getState({ configurable: { thread_id: sessionId } });
+        const interrupts = state.tasks.flatMap((task) => task.interrupts);
+        if (interrupts.length === 0) return undefined;
+        const ids = new Set(interrupts.map(({ id }) => id));
+        const interrupt = interrupts[0];
+        if (ids.size !== 1 || interrupt === undefined || !interrupt.id)
+          throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
+        const request = parseInteractionRequest(interrupt.value);
+        if (request === undefined)
+          throw new GalaxieError('invalid', 'The interaction request is invalid.');
+        return { interactionId: interrupt.id as InteractionId, ...request };
+      };
       return {
         async *run(request): AsyncGenerator<ExecutorEvent> {
-          if (request.command.type === 'resume') {
-            yield { type: 'error', error: adapterError('unsupported') };
-            return;
-          }
           if (graph === undefined)
             throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');
           const handler = new LangGraphTraceHandler(request.trace);
@@ -97,7 +118,15 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           let output: unknown;
           let interrupted = false;
           try {
-            const input = request.command.input;
+            const command = request.command;
+            const input =
+              command.type === 'start'
+                ? command.input
+                : new Command({
+                    resume: {
+                      [command.interactionId]: { action: command.action, payload: command.payload },
+                    },
+                  });
             const source = async function* (): AsyncGenerator<unknown> {
               yield input;
             };
@@ -129,10 +158,17 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
               )
                 interrupted = true;
             }
-            if (!request.signal.aborted)
-              yield interrupted
-                ? { type: 'error', error: adapterError('unsupported') }
-                : { type: 'output', output };
+            if (!request.signal.aborted) {
+              if (interrupted) {
+                const interaction = await pending(request.sessionId);
+                if (
+                  interaction === undefined ||
+                  (command.type === 'resume' && interaction.interactionId === command.interactionId)
+                )
+                  throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
+                yield { type: 'interaction', interaction };
+              } else yield { type: 'output', output };
+            }
           } catch (error) {
             const cause = isGalaxieError(error)
               ? error
@@ -157,7 +193,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
             await handler.settled();
           }
         },
-        pending: async () => undefined,
+        pending,
         async dispose() {
           graph = undefined;
           host = undefined;

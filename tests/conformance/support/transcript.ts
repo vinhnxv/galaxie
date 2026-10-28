@@ -4,6 +4,7 @@
 import {
   createLangGraphAdapter,
   type LangGraphGraph,
+  requestInteraction,
   STREAM_MODES,
 } from '@galaxie/adapter-langgraph';
 import {
@@ -12,6 +13,7 @@ import {
   type CapabilityRequest,
   createRuntime,
   defineAgentDefinition,
+  type Submission,
 } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type {
@@ -36,6 +38,7 @@ export interface ConformanceTools {
   call(name: string, input: unknown, config?: LangGraphRunnableConfig): Promise<unknown>;
 }
 export interface ConformanceCase {
+  readonly resumes?: readonly Submission[];
   readonly capabilities?: Readonly<
     Record<
       CapabilityName,
@@ -47,6 +50,7 @@ export interface ConformanceCase {
     model: BaseChatModel,
     checkpointer: BaseCheckpointSaver,
     tools?: ConformanceTools,
+    interactions?: { request(value: unknown, config: LangGraphRunnableConfig): Submission },
   ) => ConformanceGraph;
   readonly input: unknown;
   readonly script: ModelScript;
@@ -65,12 +69,42 @@ export interface TranscriptCheckpoint {
 }
 
 export interface Transcript {
+  pauses?: TranscriptPause[];
   readonly events: Record<TranscriptMode, TranscriptEvent[]>;
   readonly modes: string[];
   final: unknown;
   state: { readonly values: unknown; readonly next: readonly string[] };
   checkpoints: TranscriptCheckpoint[];
   outcome: { readonly status: 'succeeded' | 'failed'; readonly errorType?: string };
+}
+
+export interface TranscriptPause {
+  readonly interrupts: readonly { readonly id: string; readonly value: unknown }[];
+  readonly historyLength: number;
+}
+
+function rootInterrupt(path: readonly string[], mode: string, data: unknown): boolean {
+  return (
+    path.length === 0 &&
+    mode === 'updates' &&
+    typeof data === 'object' &&
+    data !== null &&
+    '__interrupt__' in data
+  );
+}
+
+async function readPause(
+  graph: ConformanceGraph,
+  config: LangGraphRunnableConfig,
+): Promise<TranscriptPause> {
+  const state = await graph.getState(config);
+  const interrupts = state.tasks.flatMap((task) => task.interrupts);
+  const interrupt = interrupts[0];
+  if (interrupts.length !== 1 || interrupt === undefined || !interrupt.id)
+    throw new Error('Expected one checkpoint interrupt.');
+  let historyLength = 0;
+  for await (const _checkpoint of graph.getStateHistory(config)) historyLength++;
+  return { interrupts: [{ id: interrupt.id, value: interrupt.value }], historyLength };
 }
 
 function emptyTranscript(): Transcript {
@@ -128,21 +162,37 @@ export async function runNative(
         return capability.invoke(input);
       },
     },
+    { request: (value) => langgraph.interrupt(value) },
   );
   const config = { configurable: { thread_id: crypto.randomUUID() } };
   const transcript = emptyTranscript();
   let final: unknown = null;
   try {
-    const stream = await graph.stream(fixture.input, {
-      ...config,
-      streamMode: [...STREAM_MODES],
-      subgraphs: true,
-      signal: new AbortController().signal,
-    });
-    for await (const chunk of stream) {
-      const [path, mode, data] = chunk as [string[], TranscriptMode, unknown];
-      append(transcript, path, mode, data);
-      if (path.length === 0 && mode === 'values') final = data;
+    let input = fixture.input;
+    let resumeIndex = 0;
+    while (true) {
+      let interrupted = false;
+      const stream = await graph.stream(input, {
+        ...config,
+        streamMode: [...STREAM_MODES],
+        subgraphs: true,
+        signal: new AbortController().signal,
+      });
+      for await (const chunk of stream) {
+        const [path, mode, data] = chunk as [string[], TranscriptMode, unknown];
+        append(transcript, path, mode, data);
+        if (path.length === 0 && mode === 'values') final = data;
+        if (rootInterrupt(path, mode, data)) interrupted = true;
+      }
+      if (!interrupted) break;
+      const pause = await readPause(graph, config);
+      transcript.pauses ??= [];
+      transcript.pauses.push(pause);
+      const resume = fixture.resumes?.[resumeIndex++];
+      const id = pause.interrupts[0]?.id;
+      if (resume === undefined || id === undefined)
+        throw new Error('The conformance case has no remaining resume.');
+      input = new langgraph.Command({ resume: { [id]: resume } });
     }
     transcript.final = final;
   } catch (error) {
@@ -201,6 +251,7 @@ export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> 
           host.langchain.chatModel('assistant'),
           host.langchain.checkpointer(),
           host.capabilities,
+          { request: requestInteraction },
         );
         return graph;
       },
@@ -210,15 +261,53 @@ export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> 
   try {
     await instance.prepare();
     const { runId } = await instance.start(fixture.input);
-    for await (const event of instance.events(runId)) {
-      if (event.type === 'stream')
-        append(transcript, event.path, event.mode as TranscriptMode, event.data);
-      else if (event.type === 'output') transcript.final = event.output;
-      else if (event.type === 'error')
-        transcript.outcome = {
-          status: 'failed',
-          ...(event.error.type === undefined ? {} : { errorType: event.error.type }),
-        };
+    let sequence = -1;
+    let resumeIndex = 0;
+    while (true) {
+      let paused = false;
+      for await (const event of instance.events(runId)) {
+        if (event.sequence <= sequence) continue;
+        sequence = event.sequence;
+        if (event.type === 'stream')
+          append(transcript, event.path, event.mode as TranscriptMode, event.data);
+        else if (event.type === 'output') transcript.final = event.output;
+        else if (event.type === 'error')
+          transcript.outcome = {
+            status: 'failed',
+            ...(event.error.type === undefined ? {} : { errorType: event.error.type }),
+          };
+        else if (event.type === 'interaction') {
+          if (graph === undefined) throw new Error('The conformance graph was not prepared.');
+          const threadId = Object.keys(saver.storage)[0];
+          const pause = await readPause(graph, { configurable: { thread_id: threadId } });
+          transcript.pauses ??= [];
+          transcript.pauses.push(pause);
+          const pending = instance.getSnapshot().run?.pending;
+          const resume = fixture.resumes?.[resumeIndex++];
+          if (pending === undefined || resume === undefined)
+            throw new Error('The conformance case has no remaining resume.');
+          // The host sees run.pending, so it must match the committed interrupt exactly.
+          const { interactionId, ...request } = pending;
+          const committed = pause.interrupts[0];
+          if (
+            committed === undefined ||
+            interactionId !== committed.id ||
+            JSON.stringify(request) !== JSON.stringify(committed.value)
+          )
+            throw new Error('The pending interaction differs from the committed interrupt.');
+          const receipt = await instance.dispatch({
+            instanceId: instance.instanceId,
+            runId,
+            ...pending,
+            ...resume,
+          });
+          if (receipt.status !== 'accepted')
+            throw new Error('The conformance submission was rejected.');
+          paused = true;
+          break;
+        }
+      }
+      if (!paused) break;
     }
   } finally {
     // Public terminal events precede executor settlement; disposal waits for checkpoint writes.

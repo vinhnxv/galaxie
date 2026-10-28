@@ -10,6 +10,68 @@ export type CatalogId = `${string}/v${number}`;
 /** A catalog component, for example `education.Quiz/v1` (ADR-0007). */
 export type ComponentId = `${string}.${string}/v${number}`;
 
+/** The JSON display request carried by a checkpoint interrupt. */
+export interface InteractionRequest {
+  readonly surfaceId: SurfaceId;
+  readonly viewRevision: ViewRevision;
+  readonly component: ComponentId;
+  readonly props: Readonly<Record<string, unknown>>;
+}
+
+/** The value returned to an interrupting node after dispatch. */
+export interface Submission {
+  readonly action: string;
+  readonly payload: unknown;
+}
+
+function plainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+function json(value: unknown, ancestors: Set<object>): boolean {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (!Array.isArray(value) && !plainObject(value)) return false;
+  if (ancestors.has(value)) return false;
+  ancestors.add(value);
+  const valid = Array.isArray(value)
+    ? Array.from(value).every((item) => json(item, ancestors))
+    : Reflect.ownKeys(value).every((key) => {
+        const field = Object.getOwnPropertyDescriptor(value, key);
+        return (
+          typeof key === 'string' &&
+          field?.enumerable === true &&
+          'value' in field &&
+          json(field.value, ancestors)
+        );
+      });
+  ancestors.delete(value);
+  return valid;
+}
+
+/** Parses only the four-field plain JSON request; never includes its value in a failure. */
+export function parseInteractionRequest(value: unknown): InteractionRequest | undefined {
+  try {
+    if (!plainObject(value) || Reflect.ownKeys(value).length !== 4 || !json(value, new Set()))
+      return undefined;
+    if (
+      typeof value['surfaceId'] !== 'string' ||
+      value['surfaceId'].length === 0 ||
+      typeof value['viewRevision'] !== 'string' ||
+      value['viewRevision'].length === 0 ||
+      typeof value['component'] !== 'string' ||
+      !/^[A-Za-z][\w-]*\.[A-Za-z][\w-]*\/v\d+$/.test(value['component']) ||
+      !plainObject(value['props'])
+    )
+      return undefined;
+    return value as unknown as InteractionRequest;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The UI a definition needs. The host reports what it supports before a run (brief §11.2). */
 export interface UiRequirements {
   readonly catalog: CatalogId;
@@ -43,7 +105,7 @@ export interface UserInteractionEvent {
   readonly payload: unknown;
 }
 
-/** The answer to a dispatched event. `accepted` means it is durable in the submission inbox (ADR-0004). */
+/** The answer to a dispatched event. M1 acceptance is in-memory only (ADR-0004). */
 export type DispatchReceipt =
   | { readonly status: 'accepted'; readonly interactionId: InteractionId }
   | { readonly status: 'rejected'; readonly error: ErrorInfo };

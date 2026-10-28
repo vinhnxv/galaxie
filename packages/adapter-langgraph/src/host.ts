@@ -7,6 +7,7 @@ import {
   type BaseCheckpointSaver,
   type LangGraphRunnableConfig,
   MemorySaver,
+  type StateSnapshot,
 } from '@langchain/langgraph/web';
 import { RoutedChatModel } from './routed-chat-model.js';
 import type { LangGraphTraceHandler } from './trace-handler.js';
@@ -21,6 +22,7 @@ export interface LangGraphGraph {
   readonly config?: LangGraphRunnableConfig;
   stream(input: unknown, options: StreamOptions): Promise<AsyncIterable<unknown>>;
   transform(input: AsyncGenerator<unknown>, options: StreamOptions): AsyncIterable<unknown>;
+  getState(config: LangGraphRunnableConfig): Promise<Pick<StateSnapshot, 'tasks'>>;
 }
 
 export type LangGraphAgent = (host: LangGraphHost) => LangGraphGraph;

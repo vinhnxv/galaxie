@@ -226,3 +226,34 @@ test('all released fractional reservations permit the exact full budget again', 
   second.release();
   expect(() => budget.reserveModel(1, 0.31)).not.toThrow();
 });
+
+test('waiting for input consumes no wall-clock budget', async () => {
+  vi.useFakeTimers();
+  const executor = new FakeExecutor([
+    [
+      {
+        type: 'interaction',
+        interaction: {
+          interactionId: 'ask' as import('../src/index.js').InteractionId,
+          surfaceId: 'main',
+          viewRevision: 'r1' as import('../src/index.js').ViewRevision,
+          component: 'tests.Question/v1',
+          props: {},
+        },
+      },
+    ],
+  ]);
+  const runtime = createRuntime({
+    appId: 'tests',
+    executors: [executor],
+    budgets: { wallClockMs: 10 },
+  });
+  const instance = await runtime.create(definition, { principalScope: 'user', agent: {} });
+  await instance.prepare();
+  await instance.start('input');
+  await flush();
+  await vi.advanceTimersByTimeAsync(100);
+  expect(instance.getSnapshot().run?.status).toBe('waiting_input');
+  await runtime.dispose();
+  expect(executor.requests).toHaveLength(1);
+});

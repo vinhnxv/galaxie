@@ -8,7 +8,7 @@
       "$.events.messages",
       "$.modes"
     ],
-    "reason": "The /web entry does not install async context, so model.invoke without config receives no stream callbacks. This removes messages and their positions from modes; their absence also shifts first-appearance UUID numbers for checkpoint parents."
+    "reason": "The synchronous context shim cannot carry implicit config across the routed model's asynchronous policy and credential acquisition. model.invoke without explicit config therefore receives no stream callbacks on this /web lane. Missing messages remove their positions from modes and shift first-appearance UUID numbers for checkpoint parents. Re-measured after context installation; all other transcript fields match native Node."
   },
   {
     "case": "model-without-config",
@@ -19,6 +19,6 @@
       "$.events.messages",
       "$.modes"
     ],
-    "reason": "The browser /web entry has no implicit async context, so model.invoke without config receives no stream callbacks. This removes messages and their positions from modes; their absence also shifts first-appearance UUID numbers for checkpoint parents. All other observed transcript fields match the native baseline."
+    "reason": "The synchronous context shim cannot carry implicit config across the routed model's asynchronous policy and credential acquisition. model.invoke without explicit config therefore receives no stream callbacks on this /web lane. Missing messages remove their positions from modes and shift first-appearance UUID numbers for checkpoint parents. Re-measured after context installation; all other transcript fields match native Node."
   }
 ]

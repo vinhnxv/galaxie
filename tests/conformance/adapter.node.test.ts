@@ -5,6 +5,7 @@ import {
   createLangGraphAdapter,
   type LangGraphAgent,
   type LangGraphServices,
+  requestInteraction,
   STREAM_MODES,
 } from '@galaxie/adapter-langgraph';
 import {
@@ -12,7 +13,8 @@ import {
   type DiagnosticEvent,
   defineAgentDefinition,
   type ExecutorAdapter,
-  type RunRequest,
+  type ExecutorAgent,
+  type SessionId,
 } from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -21,12 +23,14 @@ import {
   Annotation,
   type BaseCheckpointSaver,
   END,
+  interrupt,
   type LangGraphRunnableConfig,
   MemorySaver,
   NodeInterrupt,
   START,
   StateGraph,
 } from '@langchain/langgraph/web';
+import { SpanStatusCode } from '@opentelemetry/api';
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
@@ -55,12 +59,20 @@ async function ready(
   agent: LangGraphAgent,
   services?: LangGraphServices,
   diagnostics?: (event: DiagnosticEvent) => void,
+  prepared?: (executor: ExecutorAgent) => void,
 ) {
   const exporter = new InMemorySpanExporter();
   const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const adapter = createLangGraphAdapter();
+  const prepare = adapter.prepare.bind(adapter);
+  adapter.prepare = async (...args) => {
+    const executor = await prepare(...args);
+    prepared?.(executor);
+    return executor;
+  };
   const runtime = createRuntime({
     appId: 'tests',
-    executors: [createLangGraphAdapter()],
+    executors: [adapter],
     tracerProvider: provider,
     ...(diagnostics ? { diagnostics } : {}),
   });
@@ -112,9 +124,9 @@ test('advertises the adapter package version and only the implemented features',
   const adapter = createLangGraphAdapter();
   expect(adapter.version).toBe(adapterMetadata.version);
   expect(adapter.features).toEqual({
-    interrupts: false,
-    resume: false,
-    checkpoints: false,
+    interrupts: true,
+    resume: true,
+    checkpoints: true,
     streaming: true,
     subgraphs: true,
   });
@@ -277,7 +289,7 @@ test('rejects missing model roles and malformed factory or services at preparati
   ).rejects.toMatchObject({ code: 'invalid' });
 });
 
-test('reports NodeInterrupt and resume as unsupported', async () => {
+test('reports NodeInterrupt without an ID as unsupported', async () => {
   const state = Annotation.Root({ value: Annotation<number> });
   const fixture = await ready((host) =>
     new StateGraph(state)
@@ -296,26 +308,6 @@ test('reports NodeInterrupt and resume as unsupported', async () => {
   expect(fixture.instance.getSnapshot().run?.status).toBe('failed');
   await fixture.runtime.dispose();
   await fixture.provider.shutdown();
-  const agent = await createLangGraphAdapter().prepare(
-    () => ({
-      stream: async () => {
-        throw new Error('must not run');
-      },
-      transform: () => {
-        throw new Error('must not run');
-      },
-    }),
-    { chatModels: {} },
-    { signal: new AbortController().signal },
-  );
-  const request = {
-    command: { type: 'resume', interactionId: 'interaction', payload: {} },
-    signal: new AbortController().signal,
-  } as RunRequest;
-  expect(await collect(agent.run(request))).toEqual([
-    { type: 'error', error: expect.objectContaining({ code: 'unsupported' }) },
-  ]);
-  await agent.dispose();
 });
 
 test('rejects stream-only facades without a drainable native transform', async () => {
@@ -579,4 +571,177 @@ test('core alone bounds a never-settled predecessor and disposal at ten seconds'
   } finally {
     vi.useRealTimers();
   }
+});
+
+const interactionRequest = {
+  surfaceId: 'main',
+  viewRevision: 'r1',
+  component: 'conformance.Question/v1',
+  props: { question: 'fixture' },
+};
+
+async function waitForPause(instance: Awaited<ReturnType<typeof ready>>['instance']) {
+  await vi.waitFor(() => expect(instance.getSnapshot().run?.status).toBe('waiting_input'));
+  const snapshot = instance.getSnapshot();
+  const pending = snapshot.run?.pending;
+  if (pending === undefined || snapshot.run === undefined) throw new Error('Expected a pause.');
+  return {
+    instanceId: snapshot.instanceId,
+    runId: snapshot.run.runId,
+    ...pending,
+    action: 'submit',
+    payload: false,
+  };
+}
+
+test('pauses after await and resumes the same checkpoint with a false submission', async () => {
+  const state = Annotation.Root({ value: Annotation<number>, answer: Annotation<unknown> });
+  let prepare = 0;
+  let ask = 0;
+  const saver = new MemorySaver();
+  let executor: ExecutorAgent | undefined;
+  const fixture = await ready(
+    (host) =>
+      new StateGraph(state)
+        .addNode('prepare', () => {
+          prepare++;
+          return {};
+        })
+        .addNode('ask', async (_state, config) => {
+          ask++;
+          await Promise.resolve();
+          return { answer: requestInteraction(interactionRequest, config) };
+        })
+        .addEdge(START, 'prepare')
+        .addEdge('prepare', 'ask')
+        .addEdge('ask', END)
+        .compile({ checkpointer: host.langchain.checkpointer() }),
+    { chatModels: {}, checkpointer: saver },
+    undefined,
+    (value) => {
+      executor = value;
+    },
+  );
+  try {
+    const { runId } = await fixture.instance.start({ value: 1 });
+    const event = await waitForPause(fixture.instance);
+    const snapshot = fixture.instance.getSnapshot();
+    const thread = Object.keys(saver.storage)[0];
+    expect(await executor?.pending(thread as SessionId)).toEqual(snapshot.run?.pending);
+    expect(await fixture.instance.dispatch(event)).toEqual({
+      status: 'accepted',
+      interactionId: event.interactionId,
+    });
+    expect((await collect(fixture.instance.events(runId))).at(-1)).toMatchObject({
+      type: 'output',
+      output: { value: 1, answer: { action: 'submit', payload: false } },
+    });
+    expect(fixture.instance.getSnapshot().run).toMatchObject({
+      runId,
+      status: 'succeeded',
+      submission: { status: 'consumed' },
+    });
+    expect(fixture.instance.getSnapshot().run?.pending).toBeUndefined();
+    expect({ prepare, ask }).toEqual({ prepare: 1, ask: 2 });
+    expect(await executor?.pending(thread as SessionId)).toBeUndefined();
+    // The pause unwinds the node with GraphInterrupt; its span must not read as a failure.
+    const asks = fixture.exporter
+      .getFinishedSpans()
+      .filter(({ name }) => name === 'galaxie.node ask');
+    expect(asks).toHaveLength(2);
+    for (const span of asks) {
+      expect(span.status.code).not.toBe(SpanStatusCode.ERROR);
+      expect(span.attributes['error.type']).toBeUndefined();
+    }
+  } finally {
+    await fixture.runtime.dispose();
+    await fixture.provider.shutdown();
+  }
+});
+
+test.each(['parallel', 'static', 'twice', 'invalid'] as const)(
+  'rejects the %s interrupt shape',
+  async (kind) => {
+    const state = Annotation.Root({ value: Annotation<number> });
+    const fixture = await ready((host) => {
+      const ask = (_state: unknown, config: LangGraphRunnableConfig) => {
+        if (kind === 'invalid') interrupt({ question: 'x' });
+        requestInteraction(interactionRequest, config);
+        if (kind === 'twice') requestInteraction(interactionRequest, config);
+        return {};
+      };
+      const graph = new StateGraph(state)
+        .addNode('ask', ask)
+        .addEdge(START, 'ask')
+        .addEdge('ask', END);
+      if (kind === 'parallel')
+        graph.addNode('other', ask).addEdge(START, 'other').addEdge('other', END);
+      return graph.compile({
+        checkpointer: host.langchain.checkpointer(),
+        ...(kind === 'static' ? { interruptBefore: ['ask'] } : {}),
+      });
+    });
+    try {
+      const { runId } = await fixture.instance.start({ value: 1 });
+      if (kind === 'twice')
+        expect((await fixture.instance.dispatch(await waitForPause(fixture.instance))).status).toBe(
+          'accepted',
+        );
+      expect((await collect(fixture.instance.events(runId))).at(-1)).toMatchObject({
+        type: 'error',
+        error: { code: kind === 'invalid' ? 'invalid' : 'unsupported' },
+      });
+      expect(fixture.instance.getSnapshot().run?.pending).toBeUndefined();
+    } finally {
+      await fixture.runtime.dispose();
+      await fixture.provider.shutdown();
+    }
+  },
+);
+
+test('cancel abandons a waiting interrupt and the next start runs from START on the same thread', async () => {
+  const state = Annotation.Root({ value: Annotation<number> });
+  let starts = 0;
+  const saver = new MemorySaver();
+  const fixture = await ready(
+    (host) =>
+      new StateGraph(state)
+        .addNode('ask', (_state, config) => {
+          starts++;
+          if (starts === 1) requestInteraction(interactionRequest, config);
+          return { value: starts };
+        })
+        .addEdge(START, 'ask')
+        .addEdge('ask', END)
+        .compile({ checkpointer: host.langchain.checkpointer() }),
+    { chatModels: {}, checkpointer: saver },
+  );
+  try {
+    await fixture.instance.start({ value: 1 });
+    await waitForPause(fixture.instance);
+    const waiting = fixture.instance.getSnapshot().run;
+    if (waiting === undefined) throw new Error('Expected a run.');
+    await fixture.instance.cancel(waiting.runId);
+    expect(fixture.instance.getSnapshot().run?.status).toBe('cancelled');
+    const { runId } = await fixture.instance.start({ value: 1 });
+    expect((await collect(fixture.instance.events(runId))).at(-1)).toMatchObject({
+      type: 'output',
+      output: { value: 2 },
+    });
+    expect(Object.keys(saver.storage)).toHaveLength(1);
+  } finally {
+    await fixture.runtime.dispose();
+    await fixture.provider.shutdown();
+  }
+});
+
+test('prepare rejects a graph without checkpoint state inspection', async () => {
+  const adapter: ExecutorAdapter<unknown, LangGraphServices> = createLangGraphAdapter();
+  await expect(
+    adapter.prepare(
+      () => ({ stream: async () => [], transform: async function* () {} }),
+      { chatModels: {} },
+      { signal: new AbortController().signal },
+    ),
+  ).rejects.toMatchObject({ code: 'unsupported' });
 });

@@ -4,8 +4,13 @@
 import type { CapabilityName } from './capabilities.js';
 import type { ErrorInfo } from './errors.js';
 import type { RunEvent } from './events.js';
-import type { InstanceId, RunId } from './ids.js';
-import type { DispatchReceipt, PendingInteraction, UserInteractionEvent } from './interactions.js';
+import type { InstanceId, InteractionId, RunId } from './ids.js';
+import type {
+  DispatchReceipt,
+  InboxStatus,
+  PendingInteraction,
+  UserInteractionEvent,
+} from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import type { SelectedModelRoute } from './models.js';
 import type { DataLabel } from './policy.js';
@@ -17,6 +22,7 @@ export interface RunSnapshot {
   readonly labels: readonly DataLabel[];
   /** Set while the run waits for input; rebuilt from the checkpoint after a reload (ADR-0004). */
   readonly pending?: PendingInteraction;
+  readonly submission?: { readonly interactionId: InteractionId; readonly status: InboxStatus };
   /** Set when the run failed. */
   readonly error?: ErrorInfo;
 }
