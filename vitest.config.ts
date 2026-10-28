@@ -6,6 +6,12 @@ import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
 const alias = {
+  '@galaxie/models/webllm/worker': fileURLToPath(
+    new URL('./packages/models/src/webllm/worker.ts', import.meta.url),
+  ),
+  '@galaxie/models/webllm': fileURLToPath(
+    new URL('./packages/models/src/webllm/index.ts', import.meta.url),
+  ),
   '@galaxie/models/mock': fileURLToPath(new URL('./packages/models/src/mock.ts', import.meta.url)),
   '@galaxie/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
   '@galaxie/adapter-langgraph': fileURLToPath(
@@ -28,12 +34,17 @@ const config: ViteUserConfig = defineConfig({
         root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
         resolve: { alias },
         optimizeDeps: {
+          exclude: ['@mlc-ai/web-llm'],
           include: [
             '@langchain/langgraph/web',
             '@langchain/core/callbacks/base',
             '@langchain/core/language_models/chat_models',
             '@langchain/core/messages',
             '@langchain/core/outputs',
+            '@langchain/core/utils/json_schema',
+            '@langchain/core/language_models/structured_output',
+            '@langchain/core/output_parsers',
+            '@langchain/core/runnables',
             '@opentelemetry/sdk-trace',
             'zod',
           ],

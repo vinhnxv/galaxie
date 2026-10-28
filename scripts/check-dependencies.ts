@@ -103,12 +103,43 @@ for (const file of files('packages/adapter-langgraph/src', '.ts')) {
   }
 }
 
+const models = JSON.parse(readFileSync('packages/models/package.json', 'utf8')) as {
+  peerDependencies?: Record<string, unknown>;
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+  dependencies?: Record<string, unknown>;
+  devDependencies?: Record<string, unknown>;
+  optionalDependencies?: Record<string, unknown>;
+};
+if (
+  JSON.stringify(Object.keys(models.peerDependencies ?? {}).sort()) !==
+    JSON.stringify(['@langchain/core', '@mlc-ai/web-llm']) ||
+  models.peerDependencies?.['@mlc-ai/web-llm'] !== '0.2.86' ||
+  models.peerDependenciesMeta?.['@mlc-ai/web-llm']?.optional !== true
+)
+  problems.push(
+    'packages/models/package.json: models peers must be @langchain/core and optional @mlc-ai/web-llm 0.2.86',
+  );
+for (const field of [
+  'dependencies',
+  'devDependencies',
+  'optionalDependencies',
+  'peerDependencies',
+] as const) {
+  if (Object.hasOwn(models[field] ?? {}, '@galaxie/core'))
+    problems.push('packages/models/package.json: models must not depend on @galaxie/core');
+}
+
 for (const file of files('packages/models/src', '.ts')) {
-  for (const { specifier } of imports(file)) {
+  for (const { specifier, typeOnly } of imports(file)) {
     if (
       specifier.startsWith('./') ||
       specifier.startsWith('../') ||
-      specifier.startsWith('@langchain/core/')
+      specifier.startsWith('@langchain/core/') ||
+      (specifier === '@mlc-ai/web-llm' &&
+        !typeOnly &&
+        ['packages/models/src/webllm/engine.ts', 'packages/models/src/webllm/worker.ts'].includes(
+          file,
+        ))
     )
       continue;
     problems.push(`${file}: forbidden models import ${specifier}`);
