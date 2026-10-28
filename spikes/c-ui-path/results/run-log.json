@@ -1,0 +1,472 @@
+{
+  "date": "2026-10-28T18:34:03.694Z",
+  "chromium": "156.0.8078.4",
+  "packages": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "@langchain/core": "1.2.20",
+    "@langchain/langgraph": "1.5.1",
+    "zod": "4.6.7",
+    "@opentelemetry/api": "1.10.0",
+    "vite": "8.3.4",
+    "@vitejs/plugin-react": "6.1.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "playwright": "1.64.1",
+    "typescript": "7.0.2"
+  },
+  "examples": {
+    "AE1": {
+      "status": "passed",
+      "observed": {
+        "instanceId": "3ba94887-2d03-4119-979d-d8991b276de2",
+        "runId": "eb0de08c-429f-414f-8e17-10b01c378e24",
+        "status": "waiting_input",
+        "interactionId": "152721b3d6230b6da5ae46b5cc5a22e3",
+        "surfaceId": "main",
+        "viewRevision": "quiz-1",
+        "component": "education.Quiz/v1",
+        "questions": 3,
+        "propsMatch": true,
+        "exposure": {
+          "marker": false,
+          "field": false
+        },
+        "counters": {
+          "generationRuns": 1,
+          "checkpointCount": 3,
+          "dispatches": 0
+        },
+        "singleCopy": true
+      }
+    },
+    "AE3": {
+      "status": "passed",
+      "observed": {
+        "codes": {
+          "unknown": "unknown_component",
+          "props": "invalid_props"
+        },
+        "action": {
+          "status": "rejected",
+          "code": "invalid_action"
+        },
+        "coreDispatches": 0,
+        "instanceId": "3ba94887-2d03-4119-979d-d8991b276de2",
+        "runId": "eb0de08c-429f-414f-8e17-10b01c378e24",
+        "status": "waiting_input",
+        "interactionId": "152721b3d6230b6da5ae46b5cc5a22e3",
+        "surfaceId": "main",
+        "viewRevision": "quiz-1",
+        "component": "education.Quiz/v1"
+      }
+    },
+    "AE2": {
+      "status": "passed",
+      "observed": {
+        "receipts": [
+          {
+            "status": "rejected",
+            "code": "stale"
+          },
+          {
+            "status": "rejected",
+            "code": "stale"
+          },
+          {
+            "status": "rejected",
+            "code": "stale"
+          },
+          {
+            "status": "rejected",
+            "code": "stale"
+          },
+          {
+            "status": "rejected",
+            "code": "stale"
+          }
+        ],
+        "checkpointCount": 3,
+        "afterCount": 3,
+        "instanceId": "3ba94887-2d03-4119-979d-d8991b276de2",
+        "runId": "eb0de08c-429f-414f-8e17-10b01c378e24",
+        "status": "waiting_input",
+        "interactionId": "152721b3d6230b6da5ae46b5cc5a22e3",
+        "surfaceId": "main",
+        "viewRevision": "quiz-1",
+        "component": "education.Quiz/v1"
+      }
+    },
+    "AE4": {
+      "status": "passed",
+      "observed": {
+        "instanceId": "d27d1cb5-3aeb-4fcd-b512-1f1e58fc1a47",
+        "runId": "5953e38f-5703-4552-9fca-6e50377d813b",
+        "status": "waiting_input",
+        "interactionId": "152721b3d6230b6da5ae46b5cc5a22e3",
+        "surfaceId": "main",
+        "viewRevision": "quiz-1",
+        "component": "education.Quiz/v1",
+        "samePending": true,
+        "checked": 0,
+        "counters": {
+          "generationRuns": 1,
+          "checkpointCount": 3,
+          "dispatches": 0
+        }
+      }
+    },
+    "AE5": {
+      "status": "passed",
+      "observed": {
+        "oldReceipt": {
+          "status": "rejected",
+          "code": "stale"
+        },
+        "receipts": [
+          {
+            "status": "accepted",
+            "interactionId": "152721b3d6230b6da5ae46b5cc5a22e3"
+          },
+          {
+            "status": "rejected",
+            "code": "duplicate"
+          }
+        ],
+        "instanceId": "d27d1cb5-3aeb-4fcd-b512-1f1e58fc1a47",
+        "runId": "5953e38f-5703-4552-9fca-6e50377d813b",
+        "status": "succeeded",
+        "counters": {
+          "generationRuns": 1,
+          "checkpointCount": 5,
+          "dispatches": 3
+        },
+        "scoreVisible": "Score: 3 / 3",
+        "newInstanceId": true,
+        "newRunId": true
+      }
+    },
+    "AE6": {
+      "status": "passed",
+      "observed": {
+        "freshStatus": "waiting_input",
+        "restoredStatus": "failed",
+        "code": "denied",
+        "pending": false,
+        "counters": {
+          "generationRuns": 1,
+          "checkpointCount": 3,
+          "dispatches": 0
+        }
+      }
+    },
+    "AE7": {
+      "status": "passed",
+      "observed": {
+        "requestCount": 61,
+        "browserErrors": 0
+      }
+    }
+  },
+  "extras": {
+    "button-double-click": {
+      "status": "passed",
+      "observed": {
+        "coreDispatches": 1,
+        "exhaustedRestore": "unsupported"
+      }
+    }
+  },
+  "singleCopy": {
+    "ok": true,
+    "resolutions": [
+      [
+        "@langchain/langgraph/web from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/src/graph.ts",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/web.js"
+      ],
+      [
+        "@langchain/langgraph/web from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/src/session-saver.ts",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/web.js"
+      ],
+      [
+        "@langchain/core/singletons from /Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/interaction.ts",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/singletons/index.js"
+      ],
+      [
+        "@langchain/core/callbacks/base from /Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/trace-handler.ts",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/callbacks/base.js"
+      ],
+      [
+        "@langchain/core/outputs from /Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/routed-chat-model.ts",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/outputs.js"
+      ],
+      [
+        "@langchain/core/language_models/chat_models from /Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/routed-chat-model.ts",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/language_models/chat_models.js"
+      ],
+      [
+        "@langchain/core/messages from /Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/routed-chat-model.ts",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/messages/index.js"
+      ],
+      [
+        "@langchain/langgraph-checkpoint from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/web.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/index.js"
+      ],
+      [
+        "@langchain/langgraph-checkpoint from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/channels/binop.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/index.js"
+      ],
+      [
+        "@langchain/core/callbacks/base from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/callbacks.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/callbacks/base.js"
+      ],
+      [
+        "@langchain/core/singletons from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/utils/config.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/singletons/index.js"
+      ],
+      [
+        "@langchain/core/callbacks/manager from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/utils/config.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/callbacks/manager.js"
+      ],
+      [
+        "@langchain/core/messages from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/messages_reducer.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/messages/index.js"
+      ],
+      [
+        "@langchain/core/utils/uuid from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/messages_reducer.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/uuid/index.js"
+      ],
+      [
+        "@langchain/core/language_models/stream from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/stream/transformers/messages.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/language_models/stream.js"
+      ],
+      [
+        "@langchain/core/language_models/stream from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/stream/index.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/language_models/stream.js"
+      ],
+      [
+        "@langchain/langgraph-checkpoint from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/channels/base.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/index.js"
+      ],
+      [
+        "@langchain/core/singletons from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/interrupt.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/singletons/index.js"
+      ],
+      [
+        "@langchain/core/utils/json_schema from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/interrupt.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/json_schema.js"
+      ],
+      [
+        "@langchain/core/utils/types from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/interrupt.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/types/index.js"
+      ],
+      [
+        "@langchain/langgraph-checkpoint from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/channels/delta.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/index.js"
+      ],
+      [
+        "@langchain/core/messages from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/message.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/messages/index.js"
+      ],
+      [
+        "@langchain/core/singletons from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/writer.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/singletons/index.js"
+      ],
+      [
+        "@langchain/core/singletons from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/func/index.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/singletons/index.js"
+      ],
+      [
+        "@langchain/core/utils/uuid from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/graph.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/uuid/index.js"
+      ],
+      [
+        "@langchain/core/runnables from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/graph.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/index.js"
+      ],
+      [
+        "@langchain/core/runnables/graph from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/graph.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/graph.js"
+      ],
+      [
+        "@langchain/core/runnables from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/state.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/index.js"
+      ],
+      [
+        "@langchain/core/utils/types from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/state.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/types/index.js"
+      ],
+      [
+        "@langchain/core/utils/uuid from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/id.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/uuid/index.js"
+      ],
+      [
+        "@langchain/core/utils/types from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/zod/meta.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/types/index.js"
+      ],
+      [
+        "@langchain/core/load from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/serde/jsonplus.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/load/index.js"
+      ],
+      [
+        "@langchain/core/singletons from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/utils.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/singletons/index.js"
+      ],
+      [
+        "@langchain/core/runnables from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/utils.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/index.js"
+      ],
+      [
+        "@langchain/core/singletons from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/call.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/singletons/index.js"
+      ],
+      [
+        "@langchain/core/runnables from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/call.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/index.js"
+      ],
+      [
+        "@langchain/core/runnables from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/write.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/index.js"
+      ],
+      [
+        "@langchain/core/runnables from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/read.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/index.js"
+      ],
+      [
+        "@langchain/core/utils/types from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/graph/types.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/types/index.js"
+      ],
+      [
+        "@langchain/core/runnables from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/index.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/index.js"
+      ],
+      [
+        "@langchain/langgraph-checkpoint from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/index.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/index.js"
+      ],
+      [
+        "@langchain/core/callbacks/manager from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/index.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/callbacks/manager.js"
+      ],
+      [
+        "@langchain/core/callbacks/base from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/stream.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/callbacks/base.js"
+      ],
+      [
+        "@langchain/core/utils/stream from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/stream.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/stream.js"
+      ],
+      [
+        "@langchain/langgraph-checkpoint from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/debug.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/index.js"
+      ],
+      [
+        "@langchain/core/messages from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/messages.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/messages/index.js"
+      ],
+      [
+        "@langchain/core/callbacks/base from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/messages.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/callbacks/base.js"
+      ],
+      [
+        "@langchain/core/messages from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/messages-v2.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/messages/index.js"
+      ],
+      [
+        "@langchain/core/callbacks/base from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/messages-v2.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/callbacks/base.js"
+      ],
+      [
+        "@langchain/langgraph-checkpoint from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/algo.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/index.js"
+      ],
+      [
+        "@langchain/core/runnables from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/algo.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/runnables/index.js"
+      ],
+      [
+        "@langchain/core/utils/uuid from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/loop.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/utils/uuid/index.js"
+      ],
+      [
+        "@langchain/langgraph-checkpoint from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/loop.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph-checkpoint@1.2.0_@langchain+core@1.2.20_@opentelemetry+api@1.10.0_/node_modules/@langchain/langgraph-checkpoint/dist/index.js"
+      ],
+      [
+        "@langchain/core/messages from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/loop.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/messages/index.js"
+      ],
+      [
+        "@langchain/core/callbacks/base from /Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+langgraph@1.5.1_@langchain+core@1.2.20_@opentelemetry+api@1.10.0__react-dom@_511aa8a3ce47e6509c459b4601f341fb/node_modules/@langchain/langgraph/dist/pregel/timeout.js",
+        "/Users/vinhnxv/Desktop/repos/galaxie/spikes/c-ui-path/node_modules/.pnpm/@langchain+core@1.2.20_@opentelemetry+api@1.10.0/node_modules/@langchain/core/dist/callbacks/base.js"
+      ]
+    ]
+  },
+  "requestUrls": [
+    "http://127.0.0.1:4176/",
+    "http://127.0.0.1:4176/?variant=url",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/adapter.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/errors.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/host.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/index.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/interaction.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/routed-chat-model.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/src/trace-handler.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/agent-instance.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/annotations.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/budgets.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/capabilities.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/capability-broker.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/definition.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/effects.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/errors.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/http-capability.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/index.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/interactions.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/lifecycle.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/model-router.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/policy.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/run-events.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/runtime.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/tracing.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/urls.ts",
+    "http://127.0.0.1:4176/@fs/Users/vinhnxv/Desktop/repos/galaxie/packages/core/src/version.ts",
+    "http://127.0.0.1:4176/@react-refresh",
+    "http://127.0.0.1:4176/@vite/client",
+    "http://127.0.0.1:4176/__single-copy",
+    "http://127.0.0.1:4176/node_modules/.pnpm/vite@8.3.4/node_modules/vite/dist/client/env.mjs",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/@langchain_core_callbacks_base.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/@langchain_core_language___models_chat___models.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/@langchain_core_messages.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/@langchain_core_outputs.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/@langchain_core_singletons.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/@langchain_langgraph_web.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/@opentelemetry_api.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/base-D59pQG4Q.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/chat_models-D1sem7g0.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/json-schema-processors-DLt7xQqJ.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/messages-DuTi2TM3.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/react-Kms5jKd2.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/react-dom-1NzbVbKu.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/react-dom_client.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/react.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=cfa166b8",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/runtime-9hHKQMCA.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/schemas-Czfd_7ph.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/singletons-DNIGkHuT.js?v=6295f712",
+    "http://127.0.0.1:4176/node_modules/.vite/deps/zod.js?v=cfa166b8",
+    "http://127.0.0.1:4176/src/app.tsx",
+    "http://127.0.0.1:4176/src/graph.ts",
+    "http://127.0.0.1:4176/src/main.tsx",
+    "http://127.0.0.1:4176/src/quiz.tsx",
+    "http://127.0.0.1:4176/src/registry.ts",
+    "http://127.0.0.1:4176/src/restore-adapter.ts",
+    "http://127.0.0.1:4176/src/session-saver.ts",
+    "http://127.0.0.1:4176/src/surface.tsx"
+  ],
+  "video": {
+    "bytes": 76124,
+    "committed": true
+  }
+}

@@ -3,7 +3,9 @@
 - **Status:** Proposed
 - **Date:** 2026-10-28
 - **Related:** brief §4.3, §11; ADR-0004, ADR-0012
-- **Revisions:** 2026-10-28, with brief 0.3: Spike C runs before M2 instead of in M0.
+- **Revisions:**
+  - 2026-10-28, with brief 0.3: Spike C runs before M2 instead of in M0.
+  - 2026-10-29: recorded Spike C browser evidence; status remains Proposed.
 
 ## Context
 
@@ -32,5 +34,5 @@ The real cost of reuse is that every host must render every catalog component in
 
 ## Verification
 
-- Spike C, before M2.
+- Spike C (2026-10-29, `spikes/c-ui-path/`): [recorded Chromium evidence](../../spikes/c-ui-path/README.md) rendered `education.Quiz/v1` through a Zod schema, action allowlist and React component from `run.pending`, both fresh and restored. Unknown components, invalid props and actions produced typed errors without rendering the rejected Quiz; local answers were lost on reload. The spike registry did not apply the URL allowlist itself: AE6 covered only core's `checkInteractionUrls` on the restore path, so schema-declared registry URL checks remain unverified for M2.
 - AT-06, AT-07, AT-21, AT-27, AT-28.
