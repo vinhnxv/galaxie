@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { CapabilityPort } from './capabilities.js';
 import type { ExecutorEvent } from './events.js';
 import type { InteractionId, RunId, SessionId } from './ids.js';
 import type { PendingInteraction } from './interactions.js';
@@ -28,6 +29,8 @@ export interface RunRequest {
   /** Cooperative cancellation; it cannot preempt synchronous code (brief §6.2). */
   readonly signal: AbortSignal;
   readonly trace: RunTrace;
+  readonly capabilities: CapabilityPort;
+  readonly limits: { readonly steps: number };
 }
 
 /** An agent that an executor has prepared (brief §7.5). */

@@ -3,11 +3,13 @@
 
 import { type TracerProvider, trace } from '@opentelemetry/api';
 import { createAgentInstance } from './agent-instance.js';
-import type { AgentDefinition } from './definition.js';
+import type { CapabilityBinding } from './capabilities.js';
+import type { AgentDefinition, BindingsFor } from './definition.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
 import type { AppId, InstanceId, PrincipalScope, RunId } from './ids.js';
 import type { AgentInstance } from './instance.js';
+import type { BudgetLimits, DataPolicy } from './policy.js';
 import type { InferInput } from './schema.js';
 import { VERSION } from './version.js';
 
@@ -18,10 +20,13 @@ export interface DiagnosticEvent {
     | 'executor_dispose_failed'
     | 'late_event'
     | 'protocol_violation'
-    | 'listener_threw';
+    | 'listener_threw'
+    | 'late_result'
+    | 'capability_failed';
   readonly instanceId: InstanceId;
   readonly runId?: RunId;
-  /** Host-only evidence; never stored in snapshots, events or traces. */
+  /** Host-only evidence, possibly including binding-supplied private content. Never forward it
+   * to a destination private-user may not reach; never stored in snapshots, events or traces. */
   readonly error?: unknown;
 }
 
@@ -29,6 +34,7 @@ export interface CreateOptions<Agent = unknown, Services = unknown> {
   readonly principalScope: PrincipalScope;
   readonly agent: Agent;
   readonly services?: Services;
+  readonly bindings?: Readonly<Record<string, CapabilityBinding<never, unknown>>>;
 }
 
 export interface RuntimeOptions<
@@ -41,6 +47,8 @@ export interface RuntimeOptions<
   readonly executors: Adapters;
   readonly diagnostics?: (event: DiagnosticEvent) => void;
   readonly tracerProvider?: TracerProvider;
+  readonly dataPolicy?: DataPolicy;
+  readonly budgets?: Partial<BudgetLimits>;
 }
 
 type MatchingAdapter<
@@ -68,7 +76,12 @@ export interface Runtime<
     options: CreateOptions<
       AgentOf<MatchingAdapter<Adapters, Definition['executor']>>,
       ServicesOf<MatchingAdapter<Adapters, Definition['executor']>>
-    >,
+    > &
+      (Definition extends { readonly capabilities: { readonly required: infer Required } }
+        ? keyof Required extends never
+          ? { readonly bindings?: BindingsFor<Definition> }
+          : { readonly bindings: BindingsFor<Definition> }
+        : { readonly bindings?: BindingsFor<Definition> }),
   ): Promise<AgentInstance<InferInput<Definition['input']>, unknown>>;
   dispose(): Promise<void>;
 }

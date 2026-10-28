@@ -100,6 +100,7 @@ export function createAgentInstance(
         : Object.freeze({
             runId: current.runId,
             status: current.status,
+            labels: Object.freeze([]),
             ...(current.pending === undefined ? {} : { pending: current.pending }),
             ...(current.error === undefined ? {} : { error: current.error }),
           });
@@ -232,6 +233,12 @@ export function createAgentInstance(
           command: { type: 'start', input },
           signal: run.controller.signal,
           trace: run.tracing.recorder,
+          limits: { steps: 25 },
+          capabilities: {
+            call: async () => {
+              throw new GalaxieError('denied', 'Policy denied the request.');
+            },
+          },
         })
         [Symbol.asyncIterator]();
       // Never use for-await here: its early exit calls return() and can hide live engine work.

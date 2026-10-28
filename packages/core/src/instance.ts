@@ -1,16 +1,19 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { CapabilityName } from './capabilities.js';
 import type { ErrorInfo } from './errors.js';
 import type { RunEvent } from './events.js';
 import type { InstanceId, RunId } from './ids.js';
 import type { DispatchReceipt, PendingInteraction, UserInteractionEvent } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
+import type { DataLabel } from './policy.js';
 
 /** The current run, as a snapshot shows it. */
 export interface RunSnapshot {
   readonly runId: RunId;
   readonly status: RunStatus;
+  readonly labels: readonly DataLabel[];
   /** Set while the run waits for input; rebuilt from the checkpoint after a reload (ADR-0004). */
   readonly pending?: PendingInteraction;
   /** Set when the run failed. */
@@ -40,7 +43,7 @@ export interface AgentInstance<Input, View> {
   /** Downloads and device access go through host policy and consent. */
   prepare(): Promise<void>;
   /** Claims the slot synchronously; resolves when queued after validation, before executor events. */
-  start(input: Input): Promise<{ readonly runId: RunId }>;
+  start(input: Input, options?: StartOptions): Promise<{ readonly runId: RunId }>;
   /** Checks the event against the pending interrupt, then records it in the submission inbox (ADR-0004). */
   dispatch(event: UserInteractionEvent): Promise<DispatchReceipt>;
   cancel(runId: RunId): Promise<CancelReceipt>;
@@ -50,4 +53,8 @@ export interface AgentInstance<Input, View> {
   getSnapshot(): AgentSnapshot<View>;
   subscribe(listener: () => void): () => void;
   dispose(): Promise<void>;
+}
+
+export interface StartOptions {
+  readonly grants?: readonly CapabilityName[];
 }
