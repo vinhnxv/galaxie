@@ -10,12 +10,19 @@ import {
   toErrorInfo,
 } from '@galaxie/core';
 import type { CallbackManagerForLLMRun, Callbacks } from '@langchain/core/callbacks/manager';
-import type { BaseLanguageModelInput } from '@langchain/core/language_models/base';
+import type {
+  BaseLanguageModelInput,
+  StructuredOutputMethodOptions,
+} from '@langchain/core/language_models/base';
 import {
   BaseChatModel,
   type BaseChatModelCallOptions,
   type LangSmithParams,
 } from '@langchain/core/language_models/chat_models';
+import {
+  assembleStructuredOutputPipeline,
+  createContentParser,
+} from '@langchain/core/language_models/structured_output';
 import {
   AIMessageChunk,
   type BaseMessage,
@@ -23,8 +30,29 @@ import {
   type StandardMessageStructure,
 } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult, type LLMResult } from '@langchain/core/outputs';
+import { type Runnable, RunnableLambda } from '@langchain/core/runnables';
+import { toJsonSchema, Validator } from '@langchain/core/utils/json_schema';
+import type { SerializableSchema } from '@langchain/core/utils/standard_schema';
+import type { InteropZodType } from '@langchain/core/utils/types';
 import type { LangGraphServices } from './host.js';
 import type { LangGraphTraceHandler } from './trace-handler.js';
+
+interface RoutedChatModelCallOptions extends BaseChatModelCallOptions {
+  readonly jsonSchema?: Readonly<Record<string, unknown>>;
+}
+
+type OutputSchema<Output extends Record<string, unknown>> =
+  | SerializableSchema<Output>
+  | InteropZodType<Output>
+  | Record<string, unknown>;
+
+function plainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+  );
+}
 
 const LEASE = Symbol('galaxie.model.lease');
 interface ActiveRun {
@@ -80,7 +108,7 @@ export function selectedRouteFromOptions(options: unknown): SelectedModelRoute |
 }
 
 /** One LangChain run around a model selected by the run-bound policy port (ADR-0006). */
-export class RoutedChatModel extends BaseChatModel {
+export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
   readonly #role: string;
   readonly #providers: LangGraphServices['chatModels'];
   readonly #active: () => ActiveRun | undefined;
@@ -100,12 +128,73 @@ export class RoutedChatModel extends BaseChatModel {
     return 'galaxie-routed';
   }
 
+  override withStructuredOutput<
+    RunOutput extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<false>,
+  ): Runnable<BaseLanguageModelInput, RunOutput>;
+  override withStructuredOutput<
+    RunOutput extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<true>,
+  ): Runnable<BaseLanguageModelInput, { raw: BaseMessage; parsed: RunOutput }>;
+  override withStructuredOutput<
+    RunOutput extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<boolean>,
+  ):
+    | Runnable<BaseLanguageModelInput, RunOutput>
+    | Runnable<BaseLanguageModelInput, { raw: BaseMessage; parsed: RunOutput }> {
+    if (config?.method !== undefined && config.method !== 'jsonSchema')
+      throw failure('unsupported');
+    let jsonSchema: Readonly<Record<string, unknown>>;
+    let validator: Validator;
+    let parser: ReturnType<typeof createContentParser<RunOutput>>;
+    try {
+      jsonSchema = toJsonSchema(schema as Parameters<typeof toJsonSchema>[0]);
+      if (!plainObject(jsonSchema)) throw failure('invalid');
+      validator = new Validator(jsonSchema);
+      parser = createContentParser<RunOutput>(schema);
+    } catch {
+      throw failure('invalid');
+    }
+    const safeParser = RunnableLambda.from<BaseMessage, RunOutput>(async (message) => {
+      try {
+        if (
+          typeof message.content !== 'string' ||
+          !validator.validate(JSON.parse(message.content)).valid
+        )
+          throw failure('invalid');
+        // Parse directly so content-bearing parser errors never reach callbacks.
+        return await parser.parseResult([{ text: message.content }]);
+      } catch {
+        throw failure('invalid');
+      }
+    });
+    return assembleStructuredOutputPipeline(
+      this.withConfig({ jsonSchema }),
+      safeParser,
+      config?.includeRaw,
+    );
+  }
+
   async #begin(options: Partial<BaseChatModelCallOptions> | undefined): Promise<CallState> {
     const run = this.#active();
     if (run === undefined) throw failure('invalid');
+    const jsonSchema: unknown =
+      options === undefined ? undefined : Reflect.get(options, 'jsonSchema');
+    const structured = plainObject(jsonSchema);
     const lease = await run.models.begin(
       this.#role,
-      options?.signal === undefined ? undefined : { signal: options.signal },
+      options?.signal === undefined && !structured
+        ? undefined
+        : {
+            ...(options?.signal === undefined ? {} : { signal: options.signal }),
+            ...(structured ? { requires: ['structured-output'] as const } : {}),
+          },
     );
     try {
       const implementation = Object.hasOwn(this.#providers, lease.providerId)

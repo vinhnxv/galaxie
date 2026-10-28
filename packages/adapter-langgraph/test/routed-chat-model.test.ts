@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { ModelCall, ModelUsage } from '@galaxie/core';
+import { type ModelCall, type ModelUsage, toErrorInfo } from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
@@ -12,8 +12,10 @@ import {
   type StandardMessageStructure,
 } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
+import { toJsonSchema } from '@langchain/core/utils/json_schema';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test, vi } from 'vitest';
+import { z } from 'zod';
 import { BuiltInAIChatModel } from '../../models/src/builtin-ai/chat-model.js';
 import { MockChatModel } from '../../models/src/mock.js';
 import { WebLLMChatModel } from '../../models/src/webllm/chat-model.js';
@@ -450,5 +452,134 @@ test('a provider with disableStreaming uses generation even through routed strea
   expect(chunks).toEqual(['hello world']);
   expect(generate).toHaveBeenCalledTimes(1);
   expect(stream).not.toHaveBeenCalled();
+  expect(fixture.end).toHaveBeenCalledTimes(1);
+});
+
+class StructuredReplyModel extends BaseChatModel {
+  readonly schemas: unknown[] = [];
+  readonly reply: AIMessage<StandardMessageStructure>;
+  constructor(content: string | Array<{ type: 'text'; text: string }>) {
+    super({});
+    this.reply = new AIMessage<StandardMessageStructure>({ content });
+  }
+  override _llmType(): string {
+    return 'structured-reply';
+  }
+  override async _generate(
+    _messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): Promise<ChatResult> {
+    this.schemas.push(Reflect.get(options, 'jsonSchema'));
+    return {
+      generations: [
+        {
+          text: typeof this.reply.content === 'string' ? this.reply.content : '',
+          message: this.reply,
+        },
+      ],
+    };
+  }
+}
+
+const answerSchema = z.object({ answer: z.literal('yes') });
+test.each(['zod', 'standard', 'json'] as const)(
+  'routed structured output validates %s schemas and forwards constrained decoding',
+  async (kind) => {
+    const provider = new StructuredReplyModel('{"answer":"yes"}');
+    const fixture = routed(provider);
+    const schema =
+      kind === 'zod'
+        ? answerSchema
+        : kind === 'standard'
+          ? { '~standard': answerSchema['~standard'] }
+          : toJsonSchema(answerSchema);
+    expect(await fixture.model.withStructuredOutput(schema).invoke('hello')).toEqual({
+      answer: 'yes',
+    });
+    expect(provider.schemas).toEqual([toJsonSchema(schema)]);
+    expect(fixture.begin).toHaveBeenCalledExactlyOnceWith('assistant', {
+      requires: ['structured-output'],
+    });
+    expect(fixture.end).toHaveBeenCalledTimes(1);
+    expect(fixture.fail).not.toHaveBeenCalled();
+  },
+);
+
+test('includeRaw returns the message and parsed value', async () => {
+  const provider = new StructuredReplyModel('{"answer":"yes"}');
+  const fixture = routed(provider);
+  const result = await fixture.model
+    .withStructuredOutput(answerSchema, { includeRaw: true })
+    .invoke('hello');
+  expect(result.raw.content).toBe(provider.reply.content);
+  expect(result.parsed).toEqual({ answer: 'yes' });
+});
+
+test.each([
+  'not json canary',
+  '{"answer":"private-reply-canary"}',
+  [{ type: 'text' as const, text: '{"answer":"yes"}' }],
+])(
+  'structured output rejects invalid reply %# with fixed errors and normal settlement',
+  async (content) => {
+    const fixture = routed(new StructuredReplyModel(content));
+    const observed: Error[] = [];
+    const waiting = fixture.model.withStructuredOutput(answerSchema).invoke('hello', {
+      callbacks: [
+        {
+          handleChainError: (error) => {
+            observed.push(error);
+          },
+        },
+      ],
+    });
+    await expect(waiting).rejects.toMatchObject({
+      code: 'invalid',
+      message: toErrorInfo('invalid').message,
+    });
+    const error = await waiting.catch((error: unknown) => error);
+    expect(error).not.toHaveProperty('cause');
+    for (const item of observed) {
+      expect(item.message).toBe(toErrorInfo('invalid').message);
+      expect(item).not.toHaveProperty('cause');
+    }
+    expect(fixture.end).toHaveBeenCalledTimes(1);
+    expect(fixture.fail).not.toHaveBeenCalled();
+    const withRaw = await fixture.model
+      .withStructuredOutput(answerSchema, { includeRaw: true })
+      .invoke('hello');
+    expect(withRaw.raw.content).toEqual(content);
+    expect(withRaw.parsed).toBeNull();
+    expect(fixture.end).toHaveBeenCalledTimes(2);
+    expect(fixture.fail).not.toHaveBeenCalled();
+  },
+);
+
+test('structured output rejects unsupported methods and unconvertible schemas before routing', () => {
+  const fixture = routed();
+  expect(() =>
+    fixture.model.withStructuredOutput(answerSchema, { method: 'functionCalling' }),
+  ).toThrow(expect.objectContaining({ code: 'unsupported' }));
+  expect(() => fixture.model.withStructuredOutput(z.object({ answer: z.function() }))).toThrow(
+    expect.objectContaining({ code: 'invalid' }),
+  );
+  expect(fixture.begin).not.toHaveBeenCalled();
+});
+
+test('plain JSON Schema replies receive client-side validation', async () => {
+  const fixture = routed(new StructuredReplyModel('{"answer":"private-reply-canary"}'));
+  expect(fixture.provider).toBeInstanceOf(StructuredReplyModel);
+  await expect(
+    fixture.model.withStructuredOutput(toJsonSchema(answerSchema)).invoke('hello'),
+  ).rejects.toMatchObject({ code: 'invalid', message: toErrorInfo('invalid').message });
+  expect(fixture.end).toHaveBeenCalledTimes(1);
+});
+
+test('incomplete JSON is invalid even when the LangChain parser can repair it', async () => {
+  const fixture = routed(new StructuredReplyModel('{"answer":"yes"'));
+  expect(fixture.provider).toBeInstanceOf(StructuredReplyModel);
+  await expect(
+    fixture.model.withStructuredOutput(answerSchema).invoke('hello'),
+  ).rejects.toMatchObject({ code: 'invalid' });
   expect(fixture.end).toHaveBeenCalledTimes(1);
 });
