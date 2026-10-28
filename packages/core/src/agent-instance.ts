@@ -619,7 +619,7 @@ export function createAgentInstance(
             return rejected('stale');
           const entry: InboxEntry = { interactionId, action, payload, status: 'accepted' };
           run.inbox.set(interactionId, entry);
-          if (containsText(payload)) run.submittedText = true;
+          if (!run.submittedText && containsText(payload)) run.submittedText = true;
           run.status = 'running';
           delete run.pending;
           // Register settlement before publishing: a listener may dispose synchronously.

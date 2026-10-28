@@ -28,7 +28,6 @@ function messagesText(
     }
     return result;
   } catch {
-    // Optional trace text must not raise callback errors for unencodable message content.
     return undefined;
   }
 }

@@ -7,12 +7,10 @@ export function isLoopback(hostname: string): boolean {
   return ['localhost', '127.0.0.1', '[::1]'].includes(hostname);
 }
 
-/** HTTPS, or HTTP confined to the loopback hosts accepted by the runtime. */
 export function isHttpDestination(url: URL): boolean {
   return url.protocol === 'https:' || (url.protocol === 'http:' && isLoopback(url.hostname));
 }
 
-/** Copy exact host origins before retaining runtime options. Never expose rejected values. */
 export function normalizeUrlAllowlist(origins: readonly string[] = []): readonly string[] {
   const invalid = (): never => {
     throw new GalaxieError('invalid', 'The URL allowlist is invalid.');

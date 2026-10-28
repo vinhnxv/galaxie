@@ -179,9 +179,7 @@ export function startRunTrace(
     try {
       const encoded = JSON.stringify(value);
       if (encoded !== undefined) span.setAttribute(key, encoded);
-    } catch {
-      // Text is untrusted; omission is silent and never changes the run's outcome.
-    }
+    } catch {}
   };
   const end = (record: StepRecord, result: TraceResult | CapabilityResult): void => {
     if (record.ended) return;
