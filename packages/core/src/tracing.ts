@@ -273,6 +273,7 @@ export function startRunTrace(
       root.setAttributes(
         attributes({
           'galaxie.run.status': status,
+          'galaxie.run.labels': labels.value,
           ...(status === 'failed'
             ? { 'error.type': errorType(error?.type), 'galaxie.error.code': error?.code }
             : {}),
