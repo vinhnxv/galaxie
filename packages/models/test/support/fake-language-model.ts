@@ -20,7 +20,10 @@ export interface FakeLanguageModelOptions {
 }
 
 async function abortable<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
-  signal?.throwIfAborted();
+  if (signal?.aborted) {
+    void work.catch(() => {});
+    throw signal.reason;
+  }
   const aborted = Promise.withResolvers<never>();
   const onAbort = (): void => aborted.reject(signal?.reason);
   signal?.addEventListener('abort', onAbort, { once: true });
