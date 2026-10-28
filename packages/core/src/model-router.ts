@@ -73,8 +73,10 @@ function validUsage(usage: ModelUsage | undefined): usage is ModelUsage {
   );
 }
 
-/** Await host code without letting an uncooperative callback retain an ended call. */
-async function wait<Value>(promise: Promise<Value>, signal: AbortSignal): Promise<Value> {
+async function waitForHostOrAbort<Value>(
+  promise: Promise<Value>,
+  signal: AbortSignal,
+): Promise<Value> {
   if (signal.aborted) throw failure('cancelled');
   let abort: () => void = () => {};
   try {
@@ -296,7 +298,10 @@ export class ModelRouter {
     signal.addEventListener('abort', release, { once: true });
     if (signal.aborted) release();
     try {
-      return await wait(pending.promise, AbortSignal.any([signal, pending.controller.signal]));
+      return await waitForHostOrAbort(
+        pending.promise,
+        AbortSignal.any([signal, pending.controller.signal]),
+      );
     } finally {
       signal.removeEventListener('abort', release);
       release();
@@ -359,7 +364,7 @@ export class ModelRouter {
           try {
             if (descriptor.credential === true) {
               try {
-                const value = await wait(
+                const value = await waitForHostOrAbort(
                   Promise.resolve().then(() => this.#getCredential?.({ role, providerId })),
                   signal,
                 );
