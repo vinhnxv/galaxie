@@ -5,7 +5,7 @@ import { ChatWebLLM } from '@langchain/community/chat_models/webllm';
 import type { MLCEngineInterface } from '@mlc-ai/web-llm';
 import type { Message, Session } from './arms/types.js';
 import { WEBLLM_MODEL, type WebLLMArm, webllmConfig } from './arms/webllm.js';
-import { resetCheck } from './harness.js';
+import { pause, resetCheck } from './harness.js';
 import { type Check, emptyChatCheck, type ResultsV1 } from './results.js';
 import { schemaProbe, tasks } from './tasks.js';
 
@@ -34,9 +34,7 @@ export async function chatWebLLMCheck(arm: WebLLMArm): Promise<ResultsV1['chatWe
         return requestAdapter.call(gpu, options);
       };
     chat = new ChatWebLLM({ model: WEBLLM_MODEL, temperature: 0, appConfig: webllmConfig() });
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await pause();
     result.constructionStartedInThread = fetches > 0 || adapters > 0;
   } catch {
     return { ...result, status: 'failed', reason: 'construction_failed' };
@@ -71,6 +69,7 @@ export async function chatWebLLMCheck(arm: WebLLMArm): Promise<ResultsV1['chatWe
   const messages = (values: Message[]): [Message['role'], string][] =>
     values.map((message) => [message.role, message.content]);
   const feedback = tasks.find((task) => task.id === 'feedback-en');
+  let invokeOk = false;
   try {
     if (!feedback) throw new Error('missing_task');
     try {
@@ -79,10 +78,9 @@ export async function chatWebLLMCheck(arm: WebLLMArm): Promise<ResultsV1['chatWe
         typeof reply.content === 'string' && reply.content.length > 0,
         'worker_invoke_observed',
       );
-      result.schemaAccepted = true;
+      invokeOk = result.invoke.status === 'passed';
     } catch {
       result.invoke = outcome(false, 'invoke_exception');
-      result.schemaAccepted = false;
     }
     await engine.resetChat();
     try {
@@ -96,6 +94,8 @@ export async function chatWebLLMCheck(arm: WebLLMArm): Promise<ResultsV1['chatWe
     }
     result.temperatureReachedEngine = received.some((record) => record.temperature);
     result.schemaReachedEngine = received.some((record) => record.schema);
+    // Accepted means the schema reached the engine and the call succeeded, not only no throw.
+    result.schemaAccepted = result.schemaReachedEngine && invokeOk;
     result.abortSignalReachedEngine = received.some((record) => record.signal);
     const open = async (): Promise<Session> => {
       let history: Message[] = [];

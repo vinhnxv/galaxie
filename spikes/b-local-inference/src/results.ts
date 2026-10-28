@@ -40,6 +40,7 @@ const longTasks = z.strictObject({
   reason: z.string().nullable(),
 });
 const run = z.strictObject({
+  openSessionMs: nonnegative,
   ttftMs: nonnegative.nullable(),
   totalMs: nonnegative,
   length: nonnegative,
@@ -53,7 +54,7 @@ const run = z.strictObject({
 });
 const task = z.strictObject({
   id: z.enum(['quiz', 'feedback-en', 'feedback-vi']),
-  status: z.enum(['completed', 'not_run']),
+  status: z.enum(['completed', 'failed', 'not_run']),
   reason: z.string().nullable(),
   warmupMs: nonnegative.nullable(),
   runs: z.array(run),
@@ -81,6 +82,7 @@ export const armResultSchema = z.strictObject({
   schemaMechanism: z.string(),
   fallbacks: z.array(z.string()),
   sameCheckpointAs: armId.nullable(),
+  sessionIsolation: z.enum(['harness_history_replay', 'native_session']),
   availability: z.strictObject({
     status: z.enum(['available', 'downloadable', 'unavailable']),
     reason: z
@@ -159,6 +161,7 @@ export const resultsSchema = z.strictObject({
   promptApiAvailability: z.strictObject({
     en: z.string(),
     vi: z.string(),
+    enToVi: z.string(),
     reason: z.string().nullable(),
   }),
 });

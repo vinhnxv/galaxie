@@ -23,6 +23,22 @@ import {
   validates,
 } from './tasks.js';
 
+// A macrotask pause; requestAnimationFrame never fires in a background tab.
+export function pause(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 50));
+}
+function parses(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function probeOutcome(text: string): string {
+  if (!parses(text)) return 'parse_error';
+  return validates(probeSchema, text) ? 'constrained_value_observed' : 'mismatch';
+}
 const check = (passed: boolean, reason: string): Check => ({
   status: passed ? 'passed' : 'failed',
   reason,
@@ -37,6 +53,9 @@ export function armResult(arm: Arm): ArmResult {
     schemaMechanism: arm.schemaMechanism,
     fallbacks: arm.fallbacks ?? [],
     sameCheckpointAs: arm.sameCheckpointAs,
+    // Only the Prompt API keeps context in the engine; worker arms replay a per-session
+    // history kept by the spike, so their reset check tests that history, not the engine.
+    sessionIsolation: arm.id === 'prompt-api' ? 'native_session' : 'harness_history_replay',
     availability: { status: 'unavailable', reason: 'not_implemented' },
     checks: Object.fromEntries(
       CHECK_NAMES.map((name) => [name, notRun('not_started')]),
@@ -142,13 +161,21 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
     executions.push(reply.executedIn);
     return reply;
   };
+  // Timing starts after the session is open, so session creation (a full create() for the
+  // Prompt API) is recorded apart from time to first token and total time.
   const once = async (
     request: Omit<GenerationRequest, 'signal' | 'onChunk'>,
     onChunk?: (text: string) => void,
+    timing: { openMs: number; start: number; end: number } = { openMs: 0, start: 0, end: 0 },
   ): Promise<GenerationResult> => {
+    const opened = performance.now();
     const session = await arm.openSession();
+    timing.start = performance.now();
+    timing.openMs = timing.start - opened;
     try {
-      return await generate(session, request, undefined, onChunk);
+      const reply = await generate(session, request, undefined, onChunk);
+      timing.end = performance.now();
+      return reply;
     } finally {
       await session.close();
     }
@@ -234,16 +261,18 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
         }
         const settledAt = performance.now();
         settled = true;
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        );
+        await pause();
         let nextSucceeded = false;
         let nextTtft: number | null = null;
-        const start = performance.now();
+        const timing = { openMs: 0, start: 0, end: 0 };
         try {
-          const next = await once(feedback, () => {
-            nextTtft ??= performance.now() - start;
-          });
+          const next = await once(
+            feedback,
+            () => {
+              nextTtft ??= performance.now() - timing.start;
+            },
+            timing,
+          );
           nextSucceeded = next.text.length > 0 && !next.aborted;
         } catch {}
         result.cancel = {
@@ -254,12 +283,18 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
           nextRequestTtftMs: nextTtft,
           medianFeedbackTtftMs: null,
         };
+        const stopped = reply?.aborted === true || abortRejected;
         return check(
-          abortAt !== null &&
-            (reply?.aborted === true || abortRejected) &&
-            after === 0 &&
-            nextSucceeded,
-          'abort_observed_after_second_chunk',
+          abortAt !== null && stopped && after === 0 && nextSucceeded,
+          abortAt === null
+            ? 'no_second_chunk'
+            : !stopped
+              ? 'not_aborted'
+              : after > 0
+                ? 'chunk_after_settle'
+                : !nextSucceeded
+                  ? 'next_request_failed'
+                  : 'abort_observed_after_second_chunk',
         );
       } finally {
         await session.close();
@@ -274,14 +309,17 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
     await safe('schemaEnforcedWhileDecoding', async () => {
       const reply = await once(schemaProbe);
       return {
-        ...check(validates(probeSchema, reply.text), 'adversarial_schema_probe'),
+        ...check(validates(probeSchema, reply.text), probeOutcome(reply.text)),
         constrained: reply.constrained,
       };
     });
     await safe('schemaCoverage', async () => {
       const reply = await once(schemaCoverage);
       return {
-        ...check(validates(coverageSchema, reply.text), 'coverage_probe'),
+        ...check(
+          validates(coverageSchema, reply.text),
+          parses(reply.text) ? 'coverage_probe' : 'parse_error',
+        ),
         constrained: reply.constrained,
       };
     });
@@ -316,6 +354,7 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
         await once(task);
         entry.warmupMs = performance.now() - warmup;
       } catch {
+        entry.status = 'failed';
         entry.reason = 'warmup_failed';
         result.error = 'task_failed';
         continue;
@@ -323,24 +362,29 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
       const hashes = new Set<string>();
       for (let i = 0; i < options.runs; i++) {
         const observation = longTasks();
-        const start = performance.now();
+        const timing = { openMs: 0, start: 0, end: 0 };
         let first: number | null = null;
         let reply: GenerationResult;
         try {
-          reply = await once(task, () => {
-            first ??= performance.now();
-          });
+          reply = await once(
+            task,
+            () => {
+              first ??= performance.now();
+            },
+            timing,
+          );
         } catch {
           observation.finish();
           entry.reason = 'generation_failed';
           result.error = 'task_failed';
           break;
         }
-        const end = performance.now();
+        const { start, end } = timing;
         const totalMs = end - start;
         const outputTokens = reply.outputTokens;
         const unconstrained = task.id !== 'quiz';
         entry.runs.push({
+          openSessionMs: timing.openMs,
           ttftMs: unconstrained && first !== null ? first - start : null,
           totalMs,
           length: outputTokens ?? reply.text.length,
@@ -357,7 +401,7 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
         });
         hashes.add(await outputHash(reply.text));
       }
-      entry.status = entry.runs.length === options.runs ? 'completed' : 'not_run';
+      entry.status = entry.runs.length === options.runs ? 'completed' : 'failed';
       entry.summary = {
         totalMs: summarize(entry.runs.map((run) => run.totalMs)),
         ttftMs: summarize(entry.runs.map((run) => run.ttftMs)),

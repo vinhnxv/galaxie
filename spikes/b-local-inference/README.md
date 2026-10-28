@@ -42,8 +42,10 @@ Query parameters:
 | `promptApi=probe` | Prompt API calls availability only, never create |
 | `mockFail=cancel`, `reset`, or `schema` | Break exactly one mock behavior to exercise its check |
 
-For the later real run, use normal Chrome, `?runs=20`, and one empty-cache visit to record
-cold loading. Prefer one page load per arm when comparing timings. A Prompt API `unavailable`
+For the later real run, use normal Chrome in the foreground (a background tab throttles timers
+and skews timings), and `?runs=20`. For cold loads, run once in a fresh Chrome profile; clearing
+site data for `127.0.0.1:4173` instead would also delete the 1.4 GB model cache that B0 and the
+tutor share. The Prompt API model is managed by the browser and is not cleared by site data. Prefer one page load per arm when comparing timings. A Prompt API `unavailable`
 from any scripted browser remains unconfirmed until normal Chrome agrees: scripted Chromium
 can have component updates disabled. This task never runs the real engines or downloads models.
 
@@ -61,10 +63,10 @@ not execute it; it says nothing about the engine. Unavailable arms retain typed 
 | --- | --- |
 | loads | First load, dispose, second load; the engine reports cache state |
 | streams | At least two nonempty chunks arrive before generation completes |
-| cancels | Abort after chunk two, wait for generation to settle, observe callbacks for two animation frames, then succeed on another request |
+| cancels | Abort after chunk two, wait for generation to settle, observe callbacks for 50 ms, then succeed on another request; a failure names its cause (`no_second_chunk`, `not_aborted`, `chunk_after_settle`, `next_request_failed`) |
 | worker | Every generation reply identifies `DedicatedWorkerGlobalScope`, read where inference executes; Prompt API is not applicable |
-| resetPerSession | A and B coexist; B must not recall A's code word, and A must recall it as a positive control |
-| schemaEnforcedWhileDecoding | An adversarial prose request must return the singleton object required by the schema; the arm's constrained claim is recorded separately |
+| resetPerSession | A and B coexist; B must not recall A's code word, and A must recall it as a positive control. `sessionIsolation` records what is tested: worker arms replay a history the spike keeps per session (`harness_history_replay`), so a pass there shows that history works, not that the engine isolates sessions; only the Prompt API keeps context in the engine (`native_session`) |
+| schemaEnforcedWhileDecoding | An adversarial prose request must return the singleton object required by the schema; the arm's constrained claim is recorded separately, and a failure reads `parse_error` or `mismatch`. The Prompt API arm sets `omitResponseConstraintInput`, so the model cannot copy the value from the schema |
 | schemaCoverage | Number, boolean, optional property and union coverage; an exception is a failed observation |
 
 The mock emits delayed chunks in a worker, retains conversation history by session, and uses
@@ -75,8 +77,10 @@ next-request success and first-token time, and the measured feedback median.
 
 All arms receive identical fixed quiz and English/Vietnamese feedback tasks. Quiz validity uses
 the fixed Zod schema after JSON parsing; feedback records lengths only. Each generation starts
-with a fresh session and closes it afterwards. Session setup and teardown are included in wall
-clock measurements. No answer-quality scoring is performed.
+with a fresh session and closes it afterwards. Timing starts after the session is open, so
+first-token and total times exclude session creation (a full `create()` for the Prompt API);
+`openSessionMs` records it per run. A task whose generation throws reads `failed`; `not_run`
+is kept for tasks the harness never attempted. No answer-quality scoring is performed.
 
 Measurements include storage-usage change across the first load, engine-reported bytes where
 available, cold/warm load time, warm-up time, per-run total time, output length and quiz validity.
@@ -109,7 +113,8 @@ been observed on a real device** by this task.
 WebLLM uses its prebuilt model record with a pinned Hugging Face resolve revision; its prebuilt
 WASM URL is the versioned `v0_2_86/base/Qwen2-1.5B-Instruct-q4f16_1_cs1k-webgpu.wasm`
 under the configured raw GitHub origin. Transformers.js uses explicit WebGPU and q4f16.
-There is no silent WASM inference fallback.
+No arm selects a WASM-only backend, but with `executionProviders: ['webgpu']` onnxruntime-web can still place operators WebGPU does not support on its CPU (WASM) provider.
+WebLLM's prebuilt model library URL points at the `main` branch of `binary-mlc-llm-libs`; the path is versioned, the branch is not pinned.
 
 The Transformers.js load order, if an earlier candidate cannot load on the later device, is:
 
@@ -198,22 +203,29 @@ remain unchanged, as do packages, tests and every other spike.
   timings; use one page load per arm when appropriate.
 - Main-thread long-task observations include all activity during a measured run; they do not
   identify a cause. Long tasks unsupported by the browser report null with a reason.
-- Cancellation's post-settlement observation is finite (two animation frames). It cannot prove
+- Time to first token is the first chunk the engine streams. WebLLM streams per token; the
+  Transformers.js `TextStreamer` and the copied ORT loop release text at word boundaries, so
+  their first chunk can land a token or two later.
+- "Greedy" means no sampling, not identical decoding: Transformers.js applies the model's
+  `generation_config` penalties, WebLLM applies its `mlc-chat-config` penalties, and the ORT
+  loop applies its own repetition penalty. The same-checkpoint pair also differs in quantization
+  (MLC q4f16_1 against ONNX q4f16). `sameCheckpointAs` is set only when both arms loaded.
+- Cancellation's post-settlement observation is finite (50 ms). It cannot prove
   the absence of arbitrarily late callbacks. Worker promises settle after their engine loop ends.
 - The copied ORT guide supports the quiz's strings, enums, objects and bounded arrays. It does
   not implement the broader coverage probe's number/boolean/union features; exceptions stay
   visible as failed check results. Its original token budget can also end a guided reply early.
 - `ChatWebLLM` worker use overwrites a protected engine field through an unsupported override.
-  The check observes constructor fetch/GPU activity for two frames, then observes invoke/stream
-  and option forwarding at the injected engine boundary. A schema accepted as a call option can
-  still be ignored; the forwarding fields distinguish this. The supplied signal is observed
+  The check observes constructor fetch/GPU activity for 50 ms, then observes invoke/stream
+  and option forwarding at the injected engine boundary. `schemaAccepted` is true only when the schema
+  reached the engine and the call succeeded. The supplied signal is observed
   as an option, not interpreted from model replies. Results remain not_run in the smoke.
 - Prompt API system-role handling and activation for combined language options remain unverified
   until the later normal-Chrome run. A task error is recorded rather than crashing the page.
 - Prompt API model identity and revision cannot be pinned, and decoding is browser default.
   The API does not expose the common interface's per-call output-token cap. Its docs do not
-  list Vietnamese; that feedback task is skipped with `language_unsupported` when the actual
-  Vietnamese availability is unavailable. Scripted-browser unavailability is unconfirmed.
+  list Vietnamese; that feedback task is skipped with `language_unsupported` when availability
+  for English input with Vietnamese output (`enToVi`) is unavailable. Scripted-browser unavailability is unconfirmed.
 - No engine is left `not_implemented`. Build-time integration fixes were a WebLLM chunk-evidence
   type, an explicit optional-WASM-backend check for Transformers.js, and a narrow call-parameter
   type for the ChatWebLLM observation wrapper. No real-engine download or inference was attempted.

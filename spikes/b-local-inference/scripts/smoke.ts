@@ -149,6 +149,15 @@ try {
         });
     assert.equal(typeof baseline.promptApiAvailability.en, 'string');
     assert.equal(typeof baseline.promptApiAvailability.vi, 'string');
+    assert.equal(typeof baseline.promptApiAvailability.enToVi, 'string');
+    assert.equal(mock.sessionIsolation, 'harness_history_replay');
+    assert.equal(mock.checks.schemaEnforcedWhileDecoding.reason, 'constrained_value_observed');
+    assert.equal(mock.checks.cancels.reason, 'abort_observed_after_second_chunk');
+    assert.ok(mock.tasks.every((task) => task.runs.every((run) => run.openSessionMs >= 0)));
+    assert.equal(
+      baseline.arms.find((arm) => arm.id === 'prompt-api')?.sessionIsolation,
+      'native_session',
+    );
     assert.equal(
       await page.evaluate(
         () => (globalThis as unknown as { __promptCreates: number }).__promptCreates,

@@ -9,7 +9,11 @@ export interface LanguageOptions {
 export interface PromptSession {
   promptStreaming(
     messages: import('./arms/types.js').Message[],
-    options: { signal: AbortSignal; responseConstraint?: import('./arms/types.js').JsonSchema },
+    options: {
+      signal: AbortSignal;
+      responseConstraint?: import('./arms/types.js').JsonSchema;
+      omitResponseConstraintInput?: boolean;
+    },
   ): ReadableStream<string>;
   destroy(): void;
 }
@@ -52,18 +56,47 @@ export async function gpuProbe(): Promise<import('./arms/types.js').Availability
 export async function promptAvailability(): Promise<{
   en: string;
   vi: string;
+  enToVi: string;
   reason: string | null;
 }> {
   const api = promptApi();
-  if (!api) return { en: 'unavailable', vi: 'unavailable', reason: 'api_missing' };
-  const probe = async (language: string): Promise<string> => {
+  if (!api)
+    return { en: 'unavailable', vi: 'unavailable', enToVi: 'unavailable', reason: 'api_missing' };
+  const probe = async (options: LanguageOptions): Promise<string> => {
     try {
-      return await api.availability(languages(language));
+      return await api.availability(options);
     } catch {
       return 'unavailable';
     }
   };
-  return { en: await probe('en'), vi: await probe('vi'), reason: null };
+  return {
+    en: await probe(languages('en')),
+    vi: await probe(languages('vi')),
+    // feedback-vi sends English input and asks for Vietnamese output.
+    enToVi: await probe({
+      expectedInputs: [{ type: 'text', languages: ['en'] }],
+      expectedOutputs: [{ type: 'text', languages: ['vi'] }],
+    }),
+    reason: null,
+  };
+}
+async function chromeVersion(): Promise<string | null> {
+  // Chrome reduces the user-agent string to NNN.0.0.0; the full version needs client hints.
+  const data = (
+    navigator as unknown as {
+      userAgentData?: {
+        getHighEntropyValues(hints: string[]): Promise<{
+          fullVersionList?: { brand: string; version: string }[];
+        }>;
+      };
+    }
+  ).userAgentData;
+  try {
+    const list = (await data?.getHighEntropyValues(['fullVersionList']))?.fullVersionList;
+    const entry = list?.find((item) => item.brand === 'Google Chrome' || item.brand === 'Chromium');
+    if (entry) return entry.version;
+  } catch {}
+  return /(?:Chrome|Chromium)\/([\d.]+)/.exec(navigator.userAgent)?.[1] ?? null;
 }
 export async function deviceInfo(): Promise<{
   userAgent: string;
@@ -81,7 +114,7 @@ export async function deviceInfo(): Promise<{
   const gpu = await adapter();
   return {
     userAgent: navigator.userAgent,
-    chromeVersion: /(?:Chrome|Chromium)\/([\d.]+)/.exec(navigator.userAgent)?.[1] ?? null,
+    chromeVersion: await chromeVersion(),
     logicalCores: navigator.hardwareConcurrency,
     webgpu: {
       adapter: gpu

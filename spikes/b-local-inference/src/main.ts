@@ -95,7 +95,7 @@ async function runAll(options: { runs?: number } = {}): Promise<void> {
             runs: results.runs,
             probeReal: params.get('probe') === 'real',
             promptProbe: params.get('promptApi') === 'probe',
-            promptVi: prompt.vi,
+            promptVi: prompt.enToVi,
             progress: render,
             beforeDispose: async (arm) => {
               if (arm instanceof WebLLMArm) {
@@ -114,6 +114,8 @@ async function runAll(options: { runs?: number } = {}): Promise<void> {
     if (
       webllm &&
       transformers &&
+      webllm.checks.loads.status === 'passed' &&
+      transformers.checks.loads.status === 'passed' &&
       transformers.model.id === 'onnx-community/Qwen2.5-1.5B-Instruct'
     ) {
       webllm.sameCheckpointAs = 'transformers-js';

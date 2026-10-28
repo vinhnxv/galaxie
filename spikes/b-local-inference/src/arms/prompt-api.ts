@@ -36,7 +36,8 @@ export class PromptArm implements Arm {
     if (!api) throw new Error('api_missing');
     const availability = await promptAvailability();
     this.#options = languages('en');
-    if (availability.vi !== 'unavailable') this.#options.expectedOutputs[0]?.languages.push('vi');
+    if (availability.enToVi !== 'unavailable')
+      this.#options.expectedOutputs[0]?.languages.push('vi');
     const create = (): Promise<PromptSession> =>
       api.create({
         ...this.#options,
@@ -64,7 +65,11 @@ export class PromptArm implements Arm {
         try {
           const stream = session.promptStreaming(request.messages, {
             signal: request.signal,
-            ...(request.schema ? { responseConstraint: request.schema } : {}),
+            // Keep the schema out of the model input, so a schema-valid reply comes from the
+            // constraint and not from the model copying the schema's values.
+            ...(request.schema
+              ? { responseConstraint: request.schema, omitResponseConstraintInput: true }
+              : {}),
           });
           for await (const chunk of stream) {
             text += chunk;
