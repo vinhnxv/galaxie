@@ -22,7 +22,6 @@ export interface WebLLMCacheModule {
   hasModelInCache(modelId: string, appConfig: WebLLMAppConfig): Promise<boolean>;
 }
 
-/** Internal supplier seam: tests never load the engine bundle or download weights. */
 export async function probeWebLLMModel(
   options: CheckWebLLMModelOptions,
   loadModule: () => Promise<WebLLMCacheModule>,
