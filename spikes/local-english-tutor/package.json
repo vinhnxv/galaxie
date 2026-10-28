@@ -1,0 +1,31 @@
+{
+  "name": "galaxie-spike-local-english-tutor",
+  "private": true,
+  "description": "Throwaway prototype: an English sentence tutor that runs LangGraph.js and LFM3-1.7B-ONNX on WebGPU, entirely in the browser.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "vite"
+  },
+  "dependencies": {
+    "@huggingface/jinja": "0.5.10",
+    "@huggingface/tokenizers": "0.2.0",
+    "@langchain/core": "^1.2.20",
+    "@langchain/langgraph": "^1.5.1",
+    "cmu-pronouncing-dictionary": "^3.0.0",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4"
+  }
+}
