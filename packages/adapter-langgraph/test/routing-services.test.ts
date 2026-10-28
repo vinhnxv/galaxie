@@ -11,6 +11,7 @@ const model = new MockChatModel({});
 const graph = () => ({
   stream: async () => (async function* (): AsyncGenerator<unknown> {})(),
   transform: async function* () {},
+  getState: async () => ({ tasks: [] }),
 });
 test.each([
   [false, {}],
