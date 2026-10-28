@@ -3,9 +3,6 @@
 
 // Copied from spikes/local-english-tutor/src/engine/; throwaway
 
-// The pinned model files, and how the worker gets them: from Cache Storage when present, otherwise
-// from huggingface.co, and in both cases checked against the size and hash the Hub lists.
-
 const REPO = 'LiquidAI/LFM3-1.7B-ONNX';
 const REVISION = '189271ef61b9e7fdd4a8b5b0891bcacad37700f8';
 // The Cache Storage name of spikes/b0-webgpu-load. Both pages are served from

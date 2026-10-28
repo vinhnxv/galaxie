@@ -3,9 +3,6 @@
 
 // Copied from spikes/local-english-tutor/src/engine/; throwaway
 
-// Messages between the page and the inference worker. The worker owns the model; the page only
-// sends chat turns and receives text.
-
 /** A chat turn as the model's chat template expects it. */
 export interface ChatTurn {
   readonly role: 'system' | 'user' | 'assistant';

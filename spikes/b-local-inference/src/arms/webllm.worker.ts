@@ -9,7 +9,6 @@ import {
 
 const handler = new WebWorkerMLCEngineHandler();
 const generate = handler.engine.chatCompletion.bind(handler.engine);
-// Read the execution scope in the same worker that drives the model's iterator.
 handler.engine.chatCompletion = (async (request: ChatCompletionRequestBase) => {
   const response = await generate(request);
   const executedIn = self.constructor.name;

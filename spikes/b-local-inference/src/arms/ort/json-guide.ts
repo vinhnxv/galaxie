@@ -3,31 +3,22 @@
 
 // Copied from spikes/local-english-tutor/src/engine/; throwaway
 
-// Guided JSON generation: the provider-side schema enforcement that LangChain's ProviderStrategy
-// expects from a hosted model, done in this page's own decoding loop. The guide writes the reply's
-// JSON structure itself: braces, brackets, keys, commas and constant values. The model writes the
-// contents of each string, picks each enum value and decides where an array ends, within the
-// schema's bounds. Every reply is therefore well-formed JSON with every key the schema names.
-
 import type { JsonSchema } from './protocol.js';
 
 /** How many of the likeliest next tokens a choice considers. */
 export const CANDIDATES = 40;
 
-/** A string ends after this many model tokens, so one value cannot use up the whole reply. */
 const MAX_STRING_TOKENS = 160;
 
 /** The characters JSON allows after a backslash. \u is left out, so an escape is one character. */
 const ESCAPES = '"\\/bfnrt';
 
-/** The model's scores for the next token. */
 export interface NextToken {
   /** The likeliest tokens, best first. */
   readonly ranked: readonly number[];
   score(token: number): number;
 }
 
-/** The generation loop, as the guide drives it. */
 export interface Decoder {
   /** Appends text the guide writes. The model reads it before it scores the next token. */
   write(text: string): void;
@@ -76,14 +67,12 @@ class Guide {
     }
   }
 
-  /** Writes structure, and drops the part of the lookahead it covers, or all of it if they differ. */
   #write(text: string): void {
     const ahead = this.#lookahead.trimStart();
     this.#lookahead = ahead.startsWith(text) ? ahead.slice(text.length) : '';
     this.#decoder.write(text);
   }
 
-  // Every property is written, in the schema's order: the lesson's schemas have no optional keys.
   async #object(properties: { readonly [key: string]: JsonSchema }): Promise<void> {
     let separator = '{';
     for (const [key, value] of Object.entries(properties)) {
@@ -124,7 +113,6 @@ class Guide {
     this.#write(']');
   }
 
-  /** Whether the model would rather go on with `continuation` than close the array. */
   async #wantsItem(continuation: string): Promise<boolean> {
     const ahead = this.#lookahead.trimStart();
     if (ahead.startsWith(continuation) || ahead.startsWith(']')) {
@@ -142,8 +130,6 @@ class Guide {
     return false;
   }
 
-  // Options are told apart by their first token. Options that share it are told apart by order
-  // only; the lesson's one enum has none.
   async #option(options: readonly string[]): Promise<void> {
     this.#write('"');
     const next = await this.#decoder.next();
@@ -160,7 +146,6 @@ class Guide {
     if (best === undefined) {
       throw new Error('an enum needs at least one value');
     }
-    // The opening quote is already written.
     this.#write(JSON.stringify(best).slice(1));
   }
 
@@ -185,7 +170,6 @@ class Guide {
       }
       escaping = step.escaping;
     }
-    // A string cut off inside an escape gets a second backslash, so that the reply still parses.
     decoder.write(`${escaping && end.before === '' ? '\\' : ''}${end.before}"`);
     this.#lookahead = end.after;
   }
@@ -194,7 +178,6 @@ class Guide {
 const openingOf = (schema: JsonSchema): string =>
   schema.type === 'object' ? '{' : schema.type === 'array' ? '[' : '"';
 
-/** The text a string's closing token holds on each side of its quote, as in `."` or `"},{"`. */
 interface StringEnd {
   readonly before: string;
   readonly after: string;
@@ -202,11 +185,9 @@ interface StringEnd {
 
 type StringStep =
   | { readonly kind: 'token'; readonly token: number; readonly escaping: boolean }
-  /** A token whose quotation marks belong to the text, written with the marks escaped. */
   | { readonly kind: 'text'; readonly text: string; readonly escaping: boolean }
   | ({ readonly kind: 'end' } & StringEnd);
 
-/** The likeliest token that continues the string, or the end of the string. */
 function stringStep(
   ranked: readonly number[],
   decoder: Decoder,
@@ -240,7 +221,6 @@ function stringStep(
       return { kind: 'end', before, after };
     }
   }
-  // No candidate fits inside a JSON string.
   return { kind: 'end', before: '', after: '' };
 }
 
@@ -264,19 +244,11 @@ function closesString(text: string, after: string): boolean {
 }
 
 interface Scan {
-  /** Where the first unescaped quotation mark is, if there is one. */
   readonly quote: number | undefined;
-  /** The text with its unescaped quotation marks escaped, if all of it can go in a string. */
   readonly escaped: string | undefined;
-  /** Whether a backslash escape is open after the escaped text. */
   readonly escaping: boolean;
 }
 
-/**
- * How `text` goes on inside a JSON string, given whether a backslash escape is open. Undefined if
- * it cannot: the text before the first unescaped quotation mark must fit in a string, and the text
- * after it must too for the mark to be escaped rather than end the string.
- */
 function scanInString(text: string, escaping: boolean): Scan | undefined {
   let open = escaping;
   let escaped = '';

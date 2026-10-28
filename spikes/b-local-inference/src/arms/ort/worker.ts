@@ -336,7 +336,6 @@ function penalize(logits: Float32Array, seen: ReadonlySet<number>): void {
   }
 }
 
-// Greedy choice after the repetition penalty on every token seen so far, prompt included.
 function pickNext(logits: Float32Array, seen: ReadonlySet<number>): number {
   penalize(logits, seen);
   let best = 0;
@@ -348,7 +347,6 @@ function pickNext(logits: Float32Array, seen: ReadonlySet<number>): number {
   return best;
 }
 
-/** The `count` tokens with the highest scores, best first. */
 function topTokens(scores: Float32Array, count: number): number[] {
   const ids: number[] = [];
   const kept: number[] = [];
@@ -369,8 +367,6 @@ function topTokens(scores: Float32Array, count: number): number[] {
   return ids;
 }
 
-// Turns generated tokens into text deltas that never split a character or a word: text is released
-// up to the last space, or entirely at a newline, the way Transformers' TextStreamer does it.
 class TextEmitter {
   readonly #tokenizer: Tokenizer;
   readonly #emit: (delta: string) => void;
@@ -486,7 +482,6 @@ async function generate(
 
 const tokenTexts = new Map<number, string>();
 
-/** A token's text on its own, or '' for a special token. */
 function tokenText(model: Model, token: number): string {
   let text = tokenTexts.get(token);
   if (text === undefined) {
@@ -496,12 +491,8 @@ function tokenText(model: Model, token: number): string {
   return text;
 }
 
-/** Ends a guided generation early: on abort, or at the request's token limit. */
 class GenerationStopped extends Error {}
 
-// Guided generation (json-guide.ts) on the same forward pass as generate(). The model reads the text
-// the guide writes in one pass before its next choice, so a run of structure costs one pass, not one
-// pass per token.
 async function generateGuided(
   model: Model,
   id: number,
@@ -512,13 +503,11 @@ async function generateGuided(
   const promptIds = encodePrompt(model, request.messages);
   const encode = (text: string): number[] =>
     model.tokenizer.encode(text, { add_special_tokens: false }).ids;
-  // The repetition penalty leaves out tokens with a quote, so that it does not keep the model from
-  // ending a string.
-  const penalized = (token: number): boolean => {
+  const isNonQuoteTextToken = (token: number): boolean => {
     const text = tokenText(model, token);
     return text !== '' && !text.includes('"');
   };
-  const seen = new Set(promptIds.filter(penalized));
+  const seen = new Set(promptIds.filter(isNonQuoteTextToken));
   let reply = '';
   const emit = (delta: string): void => {
     reply += delta;
@@ -526,7 +515,6 @@ async function generateGuided(
   };
   const emitter = new TextEmitter(model.tokenizer, emit);
   const state: DecodeState = { past: emptyPast(model.session), pastLength: 0 };
-  // Tokens in the sequence that the model has not read yet, and text the guide wrote since then.
   let unread = [...promptIds];
   let written = '';
   let forcedTokens = 0;
@@ -549,7 +537,7 @@ async function generateGuided(
     accept(token) {
       encodeWritten();
       unread.push(token);
-      if (penalized(token)) {
+      if (isNonQuoteTextToken(token)) {
         seen.add(token);
       }
       chosenTokens++;
@@ -592,7 +580,7 @@ async function generateGuided(
     disposeGpuTensors(state.past);
   }
   emitter.flush();
-  encodeWritten(); // counts the closing text, which the model never needs to read
+  encodeWritten();
   const newTokens = forcedTokens + chosenTokens;
   const decodeSeconds = (performance.now() - firstTokenAt) / 1000;
   return {
