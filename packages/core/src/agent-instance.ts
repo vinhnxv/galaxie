@@ -67,9 +67,14 @@ interface SegmentRecord {
 }
 
 function containsText(value: unknown): boolean {
-  if (typeof value === 'string') return value.length > 0;
-  if (Array.isArray(value)) return value.some(containsText);
-  return typeof value === 'object' && value !== null && Object.values(value).some(containsText);
+  const pending = [value];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (typeof current === 'string' && current.length > 0) return true;
+    if (typeof current === 'object' && current !== null)
+      for (const child of Object.values(current)) pending.push(child);
+  }
+  return false;
 }
 
 function terminal(run: RunRecord): boolean {

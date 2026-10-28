@@ -10,6 +10,8 @@ import {
   type DiagnosticEvent,
   defineAgentDefinition,
   galaxieField,
+  type InteractionId,
+  type ViewRevision,
 } from '@galaxie/core';
 import { MockChatModel } from '@galaxie/models/mock';
 import type { BaseChatModel, LangSmithParams } from '@langchain/core/language_models/chat_models';
@@ -23,7 +25,12 @@ import {
 } from '@opentelemetry/sdk-trace';
 import { expect, test } from 'vitest';
 import { z } from 'zod';
-import { binding, collect } from '../../packages/core/test/fake-executor.js';
+import {
+  binding,
+  collect,
+  FakeExecutor,
+  definition as fakeDefinition,
+} from '../../packages/core/test/fake-executor.js';
 import { assertSpanTree, serializeSpans } from '../../packages/core/test/span-tree.js';
 import { cases } from './cases/index.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
@@ -762,3 +769,79 @@ test.each([false, true])(
     );
   },
 );
+
+test('duplicate browser-only destinations still exclude trace text', async () => {
+  const { spans } = await textScenario({
+    label: 'app',
+    destination: 'in-browser',
+    policy: { app: { allow: ['in-browser', 'in-browser'] } },
+  });
+  expectNoText(spans);
+});
+
+test('deep accepted JSON submission stays within budget and suppresses resumed trace text', async () => {
+  let payload: unknown = 'private submission text';
+  for (let depth = 0; depth < 4000; depth++) payload = { nested: payload };
+  const interaction = {
+    interactionId: 'deep-submit' as InteractionId,
+    surfaceId: 'main',
+    viewRevision: 'r1' as ViewRevision,
+    component: 'tests.Question/v1' as const,
+    props: {},
+  };
+  const executor = new FakeExecutor([
+    [{ type: 'interaction', interaction }],
+    async function* (request) {
+      request.trace
+        .start({
+          kind: 'model',
+          input: [{ role: 'user', parts: [{ type: 'text', content: 'resumed prompt' }] }],
+        })
+        .end({
+          status: 'ok',
+          output: [{ role: 'assistant', parts: [{ type: 'text', content: 'resumed answer' }] }],
+        });
+      yield { type: 'output', output: null };
+    },
+  ]);
+  Object.assign(executor.features, { resume: true });
+  executor.agent.pending = async () => interaction;
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const runtime = createRuntime({
+    appId: 'deep-submission',
+    executors: [executor],
+    tracerProvider: provider,
+    developmentTraceText: { destination: 'third-party' },
+  });
+  const instance = await runtime.create(
+    { ...fakeDefinition, input: z.string().meta(galaxieField({ label: 'public' })) },
+    { principalScope: 'fixture', agent: {} },
+  );
+  try {
+    await instance.prepare();
+    const { runId } = await instance.start('public input');
+    for await (const event of instance.events(runId)) if (event.type === 'interaction') break;
+    expect(
+      await instance.dispatch({
+        ...interaction,
+        instanceId: instance.instanceId,
+        runId,
+        action: 'submit',
+        payload,
+      }),
+    ).toMatchObject({ status: 'accepted' });
+    await collect(instance.events(runId));
+    expect(instance.getSnapshot().run?.status).toBe('succeeded');
+    await runtime.dispose();
+    await provider.forceFlush();
+    const spans = exporter.getFinishedSpans();
+    expect(
+      spans.filter((span) => span.attributes['gen_ai.operation.name'] === 'chat'),
+    ).toHaveLength(1);
+    expectNoText(spans);
+  } finally {
+    await runtime.dispose();
+    await provider.shutdown();
+  }
+});

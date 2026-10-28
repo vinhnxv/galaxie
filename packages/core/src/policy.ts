@@ -96,6 +96,8 @@ export function inBrowserOnly(
   labels: Iterable<DataLabel>,
 ): boolean {
   return [...labels].some(
-    (label) => policy[label].allow.length === 1 && policy[label].allow[0] === 'in-browser',
+    (label) =>
+      policy[label].allow.length > 0 &&
+      policy[label].allow.every((destination) => destination === 'in-browser'),
   );
 }
