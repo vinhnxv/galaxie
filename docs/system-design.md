@@ -92,7 +92,7 @@ flowchart TD
 Proposed rules; M1 confirms them:
 
 1. `core` has no `dependencies`; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Only the OpenTelemetry API is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries.
-2. The `models` package imports `@langchain/core/*` subpaths and relative files, plus the exact optional peer `@mlc-ai/web-llm` 0.2.86 only in its WebLLM engine and worker files; it has no `core` dependency. WebLLM types are local structural types because its declaration re-exports do not resolve under NodeNext. Other integration packages depend on `core` and on their own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
+2. The `models` package imports `@langchain/core/*` subpaths and relative files, plus the exact optional peer `@mlc-ai/web-llm` 0.2.86 only in its WebLLM engine, cache probe and worker files; it has no `core` dependency. WebLLM types are local structural types because its declaration re-exports do not resolve under NodeNext. Other integration packages depend on `core` and on their own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
 3. Agent packages depend on `core` and their engine, never on a host package. From M4 the ESLint plugin flags direct `fetch`, storage, DOM and `eval` use (brief §9.7 C).
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
 5. Fewer packages are fine while these boundaries hold (brief §15).
@@ -321,20 +321,39 @@ sequenceDiagram
 
 ### 8.4. A model call
 
-**Implemented in M1 slice 3, with mock providers only:** the host supplies descriptors and ordered per-role routes in `CreateOptions.models`. Selection uses required features, primary language subtags, destination allowlists, sticky run labels and consent. Every destination other than `in-browser` needs one instance-lifetime consent decision per role and class; concurrent callers share the pending decision. Refusal or a label exclusion skips that provider. No eligible provider gives `denied` for policy exclusions, or `unavailable` for unmet requirements.
+**Implemented through the M2 first-run slice, verified with mock providers and fake host hooks:** the host supplies descriptors and ordered per-role routes in `CreateOptions.models`. Selection filters required features, primary language subtags, destination allowlists and sticky run labels before probing readiness. Every destination other than `in-browser` needs one instance-lifetime consent decision per role and class; concurrent callers share the pending decision. Policy exclusions or a download refusal give `denied` when nothing can be selected; unmet requirements or unavailable providers give `unavailable`.
 
 ```mermaid
 flowchart TD
-    Call["host.langchain.chatModel(role) call"] --> Pick["First provider matching requirements, allowed classes and current labels"]
-    Pick --> Consent["Shared consent for non-browser destinations"]
-    Consent --> Reserve["Reserve tokens and cost before dispatch"]
-    Reserve --> Credential["Obtain a per-call credential when required"]
-    Credential --> Check["Recheck active run and labels"]
-    Check --> Notice["Publish selected provider and destination in snapshot.routes"]
-    Notice --> Send["Invoke the provider and settle actual usage or the reservation"]
+    Call["host.langchain.chatModel(role) call"] --> Walk["Walk providers in host order; filter requirements and labels"]
+    Walk --> Probe["Host availability: available, downloadable or unavailable"]
+    Probe -->|Unavailable| Walk
+    Probe -->|Available browser, or non-browser before any download| Consent["Shared class consent for non-browser destinations"]
+    Probe -->|Downloadable browser, or later non-browser| Defer["Defer in original order; continue walk"]
+    Defer --> Walk
+    Walk -->|Walk exhausted| Deferred["Try deferred providers in order"]
+    Deferred -->|Downloadable| Download["Shared host download decision; optional persist after acceptance"]
+    Download -->|Ready| Reprobe["Re-probe; require available"]
+    Reprobe --> Consent
+    Deferred -->|Already available| Consent
+    Consent --> Labels["Recheck active run and labels"]
+    Labels --> Reserve["Reserve tokens and cost, then obtain per-call credential"]
+    Reserve --> Check["Recheck active run and labels"]
+    Check --> Notice["Publish route; changedFrom when the class changes"]
+    Notice --> Send["Invoke provider and settle actual usage or the reservation"]
 ```
 
+The optional `availability({ role, providerId, signal })` hook runs on every call, at most once per considered provider plus one re-probe after an accepted download. Without it, all providers are available, preserving M1 host order. Valid results are `{ status: 'available' }`, `{ status: 'unavailable' }` or `{ status: 'downloadable', bytes?, siteStorage }`; `bytes` must be a non-negative safe integer. Downloadable answers qualify only for `in-browser` destinations. The router tries available browser providers immediately. Once it encounters a downloadable provider, it defers that provider and every later non-browser provider, then tries the deferred list in original order. With `[builtin, webllm, remote]`, this selects a ready browser model or cached WebLLM before requesting a download, and offers the download before remote consent. A host listing remote first still tries remote first.
+
+The optional `download({ role, providerId, bytes?, persist?, signal })` hook owns both the decision and the download; only `true` followed by an `available` re-probe permits selection. Missing hooks and refusals are remembered per provider for the instance lifetime. Concurrent calls share the decision, whose signal aborts only when no caller still waits. Invalid answers and failed hooks count as unavailable or refused and report `model_failed`; raw hook errors go only to the host-only `DiagnosticEvent.error`, never into public errors, events, snapshots or spans. Class-consent error behavior stays unchanged.
+
+For `siteStorage: true`, the host may call `request.persist()` after acceptance and before downloading. It shares one `globalThis.navigator?.storage?.persist()` result per instance and resolves `false` for a missing or rejecting API, or cancellation of the waiting decision. Browser-managed downloads (`siteStorage: false`) carry no `persist`. Waiting counts toward the run's `wallClockMs`; hosts expecting long downloads should raise that budget. A download already started should continue when the decision signal aborts, while the hook resolves `false`; a later call can discover the completed download by probing again.
+
+`snapshot.routes[role]` publishes `{ providerId, destination }` and adds `changedFrom` only when the instance's previous selection for that role used a different class, including across runs. A first selection or a provider change within the same class has no `changedFrom`. The host uses this notice to show the destination change; it is not a new run event.
+
 `RunRequest.models` is a framework-neutral port that receives no messages or LangChain objects. The separate opt-in trace channel offers plain JSON messages to core (§6). The adapter returns a routing `BaseChatModel` for each declared role, preserving one LangChain chat-model run, provider metadata and streamed tokens. `invoke`, `batch`, `stream` and `streamEvents` all route, including calls without forwarded config. Calls without config still have no implicit chat span. Multi-list `generate` rejects `unsupported`; `batch` reserves each call separately. Credentialed providers use a per-call factory; other providers are model instances keyed by provider ID.
+
+`withStructuredOutput(schema, { method?: 'jsonSchema', includeRaw? })` accepts Zod, Standard Schema and JSON Schema objects. It converts the schema, binds the provider's `jsonSchema` decoding option and begins with `requires: ['structured-output']`; `ModelPort.begin(role, { signal, requires })` combines this with the role's requirements. Unknown feature names reject with `invalid`; other methods reject with `unsupported`. The adapter validates JSON text and the converted JSON Schema, then uses LangChain's content parser for Zod or Standard Schema validation. Invalid replies reject with the fixed core `invalid` error, without reply or validation text or a cause. `includeRaw` returns `{ raw, parsed }`, with `parsed: null` on validation failure. Parsing follows normal lease settlement; repair attempts remain deferred. Hosts may now declare `structured-output` for WebLLM and Built-in AI.
 
 Routing, labels, consent and model budgets apply only to calls through `host.langchain.chatModel(role)`. Trusted agent code that holds a model instance can bypass these controls (ADR-0002). A class names the final recipient, including when a host proxy forwards a call (ADR-0006).
 
@@ -342,19 +361,55 @@ The router's `maxTokens` is a per-call reservation. The WebLLM provider separate
 
 `getCredential({ role, providerId })` hands credentials to page code per call and never persists them in galaxie. An XSS or malicious dependency on the origin can read them; hosts should supply short-lived, host-proxy-scoped tokens rather than long-lived provider keys (ADR-0012). Credential callback failures emit a fixed error and a diagnostic without the raw error. By default, chat spans record only allowlisted metadata, including `galaxie.destination.class` and `galaxie.model.provider`; opted-in message text follows §6.
 
-`@galaxie/models/mock` remains a scripted provider with word streaming, optional usage, cancellation, scripted errors and call counts, without network requests. `@galaxie/models/webllm` adds `loadWebLLMEngine`, `WebLLMChatModel` and a pinned default Qwen2.5-1.5B record. A host bundles its own inference worker file that imports and calls `startWebLLMWorker()` from `@galaxie/models/webllm/worker`. The page creates that worker with `new Worker(new URL('./inference.worker.ts', import.meta.url), { type: 'module' })`, passes it to `loadWebLLMEngine({ worker })`, and registers `new WebLLMChatModel(handle)` under `LangGraphServices.chatModels`. Its routing descriptor uses destination `in-browser`, zero pricing and features `['streaming', 'cancellation']`. Hosts should not declare `structured-output` until routed structured output ships.
+`@galaxie/models/mock` remains a scripted provider with word streaming, optional usage, cancellation, scripted errors and call counts, without network requests. `@galaxie/models/webllm` adds `loadWebLLMEngine`, `WebLLMChatModel` and a pinned default Qwen2.5-1.5B record. A host bundles its own inference worker file that imports and calls `startWebLLMWorker()` from `@galaxie/models/webllm/worker`. The page creates that worker with `new Worker(new URL('./inference.worker.ts', import.meta.url), { type: 'module' })`, passes it to `loadWebLLMEngine({ worker })`, and registers `new WebLLMChatModel(handle)` under `LangGraphServices.chatModels`. Its routing descriptor uses destination `in-browser`, zero pricing and features `['streaming', 'cancellation', 'structured-output']`.
 
 One handle and worker serve each runtime. A shared FIFO queue runs one request at a time, resetting the engine conversation before sending the full history. Cancellation interrupts generation and returns the stream before releasing the queue. Calls report final-only usage and accept `jsonSchema`; provider-level `withStructuredOutput` converts Zod, Standard Schema and JSON Schema values, binds constrained decoding, and sanitizes parser failures. The engine bundle loads lazily after record validation and the page's WebGPU precheck. Progress exposes phase, fraction and elapsed seconds without engine text. Typed `unavailable` reasons distinguish missing WebGPU, adapter or shader-f16, adapter limits, device loss, integrity failure, worker failure, load failure and disposal. The device report is the page's view of the high-performance adapter's vendor and architecture, not a measurement of the worker's adapter.
 
 The default record pins weights and the model library by commit URL, enforces SRI for the chat config, library and tokenizer, and exposes 868,547,584 weight bytes. SRI does not cover weight shards; host records must name an immutable 40-hex revision under `/resolve/<revision>/`, which validation enforces. Only the inference worker needs download hosts `https://huggingface.co`, `https://*.hf.co` and `https://raw.githubusercontent.com` in `connect-src`, and `'wasm-unsafe-eval'` in `script-src`. Hosts that can set per-path headers should send these directives on the worker script's response and leave the page CSP unchanged.
 
-Loading, streaming, cancellation, schema decoding and the device report have fake-engine coverage only, on Node and Chromium. The first real-device run belongs to the M2 exit slice. Abort latency during long prefill, the page/worker adapter match and the cost of foregoing KV-cache reuse have not been measured. After worker failure or device loss, the role keeps its selected provider and every later call fails `unavailable`; there is no fallback to another listed provider in this slice. Recovery requires disposing the handle and creating a new handle, model and runtime.
+Loading, streaming, cancellation, schema decoding and the device report have fake-engine coverage only, on Node and Chromium. The first real-device run belongs to the M2 exit slice. Abort latency during long prefill, the page/worker adapter match and the cost of foregoing KV-cache reuse have not been measured. After worker failure or device loss, the role keeps its selected provider and every later call fails `unavailable`; the router can skip unavailable providers before dispatch when the host reports their state, but does not retry a failed dispatched call on another provider. Recovery requires disposing the handle and creating a new handle, model and runtime.
 
-`@galaxie/models/builtin-ai` exports `BuiltInAIChatModel({ inputLanguages, outputLanguages })`, `checkBuiltInAI` and `prepareBuiltInAI`. The Prompt API is page-only; a worker without `LanguageModel` reports `unavailable` with reason `no_api`. Register the model under `LangGraphServices.chatModels` with destination `in-browser`, zero pricing, features `['streaming', 'cancellation']` and the role's `languages`. Do not declare `structured-output` for routing yet. Each call checks the configured input and output languages, requires availability `available`, opens a fresh session with the full history, streams the final user turn and destroys the session on success, failure, cancellation or early stream exit. Calls never download, even with transient activation. Hosts check availability with `checkBuiltInAI({ inputLanguages, outputLanguages })` and call `prepareBuiltInAI({ inputLanguages, outputLanguages, onProgress, signal })` from an intentional download click. Preparation requires activation for `downloadable` and `downloading`, reports content-free download fractions and destroys its preparation session. Typed `unavailable` reasons are `no_api`, `unsupported_languages`, `download_required`, `activation_required`, `download_failed` and `not_allowed`; invalid input or quota/schema limits give `invalid`, and unknown browser failures have a fixed provider error without browser text or a cause.
+`@galaxie/models/builtin-ai` exports `BuiltInAIChatModel({ inputLanguages, outputLanguages })`, `checkBuiltInAI` and `prepareBuiltInAI`. The Prompt API is page-only; a worker without `LanguageModel` reports `unavailable` with reason `no_api`. Register the model under `LangGraphServices.chatModels` with destination `in-browser`, zero pricing, features `['streaming', 'cancellation', 'structured-output']` and the role's `languages`. Each call checks the configured input and output languages, requires availability `available`, opens a fresh session with the full history, streams the final user turn and destroys the session on success, failure, cancellation or early stream exit. Calls never download, even with transient activation. Hosts check availability with `checkBuiltInAI({ inputLanguages, outputLanguages })` and call `prepareBuiltInAI({ inputLanguages, outputLanguages, onProgress, signal })` from an intentional download click. Preparation requires activation for `downloadable` and `downloading`, reports content-free download fractions and destroys its preparation session. Typed `unavailable` reasons are `no_api`, `unsupported_languages`, `download_required`, `activation_required`, `download_failed` and `not_allowed`; invalid input or quota/schema limits give `invalid`, and unknown browser failures have a fixed provider error without browser text or a cause.
 
-Provider-level `jsonSchema` and `withStructuredOutput` use `responseConstraint` with `omitResponseConstraintInput: true`, so the schema is omitted from the prompt input. Built-in AI reports no per-call usage; the router charges its token reservation. `maxTokens` and temperature have no effect on this provider. The browser-managed model identity cannot be pinned, and replies vary. All verification in this slice uses a fake `LanguageModel` global, saved and restored around tests; no real Built-in AI ran. There is no fallback after `unavailable` until the first-run slice. The real-device run, stable/beta smoke tests and session-creation cost measurements belong to the M2 exit slice.
+Provider-level `jsonSchema` and `withStructuredOutput` use `responseConstraint` with `omitResponseConstraintInput: true`, so the schema is omitted from the prompt input. Built-in AI reports no per-call usage; the router charges its token reservation. `maxTokens` and temperature have no effect on this provider. The browser-managed model identity cannot be pinned, and replies vary. All verification in this slice uses a fake `LanguageModel` global, saved and restored around tests; no real Built-in AI ran. The host availability hook can skip it before selection; a failed dispatched call is not retried on another provider. The real-device run, stable/beta smoke tests and session-creation cost measurements belong to the M2 exit slice.
 
-Routed structured output, availability probing inside the router, first-run provider order, size and download-consent UI, `persist()`, per-call provider caps from the router, remote providers and the real-device run remain deferred. A host must arrange download consent before calling either provider's loader or preparation function.
+A Built-in AI host can wire the hooks as follows. `showDownloadConsent` and `showProgress` are host UI functions: the dialog invokes `prepare` directly from the acceptance click, resolves `true` only after preparation succeeds and resolves `false` on decline, failure or when no caller waits. A started preparation continues independently of the decision signal.
+
+```ts
+import type { ModelRouting } from '@galaxie/core';
+import { BuiltInAIChatModel, checkBuiltInAI, prepareBuiltInAI } from '@galaxie/models/builtin-ai';
+
+const languages = { inputLanguages: ['en'], outputLanguages: ['en'] };
+const chatModels = { builtin: new BuiltInAIChatModel(languages) };
+const models: ModelRouting = {
+  providers: {
+    builtin: {
+      destination: 'in-browser', modality: 'text',
+      features: ['streaming', 'cancellation', 'structured-output'], languages: ['en'],
+      pricing: { inputPerToken: 0, outputPerToken: 0 },
+    },
+  },
+  roles: { assistant: { providers: ['builtin'], allow: ['in-browser'], maxTokens: 1024 } },
+  async availability() {
+    const status = await checkBuiltInAI(languages);
+    return status === 'available' || status === 'unavailable'
+      ? { status }
+      : { status: 'downloadable', siteStorage: false };
+  },
+  download: ({ signal }) => showDownloadConsent({
+    signal,
+    sizeText: 'The browser manages this download; its size is not reported.',
+    prepare: () => prepareBuiltInAI({ ...languages, onProgress: showProgress }),
+  }),
+};
+// Pass models and services: { chatModels } to runtime.create with an assistant role.
+```
+
+Both `downloading` and `downloadable` from `checkBuiltInAI` map to downloadable here. The Prompt API exposes no byte size, so the request has no `bytes`. Hosts must explicitly tell users that the browser manages the download and its size is not reported. This is a known gap against ADR-0006 decision 5's requirement to show the size, not a measured estimate.
+
+For WebLLM, the host's availability hook can return `checkWebLLMModel({ model })` from `@galaxie/models/webllm`. It validates the same record used by the loader, checks for WebGPU, then lazily calls WebLLM's `hasModelInCache(modelId, appConfig)` without downloading. Cached weights give `available`; uncached weights give `downloadable` with the record's `weightBytes` and `siteStorage: true`; import or cache failures give `unavailable`. Invalid records reject with `invalid`. `available` means cached weights, not a loaded engine. Routing a not-yet-loaded provider requires lazy chat-model construction, deferred to the host example slice. Until then a WebLLM provider must be loaded before prepare, with consent arranged by the host before loading. For site-storage downloads the host calls `request.persist?.()` after acceptance, before starting its loader; persistence refusal does not itself prevent downloading.
+
+Repair attempts, a consent UI component, lazy WebLLM chat-model construction, remote providers, per-call provider caps from the router and real-device verification remain deferred. All tests use mock providers and fake hooks; none downloads weights, loads the real WebLLM bundle or calls a real `LanguageModel` global.
 
 ### 8.5. Tab ownership and takeover
 
