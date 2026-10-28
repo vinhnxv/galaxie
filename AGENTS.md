@@ -4,15 +4,26 @@ Guidance for coding agents (Claude Code, Codex and others) working in this repos
 
 ## Project status
 
-galaxie is in the design phase. There is no package code yet. Milestone M0 (feasibility spikes) comes first; spike code is throwaway and never becomes package code (brief §16.2).
+galaxie is in the design phase. `packages/core` holds draft contract types and has no runtime behavior; the runtime is M1 work. Milestone M0 (feasibility spikes) comes next. Spike code is throwaway: keep it out of `packages/` and never promote it to package code (brief §16.2).
 
 ## Read first
 
 1. `docs/galaxie-project-brief.md`: the source of truth for scope, architecture, security and the roadmap. Start with §0.
 2. `docs/adr/`: one file per decision. Follow Accepted ADRs. Proposed ADRs are working defaults that a spike or milestone must confirm.
-3. `docs/framework-overview.md`: role, audiences and the roadmap at a glance.
+3. `docs/system-design.md`: components, package boundaries, contracts and runtime flows. Read it before you add a package or change a contract.
+4. `docs/framework-overview.md`: role, audiences and the roadmap at a glance.
 
 Handoff prompts: brief §21 (implementation) and §22 (review).
+
+## Commands
+
+Node.js 24 and pnpm 11 (through Corepack).
+
+- `pnpm install`
+- `pnpm check`: everything CI runs. Run it before you report work as done.
+- `pnpm format`: apply Biome formatting and safe fixes.
+
+The compiler settings are strict (system design §10): relative imports end in `.js`, type-only imports use `import type`, exported functions declare their return types, and syntax that TypeScript cannot erase, such as `enum`, is not allowed.
 
 ## Rules
 
@@ -35,3 +46,10 @@ Handoff prompts: brief §21 (implementation) and §22 (review).
 - Git commands run inside `internal/` act on that repository, not on this one.
 - Never copy its content into tracked files, commit messages, pull requests or issues.
 - Never remove `/internal/` from `.gitignore` or force-add files from it.
+
+Two local tools are git-ignored the same way. They exist only where the maintainer set them up:
+
+- `.codegraph/`: the CodeGraph index of this repository. When it is present, use it to locate and read code. Run `codegraph sync` if it looks stale.
+- `.beads/`: the Beads (`bd`) backlog, kept out of this repository (stealth mode). Use it for work that spans sessions. It is tracker content, so write it in English.
+  - Never copy it into tracked files, and never let `bd` use this repository's remote as its Dolt remote.
+  - Never change its Dolt remote, or run `bd dolt push` or `bd sync`, without the maintainer's approval.

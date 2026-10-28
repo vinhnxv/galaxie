@@ -10,7 +10,7 @@ galaxie lets a web application host AI agents as first-class parts of the app. E
 - **Recovery:** a reload, a second tab or a double click does not repeat a side effect or lose a pending answer.
 - **A mandatory security baseline** on every path the SDK controls.
 
-> **Status: design phase.** There is no package to install yet. This repository holds the project brief and the architecture decisions that the first milestones will implement.
+> **Status: design phase.** There is no package to install yet. This repository holds the project brief, the architecture decisions, the system design, and a toolchain skeleton whose only package, `packages/core`, contains draft contract types.
 
 ## Intended use and disclaimer
 
@@ -34,6 +34,7 @@ No test suite or review proves that software is secure. The known limits are lis
 - [Project brief](docs/galaxie-project-brief.md): scope, architecture, security model, roadmap and acceptance tests.
 - [Framework overview](docs/framework-overview.md): role, audiences and the roadmap at a glance.
 - [Architecture decision records](docs/adr/README.md): one file per decision.
+- [System design](docs/system-design.md): components, packages, contracts and runtime flows.
 
 ## Roadmap
 
@@ -46,6 +47,10 @@ No test suite or review proves that software is secure. The known limits are lis
 | M4 | Remote integration, reuse and the MVP release gate |
 
 Details are in [brief §16](docs/galaxie-project-brief.md#16-roadmap).
+
+## Development
+
+You need Node.js 24 and pnpm 11 (through Corepack). Run `pnpm install`, then `pnpm check`, which runs every check CI runs. The toolchain is described in [system design §10](docs/system-design.md#10-toolchain).
 
 ## License
 

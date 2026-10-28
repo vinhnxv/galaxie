@@ -1,0 +1,28 @@
+{
+  "name": "galaxie",
+  "private": true,
+  "description": "A browser-first agent runtime SDK for web apps.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p packages/core/tsconfig.build.json",
+    "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run build",
+    "check:license": "node scripts/check-license.ts",
+    "format": "biome check --write .",
+    "lint": "biome check .",
+    "test": "vitest run --dir packages",
+    "typecheck": "tsc -p packages/core && tsc -p scripts",
+    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p scripts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "24.19.2",
+    "@typescript/typescript6": "6.0.2",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}
