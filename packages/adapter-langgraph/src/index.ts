@@ -9,3 +9,4 @@ export type {
   LangGraphHost,
   LangGraphServices,
 } from './host.js';
+export { requestInteraction } from './interaction.js';
