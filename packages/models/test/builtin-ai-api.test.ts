@@ -143,6 +143,22 @@ describe('Built-in AI availability and preparation', () => {
     expect(JSON.stringify(error)).not.toContain('private prompt sentence');
   });
 
+  it.each([
+    ['NotSupportedError', 'unsupported_languages'],
+    ['NotAllowedError', 'not_allowed'],
+    ['UnknownError', 'download_failed'],
+  ] as const)('maps a %s from preparation to %s', async (name, reason) => {
+    const fake = new FakeLanguageModel({
+      create: async () => {
+        throw new DOMException('private prompt sentence', name);
+      },
+    });
+    restore = installLanguageModel(fake);
+    const error = await prepareBuiltInAI(languages).catch((error: unknown) => error);
+    expect(error).toMatchObject({ code: 'unavailable', reason });
+    expect(JSON.stringify(error)).not.toContain('private prompt sentence');
+  });
+
   it('preserves abort reasons before and during create', async () => {
     const entered = Promise.withResolvers<void>();
     const blocked = Promise.withResolvers<void>();

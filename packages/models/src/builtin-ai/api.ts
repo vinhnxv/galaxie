@@ -3,6 +3,7 @@
 
 import { ModelError } from '../errors.js';
 import type { TextMessage } from '../messages.js';
+import { classifyBuiltInAIError } from './classify.js';
 
 export type BuiltInAIAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable';
 
@@ -124,8 +125,10 @@ export async function prepareBuiltInAI(options: PrepareBuiltInAIOptions): Promis
       },
     });
     options.signal?.throwIfAborted();
-  } catch {
+  } catch (error) {
     if (options.signal?.aborted) throw options.signal.reason;
+    const failure = classifyBuiltInAIError(error, 'create');
+    if (failure?.code === 'unavailable') throw new ModelError('unavailable', failure.reason);
     throw new ModelError('unavailable', 'download_failed');
   } finally {
     monitoring = false;
