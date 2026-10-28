@@ -75,7 +75,24 @@ export {
   type RunStatus,
   type Transitions,
 } from './lifecycle.js';
-export type { ModelFeature, ModelPolicy, ModelRoleName, ModelRoleRequirements } from './models.js';
+export type {
+  ModelCall,
+  ModelConsentRequest,
+  ModelCredentialRequest,
+  ModelDescriptor,
+  ModelFeature,
+  ModelPolicy,
+  ModelPort,
+  ModelPreparation,
+  ModelPricing,
+  ModelProviderId,
+  ModelRoleName,
+  ModelRoleRequirements,
+  ModelRoute,
+  ModelRouting,
+  ModelUsage,
+  SelectedModelRoute,
+} from './models.js';
 export type {
   ArgumentShape,
   BudgetLimits,

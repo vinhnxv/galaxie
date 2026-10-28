@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { DestinationAllowlist, DestinationPreset } from './policy.js';
+import type { DestinationAllowlist, DestinationClass, DestinationPreset } from './policy.js';
 
 /** A model role an agent declares, for example `quiz.generate` (brief §10.3). */
 export type ModelRoleName = string;
@@ -22,3 +22,111 @@ export interface ModelRoleRequirements {
 
 /** The destination classes each model role may use (ADR-0006). Data labels can only narrow them (ADR-0014). */
 export type ModelPolicy = { readonly [role: ModelRoleName]: DestinationAllowlist };
+
+/** Host-chosen identifier for a provider/model pair (ADR-0006). */
+export type ModelProviderId = string;
+
+/** Per-token prices in the host's cost unit (brief §9.4, ADR-0006). */
+export type ModelPricing =
+  | 'unknown'
+  | { readonly inputPerToken: number; readonly outputPerToken: number };
+
+/** Host claims about a provider, validated before preparing an agent (ADR-0006). */
+export interface ModelDescriptor {
+  /** Final recipient, including when a proxy forwards the call (ADR-0006). */
+  readonly destination: DestinationClass;
+  /** Text only in M1 (brief §10.5). */
+  readonly modality: 'text';
+  /** Features supported by this provider (brief §10.5). */
+  readonly features: readonly ModelFeature[];
+  /** Supported BCP 47 language tags (brief §10.5). */
+  readonly languages?: readonly string[];
+  /** Prices used for reservations and settlement (ADR-0006). */
+  readonly pricing: ModelPricing;
+  /** Requires a per-call host credential (ADR-0006). */
+  readonly credential?: boolean;
+}
+
+/** Ordered host policy for one declared role (ADR-0006). */
+export interface ModelRoute extends DestinationAllowlist {
+  /** Only these providers may serve the role (ADR-0006). */
+  readonly providers: readonly ModelProviderId[];
+  /** Per-call reservation, not a provider token cap (brief §9.4). */
+  readonly maxTokens: number;
+  /** Reservation required only when a listed provider has unknown pricing (ADR-0006). */
+  readonly maxCost?: number;
+}
+
+/** Public notice of the provider and final destination used by a call (ADR-0006). */
+export interface SelectedModelRoute {
+  /** Host's provider identifier (ADR-0006). */
+  readonly providerId: ModelProviderId;
+  /** Final recipient of the call (ADR-0006). */
+  readonly destination: DestinationClass;
+}
+
+/** One instance-wide consent decision for a role and destination class (ADR-0006). */
+export interface ModelConsentRequest {
+  /** Role asking to send data (ADR-0006). */
+  readonly role: ModelRoleName;
+  /** Class whose providers this answer covers (ADR-0006). */
+  readonly destination: DestinationClass;
+  /** All providers in that class, in route order (ADR-0006). */
+  readonly providers: readonly ModelProviderId[];
+  /** Most recently dispatched route for the role (ADR-0006). */
+  readonly previous?: SelectedModelRoute;
+  /** Aborted when no call still awaits this decision (brief §8.3). */
+  readonly signal: AbortSignal;
+}
+
+/** A credential request carries no messages or configuration (ADR-0006). */
+export interface ModelCredentialRequest {
+  /** Role making the call (ADR-0006). */
+  readonly role: ModelRoleName;
+  /** Provider receiving the credential (ADR-0006). */
+  readonly providerId: ModelProviderId;
+}
+
+/** Per-instance host routing configuration (ADR-0006). */
+export interface ModelRouting {
+  /** Descriptors keyed by host provider ID (ADR-0006). */
+  readonly providers: Readonly<Record<ModelProviderId, ModelDescriptor>>;
+  /** Policy for every role in the definition (ADR-0006). */
+  readonly roles: Readonly<Record<ModelRoleName, ModelRoute>>;
+  /** Approval before any non-browser destination is used (ADR-0006). */
+  readonly consent?: (request: ModelConsentRequest) => boolean | Promise<boolean>;
+  /** Per-call credential; never persisted by galaxie (ADR-0006). */
+  readonly getCredential?: (request: ModelCredentialRequest) => string | Promise<string>;
+}
+
+/** Provider-reported usage; the router validates both counts (brief §9.4). */
+export interface ModelUsage {
+  /** Input tokens charged after dispatch (brief §9.4). */
+  readonly inputTokens: number;
+  /** Output tokens charged after dispatch (brief §9.4). */
+  readonly outputTokens: number;
+}
+
+/** One reserved call; only this lease carries the credential (ADR-0006). */
+export interface ModelCall extends SelectedModelRoute {
+  /** Ephemeral value for this call's provider factory (ADR-0006). */
+  readonly credential?: string;
+  /** Settles once with valid usage, or the reservation when absent (ADR-0006). */
+  end(usage?: ModelUsage): void;
+  /** Settles once at the reservation on failure or abandonment (ADR-0006). */
+  fail(): void;
+}
+
+/** Framework-neutral, run-bound model policy boundary (ADR-0006, ADR-0017). */
+export interface ModelPort {
+  /** Selects, obtains consent and reserves before dispatch (ADR-0006). */
+  begin(role: ModelRoleName, options?: { readonly signal?: AbortSignal }): Promise<ModelCall>;
+}
+
+/** Implementation requirements disclosed to an executor at prepare (ADR-0006). */
+export interface ModelPreparation {
+  /** Routed roles; omitted configuration means no roles (ADR-0006). */
+  readonly roles: readonly ModelRoleName[];
+  /** Routed provider IDs and whether a factory is required (ADR-0006). */
+  readonly providers: Readonly<Record<ModelProviderId, { readonly credential: boolean }>>;
+}
