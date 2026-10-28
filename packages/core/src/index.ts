@@ -106,7 +106,13 @@ export type {
   DestinationPreset,
   FieldAnnotation,
 } from './policy.js';
-export { DEFAULT_BUDGETS, DEFAULT_DATA_POLICY, galaxieField } from './policy.js';
+export {
+  DEFAULT_BUDGETS,
+  DEFAULT_DATA_POLICY,
+  galaxieField,
+  inBrowserOnly,
+  labelsAllow,
+} from './policy.js';
 export {
   type CreateOptions,
   createRuntime,

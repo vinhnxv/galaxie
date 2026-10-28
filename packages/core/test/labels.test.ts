@@ -8,6 +8,8 @@ import {
   DEFAULT_DATA_POLICY,
   type DestinationClass,
   galaxieField,
+  inBrowserOnly,
+  labelsAllow,
 } from '../src/index.js';
 import { binding, brokerFixture, collect, deferred, FakeExecutor, flush } from './fake-executor.js';
 
@@ -302,4 +304,24 @@ test('validated private outputs register guard values for later structured calls
   await collect(fixture.instance.events(runId));
   await fixture.runtime.dispose();
   expect(fixture.scriptErrors).toEqual([]);
+});
+
+test('shared label checks cover every default destination and empty labels', () => {
+  for (const destination of destinations) {
+    expect(labelsAllow(DEFAULT_DATA_POLICY, [], destination)).toBe(true);
+    for (const label of ['public', 'app', 'private-user'] as const) {
+      const allowed =
+        label === 'public' ||
+        (label === 'app' && destination !== 'third-party') ||
+        destination === 'in-browser';
+      expect(labelsAllow(DEFAULT_DATA_POLICY, [label], destination)).toBe(allowed);
+      expect(labelsAllow(DEFAULT_DATA_POLICY, ['public', label], destination)).toBe(allowed);
+    }
+  }
+  expect(inBrowserOnly(DEFAULT_DATA_POLICY, [])).toBe(false);
+  expect(inBrowserOnly(DEFAULT_DATA_POLICY, ['app'])).toBe(false);
+  expect(inBrowserOnly(DEFAULT_DATA_POLICY, ['public', 'private-user'])).toBe(true);
+  expect(inBrowserOnly({ ...DEFAULT_DATA_POLICY, app: { allow: ['in-browser'] } }, ['app'])).toBe(
+    true,
+  );
 });

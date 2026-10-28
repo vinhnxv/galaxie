@@ -22,6 +22,7 @@ import {
   DESTINATIONS,
   type DestinationAllowlist,
   type DestinationClass,
+  labelsAllow,
 } from './policy.js';
 import type { DiagnosticEvent } from './runtime.js';
 
@@ -222,10 +223,6 @@ export class ModelRouter {
     this.#selected.clear();
   }
 
-  #allows(run: ModelRun, destination: DestinationClass): boolean {
-    return [...run.labels].every((label) => this.#policy[label].allow.includes(destination));
-  }
-
   async #approval(
     role: string,
     destination: DestinationClass,
@@ -340,14 +337,15 @@ export class ModelRouter {
             continue;
           usable = true;
           const destination = descriptor.destination;
-          if (!this.#allows(run, destination) || refused.has(destination)) continue;
+          if (!labelsAllow(this.#policy, run.labels, destination) || refused.has(destination))
+            continue;
           if (!(await this.#approval(role, destination, route, run, signal))) {
             assertActive();
             refused.add(destination);
             continue;
           }
           assertActive();
-          if (!this.#allows(run, destination)) continue;
+          if (!labelsAllow(this.#policy, run.labels, destination)) continue;
           const pricing = descriptor.pricing;
           const cost =
             pricing === 'unknown'
@@ -378,7 +376,7 @@ export class ModelRouter {
               }
             }
             assertActive();
-            if (!this.#allows(run, destination)) {
+            if (!labelsAllow(this.#policy, run.labels, destination)) {
               reservation.release();
               credential = undefined;
               continue;

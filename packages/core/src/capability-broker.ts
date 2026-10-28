@@ -20,6 +20,7 @@ import {
   DEFAULT_DATA_POLICY,
   DESTINATIONS,
   type DestinationAllowlist,
+  labelsAllow,
 } from './policy.js';
 import type { DiagnosticEvent } from './runtime.js';
 import type { Schema } from './schema.js';
@@ -250,9 +251,7 @@ export class CapabilityBroker {
           if (binding === undefined || compiled === undefined) throw failure('denied');
           if (
             compiled.input.freeTextStrings(value).some((value) => value.length > 0) &&
-            [...run.labels].some(
-              (label) => !this.#policy[label].allow.includes(binding.destination),
-            )
+            !labelsAllow(this.#policy, run.labels, binding.destination)
           )
             throw failure('denied');
           if (!this.#policy['private-user'].allow.includes(binding.destination)) {
