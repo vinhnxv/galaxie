@@ -1,0 +1,24 @@
+{
+  "name": "@galaxie/models",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deterministic mock model provider for galaxie.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./mock": {
+      "types": "./dist/mock.d.ts",
+      "default": "./dist/mock.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "@langchain/core": "~1.2.20"
+  },
+  "devDependencies": {
+    "@langchain/core": "1.2.20"
+  }
+}
