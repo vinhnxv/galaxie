@@ -20,6 +20,10 @@ function singleCopy(): Plugin {
       if (!packages.some((name) => source === name || source.startsWith(`${name}/`))) return;
       const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
       if (resolved === null) throw new Error(`Unresolved LangChain import: ${source}`);
+      // Scans mark bare imports external; optimized URLs are generated after this hook.
+      // Their physical imports are checked by the same plugin in the optimizer.
+      if (resolved.external || resolved.id.startsWith(`${root}node_modules/.vite/`))
+        return resolved;
       const path = realpathSync(resolved.id.split('?')[0] ?? resolved.id);
       if (!path.startsWith(`${allowed}/`)) {
         throw new Error(`LangChain resolved outside the spike: ${source}: ${path}`);
@@ -39,9 +43,11 @@ function singleCopy(): Plugin {
   };
 }
 
+const audit = singleCopy();
+
 export default defineConfig({
   root,
-  plugins: [singleCopy(), react()],
+  plugins: [audit, react()],
   resolve: {
     alias: {
       '@galaxie/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
@@ -53,6 +59,9 @@ export default defineConfig({
   },
   server: { host: '127.0.0.1', port: 4176, strictPort: true },
   optimizeDeps: {
+    force: true,
+    // Audit transitive imports during prebundling as well as page/build imports.
+    rolldownOptions: { plugins: [audit] },
     include: [
       '@langchain/langgraph/web',
       '@langchain/core/callbacks/base',
