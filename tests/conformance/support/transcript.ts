@@ -6,7 +6,13 @@ import {
   type LangGraphGraph,
   STREAM_MODES,
 } from '@galaxie/adapter-langgraph';
-import { createRuntime, defineAgentDefinition } from '@galaxie/core';
+import {
+  type CapabilityBinding,
+  type CapabilityName,
+  type CapabilityRequest,
+  createRuntime,
+  defineAgentDefinition,
+} from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type {
   BaseCheckpointSaver,
@@ -25,11 +31,21 @@ export interface ConformanceGraph extends LangGraphGraph {
   getStateHistory(config: LangGraphRunnableConfig): AsyncIterable<StateSnapshot>;
 }
 
+export interface ConformanceTools {
+  call(name: string, input: unknown, config?: LangGraphRunnableConfig): Promise<unknown>;
+}
 export interface ConformanceCase {
+  readonly capabilities?: Readonly<
+    Record<
+      CapabilityName,
+      CapabilityRequest & { readonly invoke: (input: unknown) => Promise<unknown> }
+    >
+  >;
   readonly factory: (
     langgraph: LangGraphModule,
     model: BaseChatModel,
     checkpointer: BaseCheckpointSaver,
+    tools?: ConformanceTools,
   ) => ConformanceGraph;
   readonly input: unknown;
   readonly script: ModelScript;
@@ -104,6 +120,13 @@ export async function runNative(
     langgraph,
     new ScriptedChatModel(fixture.script),
     new langgraph.MemorySaver(),
+    {
+      call: async (name, input) => {
+        const capability = fixture.capabilities?.[name as CapabilityName];
+        if (capability === undefined) throw new Error('The native fixture capability is missing.');
+        return capability.invoke(input);
+      },
+    },
   );
   const config = { configurable: { thread_id: crypto.randomUUID() } };
   const transcript = emptyTranscript();
@@ -139,21 +162,47 @@ export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> 
   const saver = new web.MemorySaver();
   let graph: ConformanceGraph | undefined;
   const runtime = createRuntime({ appId: 'conformance', executors: [createLangGraphAdapter()] });
-  const instance = await runtime.create(definition, {
-    principalScope: 'conformance',
-    services: {
-      chatModels: { assistant: new ScriptedChatModel(fixture.script) },
-      checkpointer: saver,
+  const requests = Object.fromEntries(
+    Object.entries(fixture.capabilities ?? {}).map(([name, capability]) => [
+      name,
+      { input: capability.input, output: capability.output, kind: capability.kind },
+    ]),
+  );
+  const bindings: Record<string, CapabilityBinding> = Object.fromEntries(
+    Object.entries(fixture.capabilities ?? {}).map(([name, capability]) => [
+      name,
+      {
+        kind: capability.kind,
+        destination: 'in-browser',
+        timeoutMs: 1000,
+        concurrency: 1,
+        grantScope: 'instance',
+        approval: 'none',
+        retry: 'none',
+        invoke: capability.invoke,
+      },
+    ]),
+  );
+  const instance = await runtime.create(
+    { ...definition, capabilities: { required: requests } },
+    {
+      bindings,
+      principalScope: 'conformance',
+      services: {
+        chatModels: { assistant: new ScriptedChatModel(fixture.script) },
+        checkpointer: saver,
+      },
+      agent: (host) => {
+        graph = fixture.factory(
+          web,
+          host.langchain.chatModel('assistant'),
+          host.langchain.checkpointer(),
+          host.capabilities,
+        );
+        return graph;
+      },
     },
-    agent: (host) => {
-      graph = fixture.factory(
-        web,
-        host.langchain.chatModel('assistant'),
-        host.langchain.checkpointer(),
-      );
-      return graph;
-    },
-  });
+  );
   const transcript = emptyTranscript();
   try {
     await instance.prepare();

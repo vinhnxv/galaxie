@@ -27,11 +27,11 @@ export interface HttpDescriptor {
   invoke(input: unknown, context: CapabilityContext, payloadBytes: number): Promise<unknown>;
 }
 // The invoke identity also preserves the marker when a host shallow-copies a binding's policy.
-const descriptors = new WeakMap<CapabilityBinding['invoke'], HttpDescriptor>();
+const descriptors = new WeakMap<object, HttpDescriptor>();
 export function getHttpCapability(binding: {
   readonly invoke: CapabilityBinding<never>['invoke'];
 }): HttpDescriptor | undefined {
-  return descriptors.get(binding.invoke as CapabilityBinding['invoke']);
+  return descriptors.get(binding.invoke);
 }
 function fail(code: ErrorCode): never {
   throw new GalaxieError(code, toErrorInfo(code).message);
@@ -153,7 +153,9 @@ async function readBody(response: Response, cap: number): Promise<string> {
 
 /** Host-literal HTTP binding. Cross-origin servers must allow both X-Galaxie attribution headers
  * in Access-Control-Allow-Headers; a failed preflight rejects unavailable. Headers never authorize. */
-export function httpCapability(supplied: HttpCapabilityOptions): CapabilityBinding {
+export function httpCapability<Input = unknown, Output = unknown>(
+  supplied: HttpCapabilityOptions,
+): CapabilityBinding<Input, Output> {
   const options = Object.freeze({ ...supplied });
   const compiled = template(options.url);
   const validateDestination = (binding: Pick<CapabilityBinding, 'destination'>): void => {
@@ -222,7 +224,7 @@ export function httpCapability(supplied: HttpCapabilityOptions): CapabilityBindi
       }
     },
   };
-  const binding: CapabilityBinding = Object.freeze({
+  const binding: CapabilityBinding<Input, Output> = Object.freeze({
     kind: options.kind,
     destination: options.destination,
     timeoutMs: options.timeoutMs,
@@ -230,8 +232,8 @@ export function httpCapability(supplied: HttpCapabilityOptions): CapabilityBindi
     grantScope: options.grantScope,
     approval: options.approval,
     retry: options.retry,
-    invoke: (input: unknown, context: CapabilityContext): Promise<unknown> =>
-      descriptor.invoke(input, context, DEFAULT_BUDGETS.payloadBytes),
+    invoke: async (input: Input, context: CapabilityContext): Promise<Output> =>
+      (await descriptor.invoke(input, context, DEFAULT_BUDGETS.payloadBytes)) as Output,
   });
   descriptors.set(binding.invoke, descriptor);
   return binding;

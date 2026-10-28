@@ -10,11 +10,13 @@ import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { collect } from '../../packages/core/test/fake-executor.js';
 import { recordNetwork } from '../../packages/core/test/network-recorder.js';
+import { CASE_NAMES, cases } from './cases/index.js';
 import {
   createModelLatch,
   FixtureModelError,
   ScriptedChatModel,
 } from './support/scripted-chat-model.js';
+import { runGalaxie } from './support/transcript.js';
 
 const definition = defineAgentDefinition({
   id: 'conformance/no-network',
@@ -156,6 +158,21 @@ test('a real adapter success, failure and cancellation lifecycle makes no outbou
   } finally {
     recorder.restore();
     nodeRecorder?.restore();
+    trace.disable();
+  }
+});
+
+test('all conformance cases including capability and step-limit make no outbound requests', async () => {
+  trace.disable();
+  const recorder = recordNetwork(
+    typeof window === 'undefined' ? undefined : window.location.origin,
+  );
+  try {
+    await recorder.selfTest();
+    for (const name of CASE_NAMES) await runGalaxie(cases[name]);
+    expect(recorder.calls).toEqual([]);
+  } finally {
+    recorder.restore();
     trace.disable();
   }
 });
