@@ -581,3 +581,17 @@ test('a queued listener can cancel without starting an executor or duplicating t
   expect(await collect(instance.events(runId))).toMatchObject([{ type: 'cancelled', sequence: 0 }]);
   await runtime.dispose();
 });
+
+test('a running listener can cancel before executor entry with one terminal event', async () => {
+  const { instance, executor, runtime } = await ready();
+  instance.subscribe(() => {
+    const run = instance.getSnapshot().run;
+    if (run?.status === 'running') void instance.cancel(run.runId);
+  });
+  const { runId } = await instance.start('input');
+  await flush();
+  expect(instance.getSnapshot().run?.status).toBe('cancelled');
+  expect(executor.requests).toHaveLength(0);
+  expect(await collect(instance.events(runId))).toMatchObject([{ type: 'cancelled', sequence: 0 }]);
+  await runtime.dispose();
+});

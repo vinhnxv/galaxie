@@ -22,7 +22,8 @@ export function recordNodeNetwork(): NetworkRecorder {
   return {
     calls,
     async selfTest(): Promise<void> {
-      calls.length = 0;
+      if (calls.length !== 0)
+        throw new Error('Node network requests were observed before recorder self-test.');
       for (const { subscribed } of subscriptions) subscribed.publish({});
       if (calls.length !== subscriptions.length || new Set(calls).size !== subscriptions.length)
         throw new Error('A Node network recorder did not fire exactly once.');

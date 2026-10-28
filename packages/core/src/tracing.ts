@@ -95,7 +95,6 @@ interface StepRecord {
   ended: boolean;
 }
 
-/** Every parent context is explicit; no context manager is required across awaits. */
 export function startRunTrace(
   tracer: Tracer,
   parent: Context,

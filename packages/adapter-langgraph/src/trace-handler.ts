@@ -25,7 +25,6 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     this.#trace = trace;
   }
 
-  /** No adapter timeout: core owns the only settlement bound. */
   async settled(): Promise<void> {
     if (this.#root !== undefined) await this.#settlement.promise;
   }

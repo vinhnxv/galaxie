@@ -91,68 +91,71 @@ test('a real adapter success, failure and cancellation lifecycle makes no outbou
       },
     },
   });
-  const runtime = createRuntime({ appId: 'conformance', executors: [createLangGraphAdapter()] });
   try {
     await recorder.selfTest();
     await nodeRecorder?.selfTest();
-    const instance = await runtime.create(definition, {
-      principalScope: 'conformance',
-      services: { chatModels: { assistant: model } },
-      agent: (host) => {
-        const state = Annotation.Root({ request: Annotation<string>, answer: Annotation<string> });
-        return new StateGraph(state)
-          .addNode('respond', async ({ request }, config) => ({
-            answer: (
-              await host.langchain
-                .chatModel('assistant')
-                .invoke([new HumanMessage({ id: `human-${request}`, content: request })], config)
-            ).content,
-          }))
-          .addEdge(START, 'respond')
-          .addEdge('respond', END)
-          .compile({ checkpointer: host.langchain.checkpointer() });
-      },
-    });
-    await instance.prepare();
-    const succeeded = await instance.start({ request: 'success' });
-    expect((await collect(instance.events(succeeded.runId))).at(-1)).toMatchObject({
-      type: 'output',
-      output: { request: 'success', answer: 'done' },
-    });
-    expect(instance.getSnapshot().run?.status).toBe('succeeded');
-
-    const failed = await instance.start({ request: 'failure' });
-    expect((await collect(instance.events(failed.runId))).at(-1)).toMatchObject({
-      type: 'error',
-      error: { code: 'executor_error', type: 'FixtureModelError' },
-    });
-    expect(instance.getSnapshot().run?.status).toBe('failed');
-
-    const cancelled = await instance.start({ request: 'cancel' });
-    await latch.entered;
-    await instance.cancel(cancelled.runId);
-    expect((await collect(instance.events(cancelled.runId))).at(-1)?.type).toBe('cancelled');
-    expect(instance.getSnapshot().run?.status).toBe('cancelled');
-    expect(modelSignal?.aborted).toBe(true);
-    latch.release();
-    const successor = await instance.start({ request: 'success' });
-    expect((await collect(instance.events(successor.runId))).at(-1)).toMatchObject({
-      type: 'output',
-      output: { request: 'success', answer: 'done' },
-    });
-    expect(instance.getSnapshot().run?.status).toBe('succeeded');
-    await runtime.dispose();
-    expect(instance.getSnapshot().state).toBe('disposed');
-    expect(recorder.calls).toEqual([]);
-    expect(nodeRecorder?.calls ?? []).toEqual([]);
-  } finally {
-    latch.release();
+    const runtime = createRuntime({ appId: 'conformance', executors: [createLangGraphAdapter()] });
     try {
+      const instance = await runtime.create(definition, {
+        principalScope: 'conformance',
+        services: { chatModels: { assistant: model } },
+        agent: (host) => {
+          const state = Annotation.Root({
+            request: Annotation<string>,
+            answer: Annotation<string>,
+          });
+          return new StateGraph(state)
+            .addNode('respond', async ({ request }, config) => ({
+              answer: (
+                await host.langchain
+                  .chatModel('assistant')
+                  .invoke([new HumanMessage({ id: `human-${request}`, content: request })], config)
+              ).content,
+            }))
+            .addEdge(START, 'respond')
+            .addEdge('respond', END)
+            .compile({ checkpointer: host.langchain.checkpointer() });
+        },
+      });
+      await instance.prepare();
+      const succeeded = await instance.start({ request: 'success' });
+      expect((await collect(instance.events(succeeded.runId))).at(-1)).toMatchObject({
+        type: 'output',
+        output: { request: 'success', answer: 'done' },
+      });
+      expect(instance.getSnapshot().run?.status).toBe('succeeded');
+
+      const failed = await instance.start({ request: 'failure' });
+      expect((await collect(instance.events(failed.runId))).at(-1)).toMatchObject({
+        type: 'error',
+        error: { code: 'executor_error', type: 'FixtureModelError' },
+      });
+      expect(instance.getSnapshot().run?.status).toBe('failed');
+
+      const cancelled = await instance.start({ request: 'cancel' });
+      await latch.entered;
+      await instance.cancel(cancelled.runId);
+      expect((await collect(instance.events(cancelled.runId))).at(-1)?.type).toBe('cancelled');
+      expect(instance.getSnapshot().run?.status).toBe('cancelled');
+      expect(modelSignal?.aborted).toBe(true);
+      latch.release();
+      const successor = await instance.start({ request: 'success' });
+      expect((await collect(instance.events(successor.runId))).at(-1)).toMatchObject({
+        type: 'output',
+        output: { request: 'success', answer: 'done' },
+      });
+      expect(instance.getSnapshot().run?.status).toBe('succeeded');
       await runtime.dispose();
+      expect(instance.getSnapshot().state).toBe('disposed');
+      expect(recorder.calls).toEqual([]);
+      expect(nodeRecorder?.calls ?? []).toEqual([]);
     } finally {
-      recorder.restore();
-      nodeRecorder?.restore();
-      trace.disable();
+      latch.release();
+      await runtime.dispose();
     }
+  } finally {
+    recorder.restore();
+    nodeRecorder?.restore();
+    trace.disable();
   }
 });

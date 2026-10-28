@@ -4,7 +4,6 @@
 import type { ExecutorEvent, RunEvent } from './events.js';
 import type { EventId, RunId } from './ids.js';
 
-/** In-memory replay and live delivery; executor payloads remain passed by reference. */
 export class RunEvents {
   private readonly runId: RunId;
   private readonly buffer: RunEvent[] = [];

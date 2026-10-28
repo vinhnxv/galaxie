@@ -90,7 +90,8 @@ export function recordNetwork(allowedOrigin?: string): NetworkRecorder {
   return {
     calls,
     async selfTest(): Promise<void> {
-      calls.length = 0;
+      if (calls.length !== 0)
+        throw new Error('Network requests were observed before recorder self-test.');
       for (const probe of probes) await probe();
       if (calls.length !== probes.length || new Set(calls).size !== probes.length)
         throw new Error('A network recorder did not fire exactly once.');

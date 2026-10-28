@@ -65,10 +65,13 @@ function imports(file: string): ImportReference[] {
 
 const core = JSON.parse(readFileSync('packages/core/package.json', 'utf8')) as {
   dependencies?: unknown;
+  optionalDependencies?: unknown;
   peerDependencies?: Record<string, unknown>;
 };
 if (core.dependencies !== undefined)
   problems.push('packages/core/package.json: core must not declare dependencies');
+if (core.optionalDependencies !== undefined)
+  problems.push('packages/core/package.json: core must not declare optionalDependencies');
 if (
   JSON.stringify(Object.keys(core.peerDependencies ?? {}).sort()) !==
   JSON.stringify(['@opentelemetry/api', 'zod'])

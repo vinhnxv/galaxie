@@ -21,33 +21,50 @@ test('a full lifecycle without an SDK makes no network request', async () => {
     return { subscribed, listener };
   });
   const latch = deferred<void>();
-  const { runtime, instance } = await ready([
-    [{ type: 'output', output: 'done' }],
-    [{ throw: new Error('secret') }],
-    [{ wait: latch.promise }],
-  ]);
   try {
     await recorder.selfTest();
     for (const { subscribed } of subscriptions) subscribed.publish({});
     expect(observed).toEqual(names);
     observed.length = 0;
-    for (const status of ['succeeded', 'failed']) {
+    const { runtime, instance } = await ready([
+      [{ type: 'output', output: 'done' }],
+      [{ throw: new Error('secret') }],
+      [{ wait: latch.promise }],
+    ]);
+    try {
+      for (const status of ['succeeded', 'failed']) {
+        const { runId } = await instance.start('input');
+        await collect(instance.events(runId));
+        expect(instance.getSnapshot().run?.status).toBe(status);
+      }
       const { runId } = await instance.start('input');
-      await collect(instance.events(runId));
-      expect(instance.getSnapshot().run?.status).toBe(status);
+      await flush();
+      await instance.cancel(runId);
+      latch.resolve();
+      await runtime.dispose();
+      expect(recorder.calls).toEqual([]);
+      expect(observed).toEqual([]);
+    } finally {
+      latch.resolve();
+      await runtime.dispose();
     }
-    const { runId } = await instance.start('input');
-    await flush();
-    await instance.cancel(runId);
-    latch.resolve();
-    await runtime.dispose();
-    expect(recorder.calls).toEqual([]);
-    expect(observed).toEqual([]);
   } finally {
-    latch.resolve();
-    await runtime.dispose();
     recorder.restore();
     for (const { subscribed, listener } of subscriptions) subscribed.unsubscribe(listener);
     trace.disable();
+  }
+});
+
+test('network recorder self-tests preserve requests observed during initialization', async () => {
+  const recorder = recordNetwork();
+  try {
+    await recorder.selfTest();
+    await fetch('https://initialization-probe.invalid/');
+    await expect(recorder.selfTest()).rejects.toThrow(
+      'Network requests were observed before recorder self-test.',
+    );
+    expect(recorder.calls).toEqual(['fetch']);
+  } finally {
+    recorder.restore();
   }
 });

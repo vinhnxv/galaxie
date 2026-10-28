@@ -106,6 +106,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
         executor,
         createOptions,
         { appId: options.appId, tracer },
+        () => instances.delete(instance),
         options.diagnostics,
       );
       instances.add(instance);

@@ -35,7 +35,6 @@ function hasOutcome(run: RunRecord): boolean {
   return terminal(run) || run.status === 'waiting_input';
 }
 
-/** The bound limits waiting, never the lifetime of the underlying executor. */
 function waitForSettlement(settled: Promise<void>, signal?: AbortSignal): Promise<boolean> {
   return new Promise((resolve) => {
     const finish = (completed: boolean): void => {
@@ -56,6 +55,7 @@ export function createAgentInstance(
   adapter: ExecutorAdapter<unknown, unknown>,
   options: CreateOptions,
   instrumentation: { readonly appId: string; readonly tracer: Tracer },
+  onDisposed: () => void,
   diagnostics?: (event: DiagnosticEvent) => void,
 ): AgentInstance<unknown, unknown> {
   const instanceId = globalThis.crypto.randomUUID() as InstanceId;
@@ -73,7 +73,6 @@ export function createAgentInstance(
   let disposing = false;
   let claimingSlot = false;
   let current: RunRecord | undefined;
-  // Include every predecessor even when a queued successor times out without starting.
   let settlement: Promise<void> = Promise.resolve();
 
   const report = (event: Omit<DiagnosticEvent, 'instanceId'>): void => {
@@ -398,6 +397,7 @@ export function createAgentInstance(
         await disposeExecutor();
         state = 'disposed';
         publish();
+        onDisposed();
         resolveDisposal();
       })();
       return disposal;
