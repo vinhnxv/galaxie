@@ -18,6 +18,8 @@ import type { InstanceId, RunId, SessionId } from './ids.js';
 import type { AgentInstance, AgentSnapshot, RunSnapshot } from './instance.js';
 import type { PendingInteraction } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
+import { ModelRouter } from './model-router.js';
+import type { SelectedModelRoute } from './models.js';
 import type { BudgetLimits, DataLabel, DestinationAllowlist } from './policy.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
@@ -84,6 +86,8 @@ export function createAgentInstance(
   let prepareError: ErrorInfo | undefined;
   let snapshot: AgentSnapshot<unknown> = Object.freeze({ instanceId, state });
   const listeners = new Set<() => void>();
+  const routes = new Map<string, SelectedModelRoute>();
+  let publishedRoutes: Readonly<Record<string, SelectedModelRoute>> | undefined;
   let executor: ExecutorAgent | undefined;
   let preparation: Promise<void> | undefined;
   let prepareController: AbortController | undefined;
@@ -111,6 +115,7 @@ export function createAgentInstance(
     options.principalScope,
     report,
   );
+  const router = new ModelRouter(definition, options.models, instrumentation.policy, report);
   const assertUsable = (): void => {
     if (disposing) throw new GalaxieError('invalid', 'The instance was disposed.');
   };
@@ -130,6 +135,7 @@ export function createAgentInstance(
       state,
       ...(prepareError === undefined ? {} : { prepareError }),
       ...(run === undefined ? {} : { run }),
+      ...(publishedRoutes === undefined ? {} : { routes: publishedRoutes }),
     });
     // AbortSignal callbacks run synchronously and must observe the committed snapshot too.
     afterSnapshot?.();
@@ -268,6 +274,34 @@ export function createAgentInstance(
         executorId: adapter.id,
         executorVersion: adapter.version,
       });
+      const ports = {
+        runId: run.runId,
+        signal: AbortSignal.any([run.controller.signal, run.capabilityController.signal]),
+        labels: run.labels,
+        privateValues: run.privateValues,
+        grants: run.grants,
+        budget: run.budget,
+        tracing: run.tracing,
+        active: () => !terminal(run),
+        labelsChanged: () => {
+          if (!terminal(run)) {
+            run.tracing?.setLabels([...run.labels]);
+            publish();
+          }
+        },
+        failBudget: (name: keyof BudgetLimits) => failRunForBudget(run, name),
+        selectedRouteChanged: (role: string, selected: SelectedModelRoute) => {
+          const previous = routes.get(role);
+          if (
+            previous?.providerId === selected.providerId &&
+            previous.destination === selected.destination
+          )
+            return;
+          routes.set(role, selected);
+          publishedRoutes = Object.freeze(Object.fromEntries(routes));
+          publish();
+        },
+      };
       const iterator = agent
         .run({
           runId: run.runId,
@@ -276,23 +310,8 @@ export function createAgentInstance(
           signal: run.controller.signal,
           trace: run.tracing.recorder,
           limits: { steps: instrumentation.limits.steps },
-          capabilities: broker.port({
-            runId: run.runId,
-            signal: AbortSignal.any([run.controller.signal, run.capabilityController.signal]),
-            labels: run.labels,
-            privateValues: run.privateValues,
-            grants: run.grants,
-            budget: run.budget,
-            tracing: run.tracing,
-            active: () => !terminal(run),
-            labelsChanged: () => {
-              if (!terminal(run)) {
-                run.tracing?.setLabels([...run.labels]);
-                publish();
-              }
-            },
-            failBudget: (name) => failRunForBudget(run, name),
-          }),
+          capabilities: broker.port(ports),
+          models: router.port(ports),
         })
         [Symbol.asyncIterator]();
       // Never use for-await here: its early exit calls return() and can hide live engine work.
@@ -346,7 +365,12 @@ export function createAgentInstance(
       state = 'preparing';
       publish();
       void Promise.resolve()
-        .then(() => adapter.prepare(options.agent, options.services, { signal: controller.signal }))
+        .then(() =>
+          adapter.prepare(options.agent, options.services, {
+            signal: controller.signal,
+            models: router.summary,
+          }),
+        )
         .then(
           async (agent) => {
             executor = agent;
@@ -472,6 +496,7 @@ export function createAgentInstance(
       publish(run?.events, () => {
         prepareController?.abort();
         cancelledRun?.controller.abort();
+        router.dispose();
       });
       void (async () => {
         await waitForSettlement(settlement);
