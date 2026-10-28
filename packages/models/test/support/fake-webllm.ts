@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { WebLLMCacheModule } from '../../src/webllm/cache.js';
 import type {
   WebLLMChunk,
   WebLLMClient,
@@ -10,6 +11,7 @@ import type {
   WebLLMRequest,
   WebLLMWorker,
 } from '../../src/webllm/engine.js';
+import type { WebLLMAppConfig } from '../../src/webllm/model-record.js';
 
 export class FakeWebLLMWorker implements WebLLMWorker {
   onmessage: ((event: MessageEvent) => void) | null = null;
@@ -173,6 +175,22 @@ export function createFakeWebLLM(options: FakeWebLLMOptions = {}): {
     },
     get constructions() {
       return engines.length;
+    },
+  };
+}
+
+export function createFakeWebLLMCache(cached: () => Promise<boolean> = async () => true): {
+  module: WebLLMCacheModule;
+  checks: Array<{ modelId: string; appConfig: WebLLMAppConfig }>;
+} {
+  const checks: Array<{ modelId: string; appConfig: WebLLMAppConfig }> = [];
+  return {
+    checks,
+    module: {
+      async hasModelInCache(modelId, appConfig) {
+        checks.push({ modelId, appConfig });
+        return cached();
+      },
     },
   };
 }

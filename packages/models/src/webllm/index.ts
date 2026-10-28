@@ -3,6 +3,11 @@
 
 export { ModelError, type ModelErrorCode, type ModelUnavailableReason } from '../errors.js';
 export {
+  type CheckWebLLMModelOptions,
+  checkWebLLMModel,
+  type WebLLMModelAvailability,
+} from './cache.js';
+export {
   type WebLLMCallOptions,
   WebLLMChatModel,
   type WebLLMChatModelOptions,
