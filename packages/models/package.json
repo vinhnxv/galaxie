@@ -2,11 +2,15 @@
   "name": "@galaxie/models",
   "version": "0.0.0",
   "private": true,
-  "description": "Mock and worker-based WebLLM model providers for galaxie.",
+  "description": "Mock, WebLLM and Chrome Built-in AI model providers for galaxie.",
   "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./builtin-ai": {
+      "types": "./dist/builtin-ai/index.d.ts",
+      "default": "./dist/builtin-ai/index.js"
+    },
     "./webllm": {
       "types": "./dist/webllm/index.d.ts",
       "default": "./dist/webllm/index.js"
