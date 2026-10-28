@@ -14,6 +14,7 @@ import {
   type CapabilityBinding,
   type CapabilityRequests,
   createRuntime,
+  DEFAULT_DATA_POLICY,
   type ErrorCode,
   GalaxieError,
   galaxieField,
@@ -530,4 +531,65 @@ test('a paused segment ends with its own status and no error', async () => {
   expect(executor.requests).toHaveLength(1);
   expect(executor.disposeCalls).toBe(1);
   await provider.shutdown();
+});
+
+test('development trace text validates its declared destination', () => {
+  for (const developmentTraceText of [{ destination: 'unknown' }, {}, null])
+    expect(() =>
+      createRuntime({
+        appId: 'trace-text',
+        executors: [new FakeExecutor()],
+        developmentTraceText: developmentTraceText as never,
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'invalid' }));
+});
+
+test('trace text omits non-serializable input without throwing and defaults to no recording', () => {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const metadata = {
+    appId: 'test',
+    agentId: 'test',
+    agentVersion: '1',
+    instanceId: 'i',
+    sessionId: 's',
+    runId: 'r',
+    executorId: 'fake',
+    executorVersion: '1',
+  };
+  const absent = startRunTrace(
+    provider.getTracer('@galaxie/core', '0.0.0'),
+    ROOT_CONTEXT,
+    metadata,
+    { policy: DEFAULT_DATA_POLICY, labels: () => new Set(['public']) },
+  );
+  expect(absent.recorder.recordsText).toBe(false);
+  absent.recorder
+    .start({ kind: 'model', input: [{ secret: 'without opt-in' }] })
+    .end({ status: 'ok', output: [{ secret: 'without opt-in' }] });
+  const absentCapability = absent.startCapability({ name: 'echo@1' });
+  absentCapability.arguments({ secret: 'without opt-in' });
+  absentCapability.end({ status: 'ok' });
+  absent.finish('succeeded');
+  const enabled = startRunTrace(
+    provider.getTracer('@galaxie/core', '0.0.0'),
+    ROOT_CONTEXT,
+    metadata,
+    {
+      developmentTraceText: { destination: 'third-party' },
+      policy: DEFAULT_DATA_POLICY,
+      labels: () => new Set(['public']),
+    },
+  );
+  expect(enabled.recorder.recordsText).toBe(true);
+  const input: Record<string, unknown> = {};
+  input['self'] = input;
+  expect(() => {
+    enabled.recorder.start({ kind: 'model', input }).end({ status: 'ok', output: input });
+    enabled.startCapability({ name: 'echo@1' }).arguments(input);
+    enabled.finish('succeeded');
+  }).not.toThrow();
+  expect(serializeSpans(exporter.getFinishedSpans())).not.toMatch(
+    /gen_ai\.(input.messages|output.messages|tool.call.arguments)|without opt-in/,
+  );
 });

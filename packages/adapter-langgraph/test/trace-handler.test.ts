@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { RunTrace, TraceHandle, TraceResult, TraceStep } from '@galaxie/core';
-import { AIMessage, type StandardMessageStructure } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, type StandardMessageStructure } from '@langchain/core/messages';
 import type { ChatGeneration } from '@langchain/core/outputs';
 import { expect, test } from 'vitest';
 import { LangGraphTraceHandler } from '../src/trace-handler.js';
@@ -17,6 +17,7 @@ interface RecordedStep {
 function recording(): { handler: LangGraphTraceHandler; steps: RecordedStep[] } {
   const steps: RecordedStep[] = [];
   const trace: RunTrace = {
+    recordsText: false,
     start(step, parent) {
       const results: TraceResult[] = [];
       const handle: TraceHandle = { end: (result) => results.push(result) };
@@ -189,4 +190,57 @@ test.each(['ok', 'error'] as const)('model %s end includes the selected route', 
     status,
     route: { providerId: 'local', destination: 'in-browser' },
   });
+});
+
+test('opt-in model text preserves the generation finish reason', () => {
+  const results: TraceResult[] = [];
+  const handler = new LangGraphTraceHandler({
+    recordsText: true,
+    start: () => ({ end: (result) => results.push(result) }),
+  });
+  handler.handleChatModelStart({}, [], 'text');
+  const generation: ChatGeneration = {
+    text: 'answer',
+    message: new AIMessage({ content: 'answer' }),
+    generationInfo: { finish_reason: 'length' },
+  };
+  handler.handleLLMEnd({ generations: [[generation]] }, 'text');
+  expect(results).toEqual([
+    {
+      status: 'ok',
+      usage: {},
+      output: [
+        {
+          role: 'assistant',
+          parts: [{ type: 'text', content: 'answer' }],
+          finish_reason: 'length',
+        },
+      ],
+    },
+  ]);
+});
+
+test('opt-in message conversion silently omits unencodable content', () => {
+  const steps: TraceStep[] = [];
+  const results: TraceResult[] = [];
+  const handler = new LangGraphTraceHandler({
+    recordsText: true,
+    start: (step) => {
+      steps.push(step);
+      return { end: (result) => results.push(result) };
+    },
+  });
+  const content: unknown[] = [];
+  content.push(content);
+  const input = new HumanMessage({ content: content as never });
+  const generation: ChatGeneration = {
+    text: '',
+    message: new AIMessage({ content: content as never }),
+  };
+  expect(() => {
+    handler.handleChatModelStart({}, [[input]], 'unencodable');
+    handler.handleLLMEnd({ generations: [[generation]] }, 'unencodable');
+  }).not.toThrow();
+  expect(steps).toEqual([{ kind: 'model' }]);
+  expect(results).toEqual([{ status: 'ok', usage: {} }]);
 });

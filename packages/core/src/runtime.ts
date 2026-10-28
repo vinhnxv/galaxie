@@ -12,7 +12,12 @@ import type { ExecutorAdapter } from './executor.js';
 import type { AppId, InstanceId, PrincipalScope, RunId } from './ids.js';
 import type { AgentInstance } from './instance.js';
 import type { ModelRouting } from './models.js';
-import type { BudgetLimits, DataPolicy } from './policy.js';
+import {
+  type BudgetLimits,
+  type DataPolicy,
+  DESTINATIONS,
+  type DestinationClass,
+} from './policy.js';
 import type { InferInput } from './schema.js';
 import { VERSION } from './version.js';
 
@@ -54,6 +59,8 @@ export interface RuntimeOptions<
   readonly executors: Adapters;
   readonly diagnostics?: (event: DiagnosticEvent) => void;
   readonly tracerProvider?: TracerProvider;
+  /** Development-only verbatim text in spans; declare the final recipient of exported spans. */
+  readonly developmentTraceText?: { readonly destination: DestinationClass };
   readonly dataPolicy?: DataPolicy;
   readonly budgets?: Partial<BudgetLimits>;
 }
@@ -100,6 +107,14 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
   if (options.appId === '') throw new GalaxieError('invalid', 'An application ID is required.');
   const limits = budgetLimits(options.budgets);
   const policy = dataPolicy(options.dataPolicy);
+  const traceText = options.developmentTraceText;
+  if (
+    traceText !== undefined &&
+    (traceText === null || !DESTINATIONS.includes(traceText.destination))
+  )
+    throw new GalaxieError('invalid', 'The development trace destination is invalid.');
+  const developmentTraceText =
+    traceText === undefined ? undefined : Object.freeze({ destination: traceText.destination });
   const executors = new Map<string, ExecutorAdapter<unknown, unknown>>();
   for (const executor of options.executors) {
     if (executors.has(executor.id)) {
@@ -127,7 +142,13 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
         definition,
         executor,
         createOptions,
-        { appId: options.appId, tracer, limits, policy },
+        {
+          appId: options.appId,
+          tracer,
+          limits,
+          policy,
+          ...(developmentTraceText === undefined ? {} : { developmentTraceText }),
+        },
         () => instances.delete(instance),
         options.diagnostics,
       );

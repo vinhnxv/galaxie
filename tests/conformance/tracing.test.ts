@@ -1,9 +1,18 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
-import { createRuntime, type DiagnosticEvent, defineAgentDefinition } from '@galaxie/core';
+import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
+import {
+  createRuntime,
+  type DataLabel,
+  type DataPolicy,
+  type DestinationClass,
+  type DiagnosticEvent,
+  defineAgentDefinition,
+  galaxieField,
+} from '@galaxie/core';
 import type { BaseChatModel, LangSmithParams } from '@langchain/core/language_models/chat_models';
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import * as web from '@langchain/langgraph/web';
 import { SpanStatusCode } from '@opentelemetry/api';
 import {
@@ -13,7 +22,7 @@ import {
 } from '@opentelemetry/sdk-trace';
 import { expect, test } from 'vitest';
 import { z } from 'zod';
-import { collect } from '../../packages/core/test/fake-executor.js';
+import { binding, collect } from '../../packages/core/test/fake-executor.js';
 import { assertSpanTree, serializeSpans } from '../../packages/core/test/span-tree.js';
 import { cases } from './cases/index.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
@@ -181,6 +190,404 @@ test('a model without forwarded config has a node span and no implicit model spa
       children: [{ name: 'galaxie.node implicit', children: [] }],
     });
   } finally {
+    await runtime.dispose();
+    await provider.shutdown();
+  }
+});
+
+const traceTextKeys = [
+  'gen_ai.input.messages',
+  'gen_ai.output.messages',
+  'gen_ai.tool.call.arguments',
+];
+const tracePrompt = `development prompt\n${'long text '.repeat(20)}`;
+const traceReply = `development reply\n${'long reply '.repeat(20)}`;
+const traceArguments = { query: 'development capability argument' };
+
+async function textScenario(
+  options: {
+    label?: DataLabel;
+    destination?: DestinationClass;
+    outputLabel?: DataLabel;
+    secondModel?: boolean;
+    resume?: boolean;
+    submission?: unknown;
+    rejected?: 'invalid' | 'policy' | 'payload';
+    policy?: DataPolicy;
+  } = {},
+) {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const runtime = createRuntime({
+    appId: 'trace-text',
+    executors: [createLangGraphAdapter()],
+    tracerProvider: provider,
+    ...(options.destination === undefined
+      ? {}
+      : { developmentTraceText: { destination: options.destination } }),
+    ...(options.policy === undefined ? {} : { dataPolicy: options.policy }),
+    ...(options.rejected === 'payload' ? { budgets: { payloadBytes: 8 } } : {}),
+  });
+  const agentDefinition = defineAgentDefinition({
+    id: 'conformance/trace-text',
+    version: '1.0.0',
+    executor: 'langgraph-js',
+    input: z.object({ value: z.string().meta(galaxieField({ label: options.label ?? 'public' })) }),
+    models: assistantRoles,
+    capabilities: {
+      optional: {
+        'lookup@1': {
+          input: z.object({ query: z.string() }),
+          output: z.object({
+            result: z.string().meta(galaxieField({ label: options.outputLabel ?? 'public' })),
+          }),
+          kind: 'read',
+        },
+      },
+    },
+  });
+  let invoked = 0;
+  const instance = await runtime.create(agentDefinition, {
+    principalScope: 'fixture',
+    models: assistantRouting(),
+    services: {
+      chatModels: {
+        assistant: new ScriptedChatModel({
+          [tracePrompt]: {
+            id: 'trace-reply',
+            text: traceReply,
+            usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
+          },
+        }),
+      },
+    },
+    bindings: {
+      'lookup@1': {
+        ...binding({ destination: options.rejected === 'policy' ? 'third-party' : 'in-browser' }),
+        invoke: async () => {
+          invoked++;
+          return { result: 'capability result' };
+        },
+      },
+    },
+    agent: (host) => {
+      const state = web.Annotation.Root({ value: web.Annotation<string> });
+      const model = host.langchain.chatModel('assistant');
+      return new web.StateGraph(state)
+        .addNode('a', async (_state, config) => {
+          await model.invoke(
+            [
+              new SystemMessage({ content: [{ type: 'text', text: 'structured system' }] }),
+              new AIMessage({ content: 'previous answer' }),
+              new ToolMessage({ content: 'tool result', tool_call_id: 'tool-1' }),
+              new HumanMessage({ content: tracePrompt }),
+            ],
+            config,
+          );
+          return {};
+        })
+        .addNode('b', async (_state, config) => {
+          const call = host.capabilities.call(
+            'lookup@1',
+            options.rejected === 'invalid' ? { query: 1 } : traceArguments,
+            config,
+          );
+          if (options.rejected !== undefined) {
+            await expect(call).rejects.toMatchObject({
+              code:
+                options.rejected === 'invalid'
+                  ? 'invalid'
+                  : options.rejected === 'policy'
+                    ? 'denied'
+                    : 'budget_exceeded',
+            });
+          } else await call;
+          return {};
+        })
+        .addNode('ask', async (_state, config) => {
+          if (options.resume)
+            requestInteraction(
+              {
+                surfaceId: 'main',
+                viewRevision: 'r1',
+                component: 'conformance.Question/v1',
+                props: { question: 'Continue?' },
+              },
+              config,
+            );
+          return {};
+        })
+        .addNode('c', async (_state, config) => {
+          if (options.secondModel || options.resume)
+            await model.invoke([new HumanMessage({ content: tracePrompt })], config);
+          return {};
+        })
+        .addEdge(web.START, 'a')
+        .addEdge('a', 'b')
+        .addEdge('b', 'ask')
+        .addEdge('ask', 'c')
+        .addEdge('c', web.END)
+        .compile({ checkpointer: host.langchain.checkpointer() });
+    },
+  });
+  try {
+    await instance.prepare();
+    const { runId } = await instance.start({ value: 'input' });
+    if (options.resume) {
+      for await (const event of instance.events(runId)) if (event.type === 'interaction') break;
+    } else await collect(instance.events(runId));
+    if (options.resume) {
+      const pending = instance.getSnapshot().run?.pending;
+      expect(pending).toBeDefined();
+      if (pending === undefined) throw new Error('The interaction is missing.');
+      expect(
+        await instance.dispatch({
+          ...pending,
+          instanceId: instance.getSnapshot().instanceId,
+          runId,
+          action: 'submit',
+          payload: options.submission ?? false,
+        }),
+      ).toMatchObject({ status: 'accepted' });
+      await collect(instance.events(runId));
+    }
+    expect(instance.getSnapshot().run?.status).toBe(
+      options.rejected === 'payload' ? 'failed' : 'succeeded',
+    );
+    await runtime.dispose();
+    await provider.forceFlush();
+    return { spans: exporter.getFinishedSpans(), invoked };
+  } finally {
+    await runtime.dispose();
+    await provider.shutdown();
+  }
+}
+
+function withoutText(spans: ReturnType<InMemorySpanExporter['getFinishedSpans']>) {
+  return spans.map((span) => ({
+    name: span.name,
+    kind: span.kind,
+    status: span.status,
+    attributes: Object.fromEntries(
+      Object.entries(span.attributes).filter(
+        ([key]) =>
+          !traceTextKeys.includes(key) &&
+          ![
+            'galaxie.instance.id',
+            'galaxie.session.id',
+            'galaxie.run.id',
+            'galaxie.run.labels',
+          ].includes(key),
+      ),
+    ),
+  }));
+}
+
+function expectNoText(spans: ReturnType<InMemorySpanExporter['getFinishedSpans']>) {
+  for (const span of spans)
+    for (const key of traceTextKeys)
+      expect(span.attributes[key], `${span.name}: ${key}`).toBeUndefined();
+}
+
+test('development trace text requires opt-in and a label-allowed destination', async () => {
+  const absent = await textScenario();
+  assertSpanTree(absent.spans);
+  expectNoText(absent.spans);
+  const publicRun = await textScenario({ destination: 'third-party' });
+  assertSpanTree(publicRun.spans, { text: 'allowed' });
+  const model = publicRun.spans.find((span) => span.name.startsWith('chat'));
+  expect(JSON.parse(String(model?.attributes['gen_ai.input.messages']))).toEqual([
+    {
+      role: 'system',
+      parts: [{ type: 'text', content: '[{"type":"text","text":"structured system"}]' }],
+    },
+    { role: 'assistant', parts: [{ type: 'text', content: 'previous answer' }] },
+    { role: 'tool', parts: [{ type: 'text', content: 'tool result' }] },
+    { role: 'user', parts: [{ type: 'text', content: tracePrompt }] },
+  ]);
+  expect(JSON.parse(String(model?.attributes['gen_ai.output.messages']))).toEqual([
+    { role: 'assistant', parts: [{ type: 'text', content: traceReply }], finish_reason: 'stop' },
+  ]);
+  expect(
+    publicRun.spans.find((span) => span.name === 'execute_tool lookup@1')?.attributes[
+      'gen_ai.tool.call.arguments'
+    ],
+  ).toBe(JSON.stringify(traceArguments));
+  const appRun = await textScenario({ label: 'app', destination: 'third-party' });
+  expectNoText(appRun.spans);
+  expect(withoutText(appRun.spans)).toEqual(withoutText(publicRun.spans));
+  const hostRun = await textScenario({ label: 'app', destination: 'host-server' });
+  expect(
+    hostRun.spans.find((span) => span.name.startsWith('chat'))?.attributes['gen_ai.input.messages'],
+  ).toBeDefined();
+});
+
+test.each(['in-browser', 'user-device', 'user-endpoint', 'host-server', 'third-party'] as const)(
+  'private input never records trace text for %s',
+  async (destination) => {
+    const { spans } = await textScenario({ label: 'private-user', destination });
+    expectNoText(spans);
+  },
+);
+
+test('browser-only host policy blocks trace text even for an in-browser destination', async () => {
+  const { spans } = await textScenario({
+    label: 'app',
+    destination: 'in-browser',
+    policy: { app: { allow: ['in-browser'] } },
+  });
+  expectNoText(spans);
+});
+
+test('trace text decisions read labels added between model calls', async () => {
+  const { spans } = await textScenario({
+    destination: 'third-party',
+    outputLabel: 'app',
+    secondModel: true,
+  });
+  const models = spans.filter((span) => span.name.startsWith('chat'));
+  expect(models).toHaveLength(2);
+  expect(models[0]?.attributes['gen_ai.input.messages']).toBeDefined();
+  expect(models[0]?.attributes['gen_ai.output.messages']).toBeDefined();
+  expect(models[1]?.attributes['gen_ai.input.messages']).toBeUndefined();
+  expect(models[1]?.attributes['gen_ai.output.messages']).toBeUndefined();
+});
+
+test('trace text keeps private capability labels across a resumed segment', async () => {
+  const { spans } = await textScenario({
+    destination: 'in-browser',
+    outputLabel: 'private-user',
+    resume: true,
+  });
+  const models = spans.filter((span) => span.name.startsWith('chat'));
+  expect(models).toHaveLength(2);
+  expect(models[0]?.attributes['gen_ai.input.messages']).toBeDefined();
+  expect(models[1]?.attributes['gen_ai.input.messages']).toBeUndefined();
+  expect(models[1]?.attributes['gen_ai.output.messages']).toBeUndefined();
+});
+
+test.each([
+  ['nested string', { nested: [false, { answer: 'free text' }] }, false],
+  ['no string', { nested: [false, { answer: '' }] }, true],
+] as const)(
+  'accepted submission %s controls resumed trace text',
+  async (_name, submission, records) => {
+    const { spans } = await textScenario({ destination: 'third-party', resume: true, submission });
+    const models = spans.filter((span) => span.name.startsWith('chat'));
+    expect(models).toHaveLength(2);
+    expect(models[0]?.attributes['gen_ai.input.messages']).toBeDefined();
+    expect(models[1]?.attributes['gen_ai.input.messages'] !== undefined).toBe(records);
+    expect(models[1]?.attributes['gen_ai.output.messages'] !== undefined).toBe(records);
+  },
+);
+
+test.each(['invalid', 'policy', 'payload'] as const)(
+  'capability %s rejection never records arguments',
+  async (rejected) => {
+    const { spans, invoked } = await textScenario({
+      label: 'app',
+      destination: 'host-server',
+      rejected,
+    });
+    expect(invoked).toBe(0);
+    expect(
+      spans.find((span) => span.name === 'execute_tool lookup@1')?.attributes[
+        'gen_ai.tool.call.arguments'
+      ],
+    ).toBeUndefined();
+  },
+);
+
+test('queued capability arguments wait for the second policy check', async () => {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const runtime = createRuntime({
+    appId: 'queued-trace-text',
+    executors: [createLangGraphAdapter()],
+    tracerProvider: provider,
+    developmentTraceText: { destination: 'host-server' },
+  });
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let calls = 0;
+  const instance = await runtime.create(
+    defineAgentDefinition({
+      id: 'conformance/queued-trace-text',
+      version: '1.0.0',
+      executor: 'langgraph-js',
+      input: z.object({ value: z.string().meta(galaxieField({ label: 'public' })) }),
+      capabilities: {
+        optional: {
+          'lookup@1': {
+            input: z.object({ query: z.string() }),
+            output: z.string().meta(galaxieField({ label: 'app' })),
+            kind: 'read',
+          },
+        },
+      },
+    }),
+    {
+      principalScope: 'fixture',
+      bindings: {
+        'lookup@1': {
+          ...binding({ destination: 'third-party' }),
+          invoke: async () => {
+            calls++;
+            entered.resolve();
+            await release.promise;
+            return 'app output';
+          },
+        },
+      },
+      agent: (host) => {
+        const state = web.Annotation.Root({ value: web.Annotation<string> });
+        return new web.StateGraph(state)
+          .addNode('queued', async (_state, config) => {
+            const first = host.capabilities.call('lookup@1', { query: 'first' }, config);
+            await entered.promise;
+            const second = host.capabilities.call(
+              'lookup@1',
+              { query: 'denied queued argument' },
+              config,
+            );
+            const rejected = expect(second).rejects.toMatchObject({ code: 'denied' });
+            // Let validation and the first policy check finish while the first call holds the slot.
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            release.resolve();
+            await first;
+            await rejected;
+            return {};
+          })
+          .addEdge(web.START, 'queued')
+          .addEdge('queued', web.END)
+          .compile();
+      },
+    },
+  );
+  try {
+    await instance.prepare();
+    const { runId } = await instance.start({ value: 'public input' });
+    expect((await collect(instance.events(runId))).at(-1)?.type).toBe('output');
+    await runtime.dispose();
+    await provider.forceFlush();
+    const spans = exporter.getFinishedSpans();
+    assertSpanTree(spans, { text: 'allowed' });
+    expect(calls).toBe(1);
+    const capabilities = spans.filter((span) => span.name === 'execute_tool lookup@1');
+    expect(capabilities).toHaveLength(2);
+    expect(
+      capabilities.find((span) => span.attributes['galaxie.step.status'] === 'ok')?.attributes[
+        'gen_ai.tool.call.arguments'
+      ],
+    ).toBe('{"query":"first"}');
+    expect(
+      capabilities.find((span) => span.attributes['galaxie.error.code'] === 'denied')?.attributes[
+        'gen_ai.tool.call.arguments'
+      ],
+    ).toBeUndefined();
+    expect(serializeSpans(spans)).not.toContain('denied queued argument');
+  } finally {
+    release.resolve();
     await runtime.dispose();
     await provider.shutdown();
   }

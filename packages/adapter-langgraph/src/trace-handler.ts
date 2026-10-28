@@ -8,6 +8,31 @@ import type { LLMResult } from '@langchain/core/outputs';
 import { isGraphInterrupt } from '@langchain/langgraph/web';
 import { selectedRouteFromOptions } from './routed-chat-model.js';
 
+function messagesText(
+  messages: readonly BaseMessage[],
+  finishReason?: string,
+): readonly object[] | undefined {
+  try {
+    const result: object[] = [];
+    for (const message of messages) {
+      const content =
+        typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+      if (content === undefined) return undefined;
+      const role =
+        message.type === 'human' ? 'user' : message.type === 'ai' ? 'assistant' : message.type;
+      result.push({
+        role,
+        parts: [{ type: 'text', content }],
+        ...(finishReason === undefined ? {} : { finish_reason: finishReason }),
+      });
+    }
+    return result;
+  } catch {
+    // Optional trace text must not raise callback errors for unencodable message content.
+    return undefined;
+  }
+}
+
 interface ChainTrace {
   readonly handle: TraceHandle | undefined;
   readonly owned: boolean;
@@ -113,7 +138,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
 
   override handleChatModelStart(
     _llm: unknown,
-    _messages: BaseMessage[][],
+    messages: BaseMessage[][],
     runId: string,
     parentRunId?: string,
     extraParams?: Record<string, unknown>,
@@ -123,11 +148,13 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     const provider = metadata?.['ls_provider'];
     const model = metadata?.['ls_model_name'];
     const route = selectedRouteFromOptions(extraParams?.['options']);
+    const input = this.#trace.recordsText ? messagesText(messages.flat()) : undefined;
     this.#models.set(
       runId,
       this.#trace.start(
         {
           kind: 'model',
+          ...(input === undefined ? {} : { input }),
           ...(typeof provider === 'string' ? { provider } : {}),
           ...(typeof model === 'string' ? { model } : {}),
           ...(route === undefined ? {} : { route }),
@@ -154,8 +181,18 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
       typeof usage === 'object' && usage !== null && 'output_tokens' in usage
         ? usage.output_tokens
         : undefined;
+    const textOutput =
+      this.#trace.recordsText && message !== undefined
+        ? messagesText(
+            [message as BaseMessage],
+            typeof generation?.generationInfo?.['finish_reason'] === 'string'
+              ? generation.generationInfo['finish_reason']
+              : 'stop',
+          )
+        : undefined;
     this.#models.get(runId)?.end({
       status: 'ok',
+      ...(textOutput === undefined ? {} : { output: textOutput }),
       ...(route === undefined ? {} : { route }),
       usage: {
         ...(typeof input === 'number' ? { inputTokens: input } : {}),

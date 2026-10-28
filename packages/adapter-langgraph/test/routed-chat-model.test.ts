@@ -101,7 +101,10 @@ function routed(
   const fail = vi.fn<() => void>();
   const lease: ModelCall = { providerId: 'provider', destination: 'in-browser', end, fail };
   const begin = vi.fn(async () => lease);
-  const handler = new LangGraphTraceHandler({ start: () => ({ end: () => {} }) });
+  const handler = new LangGraphTraceHandler({
+    recordsText: false,
+    start: () => ({ end: () => {} }),
+  });
   return {
     model: new RoutedChatModel('assistant', { provider }, () => ({ models: { begin }, handler })),
     begin,
@@ -324,7 +327,10 @@ test('credential factories receive the per-call credential while callbacks only 
     expect(received).toBe(credential);
     return provider;
   });
-  const handler = new LangGraphTraceHandler({ start: () => ({ end: () => {} }) });
+  const handler = new LangGraphTraceHandler({
+    recordsText: false,
+    start: () => ({ end: () => {} }),
+  });
   const model = new RoutedChatModel('assistant', { remote: factory }, () => ({
     models: { begin },
     handler,

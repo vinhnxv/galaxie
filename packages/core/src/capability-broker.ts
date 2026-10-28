@@ -309,6 +309,7 @@ export class CapabilityBroker {
             try {
               assertActive();
               checkPolicy(value);
+              span.arguments(value);
               const context: CapabilityContext = {
                 signal: controller.signal,
                 effectId: globalThis.crypto.randomUUID() as EffectId,

@@ -65,7 +65,10 @@ const ALLOWED = new Set([
 ]);
 
 /** Independent tree and allowlist check, reused by the adapter's Node and browser tests. */
-export function assertSpanTree(spans: readonly ReadableSpan[]): SpanTree {
+export function assertSpanTree(
+  spans: readonly ReadableSpan[],
+  options?: { readonly text: 'allowed' },
+): SpanTree {
   expect(spans.length, 'No spans: check for a duplicate @opentelemetry/api copy.').toBeGreaterThan(
     0,
   );
@@ -77,7 +80,12 @@ export function assertSpanTree(spans: readonly ReadableSpan[]): SpanTree {
     expect(span.status.message).toBeUndefined();
     expect(span.ended).toBe(true);
     for (const [key, value] of Object.entries(span.attributes)) {
-      expect(ALLOWED.has(key), key).toBe(true);
+      const text =
+        options?.text === 'allowed' &&
+        ['gen_ai.input.messages', 'gen_ai.output.messages', 'gen_ai.tool.call.arguments'].includes(
+          key,
+        );
+      expect(ALLOWED.has(key) || text, key).toBe(true);
       if (key === 'galaxie.run.segment') {
         expect(Number.isInteger(value)).toBe(true);
         expect(value).toBeGreaterThanOrEqual(0);
@@ -86,7 +94,7 @@ export function assertSpanTree(spans: readonly ReadableSpan[]): SpanTree {
       for (const item of values) {
         expect(['string', 'number', 'boolean']).toContain(typeof item);
         if (typeof item === 'number') expect(Number.isFinite(item)).toBe(true);
-        if (typeof item === 'string') expect(item).toMatch(/^[^\p{Cc}]{1,128}$/u);
+        if (typeof item === 'string' && !text) expect(item).toMatch(/^[^\p{Cc}]{1,128}$/u);
         expect(typeof item).toBe(typeof values[0]);
       }
     }

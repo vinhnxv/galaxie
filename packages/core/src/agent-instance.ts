@@ -26,7 +26,7 @@ import type {
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
 import type { SelectedModelRoute } from './models.js';
-import type { BudgetLimits, DataLabel, DestinationAllowlist } from './policy.js';
+import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
 import { type RunInstrumentation, startRunTrace } from './tracing.js';
@@ -42,6 +42,7 @@ interface RunRecord {
   readonly grants: ReadonlySet<string>;
   readonly budget: RunBudget;
   readonly inbox: Map<InteractionId, InboxEntry>;
+  submittedText?: boolean;
   dispatching?: InteractionId;
   segment?: SegmentRecord;
   readonly events: RunEvents;
@@ -62,6 +63,12 @@ interface SegmentRecord {
   outcome?: RunStatus;
   clearWallClock?: () => void;
   tracing?: RunInstrumentation;
+}
+
+function containsText(value: unknown): boolean {
+  if (typeof value === 'string') return value.length > 0;
+  if (Array.isArray(value)) return value.some(containsText);
+  return typeof value === 'object' && value !== null && Object.values(value).some(containsText);
 }
 
 function terminal(run: RunRecord): boolean {
@@ -96,6 +103,9 @@ export function createAgentInstance(
     readonly tracer: Tracer;
     readonly limits: BudgetLimits;
     readonly policy: Readonly<Record<DataLabel, DestinationAllowlist>>;
+    readonly developmentTraceText?: {
+      readonly destination: DestinationClass;
+    };
   },
   onDisposed: () => void,
   diagnostics?: (event: DiagnosticEvent) => void,
@@ -317,17 +327,29 @@ export function createAgentInstance(
       publish();
       // A synchronous listener may cancel or dispose before the executor is entered.
       if (!active(run, segment)) return;
-      segment.tracing = startRunTrace(instrumentation.tracer, parent, {
-        appId: instrumentation.appId,
-        agentId: definition.id,
-        agentVersion: definition.version,
-        instanceId,
-        sessionId,
-        runId: run.runId,
-        segment: segment.index,
-        executorId: adapter.id,
-        executorVersion: adapter.version,
-      });
+      segment.tracing = startRunTrace(
+        instrumentation.tracer,
+        parent,
+        {
+          appId: instrumentation.appId,
+          agentId: definition.id,
+          agentVersion: definition.version,
+          instanceId,
+          sessionId,
+          runId: run.runId,
+          segment: segment.index,
+          executorId: adapter.id,
+          executorVersion: adapter.version,
+        },
+        {
+          ...(instrumentation.developmentTraceText === undefined
+            ? {}
+            : { developmentTraceText: instrumentation.developmentTraceText }),
+          policy: instrumentation.policy,
+          labels: () =>
+            run.submittedText ? new Set<DataLabel>([...run.labels, 'private-user']) : run.labels,
+        },
+      );
       const ports = {
         runId: run.runId,
         signal: AbortSignal.any([run.controller.signal, run.capabilityController.signal]),
@@ -577,6 +599,7 @@ export function createAgentInstance(
             return rejected('stale');
           const entry: InboxEntry = { interactionId, action, payload, status: 'accepted' };
           run.inbox.set(interactionId, entry);
+          if (containsText(payload)) run.submittedText = true;
           run.status = 'running';
           delete run.pending;
           // Register settlement before publishing: a listener may dispose synchronously.
