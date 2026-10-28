@@ -108,7 +108,6 @@ export class BuiltInAIChatModel extends BaseChatModel<BuiltInAICallOptions> {
         });
         options.signal?.throwIfAborted();
         step = 'prompt';
-        // mapMessages guarantees a final user message before any browser call.
         const last = mapped.at(-1);
         const reader = session
           .promptStreaming(last?.content ?? '', {
