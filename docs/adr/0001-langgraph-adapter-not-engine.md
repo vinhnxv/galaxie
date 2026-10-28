@@ -37,3 +37,5 @@ Building a second graph engine would duplicate that work. It would also create t
 
 - The M1 conformance suite (ADR-0016): branch, subgraph and interrupt/resume on the pinned version, compared between Node and Chrome. Reload is tested with the IndexedDB saver in M3.
 - AT-01, AT-02, AT-15.
+
+- 2026-10-29: The M1 explicit-config API list lives in [`tests/conformance/README.md`](../../tests/conformance/README.md), next to `compatibility-matrix.json`. The matrix records observed case and lane differences; the README lists the affected APIs and their proving tests.

@@ -11,6 +11,7 @@ import {
 } from './capabilities.js';
 import { type ErrorCode, GalaxieError, toErrorInfo } from './errors.js';
 import { DEFAULT_BUDGETS } from './policy.js';
+import { isHttpDestination, isLoopback } from './urls.js';
 
 interface Placeholder {
   readonly name: string;
@@ -36,9 +37,6 @@ export function getHttpCapability(binding: {
 function fail(code: ErrorCode): never {
   throw new GalaxieError(code, toErrorInfo(code).message);
 }
-function loopback(hostname: string): boolean {
-  return ['localhost', '127.0.0.1', '[::1]'].includes(hostname);
-}
 function template(url: string): Template {
   if (typeof url !== 'string') fail('invalid');
   const authority = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i.exec(url)?.[0];
@@ -49,8 +47,7 @@ function template(url: string): Template {
   } catch {
     return fail('invalid');
   }
-  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && loopback(parsed.hostname)))
-    fail('invalid');
+  if (!isHttpDestination(parsed)) fail('invalid');
   if (/[{}]/.test(parsed.hash)) fail('invalid');
   const queryStart = url.indexOf('?');
   const fragmentStart = url.indexOf('#');
@@ -161,7 +158,7 @@ export function httpCapability<Input = unknown, Output = unknown>(
   const validateDestination = (binding: Pick<CapabilityBinding, 'destination'>): void => {
     if (
       binding.destination === 'in-browser' ||
-      (binding.destination === 'user-device' && !loopback(new URL(compiled.origin).hostname))
+      (binding.destination === 'user-device' && !isLoopback(new URL(compiled.origin).hostname))
     )
       fail('invalid');
   };

@@ -6,7 +6,7 @@
 - **Document version:** 0.3. A starting point for implementation and critique, not a specification validated by code.
 - **Date:** 2026-10-28, timezone Asia/Ho_Chi_Minh.
 - **Language:** English.
-- **Status:** the first two M1 slices implement the core lifecycle, LangGraph.js adapter, capability broker, sticky data labels and argument shapes, finite step/tool-call/wall-clock/payload budgets, Node/Chromium parity cases and allowlisted OpenTelemetry spans. The model router, persistence and UI remain unimplemented. Two throwaway spikes have run (§16.2).
+- **Status:** four M1 slices implement the core lifecycle, LangGraph.js adapter, capability broker, model router with mock providers, sticky data labels and argument shapes, in-memory interrupt dispatch and resume, and finite step/tool-call/wall-clock/payload/token/cost budgets. The M1 exit controls add interaction URL policy and opt-in trace text filtered by live labels and destination, with twelve parity cases and additional Node/Chromium guarantee tests. Durable persistence and UI remain unimplemented. Two throwaway spikes have run (§16.2).
 - **Scope:** an SDK/runtime for developers, and the framework-neutral contracts it defines for browser agents (§7.6). The English Tutor is the reference application, not the whole product.
 - **Companion documents:** [framework overview](framework-overview.md) (role, direction, audiences, production readiness, public vs private) and [ADRs](adr/README.md).
 
@@ -448,7 +448,7 @@ LangGraph.js has a browser export and browser tests in its repository. That does
 
 `graph.compile()` produces an executable graph for the LangGraph runtime; it does not compile to WASM. Nodes, edges and reducers are still executable code. Exporting the node/edge list as JSON cannot preserve closures, side effects or runtime behavior. [S3]
 
-The browser has no `AsyncLocalStorage`. LangGraph APIs that rely on implicit async context may need the `config` passed explicitly. The M1 conformance suite lists which APIs are affected at the pinned version, in the compatibility matrix (§16.3). [S2]
+The browser has no `AsyncLocalStorage`. LangGraph APIs that rely on implicit async context may need the `config` passed explicitly. The M1 conformance suite lists which APIs are affected at the pinned version with the compatibility matrix, in [`tests/conformance/README.md`](../tests/conformance/README.md) (§16.3). [S2]
 
 ### 7.2. Required ownership
 
@@ -1547,7 +1547,7 @@ Galaxie targets end users of host apps, developers and enterprises. "Many users"
 
 ## 17. Acceptance tests — the definition of done
 
-These tests are planned requirements; none has run yet.
+These are the acceptance requirements across all milestones. The implemented M1 coverage is mapped to code and Node/Chromium tests in [system design §9](system-design.md#9-security-baseline-map); requirements for later milestones remain planned.
 
 | ID | Test | Pass condition |
 | --- | --- | --- |

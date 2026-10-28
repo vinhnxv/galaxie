@@ -13,7 +13,14 @@ import {
 import type { CapabilityKind } from './capabilities.js';
 import type { ErrorCode, ErrorInfo } from './errors.js';
 import type { RunStatus } from './lifecycle.js';
-import type { BudgetLimits, DataLabel, DestinationClass } from './policy.js';
+import {
+  type BudgetLimits,
+  type DataLabel,
+  type DestinationAllowlist,
+  type DestinationClass,
+  inBrowserOnly,
+  labelsAllow,
+} from './policy.js';
 import type { RunTrace, TraceHandle, TraceResult } from './trace.js';
 
 // open-telemetry/semantic-conventions-genai@51a0f580f8a6ad804ca4de5e033683c6fbbe5906
@@ -96,6 +103,7 @@ export type CapabilityResult =
   | { readonly status: 'ok' | 'cancelled' }
   | { readonly status: 'error'; readonly code: ErrorCode };
 export interface CapabilitySpan {
+  arguments(value: unknown): void;
   end(result: CapabilityResult): void;
 }
 
@@ -126,6 +134,11 @@ export function startRunTrace(
   tracer: Tracer,
   parent: Context,
   metadata: RunMetadata,
+  options?: {
+    readonly developmentTraceText?: { readonly destination: DestinationClass };
+    readonly policy: Readonly<Record<DataLabel, DestinationAllowlist>>;
+    readonly labels: () => Iterable<DataLabel>;
+  },
 ): RunInstrumentation {
   const root = tracer.startSpan(
     `invoke_agent ${safeName(metadata.agentId)}`,
@@ -150,9 +163,29 @@ export function startRunTrace(
   const steps = new Map<object, StepRecord>();
   const labels: { value: readonly DataLabel[] } = { value: [] };
   let closed = false;
+  const text = (
+    span: Span,
+    key: 'gen_ai.input.messages' | 'gen_ai.output.messages' | 'gen_ai.tool.call.arguments',
+    value: unknown,
+  ): void => {
+    const optIn = options?.developmentTraceText;
+    if (closed || optIn === undefined || options === undefined) return;
+    const currentLabels = [...options.labels()];
+    if (
+      inBrowserOnly(options.policy, currentLabels) ||
+      !labelsAllow(options.policy, currentLabels, optIn.destination)
+    )
+      return;
+    try {
+      const encoded = JSON.stringify(value);
+      if (encoded !== undefined) span.setAttribute(key, encoded);
+    } catch {}
+  };
   const end = (record: StepRecord, result: TraceResult | CapabilityResult): void => {
     if (record.ended) return;
     record.ended = true;
+    if (record.kind === 'model' && result.status === 'ok' && 'output' in result)
+      text(record.span, 'gen_ai.output.messages', result.output);
     record.span.setAttributes(
       attributes({
         'galaxie.step.status': result.status,
@@ -186,6 +219,7 @@ export function startRunTrace(
   };
   return {
     recorder: {
+      recordsText: options?.developmentTraceText !== undefined,
       start(step, parentHandle): TraceHandle {
         if (closed) return NOOP_HANDLE;
         const ancestor = parentHandle === undefined ? undefined : steps.get(parentHandle);
@@ -216,6 +250,7 @@ export function startRunTrace(
           },
           ancestor?.context ?? rootContext,
         );
+        if (step.kind === 'model') text(span, 'gen_ai.input.messages', step.input);
         const record: StepRecord = {
           kind: step.kind,
           span,
@@ -233,7 +268,7 @@ export function startRunTrace(
       },
     },
     startCapability(meta, parentHandle): CapabilitySpan {
-      if (closed) return { end: () => {} };
+      if (closed) return { arguments: () => {}, end: () => {} };
       const ancestor = parentHandle === undefined ? undefined : steps.get(parentHandle);
       const span = tracer.startSpan(
         meta.name === undefined ? 'execute_tool' : `execute_tool ${safeName(meta.name)}`,
@@ -256,6 +291,9 @@ export function startRunTrace(
         ended: false,
       };
       const handle: CapabilitySpan = {
+        arguments(value): void {
+          if (!record.ended) text(span, 'gen_ai.tool.call.arguments', value);
+        },
         end(result): void {
           if (!closed) end(record, result);
         },

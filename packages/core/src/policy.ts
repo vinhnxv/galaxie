@@ -80,3 +80,24 @@ export function galaxieField(annotation: FieldAnnotation): {
 } {
   return { 'x-galaxie': annotation };
 }
+
+/** Every sticky label must permit the final destination. Empty labels permit all destinations. */
+export function labelsAllow(
+  policy: Readonly<Record<DataLabel, DestinationAllowlist>>,
+  labels: Iterable<DataLabel>,
+  destination: DestinationClass,
+): boolean {
+  return [...labels].every((label) => policy[label].allow.includes(destination));
+}
+
+/** Text never enters spans when any current label is restricted to the browser alone. */
+export function inBrowserOnly(
+  policy: Readonly<Record<DataLabel, DestinationAllowlist>>,
+  labels: Iterable<DataLabel>,
+): boolean {
+  return [...labels].some(
+    (label) =>
+      policy[label].allow.length > 0 &&
+      policy[label].allow.every((destination) => destination === 'in-browser'),
+  );
+}
