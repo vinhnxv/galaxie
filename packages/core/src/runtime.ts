@@ -19,6 +19,7 @@ import {
   type DestinationClass,
 } from './policy.js';
 import type { InferInput } from './schema.js';
+import { normalizeUrlAllowlist } from './urls.js';
 import { VERSION } from './version.js';
 
 export interface DiagnosticEvent {
@@ -29,6 +30,7 @@ export interface DiagnosticEvent {
     | 'executor_dispose_failed'
     | 'late_event'
     | 'protocol_violation'
+    | 'interaction_rejected'
     | 'listener_threw'
     | 'late_result'
     | 'capability_failed'
@@ -59,6 +61,8 @@ export interface RuntimeOptions<
   readonly executors: Adapters;
   readonly diagnostics?: (event: DiagnosticEvent) => void;
   readonly tracerProvider?: TracerProvider;
+  /** Exact origins permitted in interaction URL props; the default permits none. */
+  readonly urlAllowlist?: readonly string[];
   /** Development-only verbatim text in spans; declare the final recipient of exported spans. */
   readonly developmentTraceText?: { readonly destination: DestinationClass };
   readonly dataPolicy?: DataPolicy;
@@ -107,6 +111,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
   if (options.appId === '') throw new GalaxieError('invalid', 'An application ID is required.');
   const limits = budgetLimits(options.budgets);
   const policy = dataPolicy(options.dataPolicy);
+  const urlAllowlist = normalizeUrlAllowlist(options.urlAllowlist);
   const traceText = options.developmentTraceText;
   if (
     traceText !== undefined &&
@@ -147,6 +152,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
           tracer,
           limits,
           policy,
+          urlAllowlist,
           ...(developmentTraceText === undefined ? {} : { developmentTraceText }),
         },
         () => instances.delete(instance),

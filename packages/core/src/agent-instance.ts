@@ -23,6 +23,7 @@ import type {
   PendingInteraction,
   Submission,
 } from './interactions.js';
+import { checkInteractionUrls } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
 import type { SelectedModelRoute } from './models.js';
@@ -103,6 +104,7 @@ export function createAgentInstance(
     readonly tracer: Tracer;
     readonly limits: BudgetLimits;
     readonly policy: Readonly<Record<DataLabel, DestinationAllowlist>>;
+    readonly urlAllowlist: readonly string[];
     readonly developmentTraceText?: {
       readonly destination: DestinationClass;
     };
@@ -285,11 +287,24 @@ export function createAgentInstance(
         return;
       }
       case 'interaction':
+        if (!adapter.features.interrupts) {
+          const error = { name: 'ProtocolViolation' };
+          failRun(run, toErrorInfo('executor_error', error));
+          report({ kind: 'protocol_violation', runId: run.runId, error });
+          return;
+        }
         if (run.inbox.has(event.interaction.interactionId)) {
           // An answered interaction can never pause again: dispatch would only report duplicate.
           const error = { name: 'ProtocolViolation' };
           failRun(run, toErrorInfo('unsupported', error));
           report({ kind: 'protocol_violation', runId: run.runId, error });
+          return;
+        }
+        // Any later checkpoint-to-pending path, including M3 reload, must apply this check too.
+        // Raw stream events remain untrusted engine output and must never be rendered as UI.
+        if (!checkInteractionUrls(event.interaction.props, instrumentation.urlAllowlist)) {
+          failRun(run, toErrorInfo('denied'));
+          report({ kind: 'interaction_rejected', runId: run.runId });
           return;
         }
         segment.outcome = 'waiting_input';

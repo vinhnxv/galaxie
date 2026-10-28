@@ -70,7 +70,7 @@ export type {
   UiRequirements,
   UserInteractionEvent,
 } from './interactions.js';
-export { parseInteractionRequest } from './interactions.js';
+export { checkInteractionUrls, isAllowedUrl, parseInteractionRequest } from './interactions.js';
 export {
   INSTANCE_TRANSITIONS,
   type InstanceState,

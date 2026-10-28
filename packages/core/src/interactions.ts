@@ -3,6 +3,7 @@
 
 import type { ErrorInfo } from './errors.js';
 import type { InstanceId, InteractionId, RunId, SurfaceId, ViewRevision } from './ids.js';
+import { isHttpDestination } from './urls.js';
 
 /** A component catalog, for example `education/v1` (brief §11.2). */
 export type CatalogId = `${string}/v${number}`;
@@ -69,6 +70,53 @@ export function parseInteractionRequest(value: unknown): InteractionRequest | un
     return value as unknown as InteractionRequest;
   } catch {
     return undefined;
+  }
+}
+
+/** Shared with schema-declared URL props in the renderer: exact origins, no user information. */
+export function isAllowedUrl(value: string, allowlist: readonly string[]): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      isHttpDestination(url) &&
+      url.username === '' &&
+      url.password === '' &&
+      allowlist.includes(url.origin)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function urlCandidate(value: string): string | undefined {
+  const stripped = value.replace(/[\t\n\r]/g, '');
+  let start = 0;
+  let end = stripped.length;
+  while (start < end && stripped.charCodeAt(start) <= 0x20) start++;
+  while (end > start && stripped.charCodeAt(end - 1) <= 0x20) end--;
+  const candidate = stripped.slice(start, end);
+  return /^[/\\]{2}/.test(candidate) ||
+    /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(candidate) ||
+    /^(?:https?|wss?|ftp|file|javascript|vbscript|data|blob|filesystem):/i.test(candidate)
+    ? candidate
+    : undefined;
+}
+
+/** M1 examines every JSON string leaf; the M2 registry will identify URL props by schema. */
+export function checkInteractionUrls(props: unknown, allowlist: readonly string[]): boolean {
+  try {
+    if (typeof props === 'string') {
+      const candidate = urlCandidate(props);
+      return candidate === undefined || isAllowedUrl(candidate, allowlist);
+    }
+    if (Array.isArray(props)) return props.every((value) => checkInteractionUrls(value, allowlist));
+    return (
+      props === null ||
+      typeof props !== 'object' ||
+      Object.values(props).every((value) => checkInteractionUrls(value, allowlist))
+    );
+  } catch {
+    return false;
   }
 }
 
