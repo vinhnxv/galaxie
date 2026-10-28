@@ -63,6 +63,10 @@ const ERROR_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   executor_error: 'The executor or agent code failed.',
 };
 
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === 'string' && Object.hasOwn(ERROR_MESSAGES, value);
+}
+
 /** Recognizes errors across realms without trusting their message. */
 export function isGalaxieError(value: unknown): value is GalaxieError {
   return (
@@ -71,8 +75,7 @@ export function isGalaxieError(value: unknown): value is GalaxieError {
     'name' in value &&
     value.name === 'GalaxieError' &&
     'code' in value &&
-    typeof value.code === 'string' &&
-    Object.hasOwn(ERROR_MESSAGES, value.code)
+    isErrorCode(value.code)
   );
 }
 

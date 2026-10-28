@@ -140,3 +140,19 @@ test.each(['end', 'error'] as const)(
     expect(settled).toBe(true);
   },
 );
+
+test('a later parentless chain does not move the settlement barrier', async () => {
+  const { handler } = recording();
+  handler.handleChainStart({}, {}, 'root');
+  handler.handleChainStart({}, {}, 'detached');
+  let settled = false;
+  const wait = handler.settled().then(() => {
+    settled = true;
+  });
+  handler.handleChainEnd({}, 'detached');
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  handler.handleChainEnd({}, 'root');
+  await wait;
+  expect(settled).toBe(true);
+});

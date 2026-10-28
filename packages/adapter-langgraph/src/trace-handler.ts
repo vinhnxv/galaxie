@@ -40,7 +40,8 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     runName?: string,
   ): void {
     // LangChain 1.2.20 invokes parentRunId fourth and runName eighth, unlike its declaration.
-    if (parentRunId === undefined) this.#root = runId;
+    // The first parentless chain is the graph run; later ones must not move the settlement barrier.
+    if (parentRunId === undefined && this.#root === undefined) this.#root = runId;
     const parent = parentRunId === undefined ? undefined : this.#chains.get(parentRunId)?.handle;
     const owned =
       runName !== undefined &&

@@ -146,7 +146,10 @@ test('start rejects before ready and after dispose during validation', async () 
   await expect(instance.start('input')).rejects.toMatchObject({ code: 'invalid' });
   await instance.prepare();
   const starting = instance.start('input');
-  const rejected = expect(starting).rejects.toMatchObject({ code: 'invalid' });
+  const rejected = expect(starting).rejects.toMatchObject({
+    code: 'invalid',
+    message: 'The instance was disposed.',
+  });
   await instance.dispose();
   validation.resolve();
   await rejected;

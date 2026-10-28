@@ -3,7 +3,13 @@
 
 import { type Context, context, type Tracer } from '@opentelemetry/api';
 import type { AgentDefinition } from './definition.js';
-import { type ErrorInfo, GalaxieError, isGalaxieError, toErrorInfo } from './errors.js';
+import {
+  type ErrorInfo,
+  GalaxieError,
+  isErrorCode,
+  isGalaxieError,
+  toErrorInfo,
+} from './errors.js';
 import type { ExecutorEvent } from './events.js';
 import type { ExecutorAdapter, ExecutorAgent } from './executor.js';
 import type { InstanceId, RunId, SessionId } from './ids.js';
@@ -160,7 +166,7 @@ export function createAgentInstance(
         delete run.pending;
         break;
       case 'error': {
-        const knownCode = isGalaxieError({ name: 'GalaxieError', code: event.error.code });
+        const knownCode = isErrorCode(event.error.code);
         const error = Object.freeze(
           toErrorInfo(
             knownCode ? event.error.code : 'executor_error',
@@ -326,14 +332,18 @@ export function createAgentInstance(
         let value: unknown;
         try {
           const result = await definition.input['~standard'].validate(input);
-          assertUsable();
-          if (result.issues !== undefined) {
-            throw new GalaxieError('invalid', 'The run input failed validation.');
-          }
+          if (result.issues !== undefined) throw result.issues;
           value = result.value;
         } catch {
           claimingSlot = false;
+          assertUsable();
           throw new GalaxieError('invalid', 'The run input failed validation.');
+        }
+        try {
+          assertUsable();
+        } catch (error) {
+          claimingSlot = false;
+          throw error;
         }
         const runId = globalThis.crypto.randomUUID() as RunId;
         const { promise: settled, resolve: settle } = Promise.withResolvers<void>();
