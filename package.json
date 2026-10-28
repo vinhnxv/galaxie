@@ -9,14 +9,14 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -p packages/core/tsconfig.build.json",
+    "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json",
     "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run build",
     "check:license": "node scripts/check-license.ts",
     "format": "biome check --write .",
     "lint": "biome check .",
-    "test": "vitest run --dir packages",
-    "typecheck": "tsc -p packages/core && tsc -p packages/core/test && tsc -p scripts",
-    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p scripts"
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/core && tsc -p packages/core/test && tsc -p packages/adapter-langgraph && tsc -p packages/adapter-langgraph/test && tsc -p tests/conformance && tsc -p scripts",
+    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p packages/adapter-langgraph && tsc6 -p packages/adapter-langgraph/test && tsc6 -p tests/conformance && tsc6 -p scripts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

@@ -1,0 +1,30 @@
+{
+  "name": "@galaxie/adapter-langgraph",
+  "version": "0.0.0",
+  "private": true,
+  "description": "LangGraph.js executor adapter for galaxie.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@galaxie/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@langchain/core": "~1.2.20",
+    "@langchain/langgraph": "~1.5.1"
+  },
+  "devDependencies": {
+    "@langchain/core": "1.2.20",
+    "@langchain/langgraph": "1.5.1",
+    "zod": "4.6.7"
+  }
+}

@@ -171,7 +171,14 @@ export function createAgentInstance(
         failRun(run, error);
         if (!knownCode)
           report({ kind: 'protocol_violation', runId: run.runId, error: event.error });
-        report({ kind: 'run_failed', runId: run.runId, error: event.error });
+        report({
+          kind: 'run_failed',
+          runId: run.runId,
+          error:
+            isGalaxieError(event.error) && event.error.cause !== undefined
+              ? event.error.cause
+              : event.error,
+        });
         return;
       }
       case 'interaction':

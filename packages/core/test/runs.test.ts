@@ -28,6 +28,30 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+test('adapter error causes reach diagnostics without entering stored errors', async () => {
+  const raw = new TypeError('secret-adapter-cause');
+  const envelope = Object.assign(
+    new GalaxieError('executor_error', 'The executor or agent code failed.', { cause: raw }),
+    { type: 'TypeError' },
+  );
+  const diagnostics: DiagnosticEvent[] = [];
+  const runtime = createRuntime({
+    appId: 'tests',
+    executors: [new FakeExecutor([[{ type: 'error', error: envelope }]])],
+    diagnostics: (event) => diagnostics.push(event),
+  });
+  const instance = await runtime.create(definition, { principalScope: 'user', agent: {} });
+  await instance.prepare();
+  const { runId } = await instance.start('input');
+  const events = await collect(instance.events(runId));
+  await runtime.dispose();
+  expect(diagnostics).toContainEqual(expect.objectContaining({ kind: 'run_failed', error: raw }));
+  expect(JSON.stringify({ snapshot: instance.getSnapshot(), events })).not.toContain(
+    'secret-adapter-cause',
+  );
+  expect(instance.getSnapshot().run?.error?.type).toBe('TypeError');
+});
+
 test('two starts in one tick claim one slot before asynchronous schema validation', async () => {
   const validation = deferred<void>();
   const executor = new FakeExecutor();
