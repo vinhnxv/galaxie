@@ -1,0 +1,231 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 2
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 3,
+          "answer": "linear response"
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 6,
+          "answer": "linear response"
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "respond": {
+            "value": 3,
+            "answer": "linear response"
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "double": {
+            "value": 6
+          }
+        }
+      }
+    ],
+    "messages": [
+      {
+        "path": [
+          "respond:<uuid:1>"
+        ],
+        "data": [
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "AIMessageChunk"
+            ],
+            "kwargs": {
+              "id": "reply-linear",
+              "content": "linear ",
+              "tool_calls": [],
+              "invalid_tool_calls": [],
+              "tool_call_chunks": [],
+              "additional_kwargs": {},
+              "response_metadata": {}
+            }
+          },
+          {
+            "tags": [],
+            "ls_integration": "langchain_chat_model",
+            "thread_id": "<uuid:2>",
+            "langgraph_step": 1,
+            "langgraph_node": "respond",
+            "langgraph_triggers": [
+              "branch:to:respond"
+            ],
+            "langgraph_path": [
+              "__pregel_pull",
+              "respond"
+            ],
+            "langgraph_checkpoint_ns": "respond:<uuid:1>",
+            "checkpoint_ns": "respond:<uuid:1>",
+            "ls_model_type": "chat",
+            "ls_provider": "galaxie-fixture",
+            "ls_model_name": "fixture-1",
+            "versions": {
+              "@langchain/core": "1.2.20"
+            }
+          }
+        ]
+      },
+      {
+        "path": [
+          "respond:<uuid:1>"
+        ],
+        "data": [
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "AIMessageChunk"
+            ],
+            "kwargs": {
+              "id": "reply-linear",
+              "content": "response",
+              "usage_metadata": {
+                "input_tokens": 2,
+                "output_tokens": 2,
+                "total_tokens": 4
+              },
+              "tool_calls": [],
+              "invalid_tool_calls": [],
+              "tool_call_chunks": [],
+              "additional_kwargs": {},
+              "response_metadata": {}
+            }
+          },
+          {
+            "tags": [],
+            "ls_integration": "langchain_chat_model",
+            "thread_id": "<uuid:2>",
+            "langgraph_step": 1,
+            "langgraph_node": "respond",
+            "langgraph_triggers": [
+              "branch:to:respond"
+            ],
+            "langgraph_path": [
+              "__pregel_pull",
+              "respond"
+            ],
+            "langgraph_checkpoint_ns": "respond:<uuid:1>",
+            "checkpoint_ns": "respond:<uuid:1>",
+            "ls_model_type": "chat",
+            "ls_provider": "galaxie-fixture",
+            "ls_model_name": "fixture-1",
+            "versions": {
+              "@langchain/core": "1.2.20"
+            }
+          }
+        ]
+      }
+    ],
+    "custom": [
+      {
+        "path": [],
+        "data": {
+          "phase": "respond",
+          "value": 2
+        }
+      }
+    ]
+  },
+  "modes": [
+    "values",
+    "custom",
+    "messages",
+    "messages",
+    "updates",
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 6,
+    "answer": "linear response"
+  },
+  "state": {
+    "values": {
+      "value": 6,
+      "answer": "linear response"
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "respond"
+      ],
+      "values": {
+        "value": 2
+      },
+      "parentCheckpointId": "<uuid:3>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [
+        "double"
+      ],
+      "values": {
+        "value": 3,
+        "answer": "linear response"
+      },
+      "parentCheckpointId": "<uuid:4>"
+    },
+    {
+      "metadata": {
+        "step": 2,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 6,
+        "answer": "linear response"
+      },
+      "parentCheckpointId": "<uuid:5>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  }
+}

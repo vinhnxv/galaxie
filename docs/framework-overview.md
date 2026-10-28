@@ -3,7 +3,7 @@
 > What galaxie is, where it is going, what it does for developers (including people coding with AI assistants), who it serves, and what it takes to become production-ready. The detailed contract is the [project brief](galaxie-project-brief.md); decisions and their reasoning are in the [ADRs](adr/README.md).
 
 - **Date:** 2026-10-28
-- **Status:** direction document. Nothing here is implemented yet.
+- **Status:** direction document. The first M1 lifecycle, LangGraph adapter, conformance and tracing slice is implemented; the remaining components below describe the target.
 
 ## 1. Role: what galaxie is
 

@@ -46,6 +46,9 @@ describe('instance transitions', () => {
 });
 
 describe('run transitions', () => {
+  test('a queued run can fail while waiting for settlement', () => {
+    expect(RUN_TRANSITIONS.queued).toContain('failed');
+  });
   test('a run ends as succeeded, failed or cancelled', () => {
     expect(terminalStates(RUN_TRANSITIONS)).toEqual(new Set(['succeeded', 'failed', 'cancelled']));
   });

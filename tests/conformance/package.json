@@ -1,0 +1,18 @@
+{
+  "name": "@galaxie/conformance",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "dependencies": {
+    "@galaxie/core": "workspace:*",
+    "@galaxie/adapter-langgraph": "workspace:*",
+    "@langchain/core": "1.2.20",
+    "@langchain/langgraph": "1.5.1",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/sdk-trace": "3.0.0"
+  },
+  "devDependencies": {
+    "zod": "4.6.7"
+  }
+}

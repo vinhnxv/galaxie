@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - tests/*
 
 # Resolve only versions published at least 7 days ago, to limit exposure to compromised releases.
 minimumReleaseAge: 10080

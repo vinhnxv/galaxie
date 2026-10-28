@@ -10,7 +10,9 @@
 ## 1. What exists today
 
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
-- **`packages/core`:** draft contracts only: types plus three fixed transition tables, with no runtime behavior (§6).
+- **`packages/core`:** framework-neutral contracts and the first runtime slice: lifecycle, identity, cancellation, replayable in-memory events and allowlisted OpenTelemetry spans (§6).
+- **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, and callback-based step tracing.
+- **`tests/conformance`:** five graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix.
 - **`spikes/`:** two throwaway spikes, B0 (a 1.7B model on WebGPU) and the local English tutor (a LangGraph.js agent on that model in Chrome). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
 
@@ -88,7 +90,7 @@ flowchart TD
 
 Proposed rules; M1 confirms them:
 
-1. `core` has one runtime dependency, the OpenTelemetry API (`@opentelemetry/api`), whose calls do nothing until the host registers an SDK (ADR-0016). It uses Zod v4 types (a peer dependency), imports no agent framework (ADR-0017), and touches no engine, UI framework or browser API when it is imported (`sideEffects: false`).
+1. `core` has no `dependencies`; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Only the OpenTelemetry API is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries.
 2. Every other package depends on `core` and on its own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
 3. Agent packages depend on `core` and their engine, never on a host package. From M4 the ESLint plugin flags direct `fetch`, storage, DOM and `eval` use (brief §9.7 C).
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
@@ -100,14 +102,17 @@ Today:
 
 ```text
 galaxie/
-├── .github/workflows/ci.yml   CI: license check, lint, type-check (TS 7 and 6), tests, build
+├── .github/workflows/ci.yml   CI: license, lint, TS 7 and 6, Node/Chromium tests, build, dependency guard
 ├── docs/                      brief, framework overview, this document, ADRs
 ├── packages/
-│   └── core/                  draft contracts (§6)
+│   ├── core/                  runtime and framework-neutral contracts (§6)
+│   └── adapter-langgraph/     native LangGraph executor and callback mapping
 ├── scripts/
-│   └── check-license.ts       SPDX headers and package license fields (ADR-0015)
+│   ├── check-license.ts       SPDX headers and package license fields (ADR-0015)
+│   └── check-dependencies.ts  source and built-package dependency boundaries
+├── tests/conformance/         shared cases, native goldens and compatibility-matrix.json
 ├── spikes/                    throwaway spike code, outside the root workspace (brief §16.2)
-├── biome.json  package.json  pnpm-workspace.yaml  tsconfig.base.json
+├── biome.json  package.json  pnpm-workspace.yaml  tsconfig.base.json  vitest.config.ts
 └── AGENTS.md  COMMERCIAL-LICENSE.md  LICENSE  README.md
 ```
 
@@ -130,27 +135,30 @@ Target (brief §15), with the milestone that first needs each path:
 
 Spike code is throwaway. Keep it out of `packages/` and never promote it to package code (brief §16.2).
 
-## 6. Core contracts (draft)
+## 6. Core runtime and contracts
 
-`packages/core/src`, exported from `index.ts`:
+Modules in `packages/core/src`; `index.ts` exports the public contracts and runtime API:
 
 | Module | Contents | Source |
 | --- | --- | --- |
 | `schema.ts` | `Schema`, `Infer`, `InferInput` over Zod v4 core types | ADR-0008 |
 | `ids.ts` | Branded runtime IDs; host-supplied IDs as plain strings | brief §8.2 |
 | `lifecycle.ts` | `InstanceState`, `RunStatus` and their transition tables | brief §8.3 |
-| `errors.ts` | `ErrorCode`, `ErrorInfo`, `GalaxieError` | brief §9.4, §10, §11.4, §12 |
+| `errors.ts` | `ErrorCode`, fixed-message `ErrorInfo`, `GalaxieError` and sanitization helpers | brief §9.4, §10, §11.4, §12 |
 | `policy.ts` | Destination classes, presets, data labels, argument shapes, budget limits | brief §3, §9.4; ADR-0014 |
 | `models.ts` | Model roles, features, role requirements, `ModelPolicy` | brief §10; ADR-0006 |
 | `capabilities.ts` | Capability names, requests, kinds, grant scopes, retry policy, host bindings | brief §9.2, §12.3 |
 | `interactions.ts` | Catalogs, components, UI requirements, pending interactions, user events, receipts, inbox status | brief §11, §12; ADR-0004, ADR-0007 |
 | `effects.ts` | Effect states and transitions | brief §12.3 |
-| `events.ts` | Executor events and journaled run events | brief §7.5, §12.1 |
+| `events.ts` | Executor-native stream events and runtime envelopes, including cancellation; currently in memory only | brief §7.5, §12.1 |
 | `executor.ts` | Executor adapter contract and feature flags | brief §7.5; ADR-0001 |
 | `definition.ts` | `AgentDefinition`, `defineAgentDefinition`, `BindingsFor`, `InputOf` | brief §13.2; ADR-0008 |
 | `instance.ts` | `AgentInstance`, snapshots, cancel receipt | brief §14.1 |
+| `runtime.ts`, `agent-instance.ts` | `createRuntime`, instance identity and lifecycle, validation, run slots, cancellation and bounded disposal | brief §8, §14 |
+| `run-events.ts` | Per-run replay and live iteration with independent consumers | brief §8.2 |
+| `trace.ts`, `tracing.ts`, `version.ts` | Data-only executor instrumentation and core-owned, allowlisted OpenTelemetry spans | ADR-0016 |
 
-Choices the draft makes where the brief leaves room:
+Contract choices where the brief leaves room:
 
 - **Branded IDs.** IDs with a control meaning are branded types, so a plain string, such as text from model output, needs an explicit cast to pass as one. This helps at compile time only; the runtime still checks every ID (brief §8.2).
 - **A failed `prepare`** returns the instance to `created`, which gives the retry or dispose path brief §8.3 asks for.
@@ -158,7 +166,13 @@ Choices the draft makes where the brief leaves room:
 - **Run status belongs to the runtime.** An executor reports events; the runtime derives the run status from them and creates every ID.
 - **Open for M1:** how a schema field carries its data label and argument shape (`FieldAnnotation`), for example through Zod metadata (ADR-0014).
 
-Not in `core` yet: `createRuntime`, the broker, the router, budget enforcement and tracing spans, which are M1 work (brief §16.3), and multi-tab ownership, which is M3 work (brief §16.5). Unit tests cover the broker, the router and the budgets, and AT-36 covers the spans. The conformance suite (AT-15) checks that the same graphs behave alike on Node and in Chrome (ADR-0016).
+Not in `core` yet: the broker, the router and budget enforcement (remaining M1 work, brief §16.3), plus durable events and multi-tab ownership (M3). Dispatch and resume are unsupported in this slice. Conformance currently covers stream events, final state and checkpoint history for five cases; interrupt/resume and durability parity remain deferred.
+
+Each instance owns one session. A run claims its slot before asynchronous Standard Schema validation; queued successors wait for the previous executor iterator to complete. Cancellation invalidates results immediately while core keeps draining. Core's single 10-second settlement bound limits queued waits and disposal without permitting overlapping loops on a session. Diagnostics alone receive raw errors; snapshots and error events contain fixed messages and sanitized types.
+
+The LangGraph adapter imports only `@langchain/langgraph/web`. It drives the public runnable `transform()` method with one input and the native `values`, `updates`, `messages` and `custom` modes. This invokes LangGraph's own engine without LangChain 1.2.20's outer `stream()` abort race, which can leave its generator suspended before root callbacks. Native transformation must be available; stream-only facades reject with `unsupported`. The adapter adds no scheduler or settlement timeout. Tests cover a cancelled run followed by a successful run, including delayed checkpoint writes.
+
+Core records a run/node/model span tree using explicit parent contexts. The host owns SDK registration and export; core ships neither. Attributes follow `open-telemetry/semantic-conventions-genai@51a0f580f8a6ad804ca4de5e033683c6fbbe5906`, `schema_url https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev`, core semantic conventions v1.44.0. Spans contain no events, links, exception attributes or status descriptions, and never record error messages, prompts or model output. Principal scope is excluded. Failed spans use `ERROR`; cancellation leaves status `UNSET`. Canary and no-network tests run on Node and Chromium.
 
 ## 7. Runtime topology
 
@@ -341,24 +355,28 @@ M1 must cover A1–A4, A7 and A8 with tests (brief §16.3). The others are teste
 
 ## 10. Toolchain
 
-- **Node.js 24** (`.nvmrc`) and **pnpm 11** through Corepack (`packageManager`), in one workspace (`packages/*`).
+- **Node.js 24** (`.nvmrc`) and **pnpm 11** through Corepack (`packageManager`), in one workspace (`packages/*`, `tests/*`).
 - **Release age gate:** `minimumReleaseAge: 10080` lets pnpm resolve only versions published at least 7 days earlier, a supply-chain control.
 - **TypeScript 7** (`tsc`) builds and type-checks. **TypeScript 6** (`tsc6`, from `@typescript/typescript6`) type-checks the same projects, as ADR-0013 requires.
 - **Strict settings** in `tsconfig.base.json`, including `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `isolatedDeclarations` and `erasableSyntaxOnly`. Relative imports end in `.js` (NodeNext).
 - **Biome** lints and formats; it needs no compiler API. ESLint comes with the agent-package plugin in M4. It will run on TypeScript 6, because typescript-eslint supports TypeScript only below 6.1.
-- **Vitest** runs the unit tests. Type tests use `expectTypeOf`; the type-check enforces them, not Vitest.
+- **Vitest** runs `node` and `browser (chromium)` projects. The browser project explicitly enables Playwright, retains Vitest's default exclusions and resolves dependencies from the conformance workspace. Type tests use `expectTypeOf`; the type-check enforces them, not Vitest. Package source excludes Node globals; separate test configs allow Node types.
 - **CI** pins actions by commit SHA, uses a read-only token, does not persist credentials and installs from the frozen lockfile.
 
 | Command | What it runs |
 | --- | --- |
 | `pnpm check` | Everything CI runs, in the same order |
 | `pnpm check:license` | SPDX headers and package license fields (ADR-0015) |
+| `pnpm check:deps` | Core peers/imports, adapter web imports and Node-free built packages; run after build |
 | `pnpm lint` | Biome lint and format check |
 | `pnpm format` | Biome formatting and safe fixes, written to disk |
 | `pnpm typecheck` | TypeScript 7 |
 | `pnpm typecheck:ts6` | TypeScript 6 |
-| `pnpm test` | Vitest |
-| `pnpm build` | `packages/core/dist` |
+| `CI=true pnpm test` | Both Vitest projects without writing missing goldens |
+| `pnpm conformance:update` | Write goldens from the native Node lane only; review the diff |
+| `pnpm exec playwright install --only-shell chromium` | Install the local headless Chromium binary; CI adds `--with-deps` |
+| `pnpm exec vitest run --project 'browser (chromium)'` | Run only Chromium tests |
+| `pnpm build` | Build core, then the adapter against core's `dist` |
 
 ## 11. What confirms this design, and when
 
