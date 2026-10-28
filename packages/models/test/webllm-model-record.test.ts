@@ -41,6 +41,8 @@ describe('WebLLM model record and content-free errors', () => {
     { integrity: { ...defaultWebLLMModel.integrity, onFailure: 'warn' } },
     { modelUrl: 'https://example.test/resolve/main/' },
     { modelUrl: 'https://example.test/models/' },
+    { modelUrl: 'http://example.test/resolve/0123456789012345678901234567890123456789/' },
+    { libraryUrl: 'http://example.test/library.wasm' },
   ])('rejects an incomplete, mutable or downgraded record without its text', (change) => {
     let error: unknown;
     try {

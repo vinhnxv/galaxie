@@ -59,14 +59,15 @@ function object(value: unknown): value is Record<string, unknown> {
 function validUrl(value: unknown, allowSearch = false): value is string {
   if (
     typeof value !== 'string' ||
-    (!value.startsWith('/') && !/^https?:\/\//.test(value)) ||
+    // Weight shards have no SRI, so absolute URLs must not travel in cleartext.
+    (!value.startsWith('/') && !value.startsWith('https://')) ||
     value.startsWith('//')
   )
     return false;
   try {
     const url = new URL(value, 'https://validation.invalid/');
     return (
-      ['http:', 'https:'].includes(url.protocol) &&
+      url.protocol === 'https:' &&
       !url.username &&
       !url.password &&
       (allowSearch || !url.search) &&
