@@ -247,6 +247,73 @@ test('unsupported resume precedes submission validation', async () => {
   await runtime.dispose();
 });
 
+test.each(['pending', 'predecessor'] as const)(
+  'resume uses the validated JSON payload when the caller mutates it during %s settlement',
+  async (phase) => {
+    const gate = deferred<void>();
+    const { instance, executor, runtime, event, runId } = await waiting({
+      budgets: { payloadBytes: 16 },
+      scripts: [
+        [
+          { type: 'interaction', interaction },
+          ...(phase === 'predecessor' ? [{ wait: gate.promise }] : []),
+        ],
+        [{ type: 'output', output: 'done' }],
+      ],
+    });
+    if (phase === 'pending')
+      executor.agent.pending = async () => {
+        await gate.promise;
+        return interaction;
+      };
+    const payload = { answer: '' };
+    try {
+      const receipt = instance.dispatch({ ...event, payload });
+      if (phase === 'predecessor') expect((await receipt).status).toBe('accepted');
+      payload.answer = 'x'.repeat(100);
+      gate.resolve();
+      expect((await receipt).status).toBe('accepted');
+      await collect(instance.events(runId));
+      expect(executor.requests[1]?.command).toMatchObject({
+        type: 'resume',
+        payload: { answer: '' },
+      });
+    } finally {
+      gate.resolve();
+      await runtime.dispose();
+    }
+  },
+);
+
+test('dispatch keeps the validated action and interrupt identity during JSON serialization', async () => {
+  const { instance, executor, runtime, event, runId } = await waiting();
+  const submission = {
+    ...event,
+    payload: {
+      toJSON() {
+        submission.action = '';
+        submission.interactionId = 'other' as InteractionId;
+        return { answer: true };
+      },
+    },
+  };
+  try {
+    expect(await instance.dispatch(submission)).toEqual({
+      status: 'accepted',
+      interactionId: interaction.interactionId,
+    });
+    await collect(instance.events(runId));
+    expect(executor.requests[1]?.command).toEqual({
+      type: 'resume',
+      interactionId: interaction.interactionId,
+      action: 'submit',
+      payload: { answer: true },
+    });
+  } finally {
+    await runtime.dispose();
+  }
+});
+
 test('accepted and consumed submission snapshots follow the executor outcome', async () => {
   const gate = deferred<void>();
   const { instance, executor, runtime, event } = await waiting({

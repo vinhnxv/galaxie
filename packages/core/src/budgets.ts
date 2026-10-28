@@ -75,7 +75,7 @@ export class RunBudget {
       },
     };
   }
-  payload(value: unknown): void {
+  payload(value: unknown): string {
     let json: string | undefined;
     try {
       json = JSON.stringify(value);
@@ -85,6 +85,7 @@ export class RunBudget {
     if (json === undefined) throw new GalaxieError('invalid', toErrorInfo('invalid').message);
     if (new TextEncoder().encode(json).byteLength > this.limits.payloadBytes)
       throw new BudgetExceeded('payloadBytes');
+    return json;
   }
 }
 

@@ -43,7 +43,6 @@ interface RunRecord {
   readonly budget: RunBudget;
   readonly inbox: Map<InteractionId, InboxEntry>;
   dispatching?: InteractionId;
-  submission?: InboxEntry;
   segment?: SegmentRecord;
   readonly events: RunEvents;
   status: RunStatus;
@@ -150,12 +149,12 @@ export function createAgentInstance(
             status: current.status,
             labels: Object.freeze([...current.labels].sort()),
             ...(current.pending === undefined ? {} : { pending: current.pending }),
-            ...(current.submission === undefined
+            ...(current.segment?.submission === undefined
               ? {}
               : {
                   submission: Object.freeze({
-                    interactionId: current.submission.interactionId,
-                    status: current.submission.status,
+                    interactionId: current.segment.submission.interactionId,
+                    status: current.segment.submission.status,
                   }),
                 }),
             ...(current.error === undefined ? {} : { error: current.error }),
@@ -534,26 +533,28 @@ export function createAgentInstance(
       const run = current;
       if (event.instanceId !== instanceId || run === undefined || event.runId !== run.runId)
         return Promise.resolve(rejected('stale'));
-      if (run.inbox.has(event.interactionId) || run.dispatching === event.interactionId)
+      const interactionId = event.interactionId;
+      if (run.inbox.has(interactionId) || run.dispatching === interactionId)
         return Promise.resolve(rejected('duplicate'));
       const pending = run.pending;
       if (
         run.status !== 'waiting_input' ||
         pending === undefined ||
-        event.interactionId !== pending.interactionId ||
+        interactionId !== pending.interactionId ||
         event.surfaceId !== pending.surfaceId ||
         event.viewRevision !== pending.viewRevision
       )
         return Promise.resolve(rejected('stale'));
       if (!adapter.features.resume) return Promise.resolve(rejected('unsupported'));
-      if (typeof event.action !== 'string' || event.action.length === 0)
+      const action = event.action;
+      if (typeof action !== 'string' || action.length === 0)
         return Promise.resolve(rejected('invalid'));
+      let payload: unknown;
       try {
-        run.budget.payload(event.payload);
+        payload = JSON.parse(run.budget.payload(event.payload));
       } catch (error) {
         return Promise.resolve(rejected(isGalaxieError(error) ? error.code : 'invalid'));
       }
-      const { interactionId, action, payload } = event;
       const parent = context.active();
       run.dispatching = interactionId;
       const checking = (async (): Promise<DispatchReceipt> => {
@@ -568,7 +569,6 @@ export function createAgentInstance(
             return rejected('stale');
           const entry: InboxEntry = { interactionId, action, payload, status: 'accepted' };
           run.inbox.set(interactionId, entry);
-          run.submission = entry;
           run.status = 'running';
           delete run.pending;
           // Register settlement before publishing: a listener may dispose synchronously.
