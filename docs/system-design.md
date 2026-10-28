@@ -12,7 +12,7 @@
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
 - **`packages/core`:** framework-neutral contracts and four M1 runtime slices: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, model routing with consent and per-call credentials, sticky labels, argument shapes, finite budgets, in-memory interrupt dispatch and resume, and allowlisted OpenTelemetry spans. The M1 exit controls add interaction URL policy and development trace text filtered by live labels and destination (§6, §9).
 - **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
-- **`packages/models`:** a deterministic scripted LangChain mock provider; real providers remain deferred.
+- **`packages/models`:** the deterministic scripted LangChain mock and `@galaxie/models/webllm`, a worker-based WebLLM 0.2.86 provider verified against a fake engine on Node and Chromium. No real GPU has run this provider yet (§8.4).
 - **`tests/conformance`:** twelve graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix, plus dual-lane policy, lifecycle, budget and tracing tests. The [conformance README](../tests/conformance/README.md) lists the explicit-config APIs.
 - **`spikes/`:** three throwaway spikes: B0 (a 1.7B model on WebGPU), the local English tutor (a LangGraph.js agent on that model in Chrome) and [Spike C](../spikes/c-ui-path/README.md) (typed interrupt UI and session-checkpoint reload). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
@@ -92,7 +92,7 @@ flowchart TD
 Proposed rules; M1 confirms them:
 
 1. `core` has no `dependencies`; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Only the OpenTelemetry API is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries.
-2. The mock-only `models` package imports only `@langchain/core/*` subpaths and relative files; it has no `core` dependency. Other integration packages depend on `core` and on their own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
+2. The `models` package imports `@langchain/core/*` subpaths and relative files, plus the exact optional peer `@mlc-ai/web-llm` 0.2.86 only in its WebLLM engine and worker files; it has no `core` dependency. WebLLM types are local structural types because its declaration re-exports do not resolve under NodeNext. Other integration packages depend on `core` and on their own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
 3. Agent packages depend on `core` and their engine, never on a host package. From M4 the ESLint plugin flags direct `fetch`, storage, DOM and `eval` use (brief §9.7 C).
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
 5. Fewer packages are fine while these boundaries hold (brief §15).
@@ -108,7 +108,7 @@ galaxie/
 ├── packages/
 │   ├── core/                  runtime and framework-neutral contracts (§6)
 │   ├── adapter-langgraph/     native LangGraph executor and routed chat models
-│   └── models/                deterministic mock provider
+│   └── models/                mock and WebLLM providers, with a host-bundled worker entry
 ├── scripts/
 │   ├── check-license.ts       SPDX headers and package license fields (ADR-0015)
 │   └── check-dependencies.ts  source and built-package dependency boundaries
@@ -173,7 +173,7 @@ Contract choices where the brief leaves room:
 - **Run status belongs to the runtime.** An executor reports events; the runtime derives the run status from them and creates every ID.
 - **Schema annotations.** Hosts use `.meta(galaxieField({ label: 'private-user', shape: 'freeText' }))`. Core reads `x-galaxie` through Standard JSON Schema in both input and output directions, preserving transform and pipe labels without a runtime Zod import. Unrepresentable positions are free text and unlabelled; schemas without Standard JSON Schema and unsupported subschema keywords reject with `unsupported`. Shapes derive from enum/const, UUID and narrow bounded patterns; declarations cannot claim a stricter shape than their constraints support (ADR-0014).
 
-Not in `core` yet: durable events and multi-tab ownership (M3). The model slice still needs real providers, availability probing, first-run download order, structured output through the router and per-call provider token caps. Dispatch and resume use an in-memory submission inbox; durable acceptance and crash recovery remain M3 work. Conformance covers stream events, final state, checkpoint history, interrupts and resume for twelve cases on native Node, galaxie Node and Chromium, including capability calls, the native 25-step limit, subgraph re-execution, falsy resume payloads and the `async`, `sync` and `exit` durability modes.
+Not in `core` yet: durable events and multi-tab ownership (M3). The model slice has a WebLLM worker provider (§8.4); other providers, availability probing, first-run download order, structured output through the router and per-call provider token caps from the router remain deferred. Dispatch and resume use an in-memory submission inbox; durable acceptance and crash recovery remain M3 work. Conformance covers stream events, final state, checkpoint history, interrupts and resume for twelve cases on native Node, galaxie Node and Chromium, including capability calls, the native 25-step limit, subgraph re-execution, falsy resume payloads and the `async`, `sync` and `exit` durability modes.
 
 Each instance owns one session. A run consists of a start segment and one resume segment per accepted submission, all sharing its run ID, journal, labels, grants and spend budgets. Steps and wall-clock time apply separately to each segment and stop while waiting for input. Each segment owns its outcome, closed model/capability ports and root span, with `galaxie.run.segment` starting at zero; a paused span ends `waiting_input` without an error status. Late events from a settled segment are dropped and reported as `late_event`.
 
@@ -338,11 +338,19 @@ flowchart TD
 
 Routing, labels, consent and model budgets apply only to calls through `host.langchain.chatModel(role)`. Trusted agent code that holds a model instance can bypass these controls (ADR-0002). A class names the final recipient, including when a host proxy forwards a call (ADR-0006).
 
-`maxTokens` is a per-call reservation, not a provider token cap. Known prices reserve `maxTokens × max(inputPerToken, outputPerToken)`; unknown prices require the route's `maxCost`. Valid reported usage replaces the reservation; missing or malformed usage, failures and abandoned calls charge the reservation. A call can use more than reserved, and an actual-usage overrun fails the run only after that call returns. Hard spending limits belong on the host proxy. Providers are trusted to report usage accurately.
+The router's `maxTokens` is a per-call reservation. The WebLLM provider separately sends its own `maxTokens` option as the per-request output limit `max_tokens` (default 1024); the router does not pass its reservation as that limit. Known prices reserve `maxTokens × max(inputPerToken, outputPerToken)`; unknown prices require the route's `maxCost`. Valid reported usage replaces the reservation; missing or malformed usage, failures and abandoned calls charge the reservation. A call can use more than reserved, and an actual-usage overrun fails the run only after that call returns. Hard spending limits belong on the host proxy. Providers are trusted to report usage accurately.
 
 `getCredential({ role, providerId })` hands credentials to page code per call and never persists them in galaxie. An XSS or malicious dependency on the origin can read them; hosts should supply short-lived, host-proxy-scoped tokens rather than long-lived provider keys (ADR-0012). Credential callback failures emit a fixed error and a diagnostic without the raw error. By default, chat spans record only allowlisted metadata, including `galaxie.destination.class` and `galaxie.model.provider`; opted-in message text follows §6.
 
-Real providers, availability probing, the first-run download order with size and consent UI, structured output through the router, and per-call token caps on providers remain deferred to their milestones. `packages/models` currently exports only `@galaxie/models/mock`, a scripted provider with word streaming, optional usage, cancellation, scripted errors and call counts. It makes no network requests.
+`@galaxie/models/mock` remains a scripted provider with word streaming, optional usage, cancellation, scripted errors and call counts, without network requests. `@galaxie/models/webllm` adds `loadWebLLMEngine`, `WebLLMChatModel` and a pinned default Qwen2.5-1.5B record. A host bundles its own inference worker file that imports and calls `startWebLLMWorker()` from `@galaxie/models/webllm/worker`. The page creates that worker with `new Worker(new URL('./inference.worker.ts', import.meta.url), { type: 'module' })`, passes it to `loadWebLLMEngine({ worker })`, and registers `new WebLLMChatModel(handle)` under `LangGraphServices.chatModels`. Its routing descriptor uses destination `in-browser`, zero pricing and features `['streaming', 'cancellation']`. Hosts should not declare `structured-output` until routed structured output ships.
+
+One handle and worker serve each runtime. A shared FIFO queue runs one request at a time, resetting the engine conversation before sending the full history. Cancellation interrupts generation and returns the stream before releasing the queue. Calls report final-only usage and accept `jsonSchema`; provider-level `withStructuredOutput` converts Zod, Standard Schema and JSON Schema values, binds constrained decoding, and sanitizes parser failures. The engine bundle loads lazily after record validation and the page's WebGPU precheck. Progress exposes phase, fraction and elapsed seconds without engine text. Typed `unavailable` reasons distinguish missing WebGPU, adapter or shader-f16, adapter limits, device loss, integrity failure, worker failure, load failure and disposal. The device report is the page's view of the high-performance adapter's vendor and architecture, not a measurement of the worker's adapter.
+
+The default record pins weights and the model library by commit URL, enforces SRI for the chat config, library and tokenizer, and exposes 868,547,584 weight bytes. SRI does not cover weight shards; host records must name an immutable 40-hex revision under `/resolve/<revision>/`, which validation enforces. Only the inference worker needs download hosts `https://huggingface.co`, `https://*.hf.co` and `https://raw.githubusercontent.com` in `connect-src`, and `'wasm-unsafe-eval'` in `script-src`. Hosts that can set per-path headers should send these directives on the worker script's response and leave the page CSP unchanged.
+
+Loading, streaming, cancellation, schema decoding and the device report have fake-engine coverage only, on Node and Chromium. The first real-device run belongs to the M2 exit slice. Abort latency during long prefill, the page/worker adapter match and the cost of foregoing KV-cache reuse have not been measured. After worker failure or device loss, the role keeps its selected provider and every later call fails `unavailable`; there is no fallback to another listed provider in this slice. Recovery requires disposing the handle and creating a new handle, model and runtime.
+
+Routed structured output, availability probing, first-run provider order, size and download-consent UI, `persist()`, per-call provider caps from the router, the Built-in AI provider and the real-device run remain deferred. A host must arrange download consent before calling the loader.
 
 ### 8.5. Tab ownership and takeover
 
@@ -424,7 +432,7 @@ The conformance files in both test columns run on Node and Chromium. Node packag
 | --- | --- |
 | `pnpm check` | Everything CI runs, in the same order |
 | `pnpm check:license` | SPDX headers and package license fields (ADR-0015) |
-| `pnpm check:deps` | Core peers/imports, adapter web imports and Node-free built packages; run after build |
+| `pnpm check:deps` | Core and models peers/imports, WebLLM imports limited to engine/worker value imports, adapter web imports and Node-free built packages; run after build |
 | `pnpm lint` | Biome lint and format check |
 | `pnpm format` | Biome formatting and safe fixes, written to disk |
 | `pnpm typecheck` | TypeScript 7 |
@@ -433,7 +441,7 @@ The conformance files in both test columns run on Node and Chromium. Node packag
 | `pnpm conformance:update` | Write goldens from the native Node lane only; review the diff |
 | `pnpm exec playwright install --only-shell chromium` | Install the local headless Chromium binary; CI adds `--with-deps` |
 | `pnpm exec vitest run --project 'browser (chromium)'` | Run only Chromium tests |
-| `pnpm build` | Build core, then the adapter against core's `dist`, and the mock provider |
+| `pnpm build` | Build core, then the adapter against core's `dist`, and the mock/WebLLM providers with their worker entry |
 
 ## 11. What confirms this design, and when
 
