@@ -25,11 +25,13 @@ Handoff prompts: brief §21 (implementation) and §22 (review).
 - Do not merge, copy or adapt code from outside contributors. There is no contributor license agreement yet (ADR-0015).
 - Never commit secrets: API keys, tokens, credentials or `.env` files. A local gitleaks pre-commit hook blocks them.
 - The security baseline (ADR-0012) is mandatory. Never weaken a guarantee to make a test pass.
+- Never describe galaxie as secure, compliant, certified or suitable for regulated or high-risk uses, in docs, comments, commit messages or anything user-facing. Describe the controls and their documented limits instead (README, "Intended use and disclaimer").
 
 ## Maintainer-only notes
 
-`internal/` is git-ignored and exists only on the maintainer's machine. It holds planning, business and legal notes, and raw review outputs.
+`internal/` is git-ignored here. On the maintainer's machine it is a separate private git repository with its own history. It holds planning, business and legal notes, and raw review outputs.
 
 - Read it when it is present and relevant to the task.
+- Git commands run inside `internal/` act on that repository, not on this one.
 - Never copy its content into tracked files, commit messages, pull requests or issues.
 - Never remove `/internal/` from `.gitignore` or force-add files from it.

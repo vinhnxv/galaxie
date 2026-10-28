@@ -20,6 +20,8 @@ Contact the copyright holder, Nguyễn Xuân Vĩnh, at [vinh.ngxv@gmail.com](mai
 
 The terms (pricing, tiers, support and warranty) are set in a separate written agreement. Nothing in this file is that agreement.
 
+Commercial licenses are granted case by case. The copyright holder may decline a request, or set conditions, for example for regulated or high-risk uses.
+
 ## Copyright and trademark
 
 - Copyright © 2026 Nguyễn Xuân Vĩnh (Nguyen Xuan Vinh). The copyright holder is an individual.

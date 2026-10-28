@@ -12,6 +12,23 @@ galaxie lets a web application host AI agents as first-class parts of the app. E
 
 > **Status: design phase.** There is no package to install yet. This repository holds the project brief and the architecture decisions that the first milestones will implement.
 
+## Intended use and disclaimer
+
+galaxie is experimental, pre-release software, provided "as is", without warranty of any kind. Sections 15 to 17 of the [AGPL](LICENSE) (disclaimer of warranty and limitation of liability) apply.
+
+galaxie is not designed, tested or certified for high-risk or regulated uses, including:
+
+- moving money: payments, transfers, trading or lending;
+- decisions about people's credit, insurance, employment, admission or official grades;
+- core systems of banks, insurers and other financial institutions;
+- medical diagnosis or treatment, and safety-critical control.
+
+If you use galaxie in such a context, you do so at your own risk. You are responsible for your own security review and for compliance with the rules of your sector.
+
+Language models make mistakes. galaxie validates the shape of their output, not whether it is true, so keep a person in the loop for decisions that matter.
+
+No test suite or review proves that software is secure. The known limits are listed in [brief §9.9](docs/galaxie-project-brief.md#99-limits-to-state-plainly) and [ADR-0012](docs/adr/0012-security-baseline.md).
+
 ## Documentation
 
 - [Project brief](docs/galaxie-project-brief.md): scope, architecture, security model, roadmap and acceptance tests.

@@ -49,7 +49,7 @@ Five specific pains follow, and galaxie targets all five at once:
 Where galaxie fits:
 
 - No project found combines all five; the individual pieces exist, and galaxie builds on them instead of replacing them.
-- Galaxie fits where per-user inference cost, privacy, offline use or latency matter: education, health, internal enterprise tools, and products with many free users. Server-side models remain the right default for many other features.
+- Galaxie fits where per-user inference cost, privacy, offline use or latency matter: education, health information, internal enterprise tools, and products with many free users. Server-side models remain the right default for many other features.
 
 ## 2. Direction
 
@@ -213,7 +213,7 @@ Full detail, with entry gates and evidence requirements, is in [brief §16](gala
 - Guidance for hosts serving minors.
 - An accessibility conformance report.
 
-Galaxie is an SDK, so it cannot be certified on behalf of its users. It can make the host's compliance work straightforward.
+Galaxie is an SDK, so it cannot be certified on behalf of its users, and it never claims compliance. It supports the host's own compliance work by documenting its controls and their limits.
 
 ## 8. What to make public and what to keep private
 

@@ -6,6 +6,7 @@
   - 2026-10-28: the founder chose AGPL-3.0-only with a commercial license. Commercial use is allowed when the user complies with the AGPL. Closed-source use requires a commercial license, obtained by contacting the copyright holder.
   - 2026-10-28: copyright holder recorded (Nguyễn Xuân Vĩnh, an individual); the founder deferred the lawyer review.
   - 2026-10-28: commercial tier options removed; they are business decisions outside this ADR.
+  - 2026-10-28: a sector ban (finance) considered and rejected, because it is not compatible with the AGPL. An intended-use notice is in the README instead; optional section 7 additional terms are left to the lawyer review.
 - **Related:** brief §16.9; framework overview §5.3, §7, §8
 
 This ADR records an engineering and product position. It is not legal advice.
@@ -69,6 +70,16 @@ The founder accepts the AGPL trade-off. Commercial use is fine when the product'
 - **A custom "non-commercial share-alike" software license.** It would meet every requirement literally, but it must be written by a lawyer and is untested. Contributors, package registries and enterprise legal teams review unfamiliar licenses slowly, if at all.
 - **CC BY-NC-SA 4.0 for code.** Rejected: not designed for software, as Creative Commons itself advises.
 - **Apache-2.0 (earlier recommendation).** Rejected by the founder's requirements: it allows closed-source commercial forks.
+- **A field-of-use restriction**, for example no use by banks, credit or other financial institutions.
+  - Not possible under the AGPL: section 7 treats it as a "further restriction" that any recipient may remove.
+  - A custom license with such a clause would not be open source, and it would add little protection. A ban gives the copyright holder a claim against users who ignore it; it does not stop anyone from suing.
+  - Risk from high-risk uses is handled instead by:
+    - the AGPL's disclaimer of warranty and limitation of liability (sections 15–17);
+    - the intended-use notice in the README;
+    - the commercial agreement, which sets its own liability terms and which the copyright holder may decline to offer.
+  - Section 7 does allow a few additional terms. Two fit this concern, and adding them is decided with the lawyer:
+    - (a) a disclaimer or limitation of liability that differs from sections 15 and 16, for example one that names high-risk uses;
+    - (f) indemnification of the authors by anyone who conveys galaxie with contractual assumptions of liability to the recipient.
 - **Business Source License 1.1 or the Functional Source License.** Rejected: they restrict some commercial uses for a period and then convert to an open license, but they do not require forks to publish source.
 
 ## Consequences
@@ -90,6 +101,7 @@ The founder accepts the AGPL trade-off. Commercial use is fine when the product'
 - Lawyer review: a human task, deferred by the founder on 2026-10-28. Publishing the code under the AGPL does not depend on it. Each part is needed before its first use:
   - the CLA, before the first external contribution is merged;
   - the commercial agreement, before the first commercial license is signed;
-  - the trademark policy, before it is published.
+  - the trademark policy, before it is published;
+  - any section 7 additional terms, before they are added.
 - The CLA check is active before the first external contribution is merged.
 - CI license checks are green before the first release.
