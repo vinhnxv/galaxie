@@ -17,22 +17,36 @@ export class TransformersArm implements Arm {
   sameCheckpointAs: 'webllm' | null = 'webllm';
   readonly fallbacks: string[] = [];
   #client: WorkerClient | undefined;
+  #selected = false;
   probe(): Promise<Availability> {
     return gpuProbe();
   }
   async load(progress: (loaded: number, total?: number) => void): Promise<LoadInfo> {
     this.#client = new WorkerClient(
-      new Worker(new URL('./transformers.worker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('./transformers.worker.ts', import.meta.url), {
+        type: 'module',
+        name: this.#selected ? JSON.stringify(this.model) : '',
+      }),
     );
     const info = (await this.#client.load(progress)) as LoadInfo & {
       selected: ModelInfo;
       fallbacks: string[];
     };
+    if (
+      this.#selected &&
+      (info.selected.id !== this.model.id || info.selected.revision !== this.model.revision)
+    )
+      throw new Error('checkpoint_changed');
     Object.assign(this.model, info.selected);
+    this.#selected = true;
     this.fallbacks.push(...info.fallbacks.filter((id) => !this.fallbacks.includes(id)));
     this.sameCheckpointAs =
       this.model.id === 'onnx-community/Qwen2.5-1.5B-Instruct' ? 'webllm' : null;
-    return { loadKind: info.loadKind, reportedBytes: info.reportedBytes };
+    return {
+      loadKind: info.loadKind,
+      reportedBytes: info.reportedBytes,
+      ...(info.reason === undefined ? {} : { reason: info.reason }),
+    };
   }
   async openSession(): Promise<Session> {
     if (!this.#client) throw new Error('not_loaded');

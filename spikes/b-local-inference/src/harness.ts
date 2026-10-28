@@ -194,9 +194,19 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
     const feedback = tasks.find((task) => task.id === 'feedback-en');
     if (!feedback) throw new Error('missing_feedback_task');
     await safe('streams', async () => {
+      const session = await arm.openSession();
       let chunks = 0;
-      await once(feedback, () => chunks++);
-      return check(chunks >= 2, 'chunks_before_final_' + chunks);
+      let settled = false;
+      try {
+        await generate(session, feedback, undefined, () => {
+          if (!settled) chunks++;
+        });
+        settled = true;
+        return check(chunks >= 2, `chunks_before_final_${chunks}`);
+      } finally {
+        settled = true;
+        await session.close();
+      }
     });
     await safe('cancels', async () => {
       const session = await arm.openSession();
@@ -224,7 +234,6 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
         }
         const settledAt = performance.now();
         settled = true;
-        // Observe callbacks for two frames after the generation promise has settled.
         await new Promise<void>((resolve) =>
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         );

@@ -15,7 +15,7 @@ export const quizSchema = z.object({
     .length(3),
 });
 export const codeWord = 'zq-violet-7';
-export const probeSchema = z.object({ code: z.enum([codeWord]) });
+export const probeSchema = z.strictObject({ code: z.enum([codeWord]) });
 export const coverageSchema = z.object({
   count: z.number(),
   enabled: z.boolean(),

@@ -6,7 +6,8 @@ The ORT loop's copied files name their provenance in a header comment.
 
 ## Run it
 
-Use Node.js 24 or newer and pnpm 11 through Corepack:
+Use Node.js 24 or newer and pnpm 11 through Corepack. The smoke uses Biome from the
+existing root install; engine dependencies remain isolated in this workspace:
 
 ```sh
 pnpm --dir spikes/b-local-inference install --frozen-lockfile
@@ -116,6 +117,12 @@ The Transformers.js load order, if an earlier candidate cannot load on the later
 2. `onnx-community/Qwen2.5-0.5B-Instruct`, `22942cb7d7ba4cc81bb4673549ca4d4614469b5e`.
 3. `onnx-community/LFM2-1.2B-ONNX`, `dd095948cf23919ef2fcb635a156ce59975f35ff`.
 
+The first successful checkpoint is pinned for every replacement worker in that page load.
+A later reload failure is recorded rather than switching the cold/warm pair to another model.
+Cache labels observe native Cache reads/writes through the existing Transformers.js custom-cache
+hook, retaining its backend, name, keys and native Cache identity. Progress events do not
+establish downloads; unobservable cache state is recorded as unknown.
+
 Candidate revisions were obtained from Hub metadata, without loading weights. Actual selection
 and skipped candidate IDs are exported if the later load takes a fallback. No model fallback
 was taken in this task. The two Qwen2.5 1.5B arms are the only same-checkpoint pair; the result
@@ -156,8 +163,15 @@ There is no unsafe-eval or inline-script permission, and no provider-key input.
 **Not yet run on real devices.** `results/smoke.json` is the GPU-free harness run only.
 The smoke validates it against `galaxie.spike-b.results/v1`, downloads the same JSON through
 the button, checks that prompt/output text is absent, and blocks all external network requests.
-AE1-AE4 exercise the mock, all real-arm probes and the export. AE5 verifies LAN HTTPS or records
+AE1-AE4 exercise the mock, all real-arm probes and the export. Additional GPU-free fixtures
+reject post-result chunks and extra singleton keys, pin checkpoint reloads, and check repeat-run
+and thrown-check ChatWebLLM records. AE5 verifies LAN HTTPS or records
 an explicit skip if no non-internal IPv4 exists. AE6 checks the README's measurement language.
+The committed smoke has AE1-AE6 passed, all mock checks passed, and five measured runs for
+each of its three tasks. All three GPU arms reported `no_webgpu_adapter`; Prompt API raw
+availability was English `downloadable` and Vietnamese `unavailable`, with no create call.
+The additional harness, checkpoint and Chat record regressions also passed.
+
 The committed smoke JSON includes arm order, device metadata and the loopback page origin.
 AE5 does not write its LAN address. A later LAN run records its page origin as the results
 schema requires. No export contains model text, browser storage contents or output hashes.
@@ -194,6 +208,8 @@ remain unchanged, as do packages, tests and every other spike.
   and option forwarding at the injected engine boundary. A schema accepted as a call option can
   still be ignored; the forwarding fields distinguish this. The supplied signal is observed
   as an option, not interpreted from model replies. Results remain not_run in the smoke.
+- Prompt API system-role handling and activation for combined language options remain unverified
+  until the later normal-Chrome run. A task error is recorded rather than crashing the page.
 - Prompt API model identity and revision cannot be pinned, and decoding is browser default.
   The API does not expose the common interface's per-call output-token cap. Its docs do not
   list Vietnamese; that feedback task is skipped with `language_unsupported` when the actual
@@ -212,6 +228,8 @@ remain unchanged, as do packages, tests and every other spike.
   returns unavailable. The raw value alone cannot establish language or hardware as the cause.
 - The Node smoke loads the shared schemas/tasks through Vite SSR so runtime imports resolve
   the repository-required `.js` specifiers to TypeScript without adding a loader dependency.
+  It formats the generated artifact with the existing root Biome tool so regeneration preserves
+  the repository formatting check; this adds no dependency.
 - Prompt API can require a second Run click for fresh activation after earlier arms. This keeps
   the recorded sequential order and prevents creation outside a user gesture when downloading.
 - Prompt API cannot enforce the shared per-call token cap through its current API; that limit

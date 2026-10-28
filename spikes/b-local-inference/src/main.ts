@@ -84,6 +84,7 @@ async function runAll(options: { runs?: number } = {}): Promise<void> {
     createdAt: new Date().toISOString(),
     runs: options.runs ?? runs,
     arms: [],
+    chatWebLLM: emptyChatCheck('webllm_not_run'),
   };
   try {
     for (const id of armOrder) {
@@ -97,8 +98,13 @@ async function runAll(options: { runs?: number } = {}): Promise<void> {
             promptVi: prompt.vi,
             progress: render,
             beforeDispose: async (arm) => {
-              if (arm instanceof WebLLMArm)
-                results.chatWebLLM = await arm.guard(chatWebLLMCheck(arm));
+              if (arm instanceof WebLLMArm) {
+                try {
+                  results.chatWebLLM = await arm.guard(chatWebLLMCheck(arm));
+                } catch {
+                  results.chatWebLLM = { ...emptyChatCheck('check_exception'), status: 'failed' };
+                }
+              }
             },
           }),
         );
@@ -116,10 +122,19 @@ async function runAll(options: { runs?: number } = {}): Promise<void> {
       if (webllm) webllm.sameCheckpointAs = null;
       if (transformers) transformers.sameCheckpointAs = null;
     }
-    if (results.chatWebLLM.status === 'not_run')
-      results.chatWebLLM = emptyChatCheck(
-        params.get('probe') === 'real' ? 'probe_only' : 'webllm_unavailable',
-      );
+    if (results.chatWebLLM.status === 'not_run') {
+      const record = results.arms.find((arm) => arm.id === 'webllm');
+      const reason = !record
+        ? 'webllm_not_selected'
+        : params.get('probe') === 'real'
+          ? 'probe_only'
+          : record.availability.status === 'unavailable'
+            ? 'webllm_unavailable'
+            : record.error === 'load_failed'
+              ? 'webllm_load_failed'
+              : 'webllm_check_not_reached';
+      results.chatWebLLM = emptyChatCheck(reason);
+    }
     results = resultsSchema.parse(results);
     done = true;
     render('Finished');

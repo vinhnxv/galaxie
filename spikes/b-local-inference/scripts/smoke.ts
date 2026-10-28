@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { type BrowserContext, chromium, type Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
+import type { Arm, ModelInfo, Session } from '../src/arms/types.js';
 import type {} from '../src/main.js';
 import type { ResultsV1 } from '../src/results.js';
 
@@ -246,13 +248,225 @@ try {
     assert.equal(pageErrors, 0);
     assert.equal(externalRequests, 0);
   });
+  await step('Harness regressions', async () => {
+    const fixturePage = await context.newPage();
+    try {
+      await fixturePage.goto(`${origin}/?arms=mock`);
+      const observations = await fixturePage.evaluate(
+        async ({ moduleUrl, code }) => {
+          const { runArm } = (await import(moduleUrl)) as typeof import('../src/harness.js');
+          const fixture: Arm = {
+            id: 'mock',
+            model: { id: 'post-result-fixture', revision: 'v1' },
+            engineVersion: 'fixture',
+            inWorker: true,
+            decoding: 'greedy',
+            schemaMechanism: 'fixture',
+            sameCheckpointAs: null,
+            probe: async () => ({ status: 'available' }),
+            load: async () => ({ loadKind: 'warm', reportedBytes: 0 }),
+            dispose: async () => {},
+            openSession: async (): Promise<Session> => {
+              let late = (): void => {};
+              return {
+                generate: async (request) => {
+                  late = () => {
+                    request.onChunk('late');
+                    request.onChunk('late');
+                  };
+                  return {
+                    text: request.schema ? JSON.stringify({ code, extra: true }) : 'fixture',
+                    constrained: Boolean(request.schema),
+                    executedIn: 'DedicatedWorkerGlobalScope',
+                    aborted: false,
+                  };
+                },
+                close: async () => late(),
+              };
+            },
+          };
+          const result = await runArm(fixture, {
+            runs: 1,
+            probeReal: false,
+            promptProbe: true,
+            promptVi: 'unavailable',
+            progress: () => {},
+          });
+          return {
+            stream: result.checks.streams.status,
+            singleton: result.checks.schemaEnforcedWhileDecoding.status,
+          };
+        },
+        { moduleUrl: `${origin}/src/harness.ts`, code: codeWord },
+      );
+      assert.deepEqual(observations, { stream: 'failed', singleton: 'failed' });
+    } finally {
+      await fixturePage.close();
+    }
+  });
+  await step('Checkpoint regressions', async () => {
+    const fixturePage = await context.newPage();
+    try {
+      await fixturePage.goto(`${origin}/?arms=mock`);
+      const observations = await fixturePage.evaluate(async (moduleUrl) => {
+        const { TransformersArm } = (await import(
+          moduleUrl
+        )) as typeof import('../src/arms/transformers.js');
+        const NativeWorker = globalThis.Worker;
+        const primary: ModelInfo = {
+          id: 'onnx-community/Qwen2.5-1.5B-Instruct',
+          revision: 'fixture-primary',
+        };
+        const fallback: ModelInfo = {
+          id: 'onnx-community/Qwen2.5-0.5B-Instruct',
+          revision: 'fixture-fallback',
+        };
+        const outcomes: boolean[] = [];
+        try {
+          for (const mode of ['retain-fallback', 'reject-switch']) {
+            let loads = 0;
+            class LoadWorker {
+              onmessage: ((event: MessageEvent) => void) | null = null;
+              onerror: ((event: ErrorEvent) => void) | null = null;
+              readonly selected: ModelInfo | null;
+              constructor(_url: unknown, options?: WorkerOptions) {
+                this.selected = options?.name ? (JSON.parse(options.name) as ModelInfo) : null;
+              }
+              postMessage(command: { id: number; op: string }): void {
+                if (command.op === 'load') {
+                  loads++;
+                  if (this.selected && mode === 'reject-switch') {
+                    queueMicrotask(() =>
+                      this.onmessage?.(
+                        new MessageEvent('message', { data: { id: command.id, kind: 'error' } }),
+                      ),
+                    );
+                    return;
+                  }
+                  const selected =
+                    this.selected ??
+                    (mode === 'retain-fallback'
+                      ? loads === 1
+                        ? fallback
+                        : primary
+                      : loads === 1
+                        ? primary
+                        : fallback);
+                  queueMicrotask(() =>
+                    this.onmessage?.(
+                      new MessageEvent('message', {
+                        data: {
+                          id: command.id,
+                          kind: 'result',
+                          value: { loadKind: 'warm', reportedBytes: 0, selected, fallbacks: [] },
+                        },
+                      }),
+                    ),
+                  );
+                } else {
+                  queueMicrotask(() =>
+                    this.onmessage?.(
+                      new MessageEvent('message', {
+                        data: { id: command.id, kind: 'result', value: null },
+                      }),
+                    ),
+                  );
+                }
+              }
+              terminate(): void {}
+            }
+            globalThis.Worker = LoadWorker as unknown as typeof Worker;
+            const arm = new TransformersArm();
+            try {
+              await arm.load(() => {});
+              const first = { ...arm.model };
+              await arm.dispose();
+              let rejected = false;
+              try {
+                await arm.load(() => {});
+              } catch {
+                rejected = true;
+              }
+              outcomes.push(
+                mode === 'retain-fallback'
+                  ? !rejected &&
+                      first.id === fallback.id &&
+                      arm.model.id === first.id &&
+                      arm.model.revision === first.revision
+                  : rejected && arm.model.id === first.id && arm.model.revision === first.revision,
+              );
+            } finally {
+              await arm.dispose();
+            }
+          }
+        } finally {
+          globalThis.Worker = NativeWorker;
+        }
+        return outcomes;
+      }, `${origin}/src/arms/transformers.ts`);
+      assert.deepEqual(observations, [true, true]);
+    } finally {
+      await fixturePage.close();
+    }
+  });
+  await step('Chat record regressions', async () => {
+    const fakeArm = `import {MockArm} from '/src/arms/mock.ts';
+      export class WebLLMArm extends MockArm {
+        constructor() { super(null); this.id = 'webllm'; }
+        async probe() { return globalThis.__fixtureLoads >= 2 ? {status:'unavailable',reason:'api_unavailable'} : {status:'available'}; }
+        async load(progress) { globalThis.__fixtureLoads = (globalThis.__fixtureLoads ?? 0) + 1; return super.load(progress); }
+        guard(operation) { return operation; }
+      }`;
+    const completedCheck = `import {emptyChatCheck} from '/src/results.ts'; export async function chatWebLLMCheck() { return {...emptyChatCheck('fixture'), status:'completed'}; }`;
+    const retryPage = await context.newPage();
+    try {
+      await retryPage.route('**/src/arms/webllm.ts*', (route) =>
+        route.fulfill({ contentType: 'text/javascript', body: fakeArm }),
+      );
+      await retryPage.route('**/src/chat-webllm-check.ts*', (route) =>
+        route.fulfill({ contentType: 'text/javascript', body: completedCheck }),
+      );
+      const first = await run(retryPage, 'arms=webllm&runs=1&promptApi=probe');
+      assert.equal(first.chatWebLLM.status, 'completed');
+      await retryPage.getByRole('button', { name: 'Run', exact: true }).click();
+      await retryPage.waitForFunction(() => window.spikeB.status().done);
+      const second = await retryPage.evaluate(() => window.spikeB.results());
+      assert.equal(second.chatWebLLM.status, 'not_run');
+      assert.equal(second.chatWebLLM.reason, 'webllm_unavailable');
+    } finally {
+      await retryPage.close();
+    }
+    const errorPage = await context.newPage();
+    try {
+      await errorPage.route('**/src/arms/webllm.ts*', (route) =>
+        route.fulfill({ contentType: 'text/javascript', body: fakeArm }),
+      );
+      await errorPage.route('**/src/chat-webllm-check.ts*', (route) =>
+        route.fulfill({
+          contentType: 'text/javascript',
+          body: "export async function chatWebLLMCheck() { throw new Error('fixture_check_failure'); }",
+        }),
+      );
+      const result = await run(errorPage, 'arms=webllm&runs=1&promptApi=probe');
+      assert.equal(result.chatWebLLM.status, 'failed');
+      assert.equal(result.chatWebLLM.reason, 'check_exception');
+    } finally {
+      await errorPage.close();
+    }
+  });
   if (baseline) {
     await mkdir(`${root}/results`, { recursive: true });
     await writeFile(
       `${root}/results/smoke.json`,
       `${JSON.stringify(resultsSchema.parse(baseline), null, 2)}\n`,
     );
+    execFileSync('pnpm', ['exec', 'biome', 'format', '--write', `${root}/results/smoke.json`], {
+      cwd: fileURLToPath(new URL('../../..', import.meta.url)),
+      stdio: 'pipe',
+    });
   }
+  assert.equal(pageErrors, 0);
+  assert.equal(externalRequests, 0);
   await context.close();
 } finally {
   await browser.close();

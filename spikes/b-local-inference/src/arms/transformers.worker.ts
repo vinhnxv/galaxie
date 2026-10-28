@@ -14,6 +14,7 @@ import {
 } from '@huggingface/transformers-structured-output';
 import mjs from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url';
 import wasm from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url';
+import type { ModelInfo } from './types.js';
 import { serveWorker } from './worker-rpc.js';
 
 // Both arms resolve the identical ORT pin. The factory must stay on this origin under script-src self.
@@ -38,8 +39,35 @@ let generator: TextGenerationPipeline | undefined;
 serveWorker({
   async load(progress) {
     const fallbacks: string[] = [];
-    for (const selected of candidates) {
-      let downloaded = false;
+    const pinned = self.name ? (JSON.parse(self.name) as ModelInfo) : null;
+    const models = pinned
+      ? candidates.filter((model) => model.id === pinned.id && model.revision === pinned.revision)
+      : candidates;
+    let reads = 0;
+    let writes = 0;
+    let cacheObserved = false;
+    env.useCustomCache = false;
+    try {
+      const cache = await caches.open(env.cacheKey);
+      const match = cache.match.bind(cache);
+      const put = cache.put.bind(cache);
+      cache.match = async (...args) => {
+        const response = await match(...args);
+        if (response) reads++;
+        return response;
+      };
+      cache.put = async (...args) => {
+        writes++;
+        await put(...args);
+      };
+      // Transformers.js checks the native Cache type when deciding which keys may be stored.
+      env.customCache = cache;
+      env.useCustomCache = true;
+      cacheObserved = true;
+    } catch {
+      /* Cache state remains unknown; the library retains its default fallback path. */
+    }
+    for (const selected of models) {
       const sizes = new Map<string, number>();
       try {
         generator = await pipeline('text-generation', selected.id, {
@@ -47,7 +75,6 @@ serveWorker({
           dtype: 'q4f16',
           revision: selected.revision,
           progress_callback: (event) => {
-            if (event.status === 'download') downloaded = true;
             if (event.status === 'progress') {
               sizes.set(event.file, event.total);
               progress(event.loaded, event.total);
@@ -55,7 +82,8 @@ serveWorker({
           },
         });
         return {
-          loadKind: downloaded ? 'cold' : 'warm',
+          loadKind: cacheObserved && writes ? 'cold' : cacheObserved && reads ? 'warm' : 'unknown',
+          ...(!cacheObserved || (!reads && !writes) ? { reason: 'cache_state_unknown' } : {}),
           reportedBytes: sizes.size ? [...sizes.values()].reduce((a, b) => a + b, 0) : null,
           selected,
           fallbacks,
