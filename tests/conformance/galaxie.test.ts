@@ -5,6 +5,11 @@ import { expect, test } from 'vitest';
 import { CASE_NAMES, type CaseName, cases } from './cases/index.js';
 import branching from './golden/branching.json' with { type: 'json' };
 import capability from './golden/capability.json' with { type: 'json' };
+import interruptDurabilityExit from './golden/interrupt-durability-exit.json' with { type: 'json' };
+import interruptDurabilitySync from './golden/interrupt-durability-sync.json' with { type: 'json' };
+import interruptResume from './golden/interrupt-resume.json' with { type: 'json' };
+import interruptSequence from './golden/interrupt-sequence.json' with { type: 'json' };
+import interruptSubgraph from './golden/interrupt-subgraph.json' with { type: 'json' };
 import linear from './golden/linear.json' with { type: 'json' };
 import modelFailure from './golden/model-failure.json' with { type: 'json' };
 import modelWithoutConfig from './golden/model-without-config.json' with { type: 'json' };
@@ -16,6 +21,11 @@ import { normalize } from './support/normalize.js';
 import { galaxieLane, runGalaxie } from './support/transcript.js';
 
 const goldens: Record<CaseName, unknown> = {
+  'interrupt-durability-exit': interruptDurabilityExit,
+  'interrupt-durability-sync': interruptDurabilitySync,
+  'interrupt-subgraph': interruptSubgraph,
+  'interrupt-sequence': interruptSequence,
+  'interrupt-resume': interruptResume,
   linear,
   capability,
   'step-limit': stepLimit,
