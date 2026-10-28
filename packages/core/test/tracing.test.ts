@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { context, SpanStatusCode, trace } from '@opentelemetry/api';
+import { context, ROOT_CONTEXT, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
@@ -9,8 +9,20 @@ import {
   TracerProvider,
 } from '@opentelemetry/sdk-trace';
 import { afterEach, expect, test } from 'vitest';
-import { createRuntime, type TraceHandle } from '../src/index.js';
+import { z } from 'zod';
 import {
+  type CapabilityBinding,
+  type CapabilityRequests,
+  createRuntime,
+  type ErrorCode,
+  GalaxieError,
+  galaxieField,
+  httpCapability,
+  type TraceHandle,
+} from '../src/index.js';
+import { startRunTrace } from '../src/tracing.js';
+import {
+  binding,
   collect,
   deferred,
   definition,
@@ -201,4 +213,240 @@ test('uses the global provider when none is injected', async () => {
   await runtime.dispose();
   await provider.forceFlush();
   expect(exporter.getFinishedSpans()).toHaveLength(1);
+});
+
+async function recordedCapabilities(
+  script: Script,
+  bindings: Readonly<Record<string, CapabilityBinding>>,
+  requests: CapabilityRequests = {
+    'lessons.get@1': {
+      input: z.string(),
+      output: z.string().meta(galaxieField({ label: 'public' })),
+      kind: 'read',
+    },
+    'progress.save@1': { input: z.string(), output: z.string(), kind: 'write' },
+  },
+): Promise<{ exporter: InMemorySpanExporter; fields: string }> {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const errors: unknown[] = [];
+  const executor = new FakeExecutor([
+    typeof script !== 'function'
+      ? script
+      : async function* (request) {
+          try {
+            yield* script(request);
+          } catch (error) {
+            errors.push(error);
+            throw error;
+          }
+        },
+  ]);
+  const runtime = createRuntime({
+    appId: 'span-tests',
+    executors: [executor],
+    tracerProvider: provider,
+  });
+  const instance = await runtime.create(
+    {
+      ...definition,
+      input: z.string().meta(galaxieField({ label: 'private-user' })),
+      capabilities: { optional: requests },
+    },
+    { principalScope: 'user', agent: {}, bindings },
+  );
+  await instance.prepare();
+  const run = await instance.start('canary-private-run-value');
+  const events = await collect(instance.events(run.runId));
+  await runtime.dispose();
+  await provider.forceFlush();
+  expect(errors).toEqual([]);
+  return { exporter, fields: JSON.stringify([events, instance.getSnapshot()]) };
+}
+
+test('capability spans follow explicit node parents and otherwise the root, with sticky root labels', async () => {
+  const { exporter } = await recordedCapabilities(
+    async function* ({ trace: recorder, capabilities }) {
+      const node = recorder.start({ kind: 'node', name: 'lookup' });
+      await capabilities.call('lessons.get@1', 'query', { parent: node });
+      node.end({ status: 'ok' });
+      await capabilities.call('lessons.get@1', 'query');
+      yield { type: 'output', output: null };
+    },
+    { 'lessons.get@1': binding() },
+  );
+  const spans = exporter.getFinishedSpans();
+  expect(assertSpanTree(spans)).toEqual({
+    name: 'invoke_agent tests/agent',
+    children: [
+      { name: 'execute_tool lessons.get@1', children: [] },
+      {
+        name: 'galaxie.node lookup',
+        children: [{ name: 'execute_tool lessons.get@1', children: [] }],
+      },
+    ],
+  });
+  const root = spans.find((span) => span.name.startsWith('invoke_agent'));
+  expect(root?.attributes['galaxie.run.labels']).toEqual(['private-user', 'public']);
+  for (const span of spans.filter((span) => span.name.startsWith('execute_tool'))) {
+    expect(span.kind).toBe(SpanKind.INTERNAL);
+    expect(span.attributes).toMatchObject({
+      'gen_ai.operation.name': 'execute_tool',
+      'gen_ai.tool.name': 'lessons.get@1',
+      'galaxie.capability.kind': 'read',
+      'galaxie.destination.class': 'in-browser',
+      'galaxie.step.status': 'ok',
+    });
+  }
+});
+test('AE1 spans requested unbound denials but omits unrequested caller text', async () => {
+  const { exporter } = await recordedCapabilities(
+    async function* ({ capabilities }) {
+      await expect(capabilities.call('progress.save@1', 'argument')).rejects.toMatchObject({
+        code: 'denied',
+      });
+      await expect(capabilities.call('canary-unrequested-name', 'argument')).rejects.toMatchObject({
+        code: 'denied',
+      });
+      yield { type: 'output', output: null };
+    },
+    { 'lessons.get@1': binding() },
+  );
+  const spans = exporter.getFinishedSpans();
+  assertSpanTree(spans);
+  const unbound = spans.find((span) => span.name === 'execute_tool progress.save@1');
+  expect(unbound?.attributes['galaxie.error.code']).toBe('denied');
+  expect(unbound?.attributes['galaxie.capability.kind']).toBeUndefined();
+  const unknown = spans.find((span) => span.name === 'execute_tool');
+  expect(unknown?.attributes['gen_ai.tool.name']).toBeUndefined();
+  expect(serializeSpans(spans)).not.toContain('canary-unrequested-name');
+});
+const codes: ErrorCode[] = [
+  'invalid',
+  'denied',
+  'unavailable',
+  'unreachable',
+  'unsupported',
+  'budget_exceeded',
+  'timeout',
+  'stale',
+  'duplicate',
+  'fenced',
+  'cancelled',
+  'unrecoverable',
+  'executor_error',
+];
+test.each(codes)('capability %s errors use fixed span types and statuses', (code) => {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const instrumentation = startRunTrace(
+    provider.getTracer('@galaxie/core', '0.0.0'),
+    ROOT_CONTEXT,
+    {
+      appId: 'test',
+      agentId: 'test',
+      agentVersion: '1',
+      instanceId: 'i',
+      sessionId: 's',
+      runId: 'r',
+      executorId: 'fake',
+      executorVersion: '1',
+    },
+  );
+  instrumentation
+    .startCapability({ name: 'echo@1', kind: 'read', destination: 'in-browser' })
+    .end(code === 'cancelled' ? { status: 'cancelled' } : { status: 'error', code });
+  instrumentation.setLabels(['app']);
+  instrumentation.recordBudget('toolCalls');
+  instrumentation.finish('succeeded');
+  const spans = exporter.getFinishedSpans();
+  assertSpanTree(spans);
+  const span = spans.find((span) => span.name === 'execute_tool echo@1');
+  if (code === 'cancelled') {
+    expect(span?.status.code).toBe(SpanStatusCode.UNSET);
+    expect(span?.attributes['galaxie.step.status']).toBe('cancelled');
+  } else {
+    expect(span?.status).toEqual({ code: SpanStatusCode.ERROR });
+    expect(span?.attributes).toMatchObject({
+      'error.type': 'GalaxieError',
+      'galaxie.error.code': code,
+    });
+  }
+  expect(
+    spans.find((span) => span.name.startsWith('invoke_agent'))?.attributes['galaxie.budget.name'],
+  ).toBe('toolCalls');
+});
+test('HTTP credentials, input/output and binding-error canaries never enter generated fields or spans', async () => {
+  const errors: unknown[] = [];
+  const { exporter, fields } = await recordedCapabilities(
+    async function* ({ capabilities }) {
+      await capabilities.call('http@1', { id: 'entry' });
+      try {
+        await capabilities.call('fail@1', 'query');
+      } catch (error) {
+        errors.push(error);
+      }
+      yield { type: 'output', output: null };
+    },
+    {
+      'http@1': httpCapability({
+        ...binding(),
+        destination: 'host-server',
+        url: 'https://api.example.test/private/{id}',
+        method: 'GET',
+        headers: () => ({ authorization: 'canary-credential-7f3a' }),
+        fetch: async () => Response.json('canary-capability-result'),
+      }),
+      'fail@1': binding({
+        invoke: async () => {
+          throw new Error('canary-binding-message');
+        },
+      }),
+    },
+    {
+      'http@1': {
+        input: z.object({ id: z.enum(['entry']) }),
+        output: z.string().meta(galaxieField({ label: 'private-user' })),
+        kind: 'read',
+      },
+      'fail@1': { input: z.string(), output: z.string(), kind: 'read' },
+    },
+  );
+  expect(errors[0]).toBeInstanceOf(GalaxieError);
+  expect(errors[0]).not.toHaveProperty('cause');
+  const spans = exporter.getFinishedSpans();
+  assertSpanTree(spans);
+  const generated = fields + serializeSpans(spans) + JSON.stringify(errors);
+  for (const canary of [
+    'canary-credential-7f3a',
+    'canary-private-run-value',
+    'canary-capability-result',
+    'canary-binding-message',
+    'https://api.example.test',
+  ])
+    expect(generated).not.toContain(canary);
+});
+test('run finish ends an open capability span without accepting a later end', () => {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const instrumentation = startRunTrace(
+    provider.getTracer('@galaxie/core', '0.0.0'),
+    ROOT_CONTEXT,
+    {
+      appId: 'test',
+      agentId: 'test',
+      agentVersion: '1',
+      instanceId: 'i',
+      sessionId: 's',
+      runId: 'r',
+      executorId: 'fake',
+      executorVersion: '1',
+    },
+  );
+  const open = instrumentation.startCapability({ name: 'echo@1' });
+  instrumentation.finish('succeeded');
+  const before = serializeSpans(exporter.getFinishedSpans());
+  open.end({ status: 'error', code: 'unavailable' });
+  expect(serializeSpans(exporter.getFinishedSpans())).toBe(before);
+  assertSpanTree(exporter.getFinishedSpans());
 });

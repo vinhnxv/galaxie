@@ -6,6 +6,7 @@ import { z } from 'zod';
 import {
   type BindingsFor,
   type CapabilityBinding,
+  createRuntime,
   defineAgentDefinition,
   type InputOf,
 } from '../src/index.js';
@@ -83,4 +84,22 @@ test('a capability name must carry an @<version> suffix (ADR-0008)', () => {
       },
     },
   });
+});
+
+test('create requires bindings only for required capabilities', () => {
+  // This function is checked by both compilers without executing invalid create calls.
+  const check = (): void => {
+    const runtime = createRuntime({ appId: 'types', executors: [] });
+    // @ts-expect-error -- required capabilities require bindings.
+    void runtime.create(tutor, { principalScope: 'user', agent: {} });
+    const optional = defineAgentDefinition({
+      id: 'tests/optional',
+      version: '1.0.0',
+      executor: 'fake',
+      input: z.string(),
+      capabilities: { optional: tutor.capabilities.optional },
+    });
+    void runtime.create(optional, { principalScope: 'user', agent: {} });
+  };
+  expectTypeOf(check).toBeFunction();
 });

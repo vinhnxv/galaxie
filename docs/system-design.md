@@ -10,9 +10,9 @@
 ## 1. What exists today
 
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
-- **`packages/core`:** framework-neutral contracts and the first runtime slice: lifecycle, identity, cancellation, replayable in-memory events and allowlisted OpenTelemetry spans (§6).
-- **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, and callback-based step tracing.
-- **`tests/conformance`:** five graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix.
+- **`packages/core`:** framework-neutral contracts and M1 runtime slices 1 and 2: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, sticky labels, argument shapes, finite budgets and allowlisted OpenTelemetry spans (§6).
+- **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
+- **`tests/conformance`:** seven graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix.
 - **`spikes/`:** two throwaway spikes, B0 (a 1.7B model on WebGPU) and the local English tutor (a LangGraph.js agent on that model in Chrome). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
 
@@ -147,7 +147,11 @@ Modules in `packages/core/src`; `index.ts` exports the public contracts and runt
 | `errors.ts` | `ErrorCode`, fixed-message `ErrorInfo`, `GalaxieError` and sanitization helpers | brief §9.4, §10, §11.4, §12 |
 | `policy.ts` | Destination classes, presets, data labels, argument shapes, budget limits | brief §3, §9.4; ADR-0014 |
 | `models.ts` | Model roles, features, role requirements, `ModelPolicy` | brief §10; ADR-0006 |
-| `capabilities.ts` | Capability names, requests, kinds, grant scopes, retry policy, host bindings | brief §9.2, §12.3 |
+| `capabilities.ts` | Capability names, requests, kinds, grant scopes, retry policy, host bindings, executor port and attribution headers | brief §9.2, §12.3 |
+| `annotations.ts` | Cached Standard JSON Schema walking in both directions; labels, constraints and string matchers | ADR-0014 |
+| `capability-broker.ts` | Per-instance grants, validation, FIFO concurrency, timeouts, sticky labels and verbatim guard | brief §9.2; ADR-0012, ADR-0014 |
+| `budgets.ts` | Finite defaults, option validation, per-run tool-call and payload accounting | brief §9.4 |
+| `http-capability.ts` | Host-literal HTTP templates, attribution headers and capped response reads | ADR-0012 A3, A8 |
 | `interactions.ts` | Catalogs, components, UI requirements, pending interactions, user events, receipts, inbox status | brief §11, §12; ADR-0004, ADR-0007 |
 | `effects.ts` | Effect states and transitions | brief §12.3 |
 | `events.ts` | Executor-native stream events and runtime envelopes, including cancellation; currently in memory only | brief §7.5, §12.1 |
@@ -164,15 +168,15 @@ Contract choices where the brief leaves room:
 - **A failed `prepare`** returns the instance to `created`, which gives the retry or dispose path brief §8.3 asks for.
 - **Typed bindings.** `BindingsFor<D>` turns a missing or mistyped host binding into a compile error (brief §14.2). `invoke` is a function property rather than a method, so a binding that needs more input than the schema gives fails too.
 - **Run status belongs to the runtime.** An executor reports events; the runtime derives the run status from them and creates every ID.
-- **Open for M1:** how a schema field carries its data label and argument shape (`FieldAnnotation`), for example through Zod metadata (ADR-0014).
+- **Schema annotations.** Hosts use `.meta(galaxieField({ label: 'private-user', shape: 'freeText' }))`. Core reads `x-galaxie` through Standard JSON Schema in both input and output directions, preserving transform and pipe labels without a runtime Zod import. Unrepresentable positions are free text and unlabelled; schemas without Standard JSON Schema and unsupported subschema keywords reject with `unsupported`. Shapes derive from enum/const, UUID and narrow bounded patterns; declarations cannot claim a stricter shape than their constraints support (ADR-0014).
 
-Not in `core` yet: the broker, the router and budget enforcement (remaining M1 work, brief §16.3), plus durable events and multi-tab ownership (M3). Dispatch and resume are unsupported in this slice. Conformance currently covers stream events, final state and checkpoint history for five cases; interrupt/resume and durability parity remain deferred.
+Not in `core` yet: the model router (remaining M1 work, brief §16.3), plus durable events and multi-tab ownership (M3). Dispatch and resume remain unsupported. Conformance covers stream events, final state and checkpoint history for seven cases, including capability calls and the native 25-step limit; interrupt/resume and durability parity remain deferred.
 
 Each instance owns one session. A run claims its slot before asynchronous Standard Schema validation; queued successors wait for the previous executor iterator to complete. Cancellation invalidates results immediately while core keeps draining. Core's single 10-second settlement bound limits queued waits and disposal without permitting overlapping loops on a session. Diagnostics alone receive raw errors; snapshots and error events contain fixed messages and sanitized types.
 
 The LangGraph adapter imports only `@langchain/langgraph/web`. It drives the public runnable `transform()` method with one input and the native `values`, `updates`, `messages` and `custom` modes. This invokes LangGraph's own engine without LangChain 1.2.20's outer `stream()` abort race, which can leave its generator suspended before root callbacks. Native transformation must be available; stream-only facades reject with `unsupported`. The adapter adds no scheduler or settlement timeout. Tests cover a cancelled run followed by a successful run, including delayed checkpoint writes.
 
-Core records a run/node/model span tree using explicit parent contexts. The host owns SDK registration and export; core ships neither. Attributes follow `open-telemetry/semantic-conventions-genai@51a0f580f8a6ad804ca4de5e033683c6fbbe5906`, `schema_url https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev`, core semantic conventions v1.44.0. Spans contain no events, links, exception attributes or status descriptions, and never record error messages, prompts or model output. Principal scope is excluded. Failed spans use `ERROR`; cancellation leaves status `UNSET`. Canary and no-network tests run on Node and Chromium.
+Core records a run/node/model/capability span tree using explicit parent contexts. The host owns SDK registration and export; core ships neither. Attributes follow `open-telemetry/semantic-conventions-genai@51a0f580f8a6ad804ca4de5e033683c6fbbe5906`, `schema_url https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev`, core semantic conventions v1.44.0. Spans contain no events, links, exception attributes or status descriptions, and never record error messages, prompts or model output. Principal scope is excluded. Failed spans use `ERROR`; cancellation leaves status `UNSET`. Canary and no-network tests run on Node and Chromium.
 
 ## 7. Runtime topology
 
@@ -258,6 +262,18 @@ flowchart TD
 There is one render path: after a reload the host renders from the checkpoint exactly as it did before (brief §12.2). The M1 conformance suite records how the pinned LangGraph.js version persists resume values and whether a repeated resume is safe; M3 runs those cases again with the IndexedDB saver.
 
 ### 8.3. A capability call
+
+**Implemented in M1 slice 2:** per-instance bindings at `runtime.create(definition, { bindings, ... })`, instance-lifetime grants for `app`/`principal`/`instance`, and explicit `start(input, { grants })` for run grants. Nodes call `host.capabilities.call(name, input, config)`; passing the node's `config` parents the capability span under that node. Input and output validate before dispatch and return respectively. Bindings with `approval: 'confirm'` always reject `unsupported`. The journal, confirmations and retries remain unimplemented; each invocation gets a fresh effect ID and core never retries.
+
+Labels from run input and validated outputs are sticky, conservative and sorted in snapshots. Non-empty free-text strings and dynamic property names can reach a destination only when every run label allows it. The default keeps `app` off `third-party` and `private-user` in-browser; a host may replace individual label policies. The extra verbatim guard lowercases, collapses Unicode whitespace and compares private strings of at least eight normalized characters, including structured arguments. It cannot detect paraphrases, and short or structured values remain a low-bandwidth channel. These controls cover SDK paths; trusted code can bypass them (ADR-0002).
+
+Finite defaults are 25 steps, 50 tool calls, 300000 ms wall clock and 1048576 payload bytes. Exhaustion fails the run and aborts it, even if graph code catches a call's rejection. The adapter passes the lower of the step budget and the graph's positive integer recursion limit to LangGraph. Tokens (100000), cost (0), repair attempts (2) and UI elements (50) are validated defaults reserved for later enforcement.
+
+`httpCapability({ url, method, ...bindingPolicy })` is the broker's request path. Only host-literal HTTPS origins (or HTTP loopback) are accepted; validated top-level fields fill percent-encoded path/query placeholders, with no free-text path placeholders. POST/PUT/PATCH send remaining fields as JSON. The host's `headers(context)` callback supplies credentials, requests default to `credentials: 'same-origin'`, and redirects reject. Responses are byte-capped, JSON-checked and schema-validated. Custom bindings can use `attributionHeaders(context)` to forward the same `X-Galaxie-Agent` and `X-Galaxie-Run` headers. They attribute and never authorize. A cross-origin server must list both in `Access-Control-Allow-Headers`; otherwise CORS preflight fails and the call rejects `unavailable`.
+
+Capability spans contain only allowlisted metadata and fixed errors, never arguments, results, URLs, headers or binding error messages. The root records sorted labels and an exhausted budget's name. Host-only `capability_failed.error` diagnostics retain the binding's raw error and may contain private values; hosts must not forward them to a destination `private-user` may not reach. Generated diagnostic fields carry no such content. Timeout or cancellation drops late results without validation or labelling; a timed-out binding holds its concurrency slot until its promise settles.
+
+The diagram below includes the later journal and confirmation flow:
 
 ```mermaid
 sequenceDiagram
@@ -351,7 +367,7 @@ Logout bumps an invalidation generation that every tab sees, wipes the principal
 | A9. Pinned MCP tool definitions | MCP client | `tools-mcp` |
 | A10. Logout invalidation | Ownership, storage | `core`, `storage-indexeddb` |
 
-M1 must cover A1–A4, A7 and A8 with tests (brief §16.3). The others are tested in the milestone that builds their component. These guarantees are bounded and testable; they are not a promise that nothing can go wrong (brief §0.2, §9.9).
+M1 slice 2 tests A2 and A3 through the broker, A4 through allowlisted spans and HTTP credential canaries, A7 for steps/tool calls/wall clock/payload, and A8 for HTTP attribution on Node and Chromium. A5 bindings refuse dispatch until confirmations exist. A6 label checks cover capabilities; model routing remains unimplemented. A1 remains pending in its renderer component. The M1 release requirement remains A1–A4, A7 and A8 (brief §16.3); the other controls are tested in the milestone that builds their component. These guarantees are bounded and testable; they are not a promise that nothing can go wrong (brief §0.2, §9.9).
 
 ## 10. Toolchain
 

@@ -26,7 +26,7 @@ export type DataLabel = 'public' | 'app' | 'private-user';
 /** The declared shape of a string field in a capability input. Only `freeText` can carry a sentence (ADR-0014). */
 export type ArgumentShape = 'id' | 'enum' | 'pattern' | 'freeText';
 
-/** What a schema field declares for the data-label rules (ADR-0014). How a schema carries it is settled in M1. */
+/** What a schema field declares for the data-label rules (ADR-0014). Schemas carry it through x-galaxie metadata. */
 export interface FieldAnnotation {
   readonly label?: DataLabel;
   readonly shape?: ArgumentShape;
@@ -46,4 +46,37 @@ export interface BudgetLimits {
   readonly wallClockMs: number;
   readonly payloadBytes: number;
   readonly uiElements: number;
+}
+
+export const DESTINATIONS: readonly DestinationClass[] = Object.freeze([
+  'in-browser',
+  'user-device',
+  'user-endpoint',
+  'host-server',
+  'third-party',
+]);
+export const DEFAULT_DATA_POLICY: Readonly<Record<DataLabel, DestinationAllowlist>> = Object.freeze(
+  {
+    public: Object.freeze({ allow: DESTINATIONS }),
+    app: Object.freeze({
+      allow: Object.freeze(DESTINATIONS.filter((value) => value !== 'third-party')),
+    }),
+    'private-user': Object.freeze({ allow: Object.freeze(['in-browser'] as const) }),
+  },
+);
+export const DEFAULT_BUDGETS: BudgetLimits = Object.freeze({
+  steps: 25,
+  toolCalls: 50,
+  wallClockMs: 300000,
+  payloadBytes: 1048576,
+  tokens: 100000,
+  cost: 0,
+  repairAttempts: 2,
+  uiElements: 50,
+});
+
+export function galaxieField(annotation: FieldAnnotation): {
+  readonly 'x-galaxie': FieldAnnotation;
+} {
+  return { 'x-galaxie': annotation };
 }

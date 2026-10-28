@@ -16,6 +16,7 @@ type StreamOptions = LangGraphRunnableConfig & {
 
 /** Native runnable boundaries; transform permits draining the engine after abort. */
 export interface LangGraphGraph {
+  readonly config?: LangGraphRunnableConfig;
   stream(input: unknown, options: StreamOptions): Promise<AsyncIterable<unknown>>;
   transform(input: AsyncGenerator<unknown>, options: StreamOptions): AsyncIterable<unknown>;
 }
@@ -28,15 +29,22 @@ export interface LangGraphServices {
 }
 
 export interface LangGraphHost {
+  readonly capabilities: {
+    call(name: string, input: unknown, config?: LangGraphRunnableConfig): Promise<unknown>;
+  };
   readonly langchain: {
     chatModel(role: string): BaseChatModel;
     checkpointer(): BaseCheckpointSaver;
   };
 }
 
-export function createHost(services: LangGraphServices): LangGraphHost {
+export function createHost(
+  services: LangGraphServices,
+  capabilities: LangGraphHost['capabilities'],
+): LangGraphHost {
   const checkpointer = services.checkpointer ?? new MemorySaver();
   return {
+    capabilities,
     langchain: {
       chatModel(role) {
         const model = Object.hasOwn(services.chatModels, role)

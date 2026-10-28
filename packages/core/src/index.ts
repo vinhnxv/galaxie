@@ -6,11 +6,14 @@ export type {
   CapabilityContext,
   CapabilityKind,
   CapabilityName,
+  CapabilityPort,
   CapabilityRequest,
   CapabilityRequests,
   GrantScope,
+  HttpCapabilityOptions,
   RetryPolicy,
 } from './capabilities.js';
+export { attributionHeaders } from './capabilities.js';
 export {
   type AgentDefinition,
   type BindingsFor,
@@ -33,6 +36,7 @@ export type {
   RunCommand,
   RunRequest,
 } from './executor.js';
+export { httpCapability } from './http-capability.js';
 export type {
   AgentId,
   AgentRef,
@@ -48,7 +52,13 @@ export type {
   SurfaceId,
   ViewRevision,
 } from './ids.js';
-export type { AgentInstance, AgentSnapshot, CancelReceipt, RunSnapshot } from './instance.js';
+export type {
+  AgentInstance,
+  AgentSnapshot,
+  CancelReceipt,
+  RunSnapshot,
+  StartOptions,
+} from './instance.js';
 export type {
   CatalogId,
   ComponentId,
@@ -76,6 +86,7 @@ export type {
   DestinationPreset,
   FieldAnnotation,
 } from './policy.js';
+export { DEFAULT_BUDGETS, DEFAULT_DATA_POLICY, galaxieField } from './policy.js';
 export {
   type CreateOptions,
   createRuntime,

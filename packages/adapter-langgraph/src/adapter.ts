@@ -1,8 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { type ExecutorAdapter, type ExecutorEvent, GalaxieError } from '@galaxie/core';
-import { isGraphInterrupt } from '@langchain/langgraph/web';
+import {
+  type CapabilityPort,
+  type ExecutorAdapter,
+  type ExecutorEvent,
+  GalaxieError,
+  isGalaxieError,
+  toErrorInfo,
+} from '@galaxie/core';
+import { GraphRecursionError, isGraphInterrupt } from '@langchain/langgraph/web';
 import { adapterError } from './errors.js';
 import {
   createHost,
@@ -36,7 +43,28 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
       services = services === undefined ? { chatModels: {} } : services;
       if (typeof agent !== 'function' || !validServices(services))
         throw new GalaxieError('invalid', 'The LangGraph factory and services must be valid.');
-      let host: LangGraphHost | undefined = createHost(services);
+      let active:
+        | { readonly capabilities: CapabilityPort; readonly handler: LangGraphTraceHandler }
+        | undefined;
+      let host: LangGraphHost | undefined = createHost(services, {
+        async call(name, input, config): Promise<unknown> {
+          const run = active;
+          if (run === undefined) throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+          const callbacks = config?.callbacks;
+          const parentId =
+            callbacks !== undefined &&
+            !Array.isArray(callbacks) &&
+            'getParentRunId' in callbacks &&
+            typeof callbacks.getParentRunId === 'function'
+              ? callbacks.getParentRunId()
+              : undefined;
+          const parent = parentId === undefined ? undefined : run.handler.handleFor(parentId);
+          return run.capabilities.call(name, input, {
+            ...(config?.signal === undefined ? {} : { signal: config.signal }),
+            ...(parent === undefined ? {} : { parent }),
+          });
+        },
+      });
       let graph: LangGraphGraph | undefined = agent(host);
       if (typeof graph !== 'object' || graph === null || typeof graph.stream !== 'function')
         throw new GalaxieError('invalid', 'The factory must return a LangGraph stream.');
@@ -54,6 +82,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           if (graph === undefined)
             throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');
           const handler = new LangGraphTraceHandler(request.trace);
+          active = { capabilities: request.capabilities, handler };
           let output: unknown;
           let interrupted = false;
           try {
@@ -63,7 +92,13 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
             };
             // LangChain 1.2.20 stream() can reject before resuming an aborted generator.
             // transform() uses the same LangGraph engine and drains its settlement finally block.
+            const configured = graph.config?.recursionLimit;
+            const recursionLimit =
+              typeof configured === 'number' && Number.isInteger(configured) && configured > 0
+                ? Math.min(request.limits.steps, configured)
+                : request.limits.steps;
             const stream = graph.transform(source(), {
+              recursionLimit,
               streamMode: [...STREAM_MODES],
               subgraphs: true,
               signal: request.signal,
@@ -88,15 +123,26 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
                 ? { type: 'error', error: adapterError('unsupported') }
                 : { type: 'output', output };
           } catch (error) {
+            const cause = isGalaxieError(error)
+              ? error
+              : typeof error === 'object' &&
+                  error !== null &&
+                  'cause' in error &&
+                  isGalaxieError(error.cause)
+                ? error.cause
+                : undefined;
             if (!request.signal.aborted)
               yield {
                 type: 'error',
                 error: adapterError(
-                  isGraphInterrupt(error) ? 'unsupported' : 'executor_error',
+                  error instanceof GraphRecursionError
+                    ? 'budget_exceeded'
+                    : (cause?.code ?? (isGraphInterrupt(error) ? 'unsupported' : 'executor_error')),
                   error,
                 ),
               };
           } finally {
+            active = undefined;
             await handler.settled();
           }
         },

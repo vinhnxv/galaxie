@@ -387,7 +387,7 @@ test('preserves the native recursion error type', async () => {
   const { runId } = await fixture.instance.start({ value: 0 });
   expect((await collect(fixture.instance.events(runId))).at(-1)).toMatchObject({
     type: 'error',
-    error: { code: 'executor_error', type: 'GraphRecursionError' },
+    error: { code: 'budget_exceeded', type: 'GraphRecursionError' },
   });
   await fixture.runtime.dispose();
   await fixture.provider.shutdown();

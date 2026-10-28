@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { type Context, context, type Tracer } from '@opentelemetry/api';
+import { deadlineTimer, RunBudget } from './budgets.js';
+import { CapabilityBroker, registerPrivate } from './capability-broker.js';
 import type { AgentDefinition } from './definition.js';
 import {
   type ErrorInfo,
@@ -16,6 +18,7 @@ import type { InstanceId, RunId, SessionId } from './ids.js';
 import type { AgentInstance, AgentSnapshot, RunSnapshot } from './instance.js';
 import type { PendingInteraction } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
+import type { BudgetLimits, DataLabel, DestinationAllowlist } from './policy.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
 import { type RunInstrumentation, startRunTrace } from './tracing.js';
@@ -25,6 +28,12 @@ const SETTLE_TIMEOUT_MS = 10_000;
 interface RunRecord {
   readonly runId: RunId;
   readonly controller: AbortController;
+  readonly capabilityController: AbortController;
+  readonly labels: Set<DataLabel>;
+  readonly privateValues: Set<string>;
+  readonly grants: ReadonlySet<string>;
+  budget?: RunBudget;
+  clearWallClock?: () => void;
   readonly events: RunEvents;
   readonly settle: () => void;
   status: RunStatus;
@@ -60,7 +69,12 @@ export function createAgentInstance(
   definition: AgentDefinition,
   adapter: ExecutorAdapter<unknown, unknown>,
   options: CreateOptions,
-  instrumentation: { readonly appId: string; readonly tracer: Tracer },
+  instrumentation: {
+    readonly appId: string;
+    readonly tracer: Tracer;
+    readonly limits: BudgetLimits;
+    readonly policy: Readonly<Record<DataLabel, DestinationAllowlist>>;
+  },
   onDisposed: () => void,
   diagnostics?: (event: DiagnosticEvent) => void,
 ): AgentInstance<unknown, unknown> {
@@ -90,6 +104,13 @@ export function createAgentInstance(
       });
     }
   };
+  const broker = new CapabilityBroker(
+    definition,
+    options.bindings,
+    instrumentation.policy,
+    options.principalScope,
+    report,
+  );
   const assertUsable = (): void => {
     if (disposing) throw new GalaxieError('invalid', 'The instance was disposed.');
   };
@@ -100,6 +121,7 @@ export function createAgentInstance(
         : Object.freeze({
             runId: current.runId,
             status: current.status,
+            labels: Object.freeze([...current.labels].sort()),
             ...(current.pending === undefined ? {} : { pending: current.pending }),
             ...(current.error === undefined ? {} : { error: current.error }),
           });
@@ -146,14 +168,29 @@ export function createAgentInstance(
     run.status = 'cancelled';
     delete run.pending;
     run.events.append({ type: 'cancelled' });
+    run.tracing?.setLabels([...run.labels]);
     run.tracing?.finish('cancelled');
+    run.privateValues.clear();
   };
   const failRun = (run: RunRecord, error: ErrorInfo): void => {
     run.status = 'failed';
     run.error = Object.freeze(error);
     delete run.pending;
     run.events.append({ type: 'error', error: run.error });
-    publish(run.events);
+    run.privateValues.clear();
+    publish(run.events, () => run.capabilityController.abort());
+  };
+  const failRunForBudget = (
+    run: RunRecord,
+    name: keyof BudgetLimits,
+    error: ErrorInfo = toErrorInfo('budget_exceeded'),
+  ): void => {
+    if (terminal(run)) return;
+    run.tracing?.recordBudget(name);
+    failRun(run, error);
+    run.controller.abort();
+    run.tracing?.setLabels([...run.labels]);
+    run.tracing?.finish('failed', run.error);
   };
   const acceptEvent = (run: RunRecord, event: ExecutorEvent): void => {
     if (terminal(run)) {
@@ -163,6 +200,7 @@ export function createAgentInstance(
     switch (event.type) {
       case 'output':
         run.status = 'succeeded';
+        run.privateValues.clear();
         delete run.pending;
         break;
       case 'error': {
@@ -173,7 +211,8 @@ export function createAgentInstance(
             event.error.type === undefined ? undefined : { name: event.error.type },
           ),
         );
-        failRun(run, error);
+        if (error.code === 'budget_exceeded') failRunForBudget(run, 'steps', error);
+        else failRun(run, error);
         if (!knownCode)
           report({ kind: 'protocol_violation', runId: run.runId, error: event.error });
         report({
@@ -212,6 +251,10 @@ export function createAgentInstance(
       const agent = executor;
       if (agent === undefined) throw new Error('The prepared executor is unavailable.');
       run.status = 'running';
+      run.budget = new RunBudget(instrumentation.limits);
+      run.clearWallClock = deadlineTimer(instrumentation.limits.wallClockMs, () =>
+        failRunForBudget(run, 'wallClockMs'),
+      );
       publish();
       // A synchronous listener may cancel or dispose before the executor is entered.
       if (terminal(run)) return;
@@ -232,6 +275,24 @@ export function createAgentInstance(
           command: { type: 'start', input },
           signal: run.controller.signal,
           trace: run.tracing.recorder,
+          limits: { steps: instrumentation.limits.steps },
+          capabilities: broker.port({
+            runId: run.runId,
+            signal: AbortSignal.any([run.controller.signal, run.capabilityController.signal]),
+            labels: run.labels,
+            privateValues: run.privateValues,
+            grants: run.grants,
+            budget: run.budget,
+            tracing: run.tracing,
+            active: () => !terminal(run),
+            labelsChanged: () => {
+              if (!terminal(run)) {
+                run.tracing?.setLabels([...run.labels]);
+                publish();
+              }
+            },
+            failBudget: (name) => failRunForBudget(run, name),
+          }),
         })
         [Symbol.asyncIterator]();
       // Never use for-await here: its early exit calls return() and can hide live engine work.
@@ -253,6 +314,9 @@ export function createAgentInstance(
         report({ kind: 'late_event', runId: run.runId, error });
       }
     } finally {
+      run.clearWallClock?.();
+      run.privateValues.clear();
+      run.tracing?.setLabels([...run.labels]);
       run.tracing?.finish(run.status, run.error);
       run.settle();
     }
@@ -317,9 +381,11 @@ export function createAgentInstance(
         );
       return promise;
     },
-    start(input): Promise<{ readonly runId: RunId }> {
+    start(input, startOptions): Promise<{ readonly runId: RunId }> {
+      let grants: ReadonlySet<string>;
       try {
         assertUsable();
+        grants = broker.validateGrants(startOptions?.grants);
         if (state !== 'ready' || claimingSlot || (current !== undefined && !terminal(current))) {
           throw new GalaxieError('invalid', 'The instance has no available run slot.');
         }
@@ -350,10 +416,15 @@ export function createAgentInstance(
         const run: RunRecord = {
           runId,
           controller: new AbortController(),
+          capabilityController: new AbortController(),
+          labels: new Set(broker.input.labels),
+          privateValues: new Set(),
+          grants,
           events: new RunEvents(runId),
           settle,
           status: 'queued',
         };
+        registerPrivate(broker.input.privateStrings(value), run.privateValues);
         const predecessor = settlement;
         settlement = Promise.all([predecessor, settled]).then(() => {});
         current = run;

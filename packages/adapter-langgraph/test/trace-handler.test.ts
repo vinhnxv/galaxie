@@ -156,3 +156,25 @@ test('a later parentless chain does not move the settlement barrier', async () =
   await wait;
   expect(settled).toBe(true);
 });
+
+test('handleFor resolves live node and inherited wrapper handles only', () => {
+  const { handler, steps } = recording();
+  expect(handler.handleFor('missing')).toBeUndefined();
+  handler.handleChainStart({}, {}, 'root');
+  handler.handleChainStart(
+    {},
+    {},
+    'node',
+    'root',
+    [],
+    { langgraph_node: 'node' },
+    undefined,
+    'node',
+  );
+  handler.handleChainStart({}, {}, 'wrapper', 'node');
+  expect(handler.handleFor('node')).toBe(steps[0]?.handle);
+  expect(handler.handleFor('wrapper')).toBe(steps[0]?.handle);
+  expect(handler.handleFor('root')).toBeUndefined();
+  handler.handleChainEnd({}, 'node');
+  expect(handler.handleFor('node')).toBeUndefined();
+});

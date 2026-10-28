@@ -13,7 +13,9 @@ test.each(CASE_NAMES)('native %s matches its golden', async (name) => {
   expect(transcript.outcome).toEqual(
     name === 'model-failure'
       ? { status: 'failed', errorType: 'FixtureModelError' }
-      : { status: 'succeeded' },
+      : name === 'step-limit'
+        ? { status: 'failed', errorType: 'GraphRecursionError' }
+        : { status: 'succeeded' },
   );
   await expect(`${JSON.stringify(normalize(transcript), null, 2)}\n`).toMatchFileSnapshot(
     `./golden/${name}.json`,

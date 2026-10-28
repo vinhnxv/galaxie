@@ -10,14 +10,21 @@ import {
   type Tracer,
   trace,
 } from '@opentelemetry/api';
-import type { ErrorInfo } from './errors.js';
+import type { CapabilityKind } from './capabilities.js';
+import type { ErrorCode, ErrorInfo } from './errors.js';
 import type { RunStatus } from './lifecycle.js';
+import type { BudgetLimits, DataLabel, DestinationClass } from './policy.js';
 import type { RunTrace, TraceHandle, TraceResult } from './trace.js';
 
 // open-telemetry/semantic-conventions-genai@51a0f580f8a6ad804ca4de5e033683c6fbbe5906
 // schema_url https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev; core semconv v1.44.0.
 const ALLOWED = new Set([
   'gen_ai.operation.name',
+  'gen_ai.tool.name',
+  'galaxie.capability.kind',
+  'galaxie.destination.class',
+  'galaxie.run.labels',
+  'galaxie.budget.name',
   'gen_ai.agent.name',
   'galaxie.app.id',
   'galaxie.agent.version',
@@ -82,13 +89,30 @@ export interface RunMetadata {
   readonly executorVersion: string;
 }
 
+export type CapabilityResult =
+  | { readonly status: 'ok' | 'cancelled' }
+  | { readonly status: 'error'; readonly code: ErrorCode };
+export interface CapabilitySpan {
+  end(result: CapabilityResult): void;
+}
+
 export interface RunInstrumentation {
   readonly recorder: RunTrace;
+  startCapability(
+    meta: {
+      readonly name?: string;
+      readonly kind?: CapabilityKind;
+      readonly destination?: DestinationClass;
+    },
+    parent?: TraceHandle,
+  ): CapabilitySpan;
+  setLabels(labels: readonly DataLabel[]): void;
+  recordBudget(name: keyof BudgetLimits): void;
   finish(status: RunStatus, error?: ErrorInfo): void;
 }
 
 interface StepRecord {
-  readonly kind: 'node' | 'model';
+  readonly kind: 'node' | 'model' | 'capability';
   readonly span: Span;
   readonly context: Context;
   readonly depth: number;
@@ -119,23 +143,30 @@ export function startRunTrace(
     parent,
   );
   const rootContext = trace.setSpan(parent, root);
-  const steps = new Map<TraceHandle, StepRecord>();
+  const steps = new Map<object, StepRecord>();
+  const labels: { value: readonly DataLabel[] } = { value: [] };
   let closed = false;
-  const end = (
-    record: StepRecord,
-    result: TraceResult | { readonly status: 'cancelled' },
-  ): void => {
+  const end = (record: StepRecord, result: TraceResult | CapabilityResult): void => {
     if (record.ended) return;
     record.ended = true;
     record.span.setAttributes(
       attributes({
         'galaxie.step.status': result.status,
-        ...(result.status === 'error' ? { 'error.type': errorType(result.errorType) } : {}),
+        ...(result.status === 'error'
+          ? record.kind === 'capability'
+            ? {
+                'error.type': 'GalaxieError',
+                'galaxie.error.code': 'code' in result ? result.code : 'cancelled',
+              }
+            : { 'error.type': errorType('errorType' in result ? result.errorType : undefined) }
+          : {}),
         ...(result.status === 'ok' && record.kind === 'model'
           ? {
-              'gen_ai.response.model': result.responseModel,
-              'gen_ai.usage.input_tokens': result.usage?.inputTokens,
-              'gen_ai.usage.output_tokens': result.usage?.outputTokens,
+              'gen_ai.response.model': 'responseModel' in result ? result.responseModel : undefined,
+              'gen_ai.usage.input_tokens':
+                'usage' in result ? result.usage?.inputTokens : undefined,
+              'gen_ai.usage.output_tokens':
+                'usage' in result ? result.usage?.outputTokens : undefined,
             }
           : {}),
       }),
@@ -189,6 +220,43 @@ export function startRunTrace(
         return handle;
       },
     },
+    startCapability(meta, parentHandle): CapabilitySpan {
+      if (closed) return { end: () => {} };
+      const ancestor = parentHandle === undefined ? undefined : steps.get(parentHandle);
+      const span = tracer.startSpan(
+        meta.name === undefined ? 'execute_tool' : `execute_tool ${safeName(meta.name)}`,
+        {
+          kind: SpanKind.INTERNAL,
+          attributes: attributes({
+            'gen_ai.operation.name': 'execute_tool',
+            'gen_ai.tool.name': meta.name,
+            'galaxie.capability.kind': meta.kind,
+            'galaxie.destination.class': meta.destination,
+          }),
+        },
+        ancestor?.context ?? rootContext,
+      );
+      const record: StepRecord = {
+        kind: 'capability',
+        span,
+        context: trace.setSpan(ancestor?.context ?? rootContext, span),
+        depth: (ancestor?.depth ?? 0) + 1,
+        ended: false,
+      };
+      const handle: CapabilitySpan = {
+        end(result): void {
+          if (!closed) end(record, result);
+        },
+      };
+      steps.set(handle, record);
+      return handle;
+    },
+    setLabels(value): void {
+      if (!closed) labels.value = [...value].sort();
+    },
+    recordBudget(name): void {
+      if (!closed) root.setAttributes(attributes({ 'galaxie.budget.name': name }));
+    },
     finish(status, error): void {
       if (closed) return;
       closed = true;
@@ -201,10 +269,11 @@ export function startRunTrace(
       for (const record of [...steps.values()]
         .filter((record) => !record.ended)
         .sort((a, b) => b.depth - a.depth))
-        end(record, result);
+        end(record, record.kind === 'capability' ? { status: 'cancelled' } : result);
       root.setAttributes(
         attributes({
           'galaxie.run.status': status,
+          'galaxie.run.labels': labels.value,
           ...(status === 'failed'
             ? { 'error.type': errorType(error?.type), 'galaxie.error.code': error?.code }
             : {}),

@@ -4,6 +4,7 @@
 import type { AgentRef, EffectId, PrincipalScope, RunId } from './ids.js';
 import type { DestinationClass } from './policy.js';
 import type { Schema } from './schema.js';
+import type { TraceHandle } from './trace.js';
 
 /** A versioned capability name, for example `lessons.get@1`. A breaking change is a new version (ADR-0008). */
 export type CapabilityName = `${string}@${number}`;
@@ -65,4 +66,29 @@ export interface CapabilityBinding<Input = unknown, Output = unknown> {
   readonly retry: RetryPolicy;
   /** A property, not a method, so a binding that needs more input than the schema gives fails to compile. */
   readonly invoke: (input: Input, context: CapabilityContext) => Promise<Output>;
+}
+
+/** Framework-neutral access to the current run's broker. */
+export interface CapabilityPort {
+  call(
+    name: string,
+    input: unknown,
+    options?: { readonly signal?: AbortSignal; readonly parent?: TraceHandle },
+  ): Promise<unknown>;
+}
+
+export interface HttpCapabilityOptions extends Omit<CapabilityBinding, 'invoke'> {
+  readonly url: string;
+  readonly method: 'GET' | 'DELETE' | 'POST' | 'PUT' | 'PATCH';
+  readonly headers?: (context: CapabilityContext) => HeadersInit | Promise<HeadersInit>;
+  readonly credentials?: RequestCredentials;
+  readonly fetch?: typeof globalThis.fetch;
+}
+
+/** These headers attribute the calling agent and run; they never authorize a request. */
+export function attributionHeaders(context: CapabilityContext): Readonly<Record<string, string>> {
+  return {
+    'X-Galaxie-Agent': `${context.agent.id}@${context.agent.version}`,
+    'X-Galaxie-Run': context.runId,
+  };
 }

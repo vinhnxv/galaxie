@@ -25,6 +25,10 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     this.#trace = trace;
   }
 
+  handleFor(runId: string): TraceHandle | undefined {
+    return this.#chains.get(runId)?.handle;
+  }
+
   async settled(): Promise<void> {
     if (this.#root !== undefined) await this.#settlement.promise;
   }

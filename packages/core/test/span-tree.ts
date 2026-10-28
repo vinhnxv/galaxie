@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { ReadableSpan } from '@opentelemetry/sdk-trace';
+import {
+  InMemorySpanExporter,
+  type ReadableSpan,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from '@opentelemetry/sdk-trace';
 import { expect } from 'vitest';
 import metadata from '../package.json' with { type: 'json' };
 
@@ -31,6 +36,11 @@ export function serializeSpans(spans: readonly ReadableSpan[]): string {
 
 const ALLOWED = new Set([
   'gen_ai.operation.name',
+  'gen_ai.tool.name',
+  'galaxie.capability.kind',
+  'galaxie.destination.class',
+  'galaxie.run.labels',
+  'galaxie.budget.name',
   'gen_ai.agent.name',
   'galaxie.app.id',
   'galaxie.agent.version',
@@ -90,4 +100,14 @@ export function assertSpanTree(spans: readonly ReadableSpan[]): SpanTree {
   const root = roots[0];
   if (!root) throw new Error('The run span is missing.');
   return build(root);
+}
+
+/** Shares the SDK already installed for core tests with adapter tests. */
+export function createSpanRecorder(): {
+  readonly exporter: InMemorySpanExporter;
+  readonly provider: TracerProvider;
+} {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  return { exporter, provider };
 }

@@ -4,9 +4,11 @@
 import { expect, test } from 'vitest';
 import { CASE_NAMES, type CaseName, cases } from './cases/index.js';
 import branching from './golden/branching.json' with { type: 'json' };
+import capability from './golden/capability.json' with { type: 'json' };
 import linear from './golden/linear.json' with { type: 'json' };
 import modelFailure from './golden/model-failure.json' with { type: 'json' };
 import modelWithoutConfig from './golden/model-without-config.json' with { type: 'json' };
+import stepLimit from './golden/step-limit.json' with { type: 'json' };
 import subgraph from './golden/subgraph.json' with { type: 'json' };
 import { diff } from './support/diff.js';
 import { compatibilityMatrix } from './support/matrix.js';
@@ -15,6 +17,8 @@ import { galaxieLane, runGalaxie } from './support/transcript.js';
 
 const goldens: Record<CaseName, unknown> = {
   linear,
+  capability,
+  'step-limit': stepLimit,
   branching,
   subgraph,
   'model-without-config': modelWithoutConfig,
@@ -26,7 +30,9 @@ test.each(CASE_NAMES)('%s differences exactly match the compatibility matrix', a
   expect(transcript.outcome).toEqual(
     name === 'model-failure'
       ? { status: 'failed', errorType: 'FixtureModelError' }
-      : { status: 'succeeded' },
+      : name === 'step-limit'
+        ? { status: 'failed', errorType: 'GraphRecursionError' }
+        : { status: 'succeeded' },
   );
   const differences = diff(goldens[name], normalize(transcript)).sort();
   const listed = compatibilityMatrix.find(
