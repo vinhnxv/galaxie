@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-28
 - **Related:** brief §4.3, §11; ADR-0004, ADR-0012
+- **Revisions:** 2026-10-28, with brief 0.3: Spike C runs before M2 instead of in M0.
 
 ## Context
 
@@ -31,5 +32,5 @@ The real cost of reuse is that every host must render every catalog component in
 
 ## Verification
 
-- Spike C.
+- Spike C, before M2.
 - AT-06, AT-07, AT-21, AT-27, AT-28.

@@ -2,7 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-28
-- **Related:** brief §0.2, §7; ADR-0003, ADR-0004, ADR-0005
+- **Related:** brief §0.2, §7; ADR-0003, ADR-0004, ADR-0005, ADR-0016, ADR-0017
+- **Revisions:** 2026-10-28, with brief 0.3: Spike A's checks move to the M1 conformance suite, which compares Node and Chrome (ADR-0016); the adapter contract is part of the framework-neutral contracts (ADR-0017).
 
 ## Context
 
@@ -16,7 +17,7 @@ Building a second graph engine would duplicate that work. It would also create t
 - LangGraph owns graph state, reducers, scheduling, supersteps, subgraphs and checkpoint semantics.
 - Galaxie owns identity, lifecycle, model and tool services, storage integration, budgets, public state projection and UI surfaces.
 - Galaxie never reads a checkpoint to decide the next node.
-- The executor adapter contract (brief §7.5) stays engine-neutral, so other engines can be added later as trusted infrastructure code.
+- The executor adapter contract (brief §7.5) stays engine-neutral, so other engines can be added later as trusted infrastructure code. It is part of the framework-neutral contracts (ADR-0017).
 
 ## Alternatives considered
 
@@ -28,11 +29,11 @@ Building a second graph engine would duplicate that work. It would also create t
 ## Consequences
 
 - Galaxie depends on LangGraph.js versions. Versions are pinned, and a compatibility matrix records observed browser behavior.
-- The browser has no `AsyncLocalStorage`; some APIs may need an explicit `config`. Spike A lists them.
+- The browser has no `AsyncLocalStorage`; some APIs may need an explicit `config`. The M1 conformance suite lists them in the compatibility matrix.
 - There is no official browser checkpointer; ADR-0005 covers it.
 - Node re-execution on resume is LangGraph behavior that galaxie must design around (ADR-0004).
 
 ## Verification
 
-- Spike A: branch, subgraph, interrupt/resume and reload on the pinned version.
+- The M1 conformance suite (ADR-0016): branch, subgraph and interrupt/resume on the pinned version, compared between Node and Chrome. Reload is tested with the IndexedDB saver in M3.
 - AT-01, AT-02, AT-15.

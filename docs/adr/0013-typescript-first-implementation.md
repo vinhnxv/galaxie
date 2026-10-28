@@ -3,7 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-10-28
 - **Related:** brief §0.2, §6.1, §16.8, §16.9; ADR-0002
-- **Revisions:** 2026-10-28: TypeScript 7 facts checked against the official announcement, and the side-by-side setup made explicit.
+- **Revisions:**
+  - 2026-10-28: TypeScript 7 facts checked against the official announcement, and the side-by-side setup made explicit.
+  - 2026-10-28, with brief 0.3: references to M0 removed, because the roadmap no longer has an M0 phase.
 
 ## Context
 
@@ -23,7 +25,7 @@ Facts that shape the answer:
 ## Decision
 
 - Galaxie is written in TypeScript (strict) for every package in the MVP: core, adapters, models, MCP client, storage and React.
-- The toolchain compiles and type-checks with TypeScript 7. Tools that need the compiler API run on TypeScript 6.0, installed side by side as Microsoft recommends, until they support the 7.1 API. Examples are type-aware ESLint rules, declaration bundling and API reports. M0 lists those tools.
+- The toolchain compiles and type-checks with TypeScript 7. Tools that need the compiler API run on TypeScript 6.0, installed side by side as Microsoft recommends, until they support the 7.1 API. Examples are type-aware ESLint rules, declaration bundling and API reports. Verification lists those tools.
 - Example servers (`examples/mcp-server/`) and build scripts are TypeScript on Node, so types are shared with the browser packages.
 - Rust is not used in the MVP. It is a candidate only where a measured need exists:
   - a WASM guest target for untrusted plugins in the isolation phase (Phase 7);
@@ -44,7 +46,7 @@ Facts that shape the answer:
 
 ## Verification
 
-- M0 records the TypeScript versions and the tools that still need 6.x.
+- The repository records the TypeScript versions and the tools that still need 6.x.
   - Done (2026-10-28): the workspace pins TypeScript 7.0.2 (`tsc`) and TypeScript 6.0.3 through `@typescript/typescript6` 6.0.2 (`tsc6`). CI type-checks with both.
   - No tool in the toolchain needs the compiler API yet. Biome lints and formats without it, and Vitest runs TypeScript through Vite's own transformer.
   - The first tool that will need 6.x is typescript-eslint, for the agent-package ESLint plugin in M4: version 8.72 supports TypeScript only below 6.1.

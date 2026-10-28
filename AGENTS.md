@@ -4,7 +4,7 @@ Guidance for coding agents (Claude Code, Codex and others) working in this repos
 
 ## Project status
 
-galaxie is in the design phase. `packages/core` holds draft contract types and has no runtime behavior; the runtime is M1 work. Milestone M0 (feasibility spikes) comes next. Spike code is throwaway: keep it out of `packages/` and never promote it to package code (brief §16.2).
+galaxie is in the design phase. `packages/core` holds draft contract types and has no runtime behavior; the runtime is M1 work, and M1 comes next. Spikes run only when a milestone needs their answer (brief §16.2). Spike code is throwaway: keep it out of `packages/` and never promote it to package code.
 
 ## Read first
 

@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** brief §3.3, §9.6 (scenario 14), §9.7 A6, §17 (AT-04, AT-32); ADR-0006, ADR-0012
+- **Related:** brief §3.3, §9.6 (scenario 14), §9.7 A6, §17 (AT-04, AT-32, AT-36); ADR-0006, ADR-0012, ADR-0016
+- **Revisions:** 2026-10-28, with brief 0.3: labels also apply to the content of trace spans, checked against the destination class the host declares for its traces (ADR-0016).
 
 ## Context
 
@@ -34,7 +35,7 @@ Full taint tracking through LLM output is not possible: model output depends on 
     - A `freeText` field follows the same label rule as a model call, using the capability's host-declared destination class.
     - IDs, enums, numbers, booleans and short bounded patterns pass. They are a low-bandwidth channel, and the docs say so.
   - **Verbatim-match guard:** as an extra check, outbound request bodies are scanned for registered `private-user` values above a minimum length.
-  - **Traces** record only allowlisted fields (ADR-0012 A4).
+  - **Traces** record only allowlisted fields (ADR-0012 A4). When the host opts in to free text for development, spans are checked like any other destination: the host declares the destination class of the system that finally receives them, and text goes in only when every label the run carries allows that class. Text whose labels allow only `in-browser` stays out whatever the declaration (ADR-0016).
 
 ## Alternatives considered
 
@@ -54,5 +55,6 @@ Full taint tracking through LLM output is not possible: model output depends on 
 ## Verification
 
 - M1: router and broker unit tests for every label/class combination.
+- M1: AT-36 checks span content against the run's labels and the declared trace destination.
 - M2: AT-04 network capture on the tutor slice.
 - M4: AT-32 with injection-corpus cases that try to leak through allowed endpoints.

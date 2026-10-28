@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** brief §11.3, §12.1, §12.2; ADR-0001, ADR-0005, ADR-0009
+- **Related:** brief §11.3, §12.1, §12.2; ADR-0001, ADR-0005, ADR-0009, ADR-0016
+- **Revisions:** 2026-10-28, with brief 0.3: Spike A's checks move to the M1 conformance suite (ADR-0016); Spike C runs before M2.
 
 ## Context
 
@@ -51,10 +52,11 @@ An external review pointed out a second crash window that the projection removal
 
 ## Verification
 
-- Spike A:
+- The M1 conformance suite, on Node and in Chrome (ADR-0016):
   - node and parent re-execution on resume;
   - interrupt IDs;
   - how resume values are persisted;
   - whether a repeated resume after a crash is safe.
-- Spike C: render from the interrupt payload; reload mid-quiz.
+- M3: the same cases with the IndexedDB saver.
+- Spike C, before M2: render from the interrupt payload; reload mid-quiz.
 - AT-07, AT-08, AT-09, AT-15, AT-31, AT-35.

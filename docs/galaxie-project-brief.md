@@ -3,12 +3,26 @@
 > Project brief, proposed architecture and implementation contract, written to be handed to Codex CLI and then reviewed with Claude Code.
 
 - **Project name:** `galaxie`.
-- **Document version:** 0.2. A starting point for implementation and critique, not a specification validated by code.
+- **Document version:** 0.3. A starting point for implementation and critique, not a specification validated by code.
 - **Date:** 2026-10-28, timezone Asia/Ho_Chi_Minh.
 - **Language:** English.
-- **Status:** no implementation or benchmark exists yet.
-- **Scope:** an SDK/runtime for developers. The English Tutor is the reference application, not the whole product.
+- **Status:** no runtime exists yet. Two throwaway spikes have run (§16.2); M1 is next.
+- **Scope:** an SDK/runtime for developers, and the framework-neutral contracts it defines for browser agents (§7.6). The English Tutor is the reference application, not the whole product.
 - **Companion documents:** [framework overview](framework-overview.md) (role, direction, audiences, production readiness, public vs private) and [ADRs](adr/README.md).
+
+### Changes in 0.3 (2026-10-28)
+
+Founder decisions after the first two spikes. [ADR-0016][ADR-0017]
+
+- The mission is stated in full. galaxie packages agent pipelines (a single agent, a multi-agent system, or the harness around them) so that they run on the user's own device, in the browser. The developer deploys no agent backend and no container for the orchestration. (§0, §1.1)
+- Example deployments: customer care for a small company and questions and answers for a school, with a retrieval index of public documents shipped with the app. Retrieval over public documents is a Phase 5 item. (§1.4, §16.7)
+- New watch-list items: agents that run elsewhere (A2A), the OpenTelemetry GenAI conventions, and coding agents on the user's machine, such as Codex CLI and Claude Code. (§16.8)
+- The verdict on galaxie is **parity**: code written with LangChain and LangGraph runs in galaxie the way it runs natively on a server. A conformance suite runs the same graphs on Node and in Chrome and compares the results. (§0.2, §16.3, §17, §18) [ADR-0016]
+- Accuracy, latency and other system metrics are **demonstrations** with no pass/fail thresholds, because they depend on the model, the tools and the pipeline the agent builder chooses. This replaces the 0.2 thresholds, the frozen eval plan and the numeric Go/Revise decision. (§18) [ADR-0016]
+- Traces are OpenTelemetry spans from M1, so a development tool such as Langfuse can read them. galaxie filters everything it records in a span, and span content follows the data labels. (§3.3, §14.4, §16.3) [ADR-0016]
+- galaxie's contracts are a framework-neutral standard for browser agents. LangGraph.js is the first framework behind them, and they reuse open protocols where one exists. (§7.6) [ADR-0017]
+- Agents also provide data to the app and give it directives, such as navigation, through capabilities the host binds. (§11.2)
+- The milestone order changes. M1 starts now, and a spike runs only when a milestone needs its answer. What remained of Spike A becomes the M1 conformance suite. (§16.2, §21)
 
 ### Changes in 0.2 (2026-10-28)
 
@@ -20,7 +34,7 @@ Updated after an architecture review, an ecosystem survey and founder decisions.
 - The executor runs on the main thread in the MVP; local inference runs in a worker. [ADR-0003]
 - For pending interactions, the source of truth is the interrupt payload in the LangGraph checkpoint. [ADR-0004]
 - A mandatory security baseline is now a release condition. (§9.6–§9.9) [ADR-0012]
-- The roadmap now has spikes, entry gates for post-MVP phases and a watch list. Go/Revise decisions have numeric thresholds. (§16, §18)
+- The roadmap now has spikes, entry gates for post-MVP phases and a watch list. Go/Revise decisions have numeric thresholds (replaced in 0.3). (§16, §18)
 - The whole document is now in English.
 - Revised after an external read-only review with Codex CLI:
   - Privacy now rests on run-level data labels and argument shapes, not on destination classes alone. (§3.3) [ADR-0014]
@@ -29,16 +43,20 @@ Updated after an architecture review, an ecosystem survey and founder decisions.
   - Security guarantees are scoped to SDK-controlled paths. (§9.7)
   - The controlled MCP server has a security profile. (§9.5)
   - An external developer trial comes in M3. (§16.5)
-  - Thresholds are frozen before the Spike B bake-off. (§18)
+  - Thresholds are frozen before the Spike B bake-off (replaced in 0.3). (§18)
 - The license is AGPL-3.0-only plus a commercial license (founder decision). Commercial use is allowed under the AGPL; closed-source use needs a commercial license. [ADR-0015]
 
 ## 0. Read this before writing code
 
 **Galaxie is an environment for installing, running and managing AI agents as first-class entities inside a web application: they have identity, state, lifecycle, capabilities and an interactive UI.**
 
-Agent logic and the LLM can run entirely in the browser, using WebGPU on the user's device. When policy allows, an agent can also call HTTP APIs, MCP servers or remote models. Developers write agents with LangGraph.js or another compatible engine and integrate them through an adapter. They do not have to learn a new graph DSL.
+It packages agent pipelines (a single agent, a multi-agent system, or the harness around them) so that they run on the user's own device, in the browser. The developer deploys no agent backend and no container for the orchestration. The app's backend keeps its APIs, MCP servers, databases and tools.
 
-An agent can present UI by choosing from a component catalog the application has registered: Quiz, Flashcard, Feedback, AudioRecorder and so on. The LLM supplies data and display intent. The application's trusted renderer owns the DOM and the event handlers.
+Agent logic and the LLM can run entirely in the browser, using WebGPU on the user's device. When policy allows, an agent can also call HTTP APIs, MCP servers or other models: a model built into the browser, a model server on the user's machine, or a remote API. Developers write agents with LangGraph.js or another compatible engine and integrate them through an adapter. They do not have to learn a new graph DSL.
+
+The verdict on galaxie is parity: LangChain and LangGraph code behaves in galaxie as it does natively on a server, and every difference is listed with its reason (§0.2, item 12).
+
+An agent can present UI by choosing from a component catalog the application has registered: Quiz, Flashcard, Feedback, AudioRecorder and so on. The LLM supplies data and display intent. The application's trusted renderer owns the DOM and the event handlers. An agent can also provide data to the app and ask it to act, for example to navigate, through capabilities the host binds (§11.2).
 
 ### 0.1. Decision labels
 
@@ -68,25 +86,36 @@ API and package names in examples are **sketches**, not real APIs or registered 
     - the run's data labels.
 
     Significant writes need a confirmation bound to their exact parameters. These limits are bounded and testable; they are not a promise of "no harm". The security baseline in §9.7 is a release condition. [ADR-0012][ADR-0014]
+12. **The verdict is parity.** Code written with LangChain and LangGraph runs in galaxie the way it runs natively, for example in Node inside a Docker container. A conformance suite runs the same graphs with a deterministic fake chat model on Node and in Chrome, and compares stream events, state, checkpoints, interrupts and resume. A difference is fixed, or listed in the compatibility matrix with its reason. Accuracy and system metrics are demonstrations, never pass/fail gates: they depend on the model, the tools and the pipeline the agent builder chooses. [ADR-0016]
+13. **Traces are OpenTelemetry spans.** galaxie filters every value it records in them, and data labels apply to span content as they do to any outbound call. galaxie never exports spans itself: the host registers the exporter, for example to Langfuse during development. [ADR-0016]
+14. **The contracts are a framework-neutral standard.** LangGraph.js is the first framework behind them, not the only one. They reuse open protocols (MCP, OpenTelemetry, JSON Schema, the OpenAI-compatible wire format) and specify only what no protocol covers. [ADR-0017]
 
 ## 1. Vision and product hypotheses
 
 ### 1.1. Founder vision [VISION]
 
 - Agents become a natural part of web apps, the way routers, state management and data-fetching layers are today.
-- Developers embed agents in existing applications instead of always standing up a separate agent backend and orchestration system.
-- Agents can use a local LLM through WebGPU, using the client's hardware.
+- **No agent backend.** galaxie packages an agent pipeline (a single agent, a multi-agent system, or the harness around them) into the web app, and the pipeline runs on the user's machine. The developer deploys no orchestration server and no container for it, so orchestration costs the developer no servers. The developer's work stays on the backend: APIs, MCP servers, databases and tools.
+- **The user's device does the work it can.** Many devices are powerful. Some have a model built into the browser or the operating system, some users run their own model server, and some users want their data to stay on the device. Each model role uses what the device offers, under the host's policy (§3, §10).
+- **Feature parity with a server stack.** Building an agent on galaxie should feel no different from building it on a server with an inference engine or a retrieval pipeline, within what the device and the browser support.
+- **Lower running costs for small organizations.** A small company's customer-care assistant or a school's question-and-answer bot can run on its visitors' devices instead of on rented servers. When the documents may be public, the retrieval index can ship with the app (§1.4).
+- **Parity with native LangChain and LangGraph.** Developers keep their LangChain/LangGraph code, and it behaves as it does natively on a server, for example in Node inside a Docker container (§18).
 - One or more agents can cooperate, with many nodes, branching, loops, subgraphs and complex state machines.
+- **One environment for models and tools.** Agents use a local LLM through WebGPU, a model built into the browser, a model server on the user's machine or a remote API, and they reach MCP servers and HTTP APIs, all under one policy. Calling agents that run elsewhere may come later (§16.8).
 - Agents use data within the permissions the host app and backend grant. This is like a frontend calling an API, plus agent-specific policy.
+- **Agents work with the app's UI.** An agent drives an assigned UI region with the app's own components and LLM-generated data, provides data to the app, and gives directives such as navigating to a page, through capabilities the host defines (§11.2).
+- **Configuration and context through the web.** Agent settings, model choices, prompts and context are managed in the web app, not in a daemon or a file on the user's machine. In the MVP the host sets them in code; a web console is not scheduled until its scope is settled (§20, question 5).
+- **Development tracing.** During development, galaxie exposes run data as traces, so a tool such as Langfuse shows the order of steps and where the time went (§14.4).
+- **A standard for browser agents.** galaxie defines how browser agents communicate, the protocols they use, the security rules and the layers. The standard is framework-neutral, so LangChain, LangGraph and other frameworks can implement it (§7.6).
 - Agents, skills, plugins and integrations can be shared, reinstalled, configured and reused.
-- Developers can keep using LangChain/LangGraph where compatible and do not have to rewrite their logic in a new framework.
-- An agent can drive the experience inside an assigned UI region, using existing components and LLM-generated data.
+- Runtime assets such as WASM modules and model weights load from a CDN or object storage the host chooses, such as an S3 bucket, with pinned hashes (§3.2, §5.4).
 - Adding an agent should feel as simple as adding a library. End users should not need to install a daemon or a desktop app.
 - Users who already have an LLM API or endpoint should be able to plug it in; a local model on WebGPU stays available as an option.
+- Possibly later: a web app hands tasks to an agent the user already runs on their machine, such as Codex CLI or Claude Code, to coordinate work and cut the host's API costs. This is an idea on the watch list, not a commitment (§16.8).
 
 ### 1.2. Concrete product [PROPOSED]
 
-A **Browser-first Agent Runtime SDK**. Inside it: an agent host/harness, executor adapters, model services, a capability broker, persistence and declarative UI integration.
+A **Browser-first Agent Runtime SDK**. Inside it: an agent host/harness, executor adapters, model services, a capability broker, persistence, declarative UI integration and development tracing. Its contracts are published as a framework-neutral standard (§7.6).
 
 Product message:
 
@@ -100,11 +129,26 @@ Product message:
 - Do the privacy, latency or cost benefits of local inference outweigh model download, latency, battery and device support costs?
 - Can an agent package be reused across apps without changing its logic?
 - Do developers value lifecycle, recovery and tool binding more than a thin `graph.invoke() + useAgent()` wrapper?
-- Is the chosen small model good enough for the specific task, including explaining mistakes in Vietnamese?
+- Is a small model good enough for a given task, such as explaining mistakes in Vietnamese? galaxie records demonstrations; the agent builder decides (§18).
 - Will users accept downloading a model per website, or only a model the browser manages?
 - If the platform moves towards "the agent belongs to the browser and websites only expose tools" (WebMCP, Prompt API), does an agent embedded in the app still have a reason to exist? [S18][S19]
 
 The existence of WebGPU or the hype around AI agents is not evidence of product-market fit.
+
+### 1.4. Example deployments [VISION]
+
+These show where the hypotheses in §1.3 would pay off. None has been built.
+
+**Customer care for a small company, or questions and answers for a school.** The assistant answers from documents that may be public, such as product guides, policies, or admissions and course information.
+
+- The host builds the retrieval index (a vector index) when it builds the app, and serves it with the app's other assets from a CDN or object storage. An embedding model and the search run on the visitor's device.
+- Documents that change often, or that must stay private, stay on the backend. The host binds a search capability to them instead (§9.2).
+- Each model role runs where the host's policy allows: in the browser, in a model built into the browser, or on a cloud model (§10.3).
+- The organization pays for no orchestration or inference servers. It still serves the static assets, pays for any cloud model and runs the backend parts it keeps.
+- Every visitor downloads the index, and the documents' content travels with it; that is why the index is only for public data.
+- A local model is a large first download: B0 downloaded about 1.4 GB for a 1.7B model. A model built into the browser, or a cloud model, may suit visitors who come once (§3.2).
+
+**A voicebot for the same uses**, once voice ships (§4.4, Phase 5 in §16.7).
 
 ## 2. Boundaries: what galaxie does and does not do
 
@@ -112,7 +156,7 @@ The existence of WebGPU or the hype around AI agents is not evidence of product-
 | --- | --- |
 | Agent authoring framework | LangGraph/LangChain or hand-written code describing the workflow, reasoning, nodes and tools |
 | Agent execution engine | Executes that engine's graph semantics, reducers, branching and interrupts |
-| **Galaxie host/harness** | Identity, lifecycle, resources, model/tool bindings, permissions, persistence integration, UI surfaces and packaging |
+| **Galaxie host/harness** | Identity, lifecycle, resources, model/tool bindings, permissions, persistence integration, UI surfaces, packaging and trace spans; the framework-neutral contracts between these layers (§7.6) |
 | Inference engine | Runs a model on WebGPU/WASM or through a selected provider |
 | Host application | Main UI, design system, login session, data and business rules |
 | Backend/API/MCP | Provides services; authenticates and authorizes on the server |
@@ -123,9 +167,11 @@ The existence of WebGPU or the hype around AI agents is not evidence of product-
 - Not a compiler that turns any Python/Node application into WASM.
 - Not a Linux container in the browser.
 - Not a LangGraph clone with its own graph semantics.
+- Not a new agent-authoring framework. The standard in §7.6 is the contract between frameworks and the host; agents are still written with LangGraph or another framework.
 - Not a public agent marketplace before the runtime is trustworthy.
 - No guarantee of continuous background execution when the tab closes, the browser suspends or the device sleeps.
-- Does not remove the business backend, external API costs or the need for authentication.
+- Removes the agent backend, not the business backend: the host still runs its APIs, pays for external APIs and remote models, and authenticates users.
+- Does not judge the quality of an agent's answers. Accuracy depends on the model, the tools and the pipeline the agent builder chooses; galaxie records it only as demonstrations (§18).
 - Does not turn an agent into a good tutor through a system prompt alone.
 - Never lets an LLM inject executable DOM or JavaScript into the application.
 - Frontend state is never authoritative evidence for exam scores or transactions.
@@ -166,11 +212,11 @@ Inference policy is an allowlist of **destination classes**, set **per model rol
 ### 3.2. Data policy
 
 - Downloading weights or runtime assets is different from sending user data. Show the estimated size and ask for consent before a large download.
-- Downloading weights from a third party is still egress: WebLLM's prebuilt model list points to Hugging Face and GitHub, so the user's IP and timing reach those parties. Production hosts should serve weights from their own origin or CDN, with hash checks.
+- Downloading weights from a third party is still egress: WebLLM's prebuilt model list points to Hugging Face and GitHub, so the user's IP and timing reach those parties. Production hosts should serve weights and runtime assets, WASM included, from their own origin, a CDN or object storage such as an S3 bucket, with hash checks.
 - Claim offline mode only when the app shell, the model and the required assets are present and the workflow needs no remote tool.
 - When hardware or a capability is missing, say so clearly. Never pretend to run locally.
 - Browser storage is partitioned by origin, so every website that uses WebLLM or Transformers.js makes the user download weights again. This is a core risk to the vision, not an optimization detail. Sharing within one host runtime comes first. A browser-managed model (Built-in AI) is the only existing path to cross-site sharing. [ADR-0006]
-- Built-in AI runs on the device, so it belongs to `in-browser`. The host does not control its model or version, and the API does not expose a version. Its descriptor says `browser-builtin`, CI re-runs evals on the current Chrome stable and beta channels, and the host can disable the provider (§10.5).
+- Built-in AI runs on the device, so it belongs to `in-browser`. The host does not control its model or version, and the API does not expose a version. Its descriptor says `browser-builtin`, CI re-runs its smoke tests on the current Chrome stable and beta channels, and the host can disable the provider (§10.5).
 
 ### 3.3. Data labels and argument shapes [PROPOSED] [ADR-0014]
 
@@ -188,13 +234,14 @@ Inference policy is an allowlist of **destination classes**, set **per model rol
 
 - **Model calls.** The provider's destination class must be allowed for every label the run carries. Otherwise the call is blocked, or it needs consent if host policy allows that.
 - **Capability calls with free-text arguments.** Arguments declared `freeText` follow the same rule as model calls.
+- **Span content.** Text the host opts in to record in trace spans (§14.4) follows the same rule, against the destination class the host declares for its traces. Text whose labels allow only `in-browser` never enters a span.
 - **Capability calls with structured arguments.** IDs, enums, numbers, booleans and short bounded patterns pass. They cannot carry a sentence verbatim. They remain a low-bandwidth channel, which is documented.
 - **Verbatim-match guard.** As an extra check, outbound request bodies are scanned for registered `private-user` values.
 - **Per-role policy** (§3.1) only narrows what labels allow. It never widens it.
 
 **Limits.**
 
-- Labels cover SDK-controlled paths only: the model router and the broker. Host code that calls `fetch` itself is outside them.
+- Labels cover SDK-controlled paths only: the model router, the broker and galaxie's own spans. Host code that calls `fetch` itself is outside them.
 - A paraphrase of private data sent to an allowed destination is not detectable. This is the residual risk of "exfiltration through an allowed endpoint" (§9.6, scenario 14).
 
 **Effect on the tutor.**
@@ -225,7 +272,7 @@ Galaxie does not own the curriculum. The tutor package receives lessons and cont
 10. `Feedback` and `Progress` are shown; progress is stored through the matching capability.
 11. A reload at step 5, step 6 or while waiting for the sentence must restore the pending interaction. Calling the LLM again to make a different quiz is not recovery.
 
-**Why step 9 exists.** A quiz generated from a shared lesson is the weakest case for local inference: a server can generate it once and cache it for every learner at almost no cost. Step 9 uses data that belongs to one learner and cannot be pre-generated, so it is the step that actually tests the privacy, latency and cost hypothesis in §1.3. It is also where small-model quality gets tested for real, especially for explanations in Vietnamese.
+**Why step 9 exists.** A quiz generated from a shared lesson is the weakest case for local inference: a server can generate it once and cache it for every learner at almost no cost. Step 9 uses data that belongs to one learner and cannot be pre-generated, so it is the step that actually tests the privacy, latency and cost hypothesis in §1.3. It is also where the reference app shows how a small model handles explanations in Vietnamese, recorded as a demonstration (§18).
 
 Local grading is acceptable for practice. For real exams or certification, the client can be modified or inspected, so the backend must verify the score and store the authoritative result.
 
@@ -253,17 +300,19 @@ Two hosts in the same monorepo, written by the same team, only prove that depend
 - A transcript is not enough to grade pronunciation, stress or prosody. Pronunciation assessment needs audio evidence and a system evaluated for that purpose.
 - The browser microphone permission, the agent's permission to read audio and the permission to upload audio are three separate decisions.
 - Do not assume the Web Speech API runs locally; check the specific implementation and mode.
-- Teaching quality needs lessons, rubrics and evals, not just valid JSON.
+- Teaching quality needs lessons, rubrics and evals, not just valid JSON. That is the tutor author's work; galaxie does not score it (§18).
 
 ## 5. MVP scope and what comes later
 
 ### 5.1. In MVP v0.1 [PROPOSED]
 
-- A headless TypeScript runtime, browser-first, with no React dependency in core.
+- A headless TypeScript runtime, browser-first, with no React dependency in core and no LangGraph type in its contracts. [ADR-0017]
 - One LangGraph.js adapter with a pinned, tested version set. [ADR-0001]
+- A parity conformance suite: the same graphs on Node and in Chrome, with every difference in the compatibility matrix (§16.3, AT-15). [ADR-0016]
+- Development tracing: OpenTelemetry spans that hold only what galaxie's filter and the data labels allow; the host registers the exporter (§14.4). [ADR-0016]
 - Executor on the main thread; local inference in a worker. [ADR-0003]
 - Model providers [ADR-0006]:
-  - one in-browser engine, the winner of Spike B (WebLLM or Transformers.js v4);
+  - one in-browser engine, the one Spike B picks before M2 (§16.2);
   - Chrome Built-in AI (Prompt API) where available;
   - an OpenAI-compatible remote provider in two modes, host proxy and user endpoint;
   - a deterministic mock provider for CI.
@@ -291,14 +340,16 @@ See ADR-0010 for the cuts and the reasons, and §16 for when each item comes bac
 - OCI distribution or the WASM Component Model as requirements.
 - A visual graph editor or a dedicated IDE.
 - Several UI renderers or framework adapters at once.
+- Executor adapters for frameworks other than LangGraph.js. The contracts stay framework-neutral so that they can come later (§7.6).
 - Building A2UI, AG-UI and a third UI DSL at the same time.
-- Distributed multi-agent coordination, cross-device resume and always-on scheduling.
+- Distributed multi-agent coordination, calls to agents that run elsewhere (§16.8), cross-device resume and always-on scheduling.
 - Local model training or LoRA fine-tuning. The MVP configures prompts, skills, bindings and model selection only.
+- A web console for agent settings, model choices, prompts and context. The host sets them in code; the console's scope is open (§20).
 - Full-duplex voice, authoritative pronunciation scoring and every kind of multimodal input.
 - Support for every browser, mobile device or GPU. Choose reference configurations and measure first.
 - Third-party MCP servers with OAuth 2.1, and importing OpenAPI operations as capabilities.
 - A "BYOK direct" mode where the browser calls OpenAI or Anthropic with the user's key.
-- A published CLI, exportable trace files, json-render, a multi-model pool and a dedicated executor worker.
+- A published CLI, json-render and a multi-model pool. A dedicated executor worker too, unless its measured trigger fires during the MVP (§6.2). (Trace export is the host's OpenTelemetry exporter from M1, §14.4.)
 - LLM-composed UI (§11.2) and LLM-chosen tool calls with small local models (§10.6).
 
 ### 5.3. Initial target platform [PROPOSED]
@@ -322,7 +373,7 @@ Integrating galaxie asks things of the host application. They must be documented
 
   CSP narrows script injection and limits where SDK-rendered content can connect. It does **not** contain arbitrary same-origin code: such code can still use allowed endpoints, top-level navigation and any Trusted Types policy the host registers. Tests check the real exfiltration paths (AT-27, AT-32).
 - **Cross-origin isolation:** COOP/COEP is needed only when a WASM multi-threaded path needs `SharedArrayBuffer`. COEP can break third-party embeds, so it is a documented, opt-in choice. [S33]
-- **Model hosting:** serve weights and runtime libraries from the host origin or CDN, with pinned hashes and correct CORS headers.
+- **Model hosting:** serve weights, WASM modules and runtime libraries from the host origin, a CDN or object storage (for example an S3 bucket URL), with pinned hashes and correct CORS headers.
 - **Storage:** call `navigator.storage.persist()` after the user consents to a model download, and handle a denial. [S34]
 - **User-device endpoints:**
   - From Chrome 142, a public site that fetches `localhost` or LAN addresses triggers a Local Network Access permission prompt. [S38]
@@ -364,6 +415,7 @@ The diagram shows responsibilities; not every box is a separate process or packa
 | Remote inference | LangChain chat models (`ChatOpenAI` with `baseURL`) wrapped by policy | Reuse the standard wire format; no in-house model SDK |
 | UI rendering | Trusted React components, typed registry with schemas | Keeps the design system and DOM control |
 | Storage | IndexedDB; OPFS for large artifacts when needed | Recovery and quota management |
+| Tracing | Spans through the OpenTelemetry API; the host registers the SDK and the exporter | The format tracing tools already read; no exporter or tracing key inside galaxie (§14.4) |
 | WASM plugin target | After MVP | Useful for portable or isolated modules; needs explicit host imports |
 | Own Rust graph kernel | Not planned | Only after a measured need that an engine adapter cannot meet |
 
@@ -396,7 +448,7 @@ LangGraph.js has a browser export and browser tests in its repository. That does
 
 `graph.compile()` produces an executable graph for the LangGraph runtime; it does not compile to WASM. Nodes, edges and reducers are still executable code. Exporting the node/edge list as JSON cannot preserve closures, side effects or runtime behavior. [S3]
 
-The browser has no `AsyncLocalStorage`. LangGraph APIs that rely on implicit async context may need the `config` passed explicitly. Spike A must list which APIs are affected at the pinned version. [S2]
+The browser has no `AsyncLocalStorage`. LangGraph APIs that rely on implicit async context may need the `config` passed explicitly. The M1 conformance suite lists which APIs are affected at the pinned version, in the compatibility matrix (§16.3). [S2]
 
 ### 7.2. Required ownership
 
@@ -464,6 +516,28 @@ The minimal contract must describe:
 - Capability discovery: whether interruption, resume, checkpoints, streaming and subgraphs are supported.
 
 Do not make every executor pretend it can `pause/resume` at any moment. The community can write more executor adapters, but an adapter is infrastructure code that the host must trust.
+
+### 7.6. The standard: framework-neutral contracts [VISION + PROPOSED] [ADR-0017]
+
+galaxie's contracts are a standard for browser agents, not the private API of its LangGraph adapter. They cover the layers in §2 and what passes between them:
+
+| Layer | What galaxie specifies | Open protocol reused |
+| --- | --- | --- |
+| Agent definition and packaging | Agent ID and version, executor, model roles and the features they need, capabilities, UI requirements, the generated manifest (§13) | JSON Schema for the schemas in the manifest |
+| Executor | The adapter contract in §7.5: lifecycle, typed events, interrupts, cancellation, checkpoints, feature flags | None; each framework's events map onto it |
+| Models | Roles, features, destination classes, the provider descriptor (§10.5) | The OpenAI-compatible wire format for remote providers |
+| Tools and data | Capabilities: logical names, versions, schemas, grants, data labels and argument shapes (§3.3, §9.2) | MCP for remote tools (§9.5), HTTP for APIs |
+| UI | Catalogs, components, surfaces, user events and revisions (§11) | A2UI, AG-UI and MCP Apps through adapters (§11.5) |
+| Security | The baseline in §9.7, which every implementation keeps | None |
+| Observability | Span names, attributes, and the rules for what galaxie records in a span (§14.4) | OpenTelemetry, with its GenAI semantic conventions where they apply |
+
+Rules:
+
+- galaxie specifies only what no open protocol covers: the host-side lifecycle, capability grants, data labels and argument shapes, UI surfaces, pending-interaction recovery, and how policy applies across them.
+- Each framework gets its own executor adapter; LangGraph.js is the first. An adapter shows that it implements the standard and keeps its framework's native behavior by passing the conformance suite for that framework (§16.3).
+- An implementation that drops a guarantee of the security baseline does not implement the standard.
+- Contracts carry versions, as capabilities (`lessons.get@1`) and catalogs (`education/v1`) already do. How the set as a whole is versioned is open (§20).
+- Agents inside one graph communicate through their framework's own mechanisms: state, subgraphs and handoffs. Separate agent instances in one runtime reach each other only through capabilities the host binds. Agents that run elsewhere are on the watch list (§16.8).
 
 ## 8. State, identity and lifecycle
 
@@ -683,7 +757,7 @@ These hold on SDK-controlled paths: the model router, the capability broker, the
 3. No generic `fetch`, SQL or shell capability is ever offered to a model.
 4. Credentials:
    - Galaxie never writes the credentials it handles (provider keys, tokens from the host callback) into prompts, state, checkpoints, traces or exports.
-   - Traces record only allowlisted fields. Free text is omitted or hashed unless the host opts in during development.
+   - Traces record only allowlisted fields. Free text is omitted or hashed unless the host opts in during development, and opted-in text still follows the data labels (§3.3, §14.4).
    - Automatic redaction cannot recognize a secret hidden in arbitrary text, so the design does not rely on it.
 5. Confirmations:
    - Significant actions need a confirmation that the host renders from the real parameters. An agent surface can never draw its own confirmation.
@@ -714,7 +788,7 @@ These hold on SDK-controlled paths: the model router, the capability broker, the
    - allowlists for `connect-src`, `img-src` and `media-src`.
 
    CSP is the browser-level exfiltration stop that still holds when code goes around the broker. (§5.4)
-3. Never ship provider API keys in the bundle. Remote LLM calls go through the host proxy.
+3. Never ship provider API keys or tracing credentials in the bundle. Remote LLM calls go through the host proxy, and spans from the browser go through a collector the host runs (§14.4).
 4. Bind the narrowest capabilities possible; write capabilities carry an idempotency key. In v0.1, agents never touch payments, email or password changes, or account deletion.
 5. Register no catalog component that collects passwords or payment details.
 6. Route MCP through a gateway or server the host controls. Agents cannot add servers.
@@ -772,7 +846,7 @@ Pin Transformers.js v4. v3 is superseded; do not start new work on it.
 ### 10.2. Adapters on LangChain chat models, not a model SDK
 
 - The integration point is the LangChain `BaseChatModel`, because the executor is LangGraph:
-  - `ChatWebLLM` exists, but Spike B must check that it can use a worker engine and reset context per session at the pinned version; otherwise galaxie writes a thin adapter;
+  - `ChatWebLLM` exists, but Spike B (before M2) must check that it can use a worker engine and reset context per session at the pinned version; otherwise galaxie writes a thin adapter;
   - `ChatOpenAI` with `baseURL` covers every OpenAI-compatible endpoint;
   - Transformers.js and the Prompt API need thin adapters.
 - Galaxie wraps every provider with the same policy layer: destination class, egress allowlist, consent, budgets, the inference queue for local engines, trace redaction and capability flags.
@@ -783,7 +857,7 @@ Pin Transformers.js v4. v3 is superseded; do not start new work on it.
 - The agent declares model roles and the features each role needs (structured output, tool calling, languages).
 - The host maps each role to an ordered list of providers and an allowlist of destination classes.
 - First-run order for a role:
-  1. Built-in AI, if `availability()` reports it usable for the role's input and output languages (`expectedInputs` / `expectedOutputs`) and it passes the role's eval. Today that excludes roles that need Vietnamese. Starting its model download requires user activation;
+  1. Built-in AI, if `availability()` reports it usable for the role's input and output languages (`expectedInputs` / `expectedOutputs`). Today that excludes roles that need Vietnamese. Whether its quality suits the role is the host's call: the host lists it for the role or leaves it out. Starting its model download requires user activation;
   2. the in-browser engine, if its model is already cached;
   3. the in-browser engine with a download, after showing the size and getting consent;
   4. a remote provider, only if the role allows remote classes and the user consents.
@@ -803,10 +877,10 @@ Pin Transformers.js v4. v3 is superseded; do not start new work on it.
 
 Every provider/model pair declares, and tests:
 
-- artifact, version and hash, tokenizer/template and license metadata. Built-in AI exposes no version, so its descriptor records `browser-builtin`, the Chrome version and the `availability()` result instead. CI re-runs role evals on Chrome stable and beta, and the host can turn the provider off;
+- artifact, version and hash, tokenizer/template and license metadata. Built-in AI exposes no version, so its descriptor records `browser-builtin`, the Chrome version and the `availability()` result instead. CI re-runs its smoke tests on Chrome stable and beta, and the host can turn the provider off;
 - memory and context requirements measured on a test profile, not only the download size;
 - generation, streaming, structured output, tool calling and cancellation support;
-- modality, languages, and quality evaluated for the use case (English and Vietnamese explanations for the tutor);
+- modality and languages. Quality for a use case is not a descriptor field: the host judges it, and galaxie's measurements of it are demonstrations (§18);
 - the device actually used (`webgpu` or `wasm`). Transformers.js `device` is set explicitly and reported; a silent downgrade to WASM is a bug.
 
 An OpenAI-compatible API does not prove that tool calling or structured output works with the chosen model. Small local models are often weak at tool calling, so the graph decides which tool to call (§9.5).
@@ -825,9 +899,10 @@ Each tested endpoint type gets its own descriptor. An unknown user endpoint runs
 
 - Use a structured workflow to create the quiz; no autonomous tool loop per node.
 - The model returns data matching a schema. Validate it, allow a bounded number of repairs, then return an understandable error.
+- Where a provider can enforce a JSON Schema while it decodes (a strict `response_format`, the Prompt API's `responseConstraint`, or guided decoding in the in-browser engine), the adapter uses it, and `withStructuredOutput` takes the same path. In the local tutor spike at 1.7B parameters, free-form JSON with one repair left 13 of 49 sections failed; enforcing each section's schema while decoding left none (`spikes/local-english-tutor/`).
 - Tool-calling support is announced only when a test exists for the specific model/provider.
 - The mock provider is for unit tests and CI. A smoke test with real WebGPU is required before calling anything a local-inference MVP.
-- Do not freeze a model name in this document. Spike B picks a model that meets quality and latency on the reference devices; then pin the artifact and version.
+- Do not freeze a model name in this document. Before M2, Spike B picks the in-browser engine from functional checks on the reference devices (it loads, streams, cancels and enforces a schema) and records its numbers as demonstrations; then pin the artifact and version.
 
 ### 10.7. Model pool
 
@@ -864,6 +939,9 @@ flowchart TB
 - A custom component that is not registered is rejected or shown as an explicit fallback. Never download or execute new code because the LLM named a component.
 - The host assigns surfaces such as `lesson-main` or `tutor-sidebar`. An agent cannot overwrite navigation, payment UI or another agent's region.
 - The host decides branding, accessibility, layout constraints, allowed URLs and action implementations.
+- Beyond its surfaces, an agent works with the app in two more ways:
+  - **As a data provider.** Run results reach the app through typed events and snapshots (§14.1). The app decides where to show them.
+  - **Through directives.** The agent asks the app to act, for example to navigate to a route. The host binds a capability for it, such as `app.navigate@1` with an allowlist of routes, and the broker checks each call (§9.2). The agent never touches the router or the DOM.
 
 Two modes, with different policies:
 
@@ -974,21 +1052,21 @@ A full general event-sourcing system is not required in v0.1, but the recovery c
    - In one IndexedDB transaction it checks the owner epoch and writes the event to the **submission inbox**, keyed by `interactionId`, with status `accepted`.
    - A second event for the same `interactionId` is rejected at the inbox.
    - Only then does a single inbox processor call `graph.invoke(new Command({ resume: answers }), config)`.
-6. On resume, LangGraph re-executes the node containing `interrupt()` from its start. Code before `interrupt()` must be deterministic and side-effect free. The `interactionId` comes from the engine's interrupt ID or a deterministic host ID derived from the checkpoint, never from the LLM and never regenerated in that node. Spike A must confirm the interrupt ID behavior at the pinned version.
+6. On resume, LangGraph re-executes the node containing `interrupt()` from its start. Code before `interrupt()` must be deterministic and side-effect free. The `interactionId` comes from the engine's interrupt ID or a deterministic host ID derived from the checkpoint, never from the LLM and never regenerated in that node. The M1 conformance suite confirms the interrupt ID behavior at the pinned version.
 7. When the checkpoint after the resume is durably committed, the inbox entry becomes `consumed`; that is the receipt. Side effects after resume go through the effect journal (§12.3). Their effect IDs are derived from `interactionId`, so a repeated resume reuses them.
 8. Recovery after a crash reconciles the inbox with the checkpoint:
    - entry `accepted` and the same interrupt still pending → resume again with the stored payload;
    - entry `accepted` and the interrupt no longer pending → mark the entry `consumed`;
    - no entry → the submission never happened, and the interrupt is shown again.
 
-   Spike A must check how the pinned version persists a resume value (pending writes) and that a second resume after a crash is safe.
+   The M1 conformance suite checks how the pinned version persists a resume value (pending writes) and whether a second resume after a crash is safe. M3 runs those cases again with the IndexedDB saver.
 
 LangGraph may re-run part of a node after interrupt/resume. Never place an irreversible side effect before an interrupt without an idempotency or replay contract.
 
 Limits in the MVP:
 
 - **One pending interrupt per run.** A graph that produces several simultaneous interrupts (parallel branches) gets a typed `unsupported` error. Supporting it needs interrupt-ID routing and surface arbitration, which are not designed yet.
-- **Subgraphs.** When a subgraph interrupts, resuming re-executes the parent node that called the subgraph as well as the interrupting node. The "deterministic, no side effects before `interrupt()`" rule applies to that parent node too. Spike A confirms this on the pinned version.
+- **Subgraphs.** When a subgraph interrupts, resuming re-executes the parent node that called the subgraph as well as the interrupting node. The "deterministic, no side effects before `interrupt()`" rule applies to that parent node too. The M1 conformance suite confirms this on the pinned version.
 
 ### 12.3. Journal for external effects
 
@@ -1014,7 +1092,7 @@ Minimal states:
 - The LangGraph checkpointer for IndexedDB is ours to build: LangGraph ships `InMemorySaver` and Node-oriented savers, not a browser one. It implements `BaseCheckpointSaver` (`getTuple`, `list`, `put`, `putWrites`, `deleteThread`) and must pass the official checkpointer conformance tests if they can run in a browser. [ADR-0005]
 - **Durability barrier.**
   - `put` and `putWrites` resolve only after their IndexedDB transaction completes.
-  - Use LangGraph's synchronous durability mode where the pinned version offers it (to verify in Spike A), so a checkpoint is committed before the next step's effects run.
+  - Use LangGraph's synchronous durability mode where the pinned version offers it (the M1 conformance suite records which modes it offers), so a checkpoint is committed before the next step's effects run.
   - The UI never shows a state as committed before its checkpoint is.
 - **Retention.** Completed sessions keep their final checkpoint, and older checkpoints are dropped after a host-configured period. Abandoned sessions expire. Defaults are finite.
 - **Schema upgrades.**
@@ -1231,15 +1309,32 @@ function LessonWorkspace({ tutor }: { tutor: TutorInstance }) {
 - Scope and identity never come from arbitrary form props as proof of authorization.
 - A Vue adapter comes after the headless contract and renderer mapping are stable.
 
+### 14.4. Development tracing [PROPOSED] [ADR-0016]
+
+During development, galaxie exposes what a run did as OpenTelemetry spans, so that a tracing tool such as Langfuse shows the order of the steps and where the time went.
+
+- galaxie calls only the OpenTelemetry API (`@opentelemetry/api`). Until the host registers an OpenTelemetry SDK, those calls do nothing. galaxie ships no exporter, holds no tracing credentials and sends no telemetry of its own.
+- Each run produces one span tree: a span for the run, and under it a span for each graph node, model call and capability call. A model span records the role, the provider, the destination class, token counts and timing.
+- Attributes follow the OpenTelemetry GenAI semantic conventions where one fits, such as `gen_ai.request.model` and `gen_ai.usage.input_tokens` [S47]. Their status is Development, not stable, so galaxie records which revision it follows. galaxie's own attributes start with `galaxie.`.
+- galaxie filters what it records, not what the exporter sends. The same rules hold for every attribute, event, exception and status message that galaxie records:
+  - By default, only allowlisted values go in: IDs, names, statuses, timings, sizes and counts.
+  - An error is recorded as its type and galaxie's error code, not its message, because a provider or capability error can repeat the request.
+  - Prompts, model output and capability arguments stay out unless the host opts in for development (§9.7 A4).
+  - Opted-in text follows the data labels (§3.3). The host declares the destination class of the system that finally receives the spans (§3.1); Langfuse Cloud behind a host collector is `third-party`. Text goes in only when every label the run carries allows that class. Without a declaration, no text goes in.
+  - Text whose labels allow only `in-browser` never goes in, whatever the declaration, so the most private text does not depend on the declaration being right.
+  - Credentials never appear in a span.
+- Spans that other instrumentation creates, such as a `fetch` instrumentation the host registers, are outside galaxie's filter.
+- The host registers the exporter. For Langfuse, an OTLP/HTTP exporter sends spans to the Langfuse endpoint `/api/public/otel` [S46]. The Langfuse secret key must not ship in the browser bundle, so spans from the browser go through a collector or proxy that the host runs and that adds the credentials.
+
 ## 15. Proposed repository structure
 
 TypeScript strict; pnpm workspaces. Pin the toolchain and versions after checking the environment. Vitest and Playwright are the proposed test tools, not fixed dependencies.
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/core/` | Contracts, instance/run lifecycle, events, policy, capability broker, model router, multi-tab ownership |
+| `packages/core/` | Framework-neutral contracts, instance/run lifecycle, events, policy, capability broker, model router, multi-tab ownership, trace spans through the OpenTelemetry API |
 | `packages/adapter-langgraph/` | Engine adapter, host-model bridge, mapping of checkpoints, interrupts and events |
-| `packages/models/` | Providers behind subpath exports: in-browser engine (Spike B winner), Built-in AI, OpenAI-compatible, mock; inference worker |
+| `packages/models/` | Providers behind subpath exports: in-browser engine (chosen by Spike B), Built-in AI, OpenAI-compatible, mock; inference worker |
 | `packages/tools-mcp/` | MCP client over Streamable HTTP, allowlist, namespacing, definition pinning |
 | `packages/storage-indexeddb/` | LangGraph checkpoint saver, submission inbox, host records, journal and migrations |
 | `packages/react/` | Hooks, surfaces, typed registry and headless reference components |
@@ -1248,6 +1343,7 @@ TypeScript strict; pnpm workspaces. Pin the toolchain and versions after checkin
 | `examples/host-local/` | Local lesson/progress bindings, in-browser models only |
 | `examples/host-http/` | Existing-API bindings, host-proxy LLM, MCP connection |
 | `examples/mcp-server/` | Minimal Streamable HTTP MCP server with CORS, standing in for a gateway |
+| `tests/conformance/` | The parity suite: the same graphs with a deterministic fake chat model on Node and in Chrome; its results feed the compatibility matrix (M1) |
 | `tests/fixtures/` | Mock model, deterministic tools, malformed UI, crash scenarios |
 | `tests/injection-corpus/` | Prompt injection cases for lessons, tool output and MCP descriptions |
 | `docs/adr/` | Architecture decisions, alternatives and evidence |
@@ -1264,61 +1360,73 @@ These are module boundaries, not a demand to publish many npm packages at once. 
 - Post-MVP phases start only when their entry gate is met. Items on the watch list carry a trigger, not a date.
 - After each milestone, record what ran, what is mocked and what is blocked by the environment.
 
-### 16.2. M0 — Feasibility spikes
+### 16.2. Spikes, run when a milestone needs them
 
-Run the spikes one at a time. Each ends with a short report and an ADR update. Spikes are throwaway code, not the first version of the packages.
+Version 0.2 of this brief ran every spike in an M0 phase before M1. Two spikes ran: B0 loaded a 1.7B model on WebGPU, and the local English tutor ran a LangGraph.js agent on it in Chrome (`spikes/`). In 0.3, M1 starts without the others, and each remaining spike runs when a milestone needs its answer. Spikes are throwaway code, not the first version of the packages. Each ends with a short report and an ADR update.
 
-Before Spike B starts, the founder freezes the reference devices, the eval datasets and the thresholds in §18. The bake-off is then judged against numbers chosen in advance.
+| Spike | Goal | When | Evidence required | ADRs |
+| --- | --- | --- | --- | --- |
+| A — Engine and persistence | Pinned LangGraph.js in the browser: branch, subgraph, `interrupt()` and `Command({ resume })`; resume after reload | No longer a spike. The engine part becomes the M1 conformance suite (§16.3); the IndexedDB saver is built in M3 | Observed node re-execution on resume, including the parent node of an interrupting subgraph; interrupt ID behavior; how resume values are persisted and whether a repeated resume after a crash is safe; available durability modes; list of APIs that need an explicit `config` without `AsyncLocalStorage` | 0001, 0003, 0004, 0005 |
+| B — In-browser engine | WebLLM vs Transformers.js v4 vs onnxruntime-web with galaxie's own decoding loop (as in the tutor spike) vs Prompt API, on the reference devices | Before M2 | Functional checks: the engine loads, streams, cancels, runs in a worker and resets context per session; whether it enforces a JSON Schema while decoding; whether `ChatWebLLM` works with a worker engine; Prompt API `availability()` for English and Vietnamese. Recorded as demonstrations, with no threshold: download size, warm-up, TTFT, p50/p95, schema-valid rate, device actually used | 0006 |
+| C — UI path | Typed registry renders `Quiz` from an interrupt payload; submit event; stale-event rejection; reload | Before M2 | Recorded run with reload in the middle of the quiz | 0004, 0007 |
+| D — Remote paths | `ChatOpenAI` with `baseURL` against (1) a host proxy and (2) Ollama on `localhost` under Chrome LNA; MCP client over Streamable HTTP to a test server with CORS | Before M4 | Observed CORS, LNA prompt and denial behavior; credential callback design; MCP tool listing and pinning prototype; the §9.5 MCP profile (`Origin` rejection, session headers through CORS, 404 re-initialization, rejected server-to-client requests) | 0006, 0011 |
 
-| Spike | Goal | Evidence required | ADRs |
-| --- | --- | --- | --- |
-| A — Engine and persistence | Pinned LangGraph.js on the browser main thread: branch, subgraph, `interrupt()` and `Command({ resume })`; IndexedDB `BaseCheckpointSaver` prototype; resume after reload | Observed node re-execution on resume, including the parent node of an interrupting subgraph; interrupt ID behavior; how resume values are persisted and whether a repeated resume after a crash is safe; available durability modes; list of APIs that need an explicit `config` without `AsyncLocalStorage`; conformance test results | 0001, 0003, 0004, 0005 |
-| B — Local inference bake-off | WebLLM vs Transformers.js v4 vs Prompt API on the reference devices, on two tasks: quiz generation (structured output) and per-user feedback in English and Vietnamese | Download size, warm-up, TTFT, p50/p95, schema-valid rate, rubric score from a human reviewer, device actually used; Prompt API `availability()` for English and Vietnamese; whether `ChatWebLLM` works with a worker engine | 0006 |
-| C — UI path | Typed registry renders `Quiz` from an interrupt payload; submit event; stale-event rejection; reload | Recorded run with reload in the middle of the quiz | 0004, 0007 |
-| D — Remote paths | `ChatOpenAI` with `baseURL` against (1) a host proxy and (2) Ollama on `localhost` under Chrome LNA; MCP client over Streamable HTTP to a test server with CORS | Observed CORS, LNA prompt and denial behavior; credential callback design; MCP tool listing and pinning prototype; the §9.5 MCP profile (`Origin` rejection, session headers through CORS, 404 re-initialization, rejected server-to-client requests) | 0006, 0011 |
+The compatibility matrix holds **observed** results, not results inferred from READMEs. Every Proposed ADR names the milestone and the test that will confirm or revise it:
 
-Exit:
+- ADR-0003 and ADR-0004 in M1, through the conformance suite; ADR-0003 again from M2, when the long-task trigger is watched during real inference (§18);
+- ADR-0005 (IndexedDB saver) in M3;
+- ADR-0007 (UI registry) through Spike C, before M2;
+- ADR-0009 (multi-tab) in M3 with AT-18;
+- ADR-0008 (manifest generation) and ADR-0010 (scope) in M4;
+- ADR-0014 (data labels) in M1 with unit tests and AT-36, in M2 with AT-04, and in M4 with AT-32.
 
-- A compatibility matrix with **observed** results, not results inferred from READMEs.
-- ADR-0006 names the in-browser engine to ship.
-- Every Proposed ADR is either confirmed or revised by M0 evidence, or names the milestone and test that will confirm it:
-  - ADR-0009 (multi-tab) in M3 with AT-18;
-  - ADR-0008 (manifest generation) and ADR-0010 (scope) in M4;
-  - ADR-0014 (data labels) in M1 and M2 with AT-04 and AT-32.
+ADR-0006 is Accepted, but it names the in-browser engine only after Spike B.
 
 ### 16.3. M1 — Headless host, adapter, broker and security skeleton
 
 Deliverables:
 
 - Core instance/run lifecycle, stable identity, typed events and cancellation.
+- Framework-neutral contracts in `core`: the executor adapter contract (§7.5), events, capabilities and model roles, with no LangGraph type in them. [ADR-0017]
 - The LangGraph adapter uses the original engine; no second scheduler.
+- **Parity conformance suite** (`tests/conformance/`). [ADR-0016]
+  - The same graphs, with a deterministic fake chat model, run on Node and in Chrome.
+  - It compares stream events, final state, checkpoints, interrupts and resume, after normalizing generated IDs and timestamps.
+  - The graphs cover branching, subgraphs, `interrupt()` and `Command({ resume })`, node re-execution on resume (including the parent node of an interrupting subgraph), interrupt IDs, resume values, and the durability modes the pinned version offers. Checkpoints use LangGraph's in-memory saver; the IndexedDB saver joins in M3.
+  - It lists the APIs that need an explicit `config` because browsers have no `AsyncLocalStorage`.
+  - Every difference is fixed, or recorded in the compatibility matrix with its reason.
 - Capability broker with deny-by-default, schema validation, host-side classification and agent request tagging.
 - Run-level data labels and argument shapes in the model router and the broker. [ADR-0014]
 - Model router with per-role policy and destination classes (mock providers only).
 - Budgets with finite defaults, including cost.
-- Local trace with automatic redaction.
+- OpenTelemetry spans for runs, nodes, model calls and capability calls, filtered as galaxie records them (§14.4). [ADR-0016]
 - No duplicate runs on rerender or double start; late results invalidated.
 
-Exit: a headless agent with a clear lifecycle, traceable and tested, with the runtime guarantees of §9.7 A1–A4, A7 and A8 covered by tests.
+Exit:
+
+- A headless agent with a clear lifecycle, traced and tested, with the runtime guarantees of §9.7 A1–A4, A7 and A8 covered by tests.
+- The conformance suite passes on Node and in Chrome, or each difference is in the compatibility matrix with its reason (AT-15).
+- A run produces the span tree of AT-36.
 
 ### 16.4. M2 — Local models and the domain UI vertical slice
 
 Deliverables:
 
-- The chosen in-browser engine in a worker, plus the Built-in AI provider.
+- Spike B and Spike C run first (§16.2).
+- The chosen in-browser engine in a worker, plus the Built-in AI provider. Each provider enforces a JSON Schema while decoding where it can (§10.6).
 - First-run order with download consent, destination labels and `persist()`.
 - Tutor steps 1–10: lesson, quiz, grading, the free-text sentence with `tutor.feedback`, Feedback and Progress.
 - Typed registry with headless reference components, URL allowlist, surface ownership and stale-event rejection.
 - Output safety hook.
 - Example hosts with the CSP of §5.4.
 
-Exit: the learning loop runs in the browser with no server orchestration and no model API on the local path. A network capture shows that the learner's sentence never leaves the browser.
+Exit: the learning loop runs in the browser with no server orchestration and no model API on the local path. A network capture shows that the learner's sentence never leaves the browser. The demonstrations in §18 are recorded on the reference devices.
 
 ### 16.5. M3 — Durable interaction and recovery
 
 Deliverables:
 
-- IndexedDB checkpoint saver with the durability barrier, journal and versioned envelope.
+- IndexedDB checkpoint saver with the durability barrier, journal and versioned envelope. The conformance suite's persistence cases run again with it.
 - Pending interaction restored from the checkpoint interrupt after reload, with the same content and revision.
 - Submission inbox with recovery reconciliation; interrupt replay tests, including subgraphs; effect outcome handling.
 - Storage lifecycle (§12.4): retention, blocked upgrades, corruption, quota, missing artifacts and unsupported migrations.
@@ -1335,6 +1443,7 @@ Exit:
 
 Deliverables:
 
+- Spike D runs first (§16.2).
 - OpenAI-compatible provider in host-proxy mode and user-endpoint mode; credentials only through the host callback.
 - MCP client against `examples/mcp-server/`: allowlist, namespacing, pinning, result size limits; write tools only behind host confirmation.
 - The same tutor package in two host apps without graph changes. A second external developer trial with the full MVP.
@@ -1343,9 +1452,10 @@ Deliverables:
 - Prompt injection corpus in CI; security review against ADR-0012 and the OWASP LLM Top 10 mapping.
 - Dev-mode diagnostics: warnings for missing CSP directives or Trusted Types, unbound capabilities, roles without an available provider, provider keys found in storage, and blocked model-produced URLs.
 - AI-facing docs: `AGENTS.md` per package and `llms.txt` for the docs, with "do this, never that" examples for coding assistants.
+- A development tracing guide: register an OpenTelemetry exporter and send spans to Langfuse through a collector the host runs (§14.4).
 - Tested device matrix and integration docs, including §5.4.
 
-Exit: every required acceptance test has evidence. Unsupported features are listed publicly, not hidden behind mocks. The Go/Revise decision in §18 is made with the measured numbers.
+Exit: every required acceptance test has evidence. Unsupported features are listed publicly, not hidden behind mocks. The Go/Revise decision in §18 rests on parity, the acceptance tests and the engineering checks; the demonstrations are published with it.
 
 ### 16.7. After the MVP: phases with entry gates
 
@@ -1358,6 +1468,7 @@ Nothing below starts unless the M4 decision is **Go** and the phase's own entry 
 | Third-party MCP servers with OAuth 2.1 + PKCE | A real host needs it; a token storage, refresh and revocation design is reviewed; ADR-0011 updated | Tokens never in checkpoints or traces; per-server consent UI |
 | OpenAPI operations as capabilities | A host has an OpenAPI spec and asks for it | Host allowlists operations; same schema and classification rules |
 | Transformers.js for non-LLM tasks | A use case: safety classifier, embeddings for retrieval, or ASR | Explicit `device`; measured on reference devices |
+| Retrieval over public documents (§1.4) | A host with public documents asks for it; the index format, its update path and its download size are designed | The prebuilt index is a pinned asset; embeddings and search run on the device; private or fast-changing documents stay behind a backend capability |
 | Voice push-to-talk | Text loop is stable; audio permissions designed (§4.4) | ASR/TTS are capabilities, not agents |
 | BYOK direct to a provider | An ADR accepts the risk; host opt-in flag; keys in memory only | May never become a default |
 
@@ -1370,7 +1481,7 @@ Nothing below starts unless the M4 decision is **Go** and the phase's own entry 
 | Second renderer (Vue or Web Components) | Headless contract stable through M4 | Proves the catalog contract is portable |
 | A2UI / MCP Apps / json-render bridge | A host or MCP server needs it | Conformance tests per pinned version |
 | LLM-composed UI | Strong model available for the role; tighter allowlist designed | §11.2 |
-| Trace export and published CLI | Developers ask for them in M4 feedback | Redaction rules from §9.7 apply to exports |
+| Published CLI | Developers ask for it in M4 feedback | Trace spans and the host's exporter are M1 work (§14.4) |
 
 **Phase 7 — Isolation and distribution**
 
@@ -1393,6 +1504,9 @@ Nothing below starts unless the M4 decision is **Go** and the phase's own entry 
 | MCP spec revisions (auth, Apps) [S20][S39] | Affects ADR-0011 | New spec revision |
 | tsrs / `@tsrs/wasm` [S43] | A Rust port of the TypeScript 7 compiler running as WASM in browsers and Node. It could power an in-browser playground that type-checks agent definitions and host bindings without a server | We decide to build a browser playground. Check license, bundle size, memory (4 GiB cap) and Safari worker stack limits first. It is a compiler, not a runtime or sandbox: type-checking LLM-generated code does not make that code safe to run |
 | TypeScript 7.1 compiler API [S44] | Type-aware tooling (lint rules, declaration bundling) needs it before we can drop TypeScript 6.x | 7.1 released and our tooling supports it [ADR-0013] |
+| Agents that run elsewhere, for example over A2A [S48] | A galaxie agent could hand work to an agent on another stack or server, or receive work from one. The founder expects this but has not committed to it | A host needs it, and a design keeps the broker, data labels and confirmations in force for calls between agents |
+| OpenTelemetry GenAI semantic conventions [S47] | galaxie's span attributes follow them where one fits (§14.4) | A release declares them stable, or renames an attribute galaxie uses |
+| Coding agents on the user's machine (Codex CLI, Claude Code, their desktop apps) | A web app could hand tasks to an agent the user already runs and pays for, to coordinate work and cut the host's API costs. It would be optional, for users who already run such an agent; galaxie itself still needs no daemon | A design in which (1) the user starts a local bridge that the page reaches under Local Network Access; (2) the page can request only named tasks, never the agent's shell or file tools (§9.7 A3); and (3) each provider's terms allow a subscription to serve a web app this way |
 
 ### 16.9. Path to 1.0: production readiness for many users
 
@@ -1405,7 +1519,7 @@ Galaxie targets end users of host apps, developers and enterprises. "Many users"
   - `SECURITY.md` with coordinated disclosure;
   - signed releases with npm provenance and an SBOM.
 - **Reliability:**
-  - conformance suites for adapters, the saver and renderers;
+  - conformance suites for adapters (including parity with Node), the saver and renderers;
   - fault injection and a real-GPU browser matrix in CI;
   - host-controlled kill switches per agent, role, provider and MCP server;
   - staged rollout of model updates.
@@ -1417,7 +1531,7 @@ Galaxie targets end users of host apps, developers and enterprises. "Many users"
 - **End-user experience:**
   - WCAG 2.2 AA reference components;
   - tested i18n;
-  - measured performance on low-end reference devices;
+  - performance demonstrations on low-end reference devices, published with their setup (§18);
   - destination labels and consent everywhere.
 - **Governance:**
   - the AGPL and commercial license setup reviewed by a lawyer (ADR-0015);
@@ -1450,11 +1564,11 @@ These tests are planned requirements; none has run yet.
 | AT-12 | Cancellation/dispose | Cancellable work stops, late results are ignored, a model with other consumers stays loaded |
 | AT-13 | User/session isolation | Logout or a user switch wipes the old principal's storage and never surfaces its state or results |
 | AT-14 | Storage failures | Quota, missing data and version mismatch have clear recovery or error paths |
-| AT-15 | Graph semantics | Branching, subgraphs and interrupt/resume (including node re-execution) match the pinned engine version |
+| AT-15 | Framework parity | The conformance suite runs the same graphs with a deterministic fake chat model on Node and in Chrome. Stream events, state, checkpoints, interrupts and resume match after generated IDs and timestamps are normalized, including branching, subgraphs and node re-execution on resume. Every difference is in the compatibility matrix with its reason |
 | AT-16 | HTTP integration | An existing API binding works; CORS and auth failures are reported, not hidden |
 | AT-17 | React lifecycle | Rerender, Strict Mode and subscription changes never duplicate instances or runs outside the owner policy |
 | AT-18 | Multi-tab | Never two owners commit local state. Cooperative handover and forced takeover in the middle of a run both fence the old owner's late writes. In-flight remote requests end `succeeded` or `outcome_unknown`, never duplicated |
-| AT-19 | Export hygiene | Package and session exports contain no secrets; personal content only on explicit action. Trace export is deferred (Phase 6); extend this test when it ships |
+| AT-19 | Export hygiene | Package and session exports contain no secrets; personal content only on explicit action. Spans follow AT-36 |
 | AT-20 | Model output handling | Invalid quiz JSON never renders arbitrarily; repairs are bounded; errors are reported |
 | AT-21 | Host integration | Example hosts run under the CSP of §5.4 with Trusted Types; required headers are documented |
 | AT-22 | Provider selection | First-run order is followed; no silent class switch; the UI shows the destination; per-role policy holds even when another role allows remote; Built-in AI is not selected for a role whose languages `availability()` does not support |
@@ -1471,50 +1585,51 @@ These tests are planned requirements; none has run yet.
 | AT-33 | MCP server profile | The reference server rejects a bad `Origin` with 403; the client re-initializes on 404, never shares a session across principals, sends `MCP-Protocol-Version`, and rejects sampling and elicitation requests |
 | AT-34 | Storage lifecycle | Retention limits apply; a blocked upgrade, a corrupted record and a rollback each give their defined outcome; a logout in one tab stops another tab from recreating deleted records |
 | AT-35 | Interrupt limits | A graph with simultaneous interrupts gets a typed `unsupported` error; a subgraph interrupt re-executes the parent node without repeating its effects |
+| AT-36 | Trace spans | With an in-memory exporter, a run produces one span tree (run, nodes, model calls and capability calls) with correct parent links. Without the development opt-in, the complete exported spans, including runs where a model call and a capability call fail, hold only allowlisted values in their attributes, events, exceptions and status messages: no prompt, output or capability argument. With the opt-in, text from a run whose labels do not allow `third-party` is absent when the declared trace destination is `third-party`, and text whose labels allow only `in-browser` is absent whatever the declaration. No span holds a credential or an error message. With no OpenTelemetry SDK registered, tracing makes no network request |
 
 ### Testing and evidence
 
 - Unit tests: deterministic state transitions, schemas, policy decisions and event correlation.
 - Browser integration: inference worker, IndexedDB, renderer, cancellation, reload and multi-tab.
 - Fault injection: crash after checkpoint, after effect dispatch, before receipt and after UI submit.
-- Model smoke tests and evals: real machines and controlled test data; report failures instead of only demoing the happy path.
+- Conformance: the parity suite on Node and in Chrome (AT-15).
+- Model smoke tests on real machines with controlled test data. Accuracy and speed are recorded as demonstrations (§18). Report failures instead of only demoing the happy path.
 - Accessibility: the quiz and writing prompt work by keyboard, with sensible focus, labels and clear error states.
 - Security negatives: malformed props, URLs and action names; the injection corpus; cross-instance events; MCP definition changes.
 
 If CI has no real WebGPU, mark AT-03 as not verified in CI and provide a manual procedure and artifact. Never report a pass for a code path that did not run.
 
-## 18. Metrics and quality targets
+## 18. Verdict, demonstrations and engineering checks [ADR-0016]
 
-Measure at least:
+**The verdict is parity.** Code written with LangChain and LangGraph runs in galaxie the way it runs natively on a server, for example in Node inside a Docker container. The evidence is the conformance suite (AT-15): the same graphs, with a deterministic fake chat model, on Node and in Chrome. A difference is fixed, or listed in the compatibility matrix with its reason. One difference is known already: browsers have no `AsyncLocalStorage`, so some LangGraph.js APIs need `config` passed explicitly (§7.1).
+
+**Accuracy and system metrics are demonstrations.** They depend on choices the agent builder makes: the model, the tools, and for retrieval the pipeline design and the documents. galaxie records them on named devices and publishes them with the setup that produced them, never as pass/fail thresholds. Scoring the quality of an agent's answers, such as a tutor's lessons, is the agent author's work.
+
+Record as demonstrations:
 
 - First download size, download and warm-up time, and time on later visits.
 - Time to first token and time to a valid quiz, p50/p95 per reference device.
-- Schema-valid output rate and repair rate.
-- Content correctness of quizzes and feedback against a review rubric and dataset, in English and Vietnamese.
-- Pending interaction restore time and recovery failure rate.
+- Schema-valid output rate and repair rate, and whether the provider enforced the schema while decoding.
+- Pending interaction restore time.
 - Number of model instances/weights held and queue wait; memory estimates must state how they were measured.
-- Main-thread long tasks attributable to galaxie while inference runs.
 - Time for a developer outside the team to integrate the agent into an existing app; lines and places changed in the graph.
 - In moderated tests: the share of users who accept the first model download, and completion of the practice loop.
 
-Thresholds. The founder fills in the blanks and freezes the reference devices and eval datasets **before Spike B starts** (§16.2). The bake-off and M4 are then judged against numbers chosen in advance.
+Engineering checks keep a fixed bar, because they test galaxie's own code, not the model:
 
-| Metric | Threshold | Notes |
+| Check | Bar | Notes |
 | --- | --- | --- |
-| Valid quiz after at most one repair | ≥ X% (suggested 95%) | On every reference device |
-| `tutor.feedback` rubric score | ≥ Y average on a fixed set of N sentences | Human reviewer; English and Vietnamese scored separately |
-| First download for the in-browser engine | ≤ Z MB | Built-in AI path reported separately |
-| Time to interactive on a cached second visit | ≤ G s | |
-| Quiz generation p95 | ≤ H s | Reference device |
-| Recovery success in the fault-injection suite | 100% of scripted cases | |
-| `tutor.feedback` p95 latency | ≤ F s | Reference device |
-| Main-thread long tasks during inference | No galaxie-attributed task over 50 ms | If breached, this triggers the ADR-0003 revisit |
+| Framework parity | Same results on Node and in Chrome, or a listed difference with its reason | AT-15 |
+| Recovery in the fault-injection suite | 100% of scripted cases | AT-08, AT-09, AT-31 |
+| Main-thread long tasks attributable to galaxie while inference runs | None over 50 ms | Watched from M2, when real inference runs. A breach triggers the ADR-0003 revisit |
 
 No number in this document proves speed or quality. Marketing claims never rest on model size or node counts.
 
-**Go:** reuse, local execution, UI interaction and recovery meet the thresholds on the reference devices and use cases.
+**Go:** parity holds, the required acceptance tests pass, and the engineering checks meet their bar.
 
-**Revise:** the local model misses the quality thresholds or the download and latency experience is too poor. Narrow the task, the model or the devices, or route the affected role to a remote class with clear consent.
+**Revise:** parity breaks in a way the compatibility matrix cannot explain, a required acceptance test fails, or an engineering check misses its bar. galaxie is fixed before release, or the limit is documented and the claim narrowed.
+
+The demonstrations are published with the decision but do not decide it. A download that is too large or a reply that is too slow is a choice to revisit in the reference app: a smaller model, a narrower task, other devices, or a remote role with clear consent.
 
 ## 19. Gap, competitors and differentiation
 
@@ -1538,7 +1653,7 @@ No project found combines all of it. The gap is an **integration gap**.
 
 Differentiation to prove:
 
-> One consistent contract so that reusable agent packages run on the client, use local or user-chosen models under clear policy, bind to the app's permissions and data, drive interactive UI and recover sessions — without the developer wiring all of those pieces together.
+> One consistent contract so that reusable agent packages run on the client and behave as they do on a server, use local or user-chosen models under clear policy, bind to the app's permissions and data, drive interactive UI and recover sessions — without the developer wiring all of those pieces together.
 
 This is a product hypothesis. The milestones in §16 exist to prove it.
 
@@ -1546,7 +1661,7 @@ This is a product hypothesis. The milestones in §16 exist to prove it.
 
 | Issue | Risk | Mitigation |
 | --- | --- | --- |
-| Local model quality | Complex workflows are unstable even when the engine is correct | Narrow tasks, rubric evals, bounded repair, per-role remote option with consent |
+| Local model quality | Complex workflows are unstable even when the engine is correct | Narrow tasks, schema enforcement while decoding where the provider supports it, bounded repair, per-role remote option with consent; quality recorded as demonstrations (§18) |
 | Per-origin model download | Every site re-downloads weights; users refuse | Built-in AI first; host-served weights; measure acceptance (§18) |
 | GPU/device variance | OOM, device loss, slowness or no support | Capability probes, device tests, consented fallback |
 | Platform shift (WebMCP, browser agents) | Embedded agents lose relevance | Watch list; keep capabilities exposable through a WebMCP bridge later |
@@ -1555,7 +1670,9 @@ This is a product hypothesis. The milestones in §16 exist to prove it.
 | Malicious or changed MCP tools | Tool poisoning, post-approval changes | Allowlist, pinning, namespaces, host classification |
 | Remote credentials | Key theft through XSS or logs | Host proxy default; host callback; no storage; CSP |
 | Recovery gaps | Duplicate writes or a different quiz after reload | Interrupt as source of truth, receipts, journal, fault tests |
-| Framework version drift | Browser build or interrupt semantics change | Pinned versions, compatibility matrix, contract tests |
+| Framework version drift | Browser build or interrupt semantics change | Pinned versions, the conformance suite on Node and in Chrome (AT-15), compatibility matrix |
+| Trace content | A span carries a prompt, learner text, an error message or a key through the host's collector to a tracing service | Allowlisted values for everything galaxie records, data labels checked against the declared trace destination, no exporter in galaxie, AT-36 |
+| A standard with one implementation | The contracts fit only LangGraph.js | A second framework adapter must pass its conformance suite without changes to the core contracts (ADR-0017) |
 | UI protocol drift | A2UI/json-render/AG-UI versions diverge | One MVP path, adapters and conformance tests when integrating |
 | Large API surface | Too many promises, hard to support | Vertical slice first; explicit unsupported capabilities |
 | Client storage | Quota, eviction, data loss | `persist()`, recovery UX, optional host sync/export |
@@ -1572,7 +1689,7 @@ This is a product hypothesis. The milestones in §16 exist to prove it.
 | [ADR-0003] | Executor on the main thread in the MVP | Proposed |
 | [ADR-0004] | Checkpoint interrupt is the source of truth for pending interactions | Proposed |
 | [ADR-0005] | IndexedDB checkpoint saver for LangGraph.js | Proposed |
-| [ADR-0006] | Model providers, destination classes and per-role routing | Accepted (local engine chosen after Spike B) |
+| [ADR-0006] | Model providers, destination classes and per-role routing | Accepted (in-browser engine chosen by Spike B, before M2) |
 | [ADR-0007] | Typed UI registry with headless reference components for the MVP | Proposed |
 | [ADR-0008] | Code-first agent definition, generated manifest | Proposed |
 | [ADR-0009] | Multi-tab ownership with Web Locks and a fencing epoch | Proposed |
@@ -1582,15 +1699,20 @@ This is a product hypothesis. The milestones in §16 exist to prove it.
 | [ADR-0013] | TypeScript-first implementation language | Accepted |
 | [ADR-0014] | Run-level data labels and argument shapes | Proposed |
 | [ADR-0015] | License: AGPL-3.0 with a commercial license | Accepted |
+| [ADR-0016] | Parity is the verdict, metrics are demonstrations, traces are OpenTelemetry spans | Accepted |
+| [ADR-0017] | Framework-neutral contracts, with an adapter per framework | Accepted |
 
 ### Open questions
 
 1. Which reference devices and browsers make up the test matrix?
-2. What are the threshold values X, Y, Z, G, H, N and F in §18? They must be set before Spike B.
-3. Who writes the lesson rubrics and the Vietnamese and English feedback eval set?
-4. When is there a real need to invest in Rust/WASM isolation or Python support?
+2. Is galaxie JavaScript-only, or do agents written in Python run too, through Pyodide? When is there a real need to invest in Rust/WASM isolation?
+3. With no agent backend, where do the keys for remote APIs live? galaxie never stores keys (§10.4). The options so far are the host proxy, the host callback for a user endpoint, and BYOK direct (Phase 5).
+4. Which frameworks come after LangGraph.js, and what does a second adapter need from the contracts?
+5. What does the web console for configuration and context manage (agents, model choices, prompts, context), and for whom: the developer, the host's administrators or end users?
+6. How is the standard versioned as a whole, and what must another implementation show to claim it?
+7. Can a web app hand tasks to a coding agent the user already runs, such as Codex CLI or Claude Code, without giving web content a path to that agent's shell and files, and within each provider's terms (§16.8)?
 
-Default implementation: TypeScript-first, LangGraph.js, React, trusted packages, per-role model routing with local inference first, IndexedDB, and named domain UI components. Reopen a decision only with a blocker or clear evidence.
+Default implementation: TypeScript-first, LangGraph.js, React, trusted packages, per-role model routing with local inference first, IndexedDB, the OpenTelemetry API for traces, and named domain UI components. Reopen a decision only with a blocker or clear evidence.
 
 ## 21. Handoff prompt for Codex CLI
 
@@ -1604,15 +1726,17 @@ changing code.
 The goal is a browser-first agent host/harness. It is NOT a new LangGraph, NOT
 a universal Python/Node-to-WASM compiler and NOT a marketplace.
 
-Do M0 first, one spike at a time (A, B, C, D in brief §16.2). Each spike is
-throwaway code and ends with a short report plus an ADR update. Do not start
-M1 until the spike reports exist. Do not implement the whole roadmap in one
-pass. If the repository already has code or uncommitted changes, preserve them
-and integrate carefully; never reset or overwrite unrelated work.
+Start with M1 (brief §16.3). A spike runs only when a milestone needs its
+answer (brief §16.2); spike code is throwaway and stays out of packages/. Do
+not implement the whole roadmap in one pass. If the repository already has
+code or uncommitted changes, preserve them and integrate carefully; never
+reset or overwrite unrelated work.
 
 1. Inspect the repo, toolchain and actual dependency versions.
-2. Verify browser-compatible LangGraph.js with a real spike; do not confuse a
-   remote SDK with the local execution engine.
+2. Prove parity first (ADR-0016): the conformance suite runs the same
+   LangGraph.js graphs with a deterministic fake chat model on Node and in
+   Chrome, and compares stream events, state, checkpoints, interrupts and
+   resume. Do not confuse a remote SDK with the local execution engine.
 3. The executor runs on the main thread (ADR-0003); local inference runs in a
    worker. Never pass closures through postMessage. A Web Worker is not a
    sandbox for untrusted code.
@@ -1640,6 +1764,12 @@ and integrate carefully; never reset or overwrite unrelated work.
 11. Add tests and run what the environment allows. Do not add cloud fallback,
     telemetry with user content, public deployment or publication beyond the
     request.
+12. Emit traces as OpenTelemetry spans through @opentelemetry/api only.
+    Filter every attribute, event and error you record, and apply the data
+    labels to span content; never ship an exporter or tracing credentials
+    (brief §14.4).
+13. Keep the core contracts framework-neutral: no LangGraph type in them
+    (ADR-0017).
 
 The brief separates VISION, PROPOSED, OPEN and INVARIANT. Improve proposals
 through ADRs with evidence, but never silently drop security or correctness
@@ -1692,6 +1822,10 @@ Priorities:
     new or superseding ADR?
 16. Has scope grown into a compiler, marketplace, custom graph engine or new
     UI protocol without a use case?
+17. Does the conformance suite run the same graphs on Node and in Chrome, and
+    is every difference in the compatibility matrix with its reason?
+18. Can a span carry a prompt, learner text or a credential, or leave the
+    device without an exporter the host registered?
 
 Report findings as P0/P1/P2, with file:line where code exists, a failure
 scenario or reproduction, the impact and the minimal fix. Separate observed
@@ -1752,6 +1886,9 @@ Public sources consulted on 2026-10-28. `main`/`latest` pages can change; re-rea
 - [S43] tsrs (oxc-project): Rust port of the TypeScript 7 compiler, with a WASM build.
 - [S44] Announcing TypeScript 7.0 (2026-07-08): native compiler; no compiler API in 7.0, a new API expected in 7.1; `@typescript/typescript6` for side-by-side use.
 - [S45] MCP transports, revision 2025-11-25: Streamable HTTP, `Origin` validation, sessions, protocol version header.
+- [S46] Langfuse OpenTelemetry integration: OTLP over HTTP at `/api/public/otel`, and how `gen_ai.*` attributes map to Langfuse fields.
+- [S47] OpenTelemetry semantic conventions for generative AI, now in their own repository; status Development, not stable.
+- [S48] A2A (Agent2Agent) protocol.
 
 [S1]: https://github.com/langchain-ai/langgraphjs/blob/main/libs/langgraph-core/package.json
 [S2]: https://github.com/langchain-ai/langgraphjs/blob/main/docs/docs/agents/context.md
@@ -1798,6 +1935,9 @@ Public sources consulted on 2026-10-28. `main`/`latest` pages can change; re-rea
 [S43]: https://github.com/oxc-project/tsrs/blob/main/npm/tsrs-wasm/README.md
 [S44]: https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/
 [S45]: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+[S46]: https://langfuse.com/integrations/native/opentelemetry
+[S47]: https://github.com/open-telemetry/semantic-conventions-genai
+[S48]: https://a2a-protocol.org/latest/
 
 [ADR-0001]: adr/0001-langgraph-adapter-not-engine.md
 [ADR-0002]: adr/0002-trusted-first-execution.md
@@ -1814,6 +1954,8 @@ Public sources consulted on 2026-10-28. `main`/`latest` pages can change; re-rea
 [ADR-0013]: adr/0013-typescript-first-implementation.md
 [ADR-0014]: adr/0014-data-labels-and-argument-shapes.md
 [ADR-0015]: adr/0015-licensing-agpl-with-commercial-license.md
+[ADR-0016]: adr/0016-parity-demonstrations-and-otel-traces.md
+[ADR-0017]: adr/0017-framework-neutral-contracts.md
 
 Further reading for implementation and review:
 
@@ -1831,8 +1973,8 @@ Further reading for implementation and review:
 
 ## 24. Conclusion: keeping the project on course
 
-Galaxie does not need to become a tool for rewriting every agent. Its expected value is to make agents written with existing tools a managed, reusable and interactive part of web applications.
+Galaxie does not need to become a tool for rewriting every agent. Its expected value is to make agents written with existing tools a managed, reusable and interactive part of web applications: they run on the user's device with no agent backend, and they behave as they do on a server.
 
-**First prove the closed loop: package → host bindings → local execution → interactive UI → user event → checkpoint/recovery → reuse in another app — under a security baseline that holds even when the model is compromised.**
+**First prove parity with native LangGraph.js (M1). Then prove the closed loop: package → host bindings → local execution → interactive UI → user event → checkpoint/recovery → reuse in another app — under a security baseline that holds even when the model is compromised.**
 
-Expand into untrusted plugins, WASM-first execution, more frameworks, complex voice or a marketplace only after this loop has working evidence and the phase gates in §16.7 are met.
+Expand into untrusted plugins, WASM-first execution, adapters for more frameworks, complex voice or a marketplace only after this loop has working evidence and the phase gates in §16.7 are met.

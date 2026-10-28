@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** brief §5, §16; ADR-0006, ADR-0011
+- **Related:** brief §5, §16; ADR-0006, ADR-0011, ADR-0016, ADR-0017
+- **Revisions:** 2026-10-28, with brief 0.3: trace spans and the parity conformance suite join the MVP (ADR-0016); the published CLI stays cut; adapters for other frameworks are cut (ADR-0017); the executor worker row states the MVP exception from ADR-0003.
 
 ## Context
 
@@ -10,15 +11,16 @@ The v0.1 MVP mixed the core proof (reuse, local execution, interactive UI, recov
 
 ## Decision
 
-Cut from the MVP, with the phase where each item can return (brief §16.7):
+Cut from the MVP, with the phase where each item can return (brief §16.7). The executor worker is the one exception: it returns during the MVP if its measured trigger fires (ADR-0003).
 
 | Item | Reason | Returns in |
 | --- | --- | --- |
-| Dedicated executor worker | No measured need (ADR-0003) | Phase 6, on the main-thread trigger |
+| Dedicated executor worker | No measured need (ADR-0003) | Phase 6, or during the MVP under a superseding ADR if the main-thread trigger fires (ADR-0003) |
 | Multi-model pool, shared engine across tabs | One model and one tab cover the slice | Phase 6 |
 | json-render, A2UI, MCP Apps renderers | Typed registry covers graph-selected UI (ADR-0007) | Phase 6 |
 | LLM-composed UI | Needs strong models and tighter policy | Phase 6 |
-| Published CLI and exportable trace files | A build script and in-app trace view are enough | Phase 6 |
+| Published CLI | A build script is enough | Phase 6 |
+| Executor adapters for frameworks other than LangGraph.js | One adapter proves the contracts, which stay framework-neutral (ADR-0017) | After the MVP, once the next framework is chosen (brief §20) |
 | Third-party MCP with OAuth 2.1 | Token storage and consent need their own design | Phase 5 |
 | OpenAPI import as capabilities | No host needs it yet | Phase 5 |
 | BYOK direct to OpenAI/Anthropic | Key exposed to every script on the origin | Phase 5, behind its own ADR |
@@ -31,7 +33,9 @@ Added to the MVP compared with v0.1:
 - Chrome Built-in AI;
 - the MCP client with an allowlist and pinning;
 - the security baseline tests;
-- the per-user writing step.
+- the per-user writing step;
+- the parity conformance suite on Node and in Chrome (ADR-0016);
+- OpenTelemetry trace spans, with the exporter registered by the host (ADR-0016).
 
 ## Alternatives considered
 

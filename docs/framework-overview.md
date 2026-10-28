@@ -9,20 +9,29 @@
 
 Galaxie is a **browser-first agent runtime SDK**. It lets a web application host AI agents as first-class parts of the app. Each agent has an identity, state, a lifecycle, permissions, a UI region and a recovery story.
 
+- **No agent backend.** galaxie packages agent pipelines (a single agent, a multi-agent system, or the harness around them) so that they run in the browser on the user's own device. The developer deploys no orchestration server and no container for it; the app's backend keeps its APIs, MCP servers, databases and tools.
+- **One environment for models and tools.** Each model role runs where the host's policy allows: an in-browser model on WebGPU, a model built into the browser, a model server on the user's machine, or a remote API. Agents reach HTTP APIs and MCP servers through capabilities the host binds.
+- **Parity with native frameworks.** Code written with LangChain and LangGraph behaves in the browser as it does natively on a server. A conformance suite checks this [ADR-0016].
+- **Open contracts.** galaxie's contracts are a framework-neutral standard for browser agents, with an adapter per framework [ADR-0017].
+- **Managed through the web.** Agent settings, model choices, prompts and context live in the web app. In the MVP the host sets them in code; a web console waits until its scope is settled (brief §20). During development, runs are traced as OpenTelemetry spans that a tool such as Langfuse can show.
+
 It sits between the tools developers already use and the application they already have:
 
 | Layer | Who owns it | Examples |
 | --- | --- | --- |
 | Agent logic | The developer, with existing frameworks | LangGraph.js graphs, LangChain tools, plain TypeScript |
 | **Agent host (galaxie)** | Galaxie | Lifecycle, identity, model routing, capability broker, persistence, UI surfaces, security baseline |
-| Inference | Existing engines and providers | WebLLM, Transformers.js, Chrome Built-in AI, OpenAI-compatible endpoints |
+| Inference | Existing engines and providers | WebLLM, Transformers.js, Chrome Built-in AI, a model server on the user's machine, OpenAI-compatible endpoints |
 | Application | The host app | Design system, login session, data, business rules |
 | Services | Backends | HTTP APIs, MCP servers through a gateway |
+| Tracing | The host and its tools | An OpenTelemetry SDK and exporter, a collector, Langfuse |
 
 What galaxie is not:
 
 - a new LLM;
-- a new graph engine;
+- a new graph engine or agent-authoring framework;
+- a replacement for the app's business backend: it removes the agent backend, not the APIs and data the agent uses;
+- a judge of answer quality: that depends on the model and the agent's design;
 - a compiler from Python or Node to WASM;
 - a sandbox for untrusted code (yet);
 - a marketplace.
@@ -50,6 +59,7 @@ Where galaxie fits:
 
 - No project found combines all five; the individual pieces exist, and galaxie builds on them instead of replacing them.
 - Galaxie fits where per-user inference cost, privacy, offline use or latency matter: education, health information, internal enterprise tools, and products with many free users. Server-side models remain the right default for many other features.
+- It also fits small organizations that cannot afford to run an agent backend, such as a small company's customer care or a school's question-and-answer assistant over public documents (brief §1.4).
 
 ## 2. Direction
 
@@ -59,7 +69,9 @@ Where galaxie fits:
 4. **Safe by construction.** The safe path is the easy path. Some unsafe things have no API at all: raw provider keys, generic `fetch` tools, rendering model HTML.
 5. **Recover, don't restart.** A reload or crash restores the pending interaction from the checkpoint. It does not regenerate it.
 6. **Reusable packages.** One agent package works in different apps through typed, versioned capability contracts.
-7. **Evidence before expansion.** Every phase after the MVP has an entry gate based on measurements, not on enthusiasm.
+7. **Evidence before expansion.** Every phase after the MVP has an entry gate based on evidence, such as a host that needs the feature or a trigger that fired, not on enthusiasm.
+8. **Parity is the verdict.** Code written with LangChain and LangGraph behaves in the browser as it does natively on a server, and every difference is documented with its reason. Accuracy, latency and other numbers are published as demonstrations on named devices, not as promises [ADR-0016].
+9. **Open contracts.** The contracts are framework-neutral and reuse open protocols, such as MCP, OpenTelemetry and JSON Schema, wherever one exists [ADR-0017].
 
 ## 3. What galaxie helps developers do
 
@@ -67,17 +79,19 @@ Where galaxie fits:
 
 | Job | Without galaxie | With galaxie |
 | --- | --- | --- |
-| Run a LangGraph agent in the browser | Fix bundling, write a browser checkpointer, handle interrupts and reloads yourself | Adapter plus IndexedDB checkpointer; interrupts survive reloads |
+| Run a LangGraph agent in the browser | Fix bundling, write a browser checkpointer, handle interrupts and reloads yourself | Adapter plus IndexedDB checkpointer; interrupts survive reloads; a conformance suite shows the graph behaves as it does on Node |
 | Use a local model | Pick an engine, handle download consent, device checks, queueing, fallbacks | Per-role providers with first-run order, consent and typed `unavailable` errors |
 | Let users bring their own model | Wire CORS, Local Network Access, keys and fallbacks per provider | OpenAI-compatible provider in host-proxy or user-endpoint mode; keys through a callback, never stored |
 | Give the agent access to app data | Hand it `fetch` and hope | Typed, versioned capabilities bound to your existing APIs, deny by default |
 | Connect MCP tools | Trust whatever the server lists | Allowlisted, namespaced, pinned tools from servers you control |
 | Show interactive UI from the agent | Parse model output into JSX, or render HTML | Typed component registry with headless reference components; validated props and actions |
+| Let the agent feed or steer the app | Hand it the router or the DOM | Capabilities the host binds, such as `app.navigate@1` with an allowlist of routes |
 | Handle double clicks, stale tabs, two tabs | Custom locking and dedupe | Event identity and revision checks, Web Locks ownership, fencing epoch |
 | Ship it safely | Read many security articles | A baseline enforced by the runtime, plus a checklist and tests for the host |
 | Test it | Mock the LLM by hand | Deterministic mock provider, fixtures, injection corpus |
+| See what a run did | Add logging by hand | OpenTelemetry spans for the run, its nodes, model calls and capability calls, holding only what galaxie's filter and the data labels allow; your collector sends them to Langfuse or any OpenTelemetry backend |
 
-**Later, after the MVP gates (brief §16.7):** voice, third-party MCP with OAuth, OpenAPI import, a second renderer, LLM-composed UI, shared engines across tabs, untrusted package isolation, and a registry.
+**Later, after the MVP gates (brief §16.7):** voice, retrieval over public documents, third-party MCP with OAuth, OpenAPI import, executor adapters for other frameworks, a second renderer, LLM-composed UI, shared engines across tabs, untrusted package isolation, and a registry.
 
 ## 4. AI-assisted ("vibe") coding
 
@@ -112,7 +126,7 @@ Galaxie serves three groups. End users never install galaxie; they meet it insid
 | Not be surprised by large downloads | Size shown and consent before a model download; metered connections respected where the browser exposes it |
 | Use the feature on modest devices | Built-in AI first, in-browser engine if possible, remote only with consent, otherwise a clear "not available" state |
 | Accessibility | Reference components target WCAG 2.2 AA: keyboard use, focus, labels, error states |
-| Language | UI text through the host's i18n; model roles declare languages they were evaluated for |
+| Language | UI text through the host's i18n; model roles declare the languages they need, and a provider is chosen only if it supports them |
 | Safety, including minors | Output safety hook; no password or payment components; agent content visibly marked |
 | Control over personal data | Local data partitioned per user, wiped on logout; export only on explicit action |
 
@@ -123,8 +137,8 @@ Galaxie serves three groups. End users never install galaxie; they meet it insid
 | Fast start | Templates, headless reference components, mock provider |
 | Keep existing skills | LangGraph.js and LangChain as-is; no new DSL |
 | Confidence in upgrades | Semantic versioning, deprecation policy, migration guides, compatibility matrix |
-| Debuggability | Local trace with redaction, typed errors with fix hints, dev-mode diagnostics |
-| Testability | Deterministic mocks, fixtures, conformance suites for adapters |
+| Debuggability | OpenTelemetry spans, filtered as galaxie records them, readable in Langfuse or any OpenTelemetry tool; typed errors with fix hints; dev-mode diagnostics |
+| Testability | Deterministic mocks, fixtures, and conformance suites for adapters, including the parity suite that compares Node and the browser |
 
 ### 5.3. Enterprises
 
@@ -144,15 +158,16 @@ Galaxie serves three groups. End users never install galaxie; they meet it insid
 
 Full detail, with entry gates and evidence requirements, is in [brief §16](galaxie-project-brief.md#16-roadmap).
 
+Spikes are not a stage. Each runs before the milestone that needs its answer: Spike B (in-browser engine) and Spike C (UI path) before M2, Spike D (remote providers and MCP) before M4. What remained of Spike A is the M1 conformance suite.
+
 | Stage | Focus | Leaves when |
 | --- | --- | --- |
-| M0 — Spikes | A: engine and persistence; B: local inference bake-off; C: UI path; D: remote providers and MCP | Observed compatibility matrix; in-browser engine chosen; Proposed ADRs confirmed or revised |
-| M1 — Headless host | Lifecycle, identity, broker, model router, budgets, redacted trace | Headless agent tested; core security guarantees covered |
-| M2 — Local slice | Tutor steps 1–10 with local models, typed registry, consent, CSP | Learner's sentence never leaves the browser; loop runs without a server |
+| M1 — Headless host | Lifecycle, identity, broker, model router, budgets, framework-neutral contracts, the parity conformance suite, OpenTelemetry spans | Headless agent tested; the suite passes on Node and in Chrome, or each difference is in the compatibility matrix; core security guarantees covered |
+| M2 — Local slice | Spikes B and C; tutor steps 1–10 with local models, typed registry, consent, CSP | Learner's sentence never leaves the browser; loop runs without a server; demonstrations recorded |
 | M3 — Durability | IndexedDB saver, submission inbox, interrupt recovery, effect journal, multi-tab, external developer trial | Reload never changes the quiz, loses an answer or duplicates effects; an outside developer has integrated the slice |
-| M4 — Release gate | Remote providers, MCP, two hosts, second external developer trial, security review, AI-facing docs | All required acceptance tests have evidence; Go/Revise decided on numbers |
-| Phase 5 | Integration breadth: third-party MCP with OAuth, OpenAPI, Transformers.js non-LLM tasks, voice | Each item's entry gate |
-| Phase 6 | Portability and scale: worker executor, multi-model pool, second renderer, LLM-composed UI | Each item's entry gate |
+| M4 — Release gate | Spike D; remote providers, MCP, two hosts, second external developer trial, security review, AI-facing docs, a development tracing guide | All required acceptance tests have evidence; Go/Revise decided on parity, the acceptance tests and the engineering checks, with the demonstrations published |
+| Phase 5 | Integration breadth: third-party MCP with OAuth, OpenAPI, Transformers.js non-LLM tasks, voice, retrieval over public documents | Each item's entry gate |
+| Phase 6 | Portability and scale: worker executor (sooner, if its main-thread trigger fires during the MVP), multi-model pool, second renderer, LLM-composed UI | Each item's entry gate |
 | Phase 7 | Isolation and distribution: untrusted packages, registry, WebMCP bridge | Isolation ADR and test suite first |
 | 1.0 | Production readiness (§7 below) | Every 1.0 criterion met |
 
@@ -174,7 +189,7 @@ Full detail, with entry gates and evidence requirements, is in [brief §16](gala
 
 **Reliability**
 
-- Conformance suites for executor adapters, the checkpoint saver and renderers.
+- Conformance suites for executor adapters (including the parity suite on Node and in the browser), the checkpoint saver and renderers.
 - Fault injection in CI.
 - Real-GPU browser matrix runs on self-hosted runners.
 - Host-controlled kill switches and staged rollout for models and agents.
@@ -186,14 +201,14 @@ Full detail, with entry gates and evidence requirements, is in [brief §16](gala
 
 **Operability**
 
-- Content-free observability hooks (OpenTelemetry-compatible spans and metrics), off by default and owned by the host.
+- OpenTelemetry spans (from M1) and metrics, inert until the host registers an SDK, and free of content unless the host opts in for development [ADR-0016].
 - Upgrade guides.
 
 **User experience**
 
 - WCAG 2.2 AA reference components.
 - Tested i18n paths.
-- Measured performance on low-end reference devices.
+- Performance demonstrations on low-end devices, published with their setup.
 
 **Docs and DX**
 
@@ -229,11 +244,11 @@ Under the license (AGPL-3.0-only plus a commercial license [ADR-0015], see [`COM
 | Item | Why public |
 | --- | --- |
 | Runtime SDK packages, adapters, ESLint plugin | Adoption depends on developers reading and trusting the code |
-| Contracts, schemas, catalog specs | Reuse across hosts needs open contracts |
+| Contracts, schemas, catalog specs: the framework-neutral standard | Reuse across hosts and frameworks needs open contracts |
 | Conformance test suites | Lets others build adapters and renderers that interoperate |
 | Docs, ADRs, roadmap, changelog | Explains decisions; builds trust |
 | Threat model and security baseline | Security must not depend on secrecy; enterprises need it for review |
-| Benchmarks: method, devices and raw results | Claims must be checkable |
+| Demonstrations: method, devices and raw results | Numbers must be checkable |
 | Compatibility matrix and known limitations | Prevents false expectations |
 | Most of the prompt injection corpus | Helps the ecosystem; attackers already know the techniques |
 | Data-flow description per destination class | Users and hosts must know where data goes |
@@ -245,7 +260,7 @@ Under the license (AGPL-3.0-only plus a commercial license [ADR-0015], see [`COM
 | --- | --- |
 | Signing keys, npm tokens, CI and provider credentials | Compromise means a supply chain attack on every user |
 | Details of unpatched vulnerabilities | Coordinated disclosure; publish after the fix |
-| A holdout part of the injection corpus and eval sets | Prevents tuning to the test; keeps measurements honest |
+| A holdout part of the injection corpus | Prevents tuning to the test; keeps the security tests honest |
 | Any user or learner data | Galaxie does not collect it by default; hosts own it |
 | Customer configurations, enterprise contracts, raw incident data | Confidential; publish sanitized post-incident summaries instead |
 
@@ -262,3 +277,5 @@ Rust remains a candidate for a WASM isolation guest (Phase 7), for measured hot 
 
 [ADR-0013]: adr/0013-typescript-first-implementation.md
 [ADR-0015]: adr/0015-licensing-agpl-with-commercial-license.md
+[ADR-0016]: adr/0016-parity-demonstrations-and-otel-traces.md
+[ADR-0017]: adr/0017-framework-neutral-contracts.md

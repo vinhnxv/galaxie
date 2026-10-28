@@ -3,11 +3,13 @@
 - **Status:** Accepted
 - **Date:** 2026-10-28
 - **Related:** brief §9.5, §9.6, §16.7; ADR-0012
-- **Revisions:** 2026-10-28, after an external read-only review and before any implementation:
-  - corrected the authorization summary;
-  - pinned protocol revision 2025-11-25;
-  - added the security profile;
-  - pinning described as metadata-change detection.
+- **Revisions:**
+  - 2026-10-28, after an external read-only review and before any implementation:
+    - corrected the authorization summary;
+    - pinned protocol revision 2025-11-25;
+    - added the security profile;
+    - pinning described as metadata-change detection.
+  - 2026-10-28, with brief 0.3: Spike D runs before M4 instead of in M0.
 
 ## Context
 
@@ -56,6 +58,6 @@ Founder decision (2026-10-28): an MCP client in the MVP over Streamable HTTP, to
 
 ## Verification
 
-- Spike D: tool listing, pinning prototype, CORS behavior and the security profile.
+- Spike D, before M4: tool listing, pinning prototype, CORS behavior and the security profile.
 - AT-25, AT-26, AT-33.
 - The Phase 5 entry gate for third-party OAuth: a token design review and an update to this ADR.
