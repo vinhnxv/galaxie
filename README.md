@@ -17,7 +17,7 @@ The runtime is designed to add what the browser lacks:
 - **A mandatory security baseline** on every path the SDK controls.
 - **Development tracing:** OpenTelemetry spans that a tool such as Langfuse can show, through an exporter the host registers.
 
-> **Status: design phase.** There is no package to install yet. This repository holds the project brief, the architecture decisions, the system design, and a toolchain skeleton whose only package, `packages/core`, contains draft contract types.
+> **Status: first M1 runtime slice.** The workspace now includes instance and run lifecycles, cancellation, replayable in-memory events, a LangGraph.js adapter, Node/Chromium parity tests and allowlisted OpenTelemetry spans. Packages remain private and unpublished. The capability broker, model router, budgets, durable storage and UI integration remain unimplemented.
 
 ## Intended use and disclaimer
 

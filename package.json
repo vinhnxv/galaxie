@@ -10,14 +10,15 @@
   },
   "scripts": {
     "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json",
-    "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run build",
+    "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run build && pnpm run check:deps",
     "check:license": "node scripts/check-license.ts",
     "format": "biome check --write .",
     "lint": "biome check .",
     "test": "vitest run",
     "typecheck": "tsc -p packages/core && tsc -p packages/core/test && tsc -p packages/adapter-langgraph && tsc -p packages/adapter-langgraph/test && tsc -p tests/conformance && tsc -p scripts",
     "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p packages/adapter-langgraph && tsc6 -p packages/adapter-langgraph/test && tsc6 -p tests/conformance && tsc6 -p scripts",
-    "conformance:update": "vitest run --project node tests/conformance/native.node.test.ts --update"
+    "conformance:update": "vitest run --project node tests/conformance/native.node.test.ts --update",
+    "check:deps": "node scripts/check-dependencies.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

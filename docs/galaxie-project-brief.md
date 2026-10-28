@@ -6,7 +6,7 @@
 - **Document version:** 0.3. A starting point for implementation and critique, not a specification validated by code.
 - **Date:** 2026-10-28, timezone Asia/Ho_Chi_Minh.
 - **Language:** English.
-- **Status:** no runtime exists yet. Two throwaway spikes have run (§16.2); M1 is next.
+- **Status:** the first M1 slice implements the core lifecycle, LangGraph.js adapter, Node/Chromium parity cases and allowlisted OpenTelemetry spans. The broker, router, budgets, persistence and UI remain unimplemented. Two throwaway spikes have run (§16.2).
 - **Scope:** an SDK/runtime for developers, and the framework-neutral contracts it defines for browser agents (§7.6). The English Tutor is the reference application, not the whole product.
 - **Companion documents:** [framework overview](framework-overview.md) (role, direction, audiences, production readiness, public vs private) and [ADRs](adr/README.md).
 
@@ -578,6 +578,7 @@ A prepare failure is reported clearly, with a retry or dispose path. A failed ru
 stateDiagram-v2
     [*] --> queued
     queued --> running
+    queued --> failed: predecessor settlement exceeds 10 seconds
     running --> waiting_input
     waiting_input --> running: valid submission
     running --> suspended: recoverable interruption

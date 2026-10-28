@@ -3,7 +3,7 @@
 
 import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
-import { configDefaults, defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
 const alias = {
   '@galaxie/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
@@ -12,7 +12,7 @@ const alias = {
   ),
 };
 
-export default defineConfig({
+const config: ViteUserConfig = defineConfig({
   test: {
     projects: [
       {
@@ -52,3 +52,5 @@ export default defineConfig({
     ],
   },
 });
+
+export default config;
