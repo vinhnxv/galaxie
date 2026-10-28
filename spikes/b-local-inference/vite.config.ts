@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { fileURLToPath } from 'node:url';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 import { defineConfig } from 'vite';
 
 const csp = [
@@ -12,11 +13,13 @@ const csp = [
   "img-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
 ].join('; ');
+const lan = process.env['VITE_LAN'] === '1';
 export default defineConfig({
+  plugins: lan ? [basicSsl()] : [],
   root: fileURLToPath(new URL('.', import.meta.url)),
   server: {
-    host: '127.0.0.1',
-    port: 4173,
+    host: lan ? true : '127.0.0.1',
+    port: lan ? 4443 : 4173,
     strictPort: true,
     headers: { 'Content-Security-Policy': csp },
   },

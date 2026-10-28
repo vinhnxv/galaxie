@@ -108,6 +108,7 @@ export async function resetCheck(
   }
 }
 export interface HarnessOptions {
+  beforeDispose?: (arm: Arm) => Promise<void>;
   runs: number;
   probeReal: boolean;
   promptProbe: boolean;
@@ -357,6 +358,7 @@ export async function runArm(arm: Arm, options: HarnessOptions): Promise<ArmResu
         distinctOutputs: hashes.size,
       };
     }
+    await options.beforeDispose?.(arm);
     if (result.cancel)
       result.cancel.medianFeedbackTtftMs =
         result.tasks.find((task) => task.id === 'feedback-en')?.summary.ttftMs.p50 ?? null;

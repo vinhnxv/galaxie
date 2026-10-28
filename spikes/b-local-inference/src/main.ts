@@ -7,6 +7,7 @@ import { PromptArm } from './arms/prompt-api.js';
 import { TransformersArm } from './arms/transformers.js';
 import type { Arm } from './arms/types.js';
 import { WebLLMArm } from './arms/webllm.js';
+import { chatWebLLMCheck } from './chat-webllm-check.js';
 import { deviceInfo, type PromptSession, promptAvailability } from './device.js';
 import { armResult, runArm, selectedArms } from './harness.js';
 import { downloadResults, emptyChatCheck, type ResultsV1, resultsSchema } from './results.js';
@@ -95,9 +96,29 @@ async function runAll(options: { runs?: number } = {}): Promise<void> {
             promptProbe: params.get('promptApi') === 'probe',
             promptVi: prompt.vi,
             progress: render,
+            beforeDispose: async (arm) => {
+              if (arm instanceof WebLLMArm) results.chatWebLLM = await chatWebLLMCheck(arm);
+            },
           }),
         );
     }
+    const webllm = results.arms.find((arm) => arm.id === 'webllm');
+    const transformers = results.arms.find((arm) => arm.id === 'transformers-js');
+    if (
+      webllm &&
+      transformers &&
+      transformers.model.id === 'onnx-community/Qwen2.5-1.5B-Instruct'
+    ) {
+      webllm.sameCheckpointAs = 'transformers-js';
+      transformers.sameCheckpointAs = 'webllm';
+    } else {
+      if (webllm) webllm.sameCheckpointAs = null;
+      if (transformers) transformers.sameCheckpointAs = null;
+    }
+    if (results.chatWebLLM.status === 'not_run')
+      results.chatWebLLM = emptyChatCheck(
+        params.get('probe') === 'real' ? 'probe_only' : 'webllm_unavailable',
+      );
     results = resultsSchema.parse(results);
     done = true;
     render('Finished');
