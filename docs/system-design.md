@@ -10,8 +10,9 @@
 ## 1. What exists today
 
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
-- **`packages/core`:** framework-neutral contracts and M1 runtime slices 1 and 2: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, sticky labels, argument shapes, finite budgets and allowlisted OpenTelemetry spans (§6).
+- **`packages/core`:** framework-neutral contracts and M1 runtime slices 1–3: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, model routing with consent and per-call credentials, sticky labels, argument shapes, finite budgets and allowlisted OpenTelemetry spans (§6).
 - **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
+- **`packages/models`:** a deterministic scripted LangChain mock provider; real providers remain deferred.
 - **`tests/conformance`:** seven graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix.
 - **`spikes/`:** two throwaway spikes, B0 (a 1.7B model on WebGPU) and the local English tutor (a LangGraph.js agent on that model in Chrome). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
@@ -85,13 +86,13 @@ flowchart TD
     Host --> Tutor
     Host --> Adapter["adapter-langgraph"] & Models["models"] & Mcp["tools-mcp"] & Storage["storage-indexeddb"] & ReactPkg["react"]
     Tutor --> Core["core"]
-    Adapter & Models & Mcp & Storage & ReactPkg --> Core
+    Adapter & Mcp & Storage & ReactPkg --> Core
 ```
 
 Proposed rules; M1 confirms them:
 
 1. `core` has no `dependencies`; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Only the OpenTelemetry API is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries.
-2. Every other package depends on `core` and on its own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
+2. The mock-only `models` package imports only `@langchain/core/*` subpaths and relative files; it has no `core` dependency. Other integration packages depend on `core` and on their own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
 3. Agent packages depend on `core` and their engine, never on a host package. From M4 the ESLint plugin flags direct `fetch`, storage, DOM and `eval` use (brief §9.7 C).
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
 5. Fewer packages are fine while these boundaries hold (brief §15).
@@ -106,7 +107,8 @@ galaxie/
 ├── docs/                      brief, framework overview, this document, ADRs
 ├── packages/
 │   ├── core/                  runtime and framework-neutral contracts (§6)
-│   └── adapter-langgraph/     native LangGraph executor and callback mapping
+│   ├── adapter-langgraph/     native LangGraph executor and routed chat models
+│   └── models/                deterministic mock provider
 ├── scripts/
 │   ├── check-license.ts       SPDX headers and package license fields (ADR-0015)
 │   └── check-dependencies.ts  source and built-package dependency boundaries
@@ -146,11 +148,12 @@ Modules in `packages/core/src`; `index.ts` exports the public contracts and runt
 | `lifecycle.ts` | `InstanceState`, `RunStatus` and their transition tables | brief §8.3 |
 | `errors.ts` | `ErrorCode`, fixed-message `ErrorInfo`, `GalaxieError` and sanitization helpers | brief §9.4, §10, §11.4, §12 |
 | `policy.ts` | Destination classes, presets, data labels, argument shapes, budget limits | brief §3, §9.4; ADR-0014 |
-| `models.ts` | Model roles, features, role requirements, `ModelPolicy` | brief §10; ADR-0006 |
+| `models.ts` | Model roles, descriptors, routing configuration, consent, usage and run-bound leases | brief §10; ADR-0006 |
+| `model-router.ts` | Per-instance configuration validation, ordered selection, shared consent, per-call credentials and model-budget reservations | ADR-0006, ADR-0014 |
 | `capabilities.ts` | Capability names, requests, kinds, grant scopes, retry policy, host bindings, executor port and attribution headers | brief §9.2, §12.3 |
 | `annotations.ts` | Cached Standard JSON Schema walking in both directions; labels, constraints and string matchers | ADR-0014 |
 | `capability-broker.ts` | Per-instance grants, validation, FIFO concurrency, timeouts, sticky labels and verbatim guard | brief §9.2; ADR-0012, ADR-0014 |
-| `budgets.ts` | Finite defaults, option validation, per-run tool-call and payload accounting | brief §9.4 |
+| `budgets.ts` | Finite defaults, option validation, per-run tool-call, payload, token and cost accounting | brief §9.4 |
 | `http-capability.ts` | Host-literal HTTP templates, attribution headers and capped response reads | ADR-0012 A3, A8 |
 | `interactions.ts` | Catalogs, components, UI requirements, pending interactions, user events, receipts, inbox status | brief §11, §12; ADR-0004, ADR-0007 |
 | `effects.ts` | Effect states and transitions | brief §12.3 |
@@ -170,7 +173,7 @@ Contract choices where the brief leaves room:
 - **Run status belongs to the runtime.** An executor reports events; the runtime derives the run status from them and creates every ID.
 - **Schema annotations.** Hosts use `.meta(galaxieField({ label: 'private-user', shape: 'freeText' }))`. Core reads `x-galaxie` through Standard JSON Schema in both input and output directions, preserving transform and pipe labels without a runtime Zod import. Unrepresentable positions are free text and unlabelled; schemas without Standard JSON Schema and unsupported subschema keywords reject with `unsupported`. Shapes derive from enum/const, UUID and narrow bounded patterns; declarations cannot claim a stricter shape than their constraints support (ADR-0014).
 
-Not in `core` yet: the model router (remaining M1 work, brief §16.3), plus durable events and multi-tab ownership (M3). Dispatch and resume remain unsupported. Conformance covers stream events, final state and checkpoint history for seven cases, including capability calls and the native 25-step limit; interrupt/resume and durability parity remain deferred.
+Not in `core` yet: durable events and multi-tab ownership (M3). The model slice still needs real providers, availability probing, first-run download order, structured output through the router and per-call provider token caps. Dispatch and resume remain unsupported. Conformance covers stream events, final state and checkpoint history for seven cases, including capability calls and the native 25-step limit; interrupt/resume and durability parity remain deferred.
 
 Each instance owns one session. A run claims its slot before asynchronous Standard Schema validation; queued successors wait for the previous executor iterator to complete. Cancellation invalidates results immediately while core keeps draining. Core's single 10-second settlement bound limits queued waits and disposal without permitting overlapping loops on a session. Diagnostics alone receive raw errors; snapshots and error events contain fixed messages and sanitized types.
 
@@ -267,7 +270,7 @@ There is one render path: after a reload the host renders from the checkpoint ex
 
 Labels from run input and validated outputs are sticky, conservative and sorted in snapshots. Non-empty free-text strings and dynamic property names can reach a destination only when every run label allows it. The default keeps `app` off `third-party` and `private-user` in-browser; a host may replace individual label policies. The extra verbatim guard lowercases, collapses Unicode whitespace and compares private strings of at least eight normalized characters, including structured arguments. It cannot detect paraphrases, and short or structured values remain a low-bandwidth channel. These controls cover SDK paths; trusted code can bypass them (ADR-0002).
 
-Finite defaults are 25 steps, 50 tool calls, 300000 ms wall clock and 1048576 payload bytes. Exhaustion fails the run and aborts it, even if graph code catches a call's rejection. The adapter passes the lower of the step budget and the graph's positive integer recursion limit to LangGraph. Tokens (100000), cost (0), repair attempts (2) and UI elements (50) are validated defaults reserved for later enforcement.
+Finite defaults are 25 steps, 50 tool calls, 300000 ms wall clock and 1048576 payload bytes. Exhaustion fails the run and aborts it, even if graph code catches a call's rejection. The adapter passes the lower of the step budget and the graph's positive integer recursion limit to LangGraph. Model calls also enforce token (100000) and cost (0) defaults through reservations and settlement (§8.4). Repair attempts (2) and UI elements (50) remain validated defaults reserved for later enforcement.
 
 `httpCapability({ url, method, ...bindingPolicy })` is the broker's request path. Only host-literal HTTPS origins (or HTTP loopback) are accepted; validated top-level fields fill percent-encoded path/query placeholders, with no free-text path placeholders. POST/PUT/PATCH send remaining fields as JSON. The host's `headers(context)` callback supplies credentials, requests default to `credentials: 'same-origin'`, and redirects reject. Responses are byte-capped, JSON-checked and schema-validated. Custom bindings can use `attributionHeaders(context)` to forward the same `X-Galaxie-Agent` and `X-Galaxie-Run` headers. They attribute and never authorize. A cross-origin server must list both in `Access-Control-Allow-Headers`; otherwise CORS preflight fails and the call rejects `unavailable`.
 
@@ -306,21 +309,28 @@ sequenceDiagram
 
 ### 8.4. A model call
 
+**Implemented in M1 slice 3, with mock providers only:** the host supplies descriptors and ordered per-role routes in `CreateOptions.models`. Selection uses required features, primary language subtags, destination allowlists, sticky run labels and consent. Every destination other than `in-browser` needs one instance-lifetime consent decision per role and class; concurrent callers share the pending decision. Refusal or a label exclusion skips that provider. No eligible provider gives `denied` for policy exclusions, or `unavailable` for unmet requirements.
+
 ```mermaid
 flowchart TD
-    Call["Model call for a role"] --> Allowed["Allowed classes: the role's policy, narrowed by every data label the run carries"]
-    Allowed --> Pick{"First provider in the role's list that is allowed and available"}
-    Pick -- none --> Unavailable["Typed error: unavailable"]
-    Pick -- found --> Notice["Show the destination class; ask consent before moving to a less private one"]
-    Notice --> Send["Send; verbatim-match guard on the request body"]
-    Send -- "localhost or LAN endpoint fails" --> Unreachable["Typed error: unreachable, no fallback"]
+    Call["host.langchain.chatModel(role) call"] --> Pick["First provider matching requirements, allowed classes and current labels"]
+    Pick --> Consent["Shared consent for non-browser destinations"]
+    Consent --> Reserve["Reserve tokens and cost before dispatch"]
+    Reserve --> Credential["Obtain a per-call credential when required"]
+    Credential --> Check["Recheck active run and labels"]
+    Check --> Notice["Publish selected provider and destination in snapshot.routes"]
+    Notice --> Send["Invoke the provider and settle actual usage or the reservation"]
 ```
 
-- First-run order: Built-in AI if it is available and the host lists it for the role, then the cached in-browser model, then a download after consent with the size shown, then a remote provider if the role allows it and the user consents (ADR-0006).
-- Where the provider can enforce a JSON Schema while it decodes, structured output uses it (brief §10.6).
-- Built-in AI is eligible for a role only when `availability()` supports the role's input and output languages.
-- Labels are sticky for the run. To shed one, the host starts a new run (ADR-0014).
-- Provider keys come from the host's `getCredential()` callback for each request. galaxie never stores them (ADR-0006).
+`RunRequest.models` is a framework-neutral port: core receives no messages or LangChain objects. The adapter returns a routing `BaseChatModel` for each declared role, preserving one LangChain chat-model run, provider metadata and streamed tokens. `invoke`, `batch`, `stream` and `streamEvents` all route, including calls without forwarded config. Calls without config still have no implicit chat span. Multi-list `generate` rejects `unsupported`; `batch` reserves each call separately. Credentialed providers use a per-call factory; other providers are model instances keyed by provider ID.
+
+Routing, labels, consent and model budgets apply only to calls through `host.langchain.chatModel(role)`. Trusted agent code that holds a model instance can bypass these controls (ADR-0002). A class names the final recipient, including when a host proxy forwards a call (ADR-0006).
+
+`maxTokens` is a per-call reservation, not a provider token cap. Known prices reserve `maxTokens × max(inputPerToken, outputPerToken)`; unknown prices require the route's `maxCost`. Valid reported usage replaces the reservation; missing or malformed usage, failures and abandoned calls charge the reservation. A call can use more than reserved, and an actual-usage overrun fails the run only after that call returns. Hard spending limits belong on the host proxy. Providers are trusted to report usage accurately.
+
+`getCredential({ role, providerId })` hands credentials to page code per call and never persists them in galaxie. An XSS or malicious dependency on the origin can read them; hosts should supply short-lived, host-proxy-scoped tokens rather than long-lived provider keys (ADR-0012). Credential callback failures emit a fixed error and a diagnostic without the raw error. Chat spans record only allowlisted metadata, including `galaxie.destination.class` and `galaxie.model.provider`.
+
+Real providers, availability probing, the first-run download order with size and consent UI, structured output through the router, and per-call token caps on providers remain deferred to their milestones. `packages/models` currently exports only `@galaxie/models/mock`, a scripted provider with word streaming, optional usage, cancellation, scripted errors and call counts. It makes no network requests.
 
 ### 8.5. Tab ownership and takeover
 
@@ -367,7 +377,7 @@ Logout bumps an invalidation generation that every tab sees, wipes the principal
 | A9. Pinned MCP tool definitions | MCP client | `tools-mcp` |
 | A10. Logout invalidation | Ownership, storage | `core`, `storage-indexeddb` |
 
-M1 slice 2 tests A2 and A3 through the broker, A4 through allowlisted spans and HTTP credential canaries, A7 for steps/tool calls/wall clock/payload, and A8 for HTTP attribution on Node and Chromium. A5 bindings refuse dispatch until confirmations exist. A6 label checks cover capabilities; model routing remains unimplemented. A1 remains pending in its renderer component. The M1 release requirement remains A1–A4, A7 and A8 (brief §16.3); the other controls are tested in the milestone that builds their component. These guarantees are bounded and testable; they are not a promise that nothing can go wrong (brief §0.2, §9.9).
+M1 slice 2 tests A2 and A3 through the broker, A4 through allowlisted spans and HTTP credential canaries, A7 for steps/tool calls/wall clock/payload, and A8 for HTTP attribution on Node and Chromium. A5 bindings refuse dispatch until confirmations exist. M1 slice 3 tests A6 model routing and consent, A7 token/cost reservations and settlement, and A4 per-call credential and model-span hygiene on Node and Chromium. A1 remains pending in its renderer component. The M1 release requirement remains A1–A4, A7 and A8 (brief §16.3); the other controls are tested in the milestone that builds their component. These guarantees are bounded and testable; they are not a promise that nothing can go wrong (brief §0.2, §9.9).
 
 ## 10. Toolchain
 
@@ -392,7 +402,7 @@ M1 slice 2 tests A2 and A3 through the broker, A4 through allowlisted spans and 
 | `pnpm conformance:update` | Write goldens from the native Node lane only; review the diff |
 | `pnpm exec playwright install --only-shell chromium` | Install the local headless Chromium binary; CI adds `--with-deps` |
 | `pnpm exec vitest run --project 'browser (chromium)'` | Run only Chromium tests |
-| `pnpm build` | Build core, then the adapter against core's `dist` |
+| `pnpm build` | Build core, then the adapter against core's `dist`, and the mock provider |
 
 ## 11. What confirms this design, and when
 
