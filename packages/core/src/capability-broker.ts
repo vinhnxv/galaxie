@@ -11,6 +11,7 @@ import type {
 } from './capabilities.js';
 import type { AgentDefinition } from './definition.js';
 import { type ErrorCode, GalaxieError, isGalaxieError, toErrorInfo } from './errors.js';
+import { getHttpCapability, type HttpDescriptor } from './http-capability.js';
 import type { AgentRef, EffectId, RunId } from './ids.js';
 import {
   type BudgetLimits,
@@ -113,6 +114,7 @@ class Concurrency {
   }
 }
 interface Compiled {
+  readonly http?: HttpDescriptor;
   readonly request: CapabilityRequest;
   readonly input: Annotations;
   readonly output: Annotations;
@@ -189,8 +191,11 @@ export class CapabilityBroker {
         throw failure('invalid');
       const input = annotations(request.input);
       const output = annotations(request.output);
+      const http = supplied === undefined ? undefined : getHttpCapability(supplied);
+      if (binding !== undefined) http?.validate(input, binding);
       this.#capabilities.set(name, {
         request,
+        ...(http === undefined ? {} : { http }),
         input,
         output,
         ...(binding === undefined ? {} : { binding, slots: new Concurrency(binding.concurrency) }),
@@ -315,7 +320,11 @@ export class CapabilityBroker {
               let execution: Promise<unknown>;
               try {
                 invoked = true;
-                execution = Promise.resolve(binding.invoke(value, context));
+                execution = Promise.resolve(
+                  compiled.http === undefined
+                    ? binding.invoke(value, context)
+                    : compiled.http.invoke(value, context, run.budget.limits.payloadBytes),
+                );
               } catch (error) {
                 execution = Promise.reject(error);
               }

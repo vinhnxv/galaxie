@@ -36,6 +36,7 @@ export type {
   RunCommand,
   RunRequest,
 } from './executor.js';
+export { httpCapability } from './http-capability.js';
 export type {
   AgentId,
   AgentRef,
