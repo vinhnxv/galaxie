@@ -28,7 +28,8 @@ export const INSTANCE_TRANSITIONS: Transitions<InstanceState> = {
 
 /** Run transitions, as drawn in brief §8.3. */
 export const RUN_TRANSITIONS: Transitions<RunStatus> = {
-  queued: ['running', 'cancelled'],
+  /** Waits for the predecessor's iterator to settle; core fails the run after 10 seconds. */
+  queued: ['running', 'failed', 'cancelled'],
   running: ['waiting_input', 'suspended', 'succeeded', 'failed', 'cancelled'],
   waiting_input: ['running', 'cancelled'],
   suspended: ['running', 'cancelled'],

@@ -4,6 +4,7 @@
 import type { ExecutorEvent } from './events.js';
 import type { InteractionId, RunId, SessionId } from './ids.js';
 import type { PendingInteraction } from './interactions.js';
+import type { RunTrace } from './trace.js';
 
 /** What an executor supports, so the runtime never pretends it can pause or resume (brief §7.5). */
 export interface ExecutorFeatures {
@@ -26,11 +27,16 @@ export interface RunRequest {
   readonly command: RunCommand;
   /** Cooperative cancellation; it cannot preempt synchronous code (brief §6.2). */
   readonly signal: AbortSignal;
+  readonly trace: RunTrace;
 }
 
 /** An agent that an executor has prepared (brief §7.5). */
 export interface ExecutorAgent {
-  /** Streams events until the run waits for input, ends, or the signal aborts. */
+  /**
+   * Completes only when the engine has settled, including checkpoint writes after an abort.
+   * Core keeps draining after cancellation and never calls the iterator's return().
+   * Core alone bounds settlement waits; executors must not add their own timeout.
+   */
   run(request: RunRequest): AsyncIterable<ExecutorEvent>;
   /** Reads the pending interaction from committed state (ADR-0004); undefined when nothing is pending. */
   pending(sessionId: SessionId): Promise<PendingInteraction | undefined>;
@@ -41,12 +47,16 @@ export interface ExecutorAgent {
 /**
  * An engine adapter (brief §7.5, ADR-0001). `Agent` and `Services` are executor-specific: for
  * LangGraph, a graph factory and the LangChain models, tools and checkpointer the host injects
- * (brief §7.3). Draft until the Spike A report.
+ * (brief §7.3).
  */
 export interface ExecutorAdapter<Agent, Services> {
   readonly id: string;
   readonly version: string;
   readonly features: ExecutorFeatures;
-  /** Checks compatibility and builds the agent; rejects with `unsupported` rather than failing later. */
-  prepare(agent: Agent, services: Services): Promise<ExecutorAgent>;
+  /** Malformed agent/services reject with `invalid`; incompatible versions/features with `unsupported`. */
+  prepare(
+    agent: Agent,
+    services: Services,
+    options: { readonly signal: AbortSignal },
+  ): Promise<ExecutorAgent>;
 }

@@ -18,7 +18,13 @@ export {
   type InputOf,
 } from './definition.js';
 export { EFFECT_TRANSITIONS, type EffectState } from './effects.js';
-export { type ErrorCode, type ErrorInfo, GalaxieError } from './errors.js';
+export {
+  type ErrorCode,
+  type ErrorInfo,
+  GalaxieError,
+  isGalaxieError,
+  toErrorInfo,
+} from './errors.js';
 export type { ExecutorEvent, RunEvent } from './events.js';
 export type {
   ExecutorAdapter,
@@ -71,3 +77,4 @@ export type {
   FieldAnnotation,
 } from './policy.js';
 export type { Infer, InferInput, Schema } from './schema.js';
+export type { RunTrace, TraceHandle, TraceResult, TraceStep } from './trace.js';

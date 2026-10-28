@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { ErrorInfo } from './errors.js';
+import type { RunEvent } from './events.js';
 import type { InstanceId, RunId } from './ids.js';
 import type { DispatchReceipt, PendingInteraction, UserInteractionEvent } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
@@ -20,6 +21,7 @@ export interface RunSnapshot {
 export interface AgentSnapshot<View> {
   readonly instanceId: InstanceId;
   readonly state: InstanceState;
+  readonly prepareError?: ErrorInfo;
   readonly run?: RunSnapshot;
   /** The agent's public projection of its state. */
   readonly view?: View;
@@ -37,11 +39,13 @@ export interface AgentInstance<Input, View> {
   readonly instanceId: InstanceId;
   /** Downloads and device access go through host policy and consent. */
   prepare(): Promise<void>;
-  /** Resolves once the run is accepted. It never waits for the user. */
+  /** Claims the slot synchronously; resolves when queued after validation, before executor events. */
   start(input: Input): Promise<{ readonly runId: RunId }>;
   /** Checks the event against the pending interrupt, then records it in the submission inbox (ADR-0004). */
   dispatch(event: UserInteractionEvent): Promise<DispatchReceipt>;
   cancel(runId: RunId): Promise<CancelReceipt>;
+  /** Replays then follows the current run; a stale ID rejects the first next(). Break detaches the consumer. */
+  events(runId: RunId): AsyncIterable<RunEvent>;
   /** Returns the same object until something changes, as `useSyncExternalStore` requires. */
   getSnapshot(): AgentSnapshot<View>;
   subscribe(listener: () => void): () => void;
