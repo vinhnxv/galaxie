@@ -139,6 +139,7 @@ test.each([true, false])(
     });
     expect(parentBodies).toBe(2);
     expect(writes).toHaveLength(withRecovery ? 1 : 2);
+    expect(writes[0]?.effectId).not.toBe(writes[1]?.effectId);
     expect(receipts).toEqual([{ saved: true }, { saved: true }]);
     if (withRecovery) {
       expect(journalReads.mock.calls.map(([, effectId]) => effectId)).toEqual([
@@ -150,6 +151,6 @@ test.each([true, false])(
           status: 'succeeded',
           output: { saved: true },
         });
-    } else expect(writes[0]?.effectId).not.toBe(writes[1]?.effectId);
+    }
   },
 );
