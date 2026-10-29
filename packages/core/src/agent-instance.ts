@@ -297,6 +297,23 @@ export function createAgentInstance(
       return toErrorInfo('unsupported');
     return undefined;
   };
+  const validateSubmission = (
+    run: RunRecord,
+    pending: PendingInteraction,
+    action: string,
+    raw: unknown,
+  ): { readonly payload: unknown; readonly schema: StandardSchema | undefined } => {
+    if (typeof action !== 'string' || action.length === 0)
+      throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+    const actions = options.ui?.components[pending.component]?.actions;
+    if (options.ui !== undefined && (actions === undefined || !Object.hasOwn(actions, action)))
+      throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+    const payload: unknown = JSON.parse(run.budget.payload(raw));
+    const schema = actions?.[action]?.payload;
+    if (schema !== undefined && !validateSync(schema, payload).ok)
+      throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+    return { payload, schema };
+  };
   const acceptEvent = (
     run: RunRecord,
     segment: SegmentRecord,
@@ -675,6 +692,7 @@ export function createAgentInstance(
         return Promise.reject(error);
       }
       claimingSlot = true;
+      const parent = context.active();
       const restoring = (async () => {
         let restored: RunRecord;
         try {
@@ -685,11 +703,24 @@ export function createAgentInstance(
             report({ kind: 'restore_failed', error });
             throw new GalaxieError('executor_error', toErrorInfo('executor_error').message);
           }
-          let submissions: ReturnType<typeof validateSubmissions> = [];
-          if (options.recovery !== undefined) {
+          assertUsable();
+          const inbox = new Map<InteractionId, InboxEntry>();
+          const recovery = options.recovery;
+          if (recovery !== undefined) {
             try {
-              submissions = validateSubmissions(await options.recovery.submissions(sessionId));
+              const submissions = validateSubmissions(await recovery.submissions(sessionId));
+              assertUsable();
+              for (const saved of submissions) {
+                const entry: InboxEntry = { ...saved };
+                if (entry.status === 'accepted' && entry.interactionId !== pending?.interactionId) {
+                  await recovery.consumeSubmission(sessionId, entry.interactionId);
+                  entry.status = 'consumed';
+                  assertUsable();
+                }
+                inbox.set(entry.interactionId, entry);
+              }
             } catch (error) {
+              if (disposing) assertUsable();
               report({ kind: 'restore_failed', error });
               const code =
                 isGalaxieError(error) && error.code === 'unrecoverable'
@@ -716,12 +747,37 @@ export function createAgentInstance(
             grants,
             events: new RunEvents(runId),
             budget: new RunBudget(instrumentation.limits),
-            inbox: new Map(submissions.map((entry) => [entry.interactionId, { ...entry }])),
+            inbox,
             status: 'waiting_input',
             pending,
           };
-          run.events.append({ type: 'interaction', interaction: pending });
-          current = run;
+          const submission = inbox.get(pending.interactionId);
+          if (submission?.status === 'accepted') {
+            let checked: ReturnType<typeof validateSubmission>;
+            try {
+              checked = validateSubmission(run, pending, submission.action, submission.payload);
+            } catch (error) {
+              const code = isGalaxieError(error) ? error.code : 'invalid';
+              throw new GalaxieError(code, toErrorInfo(code).message);
+            }
+            if (checked.schema !== undefined) labelPayload(run, checked.schema, checked.payload);
+            run.status = 'running';
+            delete run.pending;
+            current = run;
+            startSegment(
+              run,
+              {
+                type: 'resume',
+                interactionId: submission.interactionId,
+                action: submission.action,
+                payload: checked.payload,
+              },
+              parent,
+            );
+          } else {
+            run.events.append({ type: 'interaction', interaction: pending });
+            current = run;
+          }
           restored = run;
         } finally {
           claimingSlot = false;
@@ -763,20 +819,13 @@ export function createAgentInstance(
         return Promise.resolve(rejected('stale'));
       if (!adapter.features.resume) return Promise.resolve(rejected('unsupported'));
       const action = event.action;
-      if (typeof action !== 'string' || action.length === 0)
-        return Promise.resolve(rejected('invalid'));
-      const actions = options.ui?.components[pending.component]?.actions;
-      if (options.ui !== undefined && (actions === undefined || !Object.hasOwn(actions, action)))
-        return Promise.resolve(rejected('invalid'));
-      let payload: unknown;
+      let checked: ReturnType<typeof validateSubmission>;
       try {
-        payload = JSON.parse(run.budget.payload(event.payload));
+        checked = validateSubmission(run, pending, action, event.payload);
       } catch (error) {
         return Promise.resolve(rejected(isGalaxieError(error) ? error.code : 'invalid'));
       }
-      const payloadSchema = actions?.[action]?.payload;
-      if (payloadSchema !== undefined && !validateSync(payloadSchema, payload).ok)
-        return Promise.resolve(rejected('invalid'));
+      const { payload, schema: payloadSchema } = checked;
       const parent = context.active();
       run.dispatching = interactionId;
       const checking = (async (): Promise<DispatchReceipt> => {

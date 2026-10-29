@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { expect, test, vi } from 'vitest';
+import { z } from 'zod';
 import {
+  type CreateOptions,
   createRuntime,
   type DiagnosticEvent,
+  galaxieField,
   type InteractionId,
   type PendingInteraction,
   type RecoverySubmission,
@@ -14,7 +17,14 @@ import {
   type ViewRevision,
 } from '../src/index.js';
 import { copyRecoveryJson, validateEffectRecord, validateSubmissions } from '../src/recovery.js';
-import { deferred, definition, FakeExecutor, flush, type Script } from './fake-executor.js';
+import {
+  binding,
+  deferred,
+  definition,
+  FakeExecutor,
+  flush,
+  type Script,
+} from './fake-executor.js';
 import { MemoryRecoveryStore } from './support/memory-recovery-store.js';
 
 const interaction: PendingInteraction = {
@@ -324,4 +334,402 @@ test('restore validates returned records before publishing a run', async () => {
   });
   expect(instance.getSnapshot().run).toBeUndefined();
   await runtime.dispose();
+});
+
+async function restoreFixture(
+  store: MemoryRecoveryStore,
+  sessionId: SessionId,
+  pending: PendingInteraction | undefined = interaction,
+  script: Script = [{ type: 'output', output: 'done' }],
+  options: Partial<CreateOptions> = {},
+) {
+  const executor = new FakeExecutor([script]);
+  Object.assign(executor.features, { resume: true, checkpoints: true });
+  executor.agent.pending = async () => pending;
+  const diagnostics: DiagnosticEvent[] = [];
+  const runtime = createRuntime({
+    appId: 'recovery-tests',
+    executors: [executor],
+    diagnostics: (event) => diagnostics.push(event),
+  });
+  const instance = await runtime.create(definition, {
+    principalScope: 'user',
+    agent: {},
+    sessionId,
+    recovery: store,
+    ...options,
+  });
+  await instance.prepare();
+  return { runtime, instance, executor, diagnostics };
+}
+
+test('restore automatically resumes an accepted answer without publishing its pending UI', async () => {
+  const store = new MemoryRecoveryStore();
+  const sessionId = crypto.randomUUID() as SessionId;
+  await store.acceptSubmission(sessionId, {
+    interactionId: interaction.interactionId,
+    action: 'submit',
+    payload: { answer: 'stored private answer' },
+  });
+  const gate = deferred<void>();
+  const fixture = await restoreFixture(store, sessionId, interaction, [
+    { wait: gate.promise },
+    { type: 'output', output: 'done' },
+  ]);
+  const snapshots: unknown[] = [];
+  fixture.instance.subscribe(() => snapshots.push(fixture.instance.getSnapshot()));
+  const restored = await fixture.instance.restore();
+  expect(restored).toBeDefined();
+  expect(fixture.instance.getSnapshot().run).toMatchObject({
+    status: 'running',
+    submission: { interactionId: interaction.interactionId, status: 'accepted' },
+  });
+  expect(fixture.instance.getSnapshot().run?.pending).toBeUndefined();
+  await flush();
+  expect(fixture.executor.requests).toHaveLength(1);
+  expect(fixture.executor.requests[0]?.command).toEqual({
+    type: 'resume',
+    interactionId: interaction.interactionId,
+    action: 'submit',
+    payload: { answer: 'stored private answer' },
+  });
+  expect(JSON.stringify(snapshots)).not.toContain('stored private answer');
+  expect(
+    snapshots.every((snapshot) => !(snapshot as { run?: { pending?: unknown } }).run?.pending),
+  ).toBe(true);
+  gate.resolve();
+  await flush();
+  expect(fixture.instance.getSnapshot().run?.status).toBe('succeeded');
+  expect((await store.submissions(sessionId))[0]?.status).toBe('consumed');
+  await fixture.runtime.dispose();
+});
+
+test.each([true, false])(
+  'restore consumes resolved accepted entries before publication: pending=%s',
+  async (hasPending) => {
+    const store = new MemoryRecoveryStore();
+    const sessionId = crypto.randomUUID() as SessionId;
+    await store.acceptSubmission(sessionId, {
+      interactionId: 'resolved' as InteractionId,
+      action: 'submit',
+      payload: 'answer',
+    });
+    const gate = deferred<void>();
+    const consuming = deferred<void>();
+    const consume = store.consumeSubmission.bind(store);
+    store.consumeSubmission = async (...args) => {
+      consuming.resolve();
+      await gate.promise;
+      await consume(...args);
+    };
+    const fixture = await restoreFixture(store, sessionId, hasPending ? interaction : undefined);
+    if (!hasPending) fixture.executor.agent.pending = async () => undefined;
+    const published = vi.fn();
+    fixture.instance.subscribe(published);
+    const restoring = fixture.instance.restore();
+    await consuming.promise;
+    expect(published).not.toHaveBeenCalled();
+    expect(fixture.instance.getSnapshot().run).toBeUndefined();
+    gate.resolve();
+    const result = await restoring;
+    if (hasPending) {
+      expect(result).toBeDefined();
+      expect(fixture.instance.getSnapshot().run?.pending).toEqual(interaction);
+    } else expect(result).toBeUndefined();
+    expect((await store.submissions(sessionId))[0]?.status).toBe('consumed');
+    expect(fixture.executor.requests).toHaveLength(0);
+    await fixture.runtime.dispose();
+  },
+);
+
+test('a crash before durable acceptance restores the interrupt and submits once', async () => {
+  const store = new MemoryRecoveryStore();
+  const entered = deferred<void>();
+  const gate = deferred<void>();
+  const accept = store.acceptSubmission.bind(store);
+  store.acceptSubmission = async () => {
+    entered.resolve();
+    await gate.promise;
+    throw new Error('aborted transaction');
+  };
+  const first = await waiting(store);
+  const submitting = first.instance.dispatch(first.event);
+  await entered.promise;
+  const disposal = first.runtime.dispose();
+  gate.resolve();
+  await submitting;
+  await disposal;
+  expect(store.inbox.size).toBe(0);
+  store.acceptSubmission = accept;
+  const second = await restoreFixture(store, first.instance.sessionId);
+  const restored = await second.instance.restore();
+  expect(second.instance.getSnapshot().run?.status).toBe('waiting_input');
+  expect(
+    await second.instance.dispatch({
+      ...first.event,
+      instanceId: second.instance.instanceId,
+      runId: restored?.runId as UserInteractionEvent['runId'],
+    }),
+  ).toMatchObject({ status: 'accepted' });
+  await flush();
+  expect(second.executor.requests).toHaveLength(1);
+  expect(second.instance.getSnapshot().run?.status).toBe('succeeded');
+  await second.runtime.dispose();
+});
+
+test('a crash after acceptance restores and applies the stored answer once', async () => {
+  const store = new MemoryRecoveryStore();
+  const accepted = deferred<void>();
+  const gate = deferred<void>();
+  const accept = store.acceptSubmission.bind(store);
+  store.acceptSubmission = async (...args) => {
+    const result = await accept(...args);
+    accepted.resolve();
+    await gate.promise;
+    return result;
+  };
+  const first = await waiting(store);
+  const submitting = first.instance.dispatch(first.event);
+  await accepted.promise;
+  const disposal = first.runtime.dispose();
+  gate.resolve();
+  expect(await submitting).toMatchObject({ status: 'rejected', error: { code: 'stale' } });
+  await disposal;
+  let applied = 0;
+  const second = await restoreFixture(
+    store,
+    first.instance.sessionId,
+    interaction,
+    async function* () {
+      applied++;
+      yield { type: 'output', output: 'done' };
+    },
+  );
+  await second.instance.restore();
+  await flush();
+  expect(applied).toBe(1);
+  expect(second.executor.requests[0]?.command).toMatchObject({ payload: first.event.payload });
+  expect((await store.submissions(first.instance.sessionId))[0]?.status).toBe('consumed');
+  await second.runtime.dispose();
+});
+
+test('a crash after the resume checkpoint reconciles consumption without resuming again', async () => {
+  const store = new MemoryRecoveryStore();
+  const consuming = deferred<void>();
+  const gate = deferred<void>();
+  const consume = store.consumeSubmission.bind(store);
+  store.consumeSubmission = async () => {
+    consuming.resolve();
+    await gate.promise;
+    throw new Error('aborted transaction');
+  };
+  const first = await waiting(store);
+  await first.instance.dispatch(first.event);
+  await consuming.promise;
+  const disposal = first.runtime.dispose();
+  gate.resolve();
+  await disposal;
+  expect((await store.submissions(first.instance.sessionId))[0]?.status).toBe('accepted');
+  store.consumeSubmission = consume;
+  const second = await restoreFixture(store, first.instance.sessionId);
+  second.executor.agent.pending = async () => undefined;
+  expect(await second.instance.restore()).toBeUndefined();
+  expect(second.executor.requests).toHaveLength(0);
+  expect((await store.submissions(first.instance.sessionId))[0]?.status).toBe('consumed');
+  await second.runtime.dispose();
+});
+
+test('a crash after consumption keeps the receipt and has nothing to resume', async () => {
+  const first = await waiting();
+  await first.instance.dispatch(first.event);
+  await flush();
+  await first.runtime.dispose();
+  const second = await restoreFixture(first.store, first.instance.sessionId);
+  second.executor.agent.pending = async () => undefined;
+  expect(await second.instance.restore()).toBeUndefined();
+  expect(second.executor.requests).toHaveLength(0);
+  expect(
+    await first.store.acceptSubmission(first.instance.sessionId, {
+      interactionId: interaction.interactionId,
+      action: 'submit',
+      payload: 'replacement',
+    }),
+  ).toBe('duplicate');
+  await second.runtime.dispose();
+});
+
+test('a failed resume remains accepted and a later restore resumes it once', async () => {
+  const first = await waiting(new MemoryRecoveryStore(), [
+    { type: 'error', error: toErrorInfo('executor_error') },
+  ]);
+  await first.instance.dispatch(first.event);
+  await flush();
+  expect(first.instance.getSnapshot().run?.status).toBe('failed');
+  await first.runtime.dispose();
+  const second = await restoreFixture(first.store, first.instance.sessionId);
+  await second.instance.restore();
+  await flush();
+  expect(second.executor.requests).toHaveLength(1);
+  expect(second.executor.requests[0]?.command).toMatchObject({ payload: first.event.payload });
+  expect(second.instance.getSnapshot().run?.status).toBe('succeeded');
+  await second.runtime.dispose();
+});
+
+test.each(['action', 'payload', 'url', 'component'] as const)(
+  'automatic resume repeats live %s checks before publishing a run',
+  async (failure) => {
+    const store = new MemoryRecoveryStore();
+    const sessionId = crypto.randomUUID() as SessionId;
+    await store.acceptSubmission(sessionId, {
+      interactionId: interaction.interactionId,
+      action: failure === 'action' ? 'unknown' : 'submit',
+      payload: failure === 'payload' ? false : 'private answer',
+    });
+    const fixture = await restoreFixture(
+      store,
+      sessionId,
+      {
+        ...interaction,
+        props: failure === 'url' ? { url: 'https://denied.example/private' } : {},
+      },
+      undefined,
+      {
+        ui: {
+          components:
+            failure === 'component'
+              ? {}
+              : {
+                  'tests.Question/v1': { actions: { submit: { payload: z.string() } } },
+                },
+          surfaces: ['main'],
+        },
+      },
+    );
+    await expect(fixture.instance.restore()).rejects.toMatchObject({
+      code: failure === 'url' ? 'denied' : failure === 'component' ? 'unsupported' : 'invalid',
+    });
+    expect(fixture.instance.getSnapshot().run).toBeUndefined();
+    expect(fixture.executor.requests).toHaveLength(0);
+    expect((await store.submissions(sessionId))[0]?.status).toBe('accepted');
+    await fixture.runtime.dispose();
+  },
+);
+
+test('disposal during reconciliation never publishes or starts a restored run', async () => {
+  const store = new MemoryRecoveryStore();
+  const sessionId = crypto.randomUUID() as SessionId;
+  await store.acceptSubmission(sessionId, {
+    interactionId: 'resolved' as InteractionId,
+    action: 'submit',
+    payload: 'answer',
+  });
+  const gate = deferred<void>();
+  const consuming = deferred<void>();
+  const consume = store.consumeSubmission.bind(store);
+  store.consumeSubmission = async (...args) => {
+    consuming.resolve();
+    await gate.promise;
+    await consume(...args);
+  };
+  const fixture = await restoreFixture(store, sessionId);
+  const restoring = fixture.instance.restore();
+  const rejected = expect(restoring).rejects.toMatchObject({ code: 'invalid' });
+  await consuming.promise;
+  const disposal = fixture.runtime.dispose();
+  gate.resolve();
+  await rejected;
+  await disposal;
+  expect(fixture.instance.getSnapshot().run).toBeUndefined();
+  expect(fixture.executor.requests).toHaveLength(0);
+});
+
+test('automatic resume restores schema-labelled private strings before capability access', async () => {
+  const store = new MemoryRecoveryStore();
+  const sessionId = crypto.randomUUID() as SessionId;
+  await store.acceptSubmission(sessionId, {
+    interactionId: interaction.interactionId,
+    action: 'submit',
+    payload: { answer: 'private answer' },
+  });
+  const invoke = vi.fn(async () => 'done');
+  let failure: unknown;
+  const executor = new FakeExecutor([
+    async function* (request) {
+      try {
+        await request.capabilities.call('send@1', 'private answer');
+      } catch (error) {
+        failure = error;
+      }
+      yield { type: 'output', output: 'done' };
+    },
+  ]);
+  Object.assign(executor.features, { resume: true, checkpoints: true });
+  executor.agent.pending = async () => interaction;
+  const runtime = createRuntime({ appId: 'recovery-tests', executors: [executor] });
+  const instance = await runtime.create(
+    {
+      ...definition,
+      capabilities: {
+        optional: {
+          'send@1': { kind: 'read', input: z.enum(['private answer']), output: z.string() },
+        },
+      },
+    },
+    {
+      principalScope: 'user',
+      agent: {},
+      sessionId,
+      recovery: store,
+      ui: {
+        components: {
+          'tests.Question/v1': {
+            actions: {
+              submit: {
+                payload: z.object({
+                  answer: z
+                    .string()
+                    .meta(galaxieField({ label: 'private-user', shape: 'freeText' })),
+                }),
+              },
+            },
+          },
+        },
+        surfaces: ['main'],
+      },
+      bindings: { 'send@1': { ...binding({ destination: 'host-server' }), invoke } },
+    },
+  );
+  await instance.prepare();
+  await instance.restore();
+  await flush();
+  expect(failure).toMatchObject({ code: 'denied' });
+  expect(invoke).not.toHaveBeenCalled();
+  expect(instance.getSnapshot().run?.status).toBe('succeeded');
+  await runtime.dispose();
+});
+
+test('reconciliation store failure preserves the accepted entry and leaves restore retryable', async () => {
+  const store = new MemoryRecoveryStore();
+  const sessionId = crypto.randomUUID() as SessionId;
+  await store.acceptSubmission(sessionId, {
+    interactionId: 'resolved' as InteractionId,
+    action: 'submit',
+    payload: 'private answer',
+  });
+  const consume = vi
+    .spyOn(store, 'consumeSubmission')
+    .mockRejectedValueOnce(new Error('private failure'));
+  const fixture = await restoreFixture(store, sessionId);
+  await expect(fixture.instance.restore()).rejects.toMatchObject({
+    code: 'unavailable',
+    message: 'The requested service is unavailable.',
+  });
+  expect(fixture.instance.getSnapshot().run).toBeUndefined();
+  expect((await store.submissions(sessionId))[0]?.status).toBe('accepted');
+  expect(fixture.diagnostics).toContainEqual(expect.objectContaining({ kind: 'restore_failed' }));
+  consume.mockRestore();
+  await fixture.instance.restore();
+  expect(fixture.instance.getSnapshot().run?.status).toBe('waiting_input');
+  expect((await store.submissions(sessionId))[0]?.status).toBe('consumed');
+  await fixture.runtime.dispose();
 });
