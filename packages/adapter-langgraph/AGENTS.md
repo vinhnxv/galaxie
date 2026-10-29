@@ -34,6 +34,12 @@ The role and provider must already be declared and bound by the host.
   `host.capabilities.call(name, input, config)`.
 - Put side effects after interrupts: resuming can re-execute the node prefix.
 - Preserve native stream behavior; the host must project display data separately.
+- Routed `withStructuredOutput` repairs only when the host opts in per role.
+  Forward caller config, `jsonSchema` and the one-based `repairAttempt` through
+  ordinary routing. Use the original messages, the last invalid reply and the
+  fixed instruction; never include validator text. Preserve both repair limits.
+- `includeRaw` retains the last reply with `parsed: null` only on fixed `invalid`
+  failures. Budget failures and cancellation propagate without another dispatch.
 
 ## Never
 

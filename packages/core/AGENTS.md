@@ -37,6 +37,9 @@ const runtime = createRuntime({
 - Dispose instances on logout and ownership loss; compose ownership explicitly.
 - Keep errors fixed and content-free; keep raw `DiagnosticEvent.error` host-only
   and never forward it where `private-user` data may not go.
+- Opt into routed structured-output repair per role with `ModelRoute.repairAttempts`
+  (default `0`). Core validates the one-based claim before routing side effects and
+  consumes the shared run repair budget (default `2`) before ordinary selection.
 
 ## Never
 
@@ -50,6 +53,9 @@ const runtime = createRuntime({
 
 Trusted bundled agent code and same-origin scripts can bypass SDK paths.
 Token limits are reservations; actual overruns are detected after a call.
+Repair calls also reserve tokens and cost and recheck labels, consent and output
+safety; they charge neither graph steps nor capability calls. A route may reselect
+a different provider for repair. Direct provider calls do not inherit repair.
 Recovery cannot reconcile an unknown remote outcome automatically.
 Span text is off by default; the development opt-in follows live labels and
 the declared final destination. See [the baseline](../../docs/adr/0012-security-baseline.md).

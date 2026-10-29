@@ -15,7 +15,7 @@ evidence, with the maintainer's decision pending.
 ## Models and providers
 
 - Router token reservations do not set per-call provider output caps, which remain deferred even though WebLLM and OpenAI-compatible providers have their own output-limit options ([model contract](system-design.md#84-a-model-call)).
-- SDK-supplied download-consent UI and automatic output-repair attempts remain unimplemented; hosts supply consent/download interaction and invalid structured replies fail ([provider limits](system-design.md#84-a-model-call)).
+- SDK-supplied download-consent UI remains unimplemented; hosts supply consent/download interaction. Structured-output repair is disabled by default and requires host opt-in through `ModelRoute.repairAttempts`, bounded by the shared run budget. Direct provider-level repair and real-model repair rates remain outside this slice ([provider limits](system-design.md#84-a-model-call)).
 - Cached WebLLM weights do not imply a loaded engine, and lazy routed construction still requires host preparation ([model guidance](../packages/models/AGENTS.md#limits), [model flow](system-design.md#84-a-model-call)).
 - WebLLM resets context for every queued request rather than reusing a conversation's KV cache, and worker/device failure requires a new handle, model and runtime ([model flow](system-design.md#84-a-model-call)).
 - Built-in AI is page-only, reports neither per-call token usage nor download byte size, ignores `maxTokens` and temperature, and has a browser-managed model identity that cannot be pinned ([provider contract](system-design.md#84-a-model-call)).
