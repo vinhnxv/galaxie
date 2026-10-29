@@ -22,7 +22,7 @@ import {
 } from '@langchain/langgraph-checkpoint';
 import { decode, type Envelope, encode } from './envelope.js';
 import { StorageError, type StorageErrorCode } from './errors.js';
-import { Fencing } from './fencing.js';
+import { Fencing, generation } from './fencing.js';
 import {
   type CheckpointKey,
   checkpointKey,
@@ -182,7 +182,11 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         options.appId,
         options.principalScope,
       );
-      return new IndexedDBSaver(db, options, await Fencing.open(db, options.appId));
+      return new IndexedDBSaver(
+        db,
+        options,
+        await Fencing.open(db, options.appId, options.principalScope),
+      );
     } catch (error) {
       db?.close();
       throw observeError(options.onError, error);
@@ -481,6 +485,38 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         deleteSessionRecords(tx, this.#scope, sessionId),
       );
     });
+  }
+
+  /** Wipe this principal and invalidate all open savers, including this one, without ownership. */
+  async invalidatePrincipal(): Promise<void> {
+    return storageOperation(this.#db, () =>
+      transact(
+        this.#db,
+        ['checkpoints', 'writes', 'inbox', 'journal', 'meta'],
+        'readwrite',
+        async (tx) => {
+          const next = (await generation(tx, this.#scope)) + 1;
+          if (!Number.isSafeInteger(next)) throw new StorageError('unavailable');
+          const range = prefixRange(this.#scope);
+          for (const name of ['checkpoints', 'writes', 'inbox', 'journal'])
+            await requestResult(tx.objectStore(name).delete(range));
+          const meta = tx.objectStore('meta');
+          const request = meta.openCursor(range);
+          let cursor = await requestResult(request);
+          while (cursor !== null) {
+            const key = cursor.primaryKey;
+            if (
+              !sameKey(key, [...this.#scope, 'schema']) &&
+              !sameKey(key, [...this.#scope, 'generation'])
+            )
+              await requestResult(cursor.delete());
+            cursor.continue();
+            cursor = await requestResult(request);
+          }
+          await requestResult(meta.put({ v: 1, generation: next }, [...this.#scope, 'generation']));
+        },
+      ),
+    );
   }
 
   override async deleteThread(threadId: string): Promise<void> {
