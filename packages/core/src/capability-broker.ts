@@ -52,6 +52,13 @@ export function dataPolicy(overrides: DataPolicy = {}): Policy {
 function failure(code: ErrorCode): GalaxieError {
   return new GalaxieError(code, toErrorInfo(code).message);
 }
+function storageFailure(error: unknown): ErrorCode {
+  return typeof error === 'object' &&
+    error !== null &&
+    Object.getOwnPropertyDescriptor(error, 'fenced')?.value === true
+    ? 'fenced'
+    : 'unavailable';
+}
 function canonical(value: RecoveryJson): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value !== null && typeof value === 'object')
@@ -111,9 +118,9 @@ class WriteJournal {
     let raw: unknown;
     try {
       raw = await this.#store.effect(this.#sessionId, this.effectId);
-    } catch {
+    } catch (error) {
       this.#reportFailure();
-      throw failure('unavailable');
+      throw failure(storageFailure(error));
     }
     const record = validateEffectRecord(raw);
     if (record !== undefined && record.inputDigest !== this.#inputDigest)
@@ -168,10 +175,11 @@ class WriteJournal {
       try {
         await this.#store.recordEffect(this.#sessionId, this.effectId, record);
         this.#record = record;
-      } catch {
+      } catch (error) {
         this.#storeFailed = true;
         this.#reportFailure();
-        if (!tolerateFailure) throw failure('unavailable');
+        const code = storageFailure(error);
+        if (!tolerateFailure || code === 'fenced') throw failure(code);
       }
     });
     this.#tail = next.catch(() => {});

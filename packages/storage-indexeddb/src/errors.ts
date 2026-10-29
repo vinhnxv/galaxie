@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export type StorageErrorCode =
+  | 'fenced'
   | 'invalid'
   | 'corrupt'
   | 'newer_schema'
@@ -12,6 +13,7 @@ export type StorageErrorCode =
   | 'unavailable';
 
 const messages: Record<StorageErrorCode, string> = {
+  fenced: 'Another tab took over the storage.',
   invalid: 'The storage request is invalid.',
   corrupt: 'Stored checkpoint data is corrupt.',
   newer_schema: 'The storage schema is newer than this package supports.',
@@ -25,11 +27,13 @@ const messages: Record<StorageErrorCode, string> = {
 export class StorageError extends Error {
   readonly code: StorageErrorCode;
   declare readonly unrecoverable: boolean;
+  declare readonly fenced: boolean;
 
   constructor(code: StorageErrorCode) {
     super(messages[code]);
     this.name = 'StorageError';
     this.code = code;
+    Object.defineProperty(this, 'fenced', { value: code === 'fenced', enumerable: true });
     Object.defineProperty(this, 'unrecoverable', {
       value: code === 'corrupt' || code === 'newer_schema' || code === 'superseded',
       enumerable: true,

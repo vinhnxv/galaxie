@@ -4,12 +4,14 @@
 import { createLangGraphAdapter, type LangGraphServices } from '@galaxie/adapter-langgraph';
 import {
   type AgentInstance,
+  acquireOwnership,
   type BindingsFor,
   createRuntime,
   GalaxieError,
   type ModelDescriptor,
   type ModelRouting,
   type OutputSafetyHook,
+  type OwnershipResult,
   type Runtime,
   type SessionId,
 } from '@galaxie/core';
@@ -62,6 +64,7 @@ export interface LocalHost {
   readonly progress: ReadonlyMap<string, ProgressInput>;
   getStorageStatus(): StorageStatus;
   subscribeStorage(listener: () => void): () => void;
+  acquireOwnership(takeover?: boolean): Promise<OwnershipResult>;
   deleteSession(sessionId: SessionId): Promise<void>;
   createInstance(sessionId?: SessionId): Promise<AgentInstance<TutorInput, unknown>>;
 }
@@ -129,6 +132,23 @@ export function createLocalHost(models: LocalModels): LocalHost {
     }
     return disposal;
   };
+  const openSaver = async (): Promise<IndexedDBSaver | undefined> => {
+    if (globalThis.indexedDB === undefined) return undefined;
+    saver ??= IndexedDBSaver.open({
+      appId: hostAppId,
+      principalScope: hostLearnerId,
+      onError: (code) => {
+        if (code === 'quota') observeStorage('quota');
+      },
+      onVersionChange: () => observeStorage('superseded'),
+    });
+    try {
+      return await saver;
+    } catch (error) {
+      saver = undefined;
+      throw error;
+    }
+  };
   return {
     runtime,
     registry,
@@ -139,35 +159,29 @@ export function createLocalHost(models: LocalModels): LocalHost {
       storageListeners.add(listener);
       return () => storageListeners.delete(listener);
     },
+    async acquireOwnership(takeover = false) {
+      if (disposed) throw new GalaxieError('invalid', 'The runtime was disposed.');
+      const checkpointer = await openSaver();
+      const result = await acquireOwnership({
+        appId: hostAppId,
+        takeover,
+        ...(checkpointer === undefined ? {} : { fence: checkpointer.fencing }),
+        onHandoverRequest: () => runtime.dispose(),
+      });
+      if (result.status === 'owner' && !result.ownership.signal.aborted) {
+        try {
+          await checkpointer?.sweep();
+        } catch {}
+      }
+      return result;
+    },
     async deleteSession(sessionId) {
       const checkpointer = await saver;
       await checkpointer?.deleteSession(sessionId);
     },
     async createInstance(sessionId) {
       if (disposed) throw new GalaxieError('invalid', 'The runtime was disposed.');
-      let checkpointer: IndexedDBSaver | undefined;
-      if (globalThis.indexedDB !== undefined) {
-        saver ??= IndexedDBSaver.open({
-          appId: hostAppId,
-          principalScope: hostLearnerId,
-          onError: (code) => {
-            if (code === 'quota') observeStorage('quota');
-          },
-          onVersionChange: () => observeStorage('superseded'),
-        }).then(async (opened) => {
-          // The caller holds the host's session Web Lock before opening and sweeping.
-          try {
-            await opened.sweep();
-          } catch {}
-          return opened;
-        });
-        try {
-          checkpointer = await saver;
-        } catch (error) {
-          saver = undefined;
-          throw error;
-        }
-      }
+      const checkpointer = await openSaver();
       return runtime.create(tutorDefinition, {
         principalScope: hostLearnerId,
         ...(sessionId === undefined ? {} : { sessionId }),

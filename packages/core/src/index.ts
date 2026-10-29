@@ -111,6 +111,13 @@ export type {
   PublishedModelRoute,
   SelectedModelRoute,
 } from './models.js';
+export {
+  acquireOwnership,
+  type Ownership,
+  type OwnershipLostReason,
+  type OwnershipOptions,
+  type OwnershipResult,
+} from './ownership.js';
 export type {
   ArgumentShape,
   BudgetLimits,

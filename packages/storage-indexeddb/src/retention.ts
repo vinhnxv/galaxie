@@ -3,6 +3,7 @@
 
 import { TASKS } from '@langchain/langgraph-checkpoint';
 import { StorageError } from './errors.js';
+import type { Fencing } from './fencing.js';
 import { prefixRange, validateKey } from './keys.js';
 import { requestResult, transact } from './schema.js';
 
@@ -131,17 +132,19 @@ function history(
 export async function sweep(
   db: IDBDatabase,
   scope: readonly [string, string],
+  fencing: Fencing,
   options: SweepOptions = {},
 ): Promise<SweepResult> {
   const historyMs = options.historyMs ?? 7 * day;
   const expireMs = options.expireMs ?? 30 * day;
   const now = options.now ?? storageClock.now();
   if (![historyMs, expireMs, now].every(timestamp)) throw new StorageError('invalid');
+  await fencing.write([], async () => {});
   let prunedCheckpoints = 0;
   let expiredSessions = 0;
   for (const sessionId of await sessions(db, scope)) {
     validateKey(sessionId);
-    const result = await transact(db, stores, 'readwrite', async (tx) => {
+    const result = await fencing.write(stores, async (tx) => {
       const lastActivity = activity(
         await requestResult(tx.objectStore('meta').get([...scope, 'activity', sessionId])),
       );

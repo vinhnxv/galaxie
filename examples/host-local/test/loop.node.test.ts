@@ -377,6 +377,62 @@ it('keeps a copied session inactive while another tab holds its Web Lock', async
   }
 }, 60_000);
 
+it('hands a copied lesson to Use here and leaves the former tab inert', async () => {
+  const { page, context, requests, errors, consoleErrors } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const sessionId = await page.evaluate((key) => sessionStorage.getItem(key), sessionKey);
+    const second = await context.newPage();
+    await second.addInitScript(({ key, value }) => sessionStorage.setItem(key, value), {
+      key: sessionKey,
+      value: sessionId as string,
+    });
+    await second.goto(mockOrigin);
+    await second
+      .getByRole('alert')
+      .filter({ hasText: 'The lesson is active in another tab.' })
+      .waitFor();
+    await second.setViewportSize({ width: 390, height: 844 });
+    await second.screenshot({
+      path: join(tmpdir(), 'galaxie-ownership-busy-mobile.png'),
+      fullPage: true,
+    });
+    expect(
+      await second.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    await second.getByRole('button', { name: 'Use here', exact: true }).click();
+    await page.getByRole('alert').filter({ hasText: 'The lesson moved to another tab.' }).waitFor();
+    await second.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    await page.screenshot({
+      path: join(tmpdir(), 'galaxie-ownership-moved-desktop.png'),
+      fullPage: true,
+    });
+    await second.screenshot({
+      path: join(tmpdir(), 'galaxie-ownership-active-mobile.png'),
+      fullPage: true,
+    });
+    expect(await page.getByRole('button', { name: 'Start', exact: true }).isDisabled()).toBe(true);
+    for (const input of await page.getByRole('radio').all())
+      expect(await input.isDisabled()).toBe(true);
+    expect(await second.getByRole('radio', { name: 'walk', exact: true }).isEnabled()).toBe(true);
+    await second.getByRole('radio', { name: 'walk', exact: true }).check();
+    await second.getByRole('radio', { name: 'play', exact: true }).check();
+    await second.getByRole('radio', { name: 'drinks', exact: true }).check();
+    await second.getByRole('button', { name: 'Submit answers' }).click();
+    await second.getByRole('textbox').waitFor();
+    expect(await page.getByRole('alert').textContent()).toBe('The lesson moved to another tab.');
+    expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    assertLocalRequests(requests, mockOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
 it('keeps an operationally failed session for Retry without exposing host error text', async () => {
   const { page, context, requests, errors, consoleErrors } = await observe(mockOrigin);
   try {
