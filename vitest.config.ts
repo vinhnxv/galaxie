@@ -43,6 +43,7 @@ const config: ViteUserConfig = defineConfig({
             'react',
             'react-dom/client',
             'react/jsx-runtime',
+            'react/jsx-dev-runtime',
             '@langchain/langgraph/web',
             '@langchain/core/callbacks/base',
             '@langchain/core/language_models/chat_models',

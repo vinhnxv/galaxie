@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+export { useAgentSnapshot } from './hooks.js';
 export {
   type ActionDefinition,
   type ActionDefinitions,
@@ -15,3 +16,4 @@ export {
   type ResolvedInteraction,
   type SchemaOutput,
 } from './registry.js';
+export { AgentSurface, type AgentSurfaceProps } from './surface.js';
