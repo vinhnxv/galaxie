@@ -69,11 +69,16 @@ export function App(): ReactElement {
     const dispose = (): void => {
       void current.current?.runtime.dispose().catch(() => {});
     };
+    const restorePage = (event: PageTransitionEvent): void => {
+      if (event.persisted) window.location.reload();
+    };
     window.addEventListener('pagehide', dispose);
+    window.addEventListener('pageshow', restorePage);
     mounted.current = true;
     return () => {
       mounted.current = false;
       window.removeEventListener('pagehide', dispose);
+      window.removeEventListener('pageshow', restorePage);
       dispose();
     };
   }, []);

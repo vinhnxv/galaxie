@@ -48,7 +48,6 @@ async function body(request: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
 }
 
-/** Each dev or preview server gets independent in-memory sessions and records. */
 export function backend(options: { now?: () => number } = {}): Plugin {
   const now = options.now ?? Date.now;
   let testMode = false;
@@ -183,7 +182,6 @@ export function backend(options: { now?: () => number } = {}): Plugin {
         return;
       }
       void handle(request, response, path).catch(() => {
-        // Discard parser, socket and host errors; never echo bodies or credentials.
         if (!response.headersSent) json(response, 400, { error: 'invalid' });
         else response.end();
       });

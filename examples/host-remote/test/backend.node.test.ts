@@ -132,6 +132,22 @@ it('rejects absent, unknown and expired tokens and foreign origins and hosts', a
     req.end();
   });
   expect(status).toBe(403);
+  const hostOnlyStatus = await new Promise<number | undefined>((resolve, reject) => {
+    const req = request(
+      `${origin}/api/session`,
+      {
+        method: 'POST',
+        headers: { host: `127.0.0.2:${new URL(origin).port}`, origin },
+      },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode);
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+  expect(hostOnlyStatus).toBe(403);
 });
 
 it('validates progress like the tutor schema and derives the learner from the token', async () => {

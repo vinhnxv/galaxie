@@ -246,6 +246,27 @@ it('declines quiz consent before any proxy request', async () => {
   await observed.page.getByRole('button', { name: 'Start', exact: true }).waitFor();
 }, 60_000);
 
+it('starts over after a cached history return during a pending quiz', async () => {
+  const origin = await serve();
+  const observed = await observe(origin);
+  const { page } = observed;
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.getByRole('button', { name: 'Allow', exact: true }).click();
+  await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+  await page.evaluate(() =>
+    dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })),
+  );
+  await page.evaluate(() =>
+    dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })),
+  );
+  await page.getByRole('button', { name: 'Start', exact: true }).waitFor();
+  expect(await page.getByRole('radio').count()).toBe(0);
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.getByRole('button', { name: "Don't allow", exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'The quiz needs the quiz service.' }).waitFor();
+  await assertPage(observed, origin);
+}, 60_000);
+
 it('guards preview API routes with tokens and the listening origin', async () => {
   const origin = await serve();
   const path = `${origin}/api/lessons/present-simple-1`;
@@ -273,6 +294,22 @@ it('guards preview API routes with tokens and the listening origin', async () =>
     req.end();
   });
   expect(status).toBe(403);
+  const hostOnlyStatus = await new Promise<number | undefined>((resolve, reject) => {
+    const req = request(
+      `${origin}/api/session`,
+      {
+        method: 'POST',
+        headers: { host: `127.0.0.2:${new URL(origin).port}`, origin },
+      },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode);
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+  expect(hostOnlyStatus).toBe(403);
 });
 
 it('loads default mode without real inference, weights or the test-only backend route', async () => {

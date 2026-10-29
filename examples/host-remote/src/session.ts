@@ -3,7 +3,6 @@
 
 import { GalaxieError } from '@galaxie/core';
 
-/** Tokens live only in this host's memory, shared by model and capability calls. */
 export function createSession(origin: string, now: () => number = Date.now): () => Promise<string> {
   let session: { token: string; expiresAt: number } | undefined;
   let refreshing: Promise<string> | undefined;
