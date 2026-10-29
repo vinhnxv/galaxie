@@ -72,11 +72,11 @@ it('shares a current token, renews within 60 seconds, and saves after the old to
   const { origin, now, advance } = await serve();
   const currentToken = createSession(origin, now);
   const [first, concurrent] = await Promise.all([currentToken(), currentToken()]);
-  expect(concurrent).toBe(first);
-  expect(await currentToken()).toBe(first);
+  expect(concurrent === first).toBe(true);
+  expect((await currentToken()) === first).toBe(true);
   advance(240_000);
   const renewed = await currentToken();
-  expect(renewed).not.toBe(first);
+  expect(renewed === first).toBe(false);
   advance(61_000);
   expect(
     (

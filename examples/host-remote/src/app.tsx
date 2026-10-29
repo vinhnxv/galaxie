@@ -110,7 +110,10 @@ export function App(): ReactElement {
         return;
       }
       setActive({ host, instance });
-      await instance.start({ lessonId: lessonFixture.id });
+      await instance.start(
+        { lessonId: lessonFixture.id },
+        { grants: ['lessons.get@1', 'progress.save@1'] },
+      );
     } catch {
       await host?.runtime.dispose();
       if (mounted.current) {
