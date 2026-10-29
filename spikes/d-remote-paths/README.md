@@ -8,7 +8,7 @@ Use Node 24 and the installed pnpm 11 dependencies and Playwright Chromium. From
 
 ```sh
 pnpm --dir spikes/d-remote-paths install --offline --frozen-lockfile
-node --test spikes/d-remote-paths/scripts/servers.test.ts spikes/d-remote-paths/scripts/canonical.test.ts
+node --test spikes/d-remote-paths/scripts/servers.test.ts spikes/d-remote-paths/scripts/canonical.test.ts spikes/d-remote-paths/scripts/exposure.test.ts
 pnpm --dir spikes/d-remote-paths exec tsc -p .
 pnpm --dir spikes/d-remote-paths record
 pnpm format
@@ -18,7 +18,7 @@ CI=true pnpm test
 
 Run the fixture tests and recorder sequentially: both own ports 4181–4183. The recorder starts Vite on 4180 and 4184, the proxy on 4181, the upstream on 4182 and MCP on 4183, all bound to `127.0.0.1`. It fails clearly if a port is occupied; free these ports before retrying. Every started server and the browser close in `finally`. It writes `results/<date>-headless-chromium-<version>.json`; format that JSON before committing. A normal run takes roughly two minutes because one experiment retains LangChain's default retry backoff.
 
-The browser uses a failing loopback proxy for non-loopback destinations, with a loopback bypass, and the page has a loopback-only connection CSP. Do not use Playwright request interception here: it suppressed preflights in the first characterization runs. No other hosts are used by the experiments. Dependencies and browser binaries must already be installed; the script never installs them.
+The browser uses a failing loopback proxy for non-loopback destinations, with a loopback bypass, and the page has a loopback-only connection CSP. Do not use Playwright request interception here: it suppressed preflights in the first characterization runs. The recorder disables Vite WebSockets and removes its injected development client, which otherwise attempts a WebSocket even with HMR disabled. No other hosts are used by the experiments. Dependencies and browser binaries must already be installed; the script never installs them.
 
 ## Recorded observations
 
@@ -46,6 +46,8 @@ The committed [recording](results/2026-10-29-headless-chromium-156.0.8078.4.json
 
 The `status` field records HTTP status only; `code` separately records numeric SDK/DOM error codes, including abort code 20. Raw SDK errors remain transient page-local values only long enough to inspect own data fields for credentials; the recording retains classes, numeric codes and exposed field paths. This prototype emits no runtime spans, events or snapshots and has no host diagnostic callback. It does not route raw errors into `DiagnosticEvent.error` or attach `cause` to its typed errors. M4 must retain fixed public errors and keep any permitted raw host diagnostic error in the host-only callback field, never in telemetry or serialized state.
 
+Credential inspection runs in Node over CDP response streaming: headers, initially buffered bytes and subsequent chunks are scanned without request interception. A bounded suffix detects a generated key split across chunks. This covers aborted prefixes, standing MCP streams and both page origins; an unreadable or unfinished capture fails the run. A separate Chromium boundary test deliberately returns a generated fake key in finite and aborted bodies and confirms detection. Neither the scanner key nor scanned reply bytes enter recorded observations.
+
 ## Remote model findings and M4 slice 1
 
 The observed preflight allowlist for ordinary calls is:
@@ -71,6 +73,8 @@ The exact structured request's `responseFormat` is in the recording. It contains
 The `node:http` wrapper owns CORS and OPTIONS. It permits GET, POST and DELETE; allows `authorization`, `content-type`, `mcp-session-id`, `mcp-protocol-version` and `last-event-id`; exposes `mcp-session-id`; and rejects origins before handing a request to the SDK. Generated fake 60-second bearer credentials authenticate every non-preflight MCP request. Sessions bind to a fake principal; Node checks verify that missing credentials receive 401 and another principal cannot use the session (403). The Node-only admin endpoint has a separate generated credential and rejects browser origins.
 
 The pin prototype uses SHA-256 over RFC 8785 JCS. It includes name, title, description, input/output schemas and annotations when present, following Accepted ADR-0011. Canonicalization tests cover UTF-16 key ordering, ECMAScript numbers, Unicode rejection and hash stability. Names are `mcp.lessons.lesson.lookup` and `mcp.lessons.progress.record`; dotted names belong to the fixture tools. Only a host-fixed allowlist is eligible. Approved hashes live in a page-memory map and are checked again through listing before each call. Reconnecting discards approvals. This detects definition changes, not changes to behavior behind an unchanged definition. The write tool is listed but never enabled or invoked by the recorder.
+
+`progress.record` increments a principal-scoped in-memory counter. The Node boundary test invokes it twice with a read between calls, verifies counts 1 and 2, and repeats under another principal to prove isolation. The counter disappears when the fixture process closes; no backend write occurs.
 
 The SDK accepts custom `fetch`. A pull-driven response wrapper counts bytes before handing them to the SDK and cancels the body over the cap; it does not buffer an unbounded response. The experiment uses a 1,024-byte wire cap against a 4,096-character tool response. A separate 512-byte canonical parsed-result cap rejects a 2,048-character response allowed by the 32,768-byte wire cap. Counters confirm that neither oversized result reaches delivery and that the wire-rejected result does not reach the parsed-result stage. Production needs caps per message/result plus idle timeouts, schema validation and cancellation notifications; this prototype is not that implementation.
 

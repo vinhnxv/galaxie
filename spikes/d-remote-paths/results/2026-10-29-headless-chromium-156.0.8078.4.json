@@ -1,5 +1,6 @@
 {
-  "recordedAt": "2026-10-29T10:54:39.386Z",
+  "recordedAt": "2026-10-29T11:11:39.715Z",
+  "node": "v24.15.0",
   "browser": "Headless Chromium 156.0.8078.4",
   "origins": {
     "page": "http://127.0.0.1:4180",
@@ -12,7 +13,7 @@
     {
       "name": "proxy.prefetch",
       "status": "observed",
-      "elapsedMs": 14.995208000000048,
+      "elapsedMs": 14.624458000000004,
       "details": {
         "completed": true,
         "usage": 7,
@@ -23,14 +24,14 @@
     {
       "name": "proxy.cors",
       "status": "observed",
-      "elapsedMs": 0.04508299999997689,
+      "elapsedMs": 0.038291999999955806,
       "details": {
         "preflights": [
           {
             "server": "proxy",
             "method": "OPTIONS",
             "path": "/v1/chat/completions",
-            "at": 1793271184115,
+            "at": 1793272195194,
             "headers": {
               "host": "127.0.0.1:4181",
               "connection": "keep-alive",
@@ -79,23 +80,23 @@
     {
       "name": "proxy.stream",
       "status": "observed",
-      "elapsedMs": 5.704707999999982,
+      "elapsedMs": 5.8180830000000014,
       "details": {
         "chunks": 4,
         "usage": true,
         "abortAt": null,
         "error": null,
-        "elapsedMs": 3.6000001430511475
+        "elapsedMs": 3.6999998092651367
       }
     },
     {
       "name": "proxy.abort",
       "status": "observed",
-      "elapsedMs": 17.025250000000028,
+      "elapsedMs": 17.621249999999918,
       "details": {
         "chunks": 1,
         "usage": false,
-        "abortAt": 1793271184134,
+        "abortAt": 1793272195213,
         "error": {
           "errorClass": "DOMException",
           "status": null,
@@ -110,7 +111,7 @@
     {
       "name": "proxy.error.401",
       "status": "observed",
-      "elapsedMs": 5.069582999999966,
+      "elapsedMs": 4.912417000000005,
       "details": {
         "completed": false,
         "error": {
@@ -122,13 +123,13 @@
         },
         "supplierAt": [],
         "callsAfterConstruction": 0,
-        "elapsedMs": 2.700000047683716
+        "elapsedMs": 2.5999999046325684
       }
     },
     {
       "name": "proxy.error.429",
       "status": "observed",
-      "elapsedMs": 3.5681660000000193,
+      "elapsedMs": 3.5646659999999883,
       "details": {
         "completed": false,
         "error": {
@@ -140,13 +141,13 @@
         },
         "supplierAt": [],
         "callsAfterConstruction": 0,
-        "elapsedMs": 2.1000001430511475
+        "elapsedMs": 2.0999999046325684
       }
     },
     {
       "name": "proxy.error.500",
       "status": "observed",
-      "elapsedMs": 3.1388749999999845,
+      "elapsedMs": 3.0593750000000455,
       "details": {
         "completed": false,
         "error": {
@@ -158,13 +159,13 @@
         },
         "supplierAt": [],
         "callsAfterConstruction": 0,
-        "elapsedMs": 1.5999999046325684
+        "elapsedMs": 1.7000000476837158
       }
     },
     {
       "name": "upstream.prefetch",
       "status": "observed",
-      "elapsedMs": 1.7959170000000313,
+      "elapsedMs": 2.072125000000028,
       "details": {
         "completed": true,
         "usage": 7,
@@ -175,14 +176,14 @@
     {
       "name": "upstream.cors",
       "status": "observed",
-      "elapsedMs": 0.013792000000080407,
+      "elapsedMs": 0.01812500000005457,
       "details": {
         "preflights": [
           {
             "server": "upstream",
             "method": "OPTIONS",
             "path": "/v1/chat/completions",
-            "at": 1793271184160,
+            "at": 1793272195239,
             "headers": {
               "host": "127.0.0.1:4182",
               "connection": "keep-alive",
@@ -231,23 +232,23 @@
     {
       "name": "upstream.stream",
       "status": "observed",
-      "elapsedMs": 1.5891249999999673,
+      "elapsedMs": 1.7719580000000406,
       "details": {
         "chunks": 4,
         "usage": true,
         "abortAt": null,
         "error": null,
-        "elapsedMs": 1.0999999046325684
+        "elapsedMs": 1.2000000476837158
       }
     },
     {
       "name": "upstream.abort",
       "status": "observed",
-      "elapsedMs": 1.7721669999999676,
+      "elapsedMs": 1.607040999999981,
       "details": {
         "chunks": 1,
         "usage": false,
-        "abortAt": 1793271184164,
+        "abortAt": 1793272195243,
         "error": {
           "errorClass": "DOMException",
           "status": null,
@@ -255,14 +256,14 @@
           "credentialFree": true,
           "exposedFields": []
         },
-        "elapsedMs": 1.2000000476837158,
-        "upstreamCloseDelayMs": 0
+        "elapsedMs": 1,
+        "upstreamCloseDelayMs": 1
       }
     },
     {
       "name": "upstream.error.401",
       "status": "observed",
-      "elapsedMs": 1.672916999999984,
+      "elapsedMs": 1.6869590000000017,
       "details": {
         "completed": false,
         "error": {
@@ -274,13 +275,13 @@
         },
         "supplierAt": [],
         "callsAfterConstruction": 0,
-        "elapsedMs": 1.1999998092651367
+        "elapsedMs": 1.2000000476837158
       }
     },
     {
       "name": "upstream.error.429",
       "status": "observed",
-      "elapsedMs": 1.3191249999999854,
+      "elapsedMs": 1.3279169999999567,
       "details": {
         "completed": false,
         "error": {
@@ -292,13 +293,13 @@
         },
         "supplierAt": [],
         "callsAfterConstruction": 0,
-        "elapsedMs": 0.8000001907348633
+        "elapsedMs": 0.9000000953674316
       }
     },
     {
       "name": "upstream.error.500",
       "status": "observed",
-      "elapsedMs": 1.3745840000000271,
+      "elapsedMs": 1.3377910000000384,
       "details": {
         "completed": false,
         "error": {
@@ -310,24 +311,24 @@
         },
         "supplierAt": [],
         "callsAfterConstruction": 0,
-        "elapsedMs": 0.8999998569488525
+        "elapsedMs": 1
       }
     },
     {
       "name": "proxy.supplier",
       "status": "observed",
-      "elapsedMs": 5.831792000000064,
+      "elapsedMs": 5.844875000000002,
       "details": {
         "completed": true,
         "usage": 7,
-        "supplierAt": [0.19999980926513672, 2.299999952316284],
+        "supplierAt": [0.20000004768371582, 2.5],
         "callsAfterConstruction": 0
       }
     },
     {
       "name": "proxy.structured",
       "status": "observed",
-      "elapsedMs": 5.66862500000002,
+      "elapsedMs": 5.598250000000007,
       "details": {
         "valid": true,
         "responseFormat": {
@@ -359,7 +360,7 @@
     {
       "name": "upstream.no-cors",
       "status": "observed",
-      "elapsedMs": 1.4804169999999885,
+      "elapsedMs": 1.6621249999999463,
       "details": {
         "completed": false,
         "error": {
@@ -371,13 +372,13 @@
         },
         "supplierAt": [],
         "callsAfterConstruction": 0,
-        "elapsedMs": 1
+        "elapsedMs": 1.2000000476837158
       }
     },
     {
       "name": "proxy.expired-token",
       "status": "observed",
-      "elapsedMs": 1.3205000000000382,
+      "elapsedMs": 1.3900000000001,
       "details": {
         "completed": false,
         "error": {
@@ -395,7 +396,7 @@
     {
       "name": "mcp.initialize",
       "status": "observed",
-      "elapsedMs": 15.232458999999949,
+      "elapsedMs": 12.748749999999973,
       "details": {
         "sessionVisible": true,
         "protocolVersion": "2025-11-25"
@@ -404,7 +405,7 @@
     {
       "name": "mcp.first-seen-and-approval",
       "status": "observed",
-      "elapsedMs": 9.425665999999978,
+      "elapsedMs": 9.756792000000019,
       "details": {
         "before": [
           {
@@ -449,7 +450,7 @@
     {
       "name": "mcp.changed-definition",
       "status": "observed",
-      "elapsedMs": 6.352457999999956,
+      "elapsedMs": 7.197291999999948,
       "details": {
         "changed": [
           {
@@ -482,7 +483,7 @@
     {
       "name": "mcp.parsed-limit",
       "status": "observed",
-      "elapsedMs": 3.1079590000000508,
+      "elapsedMs": 3.6264999999999645,
       "details": {
         "result": {
           "completed": false,
@@ -511,7 +512,7 @@
     {
       "name": "mcp.wire-limit",
       "status": "observed",
-      "elapsedMs": 3009.2737500000003,
+      "elapsedMs": 3010.737875,
       "details": {
         "result": {
           "completed": false,
@@ -541,7 +542,7 @@
     {
       "name": "mcp.sampling-rejected",
       "status": "observed",
-      "elapsedMs": 8.957332999999835,
+      "elapsedMs": 8.319124999999985,
       "details": {
         "clientCapabilities": {},
         "result": {
@@ -560,7 +561,7 @@
     {
       "name": "mcp.session-404",
       "status": "observed",
-      "elapsedMs": 9.626582999999755,
+      "elapsedMs": 10.178292000000056,
       "details": {
         "result": {
           "completed": false,
@@ -599,7 +600,7 @@
     {
       "name": "proxy.denied-origin",
       "status": "observed",
-      "elapsedMs": 2.6013339999999516,
+      "elapsedMs": 2.5758749999999964,
       "details": {
         "browser": {
           "status": null,
@@ -611,7 +612,7 @@
     {
       "name": "mcp.denied-origin",
       "status": "observed",
-      "elapsedMs": 3.6098330000004353,
+      "elapsedMs": 3.513582999999926,
       "details": {
         "browser": {
           "status": null,
@@ -623,7 +624,7 @@
     {
       "name": "proxy.default-retries",
       "status": "observed",
-      "elapsedMs": 91746.118,
+      "elapsedMs": 100971.624417,
       "details": {
         "completed": false,
         "error": {
@@ -634,20 +635,20 @@
           "exposedFields": []
         },
         "supplierAt": [
-          0.20000004768371582, 1249.2999999523163, 3407.7999999523163, 9843.600000143051,
-          23274.200000047684, 51078.799999952316, 91736.90000009537
+          0.20000004768371582, 1466.7999999523163, 3833.2000000476837, 8165.799999952316,
+          19177.099999904633, 41220, 100957.09999990463
         ],
         "callsAfterConstruction": 0,
-        "elapsedMs": 91743.79999995232,
+        "elapsedMs": 100969.40000009537,
         "attempts": 7,
         "retryCount": 6,
-        "backoffMs": [1251, 2159, 6438, 13427, 27810, 40655]
+        "backoffMs": [1468, 2367, 4334, 11013, 22075, 59710]
       }
     },
     {
       "name": "credentials.exposure",
       "status": "passed",
-      "elapsedMs": 0.040166999999200925,
+      "elapsedMs": 0.07095900000422262,
       "details": {
         "upstreamKeyAbsentFromPage": true,
         "browserTokenNotForwarded": true,
@@ -659,7 +660,7 @@
     {
       "name": "bundle.cost",
       "status": "observed",
-      "elapsedMs": 177.0839580000029,
+      "elapsedMs": 200.94512499999837,
       "details": [
         {
           "entry": "index.html",
@@ -714,7 +715,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184106,
+      "at": 1793272195187,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -736,7 +737,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184110,
+      "at": 1793272195189,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -758,7 +759,7 @@
       "server": "proxy",
       "method": "OPTIONS",
       "path": "/v1/chat/completions",
-      "at": 1793271184115,
+      "at": 1793272195194,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -778,7 +779,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184115,
+      "at": 1793272195194,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -809,7 +810,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184121,
+      "at": 1793272195200,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -829,7 +830,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184125,
+      "at": 1793272195204,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -851,7 +852,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184127,
+      "at": 1793272195206,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -882,7 +883,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184127,
+      "at": 1793272195206,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -902,7 +903,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184131,
+      "at": 1793272195210,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -924,7 +925,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184133,
+      "at": 1793272195212,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -955,7 +956,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184133,
+      "at": 1793272195212,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -970,13 +971,13 @@
       },
       "model": "slow",
       "includeUsage": true,
-      "closedAt": 1793271184136
+      "closedAt": 1793272195215
     },
     {
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184148,
+      "at": 1793272195228,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -998,7 +999,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184150,
+      "at": 1793272195229,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1029,7 +1030,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184151,
+      "at": 1793272195230,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1049,7 +1050,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184153,
+      "at": 1793272195232,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1071,7 +1072,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184154,
+      "at": 1793272195234,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1102,7 +1103,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184155,
+      "at": 1793272195234,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1122,7 +1123,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184156,
+      "at": 1793272195236,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1144,7 +1145,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184158,
+      "at": 1793272195237,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1175,7 +1176,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184158,
+      "at": 1793272195237,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1195,7 +1196,7 @@
       "server": "upstream",
       "method": "OPTIONS",
       "path": "/v1/chat/completions",
-      "at": 1793271184160,
+      "at": 1793272195239,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1215,7 +1216,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184160,
+      "at": 1793272195240,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1248,7 +1249,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184162,
+      "at": 1793272195241,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1281,7 +1282,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184163,
+      "at": 1793272195243,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1309,13 +1310,13 @@
       },
       "model": "slow",
       "includeUsage": true,
-      "closedAt": 1793271184164
+      "closedAt": 1793272195244
     },
     {
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184165,
+      "at": 1793272195245,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1348,7 +1349,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184167,
+      "at": 1793272195246,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1381,7 +1382,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184168,
+      "at": 1793272195248,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1414,7 +1415,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184169,
+      "at": 1793272195249,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1436,7 +1437,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184171,
+      "at": 1793272195250,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1458,7 +1459,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184171,
+      "at": 1793272195251,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1489,7 +1490,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184172,
+      "at": 1793272195251,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1509,7 +1510,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184173,
+      "at": 1793272195252,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1531,7 +1532,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184173,
+      "at": 1793272195253,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1562,7 +1563,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184174,
+      "at": 1793272195253,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1582,7 +1583,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271184175,
+      "at": 1793272195255,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1604,7 +1605,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184178,
+      "at": 1793272195257,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1636,7 +1637,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184178,
+      "at": 1793272195258,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1680,7 +1681,7 @@
       "server": "upstream",
       "method": "OPTIONS",
       "path": "/no-cors/v1/chat/completions",
-      "at": 1793271184181,
+      "at": 1793272195261,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -1700,7 +1701,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271184183,
+      "at": 1793272195262,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -1731,7 +1732,7 @@
       "server": "mcp",
       "method": "OPTIONS",
       "path": "/mcp",
-      "at": 1793271184186,
+      "at": 1793272195266,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1751,7 +1752,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184186,
+      "at": 1793272195266,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1776,7 +1777,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184196,
+      "at": 1793272195274,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1803,7 +1804,7 @@
       "server": "mcp",
       "method": "GET",
       "path": "/mcp",
-      "at": 1793271184198,
+      "at": 1793272195275,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1827,7 +1828,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184199,
+      "at": 1793272195277,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1854,7 +1855,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184202,
+      "at": 1793272195279,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1881,7 +1882,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184204,
+      "at": 1793272195281,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1908,7 +1909,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184205,
+      "at": 1793272195283,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1935,7 +1936,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184206,
+      "at": 1793272195284,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1962,7 +1963,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184210,
+      "at": 1793272195287,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -1989,7 +1990,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184211,
+      "at": 1793272195289,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2016,7 +2017,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184213,
+      "at": 1793272195291,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2043,7 +2044,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184214,
+      "at": 1793272195292,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2070,7 +2071,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184216,
+      "at": 1793272195294,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2097,7 +2098,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184217,
+      "at": 1793272195295,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2124,7 +2125,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184219,
+      "at": 1793272195298,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2151,7 +2152,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271184219,
+      "at": 1793272195298,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2178,7 +2179,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187223,
+      "at": 1793272198303,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2205,7 +2206,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187229,
+      "at": 1793272198310,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2232,7 +2233,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187231,
+      "at": 1793272198312,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2259,7 +2260,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187235,
+      "at": 1793272198315,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2285,7 +2286,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187237,
+      "at": 1793272198317,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2312,7 +2313,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187239,
+      "at": 1793272198319,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2337,7 +2338,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187241,
+      "at": 1793272198321,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2364,7 +2365,7 @@
       "server": "mcp",
       "method": "GET",
       "path": "/mcp",
-      "at": 1793271187241,
+      "at": 1793272198322,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2388,7 +2389,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187242,
+      "at": 1793272198322,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2415,7 +2416,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187244,
+      "at": 1793272198324,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2442,7 +2443,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187245,
+      "at": 1793272198325,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2469,7 +2470,7 @@
       "server": "proxy",
       "method": "OPTIONS",
       "path": "/token",
-      "at": 1793271187451,
+      "at": 1793272198534,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2489,7 +2490,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271187452,
+      "at": 1793272198535,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2506,7 +2507,7 @@
       "server": "mcp",
       "method": "OPTIONS",
       "path": "/mcp",
-      "at": 1793271187455,
+      "at": 1793272198538,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2526,7 +2527,7 @@
       "server": "mcp",
       "method": "POST",
       "path": "/mcp",
-      "at": 1793271187456,
+      "at": 1793272198539,
       "headers": {
         "host": "127.0.0.1:4183",
         "connection": "keep-alive",
@@ -2543,7 +2544,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271187457,
+      "at": 1793272198542,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2565,7 +2566,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271187459,
+      "at": 1793272198543,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2587,7 +2588,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271187459,
+      "at": 1793272198544,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2618,7 +2619,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271187460,
+      "at": 1793272198545,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -2638,7 +2639,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271188708,
+      "at": 1793272200011,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2660,7 +2661,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271188710,
+      "at": 1793272200013,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2691,7 +2692,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271188711,
+      "at": 1793272200013,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -2711,7 +2712,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271190867,
+      "at": 1793272202377,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2733,7 +2734,7 @@
       "server": "proxy",
       "method": "OPTIONS",
       "path": "/v1/chat/completions",
-      "at": 1793271190869,
+      "at": 1793272202379,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2753,7 +2754,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271190870,
+      "at": 1793272202379,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2784,7 +2785,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271190870,
+      "at": 1793272202380,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -2804,7 +2805,80 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271197303,
+      "at": 1793272206710,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793272206712,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793272206714,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793272217723,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2826,7 +2900,7 @@
       "server": "proxy",
       "method": "OPTIONS",
       "path": "/v1/chat/completions",
-      "at": 1793271197305,
+      "at": 1793272217725,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2846,7 +2920,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271197306,
+      "at": 1793272217726,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2877,7 +2951,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271197308,
+      "at": 1793272217727,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -2897,7 +2971,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271210733,
+      "at": 1793272239774,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2919,7 +2993,7 @@
       "server": "proxy",
       "method": "OPTIONS",
       "path": "/v1/chat/completions",
-      "at": 1793271210734,
+      "at": 1793272239776,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2939,7 +3013,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271210734,
+      "at": 1793272239778,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -2970,7 +3044,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271210735,
+      "at": 1793272239802,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",
@@ -2990,7 +3064,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/token",
-      "at": 1793271238539,
+      "at": 1793272299506,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -3012,7 +3086,7 @@
       "server": "proxy",
       "method": "OPTIONS",
       "path": "/v1/chat/completions",
-      "at": 1793271238542,
+      "at": 1793272299508,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -3032,7 +3106,7 @@
       "server": "proxy",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271238543,
+      "at": 1793272299509,
       "headers": {
         "host": "127.0.0.1:4181",
         "connection": "keep-alive",
@@ -3063,100 +3137,7 @@
       "server": "upstream",
       "method": "POST",
       "path": "/v1/chat/completions",
-      "at": 1793271238545,
-      "headers": {
-        "host": "127.0.0.1:4182",
-        "connection": "keep-alive",
-        "authorization": "redacted:length=69",
-        "content-type": "application/json",
-        "accept": "*/*",
-        "accept-language": "*",
-        "sec-fetch-mode": "cors",
-        "user-agent": "node",
-        "accept-encoding": "gzip, deflate",
-        "content-length": "92"
-      },
-      "model": "error-500",
-      "includeUsage": false
-    },
-    {
-      "server": "proxy",
-      "method": "POST",
-      "path": "/token",
-      "at": 1793271279196,
-      "headers": {
-        "host": "127.0.0.1:4181",
-        "connection": "keep-alive",
-        "content-length": "0",
-        "sec-ch-ua-platform": "\"macOS\"",
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
-        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
-        "sec-ch-ua-mobile": "?0",
-        "accept": "*/*",
-        "origin": "http://127.0.0.1:4180",
-        "sec-fetch-site": "same-site",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-dest": "empty",
-        "referer": "http://127.0.0.1:4180/",
-        "accept-encoding": "gzip, deflate, br, zstd"
-      }
-    },
-    {
-      "server": "proxy",
-      "method": "OPTIONS",
-      "path": "/v1/chat/completions",
-      "at": 1793271279198,
-      "headers": {
-        "host": "127.0.0.1:4181",
-        "connection": "keep-alive",
-        "accept": "*/*",
-        "access-control-request-method": "POST",
-        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
-        "origin": "http://127.0.0.1:4180",
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site",
-        "sec-fetch-dest": "empty",
-        "referer": "http://127.0.0.1:4180/",
-        "accept-encoding": "gzip, deflate, br, zstd"
-      }
-    },
-    {
-      "server": "proxy",
-      "method": "POST",
-      "path": "/v1/chat/completions",
-      "at": 1793271279199,
-      "headers": {
-        "host": "127.0.0.1:4181",
-        "connection": "keep-alive",
-        "content-length": "92",
-        "sec-ch-ua-platform": "\"macOS\"",
-        "authorization": "redacted:length=55",
-        "x-stainless-os": "Unknown",
-        "x-stainless-runtime-version": "156.0.8078",
-        "x-stainless-package-version": "7.42.0",
-        "x-stainless-runtime": "browser:chrome",
-        "x-stainless-arch": "unknown",
-        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
-        "x-stainless-retry-count": "0",
-        "sec-ch-ua-mobile": "?0",
-        "x-stainless-lang": "js",
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
-        "accept": "application/json",
-        "content-type": "application/json",
-        "origin": "http://127.0.0.1:4180",
-        "sec-fetch-site": "same-site",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-dest": "empty",
-        "referer": "http://127.0.0.1:4180/",
-        "accept-encoding": "gzip, deflate, br, zstd"
-      }
-    },
-    {
-      "server": "upstream",
-      "method": "POST",
-      "path": "/v1/chat/completions",
-      "at": 1793271279200,
+      "at": 1793272299512,
       "headers": {
         "host": "127.0.0.1:4182",
         "connection": "keep-alive",

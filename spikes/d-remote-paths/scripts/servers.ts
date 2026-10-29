@@ -16,6 +16,7 @@ import {
   CreateMessageResultSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { type SecretScanner, secretScanner } from './exposure.ts';
 
 export interface RequestRecord {
   server: string;
@@ -40,6 +41,7 @@ export interface Fixtures {
   expireTokens: () => void;
   exposure: () => { browserTokenForwarded: boolean };
   containsUpstreamKey: (value: string) => boolean;
+  responseScanner: () => SecretScanner;
   close: () => Promise<void>;
 }
 
@@ -107,6 +109,7 @@ export async function startFixtures(): Promise<Fixtures> {
   >();
   let revision = 0;
   let nextSampling = false;
+  const progress = new Map<string, number>();
   const modelHeaders =
     'authorization,content-type,x-stainless-lang,x-stainless-package-version,x-stainless-os,x-stainless-arch,x-stainless-runtime,x-stainless-runtime-version,x-stainless-retry-count,x-stainless-timeout,x-stainless-helper-method';
 
@@ -385,7 +388,13 @@ export async function startFixtures(): Promise<Fixtures> {
           const size = request.params.arguments?.['size'] ?? 8;
           if (typeof size !== 'number' || !Number.isInteger(size) || size < 0 || size > 100_000)
             throw new Error('invalid_size');
-          return { content: [{ type: 'text', text: 'x'.repeat(size) }] };
+          const content = [{ type: 'text' as const, text: 'x'.repeat(size) }];
+          if (request.params.name === 'progress.record') {
+            const recorded = (progress.get(principal.principal) ?? 0) + 1;
+            progress.set(principal.principal, recorded);
+            return { content, structuredContent: { recorded } };
+          }
+          return { content };
         });
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: randomUUID,
@@ -395,7 +404,6 @@ export async function startFixtures(): Promise<Fixtures> {
         });
         session = { server, transport, principal: principal.principal };
         // SDK 1.32.1 declares optional callbacks differently on these two types.
-        // The same transport satisfies the runtime contract; retain strict compiler flags.
         await server.connect(transport as Transport);
       }
       await session.transport.handleRequest(req, res, data);
@@ -420,6 +428,7 @@ export async function startFixtures(): Promise<Fixtures> {
     },
     exposure: () => ({ browserTokenForwarded }),
     containsUpstreamKey: (value) => value.includes(FAKE_UPSTREAM_KEY),
+    responseScanner: () => secretScanner(FAKE_UPSTREAM_KEY),
     close,
   };
 }

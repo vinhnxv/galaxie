@@ -8,6 +8,7 @@ import { gzipSync } from 'node:zlib';
 import { type Browser, chromium } from 'playwright';
 import { build, createServer, type ViteDevServer } from 'vite';
 import type {} from '../src/main.ts';
+import { watchResponses } from './exposure.ts';
 import { type Fixtures, startFixtures } from './servers.ts';
 
 interface Observation {
@@ -46,7 +47,18 @@ try {
       root,
       configFile: false,
       logLevel: 'silent',
-      server: { host: '127.0.0.1', port, strictPort: true, hmr: false, watch: null },
+      plugins: [
+        {
+          name: 'spike-without-hmr-client',
+          transformIndexHtml: {
+            order: 'post',
+            // Vite injects this client even with HMR/WS disabled; keep the page's HTTP-only CSP.
+            handler: (html) =>
+              html.replace(/<script type="module" src="\/@vite\/client"><\/script>/, ''),
+          },
+        },
+      ],
+      server: { host: '127.0.0.1', port, strictPort: true, hmr: false, ws: false, watch: null },
     });
     viteServers.push(server);
     await server.listen();
@@ -64,30 +76,12 @@ try {
   });
   const page = await context.newPage();
   let upstreamKeyVisible = false;
-  const inspections: Promise<void>[] = [];
+  const capture = await watchResponses(await context.newCDPSession(page), fixture.responseScanner);
   page.on('console', (message) => {
     if (fixture.containsUpstreamKey(message.text())) upstreamKeyVisible = true;
   });
   page.on('pageerror', (error) => {
     if (fixture.containsUpstreamKey(error.message)) upstreamKeyVisible = true;
-  });
-  page.on('response', (response) => {
-    inspections.push(
-      (async () => {
-        if (fixture.containsUpstreamKey(JSON.stringify(await response.allHeaders())))
-          upstreamKeyVisible = true;
-        // These finite responses cover every page-visible model/proxy response.
-        // MCP's standing GET event stream never finishes and contains no upstream key.
-        if (!response.url().startsWith(origins.mcp)) {
-          try {
-            if (fixture.containsUpstreamKey((await response.body()).toString()))
-              upstreamKeyVisible = true;
-          } catch {
-            /* An aborted stream has no complete body. */
-          }
-        }
-      })(),
-    );
   });
   await page.goto(origins.page);
   await page.waitForFunction(() => Boolean(window.probes));
@@ -317,6 +311,16 @@ try {
     };
   });
   const deniedPage = await context.newPage();
+  const deniedCapture = await watchResponses(
+    await context.newCDPSession(deniedPage),
+    fixture.responseScanner,
+  );
+  deniedPage.on('console', (message) => {
+    if (fixture.containsUpstreamKey(message.text())) upstreamKeyVisible = true;
+  });
+  deniedPage.on('pageerror', (error) => {
+    if (fixture.containsUpstreamKey(error.message)) upstreamKeyVisible = true;
+  });
   await deniedPage.goto(origins.denied);
   await deniedPage.waitForFunction(() => Boolean(window.probes));
   for (const service of ['proxy', 'mcp'] as const)
@@ -360,10 +364,15 @@ try {
       assert.equal(response.status, 403);
       return { browser: browserResult, nodeStatus: response.status };
     });
-  await retryProbe();
   await page.evaluate(() => window.probes.close());
+  currentCheck = 'credentials.exposure';
+  await deniedCapture.settle();
   await deniedPage.close();
-  await Promise.all(inspections);
+  await capture.settle();
+  await retryProbe();
+  currentCheck = 'credentials.exposure';
+  await capture.settle();
+  upstreamKeyVisible ||= capture.detected() || deniedCapture.detected();
   await check(
     'credentials.exposure',
     async () => {
@@ -428,6 +437,7 @@ try {
   const version = browser.version();
   const result = {
     recordedAt: new Date().toISOString(),
+    node: process.version,
     browser: `Headless Chromium ${version}`,
     origins,
     observations,

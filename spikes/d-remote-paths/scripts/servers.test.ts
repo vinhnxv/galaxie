@@ -3,10 +3,14 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { startFixtures } from './servers.ts';
 
 test('proxy scopes credentials and rejects origins, expiry, paths and methods', async () => {
   const fixtures = await startFixtures();
+  const clients: Client[] = [];
   try {
     const { proxy, page, upstream, mcp } = fixtures.origins;
     const tokenResponse = await fetch(`${proxy}/token`, {
@@ -111,7 +115,28 @@ test('proxy scopes credentials and rejects origins, expiry, paths and methods', 
       (await fetch(`${mcp}/mcp`, { method: 'GET', headers: { Origin: page } })).status,
       401,
     );
+    for (const principal of ['learner-a', 'learner-b'] as const) {
+      const client = new Client({ name: 'fixture-test', version: '1' }, { capabilities: {} });
+      clients.push(client);
+      const transport = new StreamableHTTPClientTransport(new URL(`${fixtures.origins.mcp}/mcp`), {
+        requestInit: {
+          headers: {
+            Origin: fixtures.origins.page,
+            Authorization: `Bearer ${fixtures.issueMcpCredential(principal)}`,
+          },
+        },
+      });
+      await client.connect(transport as Transport);
+      const first = await client.callTool({ name: 'progress.record', arguments: {} });
+      assert.ok(first.structuredContent && typeof first.structuredContent === 'object');
+      assert.equal(Reflect.get(first.structuredContent, 'recorded'), 1);
+      await client.callTool({ name: 'lesson.lookup', arguments: {} });
+      const second = await client.callTool({ name: 'progress.record', arguments: {} });
+      assert.ok(second.structuredContent && typeof second.structuredContent === 'object');
+      assert.equal(Reflect.get(second.structuredContent, 'recorded'), 2);
+    }
   } finally {
+    for (const client of clients) await client.close();
     await fixtures.close();
   }
 });
