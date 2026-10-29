@@ -1,7 +1,36 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import './zod-config.js';
 import { createRoot } from 'react-dom/client';
+import { App } from './app.js';
+import { createLocalHost } from './runtime.js';
+
+export { createWebLLMWorker } from './runtime.js';
 
 const root = document.getElementById('root');
-if (root) createRoot(root).render(<h1>Local English tutor</h1>);
+if (root) {
+  const view = createRoot(root);
+  if (import.meta.env.MODE === 'mock') {
+    const { createMockModels } = await import('./mock-script.js');
+    view.render(<App initialHost={createLocalHost(createMockModels())} />);
+  } else {
+    const { prepareLocalModels, realModels } = await import('./runtime.js');
+    view.render(
+      <App
+        prepareModels={async () => {
+          const handle = await prepareLocalModels();
+          const host = createLocalHost(realModels(handle));
+          window.addEventListener(
+            'pagehide',
+            () => {
+              void host.runtime.dispose().finally(() => handle.dispose());
+            },
+            { once: true },
+          );
+          return host;
+        }}
+      />,
+    );
+  }
+}

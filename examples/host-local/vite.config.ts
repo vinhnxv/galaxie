@@ -34,6 +34,7 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
     },
   },
   worker: { format: 'es' },
+  build: { rolldownOptions: { preserveEntrySignatures: 'strict' } },
   oxc: { jsx: { runtime: 'automatic' } },
   server: { headers: { 'Content-Security-Policy': cspHeader(mode) } },
   preview: { headers: { 'Content-Security-Policy': cspHeader(mode) } },
