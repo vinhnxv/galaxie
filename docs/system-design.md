@@ -10,11 +10,11 @@
 ## 1. What exists today
 
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
-- **`packages/core`:** framework-neutral contracts and four M1 runtime slices: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, model routing with consent and per-call credentials, sticky labels, argument shapes, finite budgets, in-memory interrupt dispatch and resume, and allowlisted OpenTelemetry spans. The M1 exit controls add interaction URL policy and development trace text filtered by live labels and destination (§6, §9).
+- **`packages/core`:** framework-neutral contracts and four M1 runtime slices: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, model routing with consent and per-call credentials, sticky labels, argument shapes, finite budgets, interrupt dispatch and resume, and allowlisted OpenTelemetry spans. M3 adds an optional durable recovery port, inbox reconciliation and a write-effect journal (§6, §8.1–§8.3). The M1 exit controls add interaction URL policy and development trace text filtered by live labels and destination (§6, §9).
 - **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
 - **`packages/models`:** the deterministic scripted LangChain mock and the `@galaxie/models/webllm` worker provider and `@galaxie/models/builtin-ai` page-side Prompt API provider. Both have fake-only coverage on Node and Chromium; neither has had a real-device run yet (§8.4).
 - **`packages/react`:** a typed component registry, snapshot hook, identity-bound surfaces and headless Quiz, WritingPrompt, Feedback and Progress entries. Chromium tests cover rendering, validation, Strict Mode ownership and real LangGraph resume (§4, §8.1).
-- **`packages/storage-indexeddb`:** the M3 slice 1 LangGraph checkpoint saver, with scoped keys, versioned serializer envelopes, transaction-completion barriers and Chromium differential, conformance and graph-rebuild tests; core session adoption and pending-interaction restore are now wired into host-local reloads. The remaining M3 protocols are pending (§4, §8.2).
+- **`packages/storage-indexeddb`:** a LangGraph checkpoint saver and structural recovery port, with scoped keys, versioned envelopes and transaction-completion barriers. Host-local supplies both for reload reconciliation; Node/Chromium fault tests cover inbox and journal crash windows, including IndexedDB reopen in Chromium. Retention, fencing and logout remain later M3 slices (§8.2).
 - **`tests/conformance`:** twelve graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix, plus dual-lane policy, lifecycle, budget and tracing tests. The [conformance README](../tests/conformance/README.md) lists the explicit-config APIs.
 - **`spikes/`:** three throwaway spikes: B0 (a 1.7B model on WebGPU), the local English tutor (a LangGraph.js agent on that model in Chrome) and [Spike C](../spikes/c-ui-path/README.md) (typed interrupt UI and session-checkpoint reload). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
@@ -73,7 +73,7 @@ Trust rules:
 | Model providers | The in-browser engine in a worker, Built-in AI from the page, OpenAI-compatible, mock | `models` | ADR-0006 |
 | Capability broker | Grants, schema validation, argument shapes, confirmations, attribution header, effect journal | `core` | brief §9.2, [ADR-0012](adr/0012-security-baseline.md), ADR-0014 |
 | MCP client | Streamable HTTP, tools only, allowlist, `mcp.<server>.<tool>` names, definition pinning | `tools-mcp` | [ADR-0011](adr/0011-mcp-via-controlled-servers.md) |
-| Storage | Implemented: checkpoint saver, pending writes, scoped versioned envelopes and durability barrier; later M3: submission inbox, journal, host records, migrations and epoch checks | `storage-indexeddb` | [ADR-0004](adr/0004-interrupt-as-pending-interaction-source.md), [ADR-0005](adr/0005-indexeddb-checkpoint-saver.md) |
+| Storage | Implemented: checkpoint saver, pending writes, recovery inbox/journal, scoped versioned envelopes and durability barrier; later M3: retention, host records, migrations, epoch checks and logout deletion | `storage-indexeddb` | [ADR-0004](adr/0004-interrupt-as-pending-interaction-source.md), [ADR-0005](adr/0005-indexeddb-checkpoint-saver.md) |
 | Ownership | One owner tab per app, handover, takeover, logout generation | `core` | [ADR-0009](adr/0009-multi-tab-ownership.md) |
 | UI | Hooks, surfaces, typed registry, headless reference components | `react` | [ADR-0007](adr/0007-typed-ui-registry-for-mvp.md) |
 | Agent definitions | Code-first definitions; a build script generates the manifest | `core` (types) | [ADR-0008](adr/0008-code-first-agent-definition.md) |
@@ -99,7 +99,7 @@ Proposed rules; M1 confirms them:
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
 5. Fewer packages are fine while these boundaries hold (brief §15).
 
-`@galaxie/storage-indexeddb` exports `IndexedDBSaver.open({ appId, principalScope, databaseName?, serde? })` and `StorageError`. It implements `BaseCheckpointSaver` 1.2.0 without adapter changes. The host derives the principal from its authenticated session; every stored key includes app and principal. Database version 1 contains indexed `checkpoints` and `writes`, scoped schema/insertion-order `meta`, and empty `inbox` and `journal` stores. Serializer tags and bytes are retained in versioned envelopes. Writes request strict durability where supported and resolve on transaction completion; malformed records and decode failures reject with fixed `corrupt` errors. The package emits no diagnostics or spans and retains no host error text or error cause. See its [usage and limits](../packages/storage-indexeddb/README.md); core now rebuilds pending UI through `restore()` (§8.2); inbox/journal processing, retention, fencing and logout remain later M3 slices.
+`@galaxie/storage-indexeddb` exports `IndexedDBSaver.open({ appId, principalScope, databaseName?, serde? })` and `StorageError`. It implements `BaseCheckpointSaver` 1.2.0 and exposes the structural `saver.recovery` port on the same connection, without importing core. The host derives the principal from its authenticated session; every stored key includes app and principal. Database version 1 contains indexed `checkpoints` and `writes`, scoped schema/insertion-order `meta`, and the recovery `inbox` and `journal` stores. Serializer tags and bytes are retained in versioned checkpoint envelopes; recovery envelopes hold validated JSON. Writes request strict durability where supported and resolve on transaction completion; malformed records and decode failures reject with fixed `corrupt` errors. The package emits no diagnostics or spans and retains no host error text or error cause. See its [usage and limits](../packages/storage-indexeddb/README.md); core reconciles submissions and write receipts during restore (§8.2–§8.3). Retention, fencing and logout remain later M3 slices.
 
 `@galaxie/react` exports `defineComponent`, `createRegistry`, `useAgentSnapshot`, `AgentSurface`, the individual `Quiz`, `WritingPrompt`, `Feedback` and `Progress` entries, and `educationComponents`. An entry declares its versioned ID, synchronous Standard Schema props and action payloads, trusted action labels, optional `urls(props)` extractor and trusted React component. Zod 4 reference schemas bound strings, IDs and collection sizes. Components receive `{ props, actions, status }`; bound actions expose their host label and `submit(payload)`. Model-produced strings render only as React text children.
 
@@ -189,11 +189,12 @@ Modules in `packages/core/src`; `index.ts` exports the public contracts and runt
 | `model-router.ts` | Per-instance configuration validation, ordered selection, shared consent, per-call credentials and model-budget reservations | ADR-0006, ADR-0014 |
 | `capabilities.ts` | Capability names, requests, kinds, grant scopes, retry policy, host bindings, executor port and attribution headers | brief §9.2, §12.3 |
 | `annotations.ts` | Cached Standard JSON Schema walking in both directions; labels, constraints and string matchers | ADR-0014 |
-| `capability-broker.ts` | Per-instance grants, validation, FIFO concurrency, timeouts, sticky labels and verbatim guard | brief §9.2; ADR-0012, ADR-0014 |
+| `capability-broker.ts` | Per-instance grants, validation, FIFO concurrency, timeouts, sticky labels, verbatim guard and optional write-effect journal | brief §9.2, §12.3; ADR-0012, ADR-0014 |
 | `budgets.ts` | Finite defaults, option validation, per-run tool-call, payload, token and cost accounting | brief §9.4 |
 | `http-capability.ts` | Host-literal HTTP templates, attribution headers and capped response reads | ADR-0012 A3, A8 |
 | `interactions.ts`, `urls.ts` | Catalogs, components, UI requirements, pending interactions, user events, receipts, inbox status, URL candidates and shared origin checks | brief §11, §12; ADR-0004, ADR-0007 |
 | `effects.ts` | Effect states and transitions | brief §12.3 |
+| `recovery.ts` | `RecoveryStore`, JSON submission receipts and write-effect records, with returned-record validation | brief §12.2, §12.3; ADR-0004, ADR-0005 |
 | `events.ts` | Executor-native stream events and runtime envelopes, including cancellation; currently in memory only | brief §7.5, §12.1 |
 | `executor.ts` | Executor adapter contract and feature flags | brief §7.5; ADR-0001 |
 | `definition.ts` | `AgentDefinition`, `defineAgentDefinition`, `BindingsFor`, `InputOf` | brief §13.2; ADR-0008 |
@@ -210,11 +211,15 @@ Contract choices where the brief leaves room:
 - **Run status belongs to the runtime.** An executor reports events; the runtime derives the run status from them and creates every ID.
 - **Schema annotations.** Hosts use `.meta(galaxieField({ label: 'private-user', shape: 'freeText' }))`. Core reads `x-galaxie` through Standard JSON Schema in both input and output directions, preserving transform and pipe labels without a runtime Zod import. Unrepresentable positions are free text and unlabelled; schemas without Standard JSON Schema and unsupported subschema keywords reject with `unsupported`. Shapes derive from enum/const, UUID and narrow bounded patterns; declarations cannot claim a stricter shape than their constraints support (ADR-0014).
 
-Not in `core` yet: durable events and multi-tab ownership (M3). The model slice has WebLLM worker and Built-in AI page providers (§8.4); remote providers, availability probing inside the router, first-run download order, structured output through the router and per-call provider token caps from the router remain deferred. Dispatch and resume use an in-memory submission inbox; durable acceptance and crash recovery remain M3 work. Conformance covers stream events, final state, checkpoint history, interrupts and resume for twelve cases on native Node, galaxie Node and Chromium, including capability calls, the native 25-step limit, subgraph re-execution, falsy resume payloads and the `async`, `sync` and `exit` durability modes.
+Not in `core` yet: durable events and multi-tab ownership (M3). The model slice has WebLLM worker and Built-in AI page providers (§8.4); remote providers and per-call provider token caps from the router remain deferred. Dispatch and resume use an in-memory submission inbox unless the host supplies `CreateOptions.recovery`. Conformance covers stream events, final state, checkpoint history, interrupts and resume for twelve cases on native Node, galaxie Node and Chromium, including capability calls, the native 25-step limit, subgraph re-execution, falsy resume payloads and the `async`, `sync` and `exit` durability modes. Separate recovery graphs exercise durable inbox and write replay without changing those goldens or the compatibility matrix.
+
+`RecoveryStore` is an asynchronous core port, implemented structurally by `IndexedDBSaver.recovery` without a storage-to-core dependency. Its methods are `acceptSubmission(sessionId, entry)` (atomic insert-if-absent returning `accepted` or `duplicate`), `consumeSubmission(sessionId, interactionId)`, `submissions(sessionId)`, `effect(sessionId, effectId)` and `recordEffect(sessionId, effectId, record)`. Writes resolve only after durable commit. Submissions contain `interactionId`, `action`, JSON `payload` and status `accepted` or `consumed`; effect records contain a state, input digest and, for success, the validated JSON output. Returned IDs are plain strings; core validates and brands them, rejecting malformed records as `unrecoverable`. The host must scope the store to the same app and authenticated principal as the checkpointer and keep it on-device: answers and capability outputs are principal data, as private as checkpoints.
+
+`ErrorCode` includes `invalid`, `denied`, `unavailable`, `unreachable`, `unsupported`, `budget_exceeded`, `timeout`, `stale`, `duplicate`, `fenced`, `cancelled`, `unrecoverable`, `outcome_unknown` and `executor_error`. The new `outcome_unknown` message is fixed: `The outcome of an earlier call is unknown.` It means a prior write may have reached the backend and its retry policy forbids automatic replay. Public error data has no stored input/output or host error text; the journal path's typed errors set no cause.
 
 Each instance owns one session. A run consists of a start segment and one resume segment per accepted submission, all sharing its run ID, journal, labels, grants and spend budgets. Steps and wall-clock time apply separately to each segment and stop while waiting for input. Each segment owns its outcome, closed model/capability ports and root span, with `galaxie.run.segment` starting at zero; a paused span ends `waiting_input` without an error status. Late events from a settled segment are dropped and reported as `late_event`.
 
-A pending interaction is read from committed checkpoint `tasks[].interrupts`. Dispatch checks the instance, run, interrupt, surface and view revision, validates the action and JSON payload budget, claims the interrupt synchronously against duplicate submissions, and confirms it again against committed state. Acceptance clears pending, records `accepted` in the per-run inbox and starts one resume segment after its predecessor settles. An executor outcome marks the entry `consumed`. Inbox state is in memory only; acceptance is not a durable receipt. Cancelling or disposing a waiting run calls no executor; a later start abandons the old interrupt on the same thread.
+A pending interaction is read from committed checkpoint `tasks[].interrupts`. Dispatch checks the instance, run, interrupt, surface and view revision, validates the action and JSON payload budget, claims the interrupt synchronously against duplicate submissions, and confirms it again against committed state. Acceptance clears pending, records `accepted` in the per-run inbox and starts one resume segment after its predecessor settles. With recovery, durable acceptance precedes the receipt and resume, and consumption follows a checkpoint-confirmed output or new interaction (§8.1). Without recovery, the existing in-memory behavior remains: executor outcomes consume the entry, effect IDs are random and there is no journal. Cancelling or disposing a waiting run calls no executor; a later start abandons the old interrupt on the same thread.
 
 A run claims its slot before asynchronous Standard Schema validation; queued successors wait for the previous executor iterator to complete. Cancellation invalidates results immediately while core keeps draining. Core's single 10-second settlement bound limits queued waits and disposal without permitting overlapping loops on a session. Diagnostics alone receive raw errors; snapshots and error events contain fixed messages and sanitized types.
 
@@ -268,9 +273,11 @@ Rules (brief §6.2, ADR-0003):
 
 ### 8.1. A run with a pending interaction
 
-The M2 path uses the in-memory inbox described in §6; the diagram below also shows M3's target durable transaction. With UI bindings, core checks component availability, a non-empty action map and surface assignment before publishing pending state, alongside the URL check. The registry then validates props and declared URLs before rendering. A bound submit validates its payload and dispatches the instance, run, interaction, surface and revision captured at render time. Core checks identity and duplicates before the action allowlist, then validates the budget-parsed payload before recording acceptance. A stale screen therefore cannot answer a newer interaction, and the surface suppresses concurrent or already accepted submissions for its interaction.
+With UI bindings, core checks component availability, a non-empty action map and surface assignment before publishing pending state, alongside the URL check. The registry then validates props and declared URLs before rendering. A bound submit dispatches the instance, run, interaction, surface and revision captured at render time. Core checks identity and duplicates before the action allowlist, then validates the budget-parsed payload and confirms the committed interrupt. A stale screen therefore cannot answer a newer interaction, and the surface suppresses concurrent or already accepted submissions for its interaction.
 
-Spike C's M2 decisions are implemented here: core enforces UI requirements and actions when bindings are supplied; each entry declares URL props through `urls`; drafts stay component-local. A new interaction ID or view revision remounts the trusted component with empty inputs. Any other remount also loses local input. Core has no restore API yet; once M3 adds restore, a reload will still begin with empty component-local drafts unless M3 deliberately adds persistence under the storage and labels policy (ADR-0014). M2 writes no draft copy to browser storage.
+Each registry entry declares URL props through `urls`; model-produced props render only as React text. Drafts stay component-local. A new interaction ID or view revision remounts the trusted component with empty inputs. Any other remount, including reload, also loses local input; recovery persists accepted submissions, not drafts.
+
+With `recovery`, dispatch durably inserts the answer before returning `accepted` or starting resume. An existing accepted or consumed record rejects `duplicate`. A store failure reports `dispatch_failed` and returns `unavailable` without starting a segment. After the insert resolves, core rechecks disposal, current run and waiting status; a race returns `stale` and leaves the accepted entry for restore. Core consumes it only after an executor `output` or valid new `interaction`, which the adapter emits after checkpoint writes drain, and before publishing the consumed status. Errors, throws, protocol violations and cancellation leave it accepted. A consume failure reports `dispatch_failed` and leaves reconciliation work without failing an otherwise successful run.
 
 ```mermaid
 sequenceDiagram
@@ -286,9 +293,9 @@ sequenceDiagram
     EX-->>RT: interaction event
     RT-->>UI: snapshot: waiting_input, pending interaction
     UI->>RT: dispatch(event)
-    RT->>DB: read the pending interrupt
     RT->>RT: check identity, interactionId, viewRevision, payload schema
-    RT->>DB: one transaction: check epoch, write inbox entry "accepted"
+    RT->>DB: confirm the committed pending interrupt
+    RT->>DB: atomic insert inbox entry "accepted"; await commit
     RT-->>UI: receipt: accepted
     RT->>EX: inbox processor: run, command resume
     EX->>DB: checkpoint after resume, durably committed
@@ -303,37 +310,54 @@ sequenceDiagram
 
 ### 8.2. Reload and crash recovery
 
-**Implemented in M3 slice 2:** each instance exposes `sessionId`. `runtime.create(definition, { sessionId, ... })` adopts a lowercase RFC 4122 UUID for restore only; `start()` on that instance rejects `invalid`. Core cannot authorize session ownership: the host must store the ID per app and authenticated principal and supply a checkpointer with the same `principalScope`.
+Each instance exposes `sessionId`. `runtime.create(definition, { sessionId, recovery, ... })` adopts a lowercase RFC 4122 UUID for restore only; `start()` on that instance rejects `invalid`. Core cannot authorize session ownership: the host must store the ID per app and authenticated principal and scope both checkpointer and recovery store to that principal.
 
-After `prepare()`, `instance.restore(options?)` claims the run slot synchronously and reads `executor.pending(sessionId)`. It requires `interrupts`, `resume` and `checkpoints`. No pending interrupt resolves `undefined` and releases the slot. The host then disposes the adopted instance and creates a fresh one for a new run. A checkpoint read failure rejects with fixed `executor_error` text and reports `restore_failed`; its optional raw `DiagnosticEvent.error` is host-only and must never go to a destination `private-user` may not reach.
+After `prepare()`, `instance.restore(options?)` claims the run slot synchronously and reads `executor.pending(sessionId)`. It requires `interrupts`, `resume` and `checkpoints`. A checkpoint read failure rejects with fixed `executor_error` text and reports `restore_failed`; its optional raw `DiagnosticEvent.error` is host-only and must never go to a destination `private-user` may not reach. Recovery-store failures reject `unavailable`; malformed returned records reject `unrecoverable`. Both report `restore_failed` before publishing a run.
 
-Before publication, restore shares the live path's URL check followed by its bound UI check. A rejection exposes no props in snapshots, interaction events or diagnostics. A successful restore publishes one `waiting_input` snapshot and starts the replayable log with the same interaction event as the live path. The existing `AgentSurface` renders it; dispatch still rechecks the committed interrupt before accepting a submission.
+With recovery, restore validates the session's submissions and reconciles them before publishing any run snapshot:
 
-Restore creates a fresh run ID and fresh budgets. Because previous provenance is not persisted, it starts with all labels (`public`, `app`, `private-user`), an empty private-value registry and conservative submitted-text handling. Grants use the same validation as `start()`. The restore opens no run span; the first resume segment opens one normally. Run IDs, labels, private values, budgets and the submission inbox are not recovered in this slice.
+- An accepted entry matching the pending interrupt passes the live URL/UI, action, payload schema and payload-budget checks. Core reapplies the payload schema's labels and private strings, starts a resume segment without UI input and resolves `{ runId }` with status `running`.
+- Accepted entries whose interrupt is no longer pending become consumed. If another interrupt remains, the existing `AgentSurface` renders it normally; otherwise restore resolves `undefined` and releases the slot.
+- With no matching accepted entry, the pending interaction is published as `waiting_input` with the same interaction event as the live path. Without a recovery store, this remains the slice 2 behavior.
 
-Host-local opens one IndexedDB saver lazily per host for app `galaxie-host-local` and its trusted demo learner. It falls back to the adapter's MemorySaver when IndexedDB is absent, and closes the saver after runtime disposal. Once a host exists, it attempts restore from a `sessionStorage` key containing the app and principal; real model preparation still requires its button. It stores the ID at `waiting_input` and removes it at a terminal status. A Web Lock on that same key prevents a copied tab from starting or restoring while another owns the session. A missing interrupt or `denied`, `unsupported` or `invalid` rejection clears the key and returns to Start; operational failures retain the key and show a fixed error with Retry. Neither IndexedDB nor sessionStorage changes the CSP.
+A rejected interaction exposes no props in snapshots, interaction events or diagnostics. Restored inbox entries reject subsequent dispatches as `duplicate`, including consumed receipts; dispatch still checks instance and run identity first. When no interrupt remains, restore creates no run, so an obsolete dispatch is `stale`; the durable store still rejects reinsertion of the consumed interaction. Dispose that adopted instance and create a fresh instance for a new session.
 
-**Current limits:** drafts are not persisted. Accepted-but-unconsumed submissions are not reconciled until M3 slice 3: a reload between acceptance and the resume checkpoint can show the interaction again, and a second submit resumes it. There is no recovery claim for external effects. Use one tab only until slice 5; the host-local Web Lock is a host measure, not core fencing, owner epochs or bfcache recovery. Retention, corruption/quota UX, blocked-upgrade handover and logout invalidation remain later slices.
+Restore creates a fresh run ID and fresh budgets. Because previous provenance is not persisted, it starts with all labels (`public`, `app`, `private-user`), an initially empty private-value registry and conservative submitted-text handling. Stored accepted payloads and replayed capability outputs re-register their private strings. Grants use the same validation as `start()`. Display-only restore opens no run span; an automatic or later resume opens one normally. Prior run IDs, labels, private values and budgets are not persisted.
 
-The following diagram describes the later M3 recovery protocol, including the durable inbox and fencing that this slice does not implement:
+Host-local opens one IndexedDB saver lazily per host for app `galaxie-host-local` and its trusted demo learner, passing `recovery: saver.recovery` alongside the checkpointer. It falls back to the adapter's MemorySaver without recovery when IndexedDB is absent, and closes the saver after runtime disposal. Once a host exists, it attempts restore from a `sessionStorage` key containing the app and principal; real model preparation still requires its button. It stores the ID at `waiting_input` and removes it at a terminal status. A Web Lock on that same key prevents a copied tab from starting or restoring while another owns the session. A missing interrupt or `denied`, `unsupported` or `invalid` rejection clears the key and returns to Start; operational failures retain the key and show a fixed error with Retry. Neither IndexedDB nor sessionStorage changes the CSP.
+
+**Current limits:** drafts are not persisted. If a multi-step resume crashes after an intermediate checkpoint has already resolved the interrupt, restore consumes its accepted entry and resolves `undefined`: it cannot finish that run or replay later writes. Use one tab and one active owner/instance per session until M3 slice 5; journal serialization is per call, with no epoch check, core fencing or bfcache recovery yet. The host-local Web Lock is a host measure. Retention, corruption/quota UX and blocked-upgrade handover remain slice 4 work; logout deletion and invalidation remain slice 6 work. Write-outcome limits are below.
+
+The implemented inbox reconciliation is:
 
 ```mermaid
 flowchart TD
-    Load["Page load, or pageshow with persisted"] --> Lock{"Holds the runtime lock?"}
-    Lock -- no --> ReadOnly["Read-only: active in another tab; offer takeover"]
-    Lock -- yes --> Check["Check epoch and logout generation"]
-    Check --> Pending["Read the pending interrupt from the checkpoint"]
-    Pending --> Inbox{"Inbox entry for its interactionId?"}
-    Inbox -- "accepted, interrupt still pending" --> Resume["Resume with the stored payload"]
-    Inbox -- "accepted, interrupt gone" --> Consume["Mark the entry consumed"]
-    Inbox -- "none" --> Render["Render the interaction from the checkpoint payload"]
+    Load["Host adopts the session and prepares"] --> Pending["Read checkpoint interrupt and submissions"]
+    Pending --> Consume["Consume accepted entries for resolved interrupts"]
+    Consume --> Inbox{"Accepted entry for the pending interaction?"}
+    Inbox -- "yes" --> Resume["Resume with the stored payload"]
+    Inbox -- "no" --> Render["Render a pending interaction, or return undefined"]
 ```
 
-There is one render path: after a reload the host renders from the checkpoint exactly as it did before (brief §12.2). The M1 conformance suite records how the pinned LangGraph.js version persists resume values and whether a repeated resume is safe; M3 runs those cases again with the IndexedDB saver.
+There is one render path for unanswered interactions: after a reload the host renders the checkpoint payload through the same surface (brief §12.2). Fault-injection tests run actual LangGraph resume under `async`, `sync` and `exit` on Node and Chromium, with an IndexedDB reopen lane in Chromium. All use mock providers; the twelve existing goldens and compatibility matrix stay unchanged.
 
 ### 8.3. A capability call
 
-**Implemented in M1 slice 2:** per-instance bindings at `runtime.create(definition, { bindings, ... })`, instance-lifetime grants for `app`/`principal`/`instance`, and explicit `start(input, { grants })` for run grants. Nodes call `host.capabilities.call(name, input, config)`; passing the node's `config` parents the capability span under that node. Input and output validate before dispatch and return respectively. Bindings with `approval: 'confirm'` always reject `unsupported`. The journal, confirmations and retries remain unimplemented; each invocation gets a fresh effect ID and core never retries.
+Per-instance bindings live at `runtime.create(definition, { bindings, ... })`, with instance-lifetime grants for `app`/`principal`/`instance` and explicit `start(input, { grants })` for run grants. Nodes call `host.capabilities.call(name, input, config)`; passing the node's `config` parents the capability span under that node. Input and output validate before dispatch and return respectively. Bindings with `approval: 'confirm'` still reject `unsupported`; confirmations remain unimplemented.
+
+With recovery, only host bindings of `kind: 'write'` use the effect journal. Core derives a lowercase UUID-shaped effect ID with SHA-256 over the session ID, segment key (resume `interactionId` or literal `start`), capability name and per-name call ordinal within the segment. Code and call order must be deterministic across replay; code before an interrupt must also be side-effect free. Repeated start segments in one session reuse the `start` key, so create a fresh session/instance for a new logical operation. Other kinds, and all calls without recovery, retain random effect IDs and no journal.
+
+Each record includes a SHA-256 digest of canonical validated JSON input, with sorted object keys. Changed input at the same effect ID fails `unrecoverable` before invoking or returning a stored receipt. This detects reordered calls to the same capability with different inputs. Journal behavior is:
+
+| Stored state | Replay or transition |
+| --- | --- |
+| Absent, `planned` or `failed` | Persist `planned` after input validation and policy checks, then persist `dispatched` immediately before invoking. A failure after planning but before dispatch records `failed`. |
+| `succeeded` | Return a fresh copy of the already validated output without invoking or rerunning schema transforms; reapply output labels and private strings. |
+| `dispatched` or `outcome_unknown` | Persist `outcome_unknown`. Retry only for `idempotent` or `idempotency-key`, reusing the effect ID. With `none`, fail `outcome_unknown` without invoking. |
+
+A validated live output records `succeeded`; a host rejection, abort or invalid output after dispatch records `outcome_unknown`, since abort does not establish that the backend did nothing. One per-call promise chain serializes journal writes. Success is terminal: once its write starts, that write's result decides the record, and an abort/rejection cannot overwrite it with unknown. A journal-store failure before invoke fails `unavailable`; after invoke it preserves the validated result without another record and reports `capability_failed` without result or raw store-error content.
+
+The binding receives the effect ID in `CapabilityContext.effectId`; send it to the backend as the idempotency key, with verified backend deduplication semantics. This policy permits replay after recovery, not an immediate retry loop. `effect_outcome_unknown` diagnostics carry the effect ID and no content. There is no host reconciliation or decision API yet: restoring a `retry: 'none'` session with an unknown write keeps failing at that call. Reconcile it with the backend using the binding's and diagnostic's effect ID before starting a new session that could repeat the logical operation. A new session derives new IDs, so galaxie cannot prevent that repeat; there is no general exactly-once HTTP guarantee.
 
 Labels from run input and validated outputs are sticky, conservative and sorted in snapshots. Non-empty free-text strings and dynamic property names can reach a destination only when every run label allows it. The default keeps `app` off `third-party` and `private-user` in-browser; a host may replace individual label policies. The extra verbatim guard lowercases, collapses Unicode whitespace and compares private strings of at least eight normalized characters, including structured arguments. It cannot detect paraphrases, and short or structured values remain a low-bandwidth channel. These controls cover SDK paths; trusted code can bypass them (ADR-0002).
 
@@ -343,35 +367,31 @@ Finite defaults are 25 steps, 50 tool calls, 300000 ms wall clock and 1048576 pa
 
 By default, capability spans contain only allowlisted metadata and fixed errors. The development trace opt-in may add validated, budgeted and policy-approved arguments under the label rules in §6; capability results are never recorded on capability spans. Galaxie adds no URLs, headers or binding error messages. The root records sorted labels and an exhausted budget's name. Host-only `capability_failed.error` diagnostics retain the binding's raw error and may contain private values; hosts must not forward them to a destination `private-user` may not reach. Generated diagnostic fields carry no such content. Timeout or cancellation drops late results without validation or labelling; a timed-out binding holds its concurrency slot until its promise settles.
 
-The diagram below includes the later journal and confirmation flow:
+The new-write path below omits the deferred confirmation flow; the table above covers replay:
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant G as Graph node
     participant B as Capability broker
-    participant H as Host confirmation
     participant J as Effect journal
     participant X as Host binding
     G->>B: call progress.save@1 with arguments
     B->>B: granted? validate input, labels and argument shapes; reserve budget
     B->>J: planned, with its effect ID
-    opt binding requires confirmation
-        B->>H: render from the real parameters
-        H-->>B: single-use approval bound to principal, capability, arguments, effect ID, policy revision, expiry
-    end
     B->>J: dispatched
     B->>X: invoke(input, signal, effect ID, run, principal, agent)
     X-->>B: result
     B->>B: validate output; label it (default app)
-    B->>J: succeeded, failed or outcome_unknown
+    B->>J: succeeded or outcome_unknown
     B-->>G: validated result
 ```
 
 - Only capabilities the host bound and granted can run. There is never a generic `fetch`, SQL or shell capability (ADR-0012 A2, A3).
 - The binding's kind, destination class, timeout, concurrency, grant scope, approval and retry policy come from the host, never from the tool (brief §9.2).
-- The effect ID is persisted before dispatch, and the binding sends it as the idempotency key. An `outcome_unknown` effect is reconciled or decided by a person; a non-idempotent one is never fired again silently (brief §12.3).
-- The journal applies to external effects. A read with no effect skips it.
+- With recovery, the effect ID is persisted before dispatch and the binding sends it as the idempotency key. An unknown `retry: 'none'` write is never fired again automatically (brief §12.3).
+- Only `write` bindings are journaled. Reads, device and UI bindings skip the journal.
+- Inbox payloads, journal inputs and stored capability outputs are not added to snapshots, events, spans or diagnostics. Snapshots expose only submission identity/status; spans retain allowlisted metadata and fixed outcome codes. The existing host-only `DiagnosticEvent.error` rules still apply to raw binding failures.
 - Outbound requests carry an attribution header, for example `X-Galaxie-Agent`. It attributes; it never authorizes (ADR-0012 A8).
 
 ### 8.4. A model call
