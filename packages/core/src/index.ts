@@ -79,6 +79,11 @@ export {
   parseInteractionRequest,
 } from './interactions.js';
 export {
+  type InvalidationOptions,
+  type InvalidationWatcher,
+  watchInvalidation,
+} from './invalidation.js';
+export {
   INSTANCE_TRANSITIONS,
   type InstanceState,
   RUN_TRANSITIONS,

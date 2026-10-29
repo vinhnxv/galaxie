@@ -83,11 +83,20 @@ function containsText(value: unknown): boolean {
   return payloadStrings(value).next().done !== true;
 }
 
+function invalidated(error: unknown): boolean {
+  const marked = (value: unknown): boolean =>
+    typeof value === 'object' &&
+    value !== null &&
+    Object.getOwnPropertyDescriptor(value, 'invalidated')?.value === true;
+  return marked(error) || (isGalaxieError(error) && marked(error.cause));
+}
+
 function failureCode(error: unknown, fallback: ErrorCode): ErrorCode {
   const marked = (value: unknown, code: 'fenced' | 'unrecoverable'): boolean =>
     typeof value === 'object' &&
     value !== null &&
     Object.getOwnPropertyDescriptor(value, code)?.value === true;
+  if (invalidated(error)) return 'stale';
   for (const code of ['fenced', 'unrecoverable'] as const) {
     if (
       marked(error, code) ||
@@ -682,10 +691,11 @@ export function createAgentInstance(
             } finally {
               checkpointChecks.delete(recording);
             }
-          } catch {
+          } catch (error) {
             claimingSlot = false;
             assertUsable();
-            throw new GalaxieError('unavailable', toErrorInfo('unavailable').message);
+            const code = invalidated(error) ? 'stale' : 'unavailable';
+            throw new GalaxieError(code, toErrorInfo(code).message);
           }
         }
         try {
