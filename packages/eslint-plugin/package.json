@@ -1,0 +1,24 @@
+{
+  "name": "@galaxie/eslint-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ESLint rules that flag direct platform access in galaxie agent packages.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "eslint": "^10.0.0"
+  },
+  "devDependencies": {
+    "eslint": "10.13.0"
+  }
+}
