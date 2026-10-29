@@ -28,6 +28,7 @@ export {
   defineConfirmations,
 } from './confirmations.js';
 export { useAgentSnapshot } from './hooks.js';
+export { ModelRoutes, type ModelRoutesProps } from './model-routes.js';
 export {
   type ActionDefinition,
   type ActionDefinitions,
