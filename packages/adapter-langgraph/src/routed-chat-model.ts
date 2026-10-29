@@ -19,14 +19,13 @@ import {
   type BaseChatModelCallOptions,
   type LangSmithParams,
 } from '@langchain/core/language_models/chat_models';
+import { createContentParser } from '@langchain/core/language_models/structured_output';
 import {
-  assembleStructuredOutputPipeline,
-  createContentParser,
-} from '@langchain/core/language_models/structured_output';
-import {
+  AIMessage,
   AIMessageChunk,
   type BaseMessage,
   type BaseMessageLike,
+  HumanMessage,
   isAIMessage,
   isAIMessageChunk,
   type StandardMessageStructure,
@@ -41,6 +40,7 @@ import type { LangGraphTraceHandler } from './trace-handler.js';
 
 interface RoutedChatModelCallOptions extends BaseChatModelCallOptions {
   readonly jsonSchema?: Readonly<Record<string, unknown>>;
+  readonly repairAttempt?: number;
 }
 
 type OutputSchema<Output extends Record<string, unknown>> =
@@ -216,9 +216,7 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
   >(
     schema: OutputSchema<RunOutput>,
     config?: StructuredOutputMethodOptions<boolean>,
-  ):
-    | Runnable<BaseLanguageModelInput, RunOutput>
-    | Runnable<BaseLanguageModelInput, { raw: BaseMessage; parsed: RunOutput }> {
+  ): Runnable<BaseLanguageModelInput, RunOutput | { raw: BaseMessage; parsed: RunOutput | null }> {
     if (config?.method !== undefined && config.method !== 'jsonSchema')
       throw failure('unsupported');
     let jsonSchema: Readonly<Record<string, unknown>>;
@@ -232,7 +230,7 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     } catch {
       throw failure('invalid');
     }
-    const safeParser = RunnableLambda.from<BaseMessage, RunOutput>(async (message) => {
+    const parse = async (message: BaseMessage): Promise<RunOutput> => {
       try {
         if (
           typeof message.content !== 'string' ||
@@ -244,12 +242,35 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       } catch {
         throw failure('invalid');
       }
+    };
+    return RunnableLambda.from(async (input: BaseLanguageModelInput, options) => {
+      const original = RoutedChatModel._convertInputToPromptValue(input).toChatMessages();
+      let raw: BaseMessage = await this.withConfig({ jsonSchema }).invoke(input, options);
+      for (let repairAttempt = 1; ; repairAttempt++) {
+        try {
+          const parsed = await parse(raw);
+          return config?.includeRaw ? { raw, parsed } : parsed;
+        } catch {
+          // Only the fixed instruction accompanies the reply; validator errors are discarded.
+        }
+        try {
+          raw = await this.withConfig({ jsonSchema, repairAttempt }).invoke(
+            [
+              ...original,
+              new AIMessage({ content: raw.content }),
+              new HumanMessage(
+                'The previous reply did not match the required JSON Schema. Reply again with only JSON that matches the schema.',
+              ),
+            ],
+            options,
+          );
+        } catch (error) {
+          if (!(error instanceof GalaxieError) || error.code !== 'invalid') throw error;
+          if (config?.includeRaw) return { raw, parsed: null };
+          throw failure('invalid');
+        }
+      }
     });
-    return assembleStructuredOutputPipeline(
-      this.withConfig({ jsonSchema }),
-      safeParser,
-      config?.includeRaw,
-    );
   }
 
   async #begin(options: Partial<BaseChatModelCallOptions> | undefined): Promise<CallState> {
@@ -258,13 +279,16 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     const jsonSchema: unknown =
       options === undefined ? undefined : Reflect.get(options, 'jsonSchema');
     const structured = plainObject(jsonSchema);
+    const repairAttempt: number | undefined =
+      options === undefined ? undefined : Reflect.get(options, 'repairAttempt');
     const lease = await run.models.begin(
       this.#role,
-      options?.signal === undefined && !structured
+      options?.signal === undefined && !structured && repairAttempt === undefined
         ? undefined
         : {
             ...(options?.signal === undefined ? {} : { signal: options.signal }),
             ...(structured ? { requires: ['structured-output'] as const } : {}),
+            ...(repairAttempt === undefined ? {} : { repairAttempt }),
           },
     );
     try {
