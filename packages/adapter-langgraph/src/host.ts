@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { GalaxieError, type ModelPort, type ModelPreparation } from '@galaxie/core';
+import {
+  type DestinationClass,
+  GalaxieError,
+  type ModelPort,
+  type ModelPreparation,
+} from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
   type BaseCheckpointSaver,
@@ -30,7 +35,10 @@ export type LangGraphAgent = (host: LangGraphHost) => LangGraphGraph;
 /** Credential providers are constructed per call; credentials never enter call options (ADR-0006). */
 export type LangGraphChatModel =
   | BaseChatModel
-  | ((options: { readonly credential: string }) => BaseChatModel);
+  | ((options: {
+      readonly credential: string;
+      readonly destination?: DestinationClass;
+    }) => BaseChatModel);
 
 export interface LangGraphServices {
   /** Provider IDs, rather than role names (ADR-0006). */

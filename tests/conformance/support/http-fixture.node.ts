@@ -88,6 +88,9 @@ export async function createHttpFixture(): Promise<HttpControl> {
   const [cors, noCors] = servers;
   if (cors === undefined || noCors === undefined) throw new Error('Missing HTTP test server.');
   const corsUrl = await listen(cors);
+  const closed = createServer();
+  const closedUrl = await listen(closed);
+  await close(closed);
   let noCorsUrl: string;
   try {
     noCorsUrl = await listen(noCors);
@@ -96,7 +99,7 @@ export async function createHttpFixture(): Promise<HttpControl> {
     throw error;
   }
   return {
-    fixture: { corsUrl, noCorsUrl, adminUrl: `${corsUrl}/__admin` },
+    fixture: { corsUrl, noCorsUrl, closedUrl, adminUrl: `${corsUrl}/__admin` },
     async close(): Promise<void> {
       await Promise.all(servers.map(close));
     },

@@ -28,6 +28,48 @@ const values = [
   '%2E%2e',
 ];
 const inputSchema = z.object({ id: z.enum(values) });
+
+test.each([
+  ['http://localhost/x/{id}', 'user-device', 'unreachable'],
+  ['http://127.0.0.1/x/{id}', 'user-endpoint', 'unreachable'],
+  ['https://192.168.1.1/x/{id}', 'user-endpoint', 'unreachable'],
+  ['https://model.local/x/{id}', 'user-endpoint', 'unreachable'],
+  ['https://api.example/x/{id}', 'user-endpoint', 'unavailable'],
+  ['http://localhost/x/{id}', 'host-server', 'unavailable'],
+] as const)(
+  'maps only user-endpoint transport failures for %s (%s)',
+  async (url, destination, code) => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+      throw new TypeError(`transport-marker ${url}`);
+    });
+    const result = await call(httpCapability(options({ url, destination, fetch })), inputSchema, {
+      id: 'a/b',
+    });
+    expect(result.error).toMatchObject({ code });
+    expect(result.error).not.toHaveProperty('cause');
+    expect(result.publicFields).not.toContain('transport-marker');
+    expect(result.publicFields).not.toContain(new URL(url).hostname);
+  },
+);
+
+test.each(['user-device', 'host-server'] as const)(
+  'uses a copied binding destination of %s for network failure classification',
+  async (destination) => {
+    const original = httpCapability(
+      options({
+        url: 'http://localhost/x/{id}',
+        destination: destination === 'user-device' ? 'host-server' : 'user-device',
+        fetch: async () => {
+          throw new TypeError('transport-marker');
+        },
+      }),
+    );
+    const result = await call({ ...original, destination }, inputSchema, { id: 'a/b' });
+    expect(result.error).toMatchObject({
+      code: destination === 'user-device' ? 'unreachable' : 'unavailable',
+    });
+  },
+);
 function options(overrides: Partial<HttpCapabilityOptions> = {}): HttpCapabilityOptions {
   return {
     ...binding(),

@@ -26,9 +26,11 @@ export function classifyOpenAIError(
   if (status === 408 || (typeof status === 'number' && status >= 500 && status <= 599))
     return { code: 'unavailable', reason: 'endpoint_failed' };
   if (status === undefined) {
+    const cause = error instanceof OpenAIClient.APIConnectionError ? error.cause : error;
+    if (cause instanceof Error && cause.name === 'AbortError') return undefined;
     if (
       error instanceof OpenAIClient.APIConnectionTimeoutError ||
-      (error instanceof Error && error.name === 'TimeoutError')
+      (cause instanceof Error && cause.name === 'TimeoutError')
     )
       return { code: 'unavailable', reason: 'endpoint_failed' };
     if (error instanceof OpenAIClient.APIConnectionError) {

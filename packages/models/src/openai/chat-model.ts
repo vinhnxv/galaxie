@@ -26,7 +26,7 @@ import { ChatOpenAICompletions } from '@langchain/openai';
 import { ModelError, ModelProviderError } from '../errors.js';
 import { mapMessages } from '../messages.js';
 import { type OutputSchema, structuredOutput } from '../structured-output.js';
-import { classifyOpenAIError } from './classify.js';
+import { classifyOpenAIError, type EndpointDestination } from './classify.js';
 
 export interface OpenAICompatibleOptions {
   readonly baseURL: string;
@@ -35,6 +35,8 @@ export interface OpenAICompatibleOptions {
   readonly temperature?: number;
   readonly fetch?: typeof globalThis.fetch;
   readonly headers?: Readonly<Record<string, string>>;
+  /** Direct calls default to user-endpoint; routed factories receive the selected destination. */
+  readonly destination?: EndpointDestination;
 }
 
 export interface OpenAICompatibleCallOptions extends BaseChatModelCallOptions {
@@ -60,7 +62,11 @@ function validateOptions(options: OpenAICompatibleOptions): OpenAICompatibleOpti
       (options.maxTokens !== undefined &&
         (!Number.isSafeInteger(options.maxTokens) || options.maxTokens <= 0)) ||
       (options.temperature !== undefined && !Number.isFinite(options.temperature)) ||
-      (options.fetch !== undefined && typeof options.fetch !== 'function')
+      (options.fetch !== undefined && typeof options.fetch !== 'function') ||
+      (options.destination !== undefined &&
+        !['in-browser', 'user-device', 'user-endpoint', 'host-server', 'third-party'].includes(
+          options.destination,
+        ))
     )
       throw new ModelError('invalid');
     const headers = new Headers(options.headers);
@@ -144,8 +150,8 @@ function assertTextReply(message: BaseMessage): string {
   return message.content;
 }
 
-function providerFailure(error: unknown): Error {
-  const failure = classifyOpenAIError(error);
+function providerFailure(error: unknown, endpoint: OpenAICompatibleOptions): Error {
+  const failure = classifyOpenAIError(error, endpoint);
   return failure === undefined
     ? new ModelProviderError()
     : new ModelError(failure.code, failure.reason);
@@ -154,10 +160,12 @@ function providerFailure(error: unknown): Error {
 /** One wrapper and one SDK model per router credential lease. Never retains credentials across leases. */
 export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCallOptions> {
   readonly #inner: ChatOpenAICompletions;
+  readonly #endpoint: OpenAICompatibleOptions;
 
   constructor(options: OpenAICompatibleOptions, credential: string) {
     super({});
     const valid = validateOptions(options);
+    this.#endpoint = valid;
     if (typeof credential !== 'string' || credential.trim().length === 0)
       throw new ModelError('invalid');
     try {
@@ -242,7 +250,7 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
       };
     } catch (error) {
       options.signal?.throwIfAborted();
-      throw providerFailure(error);
+      throw providerFailure(error, this.#endpoint);
     }
   }
 
@@ -285,7 +293,7 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
       if (!hasText || !finished) throw new ModelProviderError();
     } catch (error) {
       options.signal?.throwIfAborted();
-      throw providerFailure(error);
+      throw providerFailure(error, this.#endpoint);
     }
   }
 
@@ -315,7 +323,14 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
 
 export function openAICompatible(
   options: OpenAICompatibleOptions,
-): (call: { readonly credential: string }) => OpenAICompatibleChatModel {
+): (call: {
+  readonly credential: string;
+  readonly destination?: EndpointDestination;
+}) => OpenAICompatibleChatModel {
   const valid = validateOptions(options);
-  return ({ credential }) => new OpenAICompatibleChatModel(valid, credential);
+  return ({ credential, destination }) =>
+    new OpenAICompatibleChatModel(
+      destination === undefined ? valid : { ...valid, destination },
+      credential,
+    );
 }

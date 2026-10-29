@@ -165,7 +165,7 @@ async function run(name: keyof typeof requests, bound: CapabilityBinding, input:
     // Host-only errors are inspected locally, never forwarded to public fields or exports.
     for (const diagnostic of diagnostics)
       expect(String(diagnostic.error)).not.toContain(HTTP_ERROR_BODY);
-    return { runId, answer, error, events, snapshot };
+    return { runId, answer, error, events, snapshot, publicFields };
   } finally {
     await runtime.dispose();
     await provider.shutdown();
@@ -183,6 +183,29 @@ function expectFailure(result: Awaited<ReturnType<typeof run>>, code: 'denied' |
   expect(result.events.at(-1)).toMatchObject({ type: 'error', error: { code, message } });
   expect(result.events.some((event) => event.type === 'output')).toBe(false);
 }
+
+test('AT-24 a closed loopback user-device HTTP capability is unreachable', async () => {
+  const url = `${fixture.closedUrl}/public/items/{id}`;
+  const result = await run('items.get@1', http('', { url, destination: 'user-device' }), {
+    id: 'item-1',
+  });
+  const message =
+    'The endpoint did not answer. Local Network Access may be denied, CORS may not allow this app origin (for example OLLAMA_ORIGINS), or the server may be stopped.';
+  expect(result.answer).toBeUndefined();
+  expect(result.error).toBeInstanceOf(GalaxieError);
+  expect(result.error).toMatchObject({ code: 'unreachable', message });
+  expect(result.error).not.toHaveProperty('cause');
+  expect(result.snapshot.run).toMatchObject({
+    status: 'failed',
+    error: { code: 'unreachable', message },
+  });
+  expect(result.events.at(-1)).toMatchObject({
+    type: 'error',
+    error: { code: 'unreachable', message },
+  });
+  for (const marker of [fixture.closedUrl, new URL(fixture.closedUrl).host, '127.0.0.1'])
+    expect(result.publicFields).not.toContain(marker);
+});
 
 test('AT-29 tags an HTTP read with the agent identity and run ID', async () => {
   const result = await run('items.get@1', http('/public/items/{id}'), { id: 'item-1' });

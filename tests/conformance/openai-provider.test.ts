@@ -2,11 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
-import { createRuntime, type DiagnosticEvent, defineAgentDefinition } from '@galaxie/core';
+import {
+  createRuntime,
+  type DestinationClass,
+  type DiagnosticEvent,
+  defineAgentDefinition,
+} from '@galaxie/core';
+import { MockChatModel } from '@galaxie/models/mock';
 import { openAICompatible } from '@galaxie/models/openai';
 import type { BaseMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
-import { expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, expect, inject, test, vi } from 'vitest';
 import { z } from 'zod';
 import { RunBudget } from '../../packages/core/src/budgets.js';
 import { collect } from '../../packages/core/test/fake-executor.js';
@@ -19,6 +25,20 @@ import {
   FakeOpenAIFetch,
   type FakeOpenAIOptions,
 } from '../../packages/models/test/support/fake-openai-fetch.js';
+import type { HttpControl, HttpFixture } from './support/http-context.js';
+
+let httpFixture: HttpFixture;
+let httpControl: HttpControl | undefined;
+beforeAll(async () => {
+  if (typeof window === 'undefined') {
+    const { createHttpFixture } = await import(/* @vite-ignore */ './support/http-fixture.node.js');
+    httpControl = await createHttpFixture();
+    httpFixture = httpControl.fixture;
+  } else httpFixture = inject('http');
+});
+afterAll(async () => {
+  await httpControl?.close();
+});
 
 // Exercise the provider contract in Chromium without collecting the Node suite twice.
 if (typeof window !== 'undefined')
@@ -38,6 +58,154 @@ const schema = {
   required: ['answer'],
   additionalProperties: false,
 };
+
+test.each([
+  ['user-device', 'invoke'],
+  ['user-device', 'stream'],
+  ['user-endpoint', 'invoke'],
+  ['host-server', 'invoke'],
+  ['third-party', 'invoke'],
+  ['in-browser', 'invoke'],
+] as const)('AT-24 closed loopback model endpoint: %s %s', async (destination, mode) => {
+  await unreachableEndpoint(httpFixture.closedUrl, destination, mode);
+});
+
+test.skipIf(typeof window === 'undefined')(
+  'AT-24 a no-CORS user-device model endpoint is unreachable without fallback',
+  async () => {
+    await unreachableEndpoint(httpFixture.noCorsUrl, 'user-device', 'invoke');
+  },
+);
+
+async function unreachableEndpoint(
+  baseURL: string,
+  destination: DestinationClass,
+  mode: 'invoke' | 'stream',
+): Promise<void> {
+  // Distinguish the endpoint host from Vitest's source URLs in browser error stacks.
+  baseURL = baseURL.replace('127.0.0.1', 'localhost');
+  const fallback = new MockChatModel({
+    'endpoint-prompt-canary': { id: 'unused', text: 'unused' },
+  });
+  const spy = vi.spyOn(fallback, '_generate');
+  const { exporter, provider } = createSpanRecorder();
+  const diagnostics: DiagnosticEvent[] = [];
+  let caught: unknown;
+  const runtime = createRuntime({
+    appId: 'endpoint-conformance',
+    dataPolicy: { app: { allow: [destination, 'in-browser'] } },
+    executors: [createLangGraphAdapter()],
+    tracerProvider: provider,
+    diagnostics: (event) => diagnostics.push(event),
+  });
+  try {
+    const instance = await runtime.create(definition, {
+      principalScope: 'test',
+      services: {
+        chatModels: {
+          endpoint: openAICompatible({ baseURL, model: 'fake' }),
+          fallback,
+        },
+      },
+      models: {
+        providers: {
+          endpoint: {
+            destination,
+            modality: 'text',
+            features: ['streaming'],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+            credential: true,
+          },
+          fallback: {
+            destination: 'in-browser',
+            modality: 'text',
+            features: ['streaming'],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+          },
+        },
+        roles: {
+          assistant: {
+            providers: ['endpoint', 'fallback'],
+            allow: [destination, 'in-browser'],
+            maxTokens: 100,
+          },
+        },
+        consent: () => true,
+        getCredential: () => 'endpoint-credential-canary',
+      },
+      agent: (host) =>
+        new StateGraph(state)
+          .addNode('respond', async (_state, config) => {
+            const model = host.langchain.chatModel('assistant');
+            try {
+              if (mode === 'stream') {
+                for await (const _chunk of await model.stream('endpoint-prompt-canary', config)) {
+                  /* drain */
+                }
+              } else {
+                model.disableStreaming = true;
+                await model.invoke('endpoint-prompt-canary', config);
+              }
+            } catch (error) {
+              caught = error;
+              throw error;
+            }
+            return { answer: 'unexpected-success' };
+          })
+          .addEdge(START, 'respond')
+          .addEdge('respond', END)
+          .compile(),
+    });
+    await instance.prepare();
+    const { runId } = await instance.start({});
+    const events = await collect(instance.events(runId));
+    await runtime.dispose();
+    await provider.forceFlush();
+    const code = ['user-device', 'user-endpoint'].includes(destination)
+      ? 'unreachable'
+      : 'unavailable';
+    const message =
+      code === 'unreachable'
+        ? 'The endpoint did not answer. Local Network Access may be denied, CORS may not allow this app origin (for example OLLAMA_ORIGINS), or the server may be stopped.'
+        : 'The requested service is unavailable.';
+    expect(caught).toMatchObject({ code });
+    expect(caught).not.toHaveProperty('cause');
+    expect(events.at(-1)).toMatchObject({ type: 'error', error: { code, message } });
+    expect(instance.getSnapshot().run).toMatchObject({
+      status: 'failed',
+      error: { code, message },
+    });
+    expect(spy).not.toHaveBeenCalled();
+    expect(fallback.calls).toBe(0);
+    const spans = exporter.getFinishedSpans();
+    assertSpanTree(spans);
+    expect(
+      spans.filter((span) => span.attributes['gen_ai.operation.name'] === 'chat'),
+    ).toHaveLength(1);
+    const fields = JSON.stringify({
+      events,
+      snapshot: instance.getSnapshot(),
+      spans: serializeSpans(spans),
+      diagnostics,
+      error:
+        caught instanceof Error
+          ? { ...caught, message: caught.message, stack: caught.stack }
+          : caught,
+    });
+    for (const marker of [
+      baseURL,
+      new URL(baseURL).host,
+      'localhost',
+      'endpoint-prompt-canary',
+      'endpoint-credential-canary',
+    ])
+      expect(fields).not.toContain(marker);
+  } finally {
+    spy.mockRestore();
+    await runtime.dispose();
+    await provider.shutdown();
+  }
+}
 
 test.each([
   'invoke',

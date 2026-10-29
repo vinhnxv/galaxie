@@ -48,6 +48,26 @@ describe('OpenAI-compatible error classification', () => {
     expect(classifyOpenAIError(new OpenAIClient.APIUserAbortError(), endpoint)).toBeUndefined();
   });
 
+  it('does not turn a fetch timeout or abort wrapped by the SDK into unreachable', () => {
+    const endpoint = { baseURL: 'http://localhost/v1', destination: 'user-device' } as const;
+    expect(
+      classifyOpenAIError(
+        new OpenAIClient.APIConnectionError({
+          cause: new DOMException('timeout-marker', 'TimeoutError'),
+        }),
+        endpoint,
+      ),
+    ).toEqual({ code: 'unavailable', reason: 'endpoint_failed' });
+    expect(
+      classifyOpenAIError(
+        new OpenAIClient.APIConnectionError({
+          cause: new DOMException('abort-marker', 'AbortError'),
+        }),
+        endpoint,
+      ),
+    ).toBeUndefined();
+  });
+
   it.each([
     [401, 'not_allowed'],
     [403, 'not_allowed'],
@@ -132,6 +152,25 @@ function fixture(options: ConstructorParameters<typeof FakeOpenAIFetch>[0] = {})
 }
 
 describe('OpenAI-compatible chat model', () => {
+  it.each(['read-error', 'eof'] as const)(
+    'keeps a local endpoint failure after an SSE response outside unreachable: %s',
+    async (mode) => {
+      const fake = new FakeOpenAIFetch({ truncate: true, streamFailure: mode === 'read-error' });
+      const model = openAICompatible({
+        baseURL: 'http://localhost/v1',
+        model: 'fake',
+        fetch: fake.fetch,
+      })({ credential });
+      await expect(
+        (async () => {
+          for await (const _chunk of await model.stream('hello')) {
+            /* drain */
+          }
+        })(),
+      ).rejects.toMatchObject({ name: 'ModelProviderError' });
+    },
+  );
+
   it.each([
     {
       usage: { prompt_tokens: 0, completion_tokens: 2, total_tokens: 2 },

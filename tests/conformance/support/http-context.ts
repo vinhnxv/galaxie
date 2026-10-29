@@ -7,6 +7,7 @@ export const HTTP_ERROR_BODY: string = 'http-fixture-response-body-canary';
 export interface HttpFixture {
   readonly corsUrl: string;
   readonly noCorsUrl: string;
+  readonly closedUrl: string;
   readonly adminUrl: string;
 }
 

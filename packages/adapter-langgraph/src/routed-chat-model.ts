@@ -298,7 +298,10 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
         throw failure('invalid');
       const provider =
         typeof implementation === 'function'
-          ? implementation({ credential: lease.credential as string })
+          ? implementation({
+              credential: lease.credential as string,
+              destination: lease.destination,
+            })
           : implementation;
       return { lease, provider, handler: run.handler, settled: false };
     } catch (error) {
