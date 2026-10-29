@@ -6,6 +6,7 @@ import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
 const alias = {
+  '@galaxie/react': fileURLToPath(new URL('./packages/react/src/index.ts', import.meta.url)),
   '@galaxie/models/builtin-ai': fileURLToPath(
     new URL('./packages/models/src/builtin-ai/index.ts', import.meta.url),
   ),
@@ -39,6 +40,9 @@ const config: ViteUserConfig = defineConfig({
         optimizeDeps: {
           exclude: ['@mlc-ai/web-llm'],
           include: [
+            'react',
+            'react-dom/client',
+            'react/jsx-runtime',
             '@langchain/langgraph/web',
             '@langchain/core/callbacks/base',
             '@langchain/core/language_models/chat_models',
@@ -54,7 +58,7 @@ const config: ViteUserConfig = defineConfig({
         },
         test: {
           name: 'browser',
-          include: ['**/*.test.ts'],
+          include: ['**/*.test.ts', '**/*.test.tsx', '../../packages/react/test/**/*.test.tsx'],
           exclude: [...configDefaults.exclude, '**/*.node.test.ts'],
           browser: {
             enabled: true,

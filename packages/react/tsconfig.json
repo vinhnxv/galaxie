@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@galaxie/core": ["../core/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
