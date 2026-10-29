@@ -1,0 +1,30 @@
+{
+  "name": "@galaxie/example-host-remote",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An English tutor host with a remote quiz model, HTTP bindings and confirmed saves.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@galaxie/core": "workspace:*",
+    "@galaxie/adapter-langgraph": "workspace:*",
+    "@galaxie/models": "workspace:*",
+    "@galaxie/react": "workspace:*",
+    "@galaxie/example-english-tutor": "workspace:*",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "@langchain/core": "1.2.20",
+    "@langchain/langgraph": "1.5.1",
+    "@langchain/openai": "1.6.3",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vite": "8.3.4",
+    "playwright": "1.64.1"
+  }
+}

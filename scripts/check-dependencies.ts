@@ -322,6 +322,35 @@ for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
   }
 }
 
+for (const area of ['src', 'server', 'test']) {
+  const directory = join('examples/host-remote', area);
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier, typeOnly } of imports(file)) {
+      const relative = specifier.startsWith('./') || specifier.startsWith('../');
+      if (relative) {
+        const target = resolve(dirname(file), specifier);
+        const allowed = area === 'test' ? ['src', 'server', 'test'] : [area];
+        if (allowed.some((part) => target.startsWith(`${resolve('examples/host-remote', part)}/`)))
+          continue;
+      } else if (area === 'server') {
+        if (specifier.startsWith('node:') || (specifier === 'vite' && typeOnly)) continue;
+      } else if (
+        specifier.startsWith('@galaxie/') ||
+        specifier.startsWith('@langchain/') ||
+        specifier === 'react' ||
+        specifier.startsWith('react/') ||
+        specifier === 'react-dom' ||
+        specifier.startsWith('react-dom/') ||
+        specifier === 'zod' ||
+        (area === 'test' &&
+          (specifier.startsWith('node:') || ['vite', 'playwright', 'vitest'].includes(specifier)))
+      )
+        continue;
+      problems.push(`${file}: forbidden remote host ${area} import ${specifier}`);
+    }
+  }
+}
+
 for (const directory of [
   'packages/core/dist',
   'packages/adapter-langgraph/dist',
