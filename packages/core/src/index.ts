@@ -103,6 +103,10 @@ export type {
   ModelRoute,
   ModelRouting,
   ModelUsage,
+  OutputSafetyCheck,
+  OutputSafetyHook,
+  OutputSafetyOutcome,
+  OutputSafetyVerdict,
   PublishedModelRoute,
   SelectedModelRoute,
 } from './models.js';

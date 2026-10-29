@@ -139,10 +139,29 @@ export interface ModelUsage {
   readonly outputTokens: number;
 }
 
+/** Host policy for model-generated text, including accumulated tool arguments. */
+export interface OutputSafetyCheck {
+  readonly text: string;
+  readonly final: boolean;
+  readonly role: ModelRoleName;
+  readonly destination: DestinationClass;
+  readonly signal: AbortSignal;
+}
+
+export type OutputSafetyVerdict = 'allow' | 'block';
+export type OutputSafetyHook = (
+  check: OutputSafetyCheck,
+) => OutputSafetyVerdict | Promise<OutputSafetyVerdict>;
+export type OutputSafetyOutcome = 'allowed' | 'blocked' | 'failed' | 'unset';
+
 /** One reserved call; only this lease carries the credential (ADR-0006). */
 export interface ModelCall extends SelectedModelRoute {
   /** Ephemeral value for this call's provider factory (ADR-0006). */
   readonly credential?: string;
+  /** Last check outcome, or unset when no hook is configured. */
+  readonly outputSafetyOutcome: OutputSafetyOutcome | undefined;
+  /** Must pass before generated text reaches an executor or a stream consumer. */
+  checkOutput(text: string, options: { readonly final: boolean }): Promise<void>;
   /** Settles once with valid usage, or the reservation when absent (ADR-0006). */
   end(usage?: ModelUsage): void;
   /** Settles once at the reservation on failure or abandonment (ADR-0006). */

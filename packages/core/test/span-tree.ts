@@ -40,6 +40,7 @@ const ALLOWED = new Set([
   'galaxie.capability.kind',
   'galaxie.destination.class',
   'galaxie.model.provider',
+  'galaxie.output_safety',
   'galaxie.run.labels',
   'galaxie.budget.name',
   'gen_ai.agent.name',
@@ -86,6 +87,8 @@ export function assertSpanTree(
           key,
         );
       expect(ALLOWED.has(key) || text, key).toBe(true);
+      if (key === 'galaxie.output_safety')
+        expect(['allowed', 'blocked', 'failed', 'unset']).toContain(value);
       if (key === 'galaxie.run.segment') {
         expect(Number.isInteger(value)).toBe(true);
         expect(value).toBeGreaterThanOrEqual(0);
