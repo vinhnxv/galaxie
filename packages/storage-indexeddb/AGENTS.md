@@ -9,7 +9,8 @@ See the [README](README.md) and [recovery flow](../../docs/system-design.md#82-r
 ## Entry points
 
 - `@galaxie/storage-indexeddb` exports `IndexedDBSaver`, `IndexedDBSaverOptions`,
-  `StorageError`, `StorageErrorCode` and `IndexedDBRecovery`.
+  `StorageError`, `StorageErrorCode`, `IndexedDBRecovery`, `SessionExport` and
+  `SessionExportValue`.
 - The supported surface is [src/index.ts](src/index.ts); there are no subpaths.
 - `IndexedDBSaver.open` constructs the saver; `saver.recovery` supplies core's
   recovery port structurally without importing core.
@@ -34,6 +35,9 @@ from its own verified session.
 - Dispose the runtime before releasing ownership and closing the saver.
 - Await `invalidatePrincipal()` before broadcasting logout; reopen afterward.
 - Use `deleteSession` to remove the inbox/journal as well as checkpoints.
+- Use `exportSession(sessionId)` for content-free metadata. Bind
+  `personalContent: true` only to an explicit user export action and treat the
+  result as personal data; see [export semantics](README.md#explicit-session-export).
 
 ## Never
 
@@ -48,6 +52,9 @@ from its own verified session.
 Browser eviction may return a fresh start. Storage is not encrypted by this
 package. Reload recovery needs compatible graph identity and an outstanding
 interrupt; it cannot finish arbitrary intermediate checkpoints.
+Exports are lossy JSON snapshots, with no import, sync or cross-device recovery.
+There is no example-host export UI. Logout rejects an in-progress export before
+publication but cannot revoke copies already returned to host code.
 Ownership must be composed by the host; an already-sent remote effect may finish.
 See [ownership](../../docs/system-design.md#85-tab-ownership-and-takeover) and
 [logout limits](../../docs/system-design.md#86-logout).

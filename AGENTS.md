@@ -34,6 +34,8 @@ Core now offers opt-in, content-free `RuntimeOptions.developmentWarnings` for pa
 
 The M4 documentation slice adds package coding guidance, a root [AI-facing index](llms.txt), [tracing](docs/guides/tracing.md) and [host integration](docs/guides/host-integration.md) guides, a [tested device matrix](docs/device-matrix.md), and an offline tracked-document link check in `pnpm check`.
 
+`IndexedDBSaver.exportSession(sessionId, { personalContent? })` now adds principal-scoped session export with content-free defaults. Only exact `personalContent: true` includes decoded checkpoints and pending writes; hosts must bind that opt-in to an explicit user action and treat the result as personal data. Exports are frozen JSON snapshots with marked base64 bytes and fixed placeholders for unreadable values. Logout generation checks surround decoding; ownership loss leaves reads available. No storage schema, record format or database version changes. Chromium storage tests and the injected-fetch AT-23 scan cover exports through success, 401 and transport failure; pure conversion tests run on Node and Chromium. No host export UI, import, sync or cross-device recovery ships. AT-19 remains partial for the missing host action flow; see [export semantics](packages/storage-indexeddb/README.md#explicit-session-export).
+
 ## Read first
 
 1. `docs/galaxie-project-brief.md`: the source of truth for scope, architecture, security and the roadmap. Start with §0.
