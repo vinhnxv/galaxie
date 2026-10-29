@@ -40,7 +40,6 @@ function activity(value: unknown): number | undefined {
   return value.lastActivity;
 }
 
-/** Called inside every session write's transaction. */
 export async function touchSession(
   tx: IDBTransaction,
   scope: readonly [string, string],
@@ -163,12 +162,14 @@ export async function sweep(
           row.key[4] !== latest.get(row.key[3]) &&
           (row.savedAt === undefined || row.savedAt < now - historyMs),
       );
-      const retained = rows.filter((row) => !removed.includes(row));
+      const removedSet = new Set(removed);
+      const retained = rows.filter((row) => !removedSet.has(row));
       const parentTasks = new Set(
         retained
           .filter((row) => row.parentId !== null)
           .map((row) => JSON.stringify([...row.key.slice(0, 4), row.parentId])),
       );
+      const retainedKeys = new Set(retained.map((row) => JSON.stringify(row.key)));
       const writes = tx.objectStore('writes');
       for (const row of removed) {
         await requestResult(checkpoints.delete(row.key));
@@ -190,10 +191,42 @@ export async function sweep(
             typeof value.channel !== 'string'
           )
             throw new StorageError('corrupt');
-          if (value.channel !== TASKS) await requestResult(cursor.delete());
+          if (value.channel === TASKS)
+            await requestResult(cursor.update({ ...value, retainedForHistory: true }));
+          else await requestResult(cursor.delete());
           cursor.continue();
           cursor = await requestResult(request);
         }
+      }
+      // Native writes can precede checkpoints. Reclaim only dependencies a sweep retained.
+      const request = writes.openCursor(prefixRange([...scope, sessionId]));
+      let cursor = await requestResult(request);
+      while (cursor !== null) {
+        const value: unknown = cursor.value;
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          'retainedForHistory' in value &&
+          value.retainedForHistory === true
+        ) {
+          const key = cursor.primaryKey;
+          if (
+            !Array.isArray(key) ||
+            key.length !== 7 ||
+            !key.slice(0, 6).every((part) => typeof part === 'string') ||
+            !Number.isSafeInteger(key[6]) ||
+            !('v' in value) ||
+            value.v !== 1 ||
+            !('channel' in value) ||
+            value.channel !== TASKS
+          )
+            throw new StorageError('corrupt');
+          const checkpoint = JSON.stringify(key.slice(0, 5));
+          if (!retainedKeys.has(checkpoint) && !parentTasks.has(checkpoint))
+            await requestResult(cursor.delete());
+        }
+        cursor.continue();
+        cursor = await requestResult(request);
       }
       return { prunedCheckpoints: removed.length, expiredSessions: 0 };
     });

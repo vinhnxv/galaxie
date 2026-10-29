@@ -178,3 +178,43 @@ describe.skipIf(typeof indexedDB === 'undefined')('storage lifecycle', () => {
     await expect(saver.getTuple({})).rejects.toMatchObject({ code: 'superseded' });
   });
 });
+
+describe.skipIf(typeof indexedDB === 'undefined')('asynchronous storage observers', () => {
+  test.each(['onError', 'onVersionChange'] as const)(
+    'swallows a rejecting %s callback',
+    async (hook) => {
+      const unhandled: unknown[] = [];
+      const listener = (event: PromiseRejectionEvent): void => {
+        event.preventDefault();
+        unhandled.push(event.reason);
+      };
+      addEventListener('unhandledrejection', listener);
+      try {
+        const databaseName = name();
+        const observer = async (): Promise<void> => {
+          throw new Error('private observer canary');
+        };
+        const saver = await IndexedDBSaver.open({
+          databaseName,
+          appId: 'app',
+          principalScope: 'user',
+          [hook]: observer,
+        });
+        connections.push(saver);
+        if (hook === 'onError') {
+          await expect(saver.getTuple({ configurable: { thread_id: '' } })).rejects.toEqual(
+            new StorageError('invalid'),
+          );
+        } else {
+          const newer = await openDatabase(databaseName, 'app', 'other', 2);
+          connections.push(newer);
+          await expect(saver.getTuple({})).rejects.toMatchObject({ code: 'superseded' });
+        }
+        await new Promise<void>((resolve) => setTimeout(resolve, 50));
+        expect(unhandled).toEqual([]);
+      } finally {
+        removeEventListener('unhandledrejection', listener);
+      }
+    },
+  );
+});

@@ -15,7 +15,7 @@ export function observeError(
 ): StorageError {
   const fixed = storageError(error);
   try {
-    onError?.(fixed.code);
+    void Promise.resolve(onError?.(fixed.code)).catch(() => {});
   } catch {}
   return fixed;
 }
@@ -34,7 +34,7 @@ export function manageConnection(
     if (state.superseded) return;
     state.superseded = true;
     try {
-      options.onVersionChange?.();
+      void Promise.resolve(options.onVersionChange?.()).catch(() => {});
     } catch {}
   });
 }

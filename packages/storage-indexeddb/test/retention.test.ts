@@ -256,4 +256,34 @@ describe.skipIf(typeof indexedDB === 'undefined')('retention', () => {
     });
     expect(await saver.getTuple(cfg())).toBeDefined();
   });
+
+  test('reclaims obsolete parent tasks across sweeps while keeping future checkpoint writes', async () => {
+    const databaseName = `galaxie-retention-repeated-${crypto.randomUUID()}`;
+    const saver = await open(databaseName);
+    const clock = vi.spyOn(storageClock, 'now').mockReturnValue(day);
+    const first = await save(saver, cfg(), '001', 3);
+    await saver.putWrites(first, [[TASKS, 'old private task']], 'task');
+    const second = await save(saver, first, '002', 3);
+    await saver.putWrites(second, [[TASKS, 'current parent task']], 'task');
+    const secondBefore = await saver.getTuple(second);
+    await saver.sweep({ historyMs: 0, now: 10 * day });
+    expect(await saver.getTuple(second)).toEqual(secondBefore);
+
+    clock.mockReturnValue(11 * day);
+    const third = await save(saver, second, '003', 3);
+    await saver.putWrites(third, [['answer', 'current write']], 'task');
+    await saver.putWrites(cfg('session', '', 'future'), [[TASKS, 'future task']], 'task');
+    const thirdBefore = await saver.getTuple(third);
+    await saver.sweep({ historyMs: 0, now: 12 * day });
+    expect(await saver.getTuple(third)).toEqual(thirdBefore);
+    const db = await openDatabase(databaseName, 'app', 'user');
+    try {
+      const keys = await transact(db, ['writes'], 'readonly', (tx) =>
+        requestResult(tx.objectStore('writes').getAllKeys()),
+      );
+      expect(keys.map((key) => (key as string[])[4]).sort()).toEqual(['002', '003', 'future']);
+    } finally {
+      db.close();
+    }
+  });
 });

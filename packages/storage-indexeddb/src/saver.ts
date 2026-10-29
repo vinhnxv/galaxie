@@ -46,6 +46,7 @@ import {
   openDatabase,
   operationError,
   requestResult,
+  storageOperation,
   transact,
 } from './schema.js';
 
@@ -80,6 +81,7 @@ interface WriteRecord {
   readonly value: Envelope;
   readonly taskPath: string;
   readonly order: number;
+  readonly retainedForHistory?: true;
 }
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -259,8 +261,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
   }
 
   override async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
-    try {
-      assertConnection(this.#db);
+    return storageOperation(this.#db, async () => {
       const thread: unknown = config.configurable?.['thread_id'];
       const namespace: unknown = config.configurable?.['checkpoint_ns'] ?? '';
       const id = getCheckpointId(config);
@@ -289,9 +290,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
       return saved === undefined
         ? undefined
         : await this.#tuple(saved.row, saved.writes, saved.parent, id ? config : undefined);
-    } catch (error) {
-      throw operationError(this.#db, error);
-    }
+    });
   }
 
   override async *list(
@@ -350,8 +349,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     metadata: CheckpointMetadata,
     _newVersions: ChannelVersions,
   ): Promise<RunnableConfig> {
-    try {
-      assertConnection(this.#db);
+    return storageOperation(this.#db, async () => {
       const thread: unknown = config.configurable?.['thread_id'];
       const namespace: unknown = config.configurable?.['checkpoint_ns'] ?? '';
       const parent: unknown = config.configurable?.['checkpoint_id'];
@@ -408,9 +406,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
       return {
         configurable: { thread_id: thread, checkpoint_ns: namespace, checkpoint_id: checkpoint.id },
       };
-    } catch (error) {
-      throw operationError(this.#db, error);
-    }
+    });
   }
 
   override async putWrites(
@@ -419,8 +415,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     taskId: string,
     taskPath = '',
   ): Promise<void> {
-    try {
-      assertConnection(this.#db);
+    return storageOperation(this.#db, async () => {
       const thread: unknown = config.configurable?.['thread_id'];
       const namespace: unknown = config.configurable?.['checkpoint_ns'];
       const id: unknown = config.configurable?.['checkpoint_id'];
@@ -461,23 +456,17 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           await requestResult(store.put(row));
         }
       });
-    } catch (error) {
-      throw operationError(this.#db, error);
-    }
+    });
   }
 
   async sweep(options?: SweepOptions): Promise<SweepResult> {
-    try {
-      assertConnection(this.#db);
+    return storageOperation(this.#db, async () => {
       return await sweep(this.#db, this.#scope, options);
-    } catch (error) {
-      throw operationError(this.#db, error);
-    }
+    });
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    try {
-      assertConnection(this.#db);
+    return storageOperation(this.#db, async () => {
       validateKey(sessionId);
       await transact(
         this.#db,
@@ -485,14 +474,11 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         'readwrite',
         (tx) => deleteSessionRecords(tx, this.#scope, sessionId),
       );
-    } catch (error) {
-      throw operationError(this.#db, error);
-    }
+    });
   }
 
   override async deleteThread(threadId: string): Promise<void> {
-    try {
-      assertConnection(this.#db);
+    return storageOperation(this.#db, async () => {
       validateKey(threadId);
       await transact(this.#db, ['checkpoints', 'writes', 'meta'], 'readwrite', async (tx) => {
         const range = prefixRange([...this.#scope, threadId]);
@@ -502,8 +488,6 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         await requestResult(meta.delete([...this.#scope, 'thread', threadId]));
         await requestResult(meta.delete(prefixRange([...this.#scope, 'namespace', threadId])));
       });
-    } catch (error) {
-      throw operationError(this.#db, error);
-    }
+    });
   }
 }
