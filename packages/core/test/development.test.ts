@@ -201,7 +201,7 @@ test.each(['throw', 'reject', 'null', 'unknown', 'bytes', 'siteStorage'] as cons
         : {
             status: 'downloadable',
             siteStorage: kind === 'siteStorage' ? undefined : true,
-            bytes: -1,
+            bytes: kind === 'siteStorage' ? 0 : -1,
           };
     };
     await runtime.create(modelDefinition, {
