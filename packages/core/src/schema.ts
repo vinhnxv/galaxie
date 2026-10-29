@@ -13,10 +13,12 @@ export type Infer<S extends Schema> = output<S>;
 export type InferInput<S extends Schema> = input<S>;
 
 /** Standard Schema v1 validation contract for framework-neutral UI props and actions. */
-export interface StandardSchema<Output = unknown> {
+export interface StandardSchema<Output = unknown, Input = Output> {
   readonly '~standard': {
     readonly version: 1;
     readonly vendor: string;
+    /** Type-only metadata from the Standard Schema spec; never read at runtime. */
+    readonly types?: { readonly input: Input; readonly output: Output } | undefined;
     readonly validate: (
       value: unknown,
     ) =>
@@ -45,7 +47,12 @@ export function isStandardSchema(value: unknown): value is StandardSchema {
   );
 }
 
-/** Rejects asynchronous validators and discards all schema issues and thrown values. */
+/**
+ * Rejects asynchronous validators and discards all schema issues and thrown values.
+ * Schemas must validate synchronously. Zod 4.6.7 runs an async refinement and drops its Promise
+ * before reporting async use, so a rejecting refinement still surfaces as an unhandled rejection
+ * carrying the refinement's own error; the validation result is `{ ok: false }` regardless.
+ */
 export function validateSync<Output>(
   schema: StandardSchema<Output>,
   value: unknown,

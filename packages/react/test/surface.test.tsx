@@ -324,3 +324,29 @@ test('Strict Mode rerenders and instance switches release subscriptions without 
     expect(current.dispatch).not.toHaveBeenCalled();
   }
 });
+
+test('submit takes the payload schema input and dispatches it unchanged', async () => {
+  const count = z.object({ count: z.string().transform(Number) });
+  const entry = defineComponent({
+    id: 'tests.Count/v1',
+    props: z.object({}),
+    actions: { submit: { label: 'Send', payload: count } },
+    component: ({ actions }): ReactElement => (
+      <button type="button" onClick={() => void actions.submit.submit({ count: '5' })}>
+        {actions.submit.label}
+      </button>
+    ),
+  });
+  const instance = new FakeInstance();
+  instance.setPending(interaction({ component: 'tests.Count/v1', props: {} }));
+  const { container } = await mount(
+    <AgentSurface
+      instance={instance}
+      registry={createRegistry({ components: [entry] })}
+      surfaceId="lesson-main"
+    />,
+  );
+  await act(async () => container.querySelector('button')?.click());
+  expect(instance.dispatch).toHaveBeenCalledTimes(1);
+  expect(instance.dispatch.mock.calls[0]?.[0].payload).toEqual({ count: '5' });
+});

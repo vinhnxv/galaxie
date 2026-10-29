@@ -20,9 +20,9 @@ import {
 } from '@galaxie/core';
 import type { ReactElement } from 'react';
 
-export interface ActionDefinition<Payload = unknown> {
+export interface ActionDefinition<Payload = unknown, PayloadInput = Payload> {
   readonly label: string;
-  readonly payload: StandardSchema<Payload>;
+  readonly payload: StandardSchema<Payload, PayloadInput>;
 }
 
 export type ActionDefinitions = Readonly<Record<string, ActionDefinition>>;
@@ -30,10 +30,16 @@ export type ActionDefinitions = Readonly<Record<string, ActionDefinition>>;
 export type SchemaOutput<S extends StandardSchema> =
   S extends StandardSchema<infer Output> ? Output : never;
 
+/** The value a schema accepts; `submit` sends it unchanged so core can validate it again. */
+export type SchemaInput<S extends StandardSchema> =
+  NonNullable<S['~standard']['types']> extends { readonly input: infer Input }
+    ? Input
+    : SchemaOutput<S>;
+
 export type BoundActions<Actions extends ActionDefinitions> = {
   readonly [Name in keyof Actions]: {
     readonly label: string;
-    readonly submit: (payload: SchemaOutput<Actions[Name]['payload']>) => Promise<DispatchReceipt>;
+    readonly submit: (payload: SchemaInput<Actions[Name]['payload']>) => Promise<DispatchReceipt>;
   };
 };
 

@@ -28,6 +28,7 @@ export {
   type Registry,
   type RegistryComponent,
   type ResolvedInteraction,
+  type SchemaInput,
   type SchemaOutput,
 } from './registry.js';
 export { AgentSurface, type AgentSurfaceProps } from './surface.js';

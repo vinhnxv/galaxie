@@ -73,6 +73,14 @@ function imports(file: string): ImportReference[] {
       const argument = node.arguments[0];
       if (argument === undefined) problems.push(`${file}: dynamic imports require a specifier`);
       else add(argument, false, false, true);
+    } else if (
+      (ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === 'require') ||
+      (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference))
+    ) {
+      // Packages are ES modules; a CommonJS load would bypass the specifier rules above.
+      problems.push(`${file}: CommonJS loads are not allowed`);
     }
     ts.forEachChild(node, visit);
   };
