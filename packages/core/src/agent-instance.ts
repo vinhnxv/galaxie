@@ -29,6 +29,7 @@ import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
 import type { OutputSafetyHook, PublishedModelRoute, SelectedModelRoute } from './models.js';
 import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
+import { copyRecoveryJson, validateSubmissions } from './recovery.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
 import { type StandardSchema, validateSync } from './schema.js';
@@ -296,75 +297,122 @@ export function createAgentInstance(
       return toErrorInfo('unsupported');
     return undefined;
   };
-  const acceptEvent = (run: RunRecord, segment: SegmentRecord, event: ExecutorEvent): void => {
+  const validateSubmission = (
+    run: RunRecord,
+    pending: PendingInteraction,
+    action: string,
+    raw: unknown,
+  ): { readonly payload: unknown; readonly schema: StandardSchema | undefined } => {
+    if (typeof action !== 'string' || action.length === 0)
+      throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+    const actions = options.ui?.components[pending.component]?.actions;
+    if (options.ui !== undefined && (actions === undefined || !Object.hasOwn(actions, action)))
+      throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+    const payload: unknown = JSON.parse(run.budget.payload(raw));
+    const schema = actions?.[action]?.payload;
+    if (schema !== undefined && !validateSync(schema, payload).ok)
+      throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+    return { payload, schema };
+  };
+  const acceptEvent = (
+    run: RunRecord,
+    segment: SegmentRecord,
+    event: ExecutorEvent,
+  ): void | Promise<void> => {
     if (!active(run, segment)) {
       report({ kind: 'late_event', runId: run.runId });
       return;
     }
-    if (event.type !== 'stream' && segment.submission !== undefined)
+    if (
+      options.recovery === undefined &&
+      event.type !== 'stream' &&
+      segment.submission !== undefined
+    )
       segment.submission.status = 'consumed';
-    switch (event.type) {
-      case 'output':
-        segment.outcome = 'succeeded';
-        segment.clearWallClock?.();
-        run.status = 'succeeded';
-        run.privateValues.clear();
-        delete run.pending;
-        break;
-      case 'error': {
-        const knownCode = isErrorCode(event.error.code);
-        const error = Object.freeze(
-          toErrorInfo(
-            knownCode ? event.error.code : 'executor_error',
-            event.error.type === undefined ? undefined : { name: event.error.type },
-          ),
-        );
-        if (error.code === 'budget_exceeded') failRunForBudget(run, segment, 'steps', error);
-        else failRun(run, error);
-        if (!knownCode)
-          report({ kind: 'protocol_violation', runId: run.runId, error: event.error });
-        report({
-          kind: 'run_failed',
-          runId: run.runId,
-          error:
-            isGalaxieError(event.error) && event.error.cause !== undefined
-              ? event.error.cause
-              : event.error,
-        });
+    if (event.type === 'interaction') {
+      if (!adapter.features.interrupts) {
+        const error = { name: 'ProtocolViolation' };
+        failRun(run, toErrorInfo('executor_error', error));
+        report({ kind: 'protocol_violation', runId: run.runId, error });
         return;
       }
-      case 'interaction':
-        if (!adapter.features.interrupts) {
-          const error = { name: 'ProtocolViolation' };
-          failRun(run, toErrorInfo('executor_error', error));
-          report({ kind: 'protocol_violation', runId: run.runId, error });
+      if (run.inbox.has(event.interaction.interactionId)) {
+        // An answered interaction can never pause again: dispatch would only report duplicate.
+        const error = { name: 'ProtocolViolation' };
+        failRun(run, toErrorInfo('unsupported', error));
+        report({ kind: 'protocol_violation', runId: run.runId, error });
+        return;
+      }
+      {
+        const error = interactionError(event.interaction);
+        if (error !== undefined) {
+          failRun(run, error);
+          report({ kind: 'interaction_rejected', runId: run.runId });
           return;
         }
-        if (run.inbox.has(event.interaction.interactionId)) {
-          // An answered interaction can never pause again: dispatch would only report duplicate.
-          const error = { name: 'ProtocolViolation' };
-          failRun(run, toErrorInfo('unsupported', error));
-          report({ kind: 'protocol_violation', runId: run.runId, error });
-          return;
-        }
-        {
-          const error = interactionError(event.interaction);
-          if (error !== undefined) {
-            failRun(run, error);
-            report({ kind: 'interaction_rejected', runId: run.runId });
-            return;
-          }
-        }
-        segment.outcome = 'waiting_input';
-        segment.clearWallClock?.();
-        run.status = 'waiting_input';
-        run.pending = event.interaction;
-        break;
-      case 'stream':
-        break;
+      }
     }
-    run.events.append(event);
-    publish(run.events);
+    const commit = (): void => {
+      switch (event.type) {
+        case 'output':
+          segment.outcome = 'succeeded';
+          segment.clearWallClock?.();
+          run.status = 'succeeded';
+          run.privateValues.clear();
+          delete run.pending;
+          break;
+        case 'error': {
+          const knownCode = isErrorCode(event.error.code);
+          const error = Object.freeze(
+            toErrorInfo(
+              knownCode ? event.error.code : 'executor_error',
+              event.error.type === undefined ? undefined : { name: event.error.type },
+            ),
+          );
+          if (error.code === 'budget_exceeded') failRunForBudget(run, segment, 'steps', error);
+          else failRun(run, error);
+          if (!knownCode)
+            report({ kind: 'protocol_violation', runId: run.runId, error: event.error });
+          report({
+            kind: 'run_failed',
+            runId: run.runId,
+            error:
+              isGalaxieError(event.error) && event.error.cause !== undefined
+                ? event.error.cause
+                : event.error,
+          });
+          return;
+        }
+        case 'interaction':
+          segment.outcome = 'waiting_input';
+          segment.clearWallClock?.();
+          run.status = 'waiting_input';
+          run.pending = event.interaction;
+          break;
+        case 'stream':
+          break;
+      }
+      run.events.append(event);
+      publish(run.events);
+    };
+    const submission = segment.submission;
+    const recovery = options.recovery;
+    if (
+      recovery !== undefined &&
+      submission !== undefined &&
+      (event.type === 'output' || event.type === 'interaction')
+    ) {
+      return (async () => {
+        try {
+          await recovery.consumeSubmission(sessionId, submission.interactionId);
+          submission.status = 'consumed';
+        } catch (error) {
+          report({ kind: 'dispatch_failed', runId: run.runId, error });
+        }
+        if (active(run, segment)) commit();
+      })();
+    }
+    commit();
   };
   const execute = async (
     run: RunRecord,
@@ -415,6 +463,10 @@ export function createAgentInstance(
       );
       const ports = {
         runId: run.runId,
+        sessionId,
+        segmentKey: command.type === 'resume' ? command.interactionId : 'start',
+        effectOrdinals: new Map<string, number>(),
+        ...(options.recovery === undefined ? {} : { recovery: options.recovery }),
         signal: AbortSignal.any([run.controller.signal, run.capabilityController.signal]),
         labels: run.labels,
         privateValues: run.privateValues,
@@ -467,17 +519,20 @@ export function createAgentInstance(
       while (true) {
         const result = await iterator.next();
         if (result.done) break;
-        acceptEvent(run, segment, result.value);
+        const accepting = acceptEvent(run, segment, result.value);
+        if (accepting !== undefined) await accepting;
       }
       if (active(run, segment)) {
         const error = { name: 'ProtocolViolation' };
-        if (segment.submission !== undefined) segment.submission.status = 'consumed';
+        if (options.recovery === undefined && segment.submission !== undefined)
+          segment.submission.status = 'consumed';
         failRun(run, toErrorInfo('executor_error', error));
         report({ kind: 'protocol_violation', runId: run.runId, error });
       }
     } catch (error) {
       if (active(run, segment)) {
-        if (entered && segment.submission !== undefined) segment.submission.status = 'consumed';
+        if (options.recovery === undefined && entered && segment.submission !== undefined)
+          segment.submission.status = 'consumed';
         failRun(run, toErrorInfo('executor_error', error));
         report({ kind: 'run_failed', runId: run.runId, error });
       } else {
@@ -641,6 +696,7 @@ export function createAgentInstance(
         return Promise.reject(error);
       }
       claimingSlot = true;
+      const parent = context.active();
       const restoring = (async () => {
         let restored: RunRecord;
         try {
@@ -650,6 +706,32 @@ export function createAgentInstance(
           } catch (error) {
             report({ kind: 'restore_failed', error });
             throw new GalaxieError('executor_error', toErrorInfo('executor_error').message);
+          }
+          assertUsable();
+          const inbox = new Map<InteractionId, InboxEntry>();
+          const recovery = options.recovery;
+          if (recovery !== undefined) {
+            try {
+              const submissions = validateSubmissions(await recovery.submissions(sessionId));
+              assertUsable();
+              for (const saved of submissions) {
+                const entry: InboxEntry = { ...saved };
+                if (entry.status === 'accepted' && entry.interactionId !== pending?.interactionId) {
+                  await recovery.consumeSubmission(sessionId, entry.interactionId);
+                  entry.status = 'consumed';
+                  assertUsable();
+                }
+                inbox.set(entry.interactionId, entry);
+              }
+            } catch (error) {
+              if (disposing) assertUsable();
+              report({ kind: 'restore_failed', error });
+              const code =
+                isGalaxieError(error) && error.code === 'unrecoverable'
+                  ? 'unrecoverable'
+                  : 'unavailable';
+              throw new GalaxieError(code, toErrorInfo(code).message);
+            }
           }
           assertUsable();
           if (pending === undefined) return undefined;
@@ -669,12 +751,37 @@ export function createAgentInstance(
             grants,
             events: new RunEvents(runId),
             budget: new RunBudget(instrumentation.limits),
-            inbox: new Map(),
+            inbox,
             status: 'waiting_input',
             pending,
           };
-          run.events.append({ type: 'interaction', interaction: pending });
-          current = run;
+          const submission = inbox.get(pending.interactionId);
+          if (submission?.status === 'accepted') {
+            let checked: ReturnType<typeof validateSubmission>;
+            try {
+              checked = validateSubmission(run, pending, submission.action, submission.payload);
+            } catch (error) {
+              const code = isGalaxieError(error) ? error.code : 'invalid';
+              throw new GalaxieError(code, toErrorInfo(code).message);
+            }
+            if (checked.schema !== undefined) labelPayload(run, checked.schema, checked.payload);
+            run.status = 'running';
+            delete run.pending;
+            current = run;
+            startSegment(
+              run,
+              {
+                type: 'resume',
+                interactionId: submission.interactionId,
+                action: submission.action,
+                payload: checked.payload,
+              },
+              parent,
+            );
+          } else {
+            run.events.append({ type: 'interaction', interaction: pending });
+            current = run;
+          }
           restored = run;
         } finally {
           claimingSlot = false;
@@ -716,20 +823,13 @@ export function createAgentInstance(
         return Promise.resolve(rejected('stale'));
       if (!adapter.features.resume) return Promise.resolve(rejected('unsupported'));
       const action = event.action;
-      if (typeof action !== 'string' || action.length === 0)
-        return Promise.resolve(rejected('invalid'));
-      const actions = options.ui?.components[pending.component]?.actions;
-      if (options.ui !== undefined && (actions === undefined || !Object.hasOwn(actions, action)))
-        return Promise.resolve(rejected('invalid'));
-      let payload: unknown;
+      let checked: ReturnType<typeof validateSubmission>;
       try {
-        payload = JSON.parse(run.budget.payload(event.payload));
+        checked = validateSubmission(run, pending, action, event.payload);
       } catch (error) {
         return Promise.resolve(rejected(isGalaxieError(error) ? error.code : 'invalid'));
       }
-      const payloadSchema = actions?.[action]?.payload;
-      if (payloadSchema !== undefined && !validateSync(payloadSchema, payload).ok)
-        return Promise.resolve(rejected('invalid'));
+      const { payload, schema: payloadSchema } = checked;
       const parent = context.active();
       run.dispatching = interactionId;
       const checking = (async (): Promise<DispatchReceipt> => {
@@ -742,6 +842,22 @@ export function createAgentInstance(
             committed?.interactionId !== interactionId
           )
             return rejected('stale');
+          if (options.recovery !== undefined) {
+            try {
+              const accepted = await options.recovery.acceptSubmission(sessionId, {
+                interactionId,
+                action,
+                payload: copyRecoveryJson(payload),
+              });
+              if (accepted === 'duplicate') return rejected('duplicate');
+              if (accepted !== 'accepted') return rejected('unrecoverable');
+            } catch (error) {
+              report({ kind: 'dispatch_failed', runId: run.runId, error });
+              return rejected('unavailable');
+            }
+            if (disposing || current !== run || run.status !== 'waiting_input')
+              return rejected('stale');
+          }
           const entry: InboxEntry = { interactionId, action, payload, status: 'accepted' };
           run.inbox.set(interactionId, entry);
           if (!run.submittedText && containsText(payload)) run.submittedText = true;

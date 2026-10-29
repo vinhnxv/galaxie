@@ -9,7 +9,7 @@ import { dataPolicy } from './capability-broker.js';
 import type { AgentDefinition, BindingsFor } from './definition.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
-import type { AppId, InstanceId, PrincipalScope, RunId, SessionId } from './ids.js';
+import type { AppId, EffectId, InstanceId, PrincipalScope, RunId, SessionId } from './ids.js';
 import type { AgentInstance } from './instance.js';
 import { checkUiRequirements, normalizeUiBindings, type UiBindings } from './interactions.js';
 import type { ModelRouting, OutputSafetyHook } from './models.js';
@@ -19,6 +19,7 @@ import {
   DESTINATIONS,
   type DestinationClass,
 } from './policy.js';
+import type { RecoveryStore } from './recovery.js';
 import type { InferInput } from './schema.js';
 import { normalizeUrlAllowlist } from './urls.js';
 import { VERSION } from './version.js';
@@ -36,12 +37,15 @@ export interface DiagnosticEvent {
     | 'listener_threw'
     | 'late_result'
     | 'capability_failed'
+    | 'effect_outcome_unknown'
     | 'model_failed'
     | 'output_blocked'
     | 'output_safety_failed'
     | 'output_safety_unset';
   readonly instanceId: InstanceId;
   readonly runId?: RunId;
+  /** Identifier only, for host reconciliation of an earlier write with an unknown outcome. */
+  readonly effectId?: EffectId;
   /** Host-only evidence, possibly including binding-supplied private content. Never forward it
    * to a destination private-user may not reach; never stored in snapshots, events or traces. */
   readonly error?: unknown;
@@ -52,6 +56,8 @@ export interface CreateOptions<Agent = unknown, Services = unknown> {
   readonly agent: Agent;
   /** Restore-only session; the host must scope it and the checkpointer to this principal. */
   readonly sessionId?: SessionId;
+  /** Durable inbox and write journal, scoped to the checkpointer's app and principal. */
+  readonly recovery?: RecoveryStore;
   readonly services?: Services;
   readonly bindings?: Readonly<Record<string, CapabilityBinding<never, unknown>>>;
   /** Per-role providers, consent and ephemeral credentials (ADR-0006). */

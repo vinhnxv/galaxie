@@ -137,6 +137,7 @@ export function createLocalHost(models: LocalModels): LocalHost {
       return runtime.create(tutorDefinition, {
         principalScope: hostLearnerId,
         ...(sessionId === undefined ? {} : { sessionId }),
+        ...(checkpointer === undefined ? {} : { recovery: checkpointer.recovery }),
         agent: createTutorAgent(),
         services: {
           chatModels: models.chatModels,

@@ -145,8 +145,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
           if (snapshot.state !== 'ready') return;
           const status = snapshot.run?.status;
           if (status === 'waiting_input') sessionStorage.setItem(sessionKey, observed.sessionId);
-          else if (status === 'succeeded' || status === 'failed' || status === 'cancelled')
-            sessionStorage.removeItem(sessionKey);
+          else if (status === 'succeeded') sessionStorage.removeItem(sessionKey);
         });
         const result = restoring
           ? await next.restore()

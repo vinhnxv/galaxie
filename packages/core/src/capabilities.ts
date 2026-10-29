@@ -30,9 +30,14 @@ export type GrantScope = 'app' | 'principal' | 'instance' | 'run';
  * Retry semantics that the host declares, never inferred from the name or the HTTP method (brief
  * §9.2, §12.3):
  *
- * - `none`: never retried automatically; an unknown outcome is reconciled or decided by a person;
+ * - `none`: an unknown outcome fails with `outcome_unknown` and never re-invokes the binding;
  * - `idempotent`: repeating the call has no further effect;
  * - `idempotency-key`: the server dedupes calls by effect ID.
+ *
+ * With a recovery store, these policies govern replay of dispatched or unknown writes, not an
+ * immediate retry loop. A succeeded receipt is reused without invoking the binding. Without a
+ * store, core does not retry. No host reconciliation API exists yet: reconcile an unknown write
+ * with the backend before a new session could repeat it; new sessions derive new effect IDs.
  */
 export type RetryPolicy = 'none' | 'idempotent' | 'idempotency-key';
 
@@ -40,7 +45,13 @@ export type RetryPolicy = 'none' | 'idempotent' | 'idempotency-key';
 export interface CapabilityContext {
   /** Aborts on cancel or timeout. An abort does not prove that the server did nothing (brief §12.3). */
   readonly signal: AbortSignal;
-  /** Stable across retries and owner takeovers; send it as the idempotency key (ADR-0009). */
+  /**
+   * Send this as the backend's idempotency key. With recovery, writes derive it from the session,
+   * resume interaction (or literal start), capability name and per-name call ordinal. Replays
+   * reuse it; call order must be deterministic. A new logical operation needs a fresh session,
+   * because repeated start segments in one session reuse IDs. Other calls use random IDs.
+   * Owner epochs and fencing remain M3 slice 5 work (ADR-0009).
+   */
   readonly effectId: EffectId;
   readonly runId: RunId;
   readonly principalScope: PrincipalScope;

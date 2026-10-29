@@ -12,7 +12,7 @@ import type {
 import type { AgentDefinition } from './definition.js';
 import { type ErrorCode, GalaxieError, isGalaxieError, toErrorInfo } from './errors.js';
 import { getHttpCapability, type HttpDescriptor } from './http-capability.js';
-import type { AgentRef, EffectId, RunId } from './ids.js';
+import type { AgentRef, EffectId, RunId, SessionId } from './ids.js';
 import {
   type BudgetLimits,
   type DataLabel,
@@ -22,6 +22,13 @@ import {
   type DestinationAllowlist,
   labelsAllow,
 } from './policy.js';
+import {
+  copyRecoveryJson,
+  type EffectRecord,
+  type RecoveryJson,
+  type RecoveryStore,
+  validateEffectRecord,
+} from './recovery.js';
 import type { DiagnosticEvent } from './runtime.js';
 import type { Schema } from './schema.js';
 import type { RunInstrumentation } from './tracing.js';
@@ -44,6 +51,132 @@ export function dataPolicy(overrides: DataPolicy = {}): Policy {
 }
 function failure(code: ErrorCode): GalaxieError {
   return new GalaxieError(code, toErrorInfo(code).message);
+}
+function canonical(value: RecoveryJson): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object')
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonical(value[key] as RecoveryJson)}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
+}
+async function digest(value: RecoveryJson): Promise<string> {
+  const bytes = new TextEncoder().encode(canonical(value));
+  return [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes))]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+async function journalEffectId(
+  sessionId: SessionId,
+  segment: string,
+  name: string,
+  ordinal: number,
+): Promise<EffectId> {
+  const hash = await digest([sessionId, segment, name, ordinal]);
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${(
+    (Number.parseInt(hash[16] as string, 16) & 3) | 8
+  ).toString(16)}${hash.slice(17, 20)}-${hash.slice(20, 32)}` as EffectId;
+}
+
+class WriteJournal {
+  readonly effectId: EffectId;
+  readonly #store: RecoveryStore;
+  readonly #sessionId: SessionId;
+  readonly #inputDigest: string;
+  readonly #reportFailure: () => void;
+  #tail: Promise<void> = Promise.resolve();
+  #record: EffectRecord | undefined;
+  #loaded = false;
+  #dispatched = false;
+  #successStarted = false;
+  #failureRequested = false;
+  #storeFailed = false;
+
+  constructor(
+    store: RecoveryStore,
+    sessionId: SessionId,
+    effectId: EffectId,
+    inputDigest: string,
+    reportFailure: () => void,
+  ) {
+    this.#store = store;
+    this.#sessionId = sessionId;
+    this.effectId = effectId;
+    this.#inputDigest = inputDigest;
+    this.#reportFailure = reportFailure;
+  }
+
+  async read(): Promise<EffectRecord | undefined> {
+    let raw: unknown;
+    try {
+      raw = await this.#store.effect(this.#sessionId, this.effectId);
+    } catch {
+      this.#reportFailure();
+      throw failure('unavailable');
+    }
+    const record = validateEffectRecord(raw);
+    if (record !== undefined && record.inputDigest !== this.#inputDigest)
+      throw failure('unrecoverable');
+    this.#record = record;
+    this.#loaded = true;
+    this.#dispatched = record?.status === 'dispatched' || record?.status === 'outcome_unknown';
+    return record;
+  }
+
+  write(status: Exclude<EffectRecord['status'], 'succeeded'>): Promise<void> {
+    return this.#write({ status, inputDigest: this.#inputDigest }, false);
+  }
+
+  succeed(output: unknown): Promise<void> {
+    return this.#write(
+      { status: 'succeeded', inputDigest: this.#inputDigest, output: copyRecoveryJson(output) },
+      true,
+    );
+  }
+
+  fail(): Promise<void> {
+    if (
+      !this.#loaded ||
+      this.#record?.status === 'succeeded' ||
+      this.#successStarted ||
+      this.#failureRequested ||
+      this.#storeFailed ||
+      this.#record?.status === 'outcome_unknown' ||
+      this.#record?.status === 'failed'
+    )
+      return this.#tail;
+    this.#failureRequested = true;
+    return this.#write(
+      { status: this.#dispatched ? 'outcome_unknown' : 'failed', inputDigest: this.#inputDigest },
+      true,
+    );
+  }
+
+  #write(record: EffectRecord, tolerateFailure: boolean): Promise<void> {
+    const next = this.#tail.then(async () => {
+      if (this.#record?.status === 'succeeded') return;
+      if (
+        this.#failureRequested &&
+        (record.status === 'planned' ||
+          record.status === 'dispatched' ||
+          record.status === 'succeeded')
+      )
+        return;
+      if (record.status === 'succeeded') this.#successStarted = true;
+      if (record.status === 'dispatched') this.#dispatched = true;
+      try {
+        await this.#store.recordEffect(this.#sessionId, this.effectId, record);
+        this.#record = record;
+      } catch {
+        this.#storeFailed = true;
+        this.#reportFailure();
+        if (!tolerateFailure) throw failure('unavailable');
+      }
+    });
+    this.#tail = next.catch(() => {});
+    return next;
+  }
 }
 function normalize(value: string): string {
   return value.toLowerCase().replace(/\s+/gu, ' ').trim();
@@ -124,6 +257,10 @@ interface Compiled {
 }
 export interface BrokerRun {
   readonly runId: RunId;
+  readonly sessionId: SessionId;
+  readonly segmentKey: string;
+  readonly effectOrdinals: Map<string, number>;
+  readonly recovery?: RecoveryStore;
   readonly signal: AbortSignal;
   readonly labels: Set<DataLabel>;
   readonly privateValues: Set<string>;
@@ -214,6 +351,10 @@ export class CapabilityBroker {
       call: async (name, input, options) => {
         const compiled = this.#capabilities.get(name);
         const binding = compiled?.binding;
+        const recovery = binding?.kind === 'write' ? run.recovery : undefined;
+        const ordinal = run.effectOrdinals.get(name) ?? 0;
+        if (recovery !== undefined) run.effectOrdinals.set(name, ordinal + 1);
+        let journal: WriteJournal | undefined;
         const span = run.tracing.startCapability(
           {
             ...(compiled === undefined ? {} : { name }),
@@ -303,6 +444,41 @@ export class CapabilityBroker {
             run.budget.payload(value);
             checkPolicy(value);
             run.budget.reserveToolCall();
+            if (recovery !== undefined) {
+              const [effectId, inputDigest] = await Promise.all([
+                journalEffectId(run.sessionId, run.segmentKey, name, ordinal),
+                digest(copyRecoveryJson(value)),
+              ]);
+              assertActive();
+              journal = new WriteJournal(recovery, run.sessionId, effectId, inputDigest, () =>
+                this.#report({ kind: 'capability_failed', runId: run.runId }),
+              );
+              const record = await journal.read();
+              assertActive();
+              if (record?.status === 'succeeded') {
+                run.budget.payload(record.output);
+                const output = record.output;
+                for (const label of compiled.output.labels) run.labels.add(label);
+                registerPrivate(compiled.output.privateStrings(output), run.privateValues);
+                run.labelsChanged();
+                return output;
+              }
+              if (record?.status === 'dispatched' || record?.status === 'outcome_unknown') {
+                await journal.write('outcome_unknown');
+                assertActive();
+                if (binding.retry === 'none') {
+                  this.#report({
+                    kind: 'effect_outcome_unknown',
+                    runId: run.runId,
+                    effectId,
+                  });
+                  throw failure('outcome_unknown');
+                }
+              } else {
+                await journal.write('planned');
+              }
+              assertActive();
+            }
             const release = await slots.acquire(controller.signal);
             let invoked = false;
             let hostSettled = false;
@@ -310,9 +486,14 @@ export class CapabilityBroker {
               assertActive();
               checkPolicy(value);
               span.arguments(value);
+              if (journal !== undefined) {
+                await journal.write('dispatched');
+                assertActive();
+                checkPolicy(value);
+              }
               const context: CapabilityContext = {
                 signal: controller.signal,
-                effectId: globalThis.crypto.randomUUID() as EffectId,
+                effectId: journal?.effectId ?? (globalThis.crypto.randomUUID() as EffectId),
                 runId: run.runId,
                 principalScope: this.#principal,
                 agent: this.#agent,
@@ -358,6 +539,10 @@ export class CapabilityBroker {
               run.budget.payload(result);
               const output = await validate(compiled.request.output, result);
               assertActive();
+              if (journal !== undefined) {
+                await journal.succeed(output);
+                assertActive();
+              }
               for (const label of compiled.output.labels) run.labels.add(label);
               registerPrivate(compiled.output.privateStrings(output), run.privateValues);
               run.labelsChanged();
@@ -366,7 +551,8 @@ export class CapabilityBroker {
               if (!invoked || hostSettled) release();
             }
           };
-          const operation = perform().catch((error: unknown) => {
+          const operation = perform().catch(async (error: unknown) => {
+            await journal?.fail();
             if (!stopped && run.active() && error instanceof BudgetExceeded) {
               budgetFailure = error;
               span.end({ status: 'error', code: 'budget_exceeded' });
@@ -379,6 +565,7 @@ export class CapabilityBroker {
           span.end({ status: 'ok' });
           return result;
         } catch (error) {
+          await journal?.fail();
           const code: ErrorCode =
             budgetFailure !== undefined
               ? 'budget_exceeded'

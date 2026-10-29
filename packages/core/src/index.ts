@@ -128,6 +128,7 @@ export {
   inBrowserOnly,
   labelsAllow,
 } from './policy.js';
+export type { EffectRecord, RecoveryJson, RecoveryStore, RecoverySubmission } from './recovery.js';
 export {
   type CreateOptions,
   createRuntime,
