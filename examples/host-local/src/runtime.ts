@@ -161,7 +161,6 @@ export function createLocalHost(models: LocalModels): LocalHost {
     },
     async acquireOwnership(takeover = false) {
       if (disposed) throw new GalaxieError('invalid', 'The runtime was disposed.');
-      // Opening never sweeps: only a claimed owner may mutate session data.
       const checkpointer = await openSaver();
       const result = await acquireOwnership({
         appId: hostAppId,
@@ -172,9 +171,7 @@ export function createLocalHost(models: LocalModels): LocalHost {
       if (result.status === 'owner' && !result.ownership.signal.aborted) {
         try {
           await checkpointer?.sweep();
-        } catch {
-          // The fixed storage observer reports quota; restore remains available.
-        }
+        } catch {}
       }
       return result;
     },

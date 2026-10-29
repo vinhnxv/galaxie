@@ -63,7 +63,7 @@ export class Fencing {
 
   /** Check first, in the same transaction as every mutation. Never await external work here. */
   write<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
-    return transact(this.#db, [...new Set([...stores, 'meta'])], 'readwrite', async (tx) => {
+    return transact(this.#db, [...stores, 'meta'], 'readwrite', async (tx) => {
       if ((await epoch(tx, this.#appId)) !== this.#held) throw new StorageError('fenced');
       return work(tx);
     });

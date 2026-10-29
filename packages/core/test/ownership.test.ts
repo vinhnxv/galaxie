@@ -161,6 +161,72 @@ describe('Web Lock ownership', () => {
     });
     await owner(opts);
   });
+  test('keeps the public result pending until the storage claim finishes', async () => {
+    const entered = Promise.withResolvers<void>();
+    const finish = Promise.withResolvers<void>();
+    let resolved = false;
+    const pending = owner({
+      ...options(),
+      fence: {
+        claim: async () => {
+          entered.resolve();
+          await finish.promise;
+        },
+        current: async () => true,
+      },
+    }).then((value) => {
+      resolved = true;
+      return value;
+    });
+    try {
+      await entered.promise;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(resolved).toBe(false);
+    } finally {
+      finish.resolve();
+      await (await pending).release();
+    }
+  });
+  test('does not retry a granted claim that fails after the handover wait deadline', async () => {
+    const opts = options();
+    const a = await owner(opts);
+    const entered = Promise.withResolvers<void>();
+    const finish = Promise.withResolvers<void>();
+    let claims = 0;
+    const pending = acquireOwnership({
+      ...opts,
+      takeover: true,
+      handoverTimeoutMs: 250,
+      fence: {
+        claim: async () => {
+          claims++;
+          if (claims === 1) {
+            entered.resolve();
+            await finish.promise;
+            throw new Error('private delayed claim failure');
+          }
+        },
+        current: async () => true,
+      },
+    }).then(
+      (result) => {
+        if (result.status === 'owner') owners.push(result.ownership);
+        return result;
+      },
+      (error: unknown) => error,
+    );
+    await entered.promise;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    finish.resolve();
+    const outcome = await pending;
+    expect(a.lostReason).toBe('handover');
+    expect(claims).toBe(1);
+    expect(outcome).toMatchObject({
+      code: 'unavailable',
+      message: 'The requested service is unavailable.',
+    });
+    expect(outcome).not.toHaveProperty('cause');
+  });
   test.each([
     { appId: '' },
     { appId: 'bad app' },

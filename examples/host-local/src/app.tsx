@@ -25,7 +25,6 @@ interface AppProps {
 
 interface SessionOwnership {
   readonly handle: Ownership;
-  release(): Promise<void>;
   unsubscribe?: () => void;
 }
 
@@ -121,7 +120,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
 
   const observeOwnership = useCallback(
     (handle: Ownership): SessionOwnership => {
-      const owner: SessionOwnership = { handle, release: () => handle.release() };
+      const owner: SessionOwnership = { handle };
       ownership.current = owner;
       const onLoss = (): void => {
         if (handle.lostReason === 'released') return;
@@ -157,7 +156,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
       const dispose = async (): Promise<void> => {
         owner?.unsubscribe?.();
         await next?.dispose();
-        await owner?.release();
+        await owner?.handle.release();
         if (ownership.current === owner) ownership.current = undefined;
       };
       try {
@@ -284,7 +283,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
     } catch {
       if (mounted.current && !lost.current) setError('Saved lesson cannot be recovered');
     } finally {
-      await owner?.release();
+      await owner?.handle.release();
       if (ownership.current === owner) ownership.current = undefined;
       starting.current = false;
       if (mounted.current) setChecking(false);
@@ -296,7 +295,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
     void run(true);
     const disposeHost = (): void => {
       ownership.current?.unsubscribe?.();
-      void host.runtime.dispose().finally(() => ownership.current?.release());
+      void host.runtime.dispose().finally(() => ownership.current?.handle.release());
     };
     const discard = (event: PageTransitionEvent): void => {
       if (event.persisted) return;

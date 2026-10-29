@@ -150,7 +150,7 @@ function compareCheckpoints(a: CheckpointRecord, b: CheckpointRecord): number {
 /** Serializer-backed checkpoints; the host owns session identity and connection lifetime. */
 export class IndexedDBSaver extends BaseCheckpointSaver {
   readonly recovery: IndexedDBRecovery;
-  readonly fencing: Fencing;
+  readonly #fencing: Fencing;
   readonly #db: IDBDatabase;
   readonly #scope: [string, string];
 
@@ -159,8 +159,12 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     this.#db = db;
     manageConnection(db, options);
     this.#scope = [options.appId, options.principalScope];
-    this.fencing = fencing;
+    this.#fencing = fencing;
     this.recovery = new IndexedDBRecovery(db, this.#scope, fencing);
+  }
+
+  get fencing(): Pick<Fencing, 'claim' | 'current'> {
+    return this.#fencing;
   }
 
   static async open(options: IndexedDBSaverOptions): Promise<IndexedDBSaver> {
@@ -367,7 +371,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         encode(this.serde, metadata),
       ]);
       const key = this.#key(thread, namespace, checkpoint.id);
-      await this.fencing.write(['checkpoints', 'meta'], async (tx) => {
+      await this.#fencing.write(['checkpoints', 'meta'], async (tx) => {
         const meta = tx.objectStore('meta');
         const sequenceKey = [...this.#scope, 'sequence'];
         const current: unknown = await requestResult(meta.get(sequenceKey));
@@ -437,7 +441,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         })),
       );
       const checkpoint = this.#key(thread, namespace, id);
-      await this.fencing.write(['writes', 'meta'], async (tx) => {
+      await this.#fencing.write(['writes', 'meta'], async (tx) => {
         await touchSession(tx, this.#scope, thread);
         const store = tx.objectStore('writes');
         const raw: unknown[] = await requestResult(store.getAll(prefixRange(checkpoint)));
@@ -466,14 +470,14 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
 
   async sweep(options?: SweepOptions): Promise<SweepResult> {
     return storageOperation(this.#db, async () => {
-      return await sweep(this.#db, this.#scope, this.fencing, options);
+      return await sweep(this.#db, this.#scope, this.#fencing, options);
     });
   }
 
   async deleteSession(sessionId: string): Promise<void> {
     return storageOperation(this.#db, async () => {
       validateKey(sessionId);
-      await this.fencing.write(['checkpoints', 'writes', 'inbox', 'journal', 'meta'], (tx) =>
+      await this.#fencing.write(['checkpoints', 'writes', 'inbox', 'journal', 'meta'], (tx) =>
         deleteSessionRecords(tx, this.#scope, sessionId),
       );
     });
@@ -482,7 +486,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
   override async deleteThread(threadId: string): Promise<void> {
     return storageOperation(this.#db, async () => {
       validateKey(threadId);
-      await this.fencing.write(['checkpoints', 'writes', 'meta'], async (tx) => {
+      await this.#fencing.write(['checkpoints', 'writes', 'meta'], async (tx) => {
         const range = prefixRange([...this.#scope, threadId]);
         await requestResult(tx.objectStore('checkpoints').delete(range));
         await requestResult(tx.objectStore('writes').delete(range));

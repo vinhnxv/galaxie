@@ -124,6 +124,9 @@ describe.skipIf(typeof indexedDB === 'undefined')('app-wide storage fencing', ()
     expect([await a.fencing.current(), await b.fencing.current()].filter(Boolean)).toHaveLength(1);
     expect(await c.fencing.current()).toBe(true);
     const owner = await open(name);
+    const listed: string[] = [];
+    for await (const tuple of owner.list({})) listed.push(tuple.checkpoint.id);
+    expect(listed).toEqual(['001']);
     await owner.deleteSession('session');
     await owner.sweep();
     const db = await openDatabase(name, 'app', 'user');

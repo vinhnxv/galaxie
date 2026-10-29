@@ -67,7 +67,10 @@ export async function acquireOwnership(options: OwnershipOptions): Promise<Owner
     throw failure('unavailable');
   }
 
-  const hold = async (lockOptions: LockOptions): Promise<Ownership | undefined> => {
+  const hold = async (
+    lockOptions: LockOptions,
+    stopWaiting?: () => void,
+  ): Promise<Ownership | undefined> => {
     const acquired = Promise.withResolvers<Ownership | undefined>();
     const released = Promise.withResolvers<void>();
     const controller = new AbortController();
@@ -109,6 +112,7 @@ export async function acquireOwnership(options: OwnershipOptions): Promise<Owner
           return;
         }
         granted = true;
+        stopWaiting?.();
         channel.onmessage = (event: MessageEvent<unknown>) => {
           if (reason !== undefined || requested || !handover(event.data)) return;
           requested = true;
@@ -165,7 +169,7 @@ export async function acquireOwnership(options: OwnershipOptions): Promise<Owner
     const timeout = new AbortController();
     const clear = deadlineTimer(options.handoverTimeoutMs ?? 5000, () => timeout.abort());
     try {
-      ownership = await hold({ signal: timeout.signal });
+      ownership = await hold({ signal: timeout.signal }, clear);
     } catch {
       if (!timeout.signal.aborted) throw failure('unavailable');
     } finally {
