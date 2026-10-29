@@ -532,7 +532,8 @@ export class CapabilityBroker {
                 await approval.check();
                 assertActive();
                 checkPolicy(value);
-                approval.release();
+                // Synchronous from here to invoke, so no microtask can change the policy in between.
+                approval.consume();
               }
               const context: CapabilityContext = {
                 signal: controller.signal,

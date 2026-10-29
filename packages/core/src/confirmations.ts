@@ -68,7 +68,10 @@ export function approvedCopy(value: unknown): RecoveryJson {
 export interface Approval {
   readonly value: RecoveryJson;
   readonly effectId: EffectId;
+  /** Rechecks the digest; the final validation is `consume`, with no await before `invoke`. */
   check(): Promise<void>;
+  /** Validates revision, expiry, activity and signals synchronously, then spends the approval. */
+  consume(): void;
   release(): void;
 }
 
@@ -230,6 +233,10 @@ export class ConfirmationGate {
           end('denied', 'confirmation_invalidated');
           throw failure('denied');
         }
+      },
+      consume: () => {
+        if (!valid()) throw error ?? failure('denied');
+        approval.release();
       },
       release: () => {
         ended = true;

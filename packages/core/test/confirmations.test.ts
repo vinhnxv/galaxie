@@ -219,6 +219,30 @@ test('policy is checked again after approval at dispatch', async () => {
   expect(f.diagnostics.at(-1)?.kind).toBe('confirmation_invalidated');
 });
 
+test('a policy change queued during the dispatch check still prevents the call', async () => {
+  let revision = 'v1';
+  let armed = false;
+  const f = await fixture(denied(), {
+    policyRevision: () => {
+      const current = revision;
+      if (armed) {
+        // The first read after approval is the dispatch check; change the policy right after it.
+        armed = false;
+        queueMicrotask(() => {
+          revision = 'v2';
+        });
+      }
+      return current;
+    },
+  });
+  await opened(f.instance);
+  expect(f.instance.respond(pending(f.instance).id, 'approve')).toEqual({ status: 'approved' });
+  armed = true;
+  await f.events;
+  expect(f.invoke).not.toHaveBeenCalled();
+  expect(f.diagnostics.at(-1)?.kind).toBe('confirmation_invalidated');
+});
+
 test('frozen approved arguments reject mutation after approval', async () => {
   const f = await fixture(async function* ({ capabilities }) {
     await capabilities.call('write@1', { nested: { value: 'original' } });

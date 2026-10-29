@@ -78,7 +78,7 @@ function display(
 ):
   | {
       readonly entry: ConfirmationEntry;
-      readonly fields: readonly (ConfirmationField & { readonly key: string })[];
+      readonly fields: readonly ConfirmationField[];
     }
   | undefined {
   try {
@@ -91,7 +91,7 @@ function display(
         throw new Error();
       const { label, value } = field;
       if (typeof label !== 'string' || typeof value !== 'string') throw new Error();
-      return { key: globalThis.crypto.randomUUID(), label, value };
+      return { label, value };
     });
     return { entry, fields };
   } catch {
@@ -122,8 +122,10 @@ export function ConfirmationPrompt<Input, View>({
           <fieldset key={pending.id}>
             <legend>{shown.entry.title}</legend>
             <dl>
-              {shown.fields.map((field) => (
-                <div key={field.key}>
+              {shown.fields.map((field, index) => (
+                // Rows are a fixed host projection of frozen arguments, so their order is stable.
+                // biome-ignore lint/suspicious/noArrayIndexKey: no other stable identity exists.
+                <div key={index}>
                   <dt>{field.label}</dt>
                   <dd>{field.value}</dd>
                 </div>
