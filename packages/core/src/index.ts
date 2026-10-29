@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+export { type Annotations, readAnnotations } from './annotations.js';
 export type {
   CapabilityBinding,
   CapabilityContext,
