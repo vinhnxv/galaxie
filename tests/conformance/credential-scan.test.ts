@@ -228,7 +228,10 @@ test.each(['success', '401', 'transport-error'] as const)(
           getCredential,
         },
         agent: (host) => {
-          const state = Annotation.Root({ completed: Annotation<boolean> });
+          const state = Annotation.Root({
+            completed: Annotation<boolean>,
+            sentence: Annotation<string>,
+          });
           const respond = async (
             _state: unknown,
             config: Parameters<typeof requestInteraction>[1],
@@ -257,7 +260,7 @@ test.each(['success', '401', 'transport-error'] as const)(
                 },
                 config,
               );
-              return {};
+              return { sentence };
             })
             .addNode('after', respond)
             .addEdge(START, 'before')
@@ -291,7 +294,7 @@ test.each(['success', '401', 'transport-error'] as const)(
         runId,
         ...pending,
         action: 'submit',
-        payload: { sentence },
+        payload: {},
       }),
     ).toMatchObject({ status: 'accepted' });
     const events = await collect(instance.events(runId));

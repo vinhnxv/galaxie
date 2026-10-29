@@ -202,6 +202,79 @@ describe.skipIf(typeof indexedDB === 'undefined')('session export', () => {
     await expect(own.exportSession('foreign')).rejects.toMatchObject({ code: 'invalid' });
   });
 
+  test('orders interleaved namespaces and counts only their latest distinct interrupts', async () => {
+    const saver = await open();
+    for (const row of [
+      {
+        namespace: 'child:task',
+        id: '001',
+        parent: undefined,
+        text: 'child-old',
+        ids: ['stale-child'],
+      },
+      { namespace: '', id: '002', parent: '001', text: 'root-new', ids: ['shared'] },
+      {
+        namespace: 'child:task',
+        id: '003',
+        parent: '001',
+        text: 'child-new',
+        ids: ['shared', 'child'],
+      },
+      { namespace: '', id: '001', parent: undefined, text: 'root-old', ids: ['stale-root'] },
+    ]) {
+      const config = await saver.put(
+        {
+          configurable: {
+            thread_id: 'session',
+            checkpoint_ns: row.namespace,
+            ...(row.parent === undefined ? {} : { checkpoint_id: row.parent }),
+          },
+        },
+        {
+          ...emptyCheckpoint(),
+          id: row.id,
+          ts: '2026-10-30T00:00:00.000Z',
+          channel_values: { text: row.text },
+        },
+        { source: 'loop', step: 0, parents: {} },
+        {},
+      );
+      await saver.putWrites(
+        config,
+        [[INTERRUPT, row.ids.map((id) => ({ id, value: row.text }))]],
+        'task',
+      );
+    }
+    expect((await saver.exportSession('session')).metadata).toMatchObject({
+      checkpointCount: 4,
+      pendingInteractionCount: 2,
+    });
+    const exported = await saver.exportSession('session', { personalContent: true });
+    expect(
+      exported.checkpoints?.map((row) => [row.id, row.namespace, row.parentId, row.channelValues]),
+    ).toEqual([
+      ['001', '', null, { text: 'root-old' }],
+      ['001', 'child:task', null, { text: 'child-old' }],
+      ['002', '', '001', { text: 'root-new' }],
+      ['003', 'child:task', '001', { text: 'child-new' }],
+    ]);
+    expect(exported.checkpoints?.map((row) => row.pendingWrites)).toEqual([
+      [['task', INTERRUPT, [{ id: 'stale-root', value: 'root-old' }]]],
+      [['task', INTERRUPT, [{ id: 'stale-child', value: 'child-old' }]]],
+      [['task', INTERRUPT, [{ id: 'shared', value: 'root-new' }]]],
+      [
+        [
+          'task',
+          INTERRUPT,
+          [
+            { id: 'shared', value: 'child-new' },
+            { id: 'child', value: 'child-new' },
+          ],
+        ],
+      ],
+    ]);
+  });
+
   test('rejects unknown and deleted sessions with fixed content-free errors', async () => {
     const saver = await open();
     await expect(saver.exportSession(sentence)).rejects.toMatchObject({
