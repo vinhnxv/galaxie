@@ -13,6 +13,7 @@ import {
   type CapabilityRequest,
   createRuntime,
   defineAgentDefinition,
+  type SessionId,
   type Submission,
 } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -223,6 +224,7 @@ export async function runGalaxie(
   saverFactory: () => BaseCheckpointSaver | Promise<BaseCheckpointSaver> = () =>
     new web.MemorySaver(),
   stopAtInterrupt = false,
+  sessionId?: SessionId,
 ): Promise<Transcript> {
   const saver = await saverFactory();
   let graph: ConformanceGraph | undefined;
@@ -252,6 +254,7 @@ export async function runGalaxie(
     { ...definition, capabilities: { required: requests } },
     {
       bindings,
+      ...(sessionId === undefined ? {} : { sessionId }),
       models: assistantRouting(),
       principalScope: 'conformance',
       services: {
@@ -273,7 +276,10 @@ export async function runGalaxie(
   const transcript = emptyTranscript();
   try {
     await instance.prepare();
-    const { runId } = await instance.start(fixture.input);
+    const run =
+      sessionId === undefined ? await instance.start(fixture.input) : await instance.restore();
+    if (run === undefined) throw new Error('The conformance session has no pending interaction.');
+    const { runId } = run;
     let sequence = -1;
     let resumeIndex = 0;
     while (true) {
