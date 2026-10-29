@@ -30,6 +30,7 @@ import {
   validateKey,
   validateScope,
 } from './keys.js';
+import { IndexedDBRecovery } from './recovery.js';
 import { openDatabase, requestResult, transact } from './schema.js';
 
 export interface IndexedDBSaverOptions {
@@ -126,6 +127,7 @@ function compareCheckpoints(a: CheckpointRecord, b: CheckpointRecord): number {
 
 /** Serializer-backed checkpoints; the host owns session identity and connection lifetime. */
 export class IndexedDBSaver extends BaseCheckpointSaver {
+  readonly recovery: IndexedDBRecovery;
   readonly #db: IDBDatabase;
   readonly #scope: [string, string];
 
@@ -133,6 +135,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     super(options.serde);
     this.#db = db;
     this.#scope = [options.appId, options.principalScope];
+    this.recovery = new IndexedDBRecovery(db, this.#scope);
   }
 
   static async open(options: IndexedDBSaverOptions): Promise<IndexedDBSaver> {
