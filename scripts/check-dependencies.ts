@@ -256,6 +256,7 @@ for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
       specifier === '@galaxie/models/webllm' ||
       specifier === '@galaxie/models/webllm/worker' ||
       specifier === '@galaxie/models/builtin-ai' ||
+      specifier === '@galaxie/models/openai' ||
       (specifier === '@galaxie/models/mock' && file === 'examples/host-local/src/mock-script.ts') ||
       specifier === 'react' ||
       specifier === 'react/jsx-runtime' ||
