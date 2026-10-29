@@ -127,8 +127,6 @@ export function createRegistry(options: {
           return [name, Object.freeze({ label: action.label, payload: action.payload })];
         }),
       );
-      // The schema, extractor and component share Props at defineComponent. Only this
-      // heterogeneous collection boundary erases it; resolve validates before either callback.
       const stored = Object.freeze({
         id: entry.id,
         props: entry.props,

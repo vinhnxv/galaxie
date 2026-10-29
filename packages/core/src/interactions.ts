@@ -28,7 +28,6 @@ export interface UiBindings {
   readonly surfaces: readonly SurfaceId[];
 }
 
-/** Validates and snapshots UI bindings before an instance can use them. */
 export function normalizeUiBindings(bindings: UiBindings): UiBindings {
   const invalid = (): never => {
     throw new GalaxieError('invalid', 'The UI bindings are invalid.');
@@ -82,7 +81,6 @@ export function normalizeUiBindings(bindings: UiBindings): UiBindings {
   }
 }
 
-/** Required catalog names expand to the same versioned component IDs used by interrupts. */
 export function checkUiRequirements(bindings: UiBindings, requirements: UiRequirements): boolean {
   const versionAt = requirements.catalog.lastIndexOf('/v');
   const catalog = requirements.catalog.slice(0, versionAt);
@@ -94,7 +92,6 @@ export function checkUiRequirements(bindings: UiBindings, requirements: UiRequir
   );
 }
 
-/** A pending interaction must have a surface and at least one answer action. */
 export function checkInteractionBindings(
   bindings: UiBindings,
   pending: PendingInteraction,

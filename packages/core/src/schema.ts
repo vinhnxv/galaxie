@@ -59,8 +59,6 @@ export function validateSync<Output>(
     }
     if ('issues' in result && result.issues !== undefined) return { ok: false };
     if ('value' in result) return { ok: true, value: result.value };
-  } catch {
-    // Host validation errors are never retained in public error data.
-  }
+  } catch {}
   return { ok: false };
 }

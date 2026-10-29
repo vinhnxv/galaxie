@@ -75,7 +75,6 @@ function RenderedInteraction<Input, View>({
           {
             label: action.label,
             async submit(payload: unknown): Promise<DispatchReceipt> {
-              // A prior run's action must still reach core with its captured identity.
               if (instance.getSnapshot().run?.runId === runId && guard.current !== 'idle')
                 return rejected('duplicate');
               if (!validateSync(action.payload, payload).ok) {
