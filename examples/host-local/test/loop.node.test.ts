@@ -469,3 +469,247 @@ it('restores an accepted sentence after a failed resume without losing its sessi
     await context.close();
   }
 }, 60_000);
+
+async function sessionRecords(
+  page: Page,
+  sessionId: string,
+  action: 'count' | 'corrupt' | 'version' = 'count',
+): Promise<number> {
+  return page.evaluate(
+    ({ sessionId, action }) =>
+      new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open('galaxie:galaxie-host-local');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction(
+            ['checkpoints', 'meta'],
+            action === 'count' ? 'readonly' : 'readwrite',
+          );
+          const prefix = ['galaxie-host-local', 'local-demo-learner', sessionId];
+          const checkpoints = tx.objectStore('checkpoints');
+          const count = checkpoints.count(IDBKeyRange.bound(prefix, [...prefix, []]));
+          if (action === 'corrupt') {
+            const root = [...prefix, ''];
+            const cursor = checkpoints.openCursor(IDBKeyRange.bound(root, [...root, []]), 'prev');
+            cursor.onsuccess = () => {
+              if (cursor.result === null) {
+                tx.abort();
+                return;
+              }
+              const row = cursor.result.value;
+              row.checkpoint = { v: 99, type: 'json', bytes: new Uint8Array() };
+              cursor.result.update(row);
+            };
+          }
+          if (action === 'version') {
+            const meta = tx.objectStore('meta');
+            const key = ['galaxie-host-local', 'local-demo-learner', 'session', sessionId];
+            const stored = meta.get(key);
+            stored.onsuccess = () => {
+              const row = stored.result;
+              row.value.agentVersion = '9.0.0';
+              meta.put(row, key);
+            };
+          }
+          tx.oncomplete = () => {
+            db.close();
+            resolve(count.result);
+          };
+          tx.onabort = () => {
+            db.close();
+            reject(tx.error);
+          };
+        };
+      }),
+    { sessionId, action },
+  );
+}
+
+it('returns to Start after eviction before a fresh page opens its saver', async () => {
+  const { page, context, requests } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const sessionId = await page.evaluate((key) => sessionStorage.getItem(key), sessionKey);
+    expect(sessionId).toBeTypeOf('string');
+    await page.close();
+    const fresh = await context.newPage();
+    await fresh.addInitScript(
+      ({ key, sessionId }) => {
+        sessionStorage.setItem(key, sessionId);
+        // Enqueued before the application can open a connection; the old page has closed.
+        indexedDB.deleteDatabase('galaxie:galaxie-host-local');
+      },
+      { key: sessionKey, sessionId: sessionId as string },
+    );
+    await fresh.goto(mockOrigin);
+    await expect
+      .poll(() => fresh.getByRole('button', { name: 'Start', exact: true }).isEnabled())
+      .toBe(true);
+    expect(await fresh.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBeNull();
+    expect(await fresh.getByRole('radio').count()).toBe(0);
+    expect(await fresh.getByRole('alert').count()).toBe(0);
+    assertLocalRequests(requests, mockOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it('keeps corrupt lesson data until Start over explicitly deletes the session', async () => {
+  const { page, context, requests, errors, consoleErrors } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const sessionId = (await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      sessionKey,
+    )) as string;
+    const count = await sessionRecords(page, sessionId, 'corrupt');
+    expect(count).toBeGreaterThan(0);
+    await page.reload();
+    await page
+      .getByRole('alert')
+      .filter({ hasText: 'Saved lesson cannot be recovered' })
+      .waitFor({ timeout: 5_000 });
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBe(sessionId);
+    expect(await sessionRecords(page, sessionId)).toBe(count);
+    expect(await page.getByRole('button', { name: 'Start', exact: true }).isDisabled()).toBe(true);
+    await page.screenshot({ path: '/tmp/galaxie-recovery-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: '/tmp/galaxie-recovery-mobile.png', fullPage: true });
+    await page.getByRole('button', { name: 'Start over', exact: true }).click();
+    await expect
+      .poll(() => page.getByRole('button', { name: 'Start', exact: true }).isEnabled())
+      .toBe(true);
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBeNull();
+    expect(await sessionRecords(page, sessionId)).toBe(0);
+    expect(await page.getByRole('alert').count()).toBe(0);
+    expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    assertLocalRequests(requests, mockOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it('starts fresh after an incompatible agent version while retaining old data', async () => {
+  const { page, context } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const sessionId = (await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      sessionKey,
+    )) as string;
+    const count = await sessionRecords(page, sessionId, 'version');
+    await page.reload();
+    await expect
+      .poll(() => page.getByRole('button', { name: 'Start', exact: true }).isEnabled())
+      .toBe(true);
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBeNull();
+    expect(await sessionRecords(page, sessionId)).toBe(count);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it('shows a fixed quota message without host error text', async () => {
+  const { page, context } = await observe(mockOrigin);
+  try {
+    await page.addInitScript(() => {
+      const original = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (
+        this: IDBObjectStore,
+        ...args: Parameters<IDBObjectStore['put']>
+      ) {
+        if (this.name === 'meta' && Array.isArray(args[1]) && args[1][2] === 'session')
+          throw new DOMException('private-quota-canary', 'QuotaExceededError');
+        return original.apply(this, args);
+      };
+    });
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page
+      .getByRole('alert')
+      .filter({ hasText: 'Storage is full' })
+      .waitFor({ timeout: 5_000 });
+    expect(await page.locator('body').textContent()).not.toContain('private-quota-canary');
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it('asks for reload and disables lesson input after version handover', async () => {
+  const { page, context } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    const input = page.getByRole('radio', { name: 'walk', exact: true });
+    await input.waitFor();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          const request = indexedDB.open('galaxie:galaxie-host-local', 2);
+          request.onerror = () => reject(request.error);
+          request.onblocked = () => reject(new Error('The handover was blocked.'));
+          request.onsuccess = () => {
+            request.result.close();
+            resolve();
+          };
+        }),
+    );
+    await page
+      .getByRole('alert')
+      .filter({ hasText: 'Reload to use the updated app' })
+      .waitFor({ timeout: 5_000 });
+    expect(await input.isDisabled()).toBe(true);
+    expect(
+      await page.getByRole('button', { name: 'Submit answers', exact: true }).isDisabled(),
+    ).toBe(true);
+    expect(await page.getByRole('button', { name: 'Start', exact: true }).isDisabled()).toBe(true);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it('observes a failed sweep once and still restores the lesson', async () => {
+  const { page, context } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const sessionId = await page.evaluate((key) => sessionStorage.getItem(key), sessionKey);
+    await page.addInitScript(() => {
+      const original = IDBDatabase.prototype.transaction;
+      let attempts = 0;
+      Object.assign(globalThis, { sweepAttempts: () => attempts });
+      IDBDatabase.prototype.transaction = function (
+        this: IDBDatabase,
+        ...args: Parameters<IDBDatabase['transaction']>
+      ) {
+        const stores = typeof args[0] === 'string' ? [args[0]] : Array.from(args[0]);
+        if (stores.length === 5 && args[1] === 'readonly') {
+          attempts++;
+          throw new DOMException('private-sweep-canary', 'QuotaExceededError');
+        }
+        return original.apply(this, args);
+      };
+    });
+    await page.reload();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor({ timeout: 5_000 });
+    await page.getByRole('alert').filter({ hasText: 'Storage is full' }).waitFor();
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBe(sessionId);
+    expect(
+      await page.evaluate(() =>
+        (globalThis as typeof globalThis & { sweepAttempts(): number }).sweepAttempts(),
+      ),
+    ).toBe(1);
+    expect(await page.locator('body').textContent()).not.toContain('private-sweep-canary');
+  } finally {
+    await context.close();
+  }
+}, 60_000);

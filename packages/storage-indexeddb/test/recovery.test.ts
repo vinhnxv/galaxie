@@ -42,6 +42,59 @@ describe.skipIf(typeof indexedDB === 'undefined')('IndexedDB recovery', () => {
     expect(await saver.recovery.submissions('session')).toEqual([]);
   });
 
+  test('records session identity once across connections and reopens it without changing the schema', async () => {
+    const name = `galaxie-session-record-${crypto.randomUUID()}`;
+    const first = await open(name);
+    const second = await open(name);
+    const record = { agentId: 'tests/agent', agentVersion: '1.0.0' };
+    expect(await first.recovery.session('session')).toBeUndefined();
+    const values = await Promise.all([
+      first.recovery.recordSession('session', record),
+      second.recovery.recordSession('session', { ...record, agentVersion: '2.0.0' }),
+    ]);
+    expect(values[0]).toEqual(values[1]);
+    const stored = await first.recovery.session('session');
+    expect(stored).toEqual(values[0]);
+    const other = await open(name, 'app', 'other');
+    expect(await other.recovery.session('session')).toBeUndefined();
+    const returned = values[0];
+    if (returned === undefined) throw new Error('The session record is missing.');
+    Object.assign(returned, { agentId: 'changed' });
+    expect(await second.recovery.session('session')).toEqual(stored);
+    first.close();
+    const reopened = await open(name);
+    expect(await reopened.recovery.session('session')).toEqual(stored);
+    await reopened.deleteSession('session');
+    expect(await reopened.recovery.session('session')).toBeUndefined();
+  });
+
+  test.each([
+    { v: 99, value: { agentId: 'tests/agent', agentVersion: '1.0.0' } },
+    { v: 1, value: { agentId: 'tests/agent', agentVersion: 1 } },
+  ])('refuses corrupt session envelopes without replacing them: %#', async (record) => {
+    const name = `galaxie-session-corrupt-${crypto.randomUUID()}`;
+    const saver = await open(name);
+    const db = await openDatabase(name, 'app', 'user');
+    try {
+      await transact(db, ['meta'], 'readwrite', async (tx) => {
+        await requestResult(
+          tx.objectStore('meta').put(record, ['app', 'user', 'session', 'session']),
+        );
+      });
+      await expect(saver.recovery.session('session')).rejects.toEqual(new StorageError('corrupt'));
+      await expect(
+        saver.recovery.recordSession('session', { agentId: 'tests/agent', agentVersion: '1.0.0' }),
+      ).rejects.toEqual(new StorageError('corrupt'));
+      expect(
+        await transact(db, ['meta'], 'readonly', (tx) =>
+          requestResult(tx.objectStore('meta').get(['app', 'user', 'session', 'session'])),
+        ),
+      ).toEqual(record);
+    } finally {
+      db.close();
+    }
+  });
+
   test('accepts once across connections and keeps consumed entries as duplicate receipts', async () => {
     const name = `galaxie-recovery-atomic-${crypto.randomUUID()}`;
     const first = await open(name);

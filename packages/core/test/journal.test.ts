@@ -108,6 +108,10 @@ async function resume(
       }),
     },
   });
+  await store.recordSession(sessionId, {
+    agentId: definition.id,
+    agentVersion: definition.version,
+  });
   await instance.prepare();
   await instance.restore();
   return { runtime, instance, executor, diagnostics, errors };

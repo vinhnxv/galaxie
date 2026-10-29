@@ -1,7 +1,60 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { StorageError, storageError } from './errors.js';
+import { StorageError, type StorageErrorCode, storageError } from './errors.js';
+
+interface ConnectionState {
+  superseded: boolean;
+  readonly onError?: ((code: StorageErrorCode) => void) | undefined;
+}
+const connections = new WeakMap<IDBDatabase, ConnectionState>();
+
+export function observeError(
+  onError: ((code: StorageErrorCode) => void) | undefined,
+  error: unknown,
+): StorageError {
+  const fixed = storageError(error);
+  try {
+    void Promise.resolve(onError?.(fixed.code)).catch(() => {});
+  } catch {}
+  return fixed;
+}
+
+export function manageConnection(
+  db: IDBDatabase,
+  options: {
+    readonly onError?: ((code: StorageErrorCode) => void) | undefined;
+    readonly onVersionChange?: (() => void) | undefined;
+  },
+): void {
+  const state: ConnectionState = { superseded: false, onError: options.onError };
+  connections.set(db, state);
+  db.addEventListener('versionchange', () => {
+    db.close();
+    if (state.superseded) return;
+    state.superseded = true;
+    try {
+      void Promise.resolve(options.onVersionChange?.()).catch(() => {});
+    } catch {}
+  });
+}
+
+export function assertConnection(db: IDBDatabase): void {
+  if (connections.get(db)?.superseded) throw new StorageError('superseded');
+}
+
+export function operationError(db: IDBDatabase, error: unknown): StorageError {
+  return observeError(connections.get(db)?.onError, error);
+}
+
+export async function storageOperation<T>(db: IDBDatabase, work: () => Promise<T>): Promise<T> {
+  try {
+    assertConnection(db);
+    return await work();
+  } catch (error) {
+    throw operationError(db, error);
+  }
+}
 
 export const SCHEMA_VERSION: number = 1;
 
@@ -22,6 +75,7 @@ export function transact<T>(
   return new Promise((resolve, reject) => {
     let tx: IDBTransaction;
     try {
+      assertConnection(db);
       try {
         tx = db.transaction(stores, mode, { durability: 'strict' });
       } catch (error) {

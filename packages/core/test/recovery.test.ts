@@ -253,6 +253,10 @@ test.each(['accepted', 'consumed'] as const)(
       sessionId,
       recovery: store,
     });
+    await store.recordSession(instance.sessionId, {
+      agentId: definition.id,
+      agentVersion: definition.version,
+    });
     await instance.prepare();
     const restored = await instance.restore();
     expect(restored).toBeDefined();
@@ -327,6 +331,10 @@ test('restore validates returned records before publishing a run', async () => {
     sessionId: crypto.randomUUID() as SessionId,
     recovery: store,
   });
+  await store.recordSession(instance.sessionId, {
+    agentId: definition.id,
+    agentVersion: definition.version,
+  });
   await instance.prepare();
   await expect(instance.restore()).rejects.toMatchObject({
     code: 'unrecoverable',
@@ -358,6 +366,10 @@ async function restoreFixture(
     sessionId,
     recovery: store,
     ...options,
+  });
+  await store.recordSession(instance.sessionId, {
+    agentId: definition.id,
+    agentVersion: definition.version,
   });
   await instance.prepare();
   return { runtime, instance, executor, diagnostics };
@@ -699,6 +711,10 @@ test('automatic resume restores schema-labelled private strings before capabilit
       bindings: { 'send@1': { ...binding({ destination: 'host-server' }), invoke } },
     },
   );
+  await store.recordSession(instance.sessionId, {
+    agentId: definition.id,
+    agentVersion: definition.version,
+  });
   await instance.prepare();
   await instance.restore();
   await flush();

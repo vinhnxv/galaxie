@@ -3,7 +3,8 @@
 
 import { StorageError } from './errors.js';
 import { prefixRange, validateKey } from './keys.js';
-import { requestResult, transact } from './schema.js';
+import { touchSession } from './retention.js';
+import { requestResult, storageOperation, transact } from './schema.js';
 
 export type RecoveryValue =
   | null
@@ -12,6 +13,11 @@ export type RecoveryValue =
   | string
   | RecoveryValue[]
   | { [key: string]: RecoveryValue };
+
+export interface StoredSession {
+  readonly agentId: string;
+  readonly agentVersion: string;
+}
 
 export interface StoredSubmission {
   readonly interactionId: string;
@@ -71,6 +77,20 @@ function envelope(value: unknown): unknown {
   return value['value'];
 }
 
+function sessionRecord(value: unknown): StoredSession {
+  const copy = copyJson(value);
+  if (
+    !object(copy) ||
+    Object.keys(copy).length !== 2 ||
+    typeof copy['agentId'] !== 'string' ||
+    copy['agentId'].length === 0 ||
+    typeof copy['agentVersion'] !== 'string' ||
+    copy['agentVersion'].length === 0
+  )
+    throw new StorageError('corrupt');
+  return copy as unknown as StoredSession;
+}
+
 function submission(value: unknown, interactionId: string): StoredSubmission {
   if (
     !object(value) ||
@@ -115,77 +135,118 @@ export class IndexedDBRecovery {
     return [...this.#scope, sessionId, id];
   }
 
+  async recordSession(sessionId: string, record: StoredSession): Promise<StoredSession> {
+    return storageOperation(this.#db, async () => {
+      validateKey(sessionId);
+      const saved = sessionRecord(record);
+      return transact(this.#db, ['meta'], 'readwrite', async (tx) => {
+        const store = tx.objectStore('meta');
+        const key = [...this.#scope, 'session', sessionId];
+        const existing: unknown = await requestResult(store.get(key));
+        const stored = existing === undefined ? saved : sessionRecord(envelope(existing));
+        await touchSession(tx, this.#scope, sessionId);
+        if (existing === undefined) await requestResult(store.put({ v: 1, value: saved }, key));
+        return stored;
+      });
+    });
+  }
+
+  async session(sessionId: string): Promise<StoredSession | undefined> {
+    return storageOperation(this.#db, async () => {
+      validateKey(sessionId);
+      return transact(this.#db, ['meta'], 'readonly', async (tx) => {
+        const stored: unknown = await requestResult(
+          tx.objectStore('meta').get([...this.#scope, 'session', sessionId]),
+        );
+        return stored === undefined ? undefined : sessionRecord(envelope(stored));
+      });
+    });
+  }
+
   async acceptSubmission(
     sessionId: string,
     entry: Omit<StoredSubmission, 'status'>,
   ): Promise<'accepted' | 'duplicate'> {
-    const key = this.#key(sessionId, entry.interactionId);
-    const saved = submission({ ...entry, status: 'accepted' }, entry.interactionId);
-    return transact(this.#db, ['inbox'], 'readwrite', async (tx) => {
-      const store = tx.objectStore('inbox');
-      const existing: unknown = await requestResult(store.get(key));
-      if (existing !== undefined) {
-        submission(envelope(existing), entry.interactionId);
-        return 'duplicate';
-      }
-      await requestResult(store.put({ v: 1, value: saved }, key));
-      return 'accepted';
+    return storageOperation(this.#db, async () => {
+      const key = this.#key(sessionId, entry.interactionId);
+      const saved = submission({ ...entry, status: 'accepted' }, entry.interactionId);
+      return transact(this.#db, ['inbox', 'meta'], 'readwrite', async (tx) => {
+        await touchSession(tx, this.#scope, sessionId);
+        const store = tx.objectStore('inbox');
+        const existing: unknown = await requestResult(store.get(key));
+        if (existing !== undefined) {
+          submission(envelope(existing), entry.interactionId);
+          return 'duplicate';
+        }
+        await requestResult(store.put({ v: 1, value: saved }, key));
+        return 'accepted';
+      });
     });
   }
 
   async consumeSubmission(sessionId: string, interactionId: string): Promise<void> {
-    const key = this.#key(sessionId, interactionId);
-    await transact(this.#db, ['inbox'], 'readwrite', async (tx) => {
-      const store = tx.objectStore('inbox');
-      const existing: unknown = await requestResult(store.get(key));
-      if (existing === undefined) return;
-      const saved = submission(envelope(existing), interactionId);
-      if (saved.status === 'consumed') return;
-      await requestResult(store.put({ v: 1, value: { ...saved, status: 'consumed' } }, key));
+    return storageOperation(this.#db, async () => {
+      const key = this.#key(sessionId, interactionId);
+      await transact(this.#db, ['inbox', 'meta'], 'readwrite', async (tx) => {
+        await touchSession(tx, this.#scope, sessionId);
+        const store = tx.objectStore('inbox');
+        const existing: unknown = await requestResult(store.get(key));
+        if (existing === undefined) return;
+        const saved = submission(envelope(existing), interactionId);
+        if (saved.status === 'consumed') return;
+        await requestResult(store.put({ v: 1, value: { ...saved, status: 'consumed' } }, key));
+      });
     });
   }
 
   async submissions(sessionId: string): Promise<StoredSubmission[]> {
-    validateKey(sessionId);
-    const prefix = [...this.#scope, sessionId];
-    return transact(this.#db, ['inbox'], 'readonly', async (tx) => {
-      const entries: StoredSubmission[] = [];
-      const request = tx.objectStore('inbox').openCursor(prefixRange(prefix));
-      let cursor = await requestResult(request);
-      while (cursor !== null) {
-        const key = cursor.primaryKey;
-        if (
-          !Array.isArray(key) ||
-          key.length !== 4 ||
-          !prefix.every((part, index) => key[index] === part) ||
-          typeof key[3] !== 'string' ||
-          key[3].length === 0
-        )
-          throw new StorageError('corrupt');
-        entries.push(submission(envelope(cursor.value), key[3]));
-        cursor.continue();
-        cursor = await requestResult(request);
-      }
-      return entries;
+    return storageOperation(this.#db, async () => {
+      validateKey(sessionId);
+      const prefix = [...this.#scope, sessionId];
+      return transact(this.#db, ['inbox'], 'readonly', async (tx) => {
+        const entries: StoredSubmission[] = [];
+        const request = tx.objectStore('inbox').openCursor(prefixRange(prefix));
+        let cursor = await requestResult(request);
+        while (cursor !== null) {
+          const key = cursor.primaryKey;
+          if (
+            !Array.isArray(key) ||
+            key.length !== 4 ||
+            !prefix.every((part, index) => key[index] === part) ||
+            typeof key[3] !== 'string' ||
+            key[3].length === 0
+          )
+            throw new StorageError('corrupt');
+          entries.push(submission(envelope(cursor.value), key[3]));
+          cursor.continue();
+          cursor = await requestResult(request);
+        }
+        return entries;
+      });
     });
   }
 
   async effect(sessionId: string, effectId: string): Promise<StoredEffect | undefined> {
-    const key = this.#key(sessionId, effectId);
-    return transact(this.#db, ['journal'], 'readonly', async (tx) => {
-      const existing: unknown = await requestResult(tx.objectStore('journal').get(key));
-      return existing === undefined ? undefined : effect(envelope(existing));
+    return storageOperation(this.#db, async () => {
+      const key = this.#key(sessionId, effectId);
+      return transact(this.#db, ['journal'], 'readonly', async (tx) => {
+        const existing: unknown = await requestResult(tx.objectStore('journal').get(key));
+        return existing === undefined ? undefined : effect(envelope(existing));
+      });
     });
   }
 
   async recordEffect(sessionId: string, effectId: string, record: StoredEffect): Promise<void> {
-    const key = this.#key(sessionId, effectId);
-    const saved = effect(record);
-    await transact(this.#db, ['journal'], 'readwrite', async (tx) => {
-      const store = tx.objectStore('journal');
-      const existing: unknown = await requestResult(store.get(key));
-      if (existing !== undefined && effect(envelope(existing)).status === 'succeeded') return;
-      await requestResult(store.put({ v: 1, value: saved }, key));
+    return storageOperation(this.#db, async () => {
+      const key = this.#key(sessionId, effectId);
+      const saved = effect(record);
+      await transact(this.#db, ['journal', 'meta'], 'readwrite', async (tx) => {
+        await touchSession(tx, this.#scope, sessionId);
+        const store = tx.objectStore('journal');
+        const existing: unknown = await requestResult(store.get(key));
+        if (existing !== undefined && effect(envelope(existing)).status === 'succeeded') return;
+        await requestResult(store.put({ v: 1, value: saved }, key));
+      });
     });
   }
 }

@@ -5,6 +5,7 @@ export type StorageErrorCode =
   | 'invalid'
   | 'corrupt'
   | 'newer_schema'
+  | 'superseded'
   | 'blocked'
   | 'quota'
   | 'aborted'
@@ -15,6 +16,7 @@ const messages: Record<StorageErrorCode, string> = {
   corrupt: 'Stored checkpoint data is corrupt.',
   newer_schema: 'The storage schema is newer than this package supports.',
   blocked: 'The storage upgrade is blocked.',
+  superseded: 'Another version of the app upgraded the storage.',
   quota: 'The storage quota was exceeded.',
   aborted: 'The storage transaction was aborted.',
   unavailable: 'Checkpoint storage is unavailable.',
@@ -22,11 +24,16 @@ const messages: Record<StorageErrorCode, string> = {
 
 export class StorageError extends Error {
   readonly code: StorageErrorCode;
+  declare readonly unrecoverable: boolean;
 
   constructor(code: StorageErrorCode) {
     super(messages[code]);
     this.name = 'StorageError';
     this.code = code;
+    Object.defineProperty(this, 'unrecoverable', {
+      value: code === 'corrupt' || code === 'newer_schema' || code === 'superseded',
+      enumerable: true,
+    });
   }
 }
 

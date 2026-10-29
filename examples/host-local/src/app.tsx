@@ -9,7 +9,7 @@ import {
 } from '@galaxie/example-english-tutor';
 import { AgentSurface, useAgentSnapshot } from '@galaxie/react';
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
-import type { LocalHost } from './runtime.js';
+import type { LocalHost, StorageStatus } from './runtime.js';
 import { claimSession, sessionKey } from './session.js';
 
 interface AppProps {
@@ -26,10 +26,12 @@ function Lesson({
   host,
   instance,
   score,
+  disabled,
 }: {
   readonly host: LocalHost;
   readonly instance: AgentInstance<TutorInput, unknown>;
   readonly score: string | undefined;
+  readonly disabled: boolean;
 }): ReactElement {
   const snapshot = useAgentSnapshot(instance);
   return (
@@ -38,7 +40,10 @@ function Lesson({
         Run: {snapshot.run?.status ?? snapshot.state}
         {score ? `; Score: ${score}` : ''}
       </p>
-      <AgentSurface instance={instance} registry={host.registry} surfaceId="lesson-main" />
+      <fieldset disabled={disabled}>
+        <legend>Lesson</legend>
+        <AgentSurface instance={instance} registry={host.registry} surfaceId="lesson-main" />
+      </fieldset>
     </>
   );
 }
@@ -52,6 +57,8 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
   const [checking, setChecking] = useState(initialHost !== undefined);
   const [blocked, setBlocked] = useState(false);
   const [retryRestore, setRetryRestore] = useState(false);
+  const [recoverySession, setRecoverySession] = useState<SessionId>();
+  const [storageStatus, setStorageStatus] = useState<StorageStatus>('ready');
   const ownership = useRef<SessionOwnership | undefined>(undefined);
   const starting = useRef(false);
   const mounted = useRef(true);
@@ -62,6 +69,11 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
       mounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    setStorageStatus(host?.getStorageStatus() ?? 'ready');
+    return host?.subscribeStorage(() => setStorageStatus(host.getStorageStatus()));
+  }, [host]);
 
   const prepare = async (): Promise<void> => {
     if (busy || host || !prepareModels) return;
@@ -100,7 +112,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
 
   const run = useCallback(
     async (restore: boolean): Promise<void> => {
-      if (!host || starting.current) return;
+      if (!host || starting.current || host.getStorageStatus() === 'superseded') return;
       starting.current = true;
       setChecking(true);
       setError(undefined);
@@ -108,6 +120,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
       let next: AgentInstance<TutorInput, unknown> | undefined;
       let owner: SessionOwnership | undefined;
       let restoring = false;
+      let storedSession: SessionId | undefined;
       const dispose = async (): Promise<void> => {
         owner?.unsubscribe?.();
         await next?.dispose();
@@ -118,6 +131,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
         const stored = restore ? sessionStorage.getItem(sessionKey) : null;
         if (restore && stored === null) return;
         restoring = stored !== null;
+        storedSession = stored === null ? undefined : (stored as SessionId);
         const release = await claimSession();
         if (release === undefined) {
           if (mounted.current) {
@@ -178,11 +192,16 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
         if (mounted.current) {
           setInstance(undefined);
           if (!discard) {
-            setRetryRestore(restoring);
+            const unrecoverable =
+              restoring && isGalaxieError(failure) && failure.code === 'unrecoverable';
+            setRecoverySession(unrecoverable ? storedSession : undefined);
+            setRetryRestore(restoring && !unrecoverable);
             setError(
-              restoring
-                ? 'The lesson could not be restored. Try again.'
-                : 'The lesson could not start.',
+              unrecoverable
+                ? 'Saved lesson cannot be recovered'
+                : restoring
+                  ? 'The lesson could not be restored. Try again.'
+                  : 'The lesson could not start.',
             );
           }
         }
@@ -193,6 +212,36 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
     },
     [host, followOutput],
   );
+
+  const startOver = async (): Promise<void> => {
+    if (!host || !recoverySession || starting.current || host.getStorageStatus() === 'superseded')
+      return;
+    starting.current = true;
+    setChecking(true);
+    let release: (() => Promise<void>) | undefined;
+    try {
+      release = await claimSession();
+      if (release === undefined) {
+        setBlocked(true);
+        setError('The lesson is active in another tab.');
+        return;
+      }
+      await host.deleteSession(recoverySession);
+      sessionStorage.removeItem(sessionKey);
+      if (mounted.current) {
+        setRecoverySession(undefined);
+        setError(undefined);
+        setInstance(undefined);
+        setScore(undefined);
+      }
+    } catch {
+      if (mounted.current) setError('Saved lesson cannot be recovered');
+    } finally {
+      await release?.();
+      starting.current = false;
+      if (mounted.current) setChecking(false);
+    }
+  };
 
   useEffect(() => {
     if (!host) return;
@@ -237,19 +286,47 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
       ) : null}
       <button
         type="button"
-        disabled={!host || instance !== undefined || checking || blocked || retryRestore}
+        disabled={
+          !host ||
+          instance !== undefined ||
+          checking ||
+          blocked ||
+          retryRestore ||
+          recoverySession !== undefined ||
+          storageStatus === 'superseded'
+        }
         onClick={() => void run(false)}
       >
         Start
       </button>
-      {error ? <p role="alert">{error}</p> : null}
+      {storageStatus === 'superseded' ? <p role="alert">Reload to use the updated app</p> : null}
+      {storageStatus === 'quota' ? <p role="alert">Storage is full</p> : null}
+      {error && storageStatus !== 'superseded' ? <p role="alert">{error}</p> : null}
+      {recoverySession ? (
+        <button
+          type="button"
+          disabled={checking || blocked || storageStatus === 'superseded'}
+          onClick={() => void startOver()}
+        >
+          Start over
+        </button>
+      ) : null}
       {retryRestore ? (
-        <button type="button" disabled={checking} onClick={() => void run(true)}>
+        <button
+          type="button"
+          disabled={checking || storageStatus === 'superseded'}
+          onClick={() => void run(true)}
+        >
           Retry
         </button>
       ) : null}
       {host && instance ? (
-        <Lesson host={host} instance={instance} score={score} />
+        <Lesson
+          host={host}
+          instance={instance}
+          score={score}
+          disabled={storageStatus === 'superseded'}
+        />
       ) : (
         <p role="status">
           {checking ? 'Restoring lesson…' : host ? 'Ready' : 'Prepare models before starting.'}
