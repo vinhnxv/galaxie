@@ -67,6 +67,7 @@ export function createMcpServer(supplied: McpServerOptions): McpServer {
     idleMs: supplied.limits?.idleMs ?? 30000,
   };
   if (
+    typeof supplied.id !== 'string' ||
     !/^[a-z][a-z0-9-]{0,31}$/.test(supplied.id) ||
     typeof supplied.url !== 'string' ||
     url.username !== '' ||

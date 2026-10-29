@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { BrowserCommand, TestProject } from 'vitest/node';
+import type { TestProject } from 'vitest/node';
 import { startMcpServer } from '../../../examples/mcp-server/src/index.js';
 import { toolPin } from '../../../packages/tools-mcp/src/index.js';
+import { mcpFixtures } from './mcp-commands.node.js';
 import { MCP_ORIGIN, type McpAction, type McpAdminState, type McpFixture } from './mcp-context.js';
 
 export interface McpControl {
@@ -11,17 +12,6 @@ export interface McpControl {
   admin(action: McpAction): Promise<McpAdminState>;
   close(): Promise<void>;
 }
-function fixtures(project: TestProject): Map<string, McpControl> {
-  const registry = project.vitest as unknown as Record<symbol, Map<string, McpControl> | undefined>;
-  const key = Symbol.for('galaxie.mcp.test-fixtures');
-  let controls = registry[key];
-  if (controls === undefined) {
-    controls = new Map();
-    registry[key] = controls;
-  }
-  return controls;
-}
-
 export async function createFixture(): Promise<McpControl> {
   const token = crypto.randomUUID();
   const otherToken = crypto.randomUUID();
@@ -69,20 +59,10 @@ export async function createFixture(): Promise<McpControl> {
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const control = await createFixture();
-  fixtures(project).set(control.fixture.url, control);
+  mcpFixtures(project).set(control.fixture.url, control);
   project.provide('mcp', control.fixture);
   return async (): Promise<void> => {
-    fixtures(project).delete(control.fixture.url);
+    mcpFixtures(project).delete(control.fixture.url);
     await control.close();
   };
 }
-
-export const mcpAdminCommand: BrowserCommand<[McpAction], McpAdminState> = async (
-  { project },
-  action,
-) => {
-  const fixture = project.getProvidedContext().mcp;
-  const control = fixtures(project).get(fixture.url);
-  if (control === undefined) throw new Error('MCP test fixture is unavailable.');
-  return control.admin(action);
-};

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
-import { mcpAdminCommand } from './tests/conformance/support/mcp-global.node.js';
+import { mcpAdminCommand } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
   '@galaxie/tools-mcp': fileURLToPath(

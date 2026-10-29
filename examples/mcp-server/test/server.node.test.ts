@@ -30,10 +30,10 @@ function headers(bearer: string = token): Record<string, string> {
   };
 }
 
-async function initialize(url: string): Promise<string> {
+async function initialize(url: string, bearer: string = token): Promise<string> {
   const response = await fetch(url, {
     method: 'POST',
-    headers: headers(),
+    headers: headers(bearer),
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
@@ -110,4 +110,36 @@ test('deduplicates progress effects within the authenticated principal', async (
     expect(await response.text()).toContain('"count":1');
   }
   expect(server.admin.counters()).toEqual({ one: 1 });
+});
+
+test('keeps effect deduplication scoped to authenticated principals despite spoofed attribution', async () => {
+  const server = await setup();
+  for (const bearer of [token, otherToken]) {
+    const session = await initialize(server.url, bearer);
+    const response = await fetch(server.url, {
+      method: 'POST',
+      headers: {
+        ...headers(bearer),
+        'mcp-session-id': session,
+        'mcp-protocol-version': '2025-11-25',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: {
+          name: 'progress.record',
+          arguments: { lessonId: 'lesson-1' },
+          _meta: {
+            'galaxie.dev/effect': 'same-effect',
+            'galaxie.dev/agent': 'spoofed-agent',
+            'galaxie.dev/run': 'spoofed-run',
+          },
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('"count":1');
+  }
+  expect(server.admin.counters()).toEqual({ one: 1, two: 1 });
 });

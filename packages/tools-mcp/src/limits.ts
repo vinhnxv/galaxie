@@ -112,11 +112,25 @@ export class WireLimits {
       };
       this.signal.addEventListener('abort', onFailure, { once: true });
     });
+    let onAbort: () => void = () => {};
+    const aborted = new Promise<never>((_resolve, reject) => {
+      onAbort = (): void => {
+        reject(failure('cancelled'));
+        controller.abort();
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
     try {
       if (this.signal.aborted) throw failure();
-      return await Promise.race([operation(AbortSignal.any([signal, controller.signal])), failed]);
+      if (signal.aborted) throw failure('cancelled');
+      return await Promise.race([
+        operation(AbortSignal.any([signal, controller.signal])),
+        failed,
+        aborted,
+      ]);
     } finally {
       this.signal.removeEventListener('abort', onFailure);
+      signal.removeEventListener('abort', onAbort);
     }
   }
 }

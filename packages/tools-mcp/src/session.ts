@@ -114,20 +114,32 @@ export class PrincipalSession {
         );
       }).catch(() => {});
     });
-    // SDK sessionId accessor includes undefined unlike Transport's optional property.
-    await limits.request(signal, (requestSignal) =>
-      client.connect(transport as Parameters<Client['connect']>[0], {
-        signal: requestSignal,
-        timeout,
-      }),
-    );
-    if (transport.protocolVersion !== '2025-11-25') {
-      this.#options.emit({ code: 'mcp_protocol_mismatch' });
+    // SDK connect awaits initialized notification without request timeout or caller-abort handling.
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(), timeout);
+    try {
+      try {
+        // SDK sessionId accessor includes undefined unlike Transport's optional property.
+        await limits.request(AbortSignal.any([signal, deadline.signal]), (requestSignal) =>
+          client.connect(transport as Parameters<Client['connect']>[0], {
+            signal: requestSignal,
+            timeout,
+          }),
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+      if (transport.protocolVersion !== '2025-11-25') {
+        this.#options.emit({ code: 'mcp_protocol_mismatch' });
+        throw failure();
+      }
+      await this.#list(connection, signal, timeout);
+      return connection;
+    } catch (error) {
       await this.#drop();
-      throw failure();
+      if (deadline.signal.aborted && !signal.aborted) throw failure('timeout');
+      throw error;
     }
-    await this.#list(connection, signal, timeout);
-    return connection;
   }
   async #list(
     connection: Connection,

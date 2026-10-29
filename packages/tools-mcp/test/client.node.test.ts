@@ -394,3 +394,162 @@ test.each([undefined, '', 42])(
     expect(requests).toBe(0);
   },
 );
+
+test.each([undefined, null, true, false])('rejects a non-string namespace %s', (id) => {
+  expect(() =>
+    createMcpServer({
+      id,
+      url: 'http://127.0.0.1:1/',
+      destination: 'user-device',
+      token: () => token,
+    } as unknown as Parameters<typeof createMcpServer>[0]),
+  ).toThrow('The request is invalid.');
+});
+
+test('reconnects on a later independent call after initialize fails', async () => {
+  let initializes = 0;
+  const { binding, server } = await setup((url, init) => {
+    if (String(init?.body).includes('"initialize"') && ++initializes === 1)
+      return Promise.resolve(new Response(null, { status: 503 }));
+    return originFetch(url, init);
+  });
+  await fixed(binding.invoke({ lessonId: 'lesson-1' }, context()));
+  expect(await binding.invoke({ lessonId: 'lesson-1' }, context())).toHaveProperty(
+    'lessonId',
+    'lesson-1',
+  );
+  expect(initializes).toBe(2);
+  expect(server.admin.callCount()).toBe(1);
+});
+
+test.each(['cancel', 'timeout'] as const)(
+  'bounds the initialized notification on %s and releases the principal queue',
+  async (mode) => {
+    let stalled = false;
+    let transportAborted = false;
+    const { client, server } = await setup((url, init) => {
+      if (!stalled && String(init?.body).includes('"notifications/initialized"')) {
+        stalled = true;
+        return new Promise<Response>((_resolve, reject) => {
+          const abort = (): void => {
+            transportAborted = true;
+            reject(new Error('Test request aborted.'));
+          };
+          if (init?.signal?.aborted) abort();
+          else init?.signal?.addEventListener('abort', abort, { once: true });
+        });
+      }
+      return originFetch(url, init);
+    });
+    const tool = server.admin.tools()[0];
+    if (tool === undefined) throw new Error('Test tool missing.');
+    const binding = client.bindings({
+      'lesson.lookup': {
+        ...policy,
+        timeoutMs: mode === 'timeout' ? 200 : 2000,
+        pin: await toolPin(tool),
+      },
+    })['mcp.lessons.lesson.lookup@1'] as CapabilityBinding;
+    const controller = new AbortController();
+    const call = binding
+      .invoke({ lessonId: 'lesson-1' }, context('one', controller.signal))
+      .catch((error: unknown) => error);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await expect.poll(() => stalled).toBe(true);
+      if (mode === 'cancel') controller.abort();
+      const outcome = await Promise.race([
+        call,
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve('pending'), 900);
+        }),
+      ]);
+      expect(outcome).toMatchObject({
+        name: 'GalaxieError',
+        code: mode === 'cancel' ? 'cancelled' : 'timeout',
+        message: mode === 'cancel' ? 'The operation was cancelled.' : 'The operation timed out.',
+      });
+      expect(outcome).not.toHaveProperty('cause');
+      expect(transportAborted).toBe(true);
+      expect(await binding.invoke({ lessonId: 'lesson-1' }, context())).toHaveProperty(
+        'lessonId',
+        'lesson-1',
+      );
+      expect(server.admin.callCount()).toBe(1);
+    } finally {
+      clearTimeout(timer);
+      await client.close();
+      await call;
+    }
+  },
+);
+
+test('serializes rotating credentials across each principal listing and dispatch', async () => {
+  const server = await startMcpServer({
+    allowedOrigins: [origin],
+    verifyToken: (value) => (value === token || value === other ? 'one' : undefined),
+  });
+  cleanup.push(() => server.close());
+  let credentials = 0;
+  let recording = false;
+  let releaseDispatch: () => void = () => {};
+  const dispatchGate = new Promise<void>((resolve) => {
+    releaseDispatch = resolve;
+  });
+  let held = false;
+  const sent: Array<{ method: string; credential: string }> = [];
+  const client = createMcpServer({
+    id: 'rotation',
+    url: server.url,
+    destination: 'user-device',
+    token: () => {
+      credentials++;
+      return credentials <= 3 ? token : other;
+    },
+    fetch: async (url, init) => {
+      const body =
+        typeof init?.body === 'string' ? (JSON.parse(init.body) as { method?: string }) : {};
+      if (recording && (body.method === 'tools/list' || body.method === 'tools/call')) {
+        const authorization = new Headers(init?.headers).get('authorization');
+        sent.push({
+          method: body.method,
+          credential:
+            authorization === `Bearer ${token}`
+              ? 'first'
+              : authorization === `Bearer ${other}`
+                ? 'second'
+                : 'invalid',
+        });
+        if (body.method === 'tools/call' && !held) {
+          held = true;
+          await dispatchGate;
+        }
+      }
+      return originFetch(url, init);
+    },
+  });
+  cleanup.push(() => client.close());
+  const tool = server.admin.tools()[0];
+  if (tool === undefined) throw new Error('Test tool missing.');
+  const binding = client.bindings({ 'lesson.lookup': { ...policy, pin: await toolPin(tool) } })[
+    'mcp.rotation.lesson.lookup@1'
+  ] as CapabilityBinding;
+  await binding.invoke({ lessonId: 'lesson-1' }, context());
+  recording = true;
+  const first = binding.invoke({ lessonId: 'lesson-1' }, context());
+  await expect.poll(() => held).toBe(true);
+  const second = binding.invoke({ lessonId: 'lesson-1' }, context());
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(credentials).toBe(3);
+  } finally {
+    releaseDispatch();
+  }
+  await Promise.all([first, second]);
+  expect(sent).toEqual([
+    { method: 'tools/list', credential: 'first' },
+    { method: 'tools/call', credential: 'first' },
+    { method: 'tools/list', credential: 'second' },
+    { method: 'tools/call', credential: 'second' },
+  ]);
+});
