@@ -2,10 +2,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { EffectId, InteractionId, SessionId } from '../../src/ids.js';
-import type { EffectRecord, RecoveryStore, RecoverySubmission } from '../../src/recovery.js';
+import type {
+  EffectRecord,
+  RecoverySession,
+  RecoveryStore,
+  RecoverySubmission,
+} from '../../src/recovery.js';
 
 /** A durable-for-the-test store shared by successive runtime instances. */
 export class MemoryRecoveryStore implements RecoveryStore {
+  readonly sessions: Map<string, RecoverySession> = new Map();
+
+  async recordSession(sessionId: SessionId, record: RecoverySession): Promise<RecoverySession> {
+    if (!this.sessions.has(sessionId)) this.sessions.set(sessionId, structuredClone(record));
+    return structuredClone(this.sessions.get(sessionId) as RecoverySession);
+  }
+
+  async session(sessionId: SessionId): Promise<RecoverySession | undefined> {
+    return structuredClone(this.sessions.get(sessionId));
+  }
+
   readonly inbox: Map<string, RecoverySubmission> = new Map();
   readonly journal: Map<string, EffectRecord> = new Map();
 

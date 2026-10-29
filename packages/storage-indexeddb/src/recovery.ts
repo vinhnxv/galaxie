@@ -14,6 +14,11 @@ export type RecoveryValue =
   | RecoveryValue[]
   | { [key: string]: RecoveryValue };
 
+export interface StoredSession {
+  readonly agentId: string;
+  readonly agentVersion: string;
+}
+
 export interface StoredSubmission {
   readonly interactionId: string;
   readonly action: string;
@@ -72,6 +77,20 @@ function envelope(value: unknown): unknown {
   return value['value'];
 }
 
+function sessionRecord(value: unknown): StoredSession {
+  const copy = copyJson(value);
+  if (
+    !object(copy) ||
+    Object.keys(copy).length !== 2 ||
+    typeof copy['agentId'] !== 'string' ||
+    copy['agentId'].length === 0 ||
+    typeof copy['agentVersion'] !== 'string' ||
+    copy['agentVersion'].length === 0
+  )
+    throw new StorageError('corrupt');
+  return copy as unknown as StoredSession;
+}
+
 function submission(value: unknown, interactionId: string): StoredSubmission {
   if (
     !object(value) ||
@@ -114,6 +133,34 @@ export class IndexedDBRecovery {
     validateKey(sessionId);
     validateKey(id);
     return [...this.#scope, sessionId, id];
+  }
+
+  async recordSession(sessionId: string, record: StoredSession): Promise<StoredSession> {
+    return storageOperation(this.#db, async () => {
+      validateKey(sessionId);
+      const saved = sessionRecord(record);
+      return transact(this.#db, ['meta'], 'readwrite', async (tx) => {
+        const store = tx.objectStore('meta');
+        const key = [...this.#scope, 'session', sessionId];
+        const existing: unknown = await requestResult(store.get(key));
+        const stored = existing === undefined ? saved : sessionRecord(envelope(existing));
+        await touchSession(tx, this.#scope, sessionId);
+        if (existing === undefined) await requestResult(store.put({ v: 1, value: saved }, key));
+        return stored;
+      });
+    });
+  }
+
+  async session(sessionId: string): Promise<StoredSession | undefined> {
+    return storageOperation(this.#db, async () => {
+      validateKey(sessionId);
+      return transact(this.#db, ['meta'], 'readonly', async (tx) => {
+        const stored: unknown = await requestResult(
+          tx.objectStore('meta').get([...this.#scope, 'session', sessionId]),
+        );
+        return stored === undefined ? undefined : sessionRecord(envelope(stored));
+      });
+    });
   }
 
   async acceptSubmission(

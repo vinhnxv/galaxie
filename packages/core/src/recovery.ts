@@ -13,6 +13,12 @@ export type RecoveryJson =
   | RecoveryJson[]
   | { [key: string]: RecoveryJson };
 
+/** The agent code that created a durable session. Returned identifiers are plain strings. */
+export interface RecoverySession {
+  readonly agentId: string;
+  readonly agentVersion: string;
+}
+
 /** An answer and its durable receipt. Returned identifiers deliberately carry no core brand. */
 export interface RecoverySubmission {
   readonly interactionId: string;
@@ -45,6 +51,10 @@ export type EffectRecord =
  * serialization is per call. This port supplies no retention or logout deletion.
  */
 export interface RecoveryStore {
+  /** Atomic insert-if-absent; return the existing record without replacing it. */
+  recordSession(sessionId: SessionId, record: RecoverySession): Promise<RecoverySession>;
+  /** Read the session identity before attempting to read or resume checkpoints. */
+  session(sessionId: SessionId): Promise<RecoverySession | undefined>;
   /** Atomic insert-if-absent by session and interaction, including consumed receipts. */
   acceptSubmission(
     sessionId: SessionId,
@@ -101,6 +111,23 @@ export function copyRecoveryJson(value: unknown): RecoveryJson {
     // Stored content and validation failures never become error text or causes.
   }
   return corrupt();
+}
+
+export function validateSession(value: unknown): RecoverySession | undefined {
+  if (value === undefined) return undefined;
+  const copy = copyRecoveryJson(value);
+  if (
+    copy === null ||
+    Array.isArray(copy) ||
+    typeof copy !== 'object' ||
+    Object.keys(copy).length !== 2 ||
+    typeof copy['agentId'] !== 'string' ||
+    copy['agentId'].length === 0 ||
+    typeof copy['agentVersion'] !== 'string' ||
+    copy['agentVersion'].length === 0
+  )
+    return corrupt();
+  return copy as unknown as RecoverySession;
 }
 
 export function validateSubmissions(

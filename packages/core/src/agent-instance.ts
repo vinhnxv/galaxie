@@ -29,7 +29,7 @@ import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
 import type { OutputSafetyHook, PublishedModelRoute, SelectedModelRoute } from './models.js';
 import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
-import { copyRecoveryJson, validateSubmissions } from './recovery.js';
+import { copyRecoveryJson, validateSession, validateSubmissions } from './recovery.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
 import { type StandardSchema, validateSync } from './schema.js';
@@ -81,6 +81,17 @@ function* payloadStrings(value: unknown): Generator<string, void> {
 
 function containsText(value: unknown): boolean {
   return payloadStrings(value).next().done !== true;
+}
+
+function failureCode(error: unknown, fallback: ErrorCode): ErrorCode {
+  const marked = (value: unknown): boolean =>
+    typeof value === 'object' &&
+    value !== null &&
+    Object.getOwnPropertyDescriptor(value, 'unrecoverable')?.value === true;
+  return marked(error) ||
+    (isGalaxieError(error) && (error.code === 'unrecoverable' || marked(error.cause)))
+    ? 'unrecoverable'
+    : fallback;
 }
 
 function terminal(run: RunRecord): boolean {
@@ -365,7 +376,7 @@ export function createAgentInstance(
           const knownCode = isErrorCode(event.error.code);
           const error = Object.freeze(
             toErrorInfo(
-              knownCode ? event.error.code : 'executor_error',
+              failureCode(event.error, knownCode ? event.error.code : 'executor_error'),
               event.error.type === undefined ? undefined : { name: event.error.type },
             ),
           );
@@ -533,7 +544,7 @@ export function createAgentInstance(
       if (active(run, segment)) {
         if (options.recovery === undefined && entered && segment.submission !== undefined)
           segment.submission.status = 'consumed';
-        failRun(run, toErrorInfo('executor_error', error));
+        failRun(run, toErrorInfo(failureCode(error, 'executor_error'), error));
         report({ kind: 'run_failed', runId: run.runId, error });
       } else {
         report({ kind: 'late_event', runId: run.runId });
@@ -652,6 +663,27 @@ export function createAgentInstance(
           assertUsable();
           throw new GalaxieError('invalid', 'The run input failed validation.');
         }
+        if (options.recovery !== undefined) {
+          try {
+            assertUsable();
+            const recording = options.recovery.recordSession(sessionId, {
+              agentId: definition.id,
+              agentVersion: definition.version,
+            });
+            checkpointChecks.add(recording);
+            try {
+              const stored = validateSession(await recording);
+              if (stored?.agentId !== definition.id || stored.agentVersion !== definition.version)
+                throw new GalaxieError('unavailable', toErrorInfo('unavailable').message);
+            } finally {
+              checkpointChecks.delete(recording);
+            }
+          } catch {
+            claimingSlot = false;
+            assertUsable();
+            throw new GalaxieError('unavailable', toErrorInfo('unavailable').message);
+          }
+        }
         try {
           assertUsable();
         } catch (error) {
@@ -700,16 +732,37 @@ export function createAgentInstance(
       const restoring = (async () => {
         let restored: RunRecord;
         try {
+          const recovery = options.recovery;
+          if (recovery !== undefined) {
+            let stored: ReturnType<typeof validateSession>;
+            try {
+              stored = validateSession(await recovery.session(sessionId));
+            } catch (error) {
+              if (disposing) assertUsable();
+              report({ kind: 'restore_failed', error });
+              const code = failureCode(error, 'unavailable');
+              throw new GalaxieError(code, toErrorInfo(code).message);
+            }
+            assertUsable();
+            if (stored?.agentId !== definition.id || stored.agentVersion !== definition.version) {
+              const error = new GalaxieError(
+                'unsupported',
+                'The saved session uses an unsupported agent version.',
+              );
+              report({ kind: 'restore_failed', error });
+              throw error;
+            }
+          }
           let pending: PendingInteraction | undefined;
           try {
             pending = await executor?.pending(sessionId);
           } catch (error) {
             report({ kind: 'restore_failed', error });
-            throw new GalaxieError('executor_error', toErrorInfo('executor_error').message);
+            const code = failureCode(error, 'executor_error');
+            throw new GalaxieError(code, toErrorInfo(code).message);
           }
           assertUsable();
           const inbox = new Map<InteractionId, InboxEntry>();
-          const recovery = options.recovery;
           if (recovery !== undefined) {
             try {
               const submissions = validateSubmissions(await recovery.submissions(sessionId));
@@ -726,10 +779,7 @@ export function createAgentInstance(
             } catch (error) {
               if (disposing) assertUsable();
               report({ kind: 'restore_failed', error });
-              const code =
-                isGalaxieError(error) && error.code === 'unrecoverable'
-                  ? 'unrecoverable'
-                  : 'unavailable';
+              const code = failureCode(error, 'unavailable');
               throw new GalaxieError(code, toErrorInfo(code).message);
             }
           }
@@ -761,7 +811,7 @@ export function createAgentInstance(
             try {
               checked = validateSubmission(run, pending, submission.action, submission.payload);
             } catch (error) {
-              const code = isGalaxieError(error) ? error.code : 'invalid';
+              const code = failureCode(error, isGalaxieError(error) ? error.code : 'invalid');
               throw new GalaxieError(code, toErrorInfo(code).message);
             }
             if (checked.schema !== undefined) labelPayload(run, checked.schema, checked.payload);
@@ -827,7 +877,9 @@ export function createAgentInstance(
       try {
         checked = validateSubmission(run, pending, action, event.payload);
       } catch (error) {
-        return Promise.resolve(rejected(isGalaxieError(error) ? error.code : 'invalid'));
+        return Promise.resolve(
+          rejected(failureCode(error, isGalaxieError(error) ? error.code : 'invalid')),
+        );
       }
       const { payload, schema: payloadSchema } = checked;
       const parent = context.active();
@@ -853,7 +905,7 @@ export function createAgentInstance(
               if (accepted !== 'accepted') return rejected('unrecoverable');
             } catch (error) {
               report({ kind: 'dispatch_failed', runId: run.runId, error });
-              return rejected('unavailable');
+              return rejected(failureCode(error, 'unavailable'));
             }
             if (disposing || current !== run || run.status !== 'waiting_input')
               return rejected('stale');
@@ -870,7 +922,7 @@ export function createAgentInstance(
           return { status: 'accepted', interactionId };
         } catch (error) {
           report({ kind: 'dispatch_failed', runId: run.runId, error });
-          return rejected('executor_error');
+          return rejected(failureCode(error, 'executor_error'));
         } finally {
           delete run.dispatching;
         }
