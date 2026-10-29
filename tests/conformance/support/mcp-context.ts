@@ -12,6 +12,7 @@ export interface McpFixture {
 export type McpAction = 'state' | 'description' | 'reset' | 'forget' | 'sampling' | 'bad-origin';
 export interface McpAdminState {
   readonly calls: number;
+  readonly meta: Record<string, unknown>;
   readonly sessions: number;
   readonly counters: Record<string, number>;
   readonly headers: Record<string, string | string[] | undefined>;

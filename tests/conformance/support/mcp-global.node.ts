@@ -29,6 +29,7 @@ export async function createFixture(): Promise<McpControl> {
       if (action === 'sampling') server.admin.requestSampling();
       return {
         calls: server.admin.callCount(),
+        meta: server.admin.lastMeta(),
         sessions: server.admin.sessionCount(),
         counters: server.admin.counters(),
         headers: server.admin.lastHeaders(),
