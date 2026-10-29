@@ -53,11 +53,16 @@ export interface LocalModels {
   readonly routing: ModelRouting;
 }
 
+export type StorageStatus = 'ready' | 'quota' | 'superseded';
+
 export interface LocalHost {
   readonly runtime: Runtime;
   readonly registry: Registry;
   readonly bindings: BindingsFor<typeof tutorDefinition>;
   readonly progress: ReadonlyMap<string, ProgressInput>;
+  getStorageStatus(): StorageStatus;
+  subscribeStorage(listener: () => void): () => void;
+  deleteSession(sessionId: SessionId): Promise<void>;
   createInstance(sessionId?: SessionId): Promise<AgentInstance<TutorInput, unknown>>;
 }
 
@@ -104,6 +109,13 @@ export function createLocalHost(models: LocalModels): LocalHost {
     outputSafety,
   });
   let saver: Promise<IndexedDBSaver> | undefined;
+  let storageStatus: StorageStatus = 'ready';
+  const storageListeners = new Set<() => void>();
+  const observeStorage = (status: StorageStatus): void => {
+    if (storageStatus === status || storageStatus === 'superseded') return;
+    storageStatus = status;
+    for (const listener of storageListeners) listener();
+  };
   let disposed = false;
   let disposal: Promise<void> | undefined;
   const disposeRuntime = runtime.dispose.bind(runtime);
@@ -122,11 +134,33 @@ export function createLocalHost(models: LocalModels): LocalHost {
     registry,
     bindings,
     progress,
+    getStorageStatus: () => storageStatus,
+    subscribeStorage(listener) {
+      storageListeners.add(listener);
+      return () => storageListeners.delete(listener);
+    },
+    async deleteSession(sessionId) {
+      const checkpointer = await saver;
+      await checkpointer?.deleteSession(sessionId);
+    },
     async createInstance(sessionId) {
       if (disposed) throw new GalaxieError('invalid', 'The runtime was disposed.');
       let checkpointer: IndexedDBSaver | undefined;
       if (globalThis.indexedDB !== undefined) {
-        saver ??= IndexedDBSaver.open({ appId: hostAppId, principalScope: hostLearnerId });
+        saver ??= IndexedDBSaver.open({
+          appId: hostAppId,
+          principalScope: hostLearnerId,
+          onError: (code) => {
+            if (code === 'quota') observeStorage('quota');
+          },
+          onVersionChange: () => observeStorage('superseded'),
+        }).then(async (opened) => {
+          // The caller holds the host's session Web Lock before opening and sweeping.
+          try {
+            await opened.sweep();
+          } catch {}
+          return opened;
+        });
         try {
           checkpointer = await saver;
         } catch (error) {
