@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json && tsc -p packages/models/tsconfig.build.json && tsc -p packages/react/tsconfig.build.json && tsc -p examples/english-tutor/tsconfig.build.json && node scripts/build-manifest.ts examples/english-tutor && node scripts/build-manifest.ts examples/english-tutor --verify && pnpm --filter @galaxie/example-host-local build && tsc -p packages/storage-indexeddb/tsconfig.build.json && tsc -p examples/mcp-server/tsconfig.build.json && tsc -p packages/tools-mcp/tsconfig.build.json && pnpm --filter @galaxie/example-host-remote build && tsc -p packages/eslint-plugin/tsconfig.build.json",
-    "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run build && pnpm run check:deps",
+    "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run build && pnpm run check:deps && pnpm run check:docs",
     "check:license": "node scripts/check-license.ts",
     "check:docs": "node scripts/check-docs.ts",
     "format": "biome check --write .",

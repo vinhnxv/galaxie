@@ -1,0 +1,10 @@
+# galaxie
+
+> A browser-first agent runtime for reviewed, bundled agents, with host-owned capabilities, model routing and UI. Code is AGPL-3.0-only; closed-source use requires a commercial license.
+
+## Start here
+
+- [Project brief](docs/galaxie-project-brief.md): scope and architecture.
+- [System design](docs/system-design.md): implemented contracts and limits.
+- [Root coding guidance](AGENTS.md): repository rules.
+- [Commercial license](COMMERCIAL-LICENSE.md): closed-source use.

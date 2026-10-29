@@ -121,3 +121,10 @@ test('requires llms.txt', () => {
     output: 'llms.txt:1: missing required file\n',
   });
 });
+
+test('passes on the tracked repository documentation', () => {
+  expect(run(fileURLToPath(new URL('../..', import.meta.url)))).toEqual({
+    status: 0,
+    output: '',
+  });
+});

@@ -36,3 +36,4 @@ jobs:
       - run: CI=true pnpm test
       - run: pnpm run build
       - run: pnpm run check:deps
+      - run: pnpm run check:docs
