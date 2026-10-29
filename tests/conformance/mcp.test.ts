@@ -315,6 +315,16 @@ test('AT-33 rejects sampling on the call SSE stream', async () => {
 });
 
 test('AT-33 rejects elicitation on the call SSE stream without exposing its prompt', async () => {
+  function serialize(value: unknown): string {
+    return JSON.stringify(value, (_key, item: unknown) =>
+      item instanceof Error
+        ? Object.fromEntries(
+            Object.getOwnPropertyNames(item).map((key) => [key, Reflect.get(item, key)]),
+          )
+        : item,
+    );
+  }
+  expect(serialize([{ kind: 'listener_threw', error: new Error('Probe.') }])).toContain('Probe.');
   const { bindings, events, initializationCapabilities } = client();
   await admin('elicitation');
   const result = await run(bindings);
@@ -328,7 +338,7 @@ test('AT-33 rejects elicitation on the call SSE stream without exposing its prom
     method: 'elicitation/create',
   });
   expect(
-    JSON.stringify([
+    serialize([
       result.answer,
       events,
       result.diagnostics,
