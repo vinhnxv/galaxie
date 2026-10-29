@@ -1,0 +1,46 @@
+# galaxie
+
+> A browser-first agent runtime for reviewed, bundled agents, with host-owned capabilities, model routing and UI. Code is AGPL-3.0-only; closed-source use requires a commercial license.
+
+## Start here
+
+- [Project brief](docs/galaxie-project-brief.md): scope and architecture.
+- [System design](docs/system-design.md): implemented contracts and limits.
+- [Root coding guidance](AGENTS.md): repository rules.
+- [Commercial license](COMMERCIAL-LICENSE.md): closed-source use.
+- [Framework overview](docs/framework-overview.md): audiences and direction; distinguish targets from implemented contracts.
+- [Architecture decisions](docs/adr/README.md): statuses and decision index; follow Accepted decisions.
+- [Security review](docs/security-review.md): SDK controls, host duties, evidence and residual risks.
+
+## Host guides and device evidence
+
+- [Host integration](docs/guides/host-integration.md): CSP, models, persistence, ownership, logout, approvals and host proxies.
+- [Development tracing](docs/guides/tracing.md): filtered spans and a host-run collector; no tracing secrets in the browser.
+- [Device matrix](docs/device-matrix.md): automated mock/fake coverage and limited real-device demonstrations.
+- [M2 exit record](docs/m2-exit-record.md): real local models on one Apple M5 Pro with Chrome 155.
+- [M3 exit record](docs/m3-exit-record.md): reload, duplicates, handover and logout on that device.
+
+## Package introductions
+
+- [Core README](packages/core/README.md): framework-neutral contracts and host runtime setup.
+- [LangGraph adapter README](packages/adapter-langgraph/README.md): a minimal graph and explicit config.
+- [Models README](packages/models/README.md): provider subpaths and the deterministic mock.
+- [React README](packages/react/README.md): surfaces and separate host confirmations.
+- [IndexedDB README](packages/storage-indexeddb/README.md): scoped checkpoints, recovery and storage lifecycle.
+- [MCP tools README](packages/tools-mcp/README.md): pinned host-controlled tool bindings and limits.
+- [ESLint plugin README](packages/eslint-plugin/README.md): five agent lint rules and their limits.
+
+## Package coding guidance
+
+- [Core AGENTS](packages/core/AGENTS.md): lifecycle, policy and content-free instrumentation rules.
+- [LangGraph adapter AGENTS](packages/adapter-langgraph/AGENTS.md): native semantics, config and unsupported interrupts.
+- [Models AGENTS](packages/models/AGENTS.md): host registration and fake-only automated model tests.
+- [React AGENTS](packages/react/AGENTS.md): trusted registries, text rendering and host lifecycle.
+- [IndexedDB AGENTS](packages/storage-indexeddb/AGENTS.md): principal scope, fencing, recovery and deletion.
+- [MCP tools AGENTS](packages/tools-mcp/AGENTS.md): metadata pins, broker dispatch and sanitized errors.
+- [ESLint plugin AGENTS](packages/eslint-plugin/AGENTS.md): scope analysis without runtime enforcement.
+
+## Verification
+
+- [Conformance suite](tests/conformance/README.md): parity lanes, explicit-config rules and protected goldens.
+- [Injection corpus](tests/injection-corpus/README.md): 32 synthetic mock-only cases and their limits.

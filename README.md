@@ -41,6 +41,8 @@ Routing, labels, consent and model budgets cover calls through `host.langchain.c
 
 `@galaxie/core` now offers opt-in `RuntimeOptions.developmentWarnings`: content-free advice for page CSP/Trusted Types enforcement, optional unbound capabilities, roles without a usable provider, provider-key-shaped storage values and blocked interaction URLs. Omitting the option skips every warning check and extra provider probe. Host-local enables it only in Vite development; built preview pages emit nothing. These are best-effort integration checks with [documented limits](docs/system-design.md#development-warnings), tested with mock models on Node and Chromium; they do not change policy or routing.
 
+The M4 documentation slice adds package coding guidance, an AI-facing index, tracing and host integration guides, a tested device matrix, and an offline documentation check in `pnpm check`.
+
 ## Intended use and disclaimer
 
 galaxie is experimental, pre-release software, provided "as is", without warranty of any kind. Sections 15 to 17 of the [AGPL](LICENSE) (disclaimer of warranty and limitation of liability) apply.
@@ -60,6 +62,10 @@ No test suite or review proves that software is secure. The known limits are lis
 
 ## Documentation
 
+- [AI-facing index](llms.txt): package READMEs, coding guidance, guides and test evidence.
+- [Host integration guide](docs/guides/host-integration.md): CSP, model hosting, storage, ownership, logout, confirmations and proxies.
+- [Development tracing guide](docs/guides/tracing.md): span filters and host-owned export through a collector.
+- [Tested device matrix](docs/device-matrix.md): mock/fake CI coverage and the recorded real-device demonstrations.
 - [Project brief](docs/galaxie-project-brief.md): scope, architecture, security model, roadmap and acceptance tests.
 - [Framework overview](docs/framework-overview.md): role, audiences and the roadmap at a glance.
 - [Architecture decision records](docs/adr/README.md): one file per decision.
