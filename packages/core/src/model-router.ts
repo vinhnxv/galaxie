@@ -271,7 +271,6 @@ export class ModelRouter {
     this.#selected.clear();
   }
 
-  /** Advice only: no routing decisions, downloads, consent or credentials are retained. */
   async checkDevelopmentWarnings(warn: (warning: DevelopmentWarning) => void): Promise<void> {
     const controller = new AbortController();
     this.#developmentController = controller;

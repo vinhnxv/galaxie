@@ -24,7 +24,6 @@ export type DevelopmentWarningReporter = (
   onError?: (error: unknown) => void,
 ) => void;
 
-/** Internal runtime-wide de-duplication, including callbacks that throw. */
 export function createDevelopmentWarnings(
   callback: (warning: DevelopmentWarning) => void,
 ): DevelopmentWarningReporter {
@@ -45,7 +44,6 @@ export function createDevelopmentWarnings(
   };
 }
 
-/** Page-only probes. Nothing here runs unless the host opts in. */
 export function checkPageDevelopmentWarnings(warn: DevelopmentWarningReporter): void {
   try {
     if (typeof document === 'undefined') return;
