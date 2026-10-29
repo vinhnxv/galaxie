@@ -111,13 +111,62 @@ function filteredManager(
   });
 }
 
+type ArgumentChunk = NonNullable<
+  AIMessageChunk<StandardMessageStructure>['tool_call_chunks']
+>[number];
+
+function rawArgumentChunks(message: BaseMessage): ArgumentChunk[] {
+  const raw: unknown = message.additional_kwargs['tool_calls'];
+  if (!Array.isArray(raw)) return [];
+  const calls: ArgumentChunk[] = [];
+  for (const [position, call] of raw.entries()) {
+    if (!plainObject(call) || !plainObject(call['function'])) continue;
+    const fn = call['function'];
+    if (typeof fn['arguments'] !== 'string') continue;
+    calls.push({
+      ...(typeof fn['name'] === 'string' ? { name: fn['name'] } : {}),
+      ...(typeof call['id'] === 'string' ? { id: call['id'] } : {}),
+      index: typeof call['index'] === 'number' ? call['index'] : position,
+      args: fn['arguments'],
+    });
+  }
+  return calls;
+}
+
+function argumentChunks(message: BaseMessage): ArgumentChunk[] {
+  if (!isAIMessage(message)) return [];
+  const calls: Array<{ name: string | undefined; id: string | undefined; args: string }> = [
+    ...(message.tool_calls ?? []).map((call) => ({
+      name: call.name,
+      id: call.id,
+      args: JSON.stringify(call.args) ?? '',
+    })),
+    ...(message.invalid_tool_calls ?? []).map((call) => ({
+      name: call.name,
+      id: call.id,
+      args: call.args ?? '',
+    })),
+  ];
+  const normalized = [...calls];
+  // AIMessageChunk can clear invalid_tool_calls while retaining the raw provider arguments.
+  for (const { name, id, args: rawArgs } of rawArgumentChunks(message)) {
+    let args = rawArgs ?? '';
+    try {
+      args = JSON.stringify(JSON.parse(args));
+    } catch {}
+    if (!normalized.some((known) => known.name === name && known.id === id && known.args === args))
+      calls.push({ name, id, args });
+  }
+  return calls.map(({ name, id, args }, index) => ({
+    ...(name === undefined ? {} : { name }),
+    ...(id === undefined ? {} : { id }),
+    index,
+    args,
+  }));
+}
+
 function outputText(message: BaseMessage): string {
-  return [
-    message.text,
-    ...(isAIMessage(message)
-      ? (message.tool_calls?.map((call) => JSON.stringify(call.args)) ?? [])
-      : []),
-  ].join('\n');
+  return [message.text, ...argumentChunks(message).map((call) => call.args)].join('\n');
 }
 export function selectedRouteFromOptions(options: unknown): SelectedModelRoute | undefined {
   if (typeof options !== 'object' || options === null) return undefined;
@@ -338,7 +387,10 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     try {
       if (runManager !== undefined) call.handler.setModelRoute(runManager.runId, call.lease);
       let reported: ModelUsage | undefined;
-      let accumulated = '';
+      let text = '';
+      let checked = '';
+      const argumentsText: string[] = [];
+      const fragmentSlots = new Map<string, number>();
       const providerManager = filteredManager(runManager);
       const chunks =
         call.provider.disableStreaming === true ||
@@ -346,13 +398,48 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
           ? this.#generateChunk(call.provider, messages, options, providerManager)
           : call.provider._streamResponseChunks(messages, options, providerManager);
       for await (const chunk of chunks) {
-        const argumentsText = isAIMessageChunk(chunk.message)
-          ? (chunk.message.tool_call_chunks?.map((call) => call.args ?? '').join('') ?? '')
-          : '';
-        const next = accumulated + chunk.text + argumentsText;
-        if (next.length > accumulated.length) {
-          accumulated = next;
-          await call.lease.checkOutput(accumulated, { final: false });
+        text += chunk.text;
+        const fragments = isAIMessageChunk(chunk.message)
+          ? chunk.message.tool_call_chunks
+          : undefined;
+        if (fragments !== undefined && fragments.length > 0) {
+          for (const [position, fragment] of fragments.entries()) {
+            const key = JSON.stringify(
+              fragment.index !== undefined
+                ? ['index', fragment.index]
+                : fragment.id !== undefined
+                  ? ['id', fragment.id]
+                  : ['position', position],
+            );
+            let slot = fragmentSlots.get(key);
+            if (slot === undefined) {
+              slot = argumentsText.length;
+              fragmentSlots.set(key, slot);
+              argumentsText.push('');
+            }
+            argumentsText[slot] = (argumentsText[slot] ?? '') + (fragment.args ?? '');
+          }
+          for (const raw of rawArgumentChunks(chunk.message)) {
+            const mirrored = fragments.some(
+              (fragment, position) =>
+                fragment.args === raw.args &&
+                (fragment.name === undefined ||
+                  raw.name === undefined ||
+                  fragment.name === raw.name) &&
+                (fragment.id !== undefined && raw.id !== undefined
+                  ? fragment.id === raw.id
+                  : (fragment.index ?? position) === raw.index),
+            );
+            if (!mirrored) argumentsText.push(raw.args ?? '');
+          }
+        } else {
+          argumentsText.push(...argumentChunks(chunk.message).map((call) => call.args ?? ''));
+        }
+        // Preserve original arguments: native concat can drop complete calls beside fragments.
+        const next = [text, ...argumentsText.filter((value) => value.length > 0)].join('\n');
+        if (next !== checked) {
+          await call.lease.checkOutput(next, { final: false });
+          checked = next;
         }
         const current = usage(chunk.message);
         if (current !== undefined)
@@ -370,7 +457,7 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
           { chunk },
         );
       }
-      await call.lease.checkOutput(accumulated, { final: true });
+      await call.lease.checkOutput(checked, { final: true });
       finish(call, true, reported);
     } catch (error) {
       recordFailure(call, error);
@@ -395,16 +482,7 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       text: generation.text,
       message: new AIMessageChunk<StandardMessageStructure>({
         ...generation.message,
-        ...(isAIMessage(generation.message)
-          ? {
-              tool_call_chunks: (generation.message.tool_calls ?? []).map((call, index) => ({
-                name: call.name,
-                ...(call.id === undefined ? {} : { id: call.id }),
-                index,
-                args: JSON.stringify(call.args),
-              })),
-            }
-          : {}),
+        tool_call_chunks: argumentChunks(generation.message),
       }),
       ...(generation.generationInfo === undefined
         ? {}

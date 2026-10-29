@@ -33,11 +33,15 @@ class Tokens extends BaseCallbackHandler {
   readonly lc_prefer_streaming = true;
   readonly tokens: string[] = [];
   readonly texts: string[] = [];
+  readonly events: unknown[] = [];
   override handleLLMNewToken(token: string): void {
     this.tokens.push(token);
   }
   override handleText(text: string): void {
     this.texts.push(text);
+  }
+  override handleChatModelStreamEvent(event: unknown): void {
+    this.events.push(event);
   }
 }
 
@@ -212,9 +216,7 @@ test.each(['invoke', 'bridge'] as const)('checks tool arguments in %s', async (m
       }
   };
   await expect(consume()).rejects.toMatchObject({ code: 'denied' });
-  expect(checks).toEqual([
-    `visible${method === 'invoke' ? '\n' : ''}${JSON.stringify({ reply: sentinel })}`,
-  ]);
+  expect(checks).toEqual([`visible\n${JSON.stringify({ reply: sentinel })}`]);
   expect(f.tokens.tokens).toEqual([]);
   await f.runtime.dispose();
   await f.recorder.provider.shutdown();
@@ -231,10 +233,10 @@ class CallbackProvider extends ToolProvider {
     await manager?.handleText('provider lifecycle');
     await manager?.handleLLMNewToken(sentinel);
     await manager?.handleChatModelStreamEvent({
-      type: 'content',
+      event: 'content-block-delta',
       index: 0,
-      content: sentinel,
-    } as never);
+      delta: { type: 'text-delta', text: sentinel },
+    });
     yield new ChatGenerationChunk({
       text: 'visible',
       message: new AIMessageChunk<StandardMessageStructure>('visible'),
@@ -276,9 +278,9 @@ test.each(['allow', 'block'] as const)(
     if (verdict === 'allow') {
       await consume();
       expect(checks).toEqual([
-        { text: '{"reply":"', final: false },
-        { text: JSON.stringify({ reply: sentinel }), final: false },
-        { text: JSON.stringify({ reply: sentinel }), final: true },
+        { text: '\n{"reply":"', final: false },
+        { text: `\n${JSON.stringify({ reply: sentinel })}`, final: false },
+        { text: `\n${JSON.stringify({ reply: sentinel })}`, final: true },
       ]);
       expect(chunks).toHaveLength(3);
     } else {
@@ -304,10 +306,10 @@ class GenerateCallbackProvider extends BaseChatModel {
     await manager?.handleText('provider lifecycle');
     await manager?.handleLLMNewToken(sentinel);
     await manager?.handleChatModelStreamEvent({
-      type: 'content',
+      event: 'content-block-delta',
       index: 0,
-      content: sentinel,
-    } as never);
+      delta: { type: 'text-delta', text: sentinel },
+    });
     return {
       generations: [
         { text: 'visible', message: new AIMessage<StandardMessageStructure>('visible') },
@@ -319,6 +321,7 @@ class GenerateCallbackProvider extends BaseChatModel {
 test('non-streaming generation filters provider token callbacks before the final check', async () => {
   const f = await fixture(() => 'block', new GenerateCallbackProvider({}));
   const tokens: string[] = [];
+  const events: unknown[] = [];
   await expect(
     f.model.invoke('hello', {
       callbacks: [
@@ -326,11 +329,15 @@ test('non-streaming generation filters provider token callbacks before the final
           handleLLMNewToken: (token: string) => {
             tokens.push(token);
           },
+          handleChatModelStreamEvent: (event: unknown) => {
+            events.push(event);
+          },
         },
       ],
     }),
   ).rejects.toMatchObject({ code: 'denied' });
   expect(tokens).toEqual([]);
+  expect(events).toEqual([]);
   await f.runtime.dispose();
   await f.recorder.provider.shutdown();
 });
@@ -343,6 +350,7 @@ test('filters both provider token paths while retaining other callbacks and mana
     chunks.push(chunk.text);
   expect(chunks).toEqual(['visible']);
   expect(f.tokens.tokens).toEqual(['visible']);
+  expect(f.tokens.events).toEqual([]);
   expect(f.tokens.texts).toEqual(['provider lifecycle']);
   expect(provider.managers[0]?.runId).toEqual(expect.any(String));
   expect(provider.managers[0]?.handlers).toContain(f.tokens);
@@ -360,6 +368,224 @@ test('structured output fails with denied before validation', async () => {
   await f.runtime.dispose();
   await f.recorder.provider.shutdown();
 });
+
+class ArgumentFormsProvider extends BaseChatModel {
+  readonly #form: 'complete' | 'invalid' | 'mixed';
+  constructor(form: 'complete' | 'invalid' | 'mixed', bridge = false) {
+    super({});
+    this.#form = form;
+    this.disableStreaming = bridge;
+  }
+  override _llmType(): string {
+    return 'fake-argument-forms';
+  }
+  override async _generate(): Promise<ChatResult> {
+    const valid = {
+      id: 'valid',
+      type: 'function' as const,
+      function: {
+        name: 'answer',
+        arguments: JSON.stringify({ reply: this.#form === 'complete' ? sentinel : 'safe' }),
+      },
+    };
+    const invalid = {
+      id: 'invalid',
+      type: 'function' as const,
+      function: { name: 'answer', arguments: `{"reply":"${sentinel}` },
+    };
+    const message = new AIMessage<StandardMessageStructure>({
+      content: 'visible',
+      additional_kwargs: {
+        tool_calls:
+          this.#form === 'complete'
+            ? [valid]
+            : this.#form === 'invalid'
+              ? [invalid]
+              : [valid, invalid],
+      },
+    });
+    return { generations: [{ text: message.text, message }] };
+  }
+  override async *_streamResponseChunks(): AsyncGenerator<ChatGenerationChunk> {
+    const result = await this._generate();
+    const message = result.generations[0]?.message;
+    if (message === undefined) throw new Error('The fake reply is missing.');
+    yield new ChatGenerationChunk({
+      text: message.text,
+      message: new AIMessageChunk<StandardMessageStructure>({ ...message }),
+    });
+  }
+}
+
+test.each([
+  ['complete', 'stream'],
+  ['complete', 'streaming invoke'],
+  ['invalid', 'invoke'],
+  ['invalid', 'stream'],
+  ['mixed', 'bridge'],
+] as const)('checks %s tool arguments through %s before release', async (form, method) => {
+  const checks: string[] = [];
+  const f = await fixture(
+    ({ text }) => {
+      checks.push(text);
+      return text.includes(sentinel) ? 'block' : 'allow';
+    },
+    new ArgumentFormsProvider(form, method === 'bridge'),
+  );
+  const chunks: unknown[] = [];
+  const consume = async (): Promise<void> => {
+    if (method === 'invoke') await f.model.invoke('hello');
+    else if (method === 'streaming invoke')
+      await f.model.invoke('hello', { callbacks: [f.tokens] });
+    else
+      for await (const chunk of await f.model.stream('hello', { callbacks: [f.tokens] }))
+        chunks.push(chunk);
+  };
+  await expect(consume()).rejects.toMatchObject({ code: 'denied' });
+  expect(checks[0]).toContain(sentinel);
+  expect(chunks).toEqual([]);
+  expect(f.tokens.tokens).toEqual([]);
+  expect(f.tokens.events).toEqual([]);
+  await f.runtime.dispose();
+  await f.recorder.provider.shutdown();
+});
+
+class SequenceProvider extends BaseChatModel {
+  readonly #chunks: readonly ChatGenerationChunk[];
+  constructor(chunks: readonly ChatGenerationChunk[]) {
+    super({});
+    this.#chunks = chunks;
+  }
+  override _llmType(): string {
+    return 'fake-sequence';
+  }
+  override async _generate(): Promise<ChatResult> {
+    return {
+      generations: [{ text: 'unused', message: new AIMessage<StandardMessageStructure>('unused') }],
+    };
+  }
+  override async *_streamResponseChunks(): AsyncGenerator<ChatGenerationChunk> {
+    yield* this.#chunks;
+  }
+}
+
+function argumentChunk(text: string, args?: string, index = 0): ChatGenerationChunk {
+  return new ChatGenerationChunk({
+    text,
+    message: new AIMessageChunk<StandardMessageStructure>({
+      content: text,
+      ...(args === undefined
+        ? {}
+        : { tool_call_chunks: [{ name: 'answer', id: `tool-${index}`, index, args }] }),
+    }),
+  });
+}
+
+test('retains complete arguments after later fragments when the final check blocks', async () => {
+  const complete = new ChatGenerationChunk({
+    text: '',
+    message: new AIMessageChunk<StandardMessageStructure>({
+      content: '',
+      tool_calls: [{ name: 'answer', id: 'complete', args: { reply: sentinel } }],
+    }),
+  });
+  const checks: string[] = [];
+  const f = await fixture(
+    ({ text, final }) => {
+      checks.push(text);
+      return final && text.includes(sentinel) ? 'block' : 'allow';
+    },
+    new SequenceProvider([complete, argumentChunk('', '{}', 1)]),
+  );
+  await expect(f.model.invoke('hello', { callbacks: [f.tokens] })).rejects.toMatchObject({
+    code: 'denied',
+  });
+  expect(checks).toHaveLength(3);
+  for (const checked of checks) expect(checked).toContain(sentinel);
+  expect(f.tokens.tokens).toHaveLength(2);
+  await f.runtime.dispose();
+  await f.recorder.provider.shutdown();
+});
+
+test.each(['separate malformed call', 'mirrored fragment'] as const)(
+  'checks raw arguments beside fragments: %s',
+  async (kind) => {
+    const rawArgs = kind === 'mirrored fragment' ? '{}' : `{"reply":"${sentinel}`;
+    const message = new AIMessageChunk<StandardMessageStructure>({
+      content: '',
+      tool_call_chunks: [{ index: 0, name: 'safe', id: 'safe', args: '{}' }],
+      additional_kwargs: {
+        tool_calls: [
+          {
+            id: kind === 'mirrored fragment' ? 'safe' : 'invalid',
+            type: 'function',
+            function: {
+              name: kind === 'mirrored fragment' ? 'safe' : 'answer',
+              arguments: rawArgs,
+            },
+          },
+        ],
+      },
+    });
+    const checks: string[] = [];
+    const f = await fixture(
+      ({ text }) => {
+        checks.push(text);
+        return text.includes(sentinel) ? 'block' : 'allow';
+      },
+      new SequenceProvider([new ChatGenerationChunk({ text: '', message })]),
+    );
+    const chunks: unknown[] = [];
+    const consume = async (): Promise<void> => {
+      for await (const chunk of await f.model.stream('hello', { callbacks: [f.tokens] }))
+        chunks.push(chunk);
+    };
+    if (kind === 'mirrored fragment') {
+      await consume();
+      expect(checks).toEqual(['\n{}', '\n{}']);
+      expect(chunks).toHaveLength(1);
+    } else {
+      await expect(consume()).rejects.toMatchObject({ code: 'denied' });
+      expect(checks[0]).toContain(sentinel);
+      expect(chunks).toEqual([]);
+      expect(f.tokens.tokens).toEqual([]);
+    }
+    await f.runtime.dispose();
+    await f.recorder.provider.shutdown();
+  },
+);
+
+test.each(['text', 'argument', 'parallel arguments'] as const)(
+  'interleaving cannot hide contiguous %s',
+  async (kind) => {
+    const blocked = 'blocked-canary';
+    const chunks =
+      kind === 'text'
+        ? [argumentChunk('blocked-'), argumentChunk('', '{}'), argumentChunk('canary')]
+        : [
+            argumentChunk('', '{"reply":"blocked-'),
+            kind === 'argument' ? argumentChunk('{}') : argumentChunk('', '{}', 1),
+            argumentChunk('', 'canary"}'),
+          ];
+    const checks: string[] = [];
+    const f = await fixture(({ text }) => {
+      checks.push(text);
+      return text.includes(blocked) ? 'block' : 'allow';
+    }, new SequenceProvider(chunks));
+    const released: ChatGenerationChunk['message'][] = [];
+    const consume = async (): Promise<void> => {
+      for await (const chunk of await f.model.stream('hello', { callbacks: [f.tokens] }))
+        released.push(chunk);
+    };
+    await expect(consume()).rejects.toMatchObject({ code: 'denied' });
+    expect(checks.at(-1)).toContain(blocked);
+    expect(released).toHaveLength(2);
+    expect(f.tokens.tokens).toHaveLength(2);
+    expect(JSON.stringify(released)).not.toContain(blocked);
+    await f.runtime.dispose();
+    await f.recorder.provider.shutdown();
+  },
+);
 
 test('without a hook tokens are emitted once and the model span reports unset', async () => {
   const f = await fixture();
