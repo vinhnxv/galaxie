@@ -20,6 +20,7 @@
  * - `fenced`: another tab owns the runtime, so a write with a stale epoch was refused (ADR-0009).
  * - `cancelled`: the run or the call was cancelled.
  * - `unrecoverable`: stored state cannot be read or migrated (brief §12.4).
+ * - `outcome_unknown`: a previous write may have reached its destination and cannot be retried.
  * - `executor_error`: the executor or agent code failed.
  */
 export type ErrorCode =
@@ -35,6 +36,7 @@ export type ErrorCode =
   | 'fenced'
   | 'cancelled'
   | 'unrecoverable'
+  | 'outcome_unknown'
   | 'executor_error';
 
 /**
@@ -60,6 +62,7 @@ const ERROR_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   fenced: 'Another owner controls the runtime.',
   cancelled: 'The operation was cancelled.',
   unrecoverable: 'Stored state cannot be recovered.',
+  outcome_unknown: 'The outcome of an earlier call is unknown.',
   executor_error: 'The executor or agent code failed.',
 };
 

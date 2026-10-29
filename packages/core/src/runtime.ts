@@ -19,6 +19,7 @@ import {
   DESTINATIONS,
   type DestinationClass,
 } from './policy.js';
+import type { RecoveryStore } from './recovery.js';
 import type { InferInput } from './schema.js';
 import { normalizeUrlAllowlist } from './urls.js';
 import { VERSION } from './version.js';
@@ -52,6 +53,8 @@ export interface CreateOptions<Agent = unknown, Services = unknown> {
   readonly agent: Agent;
   /** Restore-only session; the host must scope it and the checkpointer to this principal. */
   readonly sessionId?: SessionId;
+  /** Durable inbox and write journal, scoped to the checkpointer's app and principal. */
+  readonly recovery?: RecoveryStore;
   readonly services?: Services;
   readonly bindings?: Readonly<Record<string, CapabilityBinding<never, unknown>>>;
   /** Per-role providers, consent and ephemeral credentials (ADR-0006). */
