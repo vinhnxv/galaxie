@@ -13,7 +13,19 @@ export interface InvalidationWatcher {
   close(): void;
 }
 
-/** Watch same-origin logout notices; the host wipes storage before announcing and disposes on abort. */
+/**
+ * Watch same-origin logout notices for trusted app/principal IDs (1–128 letters, digits, . _ : -).
+ * Invalid IDs throw `invalid`; missing BroadcastChannel throws `unsupported`.
+ *
+ * After the host's principal wipe commits, announce on `galaxie:<appId>:invalidation` with
+ * `{ v: 1, type: 'invalidated', principalScope }`. Announcing and valid matching peer notices
+ * abort signal with reason `'invalidated'`; other principals and malformed notices are ignored.
+ * The host disables input, clears its own session/tokens, disposes and releases ownership on abort.
+ * Delivery failure is caught by the next generation-checked write or persisted pageshow check.
+ * Already-sent remote requests may complete; approval invalidation remains M4 work.
+ *
+ * Close idempotently on page teardown. A closed watcher receives and announces nothing.
+ */
 export function watchInvalidation(options: InvalidationOptions): InvalidationWatcher {
   if (
     typeof options !== 'object' ||
