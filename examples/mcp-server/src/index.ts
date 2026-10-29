@@ -85,7 +85,6 @@ export async function startMcpServer(options: McpServerOptions): Promise<Referen
     string,
     { principal: string; server: Server; transport: StreamableHTTPServerTransport }
   >();
-  const counts = new Map<string, number>();
   const effects = new Map<string, Map<string, number>>();
   let headers: IncomingHttpHeaders = {};
   let meta: Record<string, unknown> = {};
@@ -203,8 +202,7 @@ export async function startMcpServer(options: McpServerOptions): Promise<Referen
             }
             let count = journal.get(effect);
             if (count === undefined) {
-              count = (counts.get(principal) ?? 0) + 1;
-              counts.set(principal, count);
+              count = journal.size + 1;
               journal.set(effect, count);
             }
             return { content: [], structuredContent: { count } };
@@ -276,7 +274,8 @@ export async function startMcpServer(options: McpServerOptions): Promise<Referen
         samplingCode = undefined;
       },
       lastHeaders: () => ({ ...headers }),
-      counters: () => Object.fromEntries(counts),
+      counters: () =>
+        Object.fromEntries([...effects].map(([principal, journal]) => [principal, journal.size])),
       lastMeta: () => structuredClone(meta),
       callCount: () => calls,
       samplingCode: () => samplingCode,

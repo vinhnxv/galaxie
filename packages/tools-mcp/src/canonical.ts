@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { GalaxieError, toErrorInfo } from '@galaxie/core';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { failure } from './events.js';
 
 function invalid(): never {
-  throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+  throw failure('invalid');
 }
 
 function string(value: string): string {
