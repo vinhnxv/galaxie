@@ -50,21 +50,86 @@ async function storedRecords(): Promise<
   for (const info of await indexedDB.databases()) {
     if (info.name === undefined) throw new Error('A database has no name.');
     const database = await requestResult(indexedDB.open(info.name));
+    database.onversionchange = () => database.close();
     try {
-      for (const store of database.objectStoreNames) {
-        const objectStore = database.transaction(store, 'readonly').objectStore(store);
-        const [keys, records] = await Promise.all([
-          requestResult(objectStore.getAllKeys()),
-          requestResult(objectStore.getAll()),
-        ]);
-        result.push({ database: info.name, store, keys, records });
-      }
+      const stores = [...database.objectStoreNames];
+      if (stores.length === 0) continue;
+      const transaction = database.transaction(stores, 'readonly');
+      const complete = new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+        transaction.onerror = () => reject(transaction.error);
+      });
+      const reads = Promise.all(
+        stores.map(async (store) => {
+          const objectStore = transaction.objectStore(store);
+          const [keys, records] = await Promise.all([
+            requestResult(objectStore.getAllKeys()),
+            requestResult(objectStore.getAll()),
+          ]);
+          return { database: info.name as string, store, keys, records };
+        }),
+      );
+      const [records] = await Promise.all([reads, complete]);
+      result.push(...records);
     } finally {
       database.close();
     }
   }
   return result;
 }
+
+test.skipIf(typeof indexedDB === 'undefined')(
+  'the origin-wide credential scan finishes read transactions before closing connections',
+  async () => {
+    const name = `galaxie-scan-lifecycle-${crypto.randomUUID()}`;
+    const opening = indexedDB.open(name);
+    opening.onupgradeneeded = () => opening.result.createObjectStore('probe');
+    const database = await requestResult(opening);
+    database.close();
+    onTestFinished(async () => {
+      const deletion = indexedDB.deleteDatabase(name);
+      await new Promise<void>((resolve, reject) => {
+        deletion.onsuccess = () => resolve();
+        deletion.onerror = () => reject(deletion.error);
+        deletion.onblocked = () => reject(new Error('Scan lifecycle cleanup was blocked.'));
+      });
+    });
+    const pending = new WeakMap<IDBDatabase, Set<IDBTransaction>>();
+    const closingReads: number[] = [];
+    const transaction = IDBDatabase.prototype.transaction;
+    const close = IDBDatabase.prototype.close;
+    const transactions = vi
+      .spyOn(IDBDatabase.prototype, 'transaction')
+      .mockImplementation(function (
+        this: IDBDatabase,
+        ...args: Parameters<IDBDatabase['transaction']>
+      ) {
+        const current = Reflect.apply(transaction, this, args) as IDBTransaction;
+        const active = pending.get(this) ?? new Set<IDBTransaction>();
+        pending.set(this, active);
+        active.add(current);
+        current.addEventListener('complete', () => active.delete(current));
+        current.addEventListener('abort', () => active.delete(current));
+        return current;
+      });
+    const closes = vi.spyOn(IDBDatabase.prototype, 'close').mockImplementation(function (
+      this: IDBDatabase,
+    ) {
+      if (this.name === name) closingReads.push(pending.get(this)?.size ?? 0);
+      Reflect.apply(close, this, []);
+    });
+    try {
+      const records = await storedRecords();
+      expect(records).toContainEqual({ database: name, store: 'probe', keys: [], records: [] });
+      expect(closingReads.length).toBeGreaterThan(0);
+      expect(closingReads.every((count) => count === 0)).toBe(true);
+    } finally {
+      transactions.mockRestore();
+      closes.mockRestore();
+    }
+  },
+);
 
 test.each(['success', '401', 'transport-error'] as const)(
   'AT-23: credentials stay in injected request authorization headers (%s)',
