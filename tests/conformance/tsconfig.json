@@ -15,7 +15,9 @@
       "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],
       "@galaxie/models/webllm/worker": ["../../packages/models/src/webllm/worker.ts"],
       "@galaxie/models/webllm": ["../../packages/models/src/webllm/index.ts"],
-      "@galaxie/example-english-tutor": ["../../examples/english-tutor/src/index.ts"]
+      "@galaxie/example-english-tutor": ["../../examples/english-tutor/src/index.ts"],
+      "@galaxie/tools-mcp": ["../../packages/tools-mcp/src/index.ts"],
+      "@galaxie/example-mcp-server": ["../../examples/mcp-server/src/index.ts"]
     }
   },
   "include": ["."]

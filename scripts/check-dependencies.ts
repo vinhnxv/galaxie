@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import ts from '@typescript/typescript6';
 
 interface ImportReference {
@@ -188,6 +188,24 @@ for (const file of files('packages/storage-indexeddb/src', /\.[cm]?tsx?$/)) {
   }
 }
 
+for (const area of ['src', 'dist']) {
+  const directory = join('packages/tools-mcp', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (
+        specifier.startsWith('./') ||
+        specifier.startsWith('../') ||
+        specifier === '@galaxie/core' ||
+        specifier.startsWith('@modelcontextprotocol/sdk/client/') ||
+        specifier === '@modelcontextprotocol/sdk/types.js'
+      )
+        continue;
+      problems.push(`${file}: forbidden MCP client import ${specifier}`);
+    }
+  }
+}
+
 for (const entry of readdirSync('packages', { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
   for (const area of ['src', 'dist', ...(entry.name === 'react' ? ['test'] : [])]) {
@@ -204,6 +222,12 @@ for (const entry of readdirSync('packages', { withFileTypes: true })) {
           )
         )
           problems.push(`${file}: OpenAI imports belong only in the models openai provider`);
+        if (
+          area !== 'test' &&
+          (specifier.startsWith('@galaxie/example-') ||
+            resolve(dirname(file), specifier).startsWith(`${resolve('examples')}/`))
+        )
+          problems.push(`${file}: packages must not import examples`);
         const react = specifier === 'react' || specifier.startsWith('react/');
         const reactDom = specifier === 'react-dom' || specifier.startsWith('react-dom/');
         if (entry.name !== 'react') {
@@ -246,6 +270,25 @@ for (const area of ['src', 'dist']) {
   }
 }
 
+for (const area of ['src', 'dist']) {
+  const directory = join('examples/mcp-server', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (
+        specifier.startsWith('./') ||
+        specifier.startsWith('../') ||
+        specifier.startsWith('node:') ||
+        specifier.startsWith('@modelcontextprotocol/sdk/server/') ||
+        specifier === '@modelcontextprotocol/sdk/types.js' ||
+        specifier === 'zod'
+      )
+        continue;
+      problems.push(`${file}: forbidden MCP reference server import ${specifier}`);
+    }
+  }
+}
+
 for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
   for (const { specifier, typeOnly, dynamic } of imports(file)) {
     if (
@@ -258,6 +301,7 @@ for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
     if (
       specifier.startsWith('./') ||
       specifier === '@galaxie/core' ||
+      specifier === '@galaxie/tools-mcp' ||
       specifier === '@galaxie/storage-indexeddb' ||
       specifier === '@galaxie/adapter-langgraph' ||
       specifier === '@galaxie/example-english-tutor' ||
@@ -284,6 +328,7 @@ for (const directory of [
   'packages/models/dist',
   'packages/react/dist',
   'packages/storage-indexeddb/dist',
+  'packages/tools-mcp/dist',
 ]) {
   for (const file of files(directory, /\.[cm]?js$/)) {
     if (readFileSync(file, 'utf8').includes('async_hooks'))

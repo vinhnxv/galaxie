@@ -1,0 +1,21 @@
+{
+  "name": "@galaxie/example-mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference MCP server over Streamable HTTP for galaxie development and tests, following the brief's MCP server profile.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  }
+}
