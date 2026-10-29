@@ -4,6 +4,7 @@
 import type { TestProject } from 'vitest/node';
 import { startMcpServer } from '../../../examples/mcp-server/src/index.js';
 import { toolPin } from '../../../packages/tools-mcp/src/index.js';
+import { createHttpFixture } from './http-fixture.node.js';
 import { mcpFixtures } from './mcp-commands.node.js';
 import { MCP_ORIGIN, type McpAdminState, type McpControl } from './mcp-context.js';
 
@@ -58,13 +59,15 @@ export async function createFixture(): Promise<McpControl> {
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const control = await createFixture();
   const corpus = await createFixture();
+  const http = await createHttpFixture();
   mcpFixtures(project).set(control.fixture.url, control);
   mcpFixtures(project).set(corpus.fixture.url, corpus);
   project.provide('mcp', control.fixture);
   project.provide('mcpCorpus', corpus.fixture);
+  project.provide('http', http.fixture);
   return async (): Promise<void> => {
     mcpFixtures(project).delete(control.fixture.url);
     mcpFixtures(project).delete(corpus.fixture.url);
-    await Promise.all([control.close(), corpus.close()]);
+    await Promise.all([control.close(), corpus.close(), http.close()]);
   };
 }
