@@ -3,7 +3,7 @@
 
 import type { AgentInstance, ModelConsentRequest } from '@galaxie/core';
 import { lessonFixture, type TutorInput } from '@galaxie/example-english-tutor';
-import { AgentSurface, ConfirmationPrompt, useAgentSnapshot } from '@galaxie/react';
+import { AgentSurface, ConfirmationPrompt, ModelRoutes, useAgentSnapshot } from '@galaxie/react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { createRemoteHost, type RemoteHost } from './runtime.js';
 
@@ -26,11 +26,14 @@ function Lesson({
       : 'The lesson could not finish.';
   return (
     <>
-      <header>
-        <p>quiz.generate: {snapshot.routes?.['quiz.generate']?.destination ?? 'not selected'}</p>
-        <p>tutor.feedback: {snapshot.routes?.['tutor.feedback']?.destination ?? 'not selected'}</p>
-      </header>
       <p role="status">Run: {snapshot.run?.status ?? 'starting'}</p>
+      <ModelRoutes
+        instance={instance}
+        labels={{
+          roles: { 'quiz.generate': 'Quiz', 'tutor.feedback': 'Feedback' },
+          providers: { quiz: 'Site quiz service', feedback: 'Browser feedback' },
+        }}
+      />
       {failed ? (
         <>
           <p role="alert">{message}</p>

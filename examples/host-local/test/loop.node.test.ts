@@ -170,9 +170,16 @@ it('completes the mock lesson without sentence egress and enforces the CSP', asy
     expect(response?.headers()['content-security-policy']).toBe(cspHeader('mock'));
     await page.getByRole('button', { name: 'Start', exact: true }).click();
     await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    expect(
+      await page
+        .getByRole('list', { name: 'Model destinations' })
+        .getByRole('listitem')
+        .allTextContents(),
+    ).toEqual(['Quiz: Mock quiz (In browser)']);
     const questions = await page.locator('fieldset').allTextContents();
     await page.reload();
     await page.getByRole('radio', { name: 'walk', exact: true }).waitFor({ timeout: 5_000 });
+    expect(await page.getByRole('list', { name: 'Model destinations' }).count()).toBe(0);
     expect(await page.locator('fieldset').allTextContents()).toEqual(questions);
     await page.getByRole('radio', { name: 'walk', exact: true }).check();
     await page.getByRole('radio', { name: 'play', exact: true }).check();
@@ -185,6 +192,12 @@ it('completes the mock lesson without sentence egress and enforces the CSP', asy
     await page.getByRole('textbox').fill(sentinelSentence);
     await page.getByRole('button', { name: 'Submit sentence' }).click();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    expect(
+      await page
+        .getByRole('list', { name: 'Model destinations' })
+        .getByRole('listitem')
+        .allTextContents(),
+    ).toEqual(['Feedback: Mock review (In browser)']);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'Run: succeeded; Score: 2/3' }).waitFor();
     expect(errors).toEqual([]);
