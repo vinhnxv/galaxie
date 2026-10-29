@@ -195,6 +195,15 @@ for (const entry of readdirSync('packages', { withFileTypes: true })) {
     if (!existsSync(directory)) continue;
     for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
       for (const { specifier } of imports(file)) {
+        if (
+          (specifier === '@langchain/openai' || specifier.startsWith('@langchain/openai/')) &&
+          !(
+            entry.name === 'models' &&
+            (area === 'src' || area === 'dist') &&
+            file.startsWith(`${directory}/openai/`)
+          )
+        )
+          problems.push(`${file}: OpenAI imports belong only in the models openai provider`);
         const react = specifier === 'react' || specifier.startsWith('react/');
         const reactDom = specifier === 'react-dom' || specifier.startsWith('react-dom/');
         if (entry.name !== 'react') {
