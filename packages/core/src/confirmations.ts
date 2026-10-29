@@ -33,7 +33,6 @@ function failure(code: ErrorCode): GalaxieError {
   return new GalaxieError(code, toErrorInfo(code).message);
 }
 
-/** Shared with the write journal so approvals and recovery bind the same canonical JSON. */
 export async function digest(value: RecoveryJson): Promise<string> {
   const canonical = (item: RecoveryJson): string => {
     if (Array.isArray(item)) return `[${item.map(canonical).join(',')}]`;
@@ -81,7 +80,6 @@ interface RecordEntry {
   end(code: ErrorCode, diagnostic?: DiagnosticEvent['kind'], notify?: boolean): void;
 }
 
-/** Per-instance single-use approvals, separate from executor events and interaction dispatch. */
 export class ConfirmationGate {
   readonly capabilities: readonly CapabilityName[];
   readonly #options: ConfirmationOptions;
@@ -137,9 +135,7 @@ export class ConfirmationGate {
       const revision = this.#options.policyRevision();
       if (typeof revision === 'string' && revision.length > 0 && revision.length <= 128)
         return revision;
-    } catch {
-      /* Host policy text is never diagnostic evidence. */
-    }
+    } catch {}
     throw failure('unavailable');
   }
 
@@ -166,7 +162,7 @@ export class ConfirmationGate {
     runId: RunId,
     signal: AbortSignal,
     active: () => boolean,
-    invalidate: (code: ErrorCode) => void,
+    abortQueuedDispatch: (code: ErrorCode) => void,
   ): Promise<Approval> {
     const order = this.#sequence++;
     const inputDigest = await digest(value);
@@ -206,8 +202,7 @@ export class ConfirmationGate {
       close(notify);
       if (diagnostic !== undefined) this.#report({ kind: diagnostic, runId });
       reject(error);
-      // Once approved, the request promise has settled; wake a queued dispatch as well.
-      if (approved) invalidate(code);
+      if (approved) abortQueuedDispatch(code);
     };
     const valid = (): boolean => {
       if (ended) return false;
