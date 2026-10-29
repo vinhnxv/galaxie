@@ -146,6 +146,57 @@ The sweep prunes checkpoints older than `historyMs`, always keeping the latest c
 
 Hold app ownership while sweeping or deleting sessions; transaction-local fencing rejects a former owner. Host-local opens the saver without sweeping, acquires app-wide core ownership, then sweeps with defaults before restore. A sweep failure is observed without retrying in that page, and restore proceeds. Quota observations show "Storage is full"; handover shows "Reload to use the updated app" and disables input. An unrecoverable restore keeps the session and shows "Saved lesson cannot be recovered" with "Start over". Only that button deletes the session, under the same Web Lock, then clears the key. An unsupported agent version clears only the key and returns to Start; old data remains until a host sweep.
 
+## Explicit session export
+
+`saver.exportSession(sessionId, options?)` reads only the saver's app and principal.
+Its deeply frozen, JSON-serializable `SessionExport` has format
+`galaxie.session-export/1`, `appId`, `sessionId`, an ISO `exportedAt`,
+`personalContent` and content-free `metadata`. The default omits `checkpoints`:
+
+```ts
+const metadataOnly = await saver.exportSession(instance.sessionId);
+// Only from a host handler for an explicit user export action:
+const personal = await saver.exportSession(instance.sessionId, { personalContent: true });
+```
+
+Hosts must bind `personalContent: true` to an explicit user action and treat the
+result as personal data. Only the boolean `true` includes content. This method
+does not download, transmit or persist the export; neither example host wires
+an export UI yet. A package manifest never includes this session data.
+
+Metadata contains the recorded agent identity (`null` for legacy checkpoints
+without one), checkpoint count and first/last checkpoint timestamps (`null`
+when absent), the count of distinct interrupt IDs in the latest checkpoint of
+each namespace, and recovery submission/effect totals grouped by status.
+The export does not include recovery inbox/journal records (submission payloads,
+receipt outputs or input digests), even with the opt-in. Personal checkpoints
+can contain the same learner text or capability results. No runtime-event
+history is included.
+
+The opt-in adds checkpoints ordered by ascending LangGraph checkpoint ID, then
+namespace. Each has `id`, `parentId`, `namespace`, `timestamp`, decoded
+`channelValues` and ordered `pendingWrites` tuples `[taskId, channel, value]`.
+The saver's serde decodes values outside the read transaction. Binary values
+become `{ type: 'base64', data }`; unrepresentable leaves, cycles and unreadable
+values become the fixed string `[unavailable]`. Conversion copies enumerable
+data properties without invoking getters or `toJSON`; errors are replaced,
+not serialized. These conversions are lossy and supply no import/restore API.
+
+Unreadable checkpoint or decoded-write data sets `metadata.unrecoverable: true`
+on that export. The saver has no persisted session-unrecoverable marker;
+export observes decoding failures without writing a marker or changing records.
+Malformed stored record structures still reject with fixed `corrupt` errors.
+Unknown or deleted sessions reject with existing `StorageError('invalid')`.
+No error contains record content or sets `cause`.
+
+Export reads remain available after app ownership loss. They check the held
+principal logout generation in the read transaction and again after decoding,
+so an invalidated saver cannot export a recreated principal's session or publish
+content after logout during decoding. Already returned exports are host-owned
+copies; logout cannot revoke them. App/principal keys do not isolate data from
+other same-origin code. Keep credentials out of stored state. Database version,
+record formats and storage schema remain unchanged.
+
 ## Write replay
 
 The [core write journal](../../docs/system-design.md#83-a-capability-call) records `planned`, `dispatched`, `succeeded`, `failed` and `outcome_unknown`. Only `write` bindings use it. SHA-256 effect IDs derive from session, interaction (or literal `start`), capability name and per-name ordinal; input digests detect changed inputs/order. Keep call order deterministic and send `CapabilityContext.effectId` as the backend idempotency key. Replay returns fresh copies of already validated successful outputs without invoking or rerunning transforms, and reapplies their labels/private strings. Unknown writes replay only under `idempotent` or `idempotency-key`; `retry: 'none'` fails `outcome_unknown` and never invokes again. Aborting a request does not prove the backend did nothing. Journal writes are serialized; once a success write starts, abort cannot overwrite it. An ordinary store failure before invoke fails `unavailable`; after invoke an ordinary store failure preserves a validated result and reports `capability_failed` without result or raw store-error content. A fenced journal failure always fails the call with `fenced`, including after a validated result; an invalidated journal failure similarly fails with `stale`. Neither can publish a successful receipt after logout.

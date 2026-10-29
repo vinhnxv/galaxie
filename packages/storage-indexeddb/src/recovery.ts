@@ -6,6 +6,7 @@ import type { Fencing } from './fencing.js';
 import { prefixRange, validateKey } from './keys.js';
 import { touchSession } from './retention.js';
 import { requestResult, storageOperation, transact } from './schema.js';
+import type { SessionExport } from './session-export.js';
 
 export type RecoveryValue =
   | null
@@ -118,6 +119,49 @@ function effect(value: unknown): StoredEffect {
   )
     throw new StorageError('corrupt');
   return copyJson(value) as unknown as StoredEffect;
+}
+
+export async function readSessionSummary(
+  tx: IDBTransaction,
+  scope: readonly [string, string],
+  sessionId: string,
+): Promise<Pick<SessionExport['metadata'], 'agent' | 'recovery'>> {
+  const stored: unknown = await requestResult(
+    tx.objectStore('meta').get([...scope, 'session', sessionId]),
+  );
+  const agent = stored === undefined ? null : Object.freeze(sessionRecord(envelope(stored)));
+  const submissions = { count: 0, accepted: 0, consumed: 0 };
+  const effects = {
+    count: 0,
+    planned: 0,
+    dispatched: 0,
+    succeeded: 0,
+    failed: 0,
+    outcome_unknown: 0,
+  };
+  const range = prefixRange([...scope, sessionId]);
+  const inbox: unknown[] = await requestResult(tx.objectStore('inbox').getAll(range));
+  for (const row of inbox) {
+    const value = envelope(row);
+    if (!object(value) || typeof value['interactionId'] !== 'string')
+      throw new StorageError('corrupt');
+    const entry = submission(value, value['interactionId']);
+    submissions.count++;
+    submissions[entry.status]++;
+  }
+  const journal: unknown[] = await requestResult(tx.objectStore('journal').getAll(range));
+  for (const row of journal) {
+    const entry = effect(envelope(row));
+    effects.count++;
+    effects[entry.status]++;
+  }
+  return {
+    agent,
+    recovery: Object.freeze({
+      submissions: Object.freeze(submissions),
+      effects: Object.freeze(effects),
+    }),
+  };
 }
 
 /** Durable JSON inbox and write receipts on the saver's principal-scoped connection. */

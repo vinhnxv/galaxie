@@ -102,6 +102,13 @@ export class Fencing {
     );
   }
 
+  read<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
+    return transact(this.#db, [...stores, 'meta'], 'readonly', async (tx) => {
+      await this.#checkGeneration(tx);
+      return work(tx);
+    });
+  }
+
   /** Check first, in the same transaction as every mutation. Never await external work here. */
   write<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
     return transact(this.#db, [...stores, 'meta'], 'readwrite', async (tx) => {
