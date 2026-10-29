@@ -246,6 +246,25 @@ for (const area of ['src', 'dist']) {
   }
 }
 
+for (const area of ['src', 'dist']) {
+  const directory = join('examples/mcp-server', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (
+        specifier.startsWith('./') ||
+        specifier.startsWith('../') ||
+        specifier.startsWith('node:') ||
+        specifier.startsWith('@modelcontextprotocol/sdk/server/') ||
+        specifier === '@modelcontextprotocol/sdk/types.js' ||
+        specifier === 'zod'
+      )
+        continue;
+      problems.push(`${file}: forbidden MCP reference server import ${specifier}`);
+    }
+  }
+}
+
 for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
   for (const { specifier, typeOnly, dynamic } of imports(file)) {
     if (

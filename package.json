@@ -9,14 +9,14 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json && tsc -p packages/models/tsconfig.build.json && tsc -p packages/react/tsconfig.build.json && tsc -p examples/english-tutor/tsconfig.build.json && pnpm --filter @galaxie/example-host-local build && tsc -p packages/storage-indexeddb/tsconfig.build.json",
+    "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json && tsc -p packages/models/tsconfig.build.json && tsc -p packages/react/tsconfig.build.json && tsc -p examples/english-tutor/tsconfig.build.json && pnpm --filter @galaxie/example-host-local build && tsc -p packages/storage-indexeddb/tsconfig.build.json && tsc -p examples/mcp-server/tsconfig.build.json",
     "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run build && pnpm run check:deps",
     "check:license": "node scripts/check-license.ts",
     "format": "biome check --write .",
     "lint": "biome check .",
     "test": "vitest run",
-    "typecheck": "tsc -p packages/core && tsc -p packages/core/test && tsc -p packages/adapter-langgraph && tsc -p packages/adapter-langgraph/test && tsc -p tests/conformance && tsc -p scripts && tsc -p packages/models && tsc -p packages/models/test && tsc -p packages/react && tsc -p packages/react/test && tsc -p examples/english-tutor && tsc -p examples/english-tutor/test && tsc -p examples/host-local && tsc -p examples/host-local/test && tsc -p packages/storage-indexeddb && tsc -p packages/storage-indexeddb/test",
-    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p packages/adapter-langgraph && tsc6 -p packages/adapter-langgraph/test && tsc6 -p tests/conformance && tsc6 -p scripts && tsc6 -p packages/models && tsc6 -p packages/models/test && tsc6 -p packages/react && tsc6 -p packages/react/test && tsc6 -p examples/english-tutor && tsc6 -p examples/english-tutor/test && tsc6 -p examples/host-local && tsc6 -p examples/host-local/test && tsc6 -p packages/storage-indexeddb && tsc6 -p packages/storage-indexeddb/test",
+    "typecheck": "tsc -p packages/core && tsc -p packages/core/test && tsc -p packages/adapter-langgraph && tsc -p packages/adapter-langgraph/test && tsc -p tests/conformance && tsc -p scripts && tsc -p packages/models && tsc -p packages/models/test && tsc -p packages/react && tsc -p packages/react/test && tsc -p examples/english-tutor && tsc -p examples/english-tutor/test && tsc -p examples/host-local && tsc -p examples/host-local/test && tsc -p packages/storage-indexeddb && tsc -p packages/storage-indexeddb/test && tsc -p examples/mcp-server && tsc -p examples/mcp-server/test",
+    "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p packages/adapter-langgraph && tsc6 -p packages/adapter-langgraph/test && tsc6 -p tests/conformance && tsc6 -p scripts && tsc6 -p packages/models && tsc6 -p packages/models/test && tsc6 -p packages/react && tsc6 -p packages/react/test && tsc6 -p examples/english-tutor && tsc6 -p examples/english-tutor/test && tsc6 -p examples/host-local && tsc6 -p examples/host-local/test && tsc6 -p packages/storage-indexeddb && tsc6 -p packages/storage-indexeddb/test && tsc6 -p examples/mcp-server && tsc6 -p examples/mcp-server/test",
     "conformance:update": "vitest run --project node tests/conformance/native.node.test.ts --update",
     "check:deps": "node scripts/check-dependencies.ts"
   },
