@@ -322,3 +322,91 @@ describe('session agent version', () => {
     await fixture.runtime.dispose();
   });
 });
+
+describe('fenced storage outcomes', () => {
+  const fenced = (): Error =>
+    Object.assign(new Error('private-fenced-storage'), { fenced: true, unrecoverable: false });
+  test.each(['pending', 'session', 'inbox'] as const)(
+    'maps restore %s failures without publishing content',
+    async (location) => {
+      const store = new MemoryRecoveryStore();
+      const fixture = await lifecycleFixture(store);
+      await store.recordSession(fixture.instance.sessionId, {
+        agentId: definition.id,
+        agentVersion: definition.version,
+      });
+      const fail = async (): Promise<never> => {
+        throw fenced();
+      };
+      if (location === 'pending') fixture.executor.agent.pending = fail;
+      else if (location === 'session') store.session = fail;
+      else store.submissions = fail;
+      await expect(fixture.instance.restore()).rejects.toMatchObject({
+        code: 'fenced',
+        message: 'Another owner controls the runtime.',
+      });
+      expect(fixture.instance.getSnapshot().run).toBeUndefined();
+      await fixture.runtime.dispose();
+    },
+  );
+  test.each([false, true])('maps a fenced run error, wrapped=%s', async (wrapped) => {
+    const original = fenced();
+    const error = wrapped
+      ? new GalaxieError('executor_error', 'private-wrapper', { cause: original })
+      : Object.assign(original, { code: 'executor_error' });
+    const fixture = await lifecycleFixture(undefined, undefined, [
+      [{ type: 'error', error: error as GalaxieError }],
+    ]);
+    const { runId } = await fixture.instance.start('input');
+    await flush();
+    expect(fixture.instance.getSnapshot().run?.error?.code).toBe('fenced');
+    const events = [];
+    for await (const event of fixture.instance.events(runId)) events.push(event);
+    expect(JSON.stringify([events, fixture.instance.getSnapshot()])).not.toContain('private-');
+    await fixture.runtime.dispose();
+  });
+  test.each(['pending', 'store'] as const)(
+    'rejects a fenced dispatch %s failure',
+    async (location) => {
+      const store = new MemoryRecoveryStore();
+      const fixture = await lifecycleFixture(store, undefined, [
+        [{ type: 'interaction', interaction: pending }],
+      ]);
+      const { runId } = await fixture.instance.start('input');
+      await flush();
+      const fail = async (): Promise<never> => {
+        throw fenced();
+      };
+      if (location === 'pending') fixture.executor.agent.pending = fail;
+      else store.acceptSubmission = fail;
+      const receipt = await fixture.instance.dispatch({
+        instanceId: fixture.instance.instanceId,
+        runId,
+        ...pending,
+        action: 'submit',
+        payload: false,
+      });
+      expect(receipt).toMatchObject({ status: 'rejected', error: { code: 'fenced' } });
+      expect(JSON.stringify(receipt)).not.toContain('private-');
+      expect(fixture.instance.getSnapshot().run?.status).toBe('waiting_input');
+      await fixture.runtime.dispose();
+    },
+  );
+  test('ignores inherited and accessor fencing markers', async () => {
+    for (const error of [
+      Object.create({ fenced: true }),
+      Object.defineProperty({}, 'fenced', {
+        get() {
+          throw new Error('Do not run accessors.');
+        },
+      }),
+    ]) {
+      const fixture = await lifecycleFixture();
+      fixture.executor.agent.pending = async () => {
+        throw error;
+      };
+      await expect(fixture.instance.restore()).rejects.toMatchObject({ code: 'executor_error' });
+      await fixture.runtime.dispose();
+    }
+  });
+});

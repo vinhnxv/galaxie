@@ -84,14 +84,18 @@ function containsText(value: unknown): boolean {
 }
 
 function failureCode(error: unknown, fallback: ErrorCode): ErrorCode {
-  const marked = (value: unknown): boolean =>
+  const marked = (value: unknown, code: 'fenced' | 'unrecoverable'): boolean =>
     typeof value === 'object' &&
     value !== null &&
-    Object.getOwnPropertyDescriptor(value, 'unrecoverable')?.value === true;
-  return marked(error) ||
-    (isGalaxieError(error) && (error.code === 'unrecoverable' || marked(error.cause)))
-    ? 'unrecoverable'
-    : fallback;
+    Object.getOwnPropertyDescriptor(value, code)?.value === true;
+  for (const code of ['fenced', 'unrecoverable'] as const) {
+    if (
+      marked(error, code) ||
+      (isGalaxieError(error) && (error.code === code || marked(error.cause, code)))
+    )
+      return code;
+  }
+  return fallback;
 }
 
 function terminal(run: RunRecord): boolean {

@@ -476,3 +476,32 @@ test('malformed stored journal records fail unrecoverable without invoking', asy
   expect(invoke).not.toHaveBeenCalled();
   expect(store.journal.size).toBe(0);
 });
+
+test.each(['read', 'planned', 'dispatched', 'succeeded'] as const)(
+  'maps a fenced journal %s failure with no cause or host text',
+  async (phase) => {
+    const store = await acceptedStore();
+    const fenced = (): never => {
+      throw Object.assign(new Error('private-fenced-journal'), { fenced: true });
+    };
+    if (phase === 'read') store.effect = async () => fenced();
+    else {
+      const record = store.recordEffect.bind(store);
+      store.recordEffect = async (...args) => {
+        if (args[2].status === phase) fenced();
+        await record(...args);
+      };
+    }
+    const invoke = vi.fn(async () => ({ receipt: 'private reply' }));
+    const fixture = await resume(store, invoke);
+    await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('failed'));
+    expect(fixture.errors[0]).toMatchObject({
+      code: 'fenced',
+      message: 'Another owner controls the runtime.',
+    });
+    expect(fixture.errors[0]).not.toHaveProperty('cause');
+    expect(JSON.stringify(fixture.instance.getSnapshot())).not.toContain('private-fenced-journal');
+    expect(JSON.stringify(fixture.instance.getSnapshot())).not.toContain('private reply');
+    expect(invoke).toHaveBeenCalledTimes(phase === 'succeeded' ? 1 : 0);
+  },
+);
