@@ -53,7 +53,8 @@ const ERROR_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   invalid: 'The request is invalid.',
   denied: 'Policy denied the request.',
   unavailable: 'The requested service is unavailable.',
-  unreachable: 'The endpoint did not answer.',
+  unreachable:
+    'The endpoint did not answer. Local Network Access may be denied, CORS may not allow this app origin (for example OLLAMA_ORIGINS), or the server may be stopped.',
   unsupported: 'This operation is unsupported.',
   budget_exceeded: 'The budget limit was reached.',
   timeout: 'The operation timed out.',

@@ -11,6 +11,44 @@ import { FakeOpenAIFetch } from './support/fake-openai-fetch.js';
 
 describe('OpenAI-compatible error classification', () => {
   it.each([
+    ['http://localhost:11434/v1', 'user-device', 'unreachable'],
+    ['http://127.0.0.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://10.0.0.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://172.31.0.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://192.168.0.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://169.254.1.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://[fd00::1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://[fe80::1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://model.local/v1', 'user-endpoint', 'unreachable'],
+    ['https://public.example/v1', 'user-device', 'unreachable'],
+    ['https://public.example/v1', 'user-endpoint', 'unavailable'],
+    ['https://10.example/v1', 'user-endpoint', 'unavailable'],
+    ['https://172.32.0.1/v1', 'user-endpoint', 'unavailable'],
+    ['http://localhost/v1', 'host-server', 'unavailable'],
+    ['http://localhost/v1', 'third-party', 'unavailable'],
+    ['http://localhost/v1', 'in-browser', 'unavailable'],
+  ] as const)('classifies a connection failure for %s (%s) as %s', (baseURL, destination, code) => {
+    const result = classifyOpenAIError(new OpenAIClient.APIConnectionError({}), {
+      baseURL,
+      destination,
+    });
+    expect(result).toEqual(code === 'unreachable' ? { code } : { code, reason: 'network' });
+  });
+
+  it('keeps HTTP statuses, timeouts and aborts outside unreachable classification', () => {
+    const endpoint = { baseURL: 'http://localhost/v1', destination: 'user-device' } as const;
+    for (const status of [401, 403, 408, 429, 500]) {
+      const error = OpenAIClient.APIError.generate(status, {}, '', new Headers());
+      expect(classifyOpenAIError(error, endpoint)).toEqual(classifyOpenAIError(error));
+    }
+    expect(classifyOpenAIError(new OpenAIClient.APIConnectionTimeoutError(), endpoint)).toEqual({
+      code: 'unavailable',
+      reason: 'endpoint_failed',
+    });
+    expect(classifyOpenAIError(new OpenAIClient.APIUserAbortError(), endpoint)).toBeUndefined();
+  });
+
+  it.each([
     [401, 'not_allowed'],
     [403, 'not_allowed'],
     [429, 'rate_limited'],

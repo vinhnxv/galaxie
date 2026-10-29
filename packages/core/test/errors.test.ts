@@ -27,6 +27,12 @@ test('stored errors use fixed messages and sanitized types', () => {
   }
 });
 
+test('unreachable has fixed likely causes without endpoint or error content', () => {
+  expect(toErrorInfo('unreachable').message).toBe(
+    'The endpoint did not answer. Local Network Access may be denied, CORS may not allow this app origin (for example OLLAMA_ORIGINS), or the server may be stopped.',
+  );
+});
+
 test('GalaxieError recognition works across execution contexts', () => {
   expect(isGalaxieError(new GalaxieError('invalid', 'Invalid call.'))).toBe(true);
   expect(isGalaxieError({ name: 'GalaxieError', code: 'unsupported' })).toBe(true);
