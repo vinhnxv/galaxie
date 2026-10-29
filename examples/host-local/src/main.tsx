@@ -24,13 +24,9 @@ if (root) {
         prepareModels={async () => {
           const handle = await prepareLocalModels();
           const host = createLocalHost(realModels(handle));
-          window.addEventListener(
-            'pagehide',
-            () => {
-              void host.runtime.dispose().finally(() => handle.dispose());
-            },
-            { once: true },
-          );
+          window.addEventListener('pagehide', (event) => {
+            if (!event.persisted) void host.runtime.dispose().finally(() => handle.dispose());
+          });
           return host;
         }}
       />,

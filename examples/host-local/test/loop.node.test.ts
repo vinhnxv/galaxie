@@ -272,6 +272,42 @@ it('loads default mode and constructs the bundled worker without a model or down
     expect(errors).toEqual([]);
     expect(consoleErrors).toEqual([]);
     assertLocalRequests(requests, defaultOrigin);
+
+    const workerControl = `${defaultOrigin}/worker-leak-control?sentence=${encodeURIComponent(sentinelSentence)}`;
+    await worker.evaluate(async (url) => {
+      await fetch(url);
+    }, workerControl);
+    const workerRequests = requests.filter((request) => request.url === workerControl);
+    expect(workerRequests).toHaveLength(1);
+    expect(containsSentence(workerRequests[0] as RequestRecord)).toBe(true);
+
+    expect(
+      await page.evaluate(() => {
+        const rejected: string[] = [];
+        for (const url of ['/other-worker.js', 'https://example.com/other-worker.js']) {
+          try {
+            new Worker(url, { type: 'module' });
+            rejected.push('allowed');
+          } catch (error) {
+            rejected.push(error instanceof TypeError ? 'TypeError' : 'other');
+          }
+        }
+        try {
+          document.createElement('div').innerHTML = '<b>probe</b>';
+          rejected.push('allowed');
+        } catch (error) {
+          rejected.push(error instanceof TypeError ? 'TypeError' : 'other');
+        }
+        return rejected;
+      }),
+    ).toEqual(['TypeError', 'TypeError', 'TypeError']);
+    await expect.poll(() => violations(page)).toEqual(['require-trusted-types-for']);
+    expect(errors).toEqual([]);
+    expect(consoleErrors.every((message) => /TrustedHTML/.test(message))).toBe(true);
+    assertLocalRequests(
+      requests.filter((request) => request.url !== workerControl),
+      defaultOrigin,
+    );
   } finally {
     await context.close();
   }
