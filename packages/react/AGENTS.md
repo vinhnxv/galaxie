@@ -14,6 +14,8 @@ See [usage and confirmation wiring](README.md).
 - `educationComponents`, `Quiz`, `WritingPrompt`, `Feedback` and `Progress`
   provide headless reference entries with exported props/action types.
 - `defineConfirmations` and `ConfirmationPrompt` use a separate host registry.
+- `ModelRoutes` displays selected providers, destination classes and class-change
+  notices from the instance snapshot, with optional trusted host labels.
 
 ## Do
 
@@ -29,6 +31,9 @@ const ui = registry.bindings({ surfaces: ['lesson-main'] });
 - Supply that `ui` to `runtime.create`; mount `AgentSurface` with the same registry
   and assigned `surfaceId`.
 - Render model-produced props as React text; keep labels and handlers in host code.
+- Mount `ModelRoutes` beside the run status, outside `AgentSurface`. Its polite
+  live region stays mounted before selection; restored instances show a role
+  only after its next routed call. Localize destination names through its props.
 - Declare every loaded or linked URL in a custom entry's `urls` extractor; each
   extracted value must be used verbatim as one attribute.
 - Mount `ConfirmationPrompt` outside `AgentSurface`; derive rows from validated
@@ -52,7 +57,7 @@ replace backend authorization. See [the broker flow](../../docs/system-design.md
 ## Tests
 
 [test/](test/) contains Chromium registry, component, surface, Strict Mode and
-confirmation tests. Run `pnpm exec vitest run --project browser packages/react/test`
+confirmation and model-route display tests. Run `pnpm exec vitest run --project browser packages/react/test`
 from the repository root; `pnpm test tests/conformance/react-surface.test.tsx` covers the
 real LangGraph resume integration. Models remain mocked. Run `pnpm check`
 before completion, including its React import dependency guard.
