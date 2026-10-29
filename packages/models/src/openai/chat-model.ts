@@ -1,0 +1,296 @@
+// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
+import type {
+  BaseLanguageModelInput,
+  StructuredOutputMethodOptions,
+} from '@langchain/core/language_models/base';
+import {
+  BaseChatModel,
+  type BaseChatModelCallOptions,
+  type LangSmithParams,
+} from '@langchain/core/language_models/chat_models';
+import {
+  AIMessage,
+  AIMessageChunk,
+  type BaseMessage,
+  HumanMessage,
+  type StandardMessageStructure,
+  SystemMessage,
+  type UsageMetadata,
+} from '@langchain/core/messages';
+import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
+import type { Runnable } from '@langchain/core/runnables';
+import { ChatOpenAICompletions } from '@langchain/openai';
+import { ModelError, ModelProviderError } from '../errors.js';
+import { mapMessages } from '../messages.js';
+import { type OutputSchema, structuredOutput } from '../structured-output.js';
+import { classifyOpenAIError } from './classify.js';
+
+export interface OpenAICompatibleOptions {
+  readonly baseURL: string;
+  readonly model: string;
+  readonly maxTokens?: number;
+  readonly temperature?: number;
+  readonly fetch?: typeof globalThis.fetch;
+  readonly headers?: Readonly<Record<string, string>>;
+}
+
+export interface OpenAICompatibleCallOptions extends BaseChatModelCallOptions {
+  readonly jsonSchema?: Readonly<Record<string, unknown>>;
+}
+
+function validateOptions(options: OpenAICompatibleOptions): OpenAICompatibleOptions {
+  try {
+    const url = new URL(options.baseURL);
+    if (
+      (url.protocol !== 'https:' &&
+        !(
+          url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+        )) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      options.baseURL.includes('?') ||
+      options.baseURL.includes('#') ||
+      typeof options.model !== 'string' ||
+      options.model.trim().length === 0 ||
+      (options.maxTokens !== undefined &&
+        (!Number.isSafeInteger(options.maxTokens) || options.maxTokens <= 0)) ||
+      (options.temperature !== undefined && !Number.isFinite(options.temperature)) ||
+      (options.fetch !== undefined && typeof options.fetch !== 'function')
+    )
+      throw new ModelError('invalid');
+    const headers = new Headers(options.headers);
+    for (const name of ['authorization', 'cookie', 'host'])
+      if (headers.has(name)) throw new ModelError('invalid');
+    return { ...options, baseURL: url.href, headers: Object.fromEntries(headers) };
+  } catch {
+    throw new ModelError('invalid');
+  }
+}
+
+function cleanMessages(messages: BaseMessage[]): BaseMessage[] {
+  return mapMessages(messages).map(({ role, content }) =>
+    role === 'system'
+      ? new SystemMessage(content)
+      : role === 'user'
+        ? new HumanMessage(content)
+        : new AIMessage(content),
+  );
+}
+
+function callOptions(
+  options: OpenAICompatibleCallOptions,
+): ChatOpenAICompletions['ParsedCallOptions'] {
+  return {
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.jsonSchema === undefined
+      ? {}
+      : {
+          response_format: {
+            type: 'json_schema',
+            json_schema: { name: 'output', strict: true, schema: options.jsonSchema },
+          },
+        }),
+  };
+}
+
+function usageOf(message: BaseMessage): UsageMetadata | undefined {
+  if (!('usage_metadata' in message)) return undefined;
+  const usage = message.usage_metadata as UsageMetadata | undefined;
+  if (
+    usage === undefined ||
+    usage.input_tokens === undefined ||
+    usage.output_tokens === undefined ||
+    usage.total_tokens === undefined
+  )
+    return undefined;
+  const values = [usage.input_tokens, usage.output_tokens, usage.total_tokens];
+  if (!values.every((value) => Number.isSafeInteger(value) && value >= 0))
+    throw new ModelProviderError();
+  return {
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+    total_tokens: usage.total_tokens,
+  };
+}
+
+function assertTextReply(message: BaseMessage): string {
+  if (
+    message.type !== 'ai' ||
+    typeof message.content !== 'string' ||
+    message.additional_kwargs['tool_calls'] !== undefined ||
+    message.additional_kwargs['function_call'] !== undefined ||
+    ('tool_calls' in message &&
+      Array.isArray(message.tool_calls) &&
+      message.tool_calls.length > 0) ||
+    ('invalid_tool_calls' in message &&
+      Array.isArray(message.invalid_tool_calls) &&
+      message.invalid_tool_calls.length > 0) ||
+    ('tool_call_chunks' in message &&
+      Array.isArray(message.tool_call_chunks) &&
+      message.tool_call_chunks.length > 0)
+  )
+    throw new ModelProviderError();
+  // LangChain drops refusal fields during conversion. Inspect the private raw response,
+  // then return fresh messages so no endpoint metadata crosses the wrapper boundary.
+  const raw = message.additional_kwargs['__raw_response'] as
+    | { choices?: { message?: { refusal?: unknown }; delta?: { refusal?: unknown } }[] }
+    | undefined;
+  if (raw?.choices?.some((choice) => choice.message?.refusal || choice.delta?.refusal))
+    throw new ModelProviderError();
+  return message.content;
+}
+
+function providerFailure(error: unknown): Error {
+  const failure = classifyOpenAIError(error);
+  return failure === undefined
+    ? new ModelProviderError()
+    : new ModelError(failure.code, failure.reason);
+}
+
+/** One wrapper and one SDK model per router credential lease. Never retains credentials across leases. */
+export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCallOptions> {
+  readonly #inner: ChatOpenAICompletions;
+
+  constructor(options: OpenAICompatibleOptions, credential: string) {
+    super({});
+    const valid = validateOptions(options);
+    if (typeof credential !== 'string' || credential.trim().length === 0)
+      throw new ModelError('invalid');
+    try {
+      this.#inner = new ChatOpenAICompletions({
+        apiKey: credential,
+        model: valid.model,
+        ...(valid.maxTokens === undefined ? {} : { maxTokens: valid.maxTokens }),
+        ...(valid.temperature === undefined ? {} : { temperature: valid.temperature }),
+        maxRetries: 0,
+        streamUsage: true,
+        __includeRawResponse: true,
+        configuration: {
+          baseURL: valid.baseURL,
+          logLevel: 'off',
+          organization: null,
+          project: null,
+          ...(valid.fetch === undefined ? {} : { fetch: valid.fetch }),
+          defaultHeaders: valid.headers,
+        },
+      });
+    } catch {
+      throw new ModelError('invalid');
+    }
+  }
+
+  override _llmType(): string {
+    return 'openai-compatible';
+  }
+
+  override getLsParams(): LangSmithParams {
+    return {
+      ls_provider: 'openai-compatible',
+      ls_model_type: 'chat',
+      ls_model_name: 'host-configured',
+    };
+  }
+
+  override async _generate(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): Promise<ChatResult> {
+    const mapped = cleanMessages(messages);
+    options.signal?.throwIfAborted();
+    try {
+      const result = await this.#inner._generate(mapped, callOptions(options));
+      options.signal?.throwIfAborted();
+      if (result.generations.length !== 1) throw new ModelProviderError();
+      const message = result.generations[0]?.message;
+      if (message === undefined) throw new ModelProviderError();
+      const text = assertTextReply(message);
+      if (text.length === 0) throw new ModelProviderError();
+      const usage = usageOf(message);
+      return {
+        generations: [
+          {
+            text,
+            message: new AIMessage<StandardMessageStructure>({
+              content: text,
+              ...(usage === undefined ? {} : { usage_metadata: usage }),
+            }),
+          },
+        ],
+      };
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw providerFailure(error);
+    }
+  }
+
+  override async *_streamResponseChunks(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+    runManager?: CallbackManagerForLLMRun,
+  ): AsyncGenerator<ChatGenerationChunk> {
+    const mapped = cleanMessages(messages);
+    options.signal?.throwIfAborted();
+    let hasText = false;
+    try {
+      for await (const inner of this.#inner._streamResponseChunks(mapped, callOptions(options))) {
+        options.signal?.throwIfAborted();
+        const text = assertTextReply(inner.message);
+        hasText ||= text.length > 0;
+        const usage = usageOf(inner.message);
+        const chunk = new ChatGenerationChunk({
+          text,
+          message: new AIMessageChunk<StandardMessageStructure>({
+            content: text,
+            ...(usage === undefined ? {} : { usage_metadata: usage }),
+          }),
+        });
+        if (text.length > 0)
+          await runManager?.handleLLMNewToken(text, undefined, undefined, undefined, undefined, {
+            chunk,
+          });
+        options.signal?.throwIfAborted();
+        yield chunk;
+      }
+      options.signal?.throwIfAborted();
+      if (!hasText) throw new ModelProviderError();
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw providerFailure(error);
+    }
+  }
+
+  override withStructuredOutput<
+    RunOutput extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<false>,
+  ): Runnable<BaseLanguageModelInput, RunOutput>;
+  override withStructuredOutput<
+    RunOutput extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<true>,
+  ): Runnable<BaseLanguageModelInput, { raw: BaseMessage; parsed: RunOutput }>;
+  override withStructuredOutput<
+    RunOutput extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<boolean>,
+  ):
+    | Runnable<BaseLanguageModelInput, RunOutput>
+    | Runnable<BaseLanguageModelInput, { raw: BaseMessage; parsed: RunOutput }> {
+    return structuredOutput(this, schema, config);
+  }
+}
+
+export function openAICompatible(
+  options: OpenAICompatibleOptions,
+): (call: { readonly credential: string }) => OpenAICompatibleChatModel {
+  const valid = validateOptions(options);
+  return ({ credential }) => new OpenAICompatibleChatModel(valid, credential);
+}

@@ -7,6 +7,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./openai": {
+      "types": "./dist/openai/index.d.ts",
+      "default": "./dist/openai/index.js"
+    },
     "./builtin-ai": {
       "types": "./dist/builtin-ai/index.d.ts",
       "default": "./dist/builtin-ai/index.js"
