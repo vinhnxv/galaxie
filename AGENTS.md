@@ -28,6 +28,8 @@ The M4 [prompt injection corpus](tests/injection-corpus/README.md) now runs 32 s
 
 Core now offers opt-in, content-free `RuntimeOptions.developmentWarnings` for page CSP/Trusted Types probes, optional unbound capabilities, roles without a usable provider, provider-key-shaped storage values and blocked interaction URLs. With the option absent, no warning check or extra availability probe runs. Host-local enables it only with `import.meta.env.DEV`; built preview pages omit it. Node and Chromium tests use mock models. The checks are best-effort integration advice, with expected development policy violations, report-only limitations and a Trusted Types default-policy false positive documented in [system design §9](docs/system-design.md#development-warnings). They change no runtime policy or routing decision.
 
+The M4 documentation slice adds package coding guidance, a root [AI-facing index](llms.txt), [tracing](docs/guides/tracing.md) and [host integration](docs/guides/host-integration.md) guides, a [tested device matrix](docs/device-matrix.md), and an offline tracked-document link check in `pnpm check`.
+
 ## Read first
 
 1. `docs/galaxie-project-brief.md`: the source of truth for scope, architecture, security and the roadmap. Start with §0.
