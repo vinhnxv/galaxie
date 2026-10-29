@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { afterEach, expect, it } from 'vitest';
-import { openDatabase } from '../src/schema.js';
+import { openDatabase, requestResult, transact } from '../src/schema.js';
 
 const databases: string[] = [];
 const connections: IDBDatabase[] = [];
@@ -29,13 +29,10 @@ it('creates version one with all stores, indexes and scoped schema metadata', as
   connections.push(db);
   expect(db.version).toBe(1);
   expect([...db.objectStoreNames]).toEqual(['checkpoints', 'inbox', 'journal', 'meta', 'writes']);
-  const tx = db.transaction(['checkpoints', 'writes', 'meta']);
-  expect([...tx.objectStore('checkpoints').indexNames]).toEqual(['namespace', 'thread']);
-  expect([...tx.objectStore('writes').indexNames]).toEqual(['checkpoint', 'thread']);
-  const record = await new Promise<unknown>((resolve, reject) => {
-    const request = tx.objectStore('meta').get(['app', 'user', 'schema']);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+  const record = await transact(db, ['checkpoints', 'writes', 'meta'], 'readonly', async (tx) => {
+    expect([...tx.objectStore('checkpoints').indexNames]).toEqual(['namespace', 'thread']);
+    expect([...tx.objectStore('writes').indexNames]).toEqual(['checkpoint', 'thread']);
+    return requestResult<unknown>(tx.objectStore('meta').get(['app', 'user', 'schema']));
   });
   expect(record).toEqual({ v: 1, schemaVersion: 1 });
   db.close();
