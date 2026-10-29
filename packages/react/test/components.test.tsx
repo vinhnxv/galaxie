@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { type DispatchReceipt, validateSync } from '@galaxie/core';
+import { type DispatchReceipt, readAnnotations, validateSync } from '@galaxie/core';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, test } from 'vitest';
@@ -12,6 +12,7 @@ import {
   Feedback,
   Progress,
   Quiz,
+  WritingPrompt,
 } from '../src/index.js';
 import { FakeInstance, interaction } from './support/fake-instance.js';
 
@@ -62,7 +63,7 @@ function quizProps() {
 }
 
 async function renderInteraction(
-  component: typeof Quiz.id | typeof Feedback.id | typeof Progress.id,
+  component: typeof Quiz.id | typeof Feedback.id | typeof Progress.id | typeof WritingPrompt.id,
   props: unknown,
 ) {
   const instance = new FakeInstance();
@@ -80,8 +81,9 @@ test('education entries expose one catalog and answer actions', () => {
     'education.Quiz/v1',
     'education.Feedback/v1',
     'education.Progress/v1',
+    'education.WritingPrompt/v1',
   ]);
-  expect(Object.keys(registry.bindings({ surfaces: ['lesson-main'] }).components)).toHaveLength(3);
+  expect(Object.keys(registry.bindings({ surfaces: ['lesson-main'] }).components)).toHaveLength(4);
 });
 
 test('Quiz uses labelled fieldsets and radios, and submits only complete answers', async () => {
@@ -325,4 +327,74 @@ test('continue payloads are empty objects', () => {
       ok: false,
     });
   }
+});
+
+test('WritingPrompt renders text and submits a non-empty trimmed sentence once', async () => {
+  const markup = '<img src=x onerror=alert(1)>';
+  const { instance, container } = await renderInteraction(WritingPrompt.id, {
+    title: 'Writing practice',
+    prompt: markup,
+    placeholder: 'One sentence',
+  });
+  expect(container.textContent).toContain(markup);
+  expect(container.querySelector('img')).toBeNull();
+  const textarea = container.querySelector('textarea');
+  const button = container.querySelector<HTMLButtonElement>('button');
+  expect(textarea?.labels?.[0]?.textContent).toBe(markup);
+  expect(textarea?.placeholder).toBe('One sentence');
+  expect(textarea?.maxLength).toBe(500);
+  expect(button?.disabled).toBe(true);
+  const setDraft = async (value: string): Promise<void> => {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+        textarea,
+        value,
+      );
+      textarea?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  await setDraft('   ');
+  expect(button?.disabled).toBe(true);
+  await setDraft('  I study English every day.  ');
+  expect(button?.disabled).toBe(false);
+  const completion = Promise.withResolvers<DispatchReceipt>();
+  instance.dispatch.mockReturnValueOnce(completion.promise);
+  await act(async () => button?.click());
+  expect(button?.disabled).toBe(true);
+  await act(async () => button?.click());
+  expect(instance.dispatch).toHaveBeenCalledTimes(1);
+  expect(instance.dispatch.mock.calls[0]?.[0]).toMatchObject({
+    action: 'submit',
+    payload: { sentence: 'I study English every day.' },
+  });
+  await act(async () =>
+    completion.resolve({ status: 'accepted', interactionId: interaction().interactionId }),
+  );
+});
+
+test('WritingPrompt binds its private schema and rejects an oversized sentence before dispatch', async () => {
+  let submit: ((payload: { sentence: string }) => Promise<DispatchReceipt>) | undefined;
+  const entry = {
+    ...WritingPrompt,
+    component: (input: Parameters<typeof WritingPrompt.component>[0]): ReactElement => {
+      submit = input.actions.submit.submit;
+      return <p>{input.props.prompt}</p>;
+    },
+  };
+  const registry = createRegistry({ components: [entry] });
+  const schema = registry.bindings({ surfaces: ['lesson-main'] }).components[WritingPrompt.id]
+    ?.actions['submit']?.payload;
+  expect(schema).toBeDefined();
+  if (schema === undefined) throw new Error('The writing schema is missing.');
+  expect([...readAnnotations(schema).labels]).toEqual(['private-user']);
+  const instance = new FakeInstance();
+  instance.setPending(
+    interaction({ component: WritingPrompt.id, props: { prompt: 'Write a sentence.' } }),
+  );
+  await mount(<AgentSurface instance={instance} registry={registry} surfaceId="lesson-main" />);
+  expect(await submit?.({ sentence: 'x'.repeat(501) })).toMatchObject({
+    status: 'rejected',
+    error: { code: 'invalid' },
+  });
+  expect(instance.dispatch).not.toHaveBeenCalled();
 });

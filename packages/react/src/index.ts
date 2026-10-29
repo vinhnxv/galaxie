@@ -14,6 +14,10 @@ export {
   type QuizProps,
   type QuizQuestion,
   type QuizSubmission,
+  WritingPrompt,
+  type WritingPromptActions,
+  type WritingPromptProps,
+  type WritingSubmission,
 } from './components/index.js';
 export { useAgentSnapshot } from './hooks.js';
 export {

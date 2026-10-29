@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { type Context, context, type Tracer } from '@opentelemetry/api';
+import { type Annotations, readAnnotations } from './annotations.js';
 import { deadlineTimer, RunBudget } from './budgets.js';
 import { CapabilityBroker, registerPrivate } from './capability-broker.js';
 import type { AgentDefinition } from './definition.js';
@@ -30,7 +31,7 @@ import type { OutputSafetyHook, PublishedModelRoute, SelectedModelRoute } from '
 import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
-import { validateSync } from './schema.js';
+import { type StandardSchema, validateSync } from './schema.js';
 import { type RunInstrumentation, startRunTrace } from './tracing.js';
 
 const SETTLE_TIMEOUT_MS = 10_000;
@@ -67,15 +68,18 @@ interface SegmentRecord {
   tracing?: RunInstrumentation;
 }
 
-function containsText(value: unknown): boolean {
+function* payloadStrings(value: unknown): Generator<string, void> {
   const pending = [value];
   while (pending.length > 0) {
     const current = pending.pop();
-    if (typeof current === 'string' && current.length > 0) return true;
+    if (typeof current === 'string' && current.length > 0) yield current;
     if (typeof current === 'object' && current !== null)
       for (const child of Object.values(current)) pending.push(child);
   }
-  return false;
+}
+
+function containsText(value: unknown): boolean {
+  return payloadStrings(value).next().done !== true;
 }
 
 function terminal(run: RunRecord): boolean {
@@ -138,6 +142,26 @@ export function createAgentInstance(
   let current: RunRecord | undefined;
   let settlement: Promise<void> = Promise.resolve();
   const dispatchChecks = new Set<Promise<DispatchReceipt>>();
+  const payloadAnnotations = new WeakMap<StandardSchema, Annotations | null>();
+  const labelPayload = (run: RunRecord, schema: StandardSchema, payload: unknown): void => {
+    let annotations = payloadAnnotations.get(schema);
+    if (annotations === undefined) {
+      try {
+        annotations = readAnnotations(schema);
+      } catch {
+        annotations = null;
+      }
+      payloadAnnotations.set(schema, annotations);
+    }
+    if (annotations === null) {
+      const values = [...payloadStrings(payload)];
+      if (values.length > 0) run.labels.add('private-user');
+      registerPrivate(values, run.privateValues);
+    } else {
+      for (const label of annotations.labels) run.labels.add(label);
+      registerPrivate(annotations.privateStrings(payload), run.privateValues);
+    }
+  };
 
   const report = (event: Omit<DiagnosticEvent, 'instanceId'>): void => {
     try {
@@ -649,6 +673,7 @@ export function createAgentInstance(
           const entry: InboxEntry = { interactionId, action, payload, status: 'accepted' };
           run.inbox.set(interactionId, entry);
           if (!run.submittedText && containsText(payload)) run.submittedText = true;
+          if (payloadSchema !== undefined) labelPayload(run, payloadSchema, payload);
           run.status = 'running';
           delete run.pending;
           // Register settlement before publishing: a listener may dispose synchronously.

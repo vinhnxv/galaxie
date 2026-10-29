@@ -3,7 +3,7 @@
 
 import { GalaxieError } from './errors.js';
 import type { ArgumentShape, DataLabel } from './policy.js';
-import type { Schema } from './schema.js';
+import type { StandardSchema } from './schema.js';
 
 type Node = Record<string, unknown>;
 const LABELS: readonly string[] = ['public', 'app', 'private-user'];
@@ -119,7 +119,7 @@ export interface Annotations {
 }
 
 /** Reads Standard JSON Schema in both directions, without importing the schema library. */
-export function readAnnotations(schema: Schema): Annotations {
+export function readAnnotations(schema: StandardSchema): Annotations {
   const standard = schema['~standard'] as unknown as {
     jsonSchema?: {
       input(options: unknown): unknown;
