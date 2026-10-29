@@ -403,6 +403,36 @@ test.each(['succeeded', 'dispatched', 'outcome_unknown'] as const)(
   },
 );
 
+test.each(['dispatched', 'outcome_unknown'] as const)(
+  'a retryable %s write asks for fresh approval and keeps its journal effect ID',
+  async (status) => {
+    const store = new MemoryRecoveryStore();
+    let recorded: string | undefined;
+    const effect = store.effect.bind(store);
+    store.effect = async (_sessionId, effectId) => {
+      recorded = effectId;
+      const { digest } = await import('../src/confirmations.js');
+      return { status, inputDigest: await digest({ value: 1 }) };
+    };
+    const f = await fixture(
+      async function* ({ capabilities }) {
+        await capabilities.call('write@1', { value: 1 });
+        yield { type: 'output', output: null };
+      },
+      {},
+      { retry: 'idempotency-key' },
+      { create: { recovery: store } },
+    );
+    await opened(f.instance);
+    expect(f.invoke).not.toHaveBeenCalled();
+    store.effect = effect;
+    expect(f.instance.respond(pending(f.instance).id, 'approve')).toEqual({ status: 'approved' });
+    await f.events;
+    expect(f.invoke).toHaveBeenCalledTimes(1);
+    expect(f.invoke.mock.calls[0]?.[1].effectId).toBe(recorded);
+  },
+);
+
 test('approved journal effect ID is exactly the dispatch effect ID', async () => {
   const store = new MemoryRecoveryStore();
   const f = await fixture(
