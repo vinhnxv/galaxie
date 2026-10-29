@@ -6,6 +6,8 @@
     "types": ["node"],
     "resolveJsonModule": true,
     "paths": {
+      "eslint": ["../../packages/eslint-plugin/node_modules/eslint/lib/types/index.d.ts"],
+      "@galaxie/eslint-plugin": ["../../packages/eslint-plugin/src/index.ts"],
       "@galaxie/storage-indexeddb": ["../../packages/storage-indexeddb/src/index.ts"],
       "@galaxie/react": ["../../packages/react/src/index.ts"],
       "@galaxie/models/builtin-ai": ["../../packages/models/src/builtin-ai/index.ts"],

@@ -8,6 +8,12 @@ import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config
 import { mcpAdminCommand } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
+  eslint: fileURLToPath(
+    new URL('./packages/eslint-plugin/node_modules/eslint/lib/api.js', import.meta.url),
+  ),
+  '@galaxie/eslint-plugin': fileURLToPath(
+    new URL('./packages/eslint-plugin/src/index.ts', import.meta.url),
+  ),
   '@galaxie/tools-mcp': fileURLToPath(
     new URL('./packages/tools-mcp/src/index.ts', import.meta.url),
   ),
