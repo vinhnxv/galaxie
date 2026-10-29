@@ -12,7 +12,8 @@
       "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
       "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],
       "@galaxie/models/webllm/worker": ["../../packages/models/src/webllm/worker.ts"],
-      "@galaxie/models/webllm": ["../../packages/models/src/webllm/index.ts"]
+      "@galaxie/models/webllm": ["../../packages/models/src/webllm/index.ts"],
+      "@galaxie/example-english-tutor": ["../../examples/english-tutor/src/index.ts"]
     }
   },
   "include": ["."]

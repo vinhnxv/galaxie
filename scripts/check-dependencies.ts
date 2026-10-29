@@ -201,6 +201,26 @@ for (const entry of readdirSync('packages', { withFileTypes: true })) {
   }
 }
 
+for (const area of ['src', 'dist']) {
+  const directory = join('examples/english-tutor', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (
+        specifier.startsWith('./') ||
+        specifier.startsWith('../') ||
+        specifier === '@galaxie/core' ||
+        specifier === '@galaxie/adapter-langgraph' ||
+        specifier === '@langchain/langgraph/web' ||
+        specifier.startsWith('@langchain/core/') ||
+        specifier === 'zod'
+      )
+        continue;
+      problems.push(`${file}: forbidden English tutor import ${specifier}`);
+    }
+  }
+}
+
 for (const directory of [
   'packages/core/dist',
   'packages/adapter-langgraph/dist',

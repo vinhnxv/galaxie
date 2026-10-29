@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@galaxie/core": ["../../packages/core/src/index.ts"],
+      "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

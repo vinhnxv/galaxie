@@ -6,6 +6,9 @@ import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
 const alias = {
+  '@galaxie/example-english-tutor': fileURLToPath(
+    new URL('./examples/english-tutor/src/index.ts', import.meta.url),
+  ),
   '@galaxie/react': fileURLToPath(new URL('./packages/react/src/index.ts', import.meta.url)),
   '@galaxie/models/builtin-ai': fileURLToPath(
     new URL('./packages/models/src/builtin-ai/index.ts', import.meta.url),
@@ -30,7 +33,11 @@ const config: ViteUserConfig = defineConfig({
         resolve: { alias },
         test: {
           name: 'node',
-          include: ['packages/*/test/**/*.test.ts', 'tests/conformance/**/*.test.ts'],
+          include: [
+            'packages/*/test/**/*.test.ts',
+            'tests/conformance/**/*.test.ts',
+            'examples/*/test/**/*.test.ts',
+          ],
           setupFiles: ['tests/conformance/support/clean-env.node.ts'],
         },
       },
@@ -59,8 +66,17 @@ const config: ViteUserConfig = defineConfig({
         },
         test: {
           name: 'browser',
-          include: ['**/*.test.ts', '**/*.test.tsx', '../../packages/react/test/**/*.test.tsx'],
-          exclude: [...configDefaults.exclude, '**/*.node.test.ts'],
+          include: [
+            '**/*.test.ts',
+            '**/*.test.tsx',
+            '../../packages/react/test/**/*.test.tsx',
+            '../../examples/*/test/**/*.test.ts',
+          ],
+          exclude: [
+            ...configDefaults.exclude,
+            '**/*.node.test.ts',
+            '../../examples/*/test/**/*.node.test.ts',
+          ],
           browser: {
             enabled: true,
             provider: playwright(),
