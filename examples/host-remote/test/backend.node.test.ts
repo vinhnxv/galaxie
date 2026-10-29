@@ -7,6 +7,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterEach, expect, it } from 'vitest';
 import { backend } from '../server/backend.js';
 import { lesson } from '../server/fixtures.js';
+import { createSession } from '../src/session.js';
 
 const servers: ViteDevServer[] = [];
 
@@ -14,7 +15,9 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-async function serve(mode = 'test'): Promise<{ origin: string; advance: () => void }> {
+async function serve(
+  mode = 'test',
+): Promise<{ origin: string; now: () => number; advance: (ms?: number) => void }> {
   let now = Date.now();
   const server = await createServer({
     configFile: false,
@@ -29,8 +32,9 @@ async function serve(mode = 'test'): Promise<{ origin: string; advance: () => vo
   if (!address || typeof address === 'string') throw new Error('Missing test server port.');
   return {
     origin: `http://127.0.0.1:${address.port}`,
-    advance: () => {
-      now += 301_000;
+    now: () => now,
+    advance: (ms = 301_000) => {
+      now += ms;
     },
   };
 }
@@ -62,6 +66,36 @@ it('serves the tutor fixture and isolates state per server', async () => {
     headers: { authorization: `Bearer ${await token(other.origin)}` },
   });
   expect(response.status).toBe(404);
+});
+
+it('shares a current token, renews within 60 seconds, and saves after the old token expires', async () => {
+  const { origin, now, advance } = await serve();
+  const currentToken = createSession(origin, now);
+  const [first, concurrent] = await Promise.all([currentToken(), currentToken()]);
+  expect(concurrent).toBe(first);
+  expect(await currentToken()).toBe(first);
+  advance(240_000);
+  const renewed = await currentToken();
+  expect(renewed).not.toBe(first);
+  advance(61_000);
+  expect(
+    (
+      await fetch(`${origin}/api/progress`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${await currentToken()}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ lessonId: lesson.id, score: 2, total: 3 }),
+      })
+    ).status,
+  ).toBe(200);
+  const headers = { authorization: `Bearer ${renewed}` };
+  const state = await (await fetch(`${origin}/api/__test/state`, { headers })).json();
+  expect(state.requests['POST /api/session']).toBe(2);
+  expect(state.progress).toEqual([
+    { learnerId: 'demo-learner', lessonId: lesson.id, score: 2, total: 3 },
+  ]);
 });
 
 it('rejects absent, unknown and expired tokens and foreign origins and hosts', async () => {
