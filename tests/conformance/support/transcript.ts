@@ -210,8 +210,21 @@ const definition = defineAgentDefinition({
   models: assistantRoles,
 });
 
-export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> {
-  const saver = new web.MemorySaver();
+async function firstThreadId(saver: BaseCheckpointSaver): Promise<string> {
+  for await (const tuple of saver.list({})) {
+    const threadId: unknown = tuple.config.configurable?.['thread_id'];
+    if (typeof threadId === 'string') return threadId;
+  }
+  throw new Error('The conformance saver has no thread.');
+}
+
+export async function runGalaxie(
+  fixture: ConformanceCase,
+  saverFactory: () => BaseCheckpointSaver | Promise<BaseCheckpointSaver> = () =>
+    new web.MemorySaver(),
+  stopAtInterrupt = false,
+): Promise<Transcript> {
+  const saver = await saverFactory();
   let graph: ConformanceGraph | undefined;
   const runtime = createRuntime({ appId: 'conformance', executors: [createLangGraphAdapter()] });
   const requests = Object.fromEntries(
@@ -278,10 +291,11 @@ export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> 
           };
         else if (event.type === 'interaction') {
           if (graph === undefined) throw new Error('The conformance graph was not prepared.');
-          const threadId = Object.keys(saver.storage)[0];
+          const threadId = await firstThreadId(saver);
           const pause = await readPause(graph, { configurable: { thread_id: threadId } });
           transcript.pauses ??= [];
           transcript.pauses.push(pause);
+          if (stopAtInterrupt) break;
           const pending = instance.getSnapshot().run?.pending;
           const resume = fixture.resumes?.[resumeIndex++];
           if (pending === undefined || resume === undefined)
@@ -314,7 +328,7 @@ export async function runGalaxie(fixture: ConformanceCase): Promise<Transcript> 
     await runtime.dispose();
   }
   if (graph === undefined) throw new Error('The conformance graph was not prepared.');
-  const threadId = Object.keys(saver.storage)[0];
+  const threadId = await firstThreadId(saver);
   await readState(transcript, graph, { configurable: { thread_id: threadId } });
   return transcript;
 }

@@ -6,6 +6,9 @@ import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
 const alias = {
+  '@galaxie/storage-indexeddb': fileURLToPath(
+    new URL('./packages/storage-indexeddb/src/index.ts', import.meta.url),
+  ),
   '@galaxie/example-english-tutor': fileURLToPath(
     new URL('./examples/english-tutor/src/index.ts', import.meta.url),
   ),
@@ -38,6 +41,12 @@ const config: ViteUserConfig = defineConfig({
             'tests/conformance/**/*.test.ts',
             'examples/*/test/**/*.test.ts',
           ],
+          exclude: [
+            ...configDefaults.exclude,
+            'packages/storage-indexeddb/test/schema.test.ts',
+            'packages/storage-indexeddb/test/saver.test.ts',
+            'tests/conformance/indexeddb.test.ts',
+          ],
           setupFiles: ['tests/conformance/support/clean-env.node.ts'],
         },
       },
@@ -52,6 +61,7 @@ const config: ViteUserConfig = defineConfig({
             'react/jsx-runtime',
             'react/jsx-dev-runtime',
             '@langchain/langgraph/web',
+            '@langchain/langgraph-checkpoint',
             '@langchain/core/callbacks/base',
             '@langchain/core/language_models/chat_models',
             '@langchain/core/messages',
@@ -70,6 +80,7 @@ const config: ViteUserConfig = defineConfig({
             '**/*.test.ts',
             '**/*.test.tsx',
             '../../packages/react/test/**/*.test.tsx',
+            '../../packages/storage-indexeddb/test/**/*.test.ts',
             '../../examples/*/test/**/*.test.ts',
           ],
           exclude: [

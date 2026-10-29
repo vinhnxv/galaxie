@@ -172,6 +172,19 @@ for (const file of files('packages/models/src', /\.[cm]?tsx?$/)) {
   }
 }
 
+for (const file of files('packages/storage-indexeddb/src', /\.[cm]?tsx?$/)) {
+  for (const { specifier, typeOnly } of imports(file)) {
+    if (
+      specifier.startsWith('./') ||
+      specifier.startsWith('../') ||
+      specifier === '@langchain/langgraph-checkpoint' ||
+      (specifier.startsWith('@langchain/core/') && typeOnly)
+    )
+      continue;
+    problems.push(`${file}: forbidden IndexedDB storage import ${specifier}`);
+  }
+}
+
 for (const entry of readdirSync('packages', { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
   for (const area of ['src', 'dist', ...(entry.name === 'react' ? ['test'] : [])]) {
@@ -256,6 +269,7 @@ for (const directory of [
   'packages/adapter-langgraph/dist',
   'packages/models/dist',
   'packages/react/dist',
+  'packages/storage-indexeddb/dist',
 ]) {
   for (const file of files(directory, /\.[cm]?js$/)) {
     if (readFileSync(file, 'utf8').includes('async_hooks'))
