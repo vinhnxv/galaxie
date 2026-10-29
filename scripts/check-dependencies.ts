@@ -137,12 +137,14 @@ const models = JSON.parse(readFileSync('packages/models/package.json', 'utf8')) 
 };
 if (
   JSON.stringify(Object.keys(models.peerDependencies ?? {}).sort()) !==
-    JSON.stringify(['@langchain/core', '@mlc-ai/web-llm']) ||
+    JSON.stringify(['@langchain/core', '@langchain/openai', '@mlc-ai/web-llm']) ||
+  models.peerDependencies?.['@langchain/openai'] !== '1.6.3' ||
+  models.peerDependenciesMeta?.['@langchain/openai']?.optional !== true ||
   models.peerDependencies?.['@mlc-ai/web-llm'] !== '0.2.86' ||
   models.peerDependenciesMeta?.['@mlc-ai/web-llm']?.optional !== true
 )
   problems.push(
-    'packages/models/package.json: models peers must be @langchain/core and optional @mlc-ai/web-llm 0.2.86',
+    'packages/models/package.json: models peers must be @langchain/core, optional @langchain/openai 1.6.3 and optional @mlc-ai/web-llm 0.2.86',
   );
 for (const field of [
   'dependencies',
@@ -160,6 +162,7 @@ for (const file of files('packages/models/src', /\.[cm]?tsx?$/)) {
       specifier.startsWith('./') ||
       specifier.startsWith('../') ||
       specifier.startsWith('@langchain/core/') ||
+      (specifier === '@langchain/openai' && file.startsWith('packages/models/src/openai/')) ||
       (specifier === '@mlc-ai/web-llm' &&
         !hasTypes &&
         (((file === 'packages/models/src/webllm/engine.ts' ||
@@ -192,6 +195,15 @@ for (const entry of readdirSync('packages', { withFileTypes: true })) {
     if (!existsSync(directory)) continue;
     for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
       for (const { specifier } of imports(file)) {
+        if (
+          (specifier === '@langchain/openai' || specifier.startsWith('@langchain/openai/')) &&
+          !(
+            entry.name === 'models' &&
+            (area === 'src' || area === 'dist') &&
+            file.startsWith(`${directory}/openai/`)
+          )
+        )
+          problems.push(`${file}: OpenAI imports belong only in the models openai provider`);
         const react = specifier === 'react' || specifier.startsWith('react/');
         const reactDom = specifier === 'react-dom' || specifier.startsWith('react-dom/');
         if (entry.name !== 'react') {
@@ -253,6 +265,7 @@ for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
       specifier === '@galaxie/models/webllm' ||
       specifier === '@galaxie/models/webllm/worker' ||
       specifier === '@galaxie/models/builtin-ai' ||
+      specifier === '@galaxie/models/openai' ||
       (specifier === '@galaxie/models/mock' && file === 'examples/host-local/src/mock-script.ts') ||
       specifier === 'react' ||
       specifier === 'react/jsx-runtime' ||

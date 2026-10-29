@@ -2,11 +2,15 @@
   "name": "@galaxie/models",
   "version": "0.0.0",
   "private": true,
-  "description": "Mock, WebLLM and Chrome Built-in AI model providers for galaxie.",
+  "description": "Mock, WebLLM, Chrome Built-in AI and OpenAI-compatible model providers for galaxie.",
   "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./openai": {
+      "types": "./dist/openai/index.d.ts",
+      "default": "./dist/openai/index.js"
+    },
     "./builtin-ai": {
       "types": "./dist/builtin-ai/index.d.ts",
       "default": "./dist/builtin-ai/index.js"
@@ -29,15 +33,20 @@
   ],
   "peerDependencies": {
     "@langchain/core": "~1.2.20",
+    "@langchain/openai": "1.6.3",
     "@mlc-ai/web-llm": "0.2.86"
   },
   "peerDependenciesMeta": {
+    "@langchain/openai": {
+      "optional": true
+    },
     "@mlc-ai/web-llm": {
       "optional": true
     }
   },
   "devDependencies": {
     "@langchain/core": "1.2.20",
+    "@langchain/openai": "1.6.3",
     "@mlc-ai/web-llm": "0.2.86",
     "zod": "4.6.7"
   }

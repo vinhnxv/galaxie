@@ -16,7 +16,10 @@ export type ModelUnavailableReason =
   | 'download_required'
   | 'activation_required'
   | 'download_failed'
-  | 'not_allowed';
+  | 'not_allowed'
+  | 'rate_limited'
+  | 'endpoint_failed'
+  | 'network';
 export type ModelErrorCode = 'unavailable' | 'invalid' | 'unsupported';
 
 const messages: Record<ModelErrorCode, string> = {

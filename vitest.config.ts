@@ -13,6 +13,12 @@ const alias = {
     new URL('./examples/english-tutor/src/index.ts', import.meta.url),
   ),
   '@galaxie/react': fileURLToPath(new URL('./packages/react/src/index.ts', import.meta.url)),
+  '@galaxie/models/openai': fileURLToPath(
+    new URL('./packages/models/src/openai/index.ts', import.meta.url),
+  ),
+  '@langchain/openai': fileURLToPath(
+    new URL('./packages/models/node_modules/@langchain/openai/dist/index.js', import.meta.url),
+  ),
   '@galaxie/models/builtin-ai': fileURLToPath(
     new URL('./packages/models/src/builtin-ai/index.ts', import.meta.url),
   ),
@@ -61,6 +67,7 @@ const config: ViteUserConfig = defineConfig({
             'react/jsx-runtime',
             'react/jsx-dev-runtime',
             '@langchain/langgraph/web',
+            '@langchain/openai',
             '@langchain/langgraph-checkpoint',
             '@langchain/core/callbacks/base',
             '@langchain/core/language_models/chat_models',
