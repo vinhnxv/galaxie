@@ -76,6 +76,7 @@ export interface InjectionFixture {
   readonly recorder: ReturnType<typeof createSpanRecorder>;
   readonly mcpEvents: McpEvent[];
   readonly mcpInvokes: MockInstance<CapabilityBinding['invoke']>[];
+  dispose(): Promise<void>;
   start(probe?: boolean): Promise<{ runId: RunId; events: Promise<RunEvent[]> }>;
   run(probe?: boolean): Promise<InjectionResult>;
 }
@@ -94,9 +95,7 @@ export async function createInjectionFixture(
     [PRIVATE_MARKER]: { id: 'remote', text: 'Unexpected remote answer.' },
   });
   const remote = vi.spyOn(remoteModel, '_generate');
-  const content = vi.fn<CapabilityBinding['invoke']>(async () =>
-    entry.vector === 'lesson' ? { lesson: entry.payload } : { toolOutput: entry.payload },
-  );
+  const content = vi.fn<CapabilityBinding['invoke']>(async () => ({ text: entry.payload }));
   const write = vi.fn<CapabilityBinding['invoke']>(async () => ({ saved: true }));
   const server =
     mcp === undefined
@@ -121,7 +120,7 @@ export async function createInjectionFixture(
             ),
           onEvent: (event) => mcpEvents.push(event),
         });
-  const mcpBindings =
+  const approvedBindings =
     server?.bindings({
       'lesson.lookup': {
         version: 1,
@@ -134,7 +133,13 @@ export async function createInjectionFixture(
         pin: mcp?.pins['lesson.lookup'] as string,
       },
     }) ?? {};
-  const mcpInvokes = Object.values(mcpBindings).map((bound) => vi.spyOn(bound, 'invoke'));
+  const mcpInvokes = Object.values(approvedBindings).map((bound) => vi.fn(bound.invoke));
+  const mcpBindings = Object.fromEntries(
+    Object.entries(approvedBindings).map(([name, bound], index) => [
+      name,
+      { ...bound, invoke: mcpInvokes[index] as Mock<CapabilityBinding['invoke']> },
+    ]),
+  );
   const runtime = createRuntime({
     appId: 'injection-corpus',
     executors: [createLangGraphAdapter()],
@@ -231,11 +236,16 @@ export async function createInjectionFixture(
               const data = await host.capabilities.call('content.get@1', {}, config);
               // MCP metadata is never exposed by the SDK. Supply synthetic metadata directly.
               const prompt =
-                entry.vector === 'mcp-description' ? entry.payload : JSON.stringify(data);
+                entry.vector === 'mcp-description'
+                  ? entry.payload
+                  : z.object({ text: z.string() }).parse(data).text;
               // A native LangGraph option: no model text is published in this fixture's messages stream.
               const message = await host.langchain
                 .chatModel('agent.local')
-                .invoke(prompt, { ...config, tags: ['nostream'] });
+                .invoke(`${prompt}\nPrivate fixture value: ${PRIVATE_MARKER}`, {
+                  ...config,
+                  tags: ['nostream'],
+                });
               const directive = readDirective(message);
               if (entry.goal !== 'instruction-in-data') {
                 switch (directive.kind) {
@@ -285,6 +295,11 @@ export async function createInjectionFixture(
     recorder,
     mcpEvents,
     mcpInvokes,
+    async dispose(): Promise<void> {
+      await runtime.dispose();
+      await server?.close();
+      await recorder.provider.forceFlush();
+    },
     async start(probe = false) {
       const { runId } = await instance.start({ privateValue: PRIVATE_MARKER, probe });
       return { runId, events: collect(instance.events(runId)) };

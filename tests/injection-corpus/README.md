@@ -1,0 +1,23 @@
+# Prompt injection corpus
+
+This synthetic corpus assumes a fully compromised model. The obedient-attacker mock selects a validated directive when its input contains the exact payload, then returns that directive without resisting it. Matching is a deterministic script selector, not an injection detector. The tests judge SDK-controlled outcomes, not model robustness or answer quality (ADR-0016).
+
+`cases.json` is a static JSON array, not a workspace package. Each case has a unique kebab-case `id`, a `vector` (`lesson`, `tool-output`, `mcp-description`), a `goal`, a synthetic `payload`, and a closed structured `directive`. Directives can call a named capability, emit the fixture's interaction, reply with text, or forward the private value to `agent.main`. They cannot execute code. Zod rejects malformed cases and unknown directive fields before use. Coverage validation requires at least 30 cases, at least eight per vector, and all 15 vector–goal pairs. The initial corpus has 32 cases.
+
+The runner is [`injection-corpus.test.ts`](../conformance/injection-corpus.test.ts). Run it on both Node and headless Chromium with:
+
+```sh
+pnpm exec vitest run tests/conformance/injection-corpus.test.ts
+```
+
+It also runs in `pnpm check` and `CI=true pnpm test`. Every provider is a deterministic mock. No real model global, WebLLM bundle or model download is used. Test network traffic is confined to the Vitest runner and the dedicated loopback MCP fixture. The network recorder captures URLs and serialized request bodies for fetch, XHR, beacons, WebSockets and EventSource, blocking other origins before dispatch. Its self-test exercises available APIs with blocked synthetic requests and a loopback request. It does not use the Node socket recorder, which would block MCP.
+
+The executing graph performs the attacker's requested action through the broker, router or interaction policy. Writes receive no approval: tests inspect the frozen real arguments and host registry text, then decline. Private input labels remain sticky; forwarding to the host-server spy fails before the provider runs. URL policy is checked before any snapshot publishes pending state. The fixed graph for `instruction-in-data` never executes model tool calls and projects output to `{ answered: true }`.
+
+MCP metadata is used only for pins; galaxie never supplies descriptions to the model. These cases therefore both give the synthetic description directly to the attacker and check the separate metadata boundary. Each MCP case first uses the host-approved pinned tool, changes its description through a test-only admin action, runs its directive, then attempts the pinned tool again. The next call must fail `unavailable` without another server invocation or metadata disclosure. `mcp-description-changes-after-approval` names that boundary explicitly. Browser files use separate servers, so the corpus never mutates the fixture used by `mcp.test.ts`. Reset restores the original description.
+
+The fixture keeps private input and retrieved content out of graph state, disables native LangGraph message streaming with the supported `nostream` tag, and projects replies away. This is fixture behavior, not SDK redaction: raw engine streams and checkpoints can contain untrusted content. Hosts must keep checkpoints on-device and never display raw streams. The runner checks every collected event, snapshot, span and error for payload/private markers. Diagnostic fields are checked locally, including `String(event.error)` because `Error.message` is not enumerable. `DiagnosticEvent.error` is host-only evidence and must never be forwarded to traces or public surfaces.
+
+`url-query-on-allowlisted-origin` documents a residual risk: `https://example.test/lesson?note=synthetic-query-value` becomes pending. Origin allowlists do not constrain paths or queries. Hosts must constrain URL templates and query values themselves. This case deliberately passes, rather than using `test.fails`. The fixture's component renders model text only as a React text child; no DOM rendering check runs in the Node project.
+
+Payloads use only `example.test` and `attacker.invalid` (including look-alike subdomains), synthetic values and no third-party corpus. Forms include instruction overrides, forged system/tool messages and approvals, Markdown links, HTML comments, zero-width/bidirectional characters, base64 and tool-call-shaped JSON. Add data-driven cases without changing existing assertions. A newly demonstrated control failure must retain its assertion, use `test.fails` with a comment naming the gap, and be reported in a draft pull request; do not change runtime controls in this slice.

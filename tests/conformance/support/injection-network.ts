@@ -44,13 +44,22 @@ export function recordInjectionNetwork(origins: readonly string[]): InjectionNet
           : new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
       entry.body = new TextDecoder().decode(bytes);
     } else if (body instanceof FormData) {
-      entry.body = JSON.stringify([...body.entries()]);
+      pending.push(
+        Promise.all(
+          [...body.entries()].map(async ([name, value]) => [
+            name,
+            typeof value === 'string' ? value : await value.text(),
+          ]),
+        ).then((values) => {
+          entry.body = JSON.stringify(values);
+        }),
+      );
     } else if (body !== undefined && body !== null) entry.body = String(body);
   };
   const originalFetch = globalThis.fetch;
   const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
-    record('fetch', url, init?.body ?? (input instanceof Request ? input.clone() : undefined));
+    record('fetch', url, new Request(input, init).clone());
     if (!permits(url)) throw new Error('Corpus recorder blocked an outbound request.');
     return originalFetch(input, init);
   });
