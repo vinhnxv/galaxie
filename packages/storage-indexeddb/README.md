@@ -7,7 +7,7 @@ An IndexedDB checkpoint saver for LangGraph checkpoint 1.2.0, with per-app and p
 The host derives `principalScope` from its authenticated session, never from user-controlled input. Both `appId` and `principalScope` must match `/^[A-Za-z0-9._:-]{1,128}$/`. These identifiers partition records within the database; they do not authorize access by other code on the same origin.
 
 ```ts
-import { IndexedDBSaver, StorageError } from '@galaxie/storage-indexeddb';
+import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 
 const saver = await IndexedDBSaver.open({
   appId: 'lesson-app',
@@ -17,37 +17,37 @@ const saver = await IndexedDBSaver.open({
 });
 
 // runtime, definition, graphFactory and input are host-owned.
-try {
-  const instance = await runtime.create(definition, {
-    principalScope,
-    agent: graphFactory,
-    services: { checkpointer: saver },
-  });
-  await instance.prepare();
-  await instance.start(input);
-} catch (error) {
-  if (error instanceof StorageError) {
-    // Present host-owned UI based on error.code, without displaying stored data.
-  }
-  throw error;
-} finally {
-  // Wait for executor settlement before closing the host-owned saver.
-  await runtime.dispose();
-  saver.close();
-}
+const instance = await runtime.create(definition, {
+  principalScope,
+  agent: graphFactory,
+  services: { chatModels: {}, checkpointer: saver },
+});
+await instance.prepare();
+const { runId } = await instance.start(input);
 ```
+
+The example assumes a model-free graph. Hosts with model roles supply their existing provider map in `services.chatModels` and the role routing required by their definition. `start()` returns a run ID before execution finishes. Keep the runtime and saver alive while the host handles the run's events, interactions and snapshots; observe execution-time failures through `instance.events(runId)` and the run snapshot.
+
+Only when the host tears down the session, dispose the runtime before closing the saver:
+
+```ts
+await runtime.dispose();
+saver.close();
+```
+
+Disposal cancels a nonterminal run and waits for executor settlement, so it must not run immediately after `start()` unless cancellation is intended.
 
 The saver implements `BaseCheckpointSaver`: `getTuple`, `list`, `put`, `putWrites` and `deleteThread`. The adapter already accepts it through `services.checkpointer`; no adapter change is needed. `close()` is idempotent. Opening a new saver with the same database, app and principal reads the same committed checkpoints. The host must also preserve the graph's original `thread_id` and use compatible graph code. Runtime session adoption and UI restoration are not implemented by this package.
 
 ## Storage and durability
 
-Database version 1 creates `checkpoints`, `writes`, `meta`, `inbox` and `journal`. The last two stores are empty reservations for later M3 work. Checkpoint and write keys contain the app, principal, thread, checkpoint namespace and checkpoint ID; write keys also contain the task and write index. Indexes support thread, namespace and checkpoint queries. Scoped metadata records hold the schema version and monotonic first-insertion order so cross-thread and cross-namespace listing matches `MemorySaver`, including integer-like identifiers.
+Database version 1 creates `checkpoints`, `writes`, `meta`, `inbox` and `journal`. The last two stores are empty reservations for later M3 work. Checkpoint and write keys contain the app, principal, thread, checkpoint namespace and checkpoint ID; write keys also contain the task and write index. Indexes support thread, namespace and checkpoint queries. Reads use scoped primary-key ranges because IndexedDB omits malformed secondary-index keys; records must be discovered before their routing fields can be validated. Scoped metadata records hold the schema version and monotonic first-insertion order so cross-thread and cross-namespace listing matches `MemorySaver`, including integer-like identifiers.
 
 Checkpoints, metadata and pending-write values pass through the saver's `dumpsTyped`; records retain the returned string type tag and `Uint8Array` bytes in `{ v: 1, type, bytes }` envelopes. The database holds no live graph objects. `loadsTyped` failures, unknown record/envelope versions and missing record fields reject with `corrupt`; reads never return a partially decoded tuple. Changing the serializer requires compatibility with previously stored tags and bytes.
 
 `put` and `putWrites` resolve after the transaction's `complete` event, and aborted transactions reject. Read/write transactions request `durability: 'strict'`, falling back to the browser's default only when transaction options are unsupported. Browser and device behavior still bound physical durability. Use LangGraph's `sync` durability when subsequent effects must wait for a checkpoint; `async` and `exit` retain their native engine behavior.
 
-All failures use `StorageError` with fixed messages and codes `invalid`, `corrupt`, `newer_schema`, `blocked`, `quota`, `aborted` or `unavailable`. Errors contain no keys, thread IDs, stored values or host error text, and never set `cause`. The package emits no spans, events or diagnostics. A blocked open rejects immediately and cancels its queued upgrade when the other connection closes. An older package refuses a newer database version.
+Direct saver operations reject with `StorageError`, with fixed messages and codes `invalid`, `corrupt`, `newer_schema`, `blocked`, `quota`, `aborted` or `unavailable`. Catch those errors at the direct `open` or saver call. During a runtime run, the existing adapter reports storage failures as run error events with code `executor_error` and type `StorageError`; it does not preserve the storage subtype code, and a catch around `instance.start()` does not observe those later failures. This slice does not change that adapter contract or provide quota/corruption UI. Storage errors contain no keys, thread IDs, stored values or host error text, and never set `cause`. The package emits no spans, events or diagnostics. A blocked open rejects immediately and cancels its queued upgrade when the other connection closes. An older package refuses a newer database version.
 
 ## Limits
 

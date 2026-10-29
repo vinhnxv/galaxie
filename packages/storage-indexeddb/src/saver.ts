@@ -71,11 +71,11 @@ function positive(value: unknown): value is number {
 }
 
 function sameKey(value: unknown, expected: IDBValidKey[]): boolean {
-  return (
-    Array.isArray(value) &&
-    value.length === expected.length &&
-    value.every((part, index) => part === expected[index])
-  );
+  if (!Array.isArray(value) || value.length !== expected.length) return false;
+  for (let index = 0; index < expected.length; index++) {
+    if (!Object.hasOwn(value, index) || value[index] !== expected[index]) return false;
+  }
+  return true;
 }
 
 function readCheckpoint(value: unknown): CheckpointRecord {
@@ -248,12 +248,14 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           : (await requestResult(store.openCursor(prefixRange(key.slice(0, 4)), 'prev')))?.value;
         if (raw === undefined) return undefined;
         const row = readCheckpoint(raw);
-        const index = tx.objectStore('writes').index('checkpoint');
-        const writes: unknown[] = await requestResult(index.getAll(row.key));
+        const storeWrites = tx.objectStore('writes');
+        const writes: unknown[] = await requestResult(storeWrites.getAll(prefixRange(row.key)));
         const parent: unknown[] =
           row.parentId === null
             ? []
-            : await requestResult(index.getAll(this.#key(thread, namespace, row.parentId)));
+            : await requestResult(
+                storeWrites.getAll(prefixRange(this.#key(thread, namespace, row.parentId))),
+              );
         return { row, writes: writes.map(readWrite), parent: parent.map(readWrite) };
       });
       return saved === undefined
@@ -278,13 +280,9 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
       if (id) validateKey(id);
       if (before) validateKey(before);
       const saved = await transact(this.#db, ['checkpoints', 'writes'], 'readonly', async (tx) => {
-        const query = thread === undefined ? prefixRange(this.#scope) : [...this.#scope, thread];
-        const rows: unknown[] = await requestResult(
-          tx.objectStore('checkpoints').index('thread').getAll(query),
-        );
-        const writes: unknown[] = await requestResult(
-          tx.objectStore('writes').index('thread').getAll(query),
-        );
+        const query = prefixRange(thread === undefined ? this.#scope : [...this.#scope, thread]);
+        const rows: unknown[] = await requestResult(tx.objectStore('checkpoints').getAll(query));
+        const writes: unknown[] = await requestResult(tx.objectStore('writes').getAll(query));
         return { rows: rows.map(readCheckpoint), writes: writes.map(readWrite) };
       });
       let limit = options?.limit;
@@ -407,7 +405,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
       const checkpoint = this.#key(thread, namespace, id);
       await transact(this.#db, ['writes'], 'readwrite', async (tx) => {
         const store = tx.objectStore('writes');
-        const raw: unknown[] = await requestResult(store.index('checkpoint').getAll(checkpoint));
+        const raw: unknown[] = await requestResult(store.getAll(prefixRange(checkpoint)));
         const existing = raw.map(readWrite);
         let order = existing.reduce((max, row) => Math.max(max, row.order), 0);
         for (const write of serialized) {

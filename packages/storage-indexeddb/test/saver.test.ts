@@ -369,3 +369,33 @@ it('maps quota and serialization failures without host text or partial data', as
   await expect(save(saver, config(), '001')).rejects.toEqual(new StorageError('unavailable'));
   expect(await entries(saver)).toEqual([]);
 });
+
+it.each([
+  ['writes', 'checkpoint'],
+  ['writes', 'thread'],
+  ['checkpoints', 'thread'],
+  ['checkpoints', 'namespace'],
+] as const)('rejects a sparse %s.%s routing array on every read', async (storeName, field) => {
+  const name = `galaxie-sparse-${crypto.randomUUID()}`;
+  const saver = await open(name);
+  const first = await save(saver, config(), '001');
+  await save(saver, first, '002');
+  await saver.putWrites(first, [['answer', 'from-001']], 'task');
+  const db = await openDatabase(name, 'app', 'user');
+  try {
+    await transact(db, [storeName], 'readwrite', async (tx) => {
+      const store = tx.objectStore(storeName);
+      const key: IDBValidKey[] = ['app', 'user', 'thread', '', '001'];
+      if (storeName === 'writes') key.push('task', 0);
+      const value = (await requestResult(store.get(key))) as Record<string, unknown>;
+      const routing = value[field];
+      if (!Array.isArray(routing)) throw new Error('The fixture routing array is missing.');
+      delete routing[routing.length - 1];
+      await requestResult(store.put(value));
+    });
+  } finally {
+    db.close();
+  }
+  await expect(saver.getTuple(first)).rejects.toEqual(new StorageError('corrupt'));
+  await expect(entries(saver)).rejects.toEqual(new StorageError('corrupt'));
+});

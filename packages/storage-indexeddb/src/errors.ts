@@ -30,7 +30,6 @@ export class StorageError extends Error {
   }
 }
 
-/** Drop host errors and their text at the storage boundary. */
 export function storageError(error: unknown): StorageError {
   if (error instanceof StorageError) return error;
   const name =

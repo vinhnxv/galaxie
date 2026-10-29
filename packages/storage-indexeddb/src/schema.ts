@@ -60,7 +60,6 @@ export function transact<T>(
   });
 }
 
-/** The version argument is internal, allowing blocked-upgrade tests without a public option. */
 export async function openDatabase(
   name: string,
   appId: string,
