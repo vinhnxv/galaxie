@@ -101,7 +101,6 @@ No ADR file is changed by this spike.
 
 ## Departures and limits
 
-- The supplied file defines U1–U3, not U1–U6. Those three units were implemented in file order; no replacement plan was written.
 - Node-executed TypeScript scripts use `.ts` specifiers with `allowImportingTsExtensions` because native Node cannot resolve a `.js` specifier to a `.ts` file. Browser source uses `.js` specifiers. Other strict flags are retained. Narrow assertions bridge the SDK's inconsistent optional transport declarations under `exactOptionalPropertyTypes`.
 - The MCP prototype expands the plan's abbreviated hash fields and namespace to match Accepted ADR-0011, and adds fake authentication/principal binding and `authorization` to CORS for its mandatory profile.
 - The page uses only host-authored status text and renders no model-produced props. React is not in the committed dependency set and was not added.
