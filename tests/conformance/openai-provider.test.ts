@@ -34,7 +34,7 @@ beforeAll(async () => {
     const { createHttpFixture } = await import(/* @vite-ignore */ './support/http-fixture.node.js');
     httpControl = await createHttpFixture();
     httpFixture = httpControl.fixture;
-  } else httpFixture = inject('http');
+  } else httpFixture = inject('openaiHttp');
 });
 afterAll(async () => {
   await httpControl?.close();

@@ -36,5 +36,6 @@ export interface HttpControl {
 declare module 'vitest' {
   interface ProvidedContext {
     http: HttpFixture;
+    openaiHttp: HttpFixture;
   }
 }
