@@ -285,7 +285,7 @@ test.each([
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   expect(input.value).toBe('local draft');
-    expect(container.querySelector('[data-draft]')?.textContent).toBe('local draft');
+  expect(container.querySelector('[data-draft]')?.textContent).toBe('local draft');
   await act(async () => instance.setPending(interaction(overrides)));
   expect(container.querySelector('input')).not.toBe(input);
   expect(container.querySelector('input')?.value).toBe('');
