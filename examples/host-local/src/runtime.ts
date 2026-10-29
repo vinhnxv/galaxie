@@ -111,6 +111,12 @@ export function createLocalHost(models: LocalModels): LocalHost {
     appId: hostAppId,
     executors: [createLangGraphAdapter()],
     outputSafety,
+    ...(import.meta.env.DEV
+      ? {
+          developmentWarnings: (warning) =>
+            console.warn('[galaxie]', warning.code, warning.name ?? '', warning.area ?? ''),
+        }
+      : {}),
   });
   let saver: Promise<IndexedDBSaver> | undefined;
   let storageStatus: StorageStatus = 'ready';
