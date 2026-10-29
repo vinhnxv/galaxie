@@ -154,7 +154,9 @@ for (const file of files('packages/models/src', '.ts')) {
       specifier.startsWith('@langchain/core/') ||
       (specifier === '@mlc-ai/web-llm' &&
         !hasTypes &&
-        ((file === 'packages/models/src/webllm/engine.ts' && dynamic) ||
+        (((file === 'packages/models/src/webllm/engine.ts' ||
+          file === 'packages/models/src/webllm/cache.ts') &&
+          dynamic) ||
           (file === 'packages/models/src/webllm/worker.ts' && !dynamic)))
     )
       continue;

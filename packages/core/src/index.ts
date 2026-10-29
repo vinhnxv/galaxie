@@ -79,10 +79,13 @@ export {
   type Transitions,
 } from './lifecycle.js';
 export type {
+  ModelAvailability,
+  ModelAvailabilityRequest,
   ModelCall,
   ModelConsentRequest,
   ModelCredentialRequest,
   ModelDescriptor,
+  ModelDownloadRequest,
   ModelFeature,
   ModelPolicy,
   ModelPort,
@@ -94,6 +97,7 @@ export type {
   ModelRoute,
   ModelRouting,
   ModelUsage,
+  PublishedModelRoute,
   SelectedModelRoute,
 } from './models.js';
 export type {
