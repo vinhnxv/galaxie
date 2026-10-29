@@ -23,13 +23,14 @@ import type {
   PendingInteraction,
   Submission,
 } from './interactions.js';
-import { checkInteractionUrls } from './interactions.js';
+import { checkInteractionBindings, checkInteractionUrls } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
 import type { PublishedModelRoute, SelectedModelRoute } from './models.js';
 import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
+import { validateSync } from './schema.js';
 import { type RunInstrumentation, startRunTrace } from './tracing.js';
 
 const SETTLE_TIMEOUT_MS = 10_000;
@@ -309,6 +310,11 @@ export function createAgentInstance(
         // Raw stream events remain untrusted engine output and must never be rendered as UI.
         if (!checkInteractionUrls(event.interaction.props, instrumentation.urlAllowlist)) {
           failRun(run, toErrorInfo('denied'));
+          report({ kind: 'interaction_rejected', runId: run.runId });
+          return;
+        }
+        if (options.ui !== undefined && !checkInteractionBindings(options.ui, event.interaction)) {
+          failRun(run, toErrorInfo('unsupported'));
           report({ kind: 'interaction_rejected', runId: run.runId });
           return;
         }
@@ -607,12 +613,18 @@ export function createAgentInstance(
       const action = event.action;
       if (typeof action !== 'string' || action.length === 0)
         return Promise.resolve(rejected('invalid'));
+      const actions = options.ui?.components[pending.component]?.actions;
+      if (options.ui !== undefined && (actions === undefined || !Object.hasOwn(actions, action)))
+        return Promise.resolve(rejected('invalid'));
       let payload: unknown;
       try {
         payload = JSON.parse(run.budget.payload(event.payload));
       } catch (error) {
         return Promise.resolve(rejected(isGalaxieError(error) ? error.code : 'invalid'));
       }
+      const payloadSchema = actions?.[action]?.payload;
+      if (payloadSchema !== undefined && !validateSync(payloadSchema, payload).ok)
+        return Promise.resolve(rejected('invalid'));
       const parent = context.active();
       run.dispatching = interactionId;
       const checking = (async (): Promise<DispatchReceipt> => {

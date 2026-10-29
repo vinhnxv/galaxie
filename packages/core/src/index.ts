@@ -67,10 +67,16 @@ export type {
   InteractionRequest,
   PendingInteraction,
   Submission,
+  UiBindings,
   UiRequirements,
   UserInteractionEvent,
 } from './interactions.js';
-export { checkInteractionUrls, isAllowedUrl, parseInteractionRequest } from './interactions.js';
+export {
+  checkInteractionUrls,
+  isAllowedUrl,
+  isComponentId,
+  parseInteractionRequest,
+} from './interactions.js';
 export {
   INSTANCE_TRANSITIONS,
   type InstanceState,
@@ -124,5 +130,7 @@ export {
   type Runtime,
   type RuntimeOptions,
 } from './runtime.js';
-export type { Infer, InferInput, Schema } from './schema.js';
+export type { Infer, InferInput, Schema, StandardSchema } from './schema.js';
+export { isStandardSchema, validateSync } from './schema.js';
 export type { RunTrace, TraceHandle, TraceResult, TraceStep } from './trace.js';
+export { normalizeUrlAllowlist } from './urls.js';
