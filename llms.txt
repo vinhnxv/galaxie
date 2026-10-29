@@ -14,6 +14,8 @@
 
 ## Host guides and device evidence
 
+- [MVP exit record](docs/mvp-exit-record.md): AT-01 through AT-36 evidence, gaps and decision inputs; the maintainer's decision is pending.
+- [Unsupported features](docs/unsupported.md): current exclusions, implementation limits and unverified paths.
 - [Host integration](docs/guides/host-integration.md): CSP, models, persistence, ownership, logout, approvals and host proxies.
 - [Development tracing](docs/guides/tracing.md): filtered spans and a host-run collector; no tracing secrets in the browser.
 - [Device matrix](docs/device-matrix.md): automated mock/fake coverage and limited real-device demonstrations.
