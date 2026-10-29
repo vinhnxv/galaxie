@@ -48,8 +48,6 @@ declare global {
   }
 }
 window.probes = probes;
-// The page displays only host-authored text. Model replies stay in the probe's
-// local variables and never enter the DOM, events or result recordings.
 document
   .querySelector('output')
   ?.replaceChildren(document.createTextNode('Loopback probes ready.'));

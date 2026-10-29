@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 // RFC 8785: ECMAScript number/string serialization and UTF-16 property ordering.
-// Reject non-I-JSON input instead of silently dropping fields or repairing Unicode.
 export function canonical(value: unknown): string {
   if (value === null || typeof value === 'boolean') return JSON.stringify(value);
   if (typeof value === 'number' && Number.isFinite(value)) return JSON.stringify(value);
