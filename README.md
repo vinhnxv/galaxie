@@ -62,6 +62,7 @@ No test suite or review proves that software is secure. The known limits are lis
 - [Framework overview](docs/framework-overview.md): role, audiences and the roadmap at a glance.
 - [Architecture decision records](docs/adr/README.md): one file per decision.
 - [System design](docs/system-design.md): components, packages, contracts and runtime flows.
+- [Security review](docs/security-review.md): ADR-0012 and OWASP LLM Top 10 controls, test evidence and residual risks, including the mock-only [prompt injection corpus](tests/injection-corpus/README.md).
 
 ## Roadmap
 

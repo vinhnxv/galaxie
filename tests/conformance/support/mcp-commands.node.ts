@@ -24,3 +24,13 @@ export const mcpAdminCommand: BrowserCommand<[McpAction], McpAdminState> = async
   if (control === undefined) throw new Error('MCP test fixture is unavailable.');
   return control.admin(action);
 };
+
+export const mcpCorpusAdminCommand: BrowserCommand<[McpAction], McpAdminState> = async (
+  { project },
+  action,
+) => {
+  const fixture = project.getProvidedContext().mcpCorpus;
+  const control = mcpFixtures(project).get(fixture.url);
+  if (control === undefined) throw new Error('Corpus MCP test fixture is unavailable.');
+  return control.admin(action);
+};
