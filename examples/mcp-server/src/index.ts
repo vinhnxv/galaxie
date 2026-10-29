@@ -26,11 +26,13 @@ export interface ReferenceServer {
     changeDescription(name: string, description: string): Promise<void>;
     forgetSessions(): Promise<void>;
     requestSampling(): void;
+    requestElicitation(): void;
     lastHeaders(): IncomingHttpHeaders;
     counters(): Record<string, number>;
     lastMeta(): Record<string, unknown>;
     callCount(): number;
     samplingCode(): number | undefined;
+    elicitationCode(): number | undefined;
     cancellations(): number;
     sessionCount(): number;
   };
@@ -91,6 +93,8 @@ export async function startMcpServer(options: McpServerOptions): Promise<Referen
   let calls = 0;
   let sampling = false;
   let samplingCode: number | undefined;
+  let elicitation = false;
+  let elicitationCode: number | undefined;
   let cancellations = 0;
   const forgetSessions = async (): Promise<void> => {
     const active = [...sessions.values()];
@@ -184,6 +188,22 @@ export async function startMcpServer(options: McpServerOptions): Promise<Referen
             { relatedRequestId: extra.requestId },
           );
         }
+        if (elicitation) {
+          elicitation = false;
+          // Send directly so the test exercises rejection even without advertised elicitation.
+          await transport.send(
+            {
+              jsonrpc: '2.0',
+              id: 'elicitation-probe',
+              method: 'elicitation/create',
+              params: {
+                message: 'Probe.',
+                requestedSchema: { type: 'object', properties: {} },
+              },
+            },
+            { relatedRequestId: extra.requestId },
+          );
+        }
         if (call.params.name === 'lesson.lookup') {
           const parsed = lesson.safeParse(call.params.arguments);
           if (parsed.success)
@@ -230,6 +250,8 @@ export async function startMcpServer(options: McpServerOptions): Promise<Referen
       transport.onmessage = (message, extra) => {
         if ('id' in message && message.id === 'sampling-probe' && 'error' in message)
           samplingCode = message.error.code;
+        else if ('id' in message && message.id === 'elicitation-probe' && 'error' in message)
+          elicitationCode = message.error.code;
         else receive?.(message, extra);
       };
       await transport.handleRequest(request, response);
@@ -273,12 +295,17 @@ export async function startMcpServer(options: McpServerOptions): Promise<Referen
         sampling = true;
         samplingCode = undefined;
       },
+      requestElicitation: () => {
+        elicitation = true;
+        elicitationCode = undefined;
+      },
       lastHeaders: () => ({ ...headers }),
       counters: () =>
         Object.fromEntries([...effects].map(([principal, journal]) => [principal, journal.size])),
       lastMeta: () => structuredClone(meta),
       callCount: () => calls,
       samplingCode: () => samplingCode,
+      elicitationCode: () => elicitationCode,
       cancellations: () => cancellations,
       sessionCount: () => sessions.size,
     },

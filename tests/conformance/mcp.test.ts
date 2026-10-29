@@ -66,16 +66,27 @@ const policy = {
 function client(
   limits?: McpLimits,
   url?: string,
-): { client: McpServer; bindings: Record<string, CapabilityBinding>; events: McpEvent[] } {
+): {
+  client: McpServer;
+  bindings: Record<string, CapabilityBinding>;
+  events: McpEvent[];
+  initializationCapabilities: unknown[];
+} {
   const events: McpEvent[] = [];
+  const initializationCapabilities: unknown[] = [];
   const instance = createMcpServer({
     id: 'lessons',
     url: url ?? fixture.url,
     destination: 'user-device',
     token: ({ principalScope }) => (principalScope === 'two' ? fixture.otherToken : fixture.token),
     ...(limits === undefined ? {} : { limits }),
-    fetch: (url, init) =>
-      fetch(
+    fetch: (url, init) => {
+      if (typeof init?.body === 'string') {
+        const request = JSON.parse(init.body);
+        if (request.method === 'initialize')
+          initializationCapabilities.push(request.params.capabilities);
+      }
+      return fetch(
         url,
         typeof window === 'undefined'
           ? {
@@ -83,7 +94,8 @@ function client(
               headers: { ...Object.fromEntries(new Headers(init?.headers)), origin: MCP_ORIGIN },
             }
           : init,
-      ),
+      );
+    },
     onEvent: (event) => {
       events.push(event);
     },
@@ -92,6 +104,7 @@ function client(
   return {
     client: instance,
     events,
+    initializationCapabilities,
     bindings: instance.bindings({
       'lesson.lookup': { ...policy, pin: fixture.pins['lesson.lookup'] as string },
       'text.echo': { ...policy, pin: fixture.pins['text.echo'] as string, result: 'text' },
@@ -299,6 +312,42 @@ test('AT-33 rejects sampling on the call SSE stream', async () => {
     server: 'lessons',
     method: 'sampling/createMessage',
   });
+});
+
+test('AT-33 rejects elicitation on the call SSE stream without exposing its prompt', async () => {
+  function serialize(value: unknown): string {
+    return JSON.stringify(value, (_key, item: unknown) =>
+      item instanceof Error
+        ? Object.fromEntries(
+            Object.getOwnPropertyNames(item).map((key) => [key, Reflect.get(item, key)]),
+          )
+        : item,
+    );
+  }
+  expect(serialize([{ kind: 'listener_threw', error: new Error('Probe.') }])).toContain('Probe.');
+  const { bindings, events, initializationCapabilities } = client();
+  await admin('elicitation');
+  const result = await run(bindings);
+  expect(result.error).toBeUndefined();
+  expect(result.answer).toEqual({ lessonId: 'lesson-1', title: 'Practice lesson' });
+  await expect.poll(async () => (await admin('state')).elicitationCode).toBe(-32601);
+  expect(initializationCapabilities).toEqual([{}]);
+  expect(events).toContainEqual({
+    code: 'mcp_server_request_rejected',
+    server: 'lessons',
+    method: 'elicitation/create',
+  });
+  expect(
+    serialize([
+      result.answer,
+      events,
+      result.diagnostics,
+      result.events,
+      result.spans,
+      result.snapshot,
+      String(result.error),
+    ]),
+  ).not.toContain('Probe.');
 });
 
 test('AT-33 rejects a bad Origin with 403; browsers observe the CORS failure', async () => {

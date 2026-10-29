@@ -30,6 +30,23 @@ Additional tests in this directory run on both Node and Chromium unless their fi
 
 The credential fixture uses native `nostream` and projects replies away so its events/state contain no model text; this is not SDK stream redaction. Host-only `DiagnosticEvent.error` may hold raw host exceptions on other paths and must never be forwarded to traces or public surfaces. The scan covers these fixtures and build exports, not arbitrary host code or session exports. Page code receives credentials; XSS or a malicious same-origin dependency can read them. None of these tests uses real inference, weights, the real WebLLM bundle or a real `LanguageModel` global. Goldens, cases and the compatibility matrix are unchanged.
 
+## MCP server profile
+
+[`mcp.test.ts`](mcp.test.ts) exercises the broker and the loopback
+[`reference server`](../../examples/mcp-server/src/index.ts) on Node and headless
+Chromium. AT-33 covers protocol headers, re-initialization after a forgotten
+session, principal isolation, sign-out and bad-Origin rejection. Separate
+sampling and elicitation probes send unadvertised server requests on the tool-call
+SSE stream; each receives `-32601` while the tool call completes.
+
+`AT-33 rejects elicitation on the call SSE stream without exposing its prompt`
+also checks that the client's initialization advertises neither sampling nor
+elicitation. The probe text is absent from the agent result, MCP events, runtime
+events, spans, diagnostics and snapshot. The shared fixture controls reach the
+server directly on Node and through Vitest browser commands on Chromium. These
+tests use mock tools and no model inference or external server; they add no
+elicitation support and change no goldens or compatibility-matrix entries.
+
 ## HTTP tagging, auth and CORS
 
 [`http-integration.test.ts`](http-integration.test.ts) exercises `httpCapability` through a real runtime, LangGraph adapter, broker and routed mock model. It covers AT-29's agent/run attribution on reads and tagged sensitive writes rejected with 403, including host header override/removal attempts. AT-16 covers a real 401 without a token and success with a host-supplied bearer token. Attribution is not authorization; backends still own authorization and custom bindings must forward attribution.
