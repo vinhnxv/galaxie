@@ -90,9 +90,7 @@ export function createMcpServer(supplied: McpServerOptions): McpServer {
     emit(event): void {
       try {
         supplied.onEvent?.(Object.freeze({ ...event, server: supplied.id }));
-      } catch {
-        /* Host observers cannot change dispatch. */
-      }
+      } catch {}
     },
   };
   const entries = new Map<string, McpToolBinding>();

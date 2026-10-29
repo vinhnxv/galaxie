@@ -16,15 +16,15 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { canonical, toolPin } from './canonical.js';
 import { failure } from './events.js';
+import { WireLimits } from './limits.js';
 import type { McpToolBinding, SessionOptions } from './server.js';
 
 interface Connection {
   readonly client: Client;
-  readonly transport: StreamableHTTPClientTransport;
+  readonly limits: WireLimits;
   expired: boolean;
 }
 
-/** A principal owns one serial lane, including token acquisition and all pin checks. */
 export class PrincipalSession {
   readonly #options: SessionOptions;
   readonly #principal: string;
@@ -66,6 +66,11 @@ export class PrincipalSession {
       this.#options.emit({ code: 'mcp_server_request_rejected', method: request.method });
       throw new McpError(-32601, 'Method not found');
     };
+    const limits = new WireLimits(
+      this.#options.limits.messageBytes,
+      this.#options.limits.idleMs,
+      () => this.#options.emit({ code: 'mcp_limit_exceeded' }),
+    );
     const transport = new StreamableHTTPClientTransport(new URL(this.#options.url), {
       reconnectionOptions: {
         maxRetries: 0,
@@ -94,10 +99,10 @@ export class PrincipalSession {
           // SDK HTTP errors embed the response body; discard it before SDK error construction.
           return new Response(null, { status: response.status });
         }
-        return response;
+        return limits.wrap(response, init?.method === 'POST');
       },
     });
-    const connection: Connection = { client, transport, expired: false };
+    const connection: Connection = { client, limits, expired: false };
     this.#connection = connection;
     client.setNotificationHandler(ToolListChangedNotificationSchema, () => {
       void this.#serialize(async () => {
@@ -110,7 +115,12 @@ export class PrincipalSession {
       }).catch(() => {});
     });
     // SDK sessionId accessor includes undefined unlike Transport's optional property.
-    await client.connect(transport as Parameters<Client['connect']>[0], { signal, timeout });
+    await limits.request(signal, (requestSignal) =>
+      client.connect(transport as Parameters<Client['connect']>[0], {
+        signal: requestSignal,
+        timeout,
+      }),
+    );
     if (transport.protocolVersion !== '2025-11-25') {
       this.#options.emit({ code: 'mcp_protocol_mismatch' });
       await this.#drop();
@@ -123,40 +133,40 @@ export class PrincipalSession {
     connection: Connection,
     signal: AbortSignal,
     timeout: number,
-  ): Promise<Map<string, Tool>> {
+  ): Promise<Map<string, string>> {
     const tools = new Map<string, Tool>();
     let cursor: string | undefined;
-    let bytes = 0;
-    for (let page = 0; page < 10; page++) {
-      const result = await connection.client.request(
-        { method: 'tools/list', params: cursor === undefined ? {} : { cursor } },
-        ListToolsResultSchema,
-        { signal, timeout },
-      );
-      bytes += new TextEncoder().encode(canonical(result)).byteLength;
-      if (bytes > this.#options.limits.messageBytes) {
-        this.#options.emit({ code: 'mcp_limit_exceeded' });
-        throw failure();
+    connection.limits.beginListing();
+    try {
+      for (let page = 0; page < 10; page++) {
+        const result = await connection.limits.request(signal, (requestSignal) =>
+          connection.client.request(
+            { method: 'tools/list', params: cursor === undefined ? {} : { cursor } },
+            ListToolsResultSchema,
+            { signal: requestSignal, timeout },
+          ),
+        );
+        for (const tool of result.tools) {
+          if (tools.has(tool.name)) throw failure();
+          tools.set(tool.name, tool);
+        }
+        cursor = result.nextCursor;
+        if (cursor === undefined) {
+          const pins = new Map<string, string>();
+          for (const [name, tool] of tools)
+            if (this.#entries.has(name)) pins.set(name, await toolPin(tool));
+          for (const [name, entry] of this.#entries) this.#pin(name, entry, pins);
+          return pins;
+        }
       }
-      for (const tool of result.tools) {
-        if (tools.has(tool.name)) throw failure();
-        tools.set(tool.name, tool);
-      }
-      cursor = result.nextCursor;
-      if (cursor === undefined) {
-        for (const [name, entry] of this.#entries) await this.#pin(name, entry, tools);
-        return tools;
-      }
+      throw failure();
+    } finally {
+      connection.limits.endListing();
     }
-    throw failure();
   }
-  async #pin(
-    name: string,
-    entry: McpToolBinding,
-    tools: ReadonlyMap<string, Tool>,
-  ): Promise<boolean> {
+  #pin(name: string, entry: McpToolBinding, tools: ReadonlyMap<string, string>): boolean {
     const tool = tools.get(name);
-    const valid = tool !== undefined && (await toolPin(tool)) === entry.pin;
+    const valid = tool !== undefined && tool === entry.pin;
     if (!valid)
       this.#options.emit({
         code: tool === undefined ? 'mcp_tool_missing' : 'mcp_pin_mismatch',
@@ -167,6 +177,7 @@ export class PrincipalSession {
   async #drop(): Promise<void> {
     const connection = this.#connection;
     this.#connection = undefined;
+    connection?.limits.close();
     await connection?.client.close().catch(() => {});
   }
   async close(): Promise<void> {
@@ -192,23 +203,25 @@ export class PrincipalSession {
             if (connection.expired) throw new StreamableHTTPError(404, 'Session reset');
             await this.#credential(signal);
             const tools = await this.#list(connection, signal, entry.timeoutMs);
-            if (!(await this.#pin(tool, entry, tools))) throw failure();
+            if (!this.#pin(tool, entry, tools)) throw failure();
             if (signal.aborted) throw failure('cancelled');
-            const result = await connection.client.request(
-              {
-                method: 'tools/call',
-                params: {
-                  name: tool,
-                  arguments: input as Record<string, unknown>,
-                  _meta: {
-                    'galaxie.dev/agent': `${context.agent.id}@${context.agent.version}`,
-                    'galaxie.dev/run': context.runId,
-                    'galaxie.dev/effect': context.effectId,
+            const result = await connection.limits.request(signal, (requestSignal) =>
+              connection.client.request(
+                {
+                  method: 'tools/call',
+                  params: {
+                    name: tool,
+                    arguments: input as Record<string, unknown>,
+                    _meta: {
+                      'galaxie.dev/agent': `${context.agent.id}@${context.agent.version}`,
+                      'galaxie.dev/run': context.runId,
+                      'galaxie.dev/effect': context.effectId,
+                    },
                   },
                 },
-              },
-              CallToolResultSchema,
-              { signal, timeout: entry.timeoutMs },
+                CallToolResultSchema,
+                { signal: requestSignal, timeout: entry.timeoutMs },
+              ),
             );
             if (result.isError) {
               this.#options.emit({ code: 'mcp_tool_error', tool });
@@ -216,14 +229,14 @@ export class PrincipalSession {
             }
             if (entry.result === 'text') {
               if (result.content.some((block) => block.type !== 'text')) throw failure('invalid');
-              return {
+              return this.#result({
                 text: result.content
                   .map((block) => (block.type === 'text' ? block.text : ''))
                   .join(''),
-              };
+              });
             }
             if (result.structuredContent === undefined) throw failure('invalid');
-            return result.structuredContent;
+            return this.#result(result.structuredContent);
           } catch (error) {
             if (!(error instanceof StreamableHTTPError && error.code === 404)) throw error;
             this.#options.emit({ code: 'mcp_session_reset', tool });
@@ -233,6 +246,7 @@ export class PrincipalSession {
         }
         throw failure();
       } catch (error) {
+        if (signal.aborted || this.#connection?.limits.signal.aborted) await this.#drop();
         if (signal.aborted) throw failure('cancelled');
         throw failure(
           error instanceof GalaxieError
@@ -243,5 +257,12 @@ export class PrincipalSession {
         );
       }
     });
+  }
+  #result(value: unknown): unknown {
+    if (new TextEncoder().encode(canonical(value)).byteLength > this.#options.limits.resultBytes) {
+      this.#options.emit({ code: 'mcp_limit_exceeded' });
+      throw failure();
+    }
+    return value;
   }
 }
