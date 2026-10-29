@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { type ModelCall, type ModelUsage, toErrorInfo } from '@galaxie/core';
+import {
+  GalaxieError,
+  type ModelCall,
+  type ModelPort,
+  type ModelUsage,
+  toErrorInfo,
+} from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
@@ -17,7 +23,7 @@ import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { BuiltInAIChatModel } from '../../models/src/builtin-ai/chat-model.js';
-import { MockChatModel } from '../../models/src/mock.js';
+import { createMockLatch, MockChatModel } from '../../models/src/mock.js';
 import { WebLLMChatModel } from '../../models/src/webllm/chat-model.js';
 import { createWebLLMEngine } from '../../models/src/webllm/engine.js';
 import {
@@ -106,6 +112,7 @@ function routed(
       usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
     },
   }),
+  repairAttempts = 0,
 ) {
   const end = vi.fn<(usage?: ModelUsage) => void>();
   const fail = vi.fn<() => void>();
@@ -117,7 +124,11 @@ function routed(
     outputSafetyOutcome: 'unset',
     checkOutput: async () => {},
   };
-  const begin = vi.fn(async () => lease);
+  const begin = vi.fn<ModelPort['begin']>(async (_role, options) => {
+    if ((options?.repairAttempt ?? 0) > repairAttempts)
+      throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+    return lease;
+  });
   const handler = new LangGraphTraceHandler({
     recordsText: false,
     start: () => ({ end: () => {} }),
@@ -491,6 +502,72 @@ class StructuredReplyModel extends BaseChatModel {
 }
 
 const answerSchema = z.object({ answer: z.literal('yes') });
+test('structured repair forwards the original messages, invalid reply and fixed instruction through routing', async () => {
+  const instruction =
+    'The previous reply did not match the required JSON Schema. Reply again with only JSON that matches the schema.';
+  const provider = new MockChatModel({
+    hello: { id: 'invalid', text: 'invalid-reply-canary' },
+    [instruction]: { id: 'valid', text: '{"answer":"yes"}' },
+  });
+  const generate = vi.spyOn(provider, '_generate');
+  const fixture = routed(provider, 1);
+  const messages = [new HumanMessage('hello')];
+  expect(await fixture.model.withStructuredOutput(answerSchema).invoke(messages)).toEqual({
+    answer: 'yes',
+  });
+  expect(provider.calls).toBe(2);
+  expect(generate.mock.calls[1]?.[0].map((message) => [message.type, message.content])).toEqual([
+    ['human', 'hello'],
+    ['ai', 'invalid-reply-canary'],
+    ['human', instruction],
+  ]);
+  expect(messages).toHaveLength(1);
+  expect(fixture.begin).toHaveBeenNthCalledWith(2, 'assistant', {
+    requires: ['structured-output'],
+    repairAttempt: 1,
+  });
+  expect(generate.mock.calls.map(([, options]) => Reflect.get(options, 'jsonSchema'))).toEqual([
+    toJsonSchema(answerSchema),
+    toJsonSchema(answerSchema),
+  ]);
+  expect(fixture.end).toHaveBeenCalledTimes(2);
+});
+test.each(['invoke', 'stream'] as const)(
+  'caller abort during a structured %s repair rejects without another dispatch',
+  async (mode) => {
+    const latch = createMockLatch();
+    const provider = new MockChatModel({
+      hello: { id: 'first', text: 'not json' },
+      'The previous reply did not match the required JSON Schema. Reply again with only JSON that matches the schema.':
+        {
+          id: 'repair',
+          text: 'still not json',
+          wait: latch,
+        },
+    });
+    const fixture = routed(provider, 2);
+    const structured = fixture.model.withStructuredOutput(answerSchema, { includeRaw: true });
+    const controller = new AbortController();
+    const reason = new Error('Host cancelled the structured call.');
+    const waiting = (async () => {
+      if (mode === 'invoke') return structured.invoke('hello', { signal: controller.signal });
+      const results = [];
+      for await (const result of await structured.stream('hello', { signal: controller.signal }))
+        results.push(result);
+      return results;
+    })();
+    const rejected = expect(waiting).rejects.toBe(reason);
+    try {
+      await latch.entered;
+      controller.abort(reason);
+      await rejected;
+      expect(provider.calls).toBe(2);
+      expect(fixture.begin).toHaveBeenCalledTimes(2);
+    } finally {
+      latch.release();
+    }
+  },
+);
 test.each(['zod', 'standard', 'json'] as const)(
   'routed structured output validates %s schemas and forwards constrained decoding',
   async (kind) => {

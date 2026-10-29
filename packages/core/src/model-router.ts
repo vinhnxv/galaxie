@@ -229,7 +229,9 @@ export class ModelRouter {
         ) ||
         !Number.isInteger(route.maxTokens) ||
         route.maxTokens < 1 ||
-        (route.maxCost !== undefined && !nonnegative(route.maxCost))
+        (route.maxCost !== undefined && !nonnegative(route.maxCost)) ||
+        (route.repairAttempts !== undefined &&
+          (!Number.isSafeInteger(route.repairAttempts) || route.repairAttempts < 0))
       )
         throw failure('invalid');
       let unknownPrice = false;
@@ -496,6 +498,21 @@ export class ModelRouter {
         const compiled = this.#roles.get(role);
         if (compiled === undefined) throw failure('unavailable');
         const { route, requirements } = compiled;
+        const repairAttempt = options?.repairAttempt;
+        if (repairAttempt !== undefined) {
+          if (
+            !Number.isSafeInteger(repairAttempt) ||
+            repairAttempt < 1 ||
+            repairAttempt > (route.repairAttempts ?? 0)
+          )
+            throw failure('invalid');
+          try {
+            run.budget.reserveRepair();
+          } catch (error) {
+            if (error instanceof BudgetExceeded) run.failBudget(error.budget);
+            throw error;
+          }
+        }
         const requires = options?.requires;
         if (
           requires !== undefined &&

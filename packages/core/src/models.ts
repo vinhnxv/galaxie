@@ -55,6 +55,8 @@ export interface ModelRoute extends DestinationAllowlist {
   readonly maxTokens: number;
   /** Reservation required only when a listed provider has unknown pricing (ADR-0006). */
   readonly maxCost?: number;
+  /** Maximum repair calls per routed structured invocation; defaults to zero. */
+  readonly repairAttempts?: number;
 }
 
 /** Public notice of the provider and final destination used by a call (ADR-0006). */
@@ -173,7 +175,12 @@ export interface ModelPort {
   /** Selects, obtains consent and reserves before dispatch (ADR-0006). */
   begin(
     role: ModelRoleName,
-    options?: { readonly signal?: AbortSignal; readonly requires?: readonly ModelFeature[] },
+    options?: {
+      readonly signal?: AbortSignal;
+      readonly requires?: readonly ModelFeature[];
+      /** One-based repair index within a structured invocation. */
+      readonly repairAttempt?: number;
+    },
   ): Promise<ModelCall>;
 }
 

@@ -88,6 +88,101 @@ test('selection uses the first eligible provider and local calls never request c
   });
   expect(consent).not.toHaveBeenCalled();
 });
+test.each([-1, 1.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1, '1', null])(
+  'repair limit rejects malformed value %s',
+  (repairAttempts) => {
+    expect(() =>
+      fixture(
+        configuration(
+          { local },
+          {
+            roles: {
+              assistant: {
+                providers: ['local'],
+                allow: ['in-browser'],
+                maxTokens: 1,
+                repairAttempts: repairAttempts as number,
+              },
+            },
+          },
+        ) as ModelRouting,
+      ),
+    ).toThrowError(
+      expect.objectContaining({ code: 'invalid', message: 'The request is invalid.' }),
+    );
+  },
+);
+test.each([undefined, 0])(
+  'repair disabled by %s refuses before routing side effects',
+  async (repairAttempts) => {
+    const availability = vi.fn(() => ({ status: 'available' as const }));
+    const consent = vi.fn(() => true);
+    const { router, run } = fixture(
+      configuration(
+        { remote },
+        {
+          availability,
+          consent,
+          roles: {
+            assistant: {
+              providers: ['remote'],
+              allow: ['third-party'],
+              maxTokens: 1,
+              ...(repairAttempts === undefined ? {} : { repairAttempts }),
+            },
+          },
+        },
+      ),
+    );
+    await expect(router.port(run).begin('assistant', { repairAttempt: 1 })).rejects.toMatchObject({
+      code: 'invalid',
+    });
+    expect(availability).not.toHaveBeenCalled();
+    expect(consent).not.toHaveBeenCalled();
+    expect(run.selectedRouteChanged).not.toHaveBeenCalled();
+    expect(run.failBudget).not.toHaveBeenCalled();
+  },
+);
+test('repair claims enforce per-call and shared run limits before reserving a model', async () => {
+  const { router, run } = fixture(
+    configuration(
+      { local },
+      {
+        roles: {
+          assistant: {
+            providers: ['local'],
+            allow: ['in-browser'],
+            maxTokens: 1,
+            repairAttempts: 2,
+          },
+        },
+      },
+    ),
+    { repairAttempts: 2, toolCalls: 0, tokens: 3 },
+  );
+  const port = router.port(run);
+  (await port.begin('assistant')).end();
+  (await port.begin('assistant', { repairAttempt: 1 })).end();
+  (await port.begin('assistant', { repairAttempt: 2 })).end();
+  await expect(port.begin('assistant', { repairAttempt: 3 })).rejects.toMatchObject({
+    code: 'invalid',
+  });
+  await expect(port.begin('assistant', { repairAttempt: 1 })).rejects.toMatchObject({
+    code: 'budget_exceeded',
+    budget: 'repairAttempts',
+  });
+  expect(run.failBudget).toHaveBeenCalledExactlyOnceWith('repairAttempts');
+});
+test.each([0, -1, 1.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1])(
+  'repair claim rejects invalid index %s',
+  async (repairAttempt) => {
+    const { router, run } = fixture();
+    await expect(router.port(run).begin('assistant', { repairAttempt })).rejects.toMatchObject({
+      code: 'invalid',
+    });
+    expect(run.selectedRouteChanged).not.toHaveBeenCalled();
+  },
+);
 test('selection skips missing features and languages and compares primary subtags', async () => {
   const providers = {
     missingFeature: { ...local, features: [] },
