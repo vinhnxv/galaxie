@@ -9,6 +9,7 @@
 
 ## 1. What exists today
 
+- **MVP evidence:** the [exit record](mvp-exit-record.md) maps AT-01 through AT-36 to existing evidence and gaps, and [unsupported features](unsupported.md) lists current limits and unverified paths; the maintainer's Go/Revise decision is pending.
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
 - **`packages/core`:** framework-neutral contracts and four M1 runtime slices: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, model routing with consent and per-call credentials, sticky labels, argument shapes, finite budgets, interrupt dispatch and resume, and allowlisted OpenTelemetry spans. M3 adds an optional durable recovery port, inbox reconciliation and a write-effect journal (§6, §8.1–§8.3). The M1 exit controls add interaction URL policy and development trace text filtered by live labels and destination (§6, §9).
 - **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
