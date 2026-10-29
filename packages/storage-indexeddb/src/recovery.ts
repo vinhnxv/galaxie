@@ -3,6 +3,7 @@
 
 import { StorageError } from './errors.js';
 import { prefixRange, validateKey } from './keys.js';
+import { touchSession } from './retention.js';
 import { requestResult, storageOperation, transact } from './schema.js';
 
 export type RecoveryValue =
@@ -122,7 +123,8 @@ export class IndexedDBRecovery {
     return storageOperation(this.#db, async () => {
       const key = this.#key(sessionId, entry.interactionId);
       const saved = submission({ ...entry, status: 'accepted' }, entry.interactionId);
-      return transact(this.#db, ['inbox'], 'readwrite', async (tx) => {
+      return transact(this.#db, ['inbox', 'meta'], 'readwrite', async (tx) => {
+        await touchSession(tx, this.#scope, sessionId);
         const store = tx.objectStore('inbox');
         const existing: unknown = await requestResult(store.get(key));
         if (existing !== undefined) {
@@ -138,7 +140,8 @@ export class IndexedDBRecovery {
   async consumeSubmission(sessionId: string, interactionId: string): Promise<void> {
     return storageOperation(this.#db, async () => {
       const key = this.#key(sessionId, interactionId);
-      await transact(this.#db, ['inbox'], 'readwrite', async (tx) => {
+      await transact(this.#db, ['inbox', 'meta'], 'readwrite', async (tx) => {
+        await touchSession(tx, this.#scope, sessionId);
         const store = tx.objectStore('inbox');
         const existing: unknown = await requestResult(store.get(key));
         if (existing === undefined) return;
@@ -190,7 +193,8 @@ export class IndexedDBRecovery {
     return storageOperation(this.#db, async () => {
       const key = this.#key(sessionId, effectId);
       const saved = effect(record);
-      await transact(this.#db, ['journal'], 'readwrite', async (tx) => {
+      await transact(this.#db, ['journal', 'meta'], 'readwrite', async (tx) => {
+        await touchSession(tx, this.#scope, sessionId);
         const store = tx.objectStore('journal');
         const existing: unknown = await requestResult(store.get(key));
         if (existing !== undefined && effect(envelope(existing)).status === 'succeeded') return;

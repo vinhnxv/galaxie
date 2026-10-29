@@ -32,6 +32,14 @@ import {
 } from './keys.js';
 import { IndexedDBRecovery } from './recovery.js';
 import {
+  deleteSessionRecords,
+  type SweepOptions,
+  type SweepResult,
+  storageClock,
+  sweep,
+  touchSession,
+} from './retention.js';
+import {
   assertConnection,
   manageConnection,
   observeError,
@@ -60,6 +68,7 @@ interface CheckpointRecord {
   readonly parentId: string | null;
   readonly threadOrder: number;
   readonly namespaceOrder: number;
+  readonly savedAt?: number;
 }
 
 interface WriteRecord {
@@ -380,7 +389,10 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         const threadOrder = await order([...this.#scope, 'thread', thread]);
         const namespaceOrder = await order([...this.#scope, 'namespace', thread, namespace]);
         await requestResult(meta.put({ v: 1, sequence }, sequenceKey));
+        const savedAt = storageClock.now();
+        await touchSession(tx, this.#scope, thread, savedAt);
         const row: CheckpointRecord = {
+          savedAt,
           v: 1,
           key,
           thread: key.slice(0, 3),
@@ -425,7 +437,8 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         })),
       );
       const checkpoint = this.#key(thread, namespace, id);
-      await transact(this.#db, ['writes'], 'readwrite', async (tx) => {
+      await transact(this.#db, ['writes', 'meta'], 'readwrite', async (tx) => {
+        await touchSession(tx, this.#scope, thread);
         const store = tx.objectStore('writes');
         const raw: unknown[] = await requestResult(store.getAll(prefixRange(checkpoint)));
         const existing = raw.map(readWrite);
@@ -448,6 +461,30 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           await requestResult(store.put(row));
         }
       });
+    } catch (error) {
+      throw operationError(this.#db, error);
+    }
+  }
+
+  async sweep(options?: SweepOptions): Promise<SweepResult> {
+    try {
+      assertConnection(this.#db);
+      return await sweep(this.#db, this.#scope, options);
+    } catch (error) {
+      throw operationError(this.#db, error);
+    }
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    try {
+      assertConnection(this.#db);
+      validateKey(sessionId);
+      await transact(
+        this.#db,
+        ['checkpoints', 'writes', 'inbox', 'journal', 'meta'],
+        'readwrite',
+        (tx) => deleteSessionRecords(tx, this.#scope, sessionId),
+      );
     } catch (error) {
       throw operationError(this.#db, error);
     }
