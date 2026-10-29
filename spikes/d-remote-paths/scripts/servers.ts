@@ -36,6 +36,7 @@ export interface Fixtures {
   sampling: { sent: boolean; rejected: boolean; code?: number }[];
   userKey: string;
   adminKey: string;
+  issueMcpCredential: (principal: 'learner-a' | 'learner-b') => string;
   expireTokens: () => void;
   exposure: () => { browserTokenForwarded: boolean };
   containsUpstreamKey: (value: string) => boolean;
@@ -95,15 +96,19 @@ export async function startFixtures(): Promise<Fixtures> {
   const userKey = randomBytes(29).toString('hex');
   const adminKey = randomBytes(30).toString('hex');
   const tokens = new Map<string, { expires: number; origin: string }>();
+  const mcpCredentials = new Map<string, { principal: string; expires: number }>();
   let browserTokenForwarded = false;
   const requests: RequestRecord[] = [];
   const sampling: Fixtures['sampling'] = [];
   const servers: HttpServer[] = [];
-  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: Server }>();
+  const sessions = new Map<
+    string,
+    { transport: StreamableHTTPServerTransport; server: Server; principal: string }
+  >();
   let revision = 0;
   let nextSampling = false;
   const modelHeaders =
-    'authorization,content-type,x-stainless-lang,x-stainless-package-version,x-stainless-os,x-stainless-arch,x-stainless-runtime,x-stainless-runtime-version,x-stainless-retry-count,x-stainless-timeout';
+    'authorization,content-type,x-stainless-lang,x-stainless-package-version,x-stainless-os,x-stainless-arch,x-stainless-runtime,x-stainless-runtime-version,x-stainless-retry-count,x-stainless-timeout,x-stainless-helper-method';
 
   function record(server: string, req: IncomingMessage): RequestRecord {
     const headers: Record<string, string> = {};
@@ -298,12 +303,18 @@ export async function startFixtures(): Promise<Fixtures> {
           req,
           res,
           origins.page,
-          'content-type,mcp-session-id,mcp-protocol-version,last-event-id',
+          'authorization,content-type,mcp-session-id,mcp-protocol-version,last-event-id',
         )
       )
         return;
       if (req.url !== '/mcp') {
         json(res, 404, {});
+        return;
+      }
+      const credential = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
+      const principal = mcpCredentials.get(credential);
+      if (!principal || principal.expires <= Date.now()) {
+        json(res, 401, { code: 'credential_denied' });
         return;
       }
       if (!['GET', 'POST', 'DELETE'].includes(req.method ?? '')) {
@@ -314,6 +325,10 @@ export async function startFixtures(): Promise<Fixtures> {
       if (typeof data?.['method'] === 'string') item.protocolMethod = data['method'];
       const id = req.headers['mcp-session-id'];
       let session = typeof id === 'string' ? sessions.get(id) : undefined;
+      if (session && session.principal !== principal.principal) {
+        json(res, 403, { code: 'principal_denied' });
+        return;
+      }
       if (id && !session) {
         json(res, 404, {
           jsonrpc: '2.0',
@@ -375,10 +390,10 @@ export async function startFixtures(): Promise<Fixtures> {
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: randomUUID,
           onsessioninitialized: (newId) => {
-            sessions.set(newId, { server, transport });
+            sessions.set(newId, { server, transport, principal: principal.principal });
           },
         });
-        session = { server, transport };
+        session = { server, transport, principal: principal.principal };
         // SDK 1.32.1 declares optional callbacks differently on these two types.
         // The same transport satisfies the runtime contract; retain strict compiler flags.
         await server.connect(transport as Transport);
@@ -395,6 +410,11 @@ export async function startFixtures(): Promise<Fixtures> {
     sampling,
     userKey,
     adminKey,
+    issueMcpCredential: (principal) => {
+      const credential = randomBytes(26).toString('hex');
+      mcpCredentials.set(credential, { principal, expires: Date.now() + 60_000 });
+      return credential;
+    },
     expireTokens: () => {
       for (const grant of tokens.values()) grant.expires = 0;
     },

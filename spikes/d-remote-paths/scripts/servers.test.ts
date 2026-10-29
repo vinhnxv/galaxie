@@ -75,6 +75,42 @@ test('proxy scopes credentials and rejects origins, expiry, paths and methods', 
     );
     assert.equal(fixtures.exposure().browserTokenForwarded, false);
     assert.equal(fixtures.requests.filter((r) => r.server === 'upstream').length, 2);
+    const initialize = await fetch(`${mcp}/mcp`, {
+      method: 'POST',
+      headers: {
+        Origin: page,
+        Authorization: `Bearer ${fixtures.issueMcpCredential('learner-a')}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-11-25',
+          capabilities: {},
+          clientInfo: { name: 'node-test', version: '1' },
+        },
+      }),
+    });
+    assert.equal(initialize.status, 200);
+    const sessionId = initialize.headers.get('mcp-session-id');
+    assert.ok(sessionId);
+    await initialize.body?.cancel();
+    const denied = await fetch(`${mcp}/mcp`, {
+      method: 'GET',
+      headers: {
+        Origin: page,
+        Authorization: `Bearer ${fixtures.issueMcpCredential('learner-b')}`,
+        'mcp-session-id': sessionId,
+      },
+    });
+    assert.equal(denied.status, 403);
+    assert.equal(
+      (await fetch(`${mcp}/mcp`, { method: 'GET', headers: { Origin: page } })).status,
+      401,
+    );
   } finally {
     await fixtures.close();
   }
