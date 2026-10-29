@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { ErrorInfo } from './errors.js';
+import { type ErrorInfo, GalaxieError } from './errors.js';
 import type { InstanceId, InteractionId, RunId, SurfaceId, ViewRevision } from './ids.js';
+import { isStandardSchema, type StandardSchema } from './schema.js';
 import { isHttpDestination } from './urls.js';
 
 /** A component catalog, for example `education/v1` (brief §11.2). */
@@ -10,6 +11,97 @@ export type CatalogId = `${string}/v${number}`;
 
 /** A catalog component, for example `education.Quiz/v1` (ADR-0007). */
 export type ComponentId = `${string}.${string}/v${number}`;
+
+/** Shared component-ID syntax for requests and host registries. */
+export function isComponentId(value: unknown): value is ComponentId {
+  return typeof value === 'string' && /^[A-Za-z][\w-]*\.[A-Za-z][\w-]*\/v\d+$/.test(value);
+}
+
+/** Host-owned UI contracts, independent of a renderer. */
+export interface UiBindings {
+  readonly components: Readonly<
+    Record<
+      ComponentId,
+      { readonly actions: Readonly<Record<string, { readonly payload: StandardSchema }>> }
+    >
+  >;
+  readonly surfaces: readonly SurfaceId[];
+}
+
+export function normalizeUiBindings(bindings: UiBindings): UiBindings {
+  const invalid = (): never => {
+    throw new GalaxieError('invalid', 'The UI bindings are invalid.');
+  };
+  try {
+    if (
+      bindings === null ||
+      typeof bindings !== 'object' ||
+      bindings.components === null ||
+      typeof bindings.components !== 'object' ||
+      Array.isArray(bindings.components) ||
+      !Array.isArray(bindings.surfaces) ||
+      Array.from(bindings.surfaces).some(
+        (surface) => typeof surface !== 'string' || surface.length === 0,
+      ) ||
+      new Set(bindings.surfaces).size !== bindings.surfaces.length
+    )
+      invalid();
+    const components = Object.fromEntries(
+      Object.entries(bindings.components).map(([id, entry]) => {
+        if (
+          !isComponentId(id) ||
+          entry === null ||
+          typeof entry !== 'object' ||
+          entry.actions === null ||
+          typeof entry.actions !== 'object' ||
+          Array.isArray(entry.actions)
+        )
+          invalid();
+        const actions = Object.fromEntries(
+          Object.entries(entry.actions).map(([name, action]) => {
+            if (
+              name.length === 0 ||
+              action === null ||
+              typeof action !== 'object' ||
+              !isStandardSchema(action.payload)
+            )
+              invalid();
+            return [name, Object.freeze({ payload: action.payload })];
+          }),
+        );
+        return [id, Object.freeze({ actions: Object.freeze(actions) })];
+      }),
+    );
+    return Object.freeze({
+      components: Object.freeze(components),
+      surfaces: Object.freeze([...bindings.surfaces]),
+    });
+  } catch {
+    return invalid();
+  }
+}
+
+export function checkUiRequirements(bindings: UiBindings, requirements: UiRequirements): boolean {
+  const versionAt = requirements.catalog.lastIndexOf('/v');
+  const catalog = requirements.catalog.slice(0, versionAt);
+  const version = requirements.catalog.slice(versionAt);
+  return (
+    requirements.components.every((name) =>
+      Object.hasOwn(bindings.components, `${catalog}.${name}${version}`),
+    ) && requirements.surfaces.every((surface) => bindings.surfaces.includes(surface))
+  );
+}
+
+export function checkInteractionBindings(
+  bindings: UiBindings,
+  pending: PendingInteraction,
+): boolean {
+  return (
+    Object.hasOwn(bindings.components, pending.component) &&
+    Object.keys(bindings.components[pending.component]?.actions ?? {}).length > 0 &&
+    bindings.surfaces.includes(pending.surfaceId)
+  );
+}
 
 /** The JSON display request carried by a checkpoint interrupt. */
 export interface InteractionRequest {
@@ -62,8 +154,7 @@ export function parseInteractionRequest(value: unknown): InteractionRequest | un
       value['surfaceId'].length === 0 ||
       typeof value['viewRevision'] !== 'string' ||
       value['viewRevision'].length === 0 ||
-      typeof value['component'] !== 'string' ||
-      !/^[A-Za-z][\w-]*\.[A-Za-z][\w-]*\/v\d+$/.test(value['component']) ||
+      !isComponentId(value['component']) ||
       !plainObject(value['props'])
     )
       return undefined;

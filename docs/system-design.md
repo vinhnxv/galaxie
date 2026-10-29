@@ -13,6 +13,7 @@
 - **`packages/core`:** framework-neutral contracts and four M1 runtime slices: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, model routing with consent and per-call credentials, sticky labels, argument shapes, finite budgets, in-memory interrupt dispatch and resume, and allowlisted OpenTelemetry spans. The M1 exit controls add interaction URL policy and development trace text filtered by live labels and destination (§6, §9).
 - **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
 - **`packages/models`:** the deterministic scripted LangChain mock and the `@galaxie/models/webllm` worker provider and `@galaxie/models/builtin-ai` page-side Prompt API provider. Both have fake-only coverage on Node and Chromium; neither has had a real-device run yet (§8.4).
+- **`packages/react`:** a typed component registry, snapshot hook, identity-bound surfaces and headless Quiz, Feedback and Progress entries. Chromium tests cover rendering, validation, Strict Mode ownership and real LangGraph resume (§4, §8.1).
 - **`tests/conformance`:** twelve graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix, plus dual-lane policy, lifecycle, budget and tracing tests. The [conformance README](../tests/conformance/README.md) lists the explicit-config APIs.
 - **`spikes/`:** three throwaway spikes: B0 (a 1.7B model on WebGPU), the local English tutor (a LangGraph.js agent on that model in Chrome) and [Spike C](../spikes/c-ui-path/README.md) (typed interrupt UI and session-checkpoint reload). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
@@ -97,6 +98,32 @@ Proposed rules; M1 confirms them:
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
 5. Fewer packages are fine while these boundaries hold (brief §15).
 
+`@galaxie/react` exports `defineComponent`, `createRegistry`, `useAgentSnapshot`, `AgentSurface`, the individual `Quiz`, `Feedback` and `Progress` entries, and `educationComponents`. An entry declares its versioned ID, synchronous Standard Schema props and action payloads, trusted action labels, optional `urls(props)` extractor and trusted React component. Zod 4 reference schemas bound strings, IDs and collection sizes. Components receive `{ props, actions, status }`; bound actions expose their host label and `submit(payload)`. Model-produced strings render only as React text children.
+
+The registry's `resolve(pending)` returns validated props or a fixed `ErrorInfo`. Unknown components are `unsupported`, invalid or asynchronous validation is `invalid`, and disallowed URLs are `denied`. Schemas must validate synchronously: with Zod 4.6.7 a rejecting async refinement still yields `invalid`, but Zod drops that refinement's Promise, so its rejection, carrying the refinement's own error text, surfaces as an unhandled rejection. Hosts must not use async refinements in UI schemas. `submit` takes the payload schema's input type and dispatches the input unchanged, so core validates the same value again. `AgentSurface` renders only its assigned surface, reports resolution errors from an effect, and supports a host fallback. It subscribes through `useSyncExternalStore`; the host owns creation, preparation, start and disposal outside the surface.
+
+Host wiring (the runtime, definition, graph factory and input are host-owned):
+
+```tsx
+import { AgentSurface, createRegistry, educationComponents } from '@galaxie/react';
+
+const registry = createRegistry({ components: educationComponents, urlAllowlist: [] });
+const instance = await runtime.create(definition, {
+  principalScope: 'learner',
+  agent: graphFactory,
+  ui: registry.bindings({ surfaces: ['lesson-main'] }),
+});
+await instance.prepare();
+await instance.start(input);
+
+// Mount in the host's React tree after the host has created the instance.
+<AgentSurface instance={instance} registry={registry} surfaceId="lesson-main" />;
+```
+
+`CreateOptions.ui` is optional framework-neutral `UiBindings`: supported component IDs and action payload schemas, plus host-assigned surfaces. Core checks the definition's catalog requirements at create, rejects unbound or unanswerable pending components and unlisted surfaces, and checks actions and payloads at dispatch. Without `ui`, core skips UI requirement checks and accepts any non-empty action, preserving M1 behavior. Hosts using the registry must pass `registry.bindings({ surfaces })` to get these checks. `Schema` remains the existing Zod contract; `StandardSchema` and synchronous validation helpers cover the UI protocol without changing it.
+
+Each trusted entry's `urls(props)` must return every loaded or linked URL from validated props. Each is an absolute string used verbatim as one attribute value, never CSS `url()` or a `srcset` list. The registry rejects ASCII whitespace and applies core's normalized exact-origin allowlist. Core's recursive URL-like string check remains a backup: it does not detect URLs embedded in CSS, lists or ordinary text. An allowed origin still permits model-chosen paths and queries that can carry data to that host (ADR-0012); hosts must constrain those values where needed.
+
 ## 5. Repository layout
 
 Today:
@@ -108,7 +135,8 @@ galaxie/
 ├── packages/
 │   ├── core/                  runtime and framework-neutral contracts (§6)
 │   ├── adapter-langgraph/     native LangGraph executor and routed chat models
-│   └── models/                mock and WebLLM providers, with a host-bundled worker entry
+│   ├── models/                mock and local model providers, with a host-bundled worker entry
+│   └── react/                 typed registry, snapshot hook, surfaces and headless education entries
 ├── scripts/
 │   ├── check-license.ts       SPDX headers and package license fields (ADR-0015)
 │   └── check-dependencies.ts  source and built-package dependency boundaries
@@ -230,6 +258,10 @@ Rules (brief §6.2, ADR-0003):
 ## 8. Key flows
 
 ### 8.1. A run with a pending interaction
+
+The M2 path uses the in-memory inbox described in §6; the diagram below also shows M3's target durable transaction. With UI bindings, core checks component availability, a non-empty action map and surface assignment before publishing pending state, alongside the URL check. The registry then validates props and declared URLs before rendering. A bound submit validates its payload and dispatches the instance, run, interaction, surface and revision captured at render time. Core checks identity and duplicates before the action allowlist, then validates the budget-parsed payload before recording acceptance. A stale screen therefore cannot answer a newer interaction, and the surface suppresses concurrent or already accepted submissions for its interaction.
+
+Spike C's M2 decisions are implemented here: core enforces UI requirements and actions when bindings are supplied; each entry declares URL props through `urls`; drafts stay component-local. A new interaction ID or view revision remounts the trusted component with empty inputs. Any other remount also loses local input. Core has no restore API yet; once M3 adds restore, a reload will still begin with empty component-local drafts unless M3 deliberately adds persistence under the storage and labels policy (ADR-0014). M2 writes no draft copy to browser storage.
 
 ```mermaid
 sequenceDiagram

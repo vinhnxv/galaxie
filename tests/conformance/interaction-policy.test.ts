@@ -13,12 +13,14 @@ import {
   defineAgentDefinition,
   type InteractionId,
   type PendingInteraction,
+  type UiBindings,
   type ViewRevision,
 } from '@galaxie/core';
 import {
   Annotation,
   END,
   type LangGraphRunnableConfig,
+  MemorySaver,
   START,
   StateGraph,
 } from '@langchain/langgraph/web';
@@ -306,6 +308,152 @@ test('real graph rejects pending URLs while raw updates and committed checkpoint
       configurable: { thread_id: checkpointConfig.configurable?.['thread_id'] },
     });
     expect(checkpoint.tasks.flatMap((task) => task.interrupts)).toMatchObject([{ value: request }]);
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+const uiBindings: UiBindings = {
+  components: {
+    'education.Quiz/v1': { actions: { submit: { payload: z.object({ answer: z.boolean() }) } } },
+  },
+  surfaces: ['lesson-main'],
+};
+
+async function uiGraph(ui: UiBindings) {
+  const diagnostics: DiagnosticEvent[] = [];
+  const snapshots: AgentSnapshot<unknown>[] = [];
+  let graph: LangGraphGraph | undefined;
+  let checkpointConfig: LangGraphRunnableConfig | undefined;
+  const checkpointer = new MemorySaver();
+  const runtime = createRuntime({
+    appId: 'ui-policy',
+    executors: [createLangGraphAdapter()],
+    diagnostics: (event) => diagnostics.push(event),
+  });
+  const instance = await runtime.create(
+    defineAgentDefinition({
+      id: 'conformance/ui-policy',
+      version: '1.0.0',
+      executor: 'langgraph-js',
+      input: z.object({ answer: z.boolean() }),
+    }),
+    {
+      principalScope: 'fixture',
+      ui,
+      services: { checkpointer, chatModels: {} },
+      agent: (host) => {
+        const state = Annotation.Root({ answer: Annotation<boolean> });
+        graph = new StateGraph(state)
+          .addNode('ask', async (_state, config) => {
+            checkpointConfig = config;
+            await Promise.resolve();
+            const submission = requestInteraction(
+              {
+                surfaceId: 'lesson-main',
+                viewRevision: 'r1',
+                component: 'education.Quiz/v1',
+                props: { note: 'ui-prop-canary' },
+              },
+              config,
+            );
+            return { answer: (submission.payload as { answer: boolean }).answer };
+          })
+          .addEdge(START, 'ask')
+          .addEdge('ask', END)
+          .compile({ checkpointer: host.langchain.checkpointer() });
+        return graph;
+      },
+    },
+  );
+  instance.subscribe(() => snapshots.push(instance.getSnapshot()));
+  const checkpointCount = async (): Promise<number> => {
+    if (graph === undefined || checkpointConfig === undefined)
+      throw new Error('The checkpoint fixture was not initialized.');
+    let count = 0;
+    for await (const _checkpoint of checkpointer.list({
+      configurable: { thread_id: checkpointConfig.configurable?.['thread_id'] },
+    }))
+      count++;
+    return count;
+  };
+  return { runtime, instance, diagnostics, snapshots, checkpointCount };
+}
+
+test.each([
+  ['unbound component', { ...uiBindings, components: {} }],
+  ['unlisted surface', { ...uiBindings, surfaces: ['sidebar'] }],
+  [
+    'component without actions',
+    { ...uiBindings, components: { 'education.Quiz/v1': { actions: {} } } },
+  ],
+] satisfies [string, UiBindings][])(
+  'real graph never publishes a pending interaction: %s',
+  async (_reason, ui) => {
+    const { runtime, instance, diagnostics, snapshots } = await uiGraph(ui);
+    try {
+      await instance.prepare();
+      const { runId } = await instance.start({ answer: false });
+      const events = await collect(instance.events(runId));
+      expect(instance.getSnapshot().run).toMatchObject({
+        status: 'failed',
+        error: { code: 'unsupported' },
+      });
+      expect(instance.getSnapshot().run?.pending).toBeUndefined();
+      expect(events.some((event) => event.type === 'interaction')).toBe(false);
+      expect(diagnostics.map((event) => event.kind)).toEqual(['interaction_rejected']);
+      expect(
+        JSON.stringify({
+          diagnostics,
+          snapshots,
+          events: events.filter((event) => event.type !== 'stream'),
+        }),
+      ).not.toContain('ui-prop-canary');
+    } finally {
+      await runtime.dispose();
+    }
+  },
+);
+
+test('real graph rejects UI actions and invalid payloads without advancing the checkpoint', async () => {
+  const { runtime, instance, checkpointCount } = await uiGraph(uiBindings);
+  try {
+    await instance.prepare();
+    const { runId } = await instance.start({ answer: false });
+    for await (const event of instance.events(runId)) {
+      if (event.type === 'interaction') break;
+    }
+    const snapshot = instance.getSnapshot();
+    const pending = snapshot.run?.pending;
+    if (pending === undefined) throw new Error('The interaction fixture was not initialized.');
+    const event = {
+      instanceId: instance.instanceId,
+      runId,
+      ...pending,
+      action: 'submit',
+      payload: { answer: true },
+    };
+    const before = await checkpointCount();
+    for (const invalid of [
+      { ...event, action: 'skip' },
+      { ...event, payload: { answer: 'ui-payload-canary' } },
+    ]) {
+      const result = await instance.dispatch(invalid);
+      expect(result).toEqual({
+        status: 'rejected',
+        error: { code: 'invalid', message: 'The request is invalid.' },
+      });
+      expect(instance.getSnapshot()).toBe(snapshot);
+      expect(instance.getSnapshot().run?.status).toBe('waiting_input');
+      expect(await checkpointCount()).toBe(before);
+    }
+    await expect(instance.dispatch(event)).resolves.toMatchObject({ status: 'accepted' });
+    const events = await collect(instance.events(runId));
+    expect(instance.getSnapshot().run?.status).toBe('succeeded');
+    expect(events.find((event) => event.type === 'output')).toMatchObject({
+      output: { answer: true },
+    });
+    expect(await checkpointCount()).toBeGreaterThan(before);
   } finally {
     await runtime.dispose();
   }

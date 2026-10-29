@@ -11,6 +11,7 @@ import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
 import type { AppId, InstanceId, PrincipalScope, RunId } from './ids.js';
 import type { AgentInstance } from './instance.js';
+import { checkUiRequirements, normalizeUiBindings, type UiBindings } from './interactions.js';
 import type { ModelRouting } from './models.js';
 import {
   type BudgetLimits,
@@ -49,6 +50,8 @@ export interface CreateOptions<Agent = unknown, Services = unknown> {
   readonly bindings?: Readonly<Record<string, CapabilityBinding<never, unknown>>>;
   /** Per-role providers, consent and ephemeral credentials (ADR-0006). */
   readonly models?: ModelRouting;
+  /** Supported components, their actions and host-assigned surfaces. */
+  readonly ui?: UiBindings;
 }
 
 export interface RuntimeOptions<
@@ -143,10 +146,17 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
       if (executor === undefined) {
         throw new GalaxieError('unsupported', 'The requested executor is not registered.');
       }
+      const ui = createOptions.ui === undefined ? undefined : normalizeUiBindings(createOptions.ui);
+      if (
+        ui !== undefined &&
+        definition.ui !== undefined &&
+        !checkUiRequirements(ui, definition.ui)
+      )
+        throw new GalaxieError('unsupported', 'The required UI is not bound.');
       const instance = createAgentInstance(
         definition,
         executor,
-        createOptions,
+        ui === undefined ? createOptions : { ...createOptions, ui },
         {
           appId: options.appId,
           tracer,
