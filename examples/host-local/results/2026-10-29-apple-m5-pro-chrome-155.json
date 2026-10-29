@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-29",
+  "kind": "demonstration",
+  "device": {
+    "machine": "Apple M5 Pro",
+    "os": "macOS (Darwin 25.6.0)",
+    "browser": "Chrome 155.0.0.0",
+    "webgpuAdapter": "apple metal-3"
+  },
+  "build": {
+    "package": "@galaxie/example-host-local",
+    "mode": "default",
+    "origin": "http://127.0.0.1:4173",
+    "server": "vite preview"
+  },
+  "cache": {
+    "webllmWeights": "cached before the run by an earlier Spike B session at the same origin (32 entries in webllm/model, same commit as defaultWebLLMModel)",
+    "builtInAI": "LanguageModel.availability() for English input and output returned available"
+  },
+  "runs": [
+    {
+      "id": "builtin-ai",
+      "route": "Built-in AI first in the route order; LanguageModel present and available; provider selection inferred from the route order, not observed",
+      "prepareMs": null,
+      "quiz": { "questions": 4, "schemaValid": true, "repairs": 0 },
+      "review": { "schemaValid": true, "repairs": 0 },
+      "score": "3/4",
+      "outcome": "succeeded",
+      "pageResourceRequests": 9,
+      "pageRequestsOffOrigin": 0,
+      "pageRequestsWithSentinel": 0
+    },
+    {
+      "id": "webllm",
+      "route": "LanguageModel global deleted before Prepare, so the router had only WebLLM on WebGPU",
+      "prepareMs": 1324,
+      "startToQuizMs": 12955,
+      "sentenceToFeedbackMs": 4615,
+      "quiz": { "questions": 3, "schemaValid": true, "repairs": 0 },
+      "review": { "schemaValid": true, "repairs": 0 },
+      "score": "1/3",
+      "outcome": "succeeded",
+      "pageResourceRequests": 9,
+      "pageRequestsOffOrigin": 0,
+      "pageRequestsWithSentinel": 0
+    }
+  ],
+  "notMeasured": [
+    "first download size and download time (weights were already cached)",
+    "time to first token and p50/p95 (one run per path)",
+    "requests made by the WebLLM dedicated worker (page Resource Timing and the extension's network log do not include them)",
+    "main-thread long tasks during inference",
+    "memory use"
+  ]
+}
