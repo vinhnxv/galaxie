@@ -84,7 +84,12 @@ export interface CapabilityPort {
   call(
     name: string,
     input: unknown,
-    options?: { readonly signal?: AbortSignal; readonly parent?: TraceHandle },
+    options?: {
+      readonly signal?: AbortSignal;
+      readonly parent?: TraceHandle;
+      /** Opaque, stable executor task namespace for recovery write identity. */
+      readonly effectScope?: string;
+    },
   ): Promise<unknown>;
 }
 
