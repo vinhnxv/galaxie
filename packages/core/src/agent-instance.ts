@@ -341,12 +341,27 @@ export function createAgentInstance(
     segment.tracing?.finish('failed', run.error);
   };
   // Raw stream events remain untrusted engine output and must never be rendered as UI.
-  const interactionError = (interaction: PendingInteraction): ErrorInfo | undefined => {
+  const interactionError = (
+    interaction: PendingInteraction,
+  ):
+    | {
+        readonly reason: 'url' | 'binding';
+        readonly error: ErrorInfo;
+      }
+    | undefined => {
     if (!checkInteractionUrls(interaction.props, instrumentation.urlAllowlist))
-      return toErrorInfo('denied');
+      return { reason: 'url', error: toErrorInfo('denied') };
     if (options.ui !== undefined && !checkInteractionBindings(options.ui, interaction))
-      return toErrorInfo('unsupported');
+      return { reason: 'binding', error: toErrorInfo('unsupported') };
     return undefined;
+  };
+  const warnBlockedUrl = (interaction: PendingInteraction): void => {
+    warn?.({
+      code: 'url_blocked',
+      ...(options.ui !== undefined && Object.hasOwn(options.ui.components, interaction.component)
+        ? { name: interaction.component }
+        : {}),
+    });
   };
   const validateSubmission = (
     run: RunRecord,
@@ -397,8 +412,9 @@ export function createAgentInstance(
       {
         const error = interactionError(event.interaction);
         if (error !== undefined) {
-          failRun(run, error);
+          failRun(run, error.error);
           report({ kind: 'interaction_rejected', runId: run.runId });
+          if (error.reason === 'url') warnBlockedUrl(event.interaction);
           return;
         }
       }
@@ -830,7 +846,8 @@ export function createAgentInstance(
           const error = interactionError(pending);
           if (error !== undefined) {
             report({ kind: 'interaction_rejected' });
-            throw new GalaxieError(error.code, error.message);
+            if (error.reason === 'url') warnBlockedUrl(pending);
+            throw new GalaxieError(error.error.code, error.error.message);
           }
           const runId = globalThis.crypto.randomUUID() as RunId;
           const run: RunRecord = {

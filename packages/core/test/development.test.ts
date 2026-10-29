@@ -13,6 +13,8 @@ import {
   type ModelDescriptor,
   type ModelRoleRequirements,
   type ModelRouting,
+  type PendingInteraction,
+  type UiBindings,
 } from '../src/index.js';
 import { binding, collect, deferred, definition, FakeExecutor, flush } from './fake-executor.js';
 
@@ -306,5 +308,245 @@ test('absent option performs no creation availability check', async () => {
     models: routing({ availability }),
   });
   expect(availability).not.toHaveBeenCalled();
+  expect(warnings).toEqual([]);
+});
+
+function storage(values: readonly string[]): Storage {
+  return {
+    length: values.length,
+    key: vi.fn((index: number) => String(index)),
+    getItem: vi.fn((key: string) => values[Number(key)] ?? null),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  };
+}
+
+function page(): void {
+  vi.stubGlobal('document', { createElement: () => ({ innerHTML: '' }) });
+  vi.stubGlobal('localStorage', storage([]));
+  vi.stubGlobal('sessionStorage', storage([]));
+}
+
+test.each(
+  [
+    `sk-${'x'.repeat(20)}`,
+    `sk-ant-${'x'.repeat(20)}`,
+    `sk-proj-${'x'.repeat(20)}`,
+    `AIza${'x'.repeat(35)}`,
+    `gsk_${'x'.repeat(20)}`,
+    `hf_${'x'.repeat(20)}`,
+    `xai-${'x'.repeat(20)}`,
+    `r8_${'x'.repeat(20)}`,
+  ].flatMap((value) => [value, JSON.stringify({ credential: value })]),
+)('synthetic storage value pattern %s emits only its area', (value) => {
+  page();
+  const area = storage([value, value]);
+  vi.stubGlobal('localStorage', area);
+  const { warnings } = fixture();
+  expect(warnings.filter(({ code }) => code === 'provider_key_in_storage')).toEqual([
+    { code: 'provider_key_in_storage', area: 'localStorage' },
+  ]);
+  expect(JSON.stringify(warnings)).not.toContain(value);
+  expect(area.setItem).not.toHaveBeenCalled();
+  expect(area.removeItem).not.toHaveBeenCalled();
+  expect(area.clear).not.toHaveBeenCalled();
+});
+
+test('storage matching requires a token boundary and ignores short and unrelated values', () => {
+  page();
+  const prefixes = ['sk-', 'sk-ant-', 'sk-proj-', 'AIza', 'gsk_', 'hf_', 'xai-', 'r8_'];
+  vi.stubGlobal(
+    'localStorage',
+    storage([
+      `task-${'x'.repeat(20)}`,
+      'half_value',
+      `sk-${'x'.repeat(19)}`,
+      ...prefixes.flatMap((prefix) =>
+        ['a', '9', '_', '-'].map((boundary) => `${boundary}${prefix}${'x'.repeat(35)}`),
+      ),
+    ]),
+  );
+  const { warnings } = fixture();
+  expect(warnings.filter(({ code }) => code === 'provider_key_in_storage')).toEqual([]);
+});
+
+test('both storage areas warn once without names or values', async () => {
+  page();
+  for (const area of ['localStorage', 'sessionStorage'])
+    vi.stubGlobal(area, storage([`sk-${'x'.repeat(20)}`]));
+  const { runtime, warnings } = fixture();
+  for (let index = 0; index < 2; index++)
+    await runtime.create(definition, { agent: {}, principalScope: 'test' });
+  expect(warnings.filter(({ code }) => code === 'provider_key_in_storage')).toEqual([
+    { code: 'provider_key_in_storage', area: 'localStorage' },
+    { code: 'provider_key_in_storage', area: 'sessionStorage' },
+  ]);
+});
+
+test.each(['access', 'key', 'getItem'] as const)(
+  'storage %s failure is skipped independently',
+  (kind) => {
+    page();
+    const area = storage(['plain']);
+    const fail = (): never => {
+      throw new Error('host-only storage failure');
+    };
+    if (kind === 'access')
+      Object.defineProperty(globalThis, 'localStorage', { configurable: true, get: fail });
+    else vi.spyOn(area, kind).mockImplementation(fail);
+    if (kind !== 'access') vi.stubGlobal('localStorage', area);
+    vi.stubGlobal('sessionStorage', storage([`sk-${'x'.repeat(20)}`]));
+    const { warnings, diagnostics } = fixture();
+    expect(warnings.filter(({ code }) => code === 'provider_key_in_storage')).toEqual([
+      { code: 'provider_key_in_storage', area: 'sessionStorage' },
+    ]);
+    expect(diagnostics).toEqual([]);
+  },
+);
+
+test('page probes warn once per runtime and contain only constant identifiers', async () => {
+  page();
+  const createElement = vi.spyOn(document, 'createElement');
+  const { runtime, warnings } = fixture();
+  await runtime.create(definition, { agent: {}, principalScope: 'test' });
+  await runtime.create(definition, { agent: {}, principalScope: 'test' });
+  expect(warnings).toEqual([
+    { code: 'trusted_types_unenforced' },
+    { code: 'csp_unenforced', name: 'script-src' },
+  ]);
+  expect(createElement).toHaveBeenCalledExactlyOnceWith('template');
+});
+
+test('blocked or failed page probes emit nothing', () => {
+  page();
+  vi.spyOn(document, 'createElement').mockImplementation(() => {
+    throw new TypeError('blocked');
+  });
+  vi.spyOn(globalThis, 'Function').mockImplementation(() => {
+    throw new TypeError('blocked');
+  });
+  const { warnings, diagnostics } = fixture();
+  expect(warnings).toEqual([]);
+  expect(diagnostics).toEqual([]);
+});
+
+test('runtime-level callback errors are queued without becoming diagnostics', () => {
+  page();
+  const error = new Error('host-only callback failure');
+  const queued: VoidFunction[] = [];
+  vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => queued.push(callback));
+  const { diagnostics } = fixture(true, () => {
+    throw error;
+  });
+  expect(queued).toHaveLength(2);
+  for (const callback of queued) expect(callback).toThrow(error);
+  expect(diagnostics).toEqual([]);
+});
+
+test.each([true, false])('page checks are skipped without a page, enabled %s', (enabled) => {
+  vi.stubGlobal('document', undefined);
+  const getItem = vi.fn();
+  vi.stubGlobal('localStorage', { length: 1, key: () => 'test', getItem });
+  const { warnings } = fixture(enabled);
+  expect(getItem).not.toHaveBeenCalled();
+  expect(warnings).toEqual([]);
+});
+
+test('absent option reads neither storage nor document and never probes providers', async () => {
+  page();
+  const reads = vi.fn(() => storage([`sk-${'x'.repeat(20)}`]));
+  for (const area of ['localStorage', 'sessionStorage'])
+    Object.defineProperty(globalThis, area, { configurable: true, get: reads });
+  const createElement = vi.spyOn(document, 'createElement');
+  const functionProbe = vi.spyOn(globalThis, 'Function');
+  const availability = vi.fn(() => ({ status: 'available' as const }));
+  const { runtime, warnings } = fixture(false);
+  const instance = await runtime.create(modelDefinition, {
+    agent: {},
+    principalScope: 'test',
+    models: routing({ availability }),
+  });
+  await instance.prepare();
+  const { runId } = await instance.start('input');
+  await collect(instance.events(runId));
+  expect(reads).not.toHaveBeenCalled();
+  expect(createElement).not.toHaveBeenCalled();
+  expect(functionProbe).not.toHaveBeenCalled();
+  expect(availability).not.toHaveBeenCalled();
+  expect(warnings).toEqual([]);
+});
+
+const pending: PendingInteraction = {
+  interactionId: 'warning' as PendingInteraction['interactionId'],
+  component: 'tests.Question/v1',
+  surfaceId: 'main',
+  viewRevision: 'v1' as PendingInteraction['viewRevision'],
+  props: { image: 'https://blocked.example/synthetic-path' },
+};
+const ui: UiBindings = { components: { 'tests.Question/v1': { actions: {} } }, surfaces: ['main'] };
+
+test.each(['absent', 'bound', 'unbound'] as const)(
+  'URL warnings identify only a host-bound component: %s',
+  async (kind) => {
+    const { runtime, executor, warnings, diagnostics } = fixture();
+    executor.scripts.push(
+      [{ type: 'interaction', interaction: pending }],
+      [{ type: 'interaction', interaction: pending }],
+    );
+    const instance = await runtime.create(definition, {
+      agent: {},
+      principalScope: 'test',
+      ...(kind === 'absent' ? {} : { ui: kind === 'bound' ? ui : { ...ui, components: {} } }),
+    });
+    await instance.prepare();
+    for (let index = 0; index < 2; index++) {
+      const { runId } = await instance.start('input');
+      await collect(instance.events(runId));
+      expect(instance.getSnapshot().run).toMatchObject({
+        status: 'failed',
+        error: { code: 'denied' },
+      });
+    }
+    expect(warnings).toEqual([
+      {
+        code: 'url_blocked',
+        instanceId: instance.instanceId,
+        ...(kind === 'bound' ? { name: pending.component } : {}),
+      },
+    ]);
+    expect(diagnostics.map(({ kind }) => kind)).toEqual([
+      'interaction_rejected',
+      'interaction_rejected',
+    ]);
+  },
+);
+
+test('restore emits a de-duplicated URL warning before exposing pending props', async () => {
+  const { runtime, executor, warnings } = fixture();
+  Object.assign(executor.features, { checkpoints: true, resume: true });
+  executor.agent.pending = async () => pending;
+  const instance = await runtime.create(definition, { agent: {}, principalScope: 'test', ui });
+  await instance.prepare();
+  for (let index = 0; index < 2; index++)
+    await expect(instance.restore()).rejects.toMatchObject({ code: 'denied' });
+  expect(warnings).toEqual([
+    { code: 'url_blocked', instanceId: instance.instanceId, name: pending.component },
+  ]);
+  expect(instance.getSnapshot().run?.pending).toBeUndefined();
+});
+
+test('binding rejection without a URL emits no warning', async () => {
+  const { runtime, executor, warnings } = fixture();
+  executor.scripts.push([{ type: 'interaction', interaction: { ...pending, props: {} } }]);
+  const instance = await runtime.create(definition, {
+    agent: {},
+    principalScope: 'test',
+    ui: { ...ui, components: {} },
+  });
+  await instance.prepare();
+  const { runId } = await instance.start('input');
+  await collect(instance.events(runId));
+  expect(instance.getSnapshot().run?.error?.code).toBe('unsupported');
   expect(warnings).toEqual([]);
 });

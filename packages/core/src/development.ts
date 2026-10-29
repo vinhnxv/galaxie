@@ -44,3 +44,46 @@ export function createDevelopmentWarnings(
     }
   };
 }
+
+/** Page-only probes. Nothing here runs unless the host opts in. */
+export function checkPageDevelopmentWarnings(warn: DevelopmentWarningReporter): void {
+  try {
+    if (typeof document === 'undefined') return;
+  } catch {
+    return;
+  }
+  // Enforced policies produce expected console violations (and reports if configured)
+  // once per runtime in development. Blocked probes emit no warning. Report-only
+  // policies report but allow probes, so they can still warn. A pass-through
+  // Trusted Types default createHTML policy is a known false positive.
+  try {
+    const template = document.createElement('template');
+    template.innerHTML = '';
+    warn({ code: 'trusted_types_unenforced' });
+  } catch {
+    // A blocked sink or failed probe provides no evidence of missing enforcement.
+  }
+  try {
+    new Function('return 1');
+    warn({ code: 'csp_unenforced', name: 'script-src' });
+  } catch {
+    // Page code cannot inspect response headers; a failed probe emits no advice.
+  }
+  const providerKey =
+    /(?:^|[^A-Za-z0-9_-])(?:sk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|(?:gsk_|hf_|xai-|r8_)[A-Za-z0-9]{20,})/;
+  for (const area of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      const storage = globalThis[area];
+      for (let index = 0; index < storage.length; index++) {
+        const key = storage.key(index);
+        const value = key === null ? null : storage.getItem(key);
+        if (value !== null && providerKey.test(value)) {
+          warn({ code: 'provider_key_in_storage', area });
+          break;
+        }
+      }
+    } catch {
+      // Storage may be denied. Never change it or retain its keys or values.
+    }
+  }
+}

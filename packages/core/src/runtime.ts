@@ -8,7 +8,11 @@ import type { CapabilityBinding } from './capabilities.js';
 import { dataPolicy } from './capability-broker.js';
 import type { ConfirmationOptions } from './confirmations.js';
 import type { AgentDefinition, BindingsFor } from './definition.js';
-import { createDevelopmentWarnings, type DevelopmentWarning } from './development.js';
+import {
+  checkPageDevelopmentWarnings,
+  createDevelopmentWarnings,
+  type DevelopmentWarning,
+} from './development.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
 import type { AppId, EffectId, InstanceId, PrincipalScope, RunId, SessionId } from './ids.js';
@@ -170,6 +174,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
     options.developmentWarnings === undefined
       ? undefined
       : createDevelopmentWarnings(options.developmentWarnings);
+  if (developmentWarnings !== undefined) checkPageDevelopmentWarnings(developmentWarnings);
   return {
     async create(definition, createOptions) {
       if (disposal !== undefined) throw new GalaxieError('invalid', 'The runtime was disposed.');
