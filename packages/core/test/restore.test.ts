@@ -278,7 +278,7 @@ test('restore validates grants and enforces private-user policy on free-text cap
       agent: {},
       sessionId,
       bindings: {
-        'send@1': { ...binding({ destination: 'third-party', grantScope: 'run' }), invoke },
+        'send@1': { ...binding({ destination: 'host-server', grantScope: 'run' }), invoke },
       },
     },
   );
