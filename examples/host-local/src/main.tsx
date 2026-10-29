@@ -3,13 +3,16 @@
 
 import './zod-config.js';
 import { createRoot } from 'react-dom/client';
-import { App } from './app.js';
-import { createLocalHost } from './runtime.js';
 
-export { createWebLLMWorker } from './runtime.js';
+export async function createWebLLMWorker(): Promise<Worker> {
+  const runtime = await import('./runtime.js');
+  return runtime.createWebLLMWorker();
+}
 
 const root = document.getElementById('root');
 if (root) {
+  const { App } = await import('./app.js');
+  const { createLocalHost } = await import('./runtime.js');
   const view = createRoot(root);
   if (import.meta.env.MODE === 'mock') {
     const { createMockModels } = await import('./mock-script.js');

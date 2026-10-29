@@ -34,7 +34,15 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
     },
   },
   worker: { format: 'es' },
-  build: { rolldownOptions: { preserveEntrySignatures: 'strict' } },
+  build: {
+    rolldownOptions: {
+      preserveEntrySignatures: 'strict',
+      input: {
+        index: fileURLToPath(new URL('./index.html', import.meta.url)),
+        host: fileURLToPath(new URL('./src/main.tsx', import.meta.url)),
+      },
+    },
+  },
   oxc: { jsx: { runtime: 'automatic' } },
   server: { headers: { 'Content-Security-Policy': cspHeader(mode) } },
   preview: { headers: { 'Content-Security-Policy': cspHeader(mode) } },
