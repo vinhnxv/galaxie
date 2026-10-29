@@ -19,7 +19,7 @@ import {
   toErrorInfo,
   type ViewRevision,
 } from '../src/index.js';
-import { binding, deferred, definition, FakeExecutor, flush } from './fake-executor.js';
+import { binding, collect, deferred, definition, FakeExecutor, flush } from './fake-executor.js';
 import { MemoryRecoveryStore } from './support/memory-recovery-store.js';
 
 const sessionId = 'f03855d0-093d-44ef-afdd-58bff38d34dc' as SessionId;
@@ -371,6 +371,11 @@ test('a failed succeeded write returns the validated result without exposing it 
   };
   const fixture = await resume(store, async () => ({ receipt: 'private receipt' }));
   await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('succeeded'));
+  const runId = fixture.instance.getSnapshot().run?.runId;
+  if (runId === undefined) throw new Error('The journal run is missing.');
+  expect(await collect(fixture.instance.events(runId))).toContainEqual(
+    expect.objectContaining({ type: 'output', output: { receipt: 'private receipt' } }),
+  );
   expect([...store.journal.values()][0]?.status).toBe('dispatched');
   expect(fixture.diagnostics).toEqual([
     {

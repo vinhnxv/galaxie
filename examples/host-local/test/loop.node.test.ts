@@ -409,3 +409,63 @@ it('keeps an operationally failed session for Retry without exposing host error 
     await context.close();
   }
 }, 60_000);
+
+it('restores an accepted sentence after a failed resume without losing its session', async () => {
+  const { page, context, requests, errors, consoleErrors } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).check();
+    await page.getByRole('radio', { name: 'play', exact: true }).check();
+    await page.getByRole('radio', { name: 'drinks', exact: true }).check();
+    await page.getByRole('button', { name: 'Submit answers' }).click();
+    await page.getByRole('textbox').fill(sentinelSentence);
+    const sessionId = await page.evaluate((key) => sessionStorage.getItem(key), sessionKey);
+    expect(sessionId).not.toBeNull();
+    await page.evaluate(() => {
+      const original = IDBDatabase.prototype.transaction;
+      let accepted = false;
+      IDBDatabase.prototype.transaction = function (
+        this: IDBDatabase,
+        stores: string | string[],
+        mode?: IDBTransactionMode,
+        options?: IDBTransactionOptions,
+      ): IDBTransaction {
+        const names = typeof stores === 'string' ? [stores] : stores;
+        if (accepted && mode === 'readonly' && names.includes('checkpoints')) {
+          IDBDatabase.prototype.transaction = original;
+          throw new DOMException('private-checkpoint-read-canary', 'UnknownError');
+        }
+        const transaction = original.call(this, stores, mode, options);
+        if (mode === 'readwrite' && names.includes('inbox'))
+          transaction.addEventListener(
+            'complete',
+            () => {
+              accepted = true;
+            },
+            { once: true },
+          );
+        return transaction;
+      };
+    });
+    await page.getByRole('button', { name: 'Submit sentence' }).click();
+    await page.getByRole('status').filter({ hasText: 'Run: failed' }).waitFor();
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBe(sessionId);
+    expect(await page.locator('body').textContent()).not.toContain(
+      'private-checkpoint-read-canary',
+    );
+    await page.reload();
+    await page.getByRole('button', { name: 'Continue', exact: true }).waitFor();
+    expect(await page.getByRole('textbox').count()).toBe(0);
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBe(sessionId);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('progressbar').waitFor();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Run: succeeded; Score: 2/3' }).waitFor();
+    expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    assertLocalRequests(requests, mockOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);

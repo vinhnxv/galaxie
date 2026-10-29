@@ -79,7 +79,6 @@ async function journalEffectId(
   ).toString(16)}${hash.slice(17, 20)}-${hash.slice(20, 32)}` as EffectId;
 }
 
-/** Serializes one call's durable transitions, including the abort/result race. */
 class WriteJournal {
   readonly effectId: EffectId;
   readonly #store: RecoveryStore;
