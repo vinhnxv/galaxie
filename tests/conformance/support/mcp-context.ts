@@ -15,6 +15,7 @@ export type McpAction =
   | 'reset'
   | 'forget'
   | 'sampling'
+  | 'elicitation'
   | 'bad-origin'
   | { readonly kind: 'set-description'; readonly description: string };
 export interface McpAdminState {
@@ -24,6 +25,7 @@ export interface McpAdminState {
   readonly counters: Record<string, number>;
   readonly headers: Record<string, string | string[] | undefined>;
   readonly samplingCode?: number;
+  readonly elicitationCode?: number;
   readonly badOriginStatus?: number;
 }
 

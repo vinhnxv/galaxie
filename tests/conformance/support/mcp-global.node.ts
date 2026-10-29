@@ -30,6 +30,7 @@ export async function createFixture(): Promise<McpControl> {
       }
       if (action === 'forget') await server.admin.forgetSessions();
       if (action === 'sampling') server.admin.requestSampling();
+      if (action === 'elicitation') server.admin.requestElicitation();
       return {
         calls: server.admin.callCount(),
         meta: server.admin.lastMeta(),
@@ -39,6 +40,9 @@ export async function createFixture(): Promise<McpControl> {
         ...(server.admin.samplingCode() === undefined
           ? {}
           : { samplingCode: server.admin.samplingCode() as number }),
+        ...(server.admin.elicitationCode() === undefined
+          ? {}
+          : { elicitationCode: server.admin.elicitationCode() as number }),
         ...(action !== 'bad-origin'
           ? {}
           : {
