@@ -4,7 +4,7 @@
 import type { CapabilityName } from './capabilities.js';
 import type { ErrorInfo } from './errors.js';
 import type { RunEvent } from './events.js';
-import type { InstanceId, InteractionId, RunId } from './ids.js';
+import type { InstanceId, InteractionId, RunId, SessionId } from './ids.js';
 import type {
   DispatchReceipt,
   InboxStatus,
@@ -49,10 +49,14 @@ export interface CancelReceipt {
 /** The agent instance a host works with (brief §14.1). At most one run is active per instance (brief §8.3). */
 export interface AgentInstance<Input, View> {
   readonly instanceId: InstanceId;
+  /** Host storage and the checkpointer must be scoped to the same app and principal. */
+  readonly sessionId: SessionId;
   /** Downloads and device access go through host policy and consent. */
   prepare(): Promise<void>;
   /** Claims the slot synchronously; resolves when queued after validation, before executor events. */
   start(input: Input, options?: StartOptions): Promise<{ readonly runId: RunId }>;
+  /** Rebuilds a waiting run from its checkpoint with fresh budgets and conservative labels. */
+  restore(options?: StartOptions): Promise<{ readonly runId: RunId } | undefined>;
   /** Checks the event against the pending interrupt, then records it in the submission inbox (ADR-0004). */
   dispatch(event: UserInteractionEvent): Promise<DispatchReceipt>;
   cancel(runId: RunId): Promise<CancelReceipt>;

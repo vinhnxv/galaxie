@@ -9,7 +9,7 @@ import { dataPolicy } from './capability-broker.js';
 import type { AgentDefinition, BindingsFor } from './definition.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
-import type { AppId, InstanceId, PrincipalScope, RunId } from './ids.js';
+import type { AppId, InstanceId, PrincipalScope, RunId, SessionId } from './ids.js';
 import type { AgentInstance } from './instance.js';
 import { checkUiRequirements, normalizeUiBindings, type UiBindings } from './interactions.js';
 import type { ModelRouting, OutputSafetyHook } from './models.js';
@@ -28,6 +28,7 @@ export interface DiagnosticEvent {
     | 'prepare_failed'
     | 'run_failed'
     | 'dispatch_failed'
+    | 'restore_failed'
     | 'executor_dispose_failed'
     | 'late_event'
     | 'protocol_violation'
@@ -49,6 +50,8 @@ export interface DiagnosticEvent {
 export interface CreateOptions<Agent = unknown, Services = unknown> {
   readonly principalScope: PrincipalScope;
   readonly agent: Agent;
+  /** Restore-only session; the host must scope it and the checkpointer to this principal. */
+  readonly sessionId?: SessionId;
   readonly services?: Services;
   readonly bindings?: Readonly<Record<string, CapabilityBinding<never, unknown>>>;
   /** Per-role providers, consent and ephemeral credentials (ADR-0006). */
@@ -112,7 +115,7 @@ export interface Runtime<
   dispose(): Promise<void>;
 }
 
-/** Creates a runtime synchronously. Each created instance owns a fresh session. */
+/** Creates a runtime synchronously. Instances mint a fresh session unless the host adopts one for restore. */
 export function createRuntime<const Adapters extends readonly ExecutorAdapter<unknown, unknown>[]>(
   options: RuntimeOptions<Adapters>,
 ): Runtime<Adapters> {
@@ -150,6 +153,15 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
   return {
     async create(definition, createOptions) {
       if (disposal !== undefined) throw new GalaxieError('invalid', 'The runtime was disposed.');
+      if (
+        createOptions.sessionId !== undefined &&
+        (typeof createOptions.sessionId !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+            createOptions.sessionId,
+          ) ||
+          createOptions.sessionId.length !== 36)
+      )
+        throw new GalaxieError('invalid', 'The session ID is invalid.');
       const executor = executors.get(definition.executor);
       if (executor === undefined) {
         throw new GalaxieError('unsupported', 'The requested executor is not registered.');

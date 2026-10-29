@@ -124,7 +124,7 @@ export function createAgentInstance(
   diagnostics?: (event: DiagnosticEvent) => void,
 ): AgentInstance<unknown, unknown> {
   const instanceId = globalThis.crypto.randomUUID() as InstanceId;
-  const sessionId = globalThis.crypto.randomUUID() as SessionId;
+  const sessionId = options.sessionId ?? (globalThis.crypto.randomUUID() as SessionId);
   let state: InstanceState = 'created';
   let prepareError: ErrorInfo | undefined;
   let snapshot: AgentSnapshot<unknown> = Object.freeze({ instanceId, state });
@@ -141,7 +141,7 @@ export function createAgentInstance(
   let claimingSlot = false;
   let current: RunRecord | undefined;
   let settlement: Promise<void> = Promise.resolve();
-  const dispatchChecks = new Set<Promise<DispatchReceipt>>();
+  const checkpointChecks = new Set<Promise<unknown>>();
   const payloadAnnotations = new WeakMap<StandardSchema, Annotations | null>();
   const labelPayload = (run: RunRecord, schema: StandardSchema, payload: unknown): void => {
     let annotations = payloadAnnotations.get(schema);
@@ -288,6 +288,14 @@ export function createAgentInstance(
     segment.tracing?.setLabels([...run.labels]);
     segment.tracing?.finish('failed', run.error);
   };
+  // Raw stream events remain untrusted engine output and must never be rendered as UI.
+  const interactionError = (interaction: PendingInteraction): ErrorInfo | undefined => {
+    if (!checkInteractionUrls(interaction.props, instrumentation.urlAllowlist))
+      return toErrorInfo('denied');
+    if (options.ui !== undefined && !checkInteractionBindings(options.ui, interaction))
+      return toErrorInfo('unsupported');
+    return undefined;
+  };
   const acceptEvent = (run: RunRecord, segment: SegmentRecord, event: ExecutorEvent): void => {
     if (!active(run, segment)) {
       report({ kind: 'late_event', runId: run.runId });
@@ -339,17 +347,13 @@ export function createAgentInstance(
           report({ kind: 'protocol_violation', runId: run.runId, error });
           return;
         }
-        // Any later checkpoint-to-pending path, including M3 reload, must apply this check too.
-        // Raw stream events remain untrusted engine output and must never be rendered as UI.
-        if (!checkInteractionUrls(event.interaction.props, instrumentation.urlAllowlist)) {
-          failRun(run, toErrorInfo('denied'));
-          report({ kind: 'interaction_rejected', runId: run.runId });
-          return;
-        }
-        if (options.ui !== undefined && !checkInteractionBindings(options.ui, event.interaction)) {
-          failRun(run, toErrorInfo('unsupported'));
-          report({ kind: 'interaction_rejected', runId: run.runId });
-          return;
+        {
+          const error = interactionError(event.interaction);
+          if (error !== undefined) {
+            failRun(run, error);
+            report({ kind: 'interaction_rejected', runId: run.runId });
+            return;
+          }
         }
         segment.outcome = 'waiting_input';
         segment.clearWallClock?.();
@@ -504,6 +508,7 @@ export function createAgentInstance(
 
   return {
     instanceId,
+    sessionId,
     getSnapshot: () => snapshot,
     subscribe(listener): () => void {
       if (state !== 'disposed') listeners.add(listener);
@@ -570,6 +575,8 @@ export function createAgentInstance(
       let grants: ReadonlySet<string>;
       try {
         assertUsable();
+        if (options.sessionId !== undefined)
+          throw new GalaxieError('invalid', 'An adopted session can only be restored.');
         grants = broker.validateGrants(startOptions?.grants);
         if (state !== 'ready' || claimingSlot || (current !== undefined && !terminal(current))) {
           throw new GalaxieError('invalid', 'The instance has no available run slot.');
@@ -616,6 +623,71 @@ export function createAgentInstance(
         startSegment(run, { type: 'start', input: value }, parent);
         return { runId };
       })();
+    },
+    restore(restoreOptions): Promise<{ readonly runId: RunId } | undefined> {
+      let grants: ReadonlySet<string>;
+      try {
+        assertUsable();
+        grants = broker.validateGrants(restoreOptions?.grants);
+        if (state !== 'ready' || claimingSlot || (current !== undefined && !terminal(current)))
+          throw new GalaxieError('invalid', 'The instance has no available run slot.');
+        if (
+          !adapter.features.interrupts ||
+          !adapter.features.resume ||
+          !adapter.features.checkpoints
+        )
+          throw new GalaxieError('unsupported', 'This operation is unsupported.');
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      claimingSlot = true;
+      const restoring = (async () => {
+        let restored: RunRecord;
+        try {
+          let pending: PendingInteraction | undefined;
+          try {
+            pending = await executor?.pending(sessionId);
+          } catch (error) {
+            report({ kind: 'restore_failed', error });
+            throw new GalaxieError('executor_error', toErrorInfo('executor_error').message);
+          }
+          assertUsable();
+          if (pending === undefined) return undefined;
+          const error = interactionError(pending);
+          if (error !== undefined) {
+            report({ kind: 'interaction_rejected' });
+            throw new GalaxieError(error.code, error.message);
+          }
+          const runId = globalThis.crypto.randomUUID() as RunId;
+          const run: RunRecord = {
+            runId,
+            controller: new AbortController(),
+            capabilityController: new AbortController(),
+            labels: new Set<DataLabel>(['public', 'app', 'private-user']),
+            privateValues: new Set(),
+            submittedText: true,
+            grants,
+            events: new RunEvents(runId),
+            budget: new RunBudget(instrumentation.limits),
+            inbox: new Map(),
+            status: 'waiting_input',
+            pending,
+          };
+          run.events.append({ type: 'interaction', interaction: pending });
+          current = run;
+          restored = run;
+        } finally {
+          claimingSlot = false;
+        }
+        publish(restored.events);
+        return { runId: restored.runId };
+      })();
+      checkpointChecks.add(restoring);
+      void restoring.then(
+        () => checkpointChecks.delete(restoring),
+        () => checkpointChecks.delete(restoring),
+      );
+      return restoring;
     },
     dispatch(event): Promise<DispatchReceipt> {
       try {
@@ -687,8 +759,8 @@ export function createAgentInstance(
           delete run.dispatching;
         }
       })();
-      dispatchChecks.add(checking);
-      void checking.then(() => dispatchChecks.delete(checking));
+      checkpointChecks.add(checking);
+      void checking.then(() => checkpointChecks.delete(checking));
       return checking;
     },
     async cancel(runId) {
@@ -728,7 +800,9 @@ export function createAgentInstance(
         router.dispose();
       });
       void (async () => {
-        await waitForSettlement(Promise.all([settlement, ...dispatchChecks]).then(() => {}));
+        await waitForSettlement(
+          Promise.allSettled([settlement, ...checkpointChecks]).then(() => {}),
+        );
         await disposeExecutor();
         state = 'disposed';
         publish();
