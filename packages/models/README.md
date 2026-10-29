@@ -27,11 +27,20 @@ This host-side example makes no network request. In an agent, use the adapter's
 by ID in `services.chatModels` and supply descriptors and role routes through
 `CreateOptions.models`; calling a provider directly bypasses routing policy.
 
-`/webllm` needs a host-owned worker importing `/webllm/worker`.
+`/webllm` needs a host-owned worker importing `/webllm/worker`. The host owns provider
+handles: instance and runtime disposal never unload them. A WebLLM handle and its
+worker can serve multiple instances or runtimes in the same page through one FIFO
+queue. The host calls `handle.dispose()` when the last consumer is gone; it unloads
+once and is idempotent. There is no reference counting or automatic unload.
+
 `/builtin-ai` runs on the page and separates readiness probing from an intentional
-download. `/openai` supplies `openAICompatible` for short-lived, per-call host
+download. Its sessions belong to individual calls: cancelling or disposing one
+consumer destroys its session without destroying another consumer's in-flight
+session. `/openai` supplies `openAICompatible` for short-lived, per-call host
 credentials. All automated model tests use fakes; the real device demonstrations
 are recorded in the [M2 exit record](../../docs/m2-exit-record.md).
+Shared-model lifetime has [fake-engine and fake Prompt API conformance evidence](../../tests/conformance/shared-model-lifetime.test.ts)
+on Node and headless Chromium only. Real prefill abort latency remains unmeasured.
 
 See [coding guidance](AGENTS.md), [model routing and provider limits](../../docs/system-design.md#84-a-model-call)
 and [the baseline](../../docs/adr/0012-security-baseline.md).
