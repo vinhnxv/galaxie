@@ -93,6 +93,24 @@ and reset on reload. Unknown remote outcomes require backend reconciliation by
 effect ID; recovery cannot finish arbitrary intermediate checkpoints without a
 pending interrupt.
 
+Bind `saver.exportSession(sessionId)` to an explicit metadata-summary action.
+Call `saver.exportSession(sessionId, { personalContent: true })` only after the
+user accepts a host-rendered confirmation explaining that the file contains
+answers and lesson text. Cancel must export nothing. Keep the saver and session
+ID in trusted host wiring, with no model-controlled export action. The
+[host-local example](../../examples/host-local/README.md#session-export) supplies
+both actions and disables them without a session or current ownership. It
+rechecks ownership and logout after the asynchronous read, before downloading.
+Export failures show fixed text without record content or raw host errors.
+
+For a local download, serialize the frozen JSON export into an `application/json`
+Blob, create an object URL, click a temporary anchor with `download`, then remove
+the anchor and revoke the URL. This adds no HTML sink or Trusted Types policy and
+needs no CSP relaxation in the tested Chromium flow. Treat personal exports as
+personal data, including lesson text and capability results in checkpoints;
+logout cannot revoke a returned copy or downloaded file. Exports are lossy and
+provide no import, sync or cross-device recovery.
+
 ## User-device endpoints and Local Network Access
 
 The [OpenAI-compatible model contract](../system-design.md#84-a-model-call)

@@ -161,8 +161,9 @@ const personal = await saver.exportSession(instance.sessionId, { personalContent
 
 Hosts must bind `personalContent: true` to an explicit user action and treat the
 result as personal data. Only the boolean `true` includes content. This method
-does not download, transmit or persist the export; neither example host wires
-an export UI yet. A package manifest never includes this session data.
+does not download, transmit or persist the export. `examples/host-local` binds
+it to two explicit actions, with personal content behind a host-rendered
+confirmation; host-remote has no export. A package manifest never includes this session data.
 
 Metadata contains the recorded agent identity (`null` for legacy checkpoints
 without one), checkpoint count and first/last checkpoint timestamps (`null`

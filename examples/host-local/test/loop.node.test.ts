@@ -5,7 +5,7 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type Browser, type BrowserContext, chromium, type Page } from 'playwright';
+import { type Browser, type BrowserContext, chromium, type Download, type Page } from 'playwright';
 import { build, type PreviewServer, preview } from 'vite';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { cspHeader } from '../src/csp.js';
@@ -33,6 +33,8 @@ const distinctiveSpans = [
   '7f3e she',
   'she walk to school',
 ];
+const exportTestToken = 'host-export-token-canary-7f3e';
+const exportProviderKey = 'sk-galaxie-export-fixture-000000000000';
 function containsSentence(request: RequestRecord): boolean {
   const raw = JSON.stringify(request);
   let decoded = raw;
@@ -168,6 +170,17 @@ it('completes the mock lesson without sentence egress and enforces the CSP', asy
   try {
     const response = await page.goto(mockOrigin);
     expect(response?.headers()['content-security-policy']).toBe(cspHeader('mock'));
+    const downloads: Download[] = [];
+    page.on('download', (download) => downloads.push(download));
+    for (const name of ['Export session summary', 'Export my answers'])
+      expect(await page.getByRole('button', { name, exact: true }).isDisabled()).toBe(true);
+    await page.evaluate(
+      ({ token, key }) => {
+        localStorage.setItem('export-test-token', token);
+        localStorage.setItem('export-test-provider-key', key);
+      },
+      { token: exportTestToken, key: exportProviderKey },
+    );
     await page.getByRole('button', { name: 'Start', exact: true }).click();
     await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
     expect(
@@ -191,6 +204,48 @@ it('completes the mock lesson without sentence egress and enforces the CSP', asy
     expect(await page.getByRole('textbox').inputValue()).toBe('');
     await page.getByRole('textbox').fill(sentinelSentence);
     await page.getByRole('button', { name: 'Submit sentence' }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).waitFor();
+    const summaryDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export session summary', exact: true }).click();
+    const summary = await summaryDownload;
+    expect(summary.suggestedFilename()).toBe('galaxie-session-summary.json');
+    const summaryText = await readFile((await summary.path()) as string, 'utf8');
+    const summaryData = JSON.parse(summaryText);
+    expect(summaryData.personalContent).toBe(false);
+    expect(summaryData).not.toHaveProperty('checkpoints');
+    expect(summaryText).not.toContain(sentinelSentence);
+
+    await page.getByRole('button', { name: 'Export my answers', exact: true }).click();
+    const confirmation = page.getByRole('group', { name: 'Export my answers' });
+    expect(await confirmation.textContent()).toContain(
+      'This file contains your answers and lesson text. Keep it private.',
+    );
+    await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await confirmation.waitFor({ state: 'hidden' });
+    expect(downloads).toHaveLength(1);
+
+    await page.getByRole('button', { name: 'Export my answers', exact: true }).click();
+    await page.screenshot({ path: join(tmpdir(), 'galaxie-export-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: join(tmpdir(), 'galaxie-export-mobile.png'), fullPage: true });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    const answersDownload = page.waitForEvent('download');
+    await confirmation.getByRole('button', { name: 'Download', exact: true }).click();
+    const answers = await answersDownload;
+    expect(answers.suggestedFilename()).toBe('galaxie-session-answers.json');
+    const answersText = await readFile((await answers.path()) as string, 'utf8');
+    expect(JSON.parse(answersText).personalContent).toBe(true);
+    expect(answersText).toContain(sentinelSentence);
+    for (const content of [summaryText, answersText]) {
+      expect(content).not.toMatch(/sk-[A-Za-z0-9_-]{20,}/);
+      expect(content).not.toContain(exportProviderKey);
+      expect(content).not.toContain(exportTestToken);
+    }
+    expect(downloads).toHaveLength(2);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     expect(
       await page
@@ -209,6 +264,9 @@ it('completes the mock lesson without sentence egress and enforces the CSP', asy
     await page.getByRole('button', { name: 'Start', exact: true }).waitFor();
     expect(await page.getByRole('button', { name: 'Start', exact: true }).isEnabled()).toBe(true);
     expect(await page.getByRole('radio').count()).toBe(0);
+    for (const name of ['Export session summary', 'Export my answers'])
+      expect(await page.getByRole('button', { name, exact: true }).isDisabled()).toBe(true);
+    expect(downloads).toHaveLength(2);
 
     const negativeUrl = `${mockOrigin}/leak-control?sentence=${encodeURIComponent(sentinelSentence)}`;
     await page.evaluate(async (url) => {
@@ -340,6 +398,43 @@ it('loads default mode and constructs the bundled worker without a model or down
   }
 }, 60_000);
 
+it('shows a fixed export failure without a download or host error text', async () => {
+  const { page, context, requests, errors, consoleErrors } = await observe(mockOrigin);
+  const downloads: Download[] = [];
+  page.on('download', (download) => downloads.push(download));
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    await page.evaluate(() => {
+      const original = IDBDatabase.prototype.transaction;
+      IDBDatabase.prototype.transaction = function (
+        this: IDBDatabase,
+        ...args: Parameters<IDBDatabase['transaction']>
+      ) {
+        if (args[1] === 'readonly') {
+          IDBDatabase.prototype.transaction = original;
+          throw new Error('private-export-error-canary');
+        }
+        return original.apply(this, args);
+      };
+    });
+    await page.getByRole('button', { name: 'Export session summary', exact: true }).click();
+    await page
+      .getByRole('alert')
+      .filter({ hasText: /^Export failed$/ })
+      .waitFor();
+    expect(await page.locator('body').textContent()).not.toContain('private-export-error-canary');
+    expect(downloads).toHaveLength(0);
+    expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    expect(await violations(page)).toEqual([]);
+    assertLocalRequests(requests, mockOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
 const sessionKey = 'galaxie-host-local:local-demo-learner:session';
 
 it('clears an empty stored thread and returns to the start screen', async () => {
@@ -382,6 +477,8 @@ it('keeps a copied session inactive while another tab holds its Web Lock', async
       true,
     );
     expect(await second.getByRole('radio').count()).toBe(0);
+    for (const name of ['Export session summary', 'Export my answers'])
+      expect(await second.getByRole('button', { name, exact: true }).isDisabled()).toBe(true);
     expect(await second.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBe(sessionId);
     expect(await page.getByRole('radio').count()).toBe(9);
     assertLocalRequests(requests, mockOrigin);
@@ -396,6 +493,7 @@ it('hands a copied lesson to Use here and leaves the former tab inert', async ()
     await page.goto(mockOrigin);
     await page.getByRole('button', { name: 'Start', exact: true }).click();
     await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Export my answers', exact: true }).click();
     const sessionId = await page.evaluate((key) => sessionStorage.getItem(key), sessionKey);
     const second = await context.newPage();
     await second.addInitScript(({ key, value }) => sessionStorage.setItem(key, value), {
@@ -429,6 +527,11 @@ it('hands a copied lesson to Use here and leaves the former tab inert', async ()
       fullPage: true,
     });
     expect(await page.getByRole('button', { name: 'Start', exact: true }).isDisabled()).toBe(true);
+    for (const name of ['Export session summary', 'Export my answers']) {
+      expect(await page.getByRole('button', { name, exact: true }).isDisabled()).toBe(true);
+      expect(await second.getByRole('button', { name, exact: true }).isEnabled()).toBe(true);
+    }
+    expect(await page.getByRole('group', { name: 'Export my answers' }).count()).toBe(0);
     for (const input of await page.getByRole('radio').all())
       expect(await input.isDisabled()).toBe(true);
     expect(await second.getByRole('radio', { name: 'walk', exact: true }).isEnabled()).toBe(true);
@@ -813,6 +916,8 @@ it.each([false, true])(
       }
       // A former owner has already disposed its runtime and closed its saver.
       const source = formerOwner ? page : second;
+      const active = formerOwner ? second : page;
+      await active.getByRole('button', { name: 'Export my answers', exact: true }).click();
       await source
         .getByRole('button', { name: 'Sign out', exact: true })
         .waitFor({ timeout: 1000 });
@@ -826,6 +931,9 @@ it.each([false, true])(
           true,
         );
         expect(await current.getByRole('radio').count()).toBe(0);
+        for (const name of ['Export session summary', 'Export my answers'])
+          expect(await current.getByRole('button', { name, exact: true }).isDisabled()).toBe(true);
+        expect(await current.getByRole('group', { name: 'Export my answers' }).count()).toBe(0);
         expect(await current.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBeNull();
       }
       await page.screenshot({ path: join(tmpdir(), 'galaxie-logout-desktop.png'), fullPage: true });

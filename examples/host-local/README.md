@@ -43,6 +43,23 @@ In development, the enforced CSP and Trusted Types policy produce one expected b
 
 The in-memory checkpointer stays on-device and belongs to the host's fixed demo learner and session. The local progress binding authorizes only the fixture lesson and stores `{ lessonId, score, total }` under a learner ID held by the host, never supplied by the agent. Scores are practice data, with no server authority. State and drafts disappear on reload; reload restore and draft persistence belong to M3.
 
+## Session export
+
+Both export actions are enabled only while a session exists and this page owns it.
+**Export session summary** downloads `galaxie-session-summary.json` with metadata
+only, without checkpoints or answers. **Export my answers** shows the host-rendered
+warning: "This file contains your answers and lesson text. Keep it private."
+Only **Download** requests personal content and downloads `galaxie-session-answers.json`;
+**Cancel** exports nothing. Failures show only **Export failed**.
+
+The host uses its existing principal-scoped saver and creates a local JSON Blob
+download, then removes the temporary link and revokes its object URL. No request
+transmits the export, and CSP and Trusted Types remain unchanged. Ownership loss
+or sign-out closes the confirmation and prevents an in-flight read from downloading.
+Treat the answers file as personal data: it can contain answers, lesson text and
+capability results. Sign-out cannot revoke a file already downloaded. Export is
+lossy; there is no import, sync or cross-device recovery.
+
 ## Evidence and limits
 
 Run the Node-side Playwright loop and the full gates from the repository root:
@@ -53,7 +70,7 @@ pnpm check
 CI=true pnpm test
 ```
 
-The loop builds production bundles in mock and default modes in temporary directories, serves each on an ephemeral loopback port, and drives headless Chromium. It records URLs, headers and post data through context routing, aborting other origins. The mock lesson finishes with one wrong answer and a projected score of 2/3. No request carries the sentinel or its distinctive word spans, and every observed request is a same-origin GET. Requests deliberately sent from page code and from the inert worker prove that the recorder detects a leak before those controls are excluded from the lesson evidence.
+The loop builds production bundles in mock and default modes in temporary directories, serves each on an ephemeral loopback port, and drives headless Chromium. It records URLs, headers and post data through context routing, aborting other origins. The mock lesson finishes with one wrong answer and a projected score of 2/3. It captures and parses both export downloads: the summary omits checkpoints and the learner sentence, and personal content appears only after Download. Cancel produces no download; neither file contains the seeded test token or provider-key-shaped string. Export failures show fixed text, and ownership loss and logout remove the confirmation and disable exports. No request carries the sentinel or its distinctive word spans, and every observed request is a same-origin GET. Requests deliberately sent from page code and from the inert worker prove that the recorder detects a leak before those controls are excluded from the lesson evidence.
 
 The test compares the document header with the shared policy, checks that an external fetch rejects with a `connect-src` violation, probes eval through CDP with CSP bypass disabled, and verifies that string assignment to `innerHTML` throws a Trusted Types error. It rejects uncaught errors and unexpected CSP violations. The default-mode case checks initial load and the exported worker factory without a WebGPU adapter, a real `LanguageModel`, an engine message or a model download; it verifies that context routing sees worker traffic and that the real WebLLM bundle is never requested. Once the default policy is installed, other same-origin and cross-origin worker URLs and string HTML are rejected. A separate runtime smoke uses fake Built-in AI for both roles, restoring any prior global descriptor afterwards. A Node entry-point test with fake resources preserves a cached document on persisted `pagehide` and verifies disposal on a later discarded-document transition; actual browser-cache restoration with real models remains unmeasured.
 

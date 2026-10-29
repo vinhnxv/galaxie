@@ -53,7 +53,7 @@ Browser eviction may return a fresh start. Storage is not encrypted by this
 package. Reload recovery needs compatible graph identity and an outstanding
 interrupt; it cannot finish arbitrary intermediate checkpoints.
 Exports are lossy JSON snapshots, with no import, sync or cross-device recovery.
-There is no example-host export UI. Logout rejects an in-progress export before
+Only `examples/host-local` wires an export UI. Logout rejects an in-progress export before
 publication but cannot revoke copies already returned to host code.
 Ownership must be composed by the host; an already-sent remote effect may finish.
 See [ownership](../../docs/system-design.md#85-tab-ownership-and-takeover) and

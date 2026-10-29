@@ -18,7 +18,13 @@ import {
 import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie/react';
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { LocalHost, StorageStatus } from './runtime.js';
-import { hostAppId, hostLearnerId, invalidateLocalPrincipal, sessionKey } from './session.js';
+import {
+  downloadSession,
+  hostAppId,
+  hostLearnerId,
+  invalidateLocalPrincipal,
+  sessionKey,
+} from './session.js';
 
 interface AppProps {
   readonly initialHost?: LocalHost;
@@ -80,6 +86,9 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
   const [signedOut, setSignedOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutFailed, setSignOutFailed] = useState(false);
+  const [confirmExport, setConfirmExport] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportFailed, setExportFailed] = useState(false);
   const signingOutRef = useRef(false);
   const signedOutRef = useRef(false);
   const signOutDisposal = useRef<Promise<void> | undefined>(undefined);
@@ -95,6 +104,46 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
   const ownership = useRef<SessionOwnership | undefined>(undefined);
   const starting = useRef(false);
   const mounted = useRef(true);
+  const canExport =
+    host !== undefined &&
+    instance !== undefined &&
+    ownership.current !== undefined &&
+    !ownership.current.handle.signal.aborted &&
+    !signedOut &&
+    !signingOut &&
+    !moved &&
+    !blocked &&
+    !checking &&
+    storageStatus !== 'superseded';
+
+  const exportSession = async (personalContent = false): Promise<void> => {
+    if (!host || !instance || !canExport || exporting) return;
+    const owner = ownership.current;
+    const stillCurrent = (): boolean =>
+      mounted.current &&
+      !lost.current &&
+      !signingOutRef.current &&
+      !signedOutRef.current &&
+      owner === ownership.current &&
+      owner !== undefined &&
+      !owner.handle.signal.aborted &&
+      currentInstance.current === instance &&
+      host.getStorageStatus() !== 'superseded';
+    if (!stillCurrent()) return;
+    setConfirmExport(false);
+    setExportFailed(false);
+    setExporting(true);
+    try {
+      const exported = personalContent
+        ? await host.exportSession(instance.sessionId, { personalContent: true })
+        : await host.exportSession(instance.sessionId);
+      if (stillCurrent()) downloadSession(exported);
+    } catch {
+      if (stillCurrent()) setExportFailed(true);
+    } finally {
+      if (mounted.current) setExporting(false);
+    }
+  };
 
   const finishSignOut = useCallback((): Promise<void> => {
     if (signedOutRef.current) return signOutDisposal.current ?? Promise.resolve();
@@ -108,6 +157,8 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
       setMoved(false);
       setError(undefined);
       setSignOutFailed(false);
+      setConfirmExport(false);
+      setExportFailed(false);
       setChecking(false);
       setRetryRestore(false);
       setRecoverySession(undefined);
@@ -216,6 +267,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
         owner.unsubscribe?.();
         if (mounted.current) {
           setMoved(true);
+          setConfirmExport(false);
           setBlocked(true);
           setRetryRestore(false);
           setChecking(false);
@@ -447,6 +499,32 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
       <button type="button" disabled={signedOut || signingOut} onClick={() => void signOut()}>
         Sign out
       </button>
+      <button type="button" disabled={!canExport || exporting} onClick={() => void exportSession()}>
+        Export session summary
+      </button>
+      <button
+        type="button"
+        disabled={!canExport || exporting}
+        onClick={() => {
+          setExportFailed(false);
+          setConfirmExport(true);
+        }}
+      >
+        Export my answers
+      </button>
+      {confirmExport && canExport ? (
+        <fieldset>
+          <legend>Export my answers</legend>
+          <p>This file contains your answers and lesson text. Keep it private.</p>
+          <button type="button" disabled={exporting} onClick={() => void exportSession(true)}>
+            Download
+          </button>
+          <button type="button" onClick={() => setConfirmExport(false)}>
+            Cancel
+          </button>
+        </fieldset>
+      ) : null}
+      {exportFailed && canExport ? <p role="alert">Export failed</p> : null}
       {signedOut ? <p role="status">Signed out. Reload to continue.</p> : null}
       {signOutFailed && !signedOut ? <p role="alert">Sign out failed</p> : null}
       {moved && !signedOut ? <p role="alert">The lesson moved to another tab.</p> : null}
