@@ -27,6 +27,8 @@ import {
   AIMessageChunk,
   type BaseMessage,
   type BaseMessageLike,
+  isAIMessage,
+  isAIMessageChunk,
   type StandardMessageStructure,
 } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult, type LLMResult } from '@langchain/core/outputs';
@@ -96,6 +98,26 @@ function finish(call: CallState, successful: boolean, reported?: ModelUsage): vo
 }
 function recordFailure(call: CallState, error: unknown): void {
   if (call.lease.credential !== undefined) call.handler.recordCredentialFailure(error);
+}
+
+/** Keep provider token output behind the routed model's checks on every LangChain path. */
+function filteredManager(
+  runManager: CallbackManagerForLLMRun | undefined,
+): CallbackManagerForLLMRun | undefined {
+  if (runManager === undefined) return undefined;
+  return Object.assign(Object.create(runManager), {
+    handleLLMNewToken: async () => {},
+    handleChatModelStreamEvent: async () => {},
+  });
+}
+
+function outputText(message: BaseMessage): string {
+  return [
+    message.text,
+    ...(isAIMessage(message)
+      ? (message.tool_calls?.map((call) => JSON.stringify(call.args)) ?? [])
+      : []),
+  ].join('\n');
 }
 export function selectedRouteFromOptions(options: unknown): SelectedModelRoute | undefined {
   if (typeof options !== 'object' || options === null) return undefined;
@@ -286,7 +308,11 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     const call = await this.#take(options);
     try {
       if (runManager !== undefined) call.handler.setModelRoute(runManager.runId, call.lease);
-      const result = await call.provider._generate(messages, options, runManager);
+      const result = await call.provider._generate(messages, options, filteredManager(runManager));
+      await call.lease.checkOutput(
+        result.generations.map((generation) => outputText(generation.message)).join('\n'),
+        { final: true },
+      );
       finish(
         call,
         true,
@@ -297,6 +323,8 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       recordFailure(call, error);
       throw error;
     } finally {
+      if (runManager !== undefined)
+        call.handler.setOutputSafetyOutcome(runManager.runId, call.lease.outputSafetyOutcome);
       finish(call, false);
     }
   }
@@ -310,12 +338,22 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     try {
       if (runManager !== undefined) call.handler.setModelRoute(runManager.runId, call.lease);
       let reported: ModelUsage | undefined;
+      let accumulated = '';
+      const providerManager = filteredManager(runManager);
       const chunks =
         call.provider.disableStreaming === true ||
         call.provider._streamResponseChunks === BaseChatModel.prototype._streamResponseChunks
-          ? this.#generateChunk(call.provider, messages, options, runManager)
-          : call.provider._streamResponseChunks(messages, options, runManager);
+          ? this.#generateChunk(call.provider, messages, options, providerManager)
+          : call.provider._streamResponseChunks(messages, options, providerManager);
       for await (const chunk of chunks) {
+        const argumentsText = isAIMessageChunk(chunk.message)
+          ? (chunk.message.tool_call_chunks?.map((call) => call.args ?? '').join('') ?? '')
+          : '';
+        const next = accumulated + chunk.text + argumentsText;
+        if (next.length > accumulated.length) {
+          accumulated = next;
+          await call.lease.checkOutput(accumulated, { final: false });
+        }
         const current = usage(chunk.message);
         if (current !== undefined)
           reported = {
@@ -323,12 +361,23 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
             outputTokens: (reported?.outputTokens ?? 0) + current.outputTokens,
           };
         yield chunk;
+        await runManager?.handleLLMNewToken(
+          chunk.text,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          { chunk },
+        );
       }
+      await call.lease.checkOutput(accumulated, { final: true });
       finish(call, true, reported);
     } catch (error) {
       recordFailure(call, error);
       throw error;
     } finally {
+      if (runManager !== undefined)
+        call.handler.setOutputSafetyOutcome(runManager.runId, call.lease.outputSafetyOutcome);
       finish(call, false);
     }
   }
@@ -344,7 +393,19 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     if (generation === undefined) return;
     const chunk = new ChatGenerationChunk({
       text: generation.text,
-      message: new AIMessageChunk<StandardMessageStructure>({ ...generation.message }),
+      message: new AIMessageChunk<StandardMessageStructure>({
+        ...generation.message,
+        ...(isAIMessage(generation.message)
+          ? {
+              tool_call_chunks: (generation.message.tool_calls ?? []).map((call, index) => ({
+                name: call.name,
+                ...(call.id === undefined ? {} : { id: call.id }),
+                index,
+                args: JSON.stringify(call.args),
+              })),
+            }
+          : {}),
+      }),
       ...(generation.generationInfo === undefined
         ? {}
         : { generationInfo: generation.generationInfo }),
