@@ -11,6 +11,7 @@ import {
   type ModelRouting,
   type OutputSafetyHook,
   type Runtime,
+  type SessionId,
 } from '@galaxie/core';
 import {
   createTutorAgent,
@@ -22,6 +23,8 @@ import {
 import { BuiltInAIChatModel, checkBuiltInAI, prepareBuiltInAI } from '@galaxie/models/builtin-ai';
 import { loadWebLLMEngine, WebLLMChatModel, type WebLLMEngineHandle } from '@galaxie/models/webllm';
 import { createRegistry, educationComponents, type Registry } from '@galaxie/react';
+import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import { hostAppId, hostLearnerId } from './session.js';
 import { allowWorkerScript } from './trusted-types.js';
 
 // The core error vocabulary has no not_found code; this stays in the host binding.
@@ -33,7 +36,8 @@ class LessonNotFoundError extends Error {
   }
 }
 
-export const hostLearnerId = 'local-demo-learner';
+export { hostLearnerId } from './session.js';
+
 const languages = { inputLanguages: ['en'], outputLanguages: ['en'] };
 
 export const localDescriptor: ModelDescriptor = {
@@ -54,7 +58,7 @@ export interface LocalHost {
   readonly registry: Registry;
   readonly bindings: BindingsFor<typeof tutorDefinition>;
   readonly progress: ReadonlyMap<string, ProgressInput>;
-  createInstance(): Promise<AgentInstance<TutorInput, unknown>>;
+  createInstance(sessionId?: SessionId): Promise<AgentInstance<TutorInput, unknown>>;
 }
 
 // This fixed marker demonstrates the hook seam; it is not a content filter.
@@ -95,24 +99,54 @@ export function createLocalHost(models: LocalModels): LocalHost {
     },
   };
   const runtime = createRuntime({
-    appId: 'galaxie-host-local',
+    appId: hostAppId,
     executors: [createLangGraphAdapter()],
     outputSafety,
   });
+  let saver: Promise<IndexedDBSaver> | undefined;
+  let disposed = false;
+  let disposal: Promise<void> | undefined;
+  const disposeRuntime = runtime.dispose.bind(runtime);
+  runtime.dispose = () => {
+    if (disposal === undefined) {
+      disposed = true;
+      disposal = (async () => {
+        await disposeRuntime();
+        (await saver?.catch(() => undefined))?.close();
+      })();
+    }
+    return disposal;
+  };
   return {
     runtime,
     registry,
     bindings,
     progress,
-    createInstance: () =>
-      runtime.create(tutorDefinition, {
+    async createInstance(sessionId) {
+      if (disposed) throw new GalaxieError('invalid', 'The runtime was disposed.');
+      let checkpointer: IndexedDBSaver | undefined;
+      if (globalThis.indexedDB !== undefined) {
+        saver ??= IndexedDBSaver.open({ appId: hostAppId, principalScope: hostLearnerId });
+        try {
+          checkpointer = await saver;
+        } catch (error) {
+          saver = undefined;
+          throw error;
+        }
+      }
+      return runtime.create(tutorDefinition, {
         principalScope: hostLearnerId,
+        ...(sessionId === undefined ? {} : { sessionId }),
         agent: createTutorAgent(),
-        services: { chatModels: models.chatModels },
+        services: {
+          chatModels: models.chatModels,
+          ...(checkpointer === undefined ? {} : { checkpointer }),
+        },
         models: models.routing,
         bindings,
         ui: registry.bindings({ surfaces: ['lesson-main'] }),
-      }),
+      });
+    },
   };
 }
 

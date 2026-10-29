@@ -169,10 +169,19 @@ it('completes the mock lesson without sentence egress and enforces the CSP', asy
     const response = await page.goto(mockOrigin);
     expect(response?.headers()['content-security-policy']).toBe(cspHeader('mock'));
     await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const questions = await page.locator('fieldset').allTextContents();
+    await page.reload();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor({ timeout: 5_000 });
+    expect(await page.locator('fieldset').allTextContents()).toEqual(questions);
     await page.getByRole('radio', { name: 'walk', exact: true }).check();
     await page.getByRole('radio', { name: 'play', exact: true }).check();
     await page.getByRole('radio', { name: 'drinks', exact: true }).check();
     await page.getByRole('button', { name: 'Submit answers' }).click();
+    await page.getByRole('textbox').fill('An unfinished local draft.');
+    await page.reload();
+    await page.getByRole('textbox').waitFor({ timeout: 5_000 });
+    expect(await page.getByRole('textbox').inputValue()).toBe('');
     await page.getByRole('textbox').fill(sentinelSentence);
     await page.getByRole('button', { name: 'Submit sentence' }).click();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -182,6 +191,11 @@ it('completes the mock lesson without sentence egress and enforces the CSP', asy
     expect(consoleErrors).toEqual([]);
     expect(await violations(page)).toEqual([]);
     assertLocalRequests(requests, mockOrigin);
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Start', exact: true }).waitFor();
+    expect(await page.getByRole('button', { name: 'Start', exact: true }).isEnabled()).toBe(true);
+    expect(await page.getByRole('radio').count()).toBe(0);
 
     const negativeUrl = `${mockOrigin}/leak-control?sentence=${encodeURIComponent(sentinelSentence)}`;
     await page.evaluate(async (url) => {
@@ -308,6 +322,89 @@ it('loads default mode and constructs the bundled worker without a model or down
       requests.filter((request) => request.url !== workerControl),
       defaultOrigin,
     );
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+const sessionKey = 'galaxie-host-local:local-demo-learner:session';
+
+it('clears an empty stored thread and returns to the start screen', async () => {
+  const { page, context, requests } = await observe(mockOrigin);
+  try {
+    await page.addInitScript((key) => sessionStorage.setItem(key, crypto.randomUUID()), sessionKey);
+    await page.goto(mockOrigin);
+    await expect
+      .poll(() => page.evaluate((key) => sessionStorage.getItem(key), sessionKey))
+      .toBeNull();
+    await expect
+      .poll(() => page.getByRole('button', { name: 'Start', exact: true }).isEnabled())
+      .toBe(true);
+    expect(await page.getByRole('radio').count()).toBe(0);
+    assertLocalRequests(requests, mockOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it('keeps a copied session inactive while another tab holds its Web Lock', async () => {
+  const { page, context, requests } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const sessionId = await page.evaluate((key) => sessionStorage.getItem(key), sessionKey);
+    expect(sessionId).toBeTypeOf('string');
+    const second = await context.newPage();
+    await second.addInitScript(({ key, value }) => sessionStorage.setItem(key, value), {
+      key: sessionKey,
+      value: sessionId as string,
+    });
+    await second.goto(mockOrigin);
+    await second
+      .getByRole('alert')
+      .filter({ hasText: 'The lesson is active in another tab.' })
+      .waitFor({ timeout: 5_000 });
+    expect(await second.getByRole('button', { name: 'Start', exact: true }).isDisabled()).toBe(
+      true,
+    );
+    expect(await second.getByRole('radio').count()).toBe(0);
+    expect(await second.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBe(sessionId);
+    expect(await page.getByRole('radio').count()).toBe(9);
+    assertLocalRequests(requests, mockOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it('keeps an operationally failed session for Retry without exposing host error text', async () => {
+  const { page, context, requests, errors, consoleErrors } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const sessionId = await page.evaluate((key) => sessionStorage.getItem(key), sessionKey);
+    await page.addInitScript(() => {
+      const original = IDBFactory.prototype.open;
+      IDBFactory.prototype.open = () => {
+        IDBFactory.prototype.open = original;
+        throw new Error('private-host-error-canary');
+      };
+    });
+    await page.reload();
+    await page
+      .getByRole('alert')
+      .filter({ hasText: 'The lesson could not be restored. Try again.' })
+      .waitFor({ timeout: 5_000 });
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBe(sessionId);
+    expect(await page.locator('body').textContent()).not.toContain('private-host-error-canary');
+    expect(await page.getByRole('button', { name: 'Start', exact: true }).isDisabled()).toBe(true);
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor({ timeout: 5_000 });
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBe(sessionId);
+    expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    assertLocalRequests(requests, mockOrigin);
   } finally {
     await context.close();
   }

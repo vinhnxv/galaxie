@@ -28,6 +28,9 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
         new URL('../../packages/models/src/mock.ts', import.meta.url),
       ),
       '@galaxie/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
+      '@galaxie/storage-indexeddb': fileURLToPath(
+        new URL('../../packages/storage-indexeddb/src/index.ts', import.meta.url),
+      ),
       '@galaxie/adapter-langgraph': fileURLToPath(
         new URL('../../packages/adapter-langgraph/src/index.ts', import.meta.url),
       ),

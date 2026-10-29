@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@galaxie/core": "workspace:*",
+    "@galaxie/storage-indexeddb": "workspace:*",
     "@galaxie/adapter-langgraph": "workspace:*",
     "@galaxie/models": "workspace:*",
     "@galaxie/react": "workspace:*",
