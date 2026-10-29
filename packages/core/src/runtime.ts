@@ -9,7 +9,7 @@ import { dataPolicy } from './capability-broker.js';
 import type { AgentDefinition, BindingsFor } from './definition.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
-import type { AppId, InstanceId, PrincipalScope, RunId, SessionId } from './ids.js';
+import type { AppId, EffectId, InstanceId, PrincipalScope, RunId, SessionId } from './ids.js';
 import type { AgentInstance } from './instance.js';
 import { checkUiRequirements, normalizeUiBindings, type UiBindings } from './interactions.js';
 import type { ModelRouting, OutputSafetyHook } from './models.js';
@@ -37,12 +37,15 @@ export interface DiagnosticEvent {
     | 'listener_threw'
     | 'late_result'
     | 'capability_failed'
+    | 'effect_outcome_unknown'
     | 'model_failed'
     | 'output_blocked'
     | 'output_safety_failed'
     | 'output_safety_unset';
   readonly instanceId: InstanceId;
   readonly runId?: RunId;
+  /** Identifier only, for host reconciliation of an earlier write with an unknown outcome. */
+  readonly effectId?: EffectId;
   /** Host-only evidence, possibly including binding-supplied private content. Never forward it
    * to a destination private-user may not reach; never stored in snapshots, events or traces. */
   readonly error?: unknown;

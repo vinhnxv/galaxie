@@ -463,6 +463,10 @@ export function createAgentInstance(
       );
       const ports = {
         runId: run.runId,
+        sessionId,
+        segmentKey: command.type === 'resume' ? command.interactionId : 'start',
+        effectOrdinals: new Map<string, number>(),
+        ...(options.recovery === undefined ? {} : { recovery: options.recovery }),
         signal: AbortSignal.any([run.controller.signal, run.capabilityController.signal]),
         labels: run.labels,
         privateValues: run.privateValues,
