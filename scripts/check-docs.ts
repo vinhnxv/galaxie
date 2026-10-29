@@ -21,7 +21,6 @@ function required(file: string): boolean {
   return false;
 }
 
-// Keep line numbers while removing fenced examples, including longer closing fences.
 function prose(content: string): string[] {
   let fence: string | undefined;
   return content.split(/\r?\n/).map((line) => {
@@ -44,8 +43,12 @@ function prose(content: string): string[] {
   });
 }
 
-function withoutCode(line: string): string {
-  return line.replace(/(`+)([\s\S]*?)\1(?!`)/g, (match: string) => ' '.repeat(match.length));
+function mask(content: string): string {
+  return content.replace(/[^\n]/g, ' ');
+}
+
+function withoutCode(content: string): string {
+  return content.replace(/(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/g, mask);
 }
 
 function headings(lines: readonly string[]): { level: number; text: string }[] {
@@ -118,7 +121,7 @@ function checkLink(file: string, line: number, target: string): void {
   const full = path === '' ? resolve(file) : resolve(dirname(file), decoded);
   if (!existsSync(full)) {
     problem(file, line, `missing target: ${target}`);
-  } else if (fragment !== '' && extname(full).toLowerCase() === '.md') {
+  } else if (fragment !== '' && (path === '' || extname(full).toLowerCase() === '.md')) {
     let anchors = headingCache.get(full);
     if (anchors === undefined) {
       anchors = slugs(prose(readFileSync(full, 'utf8')));
@@ -139,23 +142,35 @@ for (const file of files.filter((file) => /\.md$/i.test(file) || file === 'llms.
   }
   const lines = prose(readFileSync(file, 'utf8'));
   const refs = new Map<string, string>();
-  for (const line of lines) {
-    const definition = /^ {0,3}\[([^\]]+)\]:\s*(.+)/.exec(line);
-    if (definition?.[1] && definition[2])
-      refs.set(reference(definition[1]), destination(definition[2]));
-  }
-  for (const [index, raw] of lines.entries()) {
-    if (/^ {0,3}\[[^\]]+\]:/.test(raw)) continue;
-    const line = withoutCode(raw);
-    const links = /\[([^\]\n]*)\](?:\[([^\]\n]*)\])?/g;
-    for (const match of line.matchAll(links)) {
-      const after = (match.index ?? 0) + match[0].length;
-      const target =
-        line[after] === '('
-          ? destination(line.slice(after + 1))
-          : refs.get(reference(match[2] || match[1] || ''));
-      if (target !== undefined) checkLink(file, index + 1, target);
+  const content = withoutCode(lines.join('\n')).replace(
+    /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:\n[ \t]*)?(.+)$/gm,
+    (definition: string, label: string, target: string) => {
+      const key = reference(label);
+      if (!refs.has(key)) refs.set(key, destination(target));
+      return mask(definition);
+    },
+  );
+  const openings: number[] = [];
+  for (let index = 0; index < content.length; index++) {
+    if (content[index] === '\\') {
+      index++;
+      continue;
     }
+    if (content[index] === '[') openings.push(index);
+    if (content[index] !== ']') continue;
+    const start = openings.pop();
+    if (start === undefined) continue;
+    const label = content.slice(start + 1, index);
+    let target: string | undefined;
+    if (content[index + 1] === '(') target = destination(content.slice(index + 2));
+    else if (content[index + 1] === '[') {
+      const end = content.indexOf(']', index + 2);
+      if (end !== -1) {
+        target = refs.get(reference(content.slice(index + 2, end) || label));
+        index = end;
+      }
+    } else target = refs.get(reference(label));
+    if (target !== undefined) checkLink(file, content.slice(0, start).split('\n').length, target);
   }
   if (/^packages\/[^/]+\/AGENTS\.md$/.test(file)) {
     const titles = new Set(

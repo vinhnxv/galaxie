@@ -128,3 +128,45 @@ test('passes on the tracked repository documentation', () => {
     output: '',
   });
 });
+
+test.each([
+  '[API [v1]](absent.md)',
+  '[API](\nabsent.md\n)',
+  '[![Icon](assets/icon.svg)](absent.md)',
+])('rejects a broken target in a wrapped link: %s', (link) => {
+  const result = run(fixture({ 'guide.md': `# Guide\n\n${link}\n`, 'assets/icon.svg': '<svg/>' }));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('guide.md:3: missing target: absent.md');
+});
+
+test('ignores links and reference definitions inside multiline inline code', () => {
+  const root = fixture({
+    'guide.md': '# Guide\n\n`example\n[Ignored](absent.md)\n[ref]: absent.md\n`\n',
+  });
+  expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+test('validates same-file llms.txt fragments', () => {
+  const result = run(fixture({ 'llms.txt': `${index}\n[Missing](#absent)\n` }));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('missing heading: #absent');
+});
+
+test('accepts an existing same-file llms.txt fragment', () => {
+  expect(run(fixture({ 'llms.txt': `${index}\n[Section](#docs)\n` }))).toEqual({
+    status: 0,
+    output: '',
+  });
+});
+
+test.each([
+  ['absent.md', 'README.md', 1],
+  ['README.md', 'absent.md', 0],
+])('uses the first reference definition: %s before %s', (first, second, status) => {
+  const result = run(
+    fixture({ 'guide.md': `# Guide\n\n[API][ref]\n\n[ref]: ${first}\n[REF]: ${second}\n` }),
+  );
+  expect(result.status).toBe(status);
+  if (status === 1) expect(result.output).toContain('guide.md:3: missing target: absent.md');
+  else expect(result.output).toBe('');
+});
