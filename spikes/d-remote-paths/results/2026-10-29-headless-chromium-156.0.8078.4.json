@@ -1,0 +1,3183 @@
+{
+  "recordedAt": "2026-10-29T10:54:39.386Z",
+  "browser": "Headless Chromium 156.0.8078.4",
+  "origins": {
+    "page": "http://127.0.0.1:4180",
+    "proxy": "http://127.0.0.1:4181",
+    "upstream": "http://127.0.0.1:4182",
+    "mcp": "http://127.0.0.1:4183",
+    "denied": "http://127.0.0.1:4184"
+  },
+  "observations": [
+    {
+      "name": "proxy.prefetch",
+      "status": "observed",
+      "elapsedMs": 14.995208000000048,
+      "details": {
+        "completed": true,
+        "usage": 7,
+        "supplierAt": [],
+        "callsAfterConstruction": 0
+      }
+    },
+    {
+      "name": "proxy.cors",
+      "status": "observed",
+      "elapsedMs": 0.04508299999997689,
+      "details": {
+        "preflights": [
+          {
+            "server": "proxy",
+            "method": "OPTIONS",
+            "path": "/v1/chat/completions",
+            "at": 1793271184115,
+            "headers": {
+              "host": "127.0.0.1:4181",
+              "connection": "keep-alive",
+              "accept": "*/*",
+              "access-control-request-method": "POST",
+              "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+              "origin": "http://127.0.0.1:4180",
+              "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+              "sec-fetch-mode": "cors",
+              "sec-fetch-site": "same-site",
+              "sec-fetch-dest": "empty",
+              "referer": "http://127.0.0.1:4180/",
+              "accept-encoding": "gzip, deflate, br, zstd"
+            }
+          }
+        ],
+        "sdkHeaders": [
+          {
+            "host": "127.0.0.1:4181",
+            "connection": "keep-alive",
+            "content-length": "89",
+            "sec-ch-ua-platform": "\"macOS\"",
+            "authorization": "redacted:length=55",
+            "x-stainless-os": "Unknown",
+            "x-stainless-runtime-version": "156.0.8078",
+            "x-stainless-package-version": "7.42.0",
+            "x-stainless-runtime": "browser:chrome",
+            "x-stainless-arch": "unknown",
+            "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+            "x-stainless-retry-count": "0",
+            "sec-ch-ua-mobile": "?0",
+            "x-stainless-lang": "js",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+            "accept": "application/json",
+            "content-type": "application/json",
+            "origin": "http://127.0.0.1:4180",
+            "sec-fetch-site": "same-site",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-dest": "empty",
+            "referer": "http://127.0.0.1:4180/",
+            "accept-encoding": "gzip, deflate, br, zstd"
+          }
+        ]
+      }
+    },
+    {
+      "name": "proxy.stream",
+      "status": "observed",
+      "elapsedMs": 5.704707999999982,
+      "details": {
+        "chunks": 4,
+        "usage": true,
+        "abortAt": null,
+        "error": null,
+        "elapsedMs": 3.6000001430511475
+      }
+    },
+    {
+      "name": "proxy.abort",
+      "status": "observed",
+      "elapsedMs": 17.025250000000028,
+      "details": {
+        "chunks": 1,
+        "usage": false,
+        "abortAt": 1793271184134,
+        "error": {
+          "errorClass": "DOMException",
+          "status": null,
+          "code": 20,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "elapsedMs": 2.700000047683716,
+        "upstreamCloseDelayMs": 2
+      }
+    },
+    {
+      "name": "proxy.error.401",
+      "status": "observed",
+      "elapsedMs": 5.069582999999966,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "AuthenticationError$1",
+          "status": 401,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 2.700000047683716
+      }
+    },
+    {
+      "name": "proxy.error.429",
+      "status": "observed",
+      "elapsedMs": 3.5681660000000193,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "RateLimitError$1",
+          "status": 429,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 2.1000001430511475
+      }
+    },
+    {
+      "name": "proxy.error.500",
+      "status": "observed",
+      "elapsedMs": 3.1388749999999845,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "InternalServerError$1",
+          "status": 500,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 1.5999999046325684
+      }
+    },
+    {
+      "name": "upstream.prefetch",
+      "status": "observed",
+      "elapsedMs": 1.7959170000000313,
+      "details": {
+        "completed": true,
+        "usage": 7,
+        "supplierAt": [],
+        "callsAfterConstruction": 0
+      }
+    },
+    {
+      "name": "upstream.cors",
+      "status": "observed",
+      "elapsedMs": 0.013792000000080407,
+      "details": {
+        "preflights": [
+          {
+            "server": "upstream",
+            "method": "OPTIONS",
+            "path": "/v1/chat/completions",
+            "at": 1793271184160,
+            "headers": {
+              "host": "127.0.0.1:4182",
+              "connection": "keep-alive",
+              "accept": "*/*",
+              "access-control-request-method": "POST",
+              "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+              "origin": "http://127.0.0.1:4180",
+              "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+              "sec-fetch-mode": "cors",
+              "sec-fetch-site": "same-site",
+              "sec-fetch-dest": "empty",
+              "referer": "http://127.0.0.1:4180/",
+              "accept-encoding": "gzip, deflate, br, zstd"
+            }
+          }
+        ],
+        "sdkHeaders": [
+          {
+            "host": "127.0.0.1:4182",
+            "connection": "keep-alive",
+            "content-length": "89",
+            "sec-ch-ua-platform": "\"macOS\"",
+            "authorization": "redacted:length=65",
+            "x-stainless-os": "Unknown",
+            "x-stainless-runtime-version": "156.0.8078",
+            "x-stainless-package-version": "7.42.0",
+            "x-stainless-runtime": "browser:chrome",
+            "x-stainless-arch": "unknown",
+            "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+            "x-stainless-retry-count": "0",
+            "sec-ch-ua-mobile": "?0",
+            "x-stainless-lang": "js",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+            "accept": "application/json",
+            "content-type": "application/json",
+            "origin": "http://127.0.0.1:4180",
+            "sec-fetch-site": "same-site",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-dest": "empty",
+            "referer": "http://127.0.0.1:4180/",
+            "accept-encoding": "gzip, deflate, br, zstd"
+          }
+        ]
+      }
+    },
+    {
+      "name": "upstream.stream",
+      "status": "observed",
+      "elapsedMs": 1.5891249999999673,
+      "details": {
+        "chunks": 4,
+        "usage": true,
+        "abortAt": null,
+        "error": null,
+        "elapsedMs": 1.0999999046325684
+      }
+    },
+    {
+      "name": "upstream.abort",
+      "status": "observed",
+      "elapsedMs": 1.7721669999999676,
+      "details": {
+        "chunks": 1,
+        "usage": false,
+        "abortAt": 1793271184164,
+        "error": {
+          "errorClass": "DOMException",
+          "status": null,
+          "code": 20,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "elapsedMs": 1.2000000476837158,
+        "upstreamCloseDelayMs": 0
+      }
+    },
+    {
+      "name": "upstream.error.401",
+      "status": "observed",
+      "elapsedMs": 1.672916999999984,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "AuthenticationError$1",
+          "status": 401,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 1.1999998092651367
+      }
+    },
+    {
+      "name": "upstream.error.429",
+      "status": "observed",
+      "elapsedMs": 1.3191249999999854,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "RateLimitError$1",
+          "status": 429,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 0.8000001907348633
+      }
+    },
+    {
+      "name": "upstream.error.500",
+      "status": "observed",
+      "elapsedMs": 1.3745840000000271,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "InternalServerError$1",
+          "status": 500,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 0.8999998569488525
+      }
+    },
+    {
+      "name": "proxy.supplier",
+      "status": "observed",
+      "elapsedMs": 5.831792000000064,
+      "details": {
+        "completed": true,
+        "usage": 7,
+        "supplierAt": [0.19999980926513672, 2.299999952316284],
+        "callsAfterConstruction": 0
+      }
+    },
+    {
+      "name": "proxy.structured",
+      "status": "observed",
+      "elapsedMs": 5.66862500000002,
+      "details": {
+        "valid": true,
+        "responseFormat": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "fixture",
+            "strict": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "answer": {
+                  "type": "string",
+                  "title": "fixture"
+                },
+                "score": {
+                  "type": "number",
+                  "title": "fixture"
+                }
+              },
+              "required": ["answer", "score"],
+              "additionalProperties": false,
+              "title": "fixture"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "upstream.no-cors",
+      "status": "observed",
+      "elapsedMs": 1.4804169999999885,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "APIConnectionError$1",
+          "status": null,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 1
+      }
+    },
+    {
+      "name": "proxy.expired-token",
+      "status": "observed",
+      "elapsedMs": 1.3205000000000382,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "AuthenticationError$1",
+          "status": 401,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 0.7999999523162842
+      }
+    },
+    {
+      "name": "mcp.initialize",
+      "status": "observed",
+      "elapsedMs": 15.232458999999949,
+      "details": {
+        "sessionVisible": true,
+        "protocolVersion": "2025-11-25"
+      }
+    },
+    {
+      "name": "mcp.first-seen-and-approval",
+      "status": "observed",
+      "elapsedMs": 9.425665999999978,
+      "details": {
+        "before": [
+          {
+            "name": "mcp.lessons.lesson.lookup",
+            "hash": "4a683ab18c954230414247a94528d1211f870f96b4e7c389b2427e29d66a0732",
+            "enabled": false
+          },
+          {
+            "name": "mcp.lessons.progress.record",
+            "hash": "d1a3e5256750d950622ba4d227c2a75bd755dbfead78ebc8c727e491424dc421",
+            "enabled": false
+          }
+        ],
+        "denied": {
+          "completed": false,
+          "error": {
+            "errorClass": "PinError",
+            "status": null,
+            "code": null,
+            "credentialFree": true,
+            "exposedFields": []
+          }
+        },
+        "after": [
+          {
+            "name": "mcp.lessons.lesson.lookup",
+            "hash": "4a683ab18c954230414247a94528d1211f870f96b4e7c389b2427e29d66a0732",
+            "enabled": true
+          },
+          {
+            "name": "mcp.lessons.progress.record",
+            "hash": "d1a3e5256750d950622ba4d227c2a75bd755dbfead78ebc8c727e491424dc421",
+            "enabled": false
+          }
+        ],
+        "allowed": {
+          "completed": true,
+          "bytes": 47
+        }
+      }
+    },
+    {
+      "name": "mcp.changed-definition",
+      "status": "observed",
+      "elapsedMs": 6.352457999999956,
+      "details": {
+        "changed": [
+          {
+            "name": "mcp.lessons.lesson.lookup",
+            "hash": "ee1b5f19dda27b90bf341591d106fdde5ada4601c979d0d19b9c7ff3dd3ec044",
+            "enabled": false
+          },
+          {
+            "name": "mcp.lessons.progress.record",
+            "hash": "d1a3e5256750d950622ba4d227c2a75bd755dbfead78ebc8c727e491424dc421",
+            "enabled": false
+          }
+        ],
+        "denied": {
+          "completed": false,
+          "error": {
+            "errorClass": "PinError",
+            "status": null,
+            "code": null,
+            "credentialFree": true,
+            "exposedFields": []
+          }
+        },
+        "allowed": {
+          "completed": true,
+          "bytes": 47
+        }
+      }
+    },
+    {
+      "name": "mcp.parsed-limit",
+      "status": "observed",
+      "elapsedMs": 3.1079590000000508,
+      "details": {
+        "result": {
+          "completed": false,
+          "error": {
+            "errorClass": "LimitError",
+            "status": null,
+            "code": null,
+            "credentialFree": true,
+            "exposedFields": []
+          }
+        },
+        "before": {
+          "wireRejected": false,
+          "parsedRejected": false,
+          "parsedResults": 2,
+          "deliveredResults": 2
+        },
+        "after": {
+          "wireRejected": false,
+          "parsedRejected": true,
+          "parsedResults": 3,
+          "deliveredResults": 2
+        }
+      }
+    },
+    {
+      "name": "mcp.wire-limit",
+      "status": "observed",
+      "elapsedMs": 3009.2737500000003,
+      "details": {
+        "result": {
+          "completed": false,
+          "error": {
+            "errorClass": "McpError",
+            "status": null,
+            "code": -32001,
+            "credentialFree": true,
+            "exposedFields": []
+          }
+        },
+        "before": {
+          "wireRejected": false,
+          "parsedRejected": true,
+          "parsedResults": 3,
+          "deliveredResults": 2
+        },
+        "after": {
+          "wireRejected": true,
+          "parsedRejected": true,
+          "parsedResults": 3,
+          "deliveredResults": 2
+        },
+        "customFetchAccepted": true
+      }
+    },
+    {
+      "name": "mcp.sampling-rejected",
+      "status": "observed",
+      "elapsedMs": 8.957332999999835,
+      "details": {
+        "clientCapabilities": {},
+        "result": {
+          "completed": true,
+          "bytes": 47
+        },
+        "server": [
+          {
+            "sent": true,
+            "rejected": true,
+            "code": -32601
+          }
+        ]
+      }
+    },
+    {
+      "name": "mcp.session-404",
+      "status": "observed",
+      "elapsedMs": 9.626582999999755,
+      "details": {
+        "result": {
+          "completed": false,
+          "error": {
+            "errorClass": "StreamableHTTPError",
+            "status": 404,
+            "code": 404,
+            "credentialFree": true,
+            "exposedFields": []
+          }
+        },
+        "automaticInitializations": 0,
+        "reconnected": {
+          "sessionVisible": true,
+          "protocolVersion": "2025-11-25"
+        },
+        "disabled": [
+          {
+            "name": "mcp.lessons.lesson.lookup",
+            "hash": "ee1b5f19dda27b90bf341591d106fdde5ada4601c979d0d19b9c7ff3dd3ec044",
+            "enabled": false
+          },
+          {
+            "name": "mcp.lessons.progress.record",
+            "hash": "d1a3e5256750d950622ba4d227c2a75bd755dbfead78ebc8c727e491424dc421",
+            "enabled": false
+          }
+        ],
+        "resumed": {
+          "completed": true,
+          "bytes": 47
+        },
+        "writeRetried": false
+      }
+    },
+    {
+      "name": "proxy.denied-origin",
+      "status": "observed",
+      "elapsedMs": 2.6013339999999516,
+      "details": {
+        "browser": {
+          "status": null,
+          "errorClass": "TypeError"
+        },
+        "nodeStatus": 403
+      }
+    },
+    {
+      "name": "mcp.denied-origin",
+      "status": "observed",
+      "elapsedMs": 3.6098330000004353,
+      "details": {
+        "browser": {
+          "status": null,
+          "errorClass": "TypeError"
+        },
+        "nodeStatus": 403
+      }
+    },
+    {
+      "name": "proxy.default-retries",
+      "status": "observed",
+      "elapsedMs": 91746.118,
+      "details": {
+        "completed": false,
+        "error": {
+          "errorClass": "InternalServerError$1",
+          "status": 500,
+          "code": null,
+          "credentialFree": true,
+          "exposedFields": []
+        },
+        "supplierAt": [
+          0.20000004768371582, 1249.2999999523163, 3407.7999999523163, 9843.600000143051,
+          23274.200000047684, 51078.799999952316, 91736.90000009537
+        ],
+        "callsAfterConstruction": 0,
+        "elapsedMs": 91743.79999995232,
+        "attempts": 7,
+        "retryCount": 6,
+        "backoffMs": [1251, 2159, 6438, 13427, 27810, 40655]
+      }
+    },
+    {
+      "name": "credentials.exposure",
+      "status": "passed",
+      "elapsedMs": 0.040166999999200925,
+      "details": {
+        "upstreamKeyAbsentFromPage": true,
+        "browserTokenNotForwarded": true,
+        "errorsCredentialFree": true,
+        "userKeyInPageMemoryOnly": true,
+        "forbiddenRequests": 0
+      }
+    },
+    {
+      "name": "bundle.cost",
+      "status": "observed",
+      "elapsedMs": 177.0839580000029,
+      "details": [
+        {
+          "entry": "index.html",
+          "bytes": 1348474,
+          "gzipBytes": 337996,
+          "dependencies": [
+            "@cfworker/json-schema",
+            "@langchain/core",
+            "@langchain/openai",
+            "@modelcontextprotocol/sdk",
+            "ajv",
+            "ajv-formats",
+            "base64-js",
+            "content-type",
+            "eventemitter3",
+            "eventsource-parser",
+            "fast-deep-equal",
+            "fast-uri",
+            "js-tiktoken",
+            "json-schema-traverse",
+            "langsmith",
+            "openai",
+            "p-finally",
+            "p-queue",
+            "p-timeout",
+            "pkce-challenge",
+            "zod"
+          ]
+        },
+        {
+          "entry": "src/mcp.ts",
+          "bytes": 301243,
+          "gzipBytes": 85580,
+          "dependencies": [
+            "@modelcontextprotocol/sdk",
+            "ajv",
+            "ajv-formats",
+            "content-type",
+            "eventsource-parser",
+            "fast-deep-equal",
+            "fast-uri",
+            "json-schema-traverse",
+            "pkce-challenge",
+            "zod"
+          ]
+        }
+      ]
+    }
+  ],
+  "requests": [
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184106,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184110,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "OPTIONS",
+      "path": "/v1/chat/completions",
+      "at": 1793271184115,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184115,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "89",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184121,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "89"
+      },
+      "model": "normal",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184125,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184127,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "128",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184127,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "128"
+      },
+      "model": "normal",
+      "includeUsage": true
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184131,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184133,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "126",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184133,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "126"
+      },
+      "model": "slow",
+      "includeUsage": true,
+      "closedAt": 1793271184136
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184148,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184150,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184151,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-401",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184153,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184154,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184155,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-429",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184156,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184158,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184158,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "upstream",
+      "method": "OPTIONS",
+      "path": "/v1/chat/completions",
+      "at": 1793271184160,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184160,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "content-length": "89",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=65",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "model": "normal",
+      "includeUsage": false
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184162,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "content-length": "128",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=65",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "model": "normal",
+      "includeUsage": true
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184163,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "content-length": "126",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=65",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "model": "slow",
+      "includeUsage": true,
+      "closedAt": 1793271184164
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184165,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=65",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "model": "error-401",
+      "includeUsage": false
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184167,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=65",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "model": "error-429",
+      "includeUsage": false
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184168,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=65",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184169,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184171,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184171,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "89",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184172,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "89"
+      },
+      "model": "normal",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184173,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184173,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "89",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184174,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "89"
+      },
+      "model": "normal",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271184175,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184178,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "442",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "x-stainless-helper-method": "chat.completions.parse",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184178,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "442"
+      },
+      "model": "normal",
+      "responseFormat": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "fixture",
+          "strict": true,
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "answer": {
+                "type": "string",
+                "title": "fixture"
+              },
+              "score": {
+                "type": "number",
+                "title": "fixture"
+              }
+            },
+            "required": ["answer", "score"],
+            "additionalProperties": false,
+            "title": "fixture"
+          }
+        }
+      },
+      "includeUsage": false
+    },
+    {
+      "server": "upstream",
+      "method": "OPTIONS",
+      "path": "/no-cors/v1/chat/completions",
+      "at": 1793271184181,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271184183,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "89",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "mcp",
+      "method": "OPTIONS",
+      "path": "/mcp",
+      "at": 1793271184186,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184186,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "155",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "content-type": "application/json",
+        "sec-ch-ua-mobile": "?0",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "initialize"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184196,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "54",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "notifications/initialized"
+    },
+    {
+      "server": "mcp",
+      "method": "GET",
+      "path": "/mcp",
+      "at": 1793271184198,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "text/event-stream",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184199,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184202,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184204,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184205,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184206,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "103",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/call"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184210,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184211,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184213,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184214,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "103",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/call"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184216,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "47",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184217,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "107",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/call"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184219,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "47",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271184219,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "107",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/call"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187223,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "135",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "notifications/cancelled"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187229,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "47",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187231,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "104",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/call"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187235,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "77",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187237,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "47",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187239,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "155",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "content-type": "application/json",
+        "sec-ch-ua-mobile": "?0",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "initialize"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187241,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "54",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "notifications/initialized"
+    },
+    {
+      "server": "mcp",
+      "method": "GET",
+      "path": "/mcp",
+      "at": 1793271187241,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "text/event-stream",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187242,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187244,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "46",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/list"
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187245,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "content-length": "103",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=59",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "mcp-session-id": "redacted:length=36",
+        "sec-ch-ua-mobile": "?0",
+        "mcp-protocol-version": "2025-11-25",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "protocolMethod": "tools/call"
+    },
+    {
+      "server": "proxy",
+      "method": "OPTIONS",
+      "path": "/token",
+      "at": 1793271187451,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type",
+        "origin": "http://127.0.0.1:4184",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4184/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271187452,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "origin": "http://127.0.0.1:4184",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "0"
+      }
+    },
+    {
+      "server": "mcp",
+      "method": "OPTIONS",
+      "path": "/mcp",
+      "at": 1793271187455,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+        "origin": "http://127.0.0.1:4184",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4184/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "mcp",
+      "method": "POST",
+      "path": "/mcp",
+      "at": 1793271187456,
+      "headers": {
+        "host": "127.0.0.1:4183",
+        "connection": "keep-alive",
+        "origin": "http://127.0.0.1:4184",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "0"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271187457,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271187459,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271187459,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271187460,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271188708,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271188710,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271188711,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271190867,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "OPTIONS",
+      "path": "/v1/chat/completions",
+      "at": 1793271190869,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271190870,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271190870,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271197303,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "OPTIONS",
+      "path": "/v1/chat/completions",
+      "at": 1793271197305,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271197306,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271197308,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271210733,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "OPTIONS",
+      "path": "/v1/chat/completions",
+      "at": 1793271210734,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271210734,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271210735,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271238539,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "OPTIONS",
+      "path": "/v1/chat/completions",
+      "at": 1793271238542,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271238543,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271238545,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/token",
+      "at": 1793271279196,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "0",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "OPTIONS",
+      "path": "/v1/chat/completions",
+      "at": 1793271279198,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version",
+        "origin": "http://127.0.0.1:4180",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "proxy",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271279199,
+      "headers": {
+        "host": "127.0.0.1:4181",
+        "connection": "keep-alive",
+        "content-length": "92",
+        "sec-ch-ua-platform": "\"macOS\"",
+        "authorization": "redacted:length=55",
+        "x-stainless-os": "Unknown",
+        "x-stainless-runtime-version": "156.0.8078",
+        "x-stainless-package-version": "7.42.0",
+        "x-stainless-runtime": "browser:chrome",
+        "x-stainless-arch": "unknown",
+        "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"HeadlessChrome\";v=\"156\"",
+        "x-stainless-retry-count": "0",
+        "sec-ch-ua-mobile": "?0",
+        "x-stainless-lang": "js",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+        "accept": "application/json",
+        "content-type": "application/json",
+        "origin": "http://127.0.0.1:4180",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://127.0.0.1:4180/",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      }
+    },
+    {
+      "server": "upstream",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "at": 1793271279200,
+      "headers": {
+        "host": "127.0.0.1:4182",
+        "connection": "keep-alive",
+        "authorization": "redacted:length=69",
+        "content-type": "application/json",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "92"
+      },
+      "model": "error-500",
+      "includeUsage": false
+    }
+  ],
+  "notTested": [
+    "localhost/Ollama and Chrome LNA",
+    "real providers",
+    "headed and other browsers",
+    "HTTP/2",
+    "device matrix"
+  ]
+}

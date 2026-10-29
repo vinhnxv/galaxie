@@ -7,6 +7,7 @@ import { z } from 'zod';
 export interface ErrorObservation {
   errorClass: string;
   status: number | null;
+  code: number | null;
   credentialFree: boolean;
   exposedFields: string[];
 }
@@ -45,10 +46,12 @@ export function errorObservation(error: unknown): ErrorObservation {
     status?: unknown;
     code?: unknown;
   } | null;
-  const status = record?.status ?? record?.code;
+  const status =
+    record?.status ?? (record?.constructor?.name === 'StreamableHTTPError' ? record.code : null);
   return {
     errorClass: record?.constructor?.name ?? 'Unknown',
     status: typeof status === 'number' ? status : null,
+    code: typeof record?.code === 'number' ? record.code : null,
     credentialFree: exposedFields.length === 0,
     exposedFields,
   };

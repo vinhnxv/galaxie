@@ -322,22 +322,35 @@ try {
   for (const service of ['proxy', 'mcp'] as const)
     await check(`${service}.denied-origin`, async () => {
       const url = `${origins[service]}${service === 'mcp' ? '/mcp' : '/token'}`;
-      const browserResult = await deniedPage.evaluate(async (target) => {
-        try {
-          return {
-            status: (
-              await fetch(target, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: '{}',
-              })
-            ).status,
-            errorClass: null,
-          };
-        } catch (error) {
-          return { status: null, errorClass: (error as Error).constructor.name };
-        }
-      }, url);
+      const browserResult =
+        service === 'mcp'
+          ? await deniedPage.evaluate(
+              async ({ target, key }) => {
+                try {
+                  await window.probes.connect(target, key);
+                  return { status: 200, errorClass: null };
+                } catch (error) {
+                  return { status: null, errorClass: (error as Error).constructor.name };
+                }
+              },
+              { target: url, key: mcpKey },
+            )
+          : await deniedPage.evaluate(async (target) => {
+              try {
+                return {
+                  status: (
+                    await fetch(target, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: '{}',
+                    })
+                  ).status,
+                  errorClass: null,
+                };
+              } catch (error) {
+                return { status: null, errorClass: (error as Error).constructor.name };
+              }
+            }, url);
       const response = await fetch(url, {
         method: 'POST',
         headers: { Origin: origins.denied },
