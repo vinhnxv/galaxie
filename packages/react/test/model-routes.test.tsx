@@ -82,6 +82,18 @@ test('falls back to raw IDs and renders identifiers and host labels only as Reac
   expect(container.querySelector('b, img, i')).toBeNull();
 });
 
+test.each(['toString', 'constructor', '__proto__'])(
+  'falls back to raw %s IDs when label maps have no own entry',
+  async (id) => {
+    const instance = new FakeInstance();
+    routes(instance, { [id]: { providerId: id, destination: 'in-browser' } });
+    const { container } = await mount(
+      <ModelRoutes instance={instance} labels={{ roles: {}, providers: {} }} />,
+    );
+    expect(container.querySelector('li')?.textContent).toBe(`${id}: ${id} (In browser)`);
+  },
+);
+
 test('shows destination changes and uses destination label overrides for both classes', async () => {
   const instance = new FakeInstance();
   routes(instance, {

@@ -23,6 +23,10 @@ export interface ModelRoutesProps<Input, View> {
   readonly destinationLabels?: Partial<Readonly<Record<DestinationClass, string>>>;
 }
 
+function hostLabel(labels: Readonly<Record<string, string>> | undefined, id: string): string {
+  return labels !== undefined && Object.hasOwn(labels, id) ? (labels[id] ?? id) : id;
+}
+
 /** Announces selected routes without owning the instance lifecycle or rendering model output. */
 export function ModelRoutes<Input, View>({
   instance,
@@ -38,8 +42,7 @@ export function ModelRoutes<Input, View>({
         <ul aria-label="Model destinations">
           {routes.map(([role, route]) => (
             <li key={role}>
-              {labels?.roles?.[role] ?? role}:{' '}
-              {labels?.providers?.[route.providerId] ?? route.providerId} (
+              {hostLabel(labels?.roles, role)}: {hostLabel(labels?.providers, route.providerId)} (
               {destinationLabel(route.destination)})
               {route.changedFrom !== undefined &&
                 ` changed from ${destinationLabel(route.changedFrom)}`}
