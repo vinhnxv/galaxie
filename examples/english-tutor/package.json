@@ -15,6 +15,11 @@
   "files": [
     "dist"
   ],
+  "galaxie": {
+    "definition": "./dist/index.js",
+    "export": "tutorDefinition",
+    "out": "./dist/galaxie"
+  },
   "dependencies": {
     "@galaxie/core": "workspace:*",
     "@galaxie/adapter-langgraph": "workspace:*"
