@@ -7,6 +7,7 @@ evidence, with the maintainer's decision pending.
 ## Execution and LangGraph
 
 - Parallel interrupts, static breakpoints, ID-less interrupts and multiple interaction requests in one node are unsupported ([adapter limits](../packages/adapter-langgraph/AGENTS.md#limits)).
+- A parent node's effects before invoking a child graph that interrupts repeat on resume. The parent body and broker-bound host write each run twice, with and without recovery; the journal keys start and resume as different segments. Put effects after the interrupt or in a separate completed node before the interrupting parent. Recovery does not provide deduplication across this boundary ([characterization](../tests/conformance/subgraph-effects.test.ts), [AT-35](mvp-exit-record.md#acceptance-tests)).
 - Implicit async LangChain context is unavailable under the synchronous shim; pass node config explicitly, and initialize real `AsyncLocalStorage` before the first prepare on Node when async ambient context is required ([context inventory and matrix](../tests/conformance/README.md#explicit-config-and-context)).
 - LangGraph facades without native `transform()` or checkpoint `getState()` are unsupported ([adapter contract](system-design.md#6-core-runtime-and-contracts)).
 - Framework adapters beyond LangGraph.js, universal Python execution, distributed agents, cross-device resume and always-on scheduling are outside the MVP ([scope](galaxie-project-brief.md#52-outside-the-mvp)).
