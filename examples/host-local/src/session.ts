@@ -7,7 +7,6 @@ export const hostAppId = 'galaxie-host-local';
 export const hostLearnerId = 'local-demo-learner';
 export const sessionKey: string = `${hostAppId}:${hostLearnerId}:session`;
 
-/** Logout needs storage only, including before models or a runtime have been prepared. */
 export async function invalidateLocalPrincipal(): Promise<void> {
   const saver = await IndexedDBSaver.open({ appId: hostAppId, principalScope: hostLearnerId });
   try {

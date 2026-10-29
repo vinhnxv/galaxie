@@ -96,7 +96,7 @@ function failureCode(error: unknown, fallback: ErrorCode): ErrorCode {
     typeof value === 'object' &&
     value !== null &&
     Object.getOwnPropertyDescriptor(value, code)?.value === true;
-  if (invalidated(error)) return 'stale';
+  if (invalidated(error) || (isGalaxieError(error) && error.code === 'stale')) return 'stale';
   for (const code of ['fenced', 'unrecoverable'] as const) {
     if (
       marked(error, code) ||

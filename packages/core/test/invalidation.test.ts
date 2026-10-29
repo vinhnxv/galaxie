@@ -226,6 +226,43 @@ describe('invalidated storage outcomes', () => {
       expect(JSON.stringify(f.instance.getSnapshot())).not.toContain('private reply');
     },
   );
+  test.each(['read', 'succeeded'] as const)(
+    'preserves stale when an executor propagates a sanitized journal %s failure',
+    async (phase) => {
+      const store = new MemoryRecoveryStore();
+      const record = store.recordEffect.bind(store);
+      if (phase === 'read')
+        store.effect = async () => {
+          throw invalidated();
+        };
+      else
+        store.recordEffect = async (...args) => {
+          if (args[2].status === phase) throw invalidated();
+          await record(...args);
+        };
+      const f = await fixture(store, [
+        async function* (request) {
+          yield {
+            type: 'output',
+            output: await request.capabilities.call('write@1', 'private reply'),
+          };
+        },
+      ]);
+      await store.acceptSubmission(f.instance.sessionId, {
+        interactionId: pending.interactionId,
+        action: 'submit',
+        payload: false,
+      });
+      await f.instance.restore();
+      await vi.waitFor(() => expect(f.instance.getSnapshot().run?.status).toBe('failed'));
+      expect(f.instance.getSnapshot().run?.error).toMatchObject({
+        code: 'stale',
+        message: 'The request targets stale state.',
+      });
+      expect(JSON.stringify(f.instance.getSnapshot())).not.toContain('private-storage-canary');
+      expect(JSON.stringify(f.instance.getSnapshot())).not.toContain('private reply');
+    },
+  );
   test('ignores inherited and accessor invalidation markers', async () => {
     for (const error of [
       Object.create({ invalidated: true }),

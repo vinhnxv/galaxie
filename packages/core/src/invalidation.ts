@@ -64,9 +64,7 @@ export function watchInvalidation(options: InvalidationOptions): InvalidationWat
       if (closed) return;
       try {
         channel.postMessage({ v: 1, type: 'invalidated', principalScope });
-      } catch {
-        /* The next storage write or pageshow check still detects invalidation. */
-      }
+      } catch {}
       controller.abort('invalidated');
     },
     close() {

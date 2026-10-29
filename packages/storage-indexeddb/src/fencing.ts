@@ -41,7 +41,6 @@ export async function generation(
   return value.generation;
 }
 
-/** App-wide ownership and principal invalidation held by this connection. */
 export class Fencing {
   readonly #db: IDBDatabase;
   readonly #appId: string;
