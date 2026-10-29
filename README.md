@@ -31,6 +31,8 @@ Ownership protects local writes only when hosts compose `acquireOwnership({ appI
 
 Routing, labels, consent and model budgets cover calls through `host.langchain.chatModel(role)`; trusted agent code holding a model instance can bypass them (ADR-0002). The router's `maxTokens` reserves budget: a call can use more, and an actual-usage overrun fails the run after that call returns. WebLLM separately sends its own `maxTokens` as the per-request output limit `max_tokens` (default 1024); the router does not pass its reservation as that limit. `getCredential` hands credentials to page code per call. An XSS or malicious dependency on the origin can read them; hosts should return short-lived, host-proxy-scoped tokens rather than long-lived provider keys (ADR-0012).
 
+`@galaxie/tools-mcp` now binds allowlisted, pinned MCP tools through principal-scoped Streamable HTTP sessions on protocol 2025-11-25, with byte/idle limits and a loopback reference server tested through the broker on Node and Chromium. Write tools remain unavailable until host-rendered confirmations ship; pinning detects metadata changes only.
+
 ## Intended use and disclaimer
 
 galaxie is experimental, pre-release software, provided "as is", without warranty of any kind. Sections 15 to 17 of the [AGPL](LICENSE) (disclaimer of warranty and limitation of liability) apply.
