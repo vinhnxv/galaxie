@@ -53,7 +53,6 @@ const registry = createRegistry({
       props: z.object({ url: z.string(), text: z.string() }),
       actions: { continue: { label: 'Continue', payload: z.object({}) } },
       urls: (props) => [props.url],
-      // Even if a host mounts this component, model text is only a React text child.
       component: ({ props }) => createElement('span', null, props.text),
     }),
   ],
@@ -69,6 +68,7 @@ export interface InjectionFixture {
   readonly content: Mock<CapabilityBinding['invoke']>;
   readonly write: Mock<CapabilityBinding['invoke']>;
   readonly remote: MockInstance<MockChatModel['_generate']>;
+  readonly remoteModel: MockChatModel;
   readonly attacker: ObedientAttacker;
   readonly diagnostics: DiagnosticEvent[];
   readonly errors: unknown[];
@@ -133,12 +133,13 @@ export async function createInjectionFixture(
         pin: mcp?.pins['lesson.lookup'] as string,
       },
     }) ?? {};
-  const mcpInvokes = Object.values(approvedBindings).map((bound) => vi.fn(bound.invoke));
+  const mcpInvokes: Mock<CapabilityBinding['invoke']>[] = [];
   const mcpBindings = Object.fromEntries(
-    Object.entries(approvedBindings).map(([name, bound], index) => [
-      name,
-      { ...bound, invoke: mcpInvokes[index] as Mock<CapabilityBinding['invoke']> },
-    ]),
+    Object.entries(approvedBindings).map(([name, bound]) => {
+      const invoke = vi.fn(bound.invoke);
+      mcpInvokes.push(invoke);
+      return [name, { ...bound, invoke }];
+    }),
   );
   const runtime = createRuntime({
     appId: 'injection-corpus',
@@ -196,6 +197,7 @@ export async function createInjectionFixture(
       },
       services: { chatModels: { attacker, remote: remoteModel }, checkpointer: new MemorySaver() },
       models: {
+        consent: () => true,
         providers: {
           attacker: {
             destination: 'in-browser',
@@ -288,6 +290,7 @@ export async function createInjectionFixture(
     content,
     write,
     remote,
+    remoteModel,
     attacker,
     diagnostics,
     errors,

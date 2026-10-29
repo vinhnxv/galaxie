@@ -59,9 +59,10 @@ export function recordInjectionNetwork(origins: readonly string[]): InjectionNet
   const originalFetch = globalThis.fetch;
   const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
-    record('fetch', url, new Request(input, init).clone());
+    const request = new Request(input, init);
+    record('fetch', url, request.clone());
     if (!permits(url)) throw new Error('Corpus recorder blocked an outbound request.');
-    return originalFetch(input, init);
+    return originalFetch(request);
   });
   undo.push(() => fetchSpy.mockRestore());
 

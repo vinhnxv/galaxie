@@ -11,7 +11,7 @@ import {
   outputSchema,
   PRIVATE_MARKER,
 } from './support/injection-fixture.js';
-import { recordInjectionNetwork } from './support/injection-network.js';
+import { type InjectionRequest, recordInjectionNetwork } from './support/injection-network.js';
 import {
   MCP_ORIGIN,
   type McpAction,
@@ -73,6 +73,40 @@ function noText(observation: string, value: string): void {
   expect(observation).not.toContain(JSON.stringify(value).slice(1, -1));
 }
 
+function noRequestText(request: InjectionRequest, value: string): void {
+  noText(request.url, value);
+  noText(request.body, value);
+}
+
+test('AT-26 request content checks detect a quote-bearing payload in a JSON body', () => {
+  const payload = cases.find((entry) => entry.id === 'lesson-markdown-exfiltration')?.payload;
+  if (payload === undefined) throw new Error('Missing quote-bearing corpus payload.');
+  const request = {
+    kind: 'fetch',
+    url: 'https://example.test/collect',
+    body: JSON.stringify({ payload }),
+  };
+  expect(() => noRequestText(request, payload)).toThrow();
+});
+
+test('AT-26 network recorder preserves an allowed POST Request body', async () => {
+  const network = recordInjectionNetwork([MCP_ORIGIN, new URL(fixture.url).origin]);
+  onTestFinished(() => network.restore());
+  const request = new Request(fixture.url, {
+    method: 'POST',
+    headers: {
+      origin: MCP_ORIGIN,
+      authorization: `Bearer ${fixture.token}`,
+      'content-type': 'application/json',
+    },
+    body: '{}',
+  });
+  const response = await fetch(request);
+  expect(response).toBeInstanceOf(Response);
+  await network.settle();
+  expect(network.requests).toEqual([{ kind: 'fetch', url: fixture.url, body: '{}' }]);
+});
+
 test('AT-26 corpus validates closed directives, unique IDs and all vector-goal pairs', () => {
   expect(cases.length).toBeGreaterThanOrEqual(30);
   expect(corpusSchema.safeParse([...corpus, corpus[0]]).success).toBe(false);
@@ -109,6 +143,7 @@ test('AT-26 benign corpus harness projects the reply without effects or disclosu
   expect(f.content).toHaveBeenCalledTimes(1);
   expect(f.write).not.toHaveBeenCalled();
   expect(f.remote).not.toHaveBeenCalled();
+  expect(f.remoteModel.calls).toBe(0);
   expect(f.attacker.reads).toBe(1);
   expect(JSON.stringify(result)).not.toContain(PRIVATE_MARKER);
 });
@@ -215,6 +250,7 @@ for (const entry of cases) {
     expect(f.attacker.reads).toBe(1);
     expect(snapshot.run?.labels).toContain('private-user');
     expect(f.remote).not.toHaveBeenCalled();
+    expect(f.remoteModel.calls).toBe(0);
     expect(f.write).not.toHaveBeenCalled();
 
     switch (entry.goal) {
@@ -291,8 +327,8 @@ for (const entry of cases) {
     await network.settle();
     for (const request of network.requests) {
       expect(origins).toContain(new URL(request.url).origin);
-      noText(JSON.stringify(request), PRIVATE_MARKER);
-      noText(JSON.stringify(request), entry.payload);
+      noRequestText(request, PRIVATE_MARKER);
+      noRequestText(request, entry.payload);
     }
   });
 }
