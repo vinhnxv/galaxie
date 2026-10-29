@@ -77,7 +77,21 @@ function stat(path: string): ReturnType<typeof lstatSync> | undefined {
   }
 }
 
-/** Do not follow package symlinks, including an existing output directory. */
+// Case-insensitive filesystems can preserve alias casing through realpath.
+function containsPath(directory: string, path: string): boolean {
+  if (path === directory || inside(directory, path)) return true;
+  const target = stat(directory);
+  if (target === undefined) return false;
+  let current = path;
+  while (true) {
+    const info = stat(current);
+    if (info?.dev === target.dev && info.ino === target.ino) return true;
+    const parent = dirname(current);
+    if (parent === current) return false;
+    current = parent;
+  }
+}
+
 function localPath(packageDir: string, path: string): string {
   const full = resolve(packageDir, path);
   if (!inside(packageDir, full)) invalidPaths();
@@ -114,7 +128,6 @@ function metadata(packageDir: string): {
     return packagePath(file.startsWith('./') ? file : `./${file}`);
   });
   const output = localPath(root, out);
-  // The parent must already exist: even recursive creation may write only inside output.
   try {
     if (!inside(root, realpathSync(dirname(output)))) invalidPaths();
   } catch {
@@ -128,7 +141,7 @@ function metadata(packageDir: string): {
     })
   )
     invalidPaths();
-  if (entry === out || inside(output, resolve(root, entry))) invalidPaths();
+  if (containsPath(output, resolve(root, entry))) invalidPaths();
   return {
     packageDir: root,
     entry,
@@ -168,7 +181,7 @@ function inventory(packageDir: string, roots: readonly string[], excluded?: stri
   const paths = new Set<string>();
   const visit = (path: string): void => {
     const full = localPath(packageDir, path);
-    if (excluded !== undefined && (full === excluded || inside(excluded, full))) return;
+    if (excluded !== undefined && containsPath(excluded, full)) return;
     const info = stat(full);
     if (info?.isDirectory()) {
       for (const name of readdirSync(full).sort()) visit(`${path}/${name}`);
@@ -200,7 +213,7 @@ function prepare<Definition>(options: ManifestOptions<Definition>): {
   const skills = (manifest.skills ?? []).map(packagePath);
   for (const skill of skills) {
     const full = localPath(pkg.packageDir, skill);
-    if (full === output || inside(output, full)) invalidPaths();
+    if (containsPath(output, full)) invalidPaths();
     if (!stat(full)?.isFile()) mismatch(skill);
   }
   const entry = digest(pkg.packageDir, pkg.entry);
@@ -242,17 +255,17 @@ function guarded(operation: () => void): void {
   }
 }
 
-/** Generate all bytes and validate all paths before removing the validated output directory. */
+/** Generate all bytes and validate output containment before replacing its directory. */
 export function writeManifest<Definition>(options: ManifestOptions<Definition>): void {
   guarded(() => {
     const build = prepare(options);
-    const output = resolve(build.packageDir, build.out);
+    const output = localPath(build.packageDir, build.out);
     rmSync(output, { recursive: true, force: true });
     mkdirSync(output);
     for (const [path, bytes] of Object.entries(build.artifacts)) {
       const destination = resolve(build.packageDir, path);
       mkdirSync(dirname(destination), { recursive: true });
-      writeFileSync(destination, bytes);
+      writeFileSync(destination, bytes, { flag: 'wx' });
     }
   });
 }
@@ -285,12 +298,14 @@ export function verifyManifest<Definition>(options: ManifestOptions<Definition>)
     }
     if (stored['entry'] !== build.integrity.entry) mismatch(build.entry);
     if (stored['lockfile'] !== build.integrity.lockfile) mismatch(build.lock);
-    const actual = inventory(build.packageDir, [build.out]);
+    const actual = new Set(inventory(build.packageDir, [build.out]));
     for (const path of [...new Set([...actual, ...Object.keys(build.artifacts)])].sort()) {
+      const expected = build.artifacts[path];
       if (
-        !Object.hasOwn(build.artifacts, path) ||
+        expected === undefined ||
+        !actual.has(path) ||
         !stat(localPath(build.packageDir, path))?.isFile() ||
-        readFileSync(localPath(build.packageDir, path), 'utf8') !== build.artifacts[path]
+        !readFileSync(localPath(build.packageDir, path)).equals(Buffer.from(expected, 'utf8'))
       )
         mismatch(path);
     }

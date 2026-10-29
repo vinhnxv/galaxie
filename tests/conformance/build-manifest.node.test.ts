@@ -3,6 +3,7 @@
 
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -235,4 +236,123 @@ test('importing the script has no CLI side effects', () => {
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
   expect(result.stderr).toBe('');
+});
+
+test.each(['manifest.json', 'schemas/input.json'])(
+  'verification compares exact bytes in %s',
+  (path) => {
+    const options = fixture();
+    const unicodeDefinition = {
+      ...definition,
+      id: 'tests.\uFFFD',
+      input: z.string().describe('\uFFFD'),
+    };
+    writeManifest({ ...options, definition: unicodeDefinition });
+    const target = join(options.packageDir, 'dist/galaxie', path);
+    const original = readFileSync(target);
+    const index = original.indexOf(Buffer.from('\uFFFD'));
+    expect(index).toBeGreaterThanOrEqual(0);
+    const corrupt = Buffer.concat([
+      original.subarray(0, index),
+      Buffer.from([0xff]),
+      original.subarray(index + 3),
+    ]);
+    expect(corrupt.toString('utf8') === original.toString('utf8')).toBe(true);
+    writeFileSync(target, corrupt);
+    expect(() => verifyManifest({ ...options, definition: unicodeDefinition })).toThrowError(
+      `./dist/galaxie/${path}`,
+    );
+    expect(readFileSync(target).equals(corrupt)).toBe(true);
+  },
+);
+
+test('rejects entry and skill case aliases inside output before deleting them', (context) => {
+  for (const kind of ['entry', 'skill']) {
+    const options = fixture();
+    if (!existsSync(join(options.packageDir, 'DIST'))) context.skip();
+    const out = join(options.packageDir, 'dist/galaxie');
+    mkdirSync(out);
+    writeFileSync(join(out, 'kept.js'), entry);
+    const metadataPath = join(options.packageDir, 'package.json');
+    const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+    if (kind === 'entry') metadata.galaxie.definition = './dist/GALAXIE/kept.js';
+    writeFileSync(metadataPath, JSON.stringify(metadata));
+    const input =
+      kind === 'skill' ? { ...definition, skills: ['./dist/GALAXIE/kept.js'] } : definition;
+    expect(() => writeManifest({ ...options, definition: input })).toThrowError(
+      'The package paths are invalid.',
+    );
+    expect(readFileSync(join(out, 'kept.js'), 'utf8')).toBe(entry);
+  }
+});
+
+test('excludes output directory case aliases from the shipped inventory', (context) => {
+  const options = fixture();
+  if (!existsSync(join(options.packageDir, 'DIST'))) context.skip();
+  writeManifest(options);
+  const path = join(options.packageDir, 'package.json');
+  const metadata = JSON.parse(readFileSync(path, 'utf8'));
+  metadata.files.push('dist/GALAXIE');
+  writeFileSync(path, JSON.stringify(metadata));
+  writeManifest(options);
+  const manifest = JSON.parse(
+    readFileSync(join(options.packageDir, 'dist/galaxie/manifest.json'), 'utf8'),
+  );
+  expect(
+    Object.keys(manifest.integrity.files).some((file) =>
+      file.toLowerCase().startsWith('./dist/galaxie/'),
+    ),
+  ).toBe(false);
+  expect(() => verifyManifest(options)).not.toThrow();
+});
+
+test('never overwrites schema files that alias on the destination filesystem', () => {
+  const options = fixture();
+  const request = { kind: 'read', input: z.string(), output: z.boolean() } as const;
+  const input: AgentDefinition = {
+    ...definition,
+    capabilities: {
+      required: {
+        'Z@1': request,
+        'z@1': { ...request, input: z.number() },
+      },
+    },
+  };
+  if (existsSync(join(options.packageDir, 'DIST'))) {
+    expect(() => writeManifest({ ...options, definition: input })).toThrowError(
+      'Manifest operation failed.',
+    );
+  } else {
+    writeManifest({ ...options, definition: input });
+    expect(() => verifyManifest({ ...options, definition: input })).not.toThrow();
+  }
+});
+
+test('verification rejects aliased artifact names even when their bytes match', (context) => {
+  const options = fixture();
+  if (!existsSync(join(options.packageDir, 'DIST'))) context.skip();
+  const request = { kind: 'read', input: z.string(), output: z.boolean() } as const;
+  const single = { ...definition, capabilities: { required: { 'z@1': request } } };
+  const dual = { ...definition, capabilities: { required: { 'Z@1': request, 'z@1': request } } };
+  writeManifest({ ...options, definition: single });
+  const path = join(options.packageDir, 'dist/galaxie/manifest.json');
+  const saved = JSON.parse(readFileSync(path, 'utf8'));
+  writeFileSync(
+    path,
+    `${JSON.stringify({ ...createManifest(dual, { entry: './dist/index.js' }).manifest, integrity: saved.integrity }, null, 2)}\n`,
+  );
+  expect(() => verifyManifest({ ...options, definition: dual })).toThrowError(
+    './dist/galaxie/schemas/Z@1.input.json',
+  );
+});
+
+test('hashes the nearest lockfile and ignores changes to a farther ancestor', () => {
+  const options = fixture();
+  const nearest = join(options.packageDir, 'pnpm-lock.yaml');
+  writeFileSync(nearest, 'nearest-lockfile\n');
+  writeManifest(options);
+  writeFileSync(join(options.root, 'pnpm-lock.yaml'), 'farther-lockfile-changed\n');
+  expect(() => verifyManifest(options)).not.toThrow();
+  writeFileSync(nearest, 'nearest-lockfile-changed\n');
+  expect(() => verifyManifest(options)).toThrowError(nearest);
 });
