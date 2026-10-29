@@ -21,7 +21,7 @@ import {
   writesSortKey,
 } from '@langchain/langgraph-checkpoint';
 import { decode, type Envelope, encode } from './envelope.js';
-import { StorageError, storageError } from './errors.js';
+import { StorageError, type StorageErrorCode } from './errors.js';
 import {
   type CheckpointKey,
   checkpointKey,
@@ -31,13 +31,23 @@ import {
   validateScope,
 } from './keys.js';
 import { IndexedDBRecovery } from './recovery.js';
-import { openDatabase, requestResult, transact } from './schema.js';
+import {
+  assertConnection,
+  manageConnection,
+  observeError,
+  openDatabase,
+  operationError,
+  requestResult,
+  transact,
+} from './schema.js';
 
 export interface IndexedDBSaverOptions {
   readonly appId: string;
   readonly principalScope: string;
   readonly databaseName?: string;
   readonly serde?: SerializerProtocol;
+  readonly onError?: (code: StorageErrorCode) => void;
+  readonly onVersionChange?: () => void;
 }
 
 interface CheckpointRecord {
@@ -134,24 +144,29 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
   private constructor(db: IDBDatabase, options: IndexedDBSaverOptions) {
     super(options.serde);
     this.#db = db;
+    manageConnection(db, options);
     this.#scope = [options.appId, options.principalScope];
     this.recovery = new IndexedDBRecovery(db, this.#scope);
   }
 
   static async open(options: IndexedDBSaverOptions): Promise<IndexedDBSaver> {
-    validateScope(options.appId);
-    validateScope(options.principalScope);
-    if (
-      options.databaseName !== undefined &&
-      (typeof options.databaseName !== 'string' || options.databaseName.length === 0)
-    )
-      throw new StorageError('invalid');
-    const db = await openDatabase(
-      options.databaseName ?? `galaxie:${options.appId}`,
-      options.appId,
-      options.principalScope,
-    );
-    return new IndexedDBSaver(db, options);
+    try {
+      validateScope(options.appId);
+      validateScope(options.principalScope);
+      if (
+        options.databaseName !== undefined &&
+        (typeof options.databaseName !== 'string' || options.databaseName.length === 0)
+      )
+        throw new StorageError('invalid');
+      const db = await openDatabase(
+        options.databaseName ?? `galaxie:${options.appId}`,
+        options.appId,
+        options.principalScope,
+      );
+      return new IndexedDBSaver(db, options);
+    } catch (error) {
+      throw observeError(options.onError, error);
+    }
   }
 
   close(): void {
@@ -236,6 +251,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
 
   override async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
     try {
+      assertConnection(this.#db);
       const thread: unknown = config.configurable?.['thread_id'];
       const namespace: unknown = config.configurable?.['checkpoint_ns'] ?? '';
       const id = getCheckpointId(config);
@@ -265,7 +281,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         ? undefined
         : await this.#tuple(saved.row, saved.writes, saved.parent, id ? config : undefined);
     } catch (error) {
-      throw storageError(error);
+      throw operationError(this.#db, error);
     }
   }
 
@@ -274,6 +290,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     options?: CheckpointListOptions,
   ): AsyncGenerator<CheckpointTuple> {
     try {
+      assertConnection(this.#db);
       const thread: unknown = config.configurable?.['thread_id'];
       const namespace: unknown = config.configurable?.['checkpoint_ns'];
       const id: unknown = config.configurable?.['checkpoint_id'];
@@ -314,7 +331,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         yield await this.#tuple(row, related, parent);
       }
     } catch (error) {
-      throw storageError(error);
+      throw operationError(this.#db, error);
     }
   }
 
@@ -325,6 +342,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     _newVersions: ChannelVersions,
   ): Promise<RunnableConfig> {
     try {
+      assertConnection(this.#db);
       const thread: unknown = config.configurable?.['thread_id'];
       const namespace: unknown = config.configurable?.['checkpoint_ns'] ?? '';
       const parent: unknown = config.configurable?.['checkpoint_id'];
@@ -379,7 +397,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         configurable: { thread_id: thread, checkpoint_ns: namespace, checkpoint_id: checkpoint.id },
       };
     } catch (error) {
-      throw storageError(error);
+      throw operationError(this.#db, error);
     }
   }
 
@@ -390,6 +408,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     taskPath = '',
   ): Promise<void> {
     try {
+      assertConnection(this.#db);
       const thread: unknown = config.configurable?.['thread_id'];
       const namespace: unknown = config.configurable?.['checkpoint_ns'];
       const id: unknown = config.configurable?.['checkpoint_id'];
@@ -430,12 +449,13 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         }
       });
     } catch (error) {
-      throw storageError(error);
+      throw operationError(this.#db, error);
     }
   }
 
   override async deleteThread(threadId: string): Promise<void> {
     try {
+      assertConnection(this.#db);
       validateKey(threadId);
       await transact(this.#db, ['checkpoints', 'writes', 'meta'], 'readwrite', async (tx) => {
         const range = prefixRange([...this.#scope, threadId]);
@@ -446,7 +466,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         await requestResult(meta.delete(prefixRange([...this.#scope, 'namespace', threadId])));
       });
     } catch (error) {
-      throw storageError(error);
+      throw operationError(this.#db, error);
     }
   }
 }
