@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { Submission } from '@galaxie/core';
+import type { SessionId, Submission } from '@galaxie/core';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
 import * as web from '@langchain/langgraph/web';
@@ -174,5 +174,34 @@ test.each(Object.keys(reloadCases) as (keyof typeof reloadCases)[])(
     const repeated = await rebuilt.getState(config);
     expect(repeated.values).toEqual(finished.values);
     expect(repeated.next).toEqual([]);
+  },
+);
+
+test.each(Object.keys(reloadCases) as (keyof typeof reloadCases)[])(
+  '%s restores through core after closing and reopening IndexedDB',
+  async (name) => {
+    const databaseName = `galaxie-core-restore-${crypto.randomUUID()}`;
+    const saver = await open(databaseName);
+    const paused = await runGalaxie(cases[name], () => saver, true);
+    const first = await saver.list({}).next();
+    const sessionId = first.value?.config.configurable?.['thread_id'] as SessionId;
+    expect(typeof sessionId).toBe('string');
+    saver.close();
+
+    const reopened = await open(databaseName);
+    const restored = await runGalaxie(cases[name], () => reopened, false, sessionId);
+    const golden = reloadCases[name];
+    expect(restored.outcome).toEqual({ status: 'succeeded' });
+    expect(restored.pauses).toEqual(paused.pauses);
+    expect(normalize({ pauses: restored.pauses })).toEqual({ pauses: golden.pauses });
+    expect(paused.state.next).toEqual(
+      golden.checkpoints[(golden.pauses[0]?.historyLength ?? 0) - 1]?.next,
+    );
+    const { counts, ...values } = restored.final as Record<string, unknown>;
+    expect(values).toEqual({ value: golden.final.value, answer: golden.final.answer });
+    expect(restored.state.next).toEqual(golden.state.next);
+    expect(counts).toEqual(
+      name === 'interrupt-subgraph' ? { callSub: 1, s1: 0, sask: 1 } : { prepare: 0, ask: 1 },
+    );
   },
 );

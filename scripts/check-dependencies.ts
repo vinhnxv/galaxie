@@ -246,6 +246,7 @@ for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
     if (
       specifier.startsWith('./') ||
       specifier === '@galaxie/core' ||
+      specifier === '@galaxie/storage-indexeddb' ||
       specifier === '@galaxie/adapter-langgraph' ||
       specifier === '@galaxie/example-english-tutor' ||
       specifier === '@galaxie/react' ||

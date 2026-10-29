@@ -10,6 +10,7 @@ import {
   type PendingInteraction,
   type RunEvent,
   type RunId,
+  type SessionId,
   toErrorInfo,
   type ViewRevision,
 } from '@galaxie/core';
@@ -28,6 +29,7 @@ export function interaction(overrides: Partial<PendingInteraction> = {}): Pendin
 
 export class FakeInstance implements AgentInstance<unknown, unknown> {
   readonly instanceId: InstanceId;
+  readonly sessionId: SessionId = 'f03855d0-093d-44ef-afdd-58bff38d34dc' as SessionId;
   private snapshot: AgentSnapshot<unknown>;
   private readonly listeners: Set<() => void> = new Set();
   subscribeCalls: number = 0;
@@ -36,6 +38,7 @@ export class FakeInstance implements AgentInstance<unknown, unknown> {
   readonly start: Mock<AgentInstance<unknown, unknown>['start']> = vi.fn(async () => ({
     runId: 'unused' as RunId,
   }));
+  readonly restore: Mock<AgentInstance<unknown, unknown>['restore']> = vi.fn(async () => undefined);
   readonly cancel: Mock<AgentInstance<unknown, unknown>['cancel']> = vi.fn(async (runId) => ({
     runId,
     status: 'cancelled' as const,
