@@ -7,6 +7,7 @@ import { deadlineTimer, RunBudget } from './budgets.js';
 import { CapabilityBroker, registerPrivate } from './capability-broker.js';
 import { ConfirmationGate } from './confirmations.js';
 import type { AgentDefinition } from './definition.js';
+import type { DevelopmentWarning, DevelopmentWarningReporter } from './development.js';
 import {
   type ErrorCode,
   type ErrorInfo,
@@ -142,13 +143,17 @@ export function createAgentInstance(
     readonly policy: Readonly<Record<DataLabel, DestinationAllowlist>>;
     readonly urlAllowlist: readonly string[];
     readonly outputSafety?: OutputSafetyHook;
+    readonly developmentWarnings?: DevelopmentWarningReporter;
     readonly developmentTraceText?: {
       readonly destination: DestinationClass;
     };
   },
   onDisposed: () => void,
   diagnostics?: (event: DiagnosticEvent) => void,
-): AgentInstance<unknown, unknown> {
+): {
+  readonly instance: AgentInstance<unknown, unknown>;
+  readonly checkDevelopmentWarnings?: () => Promise<void>;
+} {
   const instanceId = globalThis.crypto.randomUUID() as InstanceId;
   const sessionId = options.sessionId ?? (globalThis.crypto.randomUUID() as SessionId);
   let state: InstanceState = 'created';
@@ -198,6 +203,14 @@ export function createAgentInstance(
       });
     }
   };
+  const warn =
+    instrumentation.developmentWarnings === undefined
+      ? undefined
+      : (warning: Omit<DevelopmentWarning, 'instanceId'>): void => {
+          instrumentation.developmentWarnings?.({ ...warning, instanceId }, (error) =>
+            report({ kind: 'listener_threw', error }),
+          );
+        };
   const confirmations =
     options.confirmations === undefined
       ? undefined
@@ -599,7 +612,7 @@ export function createAgentInstance(
     void execute(run, segment, predecessor, command, parent);
   };
 
-  return {
+  const instance: AgentInstance<unknown, unknown> = {
     instanceId,
     sessionId,
     getSnapshot: () => snapshot,
@@ -1008,5 +1021,22 @@ export function createAgentInstance(
       })();
       return disposal;
     },
+  };
+  return {
+    instance,
+    ...(warn === undefined
+      ? {}
+      : {
+          checkDevelopmentWarnings: async (): Promise<void> => {
+            for (const name of Object.keys(definition.capabilities?.optional ?? {})) {
+              if (
+                !Object.hasOwn(options.bindings ?? {}, name) ||
+                options.bindings?.[name] === undefined
+              )
+                warn({ code: 'capability_unbound', name });
+            }
+            await router.checkDevelopmentWarnings(warn);
+          },
+        }),
   };
 }

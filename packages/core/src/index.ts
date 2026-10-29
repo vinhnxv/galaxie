@@ -27,6 +27,7 @@ export {
   defineAgentDefinition,
   type InputOf,
 } from './definition.js';
+export type { DevelopmentWarning, DevelopmentWarningCode } from './development.js';
 export { EFFECT_TRANSITIONS, type EffectState } from './effects.js';
 export {
   type ErrorCode,
