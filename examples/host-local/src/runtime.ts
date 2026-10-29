@@ -66,6 +66,7 @@ export interface LocalHost {
   subscribeStorage(listener: () => void): () => void;
   acquireOwnership(takeover?: boolean): Promise<OwnershipResult>;
   deleteSession(sessionId: SessionId): Promise<void>;
+  readonly exportSession: IndexedDBSaver['exportSession'];
   signOut(): Promise<void>;
   createInstance(sessionId?: SessionId): Promise<AgentInstance<TutorInput, unknown>>;
 }
@@ -185,6 +186,14 @@ export function createLocalHost(models: LocalModels): LocalHost {
     async deleteSession(sessionId) {
       const checkpointer = await saver;
       await checkpointer?.deleteSession(sessionId);
+    },
+    async exportSession(sessionId, options) {
+      const checkpointer = await saver;
+      if (disposed || checkpointer === undefined)
+        throw new GalaxieError('unavailable', 'Session export is unavailable.');
+      return options === undefined
+        ? checkpointer.exportSession(sessionId)
+        : checkpointer.exportSession(sessionId, options);
     },
     async signOut() {
       const checkpointer = disposed ? undefined : await saver?.catch(() => undefined);
