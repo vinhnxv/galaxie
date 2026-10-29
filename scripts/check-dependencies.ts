@@ -137,12 +137,14 @@ const models = JSON.parse(readFileSync('packages/models/package.json', 'utf8')) 
 };
 if (
   JSON.stringify(Object.keys(models.peerDependencies ?? {}).sort()) !==
-    JSON.stringify(['@langchain/core', '@mlc-ai/web-llm']) ||
+    JSON.stringify(['@langchain/core', '@langchain/openai', '@mlc-ai/web-llm']) ||
+  models.peerDependencies?.['@langchain/openai'] !== '1.6.3' ||
+  models.peerDependenciesMeta?.['@langchain/openai']?.optional !== true ||
   models.peerDependencies?.['@mlc-ai/web-llm'] !== '0.2.86' ||
   models.peerDependenciesMeta?.['@mlc-ai/web-llm']?.optional !== true
 )
   problems.push(
-    'packages/models/package.json: models peers must be @langchain/core and optional @mlc-ai/web-llm 0.2.86',
+    'packages/models/package.json: models peers must be @langchain/core, optional @langchain/openai 1.6.3 and optional @mlc-ai/web-llm 0.2.86',
   );
 for (const field of [
   'dependencies',
@@ -160,6 +162,7 @@ for (const file of files('packages/models/src', /\.[cm]?tsx?$/)) {
       specifier.startsWith('./') ||
       specifier.startsWith('../') ||
       specifier.startsWith('@langchain/core/') ||
+      (specifier === '@langchain/openai' && file.startsWith('packages/models/src/openai/')) ||
       (specifier === '@mlc-ai/web-llm' &&
         !hasTypes &&
         (((file === 'packages/models/src/webllm/engine.ts' ||
