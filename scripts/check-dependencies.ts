@@ -206,6 +206,18 @@ for (const area of ['src', 'dist']) {
   }
 }
 
+for (const file of files('packages/eslint-plugin/src', /\.[cm]?tsx?$/)) {
+  for (const { specifier, typeOnly } of imports(file)) {
+    if (
+      specifier.startsWith('./') ||
+      specifier.startsWith('../') ||
+      (specifier === 'eslint' && typeOnly)
+    )
+      continue;
+    problems.push(`${file}: ESLint plugin imports must be relative or type-only from eslint`);
+  }
+}
+
 for (const entry of readdirSync('packages', { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
   for (const area of ['src', 'dist', ...(entry.name === 'react' ? ['test'] : [])]) {
