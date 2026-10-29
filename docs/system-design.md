@@ -251,6 +251,37 @@ A8 attribution travels in per-call MCP `_meta` as `galaxie.dev/agent`, `galaxie.
 
 `examples/mcp-server` is a development reference bound to `127.0.0.1`. It checks Origin on every request, authenticates non-preflights, binds sessions to verified principals and provides narrowly scoped CORS. Its test admin API is in-process only. There is no OAuth, resources, prompts, third-party server support, runtime pin approval, resumable stream replay or MCP host wiring in this slice. See the [client usage and limits](../packages/tools-mcp/README.md) and [reference server](../examples/mcp-server/README.md).
 
+### 6.2. Generated agent manifests
+
+`createManifest(definition, { entry })` in `@galaxie/core` is a pure build-time generator. Code remains the source of truth (ADR-0008). It returns a `schemaVersion: '0.2'` manifest with identity, executor, package-relative entry, input schema path, required and optional capability kinds and schema paths, model roles, UI requirements and skills. Absent groups are omitted; capability, model and schema maps use code-unit key order. It reads no host grants or credentials and performs no I/O.
+
+Schemas use Standard JSON Schema's input conversion with target `draft-2020-12`, preserving `x-galaxie` labels and shapes. A missing converter or an unrepresentable position, including a nested date, fails with fixed `unsupported` errors. Custom refinements have no JSON Schema form and are omitted; runtime schema validation stays authoritative. In particular, the tutor's `score <= total` refinement remains runtime-only.
+
+The package's `galaxie` field selects the definition module, named export and output directory:
+
+```json
+{
+  "galaxie": {
+    "definition": "./dist/index.js",
+    "export": "tutorDefinition",
+    "out": "./dist/galaxie"
+  }
+}
+```
+
+After compiling the package, run:
+
+```sh
+node scripts/build-manifest.ts examples/english-tutor
+node scripts/build-manifest.ts examples/english-tutor --verify
+```
+
+The root build runs both commands immediately after compiling the tutor. The Node-only script resolves core from that package, imports the definition and requires its version to match `package.json`. It validates package-relative POSIX paths and output containment before mutation. The output must be strictly inside a directory listed in `files`, its parent must already exist, and package symlinks are rejected. `files` entries are literal files or directories. Generation computes all bytes before replacing only the output directory, removing stale artifacts. `manifest.json` sits at its root, with `schemas/input.json` and `schemas/<capability>.input.json` and `.output.json` beneath it. Manifest schema paths are relative to this output directory; entry and skill paths are relative to the package. JSON uses two-space indentation and a trailing newline.
+
+The script appends `integrity.entry`, `integrity.files` and `integrity.lockfile`, all SHA-256 digests encoded as `sha256-<base64>`. The sorted file inventory covers `package.json`, every file beneath the package's `files` entries except the generated output, and every declared skill file. Entry and skill files must exist outside the output directory; filesystem identity checks also reject case aliases inside it. The lockfile digest covers the nearest ancestor `pnpm-lock.yaml`. Exclusive file creation rejects schema filenames that alias on the destination filesystem. Verification uses the same inventory and regenerates schemas and manifest bytes, rejecting missing, added or changed shipped files, digest mismatches and any missing, added or changed output file. It compares exact filenames and raw bytes, without UTF-8 replacement decoding. It writes nothing; failures contain fixed messages or paths, never file or schema contents or underlying error text.
+
+Digests prove only that a package matches the manifest being checked. A host must obtain that manifest, or pin its digest, from a source it trusts, such as its own lockfile-resolved build output or a reviewed commit. Without signing, an attacker who replaces both package and manifest passes verification. A hash identifies provenance and integrity, not safe behavior (brief §9). This is neither a sandbox nor a security guarantee. Signing, runtime loading by manifest and browser-side verification APIs are outside this slice; hosts verify at build or deploy time, or use Subresource Integrity with the listed digests.
+
 ## 7. Runtime topology
 
 ```mermaid

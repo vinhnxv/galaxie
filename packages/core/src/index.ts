@@ -96,6 +96,7 @@ export {
   type RunStatus,
   type Transitions,
 } from './lifecycle.js';
+export { type AgentManifest, createManifest, type ManifestCapability } from './manifest.js';
 export type {
   ModelAvailability,
   ModelAvailabilityRequest,
