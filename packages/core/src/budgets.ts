@@ -38,6 +38,7 @@ export interface ModelReservation {
 export class RunBudget {
   readonly limits: BudgetLimits;
   #toolCalls = 0;
+  #repairAttempts = 0;
   readonly #committed = { tokens: 0, cost: 0 };
   readonly #reservations = new Set<{ readonly tokens: number; readonly cost: number }>();
   constructor(limits: BudgetLimits) {
@@ -46,6 +47,11 @@ export class RunBudget {
   reserveToolCall(): void {
     if (this.#toolCalls >= this.limits.toolCalls) throw new BudgetExceeded('toolCalls');
     this.#toolCalls++;
+  }
+  reserveRepair(): void {
+    if (this.#repairAttempts >= this.limits.repairAttempts)
+      throw new BudgetExceeded('repairAttempts');
+    this.#repairAttempts++;
   }
   /** Reserve both dimensions atomically; token exhaustion takes precedence (ADR-0006). */
   reserveModel(tokens: number, cost: number): ModelReservation {
