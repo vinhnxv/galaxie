@@ -13,6 +13,7 @@ import {
   compareWritesSortKeys,
   copyCheckpoint,
   getCheckpointId,
+  INTERRUPT,
   maxChannelVersion,
   type PendingWrite,
   type SerializerProtocol,
@@ -31,7 +32,7 @@ import {
   validateKey,
   validateScope,
 } from './keys.js';
-import { IndexedDBRecovery } from './recovery.js';
+import { IndexedDBRecovery, readSessionSummary } from './recovery.js';
 import {
   deleteSessionRecords,
   type SweepOptions,
@@ -50,6 +51,12 @@ import {
   storageOperation,
   transact,
 } from './schema.js';
+import {
+  exportTimestamp,
+  exportValue,
+  type SessionExport,
+  unavailableValue,
+} from './session-export.js';
 
 export interface IndexedDBSaverOptions {
   readonly appId: string;
@@ -475,6 +482,117 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
   async sweep(options?: SweepOptions): Promise<SweepResult> {
     return storageOperation(this.#db, async () => {
       return await sweep(this.#db, this.#scope, this.#fencing, options);
+    });
+  }
+
+  /** Hosts bind personalContent: true to an explicit user action and treat it as personal data. */
+  async exportSession(
+    sessionId: string,
+    options?: { readonly personalContent?: boolean },
+  ): Promise<SessionExport> {
+    return storageOperation(this.#db, async () => {
+      validateKey(sessionId);
+      const personalContent = options?.personalContent === true;
+      const saved = await this.#fencing.read(
+        ['checkpoints', 'writes', 'inbox', 'journal'],
+        async (tx) => {
+          const range = prefixRange([...this.#scope, sessionId]);
+          const rows: unknown[] = await requestResult(tx.objectStore('checkpoints').getAll(range));
+          const writes: unknown[] = await requestResult(tx.objectStore('writes').getAll(range));
+          const summary = await readSessionSummary(tx, this.#scope, sessionId);
+          if (
+            rows.length === 0 &&
+            writes.length === 0 &&
+            summary.agent === null &&
+            summary.recovery.submissions.count === 0 &&
+            summary.recovery.effects.count === 0
+          )
+            throw new StorageError('invalid');
+          return { rows: rows.map(readCheckpoint), writes: writes.map(readWrite), summary };
+        },
+      );
+      const timestamps: string[] = [];
+      const pending = new Set<string>();
+      const latest = new Map<string, string>();
+      for (const row of saved.rows)
+        if ((latest.get(row.key[3]) ?? '') < row.key[4]) latest.set(row.key[3], row.key[4]);
+      let unrecoverable = false;
+      const checkpoints: NonNullable<SessionExport['checkpoints']>[number][] = [];
+      // LangGraph checkpoint IDs are time-ordered; namespace disambiguates nested graphs.
+      saved.rows.sort(
+        (a, b) => a.key[4].localeCompare(b.key[4]) || a.key[3].localeCompare(b.key[3]),
+      );
+      for (const row of saved.rows) {
+        let timestamp: string | null = null;
+        let channelValues = exportValue(unavailableValue);
+        try {
+          const checkpoint = await decode(this.serde, row.checkpoint);
+          if (!object(checkpoint) || !object(checkpoint['channel_values']))
+            throw new StorageError('corrupt');
+          timestamp = exportTimestamp(checkpoint['ts']);
+          if (timestamp === null) unrecoverable = true;
+          if (personalContent) channelValues = exportValue(checkpoint['channel_values']);
+        } catch {
+          unrecoverable = true;
+        }
+        if (timestamp !== null) timestamps.push(timestamp);
+        const pendingWrites: (readonly [string, string, ReturnType<typeof exportValue>])[] = [];
+        const related = saved.writes.filter((write) => sameKey(write.checkpoint, row.key));
+        related.sort((a, b) =>
+          compareWritesSortKeys(
+            writesSortKey(a.taskPath, a.key[5], a.key[6]),
+            writesSortKey(b.taskPath, b.key[5], b.key[6]),
+          ),
+        );
+        for (const write of related) {
+          // Default exports decode only interrupt writes to count IDs; values never escape.
+          if (!personalContent && write.channel !== INTERRUPT) continue;
+          let value: unknown;
+          try {
+            value = await decode(this.serde, write.value);
+          } catch {
+            unrecoverable = true;
+            value = unavailableValue;
+          }
+          if (write.channel === INTERRUPT && latest.get(row.key[3]) === row.key[4]) {
+            for (const interrupt of Array.isArray(value) ? value : [value])
+              if (object(interrupt) && typeof interrupt['id'] === 'string')
+                pending.add(interrupt['id']);
+          }
+          if (personalContent)
+            pendingWrites.push(Object.freeze([write.key[5], write.channel, exportValue(value)]));
+        }
+        if (personalContent)
+          checkpoints.push(
+            Object.freeze({
+              id: row.key[4],
+              parentId: row.parentId,
+              namespace: row.key[3],
+              timestamp,
+              channelValues,
+              pendingWrites: Object.freeze(pendingWrites),
+            }),
+          );
+      }
+      timestamps.sort();
+      // A custom async serializer may yield while another tab logs out and recreates the session.
+      await this.#fencing.read([], async () => {});
+      return Object.freeze({
+        format: 'galaxie.session-export/1',
+        appId: this.#scope[0],
+        sessionId,
+        exportedAt: new Date().toISOString(),
+        personalContent,
+        metadata: Object.freeze({
+          ...saved.summary,
+          checkpointCount: saved.rows.length,
+          firstTimestamp: timestamps[0] ?? null,
+          lastTimestamp: timestamps.at(-1) ?? null,
+          pendingInteractionCount: pending.size,
+          ...(unrecoverable ? { unrecoverable: true as const } : {}),
+        }),
+        ...(personalContent ? { checkpoints: Object.freeze(checkpoints) } : {}),
+      });
     });
   }
 

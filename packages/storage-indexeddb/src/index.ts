@@ -4,3 +4,4 @@
 export { StorageError, type StorageErrorCode } from './errors.js';
 export type { IndexedDBRecovery } from './recovery.js';
 export { IndexedDBSaver, type IndexedDBSaverOptions } from './saver.js';
+export type { SessionExport, SessionExportValue } from './session-export.js';
