@@ -15,6 +15,8 @@ import type {
   ModelRoute,
   ModelRouting,
   ModelUsage,
+  OutputSafetyHook,
+  OutputSafetyOutcome,
   SelectedModelRoute,
 } from './models.js';
 import {
@@ -111,6 +113,7 @@ export class ModelRouter {
   readonly #download: ModelRouting['download'];
   #persistence: Promise<boolean> | undefined;
   readonly #getCredential: ModelRouting['getCredential'];
+  readonly #outputSafety: OutputSafetyHook | undefined;
   #disposed = false;
 
   constructor(
@@ -118,9 +121,11 @@ export class ModelRouter {
     routing: ModelRouting | undefined,
     policy: Policy,
     report: (event: Omit<DiagnosticEvent, 'instanceId'>) => void,
+    outputSafety?: OutputSafetyHook,
   ) {
     this.#policy = policy;
     this.#report = report;
+    this.#outputSafety = outputSafety;
     if (
       routing !== undefined &&
       (!record(routing) || !record(routing.providers) || !record(routing.roles))
@@ -522,9 +527,58 @@ export class ModelRouter {
                 else throw error;
               }
             };
+            let outputSafetyOutcome: OutputSafetyOutcome | undefined =
+              this.#outputSafety === undefined ? 'unset' : undefined;
+            let safetyError: GalaxieError | undefined;
+            const rejectOutput = (outcome: 'blocked' | 'failed'): never => {
+              if (safetyError === undefined) {
+                outputSafetyOutcome = outcome;
+                safetyError = new GalaxieError(
+                  outcome === 'blocked' ? 'denied' : 'unavailable',
+                  outcome === 'blocked'
+                    ? 'The output safety hook blocked the reply.'
+                    : 'The output safety hook failed.',
+                );
+                this.#report({
+                  kind: outcome === 'blocked' ? 'output_blocked' : 'output_safety_failed',
+                  runId: run.runId,
+                });
+              }
+              throw safetyError;
+            };
             const call: ModelCall = Object.freeze({
               ...selected,
               ...(credential === undefined ? {} : { credential }),
+              get outputSafetyOutcome() {
+                return outputSafetyOutcome;
+              },
+              checkOutput: async (
+                text: string,
+                options: { readonly final: boolean },
+              ): Promise<void> => {
+                if (safetyError !== undefined) throw safetyError;
+                assertActive();
+                const hook = this.#outputSafety;
+                if (hook === undefined) return;
+                let verdict: unknown;
+                try {
+                  verdict = await waitForHostOrAbort(
+                    Promise.resolve().then(() => {
+                      assertActive();
+                      return hook({ text, final: options.final, role, destination, signal });
+                    }),
+                    signal,
+                  );
+                } catch {
+                  assertActive();
+                  rejectOutput('failed');
+                }
+                assertActive();
+                if (safetyError !== undefined) throw safetyError;
+                if (verdict === 'block') rejectOutput('blocked');
+                if (verdict !== 'allow') rejectOutput('failed');
+                outputSafetyOutcome = 'allowed';
+              },
               end: settle,
               fail: () => settle(),
             });

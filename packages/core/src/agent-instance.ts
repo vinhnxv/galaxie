@@ -26,7 +26,7 @@ import type {
 import { checkInteractionBindings, checkInteractionUrls } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
-import type { PublishedModelRoute, SelectedModelRoute } from './models.js';
+import type { OutputSafetyHook, PublishedModelRoute, SelectedModelRoute } from './models.js';
 import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
@@ -111,6 +111,7 @@ export function createAgentInstance(
     readonly limits: BudgetLimits;
     readonly policy: Readonly<Record<DataLabel, DestinationAllowlist>>;
     readonly urlAllowlist: readonly string[];
+    readonly outputSafety?: OutputSafetyHook;
     readonly developmentTraceText?: {
       readonly destination: DestinationClass;
     };
@@ -154,7 +155,15 @@ export function createAgentInstance(
     options.principalScope,
     report,
   );
-  const router = new ModelRouter(definition, options.models, instrumentation.policy, report);
+  const router = new ModelRouter(
+    definition,
+    options.models,
+    instrumentation.policy,
+    report,
+    instrumentation.outputSafety,
+  );
+  if (options.models !== undefined && instrumentation.outputSafety === undefined)
+    report({ kind: 'output_safety_unset' });
   const assertUsable = (): void => {
     if (disposing) throw new GalaxieError('invalid', 'The instance was disposed.');
   };

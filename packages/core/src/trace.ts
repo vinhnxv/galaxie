@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { SelectedModelRoute } from './models.js';
+import type { OutputSafetyOutcome, SelectedModelRoute } from './models.js';
 
 /** Data-only instrumentation; executors never receive OpenTelemetry objects. */
 export interface RunTrace {
@@ -32,12 +32,14 @@ export type TraceResult =
       readonly output?: unknown;
       readonly usage?: { readonly inputTokens?: number; readonly outputTokens?: number };
       readonly responseModel?: string;
+      readonly outputSafetyOutcome?: OutputSafetyOutcome;
       /** Final destination and provider for this model call (ADR-0006). */
       readonly route?: SelectedModelRoute;
     }
   | {
       readonly status: 'error';
       readonly errorType?: string;
+      readonly outputSafetyOutcome?: OutputSafetyOutcome;
       /** Final destination and provider for this model call (ADR-0006). */
       readonly route?: SelectedModelRoute;
     };

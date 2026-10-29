@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { RunTrace, SelectedModelRoute, TraceHandle } from '@galaxie/core';
+import type { OutputSafetyOutcome, RunTrace, SelectedModelRoute, TraceHandle } from '@galaxie/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { LLMResult } from '@langchain/core/outputs';
@@ -44,6 +44,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
   readonly #chains: Map<string, ChainTrace> = new Map();
   readonly #models: Map<string, TraceHandle> = new Map();
   readonly #routes = new Map<string, SelectedModelRoute>();
+  readonly #outputSafety = new Map<string, OutputSafetyOutcome>();
   readonly #credentialFailures = new Set<unknown>();
   readonly #settlement: PromiseWithResolvers<void> = Promise.withResolvers<void>();
   #root: string | undefined;
@@ -63,6 +64,10 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
         providerId: selected.providerId,
         destination: selected.destination,
       });
+  }
+
+  setOutputSafetyOutcome(runId: string, outcome: OutputSafetyOutcome | undefined): void {
+    if (this.#models.has(runId) && outcome !== undefined) this.#outputSafety.set(runId, outcome);
   }
 
   /** Classify errors without changing the graph-facing object or storing the credential (ADR-0012). */
@@ -165,6 +170,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
 
   override handleLLMEnd(output: LLMResult, runId: string): void {
     const route = this.#routes.get(runId);
+    const outputSafetyOutcome = this.#outputSafety.get(runId);
     const generation = output.generations[0]?.[0];
     const message =
       generation !== undefined && 'message' in generation ? generation.message : undefined;
@@ -193,6 +199,7 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
       status: 'ok',
       ...(textOutput === undefined ? {} : { output: textOutput }),
       ...(route === undefined ? {} : { route }),
+      ...(outputSafetyOutcome === undefined ? {} : { outputSafetyOutcome }),
       usage: {
         ...(typeof input === 'number' ? { inputTokens: input } : {}),
         ...(typeof outputTokens === 'number' ? { outputTokens } : {}),
@@ -200,16 +207,20 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     });
     this.#models.delete(runId);
     this.#routes.delete(runId);
+    this.#outputSafety.delete(runId);
   }
 
   override handleLLMError(error: Error, runId: string): void {
     const route = this.#routes.get(runId);
+    const outputSafetyOutcome = this.#outputSafety.get(runId);
     this.#models.get(runId)?.end({
       status: 'error',
       errorType: this.isCredentialFailure(error) ? 'Error' : error.name,
       ...(route === undefined ? {} : { route }),
+      ...(outputSafetyOutcome === undefined ? {} : { outputSafetyOutcome }),
     });
     this.#models.delete(runId);
     this.#routes.delete(runId);
+    this.#outputSafety.delete(runId);
   }
 }

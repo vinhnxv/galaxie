@@ -31,6 +31,7 @@ const ALLOWED = new Set([
   'galaxie.capability.kind',
   'galaxie.destination.class',
   'galaxie.model.provider',
+  'galaxie.output_safety',
   'galaxie.run.labels',
   'galaxie.budget.name',
   'gen_ai.agent.name',
@@ -189,6 +190,9 @@ export function startRunTrace(
     record.span.setAttributes(
       attributes({
         'galaxie.step.status': result.status,
+        ...(record.kind === 'model' && 'outputSafetyOutcome' in result
+          ? { 'galaxie.output_safety': result.outputSafetyOutcome }
+          : {}),
         ...(record.kind === 'model' && 'route' in result && result.route !== undefined
           ? {
               'galaxie.destination.class': result.route.destination,

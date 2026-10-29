@@ -109,7 +109,14 @@ function routed(
 ) {
   const end = vi.fn<(usage?: ModelUsage) => void>();
   const fail = vi.fn<() => void>();
-  const lease: ModelCall = { providerId: 'provider', destination: 'in-browser', end, fail };
+  const lease: ModelCall = {
+    providerId: 'provider',
+    destination: 'in-browser',
+    end,
+    fail,
+    outputSafetyOutcome: 'unset',
+    checkOutput: async () => {},
+  };
   const begin = vi.fn(async () => lease);
   const handler = new LangGraphTraceHandler({
     recordsText: false,
@@ -405,6 +412,8 @@ test('credential factories receive the per-call credential while callbacks only 
       providerId: 'remote',
       destination: 'host-server',
       credential,
+      outputSafetyOutcome: 'unset',
+      checkOutput: async () => {},
       end,
       fail,
     }),

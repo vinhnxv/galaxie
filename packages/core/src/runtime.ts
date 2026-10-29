@@ -12,7 +12,7 @@ import type { ExecutorAdapter } from './executor.js';
 import type { AppId, InstanceId, PrincipalScope, RunId } from './ids.js';
 import type { AgentInstance } from './instance.js';
 import { checkUiRequirements, normalizeUiBindings, type UiBindings } from './interactions.js';
-import type { ModelRouting } from './models.js';
+import type { ModelRouting, OutputSafetyHook } from './models.js';
 import {
   type BudgetLimits,
   type DataPolicy,
@@ -35,7 +35,10 @@ export interface DiagnosticEvent {
     | 'listener_threw'
     | 'late_result'
     | 'capability_failed'
-    | 'model_failed';
+    | 'model_failed'
+    | 'output_blocked'
+    | 'output_safety_failed'
+    | 'output_safety_unset';
   readonly instanceId: InstanceId;
   readonly runId?: RunId;
   /** Host-only evidence, possibly including binding-supplied private content. Never forward it
@@ -63,6 +66,8 @@ export interface RuntimeOptions<
   readonly appId: AppId;
   readonly executors: Adapters;
   readonly diagnostics?: (event: DiagnosticEvent) => void;
+  /** Checks routed model output before release; failures block the call. */
+  readonly outputSafety?: OutputSafetyHook;
   readonly tracerProvider?: TracerProvider;
   /** Exact origins permitted in interaction URL props; the default permits none. */
   readonly urlAllowlist?: readonly string[];
@@ -112,6 +117,9 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
   options: RuntimeOptions<Adapters>,
 ): Runtime<Adapters> {
   if (options.appId === '') throw new GalaxieError('invalid', 'An application ID is required.');
+  const outputSafety = options.outputSafety;
+  if (outputSafety !== undefined && typeof outputSafety !== 'function')
+    throw new GalaxieError('invalid', 'The output safety hook must be a function.');
   const limits = budgetLimits(options.budgets);
   const policy = dataPolicy(options.dataPolicy);
   const urlAllowlist = normalizeUrlAllowlist(options.urlAllowlist);
@@ -163,6 +171,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
           limits,
           policy,
           urlAllowlist,
+          ...(outputSafety === undefined ? {} : { outputSafety }),
           ...(developmentTraceText === undefined ? {} : { developmentTraceText }),
         },
         () => instances.delete(instance),
