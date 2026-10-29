@@ -98,9 +98,7 @@ function callOptions(
   };
 }
 
-function usageOf(message: BaseMessage): UsageMetadata | undefined {
-  if (!('usage_metadata' in message)) return undefined;
-  const usage = message.usage_metadata as UsageMetadata | undefined;
+function usageOf(usage: UsageMetadata | undefined): UsageMetadata | undefined {
   if (
     usage === undefined ||
     usage.input_tokens === undefined ||
@@ -119,10 +117,11 @@ function usageOf(message: BaseMessage): UsageMetadata | undefined {
 }
 
 function assertTextReply(message: BaseMessage): string {
+  const rawToolCalls = message.additional_kwargs['tool_calls'];
   if (
     message.type !== 'ai' ||
     typeof message.content !== 'string' ||
-    message.additional_kwargs['tool_calls'] !== undefined ||
+    (rawToolCalls !== undefined && (!Array.isArray(rawToolCalls) || rawToolCalls.length > 0)) ||
     message.additional_kwargs['function_call'] !== undefined ||
     ('tool_calls' in message &&
       Array.isArray(message.tool_calls) &&
@@ -210,7 +209,26 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
       if (message === undefined) throw new ModelProviderError();
       const text = assertTextReply(message);
       if (text.length === 0) throw new ModelProviderError();
-      const usage = usageOf(message);
+      // The pinned LangChain converter omits zero counts; read the reported usage directly.
+      const raw = message.additional_kwargs['__raw_response'] as
+        | {
+            usage?: {
+              prompt_tokens: number;
+              completion_tokens: number;
+              total_tokens: number;
+            } | null;
+          }
+        | undefined;
+      const reported = raw?.usage;
+      const usage = usageOf(
+        reported === undefined || reported === null
+          ? undefined
+          : {
+              input_tokens: reported.prompt_tokens,
+              output_tokens: reported.completion_tokens,
+              total_tokens: reported.total_tokens,
+            },
+      );
       return {
         generations: [
           {
@@ -236,12 +254,19 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
     const mapped = cleanMessages(messages);
     options.signal?.throwIfAborted();
     let hasText = false;
+    let finished = false;
     try {
       for await (const inner of this.#inner._streamResponseChunks(mapped, callOptions(options))) {
         options.signal?.throwIfAborted();
         const text = assertTextReply(inner.message);
         hasText ||= text.length > 0;
-        const usage = usageOf(inner.message);
+        const reason = inner.generationInfo?.['finish_reason'];
+        if (typeof reason === 'string' && reason.length > 0) finished = true;
+        const usage = usageOf(
+          'usage_metadata' in inner.message
+            ? (inner.message.usage_metadata as UsageMetadata | undefined)
+            : undefined,
+        );
         const chunk = new ChatGenerationChunk({
           text,
           message: new AIMessageChunk<StandardMessageStructure>({
@@ -257,7 +282,7 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
         yield chunk;
       }
       options.signal?.throwIfAborted();
-      if (!hasText) throw new ModelProviderError();
+      if (!hasText || !finished) throw new ModelProviderError();
     } catch (error) {
       options.signal?.throwIfAborted();
       throw providerFailure(error);

@@ -44,6 +44,11 @@ test.each([
   'stream',
   'structured',
   'no-usage',
+  'zero-input',
+  'zero-output',
+  'zero-usage',
+  'truncated',
+  'read-error',
   'cancel',
   'consent-denied',
   'no-consent',
@@ -63,6 +68,18 @@ test.each([
     ...(mode === 'network' ? { failure: true } : {}),
     ...(mode === 'malformed' ? { malformed: true } : {}),
     ...(mode === 'no-usage' ? { usage: false } : {}),
+    ...(mode === 'zero-input'
+      ? { usage: { prompt_tokens: 0, completion_tokens: 2, total_tokens: 2 } }
+      : {}),
+    ...(mode === 'zero-output'
+      ? { usage: { prompt_tokens: 3, completion_tokens: 0, total_tokens: 3 } }
+      : {}),
+    ...(mode === 'zero-usage'
+      ? { usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }
+      : {}),
+    ...(mode === 'truncated' || mode === 'read-error'
+      ? { truncate: true, streamFailure: mode === 'read-error' }
+      : {}),
     ...(structured
       ? {
           text:
@@ -145,7 +162,12 @@ test.each([
           .addNode('respond', async (_state, config) => {
             const model = host.langchain.chatModel('assistant');
             let answer = '';
-            if (mode === 'stream' || mode === 'cancel') {
+            if (
+              mode === 'stream' ||
+              mode === 'cancel' ||
+              mode === 'truncated' ||
+              mode === 'read-error'
+            ) {
               for await (const chunk of await model.stream('prompt-canary', config))
                 answer += chunk.text;
             } else {
@@ -175,7 +197,15 @@ test.each([
     const events = await collect(instance.events(runId));
     await runtime.dispose();
     await provider.forceFlush();
-    const succeeded = ['invoke', 'stream', 'structured', 'no-usage'].includes(mode);
+    const succeeded = [
+      'invoke',
+      'stream',
+      'structured',
+      'no-usage',
+      'zero-input',
+      'zero-output',
+      'zero-usage',
+    ].includes(mode);
     const denied = mode === 'consent-denied' || mode === 'no-consent';
     expect(getCredential).toHaveBeenCalledTimes(denied ? 0 : callCount);
     expect(fake.requests).toHaveLength(denied ? 0 : callCount);
@@ -197,10 +227,14 @@ test.each([
           answer: mode === 'structured' ? '{"answer":"yes"}' : 'hello world'.repeat(callCount),
         },
       });
+      const expectedCharges: Record<string, { tokens: number; cost: number }> = {
+        'no-usage': { tokens: 100, cost: 200 },
+        'zero-input': { tokens: 2, cost: 4 },
+        'zero-output': { tokens: 3, cost: 3 },
+        'zero-usage': { tokens: 0, cost: 0 },
+      };
       expect(charges).toEqual(
-        Array.from({ length: callCount }, () =>
-          mode === 'no-usage' ? { tokens: 100, cost: 200 } : { tokens: 5, cost: 7 },
-        ),
+        Array.from({ length: callCount }, () => expectedCharges[mode] ?? { tokens: 5, cost: 7 }),
       );
       expect(instance.getSnapshot().routes?.['assistant']).toEqual({
         providerId: 'proxy',
@@ -215,10 +249,12 @@ test.each([
         ? 'denied'
         : mode === 'schema-invalid'
           ? 'invalid'
-          : ['malformed', 'non-json'].includes(mode)
+          : ['malformed', 'non-json', 'truncated', 'read-error'].includes(mode)
             ? 'executor_error'
             : 'unavailable';
       expect(events.at(-1)).toMatchObject({ type: 'error', error: { code } });
+      if (mode === 'truncated' || mode === 'read-error')
+        expect(charges).toEqual([{ tokens: 100, cost: 200 }]);
     }
     if (structured)
       expect(fake.requests[0]?.body['response_format']).toEqual({

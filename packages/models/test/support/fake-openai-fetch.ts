@@ -12,7 +12,15 @@ export interface RecordedOpenAIRequest {
 export interface FakeOpenAIOptions {
   readonly status?: number;
   readonly text?: string;
-  readonly usage?: boolean;
+  readonly usage?:
+    | boolean
+    | {
+        readonly prompt_tokens: number;
+        readonly completion_tokens: number;
+        readonly total_tokens: number;
+      };
+  readonly truncate?: boolean;
+  readonly streamFailure?: boolean;
   readonly failure?: boolean;
   readonly malformed?: boolean;
   readonly finishReason?: string;
@@ -52,7 +60,10 @@ export class FakeOpenAIFetch {
       return new Response('endpoint-body-marker', {
         headers: { 'content-type': 'application/json' },
       });
-    const usage = { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 };
+    const usage =
+      typeof options.usage === 'object'
+        ? options.usage
+        : { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 };
     const finish_reason = options.finishReason ?? 'stop';
     const text = options.text ?? 'hello world';
     if (!body['stream'])
@@ -79,15 +90,16 @@ export class FakeOpenAIFetch {
       model: 'fake',
       choices: [{ index: 0, delta, finish_reason: null }],
     }));
-    frames.push({
-      id: 'fake-completion',
-      object: 'chat.completion.chunk',
-      created: 0,
-      model: 'fake',
-      choices: [{ index: 0, delta: {}, finish_reason }],
-    });
+    if (!options.truncate)
+      frames.push({
+        id: 'fake-completion',
+        object: 'chat.completion.chunk',
+        created: 0,
+        model: 'fake',
+        choices: [{ index: 0, delta: {}, finish_reason }],
+      });
     const events: unknown[] = [...frames];
-    if (options.usage !== false) events.push({ choices: [], usage });
+    if (options.usage !== false && !options.truncate) events.push({ choices: [], usage });
     let index = 0;
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
@@ -97,10 +109,14 @@ export class FakeOpenAIFetch {
           controller.error(request.signal.reason);
           return;
         }
+        if (options.streamFailure && index === 1) {
+          controller.error(new Error('endpoint-body-marker'));
+          return;
+        }
         if (index < events.length) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(events[index++])}\n\n`));
         } else {
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          if (!options.truncate) controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
         }
       },

@@ -4,7 +4,6 @@
 import { OpenAIClient } from '@langchain/openai';
 import type { ModelUnavailableReason } from '../errors.js';
 
-/** Endpoint failures cross the boundary only as allowlisted codes. */
 export function classifyOpenAIError(
   error: unknown,
 ): { readonly code: 'unavailable'; readonly reason: ModelUnavailableReason } | undefined {

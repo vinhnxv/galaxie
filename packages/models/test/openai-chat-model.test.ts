@@ -95,6 +95,59 @@ function fixture(options: ConstructorParameters<typeof FakeOpenAIFetch>[0] = {})
 
 describe('OpenAI-compatible chat model', () => {
   it.each([
+    {
+      usage: { prompt_tokens: 0, completion_tokens: 2, total_tokens: 2 },
+      expected: { input_tokens: 0, output_tokens: 2, total_tokens: 2 },
+    },
+    {
+      usage: { prompt_tokens: 3, completion_tokens: 0, total_tokens: 3 },
+      expected: { input_tokens: 3, output_tokens: 0, total_tokens: 3 },
+    },
+    {
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      expected: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+    },
+  ])('preserves reported zero usage in JSON and SSE: %j', async ({ usage, expected }) => {
+    const { model } = fixture({ usage });
+    expect((await model.invoke('hello')).usage_metadata).toEqual(expected);
+    const chunks = [];
+    for await (const chunk of await model.stream('hello')) chunks.push(chunk);
+    expect(chunks.at(-1)?.usage_metadata).toEqual(expected);
+    expect(chunks.filter((chunk) => chunk.usage_metadata !== undefined)).toHaveLength(1);
+  });
+
+  it('accepts text with empty tool arrays in JSON and SSE', async () => {
+    const { model } = fixture({
+      message: { tool_calls: [] },
+      deltas: [{ role: 'assistant', content: 'hello world', tool_calls: [] }],
+    });
+    expect((await model.invoke('hello')).content).toBe('hello world');
+    let text = '';
+    for await (const chunk of await model.stream('hello')) text += chunk.text;
+    expect(text).toBe('hello world');
+  });
+
+  it.each(['eof', 'read-error'] as const)(
+    'fails a partial SSE %s without successful completion or endpoint text in its error',
+    async (mode) => {
+      const { model } = fixture({ truncate: true, streamFailure: mode === 'read-error' });
+      let completed = false;
+      let text = '';
+      const run = (async () => {
+        for await (const chunk of await model.stream('hello')) text += chunk.text;
+        completed = true;
+      })();
+      const error = await run.catch((failure: unknown) => failure);
+      expect(error).toMatchObject({ name: 'ModelProviderError' });
+      expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain(
+        'endpoint-body-marker',
+      );
+      expect(error).not.toHaveProperty('cause');
+      expect(text).not.toBe('');
+      expect(completed).toBe(false);
+    },
+  );
+  it.each([
     { baseURL: 'relative' },
     { baseURL: 'http://proxy.example/v1' },
     { baseURL: 'https://user:password@proxy.example' },
