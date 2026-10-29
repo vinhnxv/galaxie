@@ -60,6 +60,7 @@ describe('OpenAI-compatible error classification', () => {
     async (finish_reason) => {
       const client = new OpenAIClient({
         apiKey: 'fake-credential',
+        dangerouslyAllowBrowser: true,
         logLevel: 'off',
         fetch: async () =>
           Response.json({

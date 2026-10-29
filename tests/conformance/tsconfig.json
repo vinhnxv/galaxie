@@ -9,6 +9,7 @@
       "@galaxie/storage-indexeddb": ["../../packages/storage-indexeddb/src/index.ts"],
       "@galaxie/react": ["../../packages/react/src/index.ts"],
       "@galaxie/models/builtin-ai": ["../../packages/models/src/builtin-ai/index.ts"],
+      "@galaxie/models/openai": ["../../packages/models/src/openai/index.ts"],
       "@galaxie/core": ["../../packages/core/src/index.ts"],
       "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
       "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],
