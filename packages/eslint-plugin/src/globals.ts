@@ -23,9 +23,42 @@ export function isGlobalReference(context: Rule.RuleContext, node: Identifier): 
 
 export function staticPropertyName(node: Member): string | undefined {
   if (!node.computed && node.property.type === 'Identifier') return node.property.name;
-  if (node.computed && node.property.type === 'Literal' && typeof node.property.value === 'string')
-    return node.property.value;
+  if (
+    node.computed &&
+    node.property.type === 'Literal' &&
+    (typeof node.property.value === 'string' || typeof node.property.value === 'number')
+  )
+    return String(node.property.value);
   return undefined;
+}
+
+const networkGlobals = new Set([
+  'fetch',
+  'XMLHttpRequest',
+  'WebSocket',
+  'EventSource',
+  'WebTransport',
+  'RTCPeerConnection',
+  'importScripts',
+]);
+const storageGlobals = new Set([
+  'localStorage',
+  'sessionStorage',
+  'indexedDB',
+  'caches',
+  'cookieStore',
+]);
+
+export function networkName(path: readonly string[] | undefined): string | undefined {
+  if (path?.length === 1 && networkGlobals.has(path[0] ?? '')) return path[0];
+  if (path?.join('.') === 'navigator.sendBeacon') return 'navigator.sendBeacon';
+  return undefined;
+}
+
+export function storageName(path: readonly string[] | undefined): string | undefined {
+  if (path?.length === 1 && storageGlobals.has(path[0] ?? '')) return path[0];
+  const name = path?.join('.');
+  return name === 'document.cookie' || name === 'navigator.storage' ? name : undefined;
 }
 
 export function globalPath(

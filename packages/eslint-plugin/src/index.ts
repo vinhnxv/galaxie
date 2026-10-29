@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { Linter, Rule } from 'eslint';
+import noDirectModel from './rules/no-direct-model.js';
+import noDirectNetwork from './rules/no-direct-network.js';
+import noDirectStorage from './rules/no-direct-storage.js';
+import noDom from './rules/no-dom.js';
+import noEval from './rules/no-eval.js';
 
 const version = '0.0.0';
 
@@ -13,7 +18,13 @@ interface GalaxiePlugin {
 
 const galaxie: GalaxiePlugin = {
   meta: { name: '@galaxie/eslint-plugin', version },
-  rules: {},
+  rules: {
+    'no-direct-network': noDirectNetwork,
+    'no-direct-storage': noDirectStorage,
+    'no-dom': noDom,
+    'no-eval': noEval,
+    'no-direct-model': noDirectModel,
+  },
   configs: { recommended: {} },
 };
 
