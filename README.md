@@ -39,6 +39,8 @@ Routing, labels, consent and model budgets cover calls through `host.langchain.c
 
 `@galaxie/eslint-plugin` now provides five ESLint 10 flat-config rules for agent packages: direct network, storage, DOM and HTML sinks, eval-style execution, and direct model-provider access. ESTree scope analysis respects shadowed locals without type information or runtime dependencies. RuleTester covers the rules, and a Node conformance test lints all unchanged tutor sources after type stripping. The plugin is a linting aid with no runtime enforcement; aliases, dependencies and runtime-built code can escape detection. TypeScript users supply a TypeScript-capable parser running on TypeScript 6 under ADR-0013; this repository does not test that parser. See the [plugin usage and limits](packages/eslint-plugin/README.md).
 
+`@galaxie/core` now offers opt-in `RuntimeOptions.developmentWarnings`: content-free advice for page CSP/Trusted Types enforcement, optional unbound capabilities, roles without a usable provider, provider-key-shaped storage values and blocked interaction URLs. Omitting the option skips every warning check and extra provider probe. Host-local enables it only in Vite development; built preview pages emit nothing. These are best-effort integration checks with [documented limits](docs/system-design.md#development-warnings), tested with mock models on Node and Chromium; they do not change policy or routing.
+
 ## Intended use and disclaimer
 
 galaxie is experimental, pre-release software, provided "as is", without warranty of any kind. Sections 15 to 17 of the [AGPL](LICENSE) (disclaimer of warranty and limitation of liability) apply.

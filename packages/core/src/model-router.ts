@@ -3,6 +3,7 @@
 
 import { BudgetExceeded, type ModelReservation, type RunBudget } from './budgets.js';
 import type { AgentDefinition } from './definition.js';
+import type { DevelopmentWarning } from './development.js';
 import { type ErrorCode, GalaxieError, toErrorInfo } from './errors.js';
 import type { RunId } from './ids.js';
 import type {
@@ -69,6 +70,37 @@ function strings(value: unknown): value is readonly string[] {
 function primary(language: string): string {
   return language.split('-')[0]?.toLowerCase() ?? '';
 }
+function matchesRequirements(
+  descriptor: ModelDescriptor,
+  requirements: ModelRoleRequirements,
+): boolean {
+  return (
+    !requirements.requires?.some((feature) => !descriptor.features.includes(feature)) &&
+    !requirements.languages?.some(
+      (language) =>
+        !descriptor.languages?.some((supported) => primary(supported) === primary(language)),
+    )
+  );
+}
+function modelAvailability(value: unknown): ModelAvailability | undefined {
+  if (!record(value)) return undefined;
+  if (value['status'] === 'available' || value['status'] === 'unavailable')
+    return { status: value['status'] };
+  if (
+    value['status'] === 'downloadable' &&
+    typeof value['siteStorage'] === 'boolean' &&
+    (value['bytes'] === undefined ||
+      (typeof value['bytes'] === 'number' &&
+        Number.isSafeInteger(value['bytes']) &&
+        value['bytes'] >= 0))
+  )
+    return {
+      status: 'downloadable',
+      siteStorage: value['siteStorage'],
+      ...(value['bytes'] === undefined ? {} : { bytes: value['bytes'] }),
+    };
+  return undefined;
+}
 function validUsage(usage: ModelUsage | undefined): usage is ModelUsage {
   return (
     record(usage) &&
@@ -115,6 +147,7 @@ export class ModelRouter {
   readonly #getCredential: ModelRouting['getCredential'];
   readonly #outputSafety: OutputSafetyHook | undefined;
   #disposed = false;
+  #developmentController: AbortController | undefined;
 
   constructor(
     definition: AgentDefinition,
@@ -231,10 +264,51 @@ export class ModelRouter {
 
   dispose(): void {
     this.#disposed = true;
+    this.#developmentController?.abort();
     for (const pending of this.#pending.values()) pending.controller.abort();
     this.#pending.clear();
     this.#answered.clear();
     this.#selected.clear();
+  }
+
+  async checkDevelopmentWarnings(warn: (warning: DevelopmentWarning) => void): Promise<void> {
+    const controller = new AbortController();
+    this.#developmentController = controller;
+    if (this.#disposed) controller.abort();
+    const signal = controller.signal;
+    await Promise.all(
+      [...this.#roles].map(async ([role, { route, requirements }]) => {
+        const usable = await Promise.all(
+          [...new Set(route.providers)].map(async (providerId) => {
+            const descriptor = this.#providers.get(providerId);
+            let availability: ModelAvailability | undefined = { status: 'available' };
+            if (this.#availability !== undefined) {
+              try {
+                availability = await waitForHostOrAbort(
+                  Promise.resolve().then(async () =>
+                    modelAvailability(await this.#availability?.({ role, providerId, signal })),
+                  ),
+                  signal,
+                );
+              } catch {
+                availability = undefined;
+              }
+            }
+            return (
+              descriptor !== undefined &&
+              matchesRequirements(descriptor, requirements) &&
+              (availability?.status === 'available' ||
+                (availability?.status === 'downloadable' &&
+                  descriptor.destination === 'in-browser' &&
+                  this.#download !== undefined))
+            );
+          }),
+        );
+        if (!signal.aborted && !usable.some(Boolean))
+          warn({ code: 'role_without_provider', name: role });
+      }),
+    );
+    if (signal.aborted) throw failure('cancelled');
   }
 
   async #decision(
@@ -353,24 +427,8 @@ export class ModelRouter {
         .then(() => this.#availability?.({ role, providerId, signal }))
         .then(
           (value): ModelAvailability => {
-            if (record(value)) {
-              if (value.status === 'available' || value.status === 'unavailable')
-                return { status: value.status };
-              if (
-                value.status === 'downloadable' &&
-                typeof value.siteStorage === 'boolean' &&
-                (value.bytes === undefined ||
-                  (typeof value.bytes === 'number' &&
-                    Number.isSafeInteger(value.bytes) &&
-                    value.bytes >= 0))
-              ) {
-                return {
-                  status: 'downloadable',
-                  siteStorage: value.siteStorage,
-                  ...(value.bytes === undefined ? {} : { bytes: value.bytes }),
-                };
-              }
-            }
+            const availability = modelAvailability(value);
+            if (availability !== undefined) return availability;
             this.#report({ kind: 'model_failed', runId: run.runId });
             return { status: 'unavailable' };
           },
@@ -604,14 +662,8 @@ export class ModelRouter {
           const descriptor = this.#providers.get(providerId);
           if (
             descriptor === undefined ||
-            requirements.requires?.some((feature) => !descriptor.features.includes(feature)) ||
-            requires?.some((feature) => !descriptor.features.includes(feature)) ||
-            requirements.languages?.some(
-              (language) =>
-                !descriptor.languages?.some(
-                  (supported) => primary(supported) === primary(language),
-                ),
-            )
+            !matchesRequirements(descriptor, requirements) ||
+            requires?.some((feature) => !descriptor.features.includes(feature))
           )
             continue;
           if (!allowed(descriptor.destination)) continue;

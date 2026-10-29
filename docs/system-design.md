@@ -691,6 +691,42 @@ Raw `stream` events are untrusted engine output and must not be rendered as UI. 
 
 M2 owns A1's rendering rules: no model-produced HTML or JavaScript, no auto-loaded resources, streamed text rendered as text, and interactions rendered only from validated `pending` state. A5 bindings dispatch only after the host gate approves their frozen arguments; without confirmation configuration they refuse dispatch with `unsupported`. Model routing and consent cover M1's A6 share; later components gain their controls in their own milestones. The M1 exit requirement is A1–A4, A7 and A8, plus the lifecycle guarantees below (brief §16.3). These controls cover SDK paths and their documented limits (brief §9.9).
 
+### Development warnings
+
+`RuntimeOptions.developmentWarnings?: (warning: DevelopmentWarning) => void` enables best-effort development advice (brief §9.9), separate from `diagnostics`. Hosts must omit it in production. With the option absent, core performs no page/storage checks or extra provider probes and emits no warnings. Host-local enables it only through `import.meta.env.DEV`; built preview pages omit it.
+
+```ts
+const runtime = createRuntime({
+  appId: 'my-app',
+  executors: [adapter],
+  ...(import.meta.env.DEV
+    ? {
+        developmentWarnings: (warning) =>
+          console.warn('[galaxie]', warning.code, warning.name ?? '', warning.area ?? ''),
+      }
+    : {}),
+});
+```
+
+The readonly warning contains `code`, optional `instanceId`, optional `name` and optional `area: 'localStorage' | 'sessionStorage'`. Names come only from trusted definitions or host configuration; a blocked component is named only if the host bound it. Warnings contain no URLs, origins, prop paths, storage keys or values, counts, credentials, model text or error text. Core emits each combination of code, instance, name and area at most once per runtime, including when the callback throws.
+
+| Code | When and what core checks | Limits |
+| --- | --- | --- |
+| `csp_unenforced` | Once at runtime creation in a page: compiling the constant `new Function('return 1')` succeeds; `name` is `script-src`. | Indicates that eval is permitted, including by an absent policy or `'unsafe-eval'`. It cannot read response headers or audit other CSP directives. |
+| `trusted_types_unenforced` | Once at runtime creation in a page: a string assignment to a detached template's `innerHTML` succeeds. | A pass-through default `createHTML` policy produces a known false positive even when Trusted Types is enforced. The template is discarded without insertion. |
+| `provider_key_in_storage` | Once at runtime creation in a page: an accessible storage value matches a fixed provider-key-shaped pattern. Only the matching `area` is reported. | Values are read only, never changed. The fixed patterns require a token boundary and cover `sk-`/`sk-ant-`/`sk-proj-`, `AIza`, `gsk_`, `hf_`, `xai-` and `r8_`. Other formats, inaccessible storage, other stores and later changes are invisible. |
+| `capability_unbound` | At instance creation after broker/router validation: a requested optional capability has no binding; `name` is the capability. | Missing required bindings and unrequested bindings still reject creation with `invalid` and emit no warning. No grant or binding is added. |
+| `role_without_provider` | At instance creation after router validation: no listed provider matches the role's required features and primary language subtags and is usable; `name` is the role. | With no availability hook, matching descriptors count as available. Otherwise creation awaits one probe per distinct provider per role; `available` is usable, as is valid `downloadable` for `in-browser` with a host download hook. Failures and malformed results count as unavailable without diagnostics. No download, consent or credential callback runs; no probe result is retained for routing. Later calls re-check readiness, labels, consent and budgets. |
+| `url_blocked` | On live or restored interaction rejection for URL policy, with instance identity. `name` is the component only when it is an own entry in the host's UI bindings. | Binding-only rejections do not warn. URL policy, raw-stream/checkpoint limits and origin-only matching remain as described above. |
+
+Page checks skip workers and Node, and failed page probes emit no warning. Under enforced CSP/Trusted Types, each probe produces one expected blocked-eval or Trusted Types console violation per runtime creation in development, with no corresponding warning. The browser also sends a report when a reporting endpoint is configured. Report-only policies report without blocking, so successful probes can still warn; page code cannot distinguish them from other permitted evaluations. This probe traffic is browser policy reporting, not a fetch of the page or its headers.
+
+Availability probes receive `{ role, providerId, signal }`. Their controller is aborted on instance disposal, including runtime disposal while creation is pending. Disposal releases creation even if a hook ignores cancellation; without disposal, creation waits for the host hook to settle.
+
+Throwing instance-scoped callbacks report `listener_threw` once through that instance's existing `report`, with the raw thrown object only in host-only `DiagnosticEvent.error`. Hosts must not forward that field to a destination private data may not reach. Runtime-level callback failures are caught and rethrown with `queueMicrotask`, matching throwing diagnostics; they do not become diagnostics. `DiagnosticEvent` is unchanged. Warnings are integration advice, not policy enforcement, remediation or evidence that a host satisfies the baseline.
+
+[`development.test.ts`](../packages/core/test/development.test.ts) covers capability/role validation, availability, cancellation, callback failures, de-duplication, storage and both URL rejection sites. [`development-warnings.test.ts`](../tests/conformance/development-warnings.test.ts) runs real LangGraph interrupts with mock models on Node and Chromium; Chromium also checks the default page probes and zero eval/HTML-sink access without the option. [`host-local tests`](../examples/host-local/test/development.node.test.ts) cover its development flag and exact logging arguments.
+
 ### M1 coverage
 
 The conformance files in both test columns run on Node and Chromium. Node package tests add focused negative cases; `.node.test.ts` files do not run in Chromium.

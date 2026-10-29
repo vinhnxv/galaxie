@@ -7,6 +7,7 @@ import { deadlineTimer, RunBudget } from './budgets.js';
 import { CapabilityBroker, registerPrivate } from './capability-broker.js';
 import { ConfirmationGate } from './confirmations.js';
 import type { AgentDefinition } from './definition.js';
+import type { DevelopmentWarning, DevelopmentWarningReporter } from './development.js';
 import {
   type ErrorCode,
   type ErrorInfo,
@@ -142,13 +143,17 @@ export function createAgentInstance(
     readonly policy: Readonly<Record<DataLabel, DestinationAllowlist>>;
     readonly urlAllowlist: readonly string[];
     readonly outputSafety?: OutputSafetyHook;
+    readonly developmentWarnings?: DevelopmentWarningReporter;
     readonly developmentTraceText?: {
       readonly destination: DestinationClass;
     };
   },
   onDisposed: () => void,
   diagnostics?: (event: DiagnosticEvent) => void,
-): AgentInstance<unknown, unknown> {
+): {
+  readonly instance: AgentInstance<unknown, unknown>;
+  readonly checkDevelopmentWarnings?: () => Promise<void>;
+} {
   const instanceId = globalThis.crypto.randomUUID() as InstanceId;
   const sessionId = options.sessionId ?? (globalThis.crypto.randomUUID() as SessionId);
   let state: InstanceState = 'created';
@@ -198,6 +203,14 @@ export function createAgentInstance(
       });
     }
   };
+  const warn =
+    instrumentation.developmentWarnings === undefined
+      ? undefined
+      : (warning: Omit<DevelopmentWarning, 'instanceId'>): void => {
+          instrumentation.developmentWarnings?.({ ...warning, instanceId }, (error) =>
+            report({ kind: 'listener_threw', error }),
+          );
+        };
   const confirmations =
     options.confirmations === undefined
       ? undefined
@@ -328,12 +341,27 @@ export function createAgentInstance(
     segment.tracing?.finish('failed', run.error);
   };
   // Raw stream events remain untrusted engine output and must never be rendered as UI.
-  const interactionError = (interaction: PendingInteraction): ErrorInfo | undefined => {
+  const interactionError = (
+    interaction: PendingInteraction,
+  ):
+    | {
+        readonly reason: 'url' | 'binding';
+        readonly error: ErrorInfo;
+      }
+    | undefined => {
     if (!checkInteractionUrls(interaction.props, instrumentation.urlAllowlist))
-      return toErrorInfo('denied');
+      return { reason: 'url', error: toErrorInfo('denied') };
     if (options.ui !== undefined && !checkInteractionBindings(options.ui, interaction))
-      return toErrorInfo('unsupported');
+      return { reason: 'binding', error: toErrorInfo('unsupported') };
     return undefined;
+  };
+  const warnBlockedUrl = (interaction: PendingInteraction): void => {
+    warn?.({
+      code: 'url_blocked',
+      ...(options.ui !== undefined && Object.hasOwn(options.ui.components, interaction.component)
+        ? { name: interaction.component }
+        : {}),
+    });
   };
   const validateSubmission = (
     run: RunRecord,
@@ -384,8 +412,9 @@ export function createAgentInstance(
       {
         const error = interactionError(event.interaction);
         if (error !== undefined) {
-          failRun(run, error);
+          failRun(run, error.error);
           report({ kind: 'interaction_rejected', runId: run.runId });
+          if (error.reason === 'url') warnBlockedUrl(event.interaction);
           return;
         }
       }
@@ -599,7 +628,7 @@ export function createAgentInstance(
     void execute(run, segment, predecessor, command, parent);
   };
 
-  return {
+  const instance: AgentInstance<unknown, unknown> = {
     instanceId,
     sessionId,
     getSnapshot: () => snapshot,
@@ -817,7 +846,8 @@ export function createAgentInstance(
           const error = interactionError(pending);
           if (error !== undefined) {
             report({ kind: 'interaction_rejected' });
-            throw new GalaxieError(error.code, error.message);
+            if (error.reason === 'url') warnBlockedUrl(pending);
+            throw new GalaxieError(error.error.code, error.error.message);
           }
           const runId = globalThis.crypto.randomUUID() as RunId;
           const run: RunRecord = {
@@ -1008,5 +1038,22 @@ export function createAgentInstance(
       })();
       return disposal;
     },
+  };
+  return {
+    instance,
+    ...(warn === undefined
+      ? {}
+      : {
+          checkDevelopmentWarnings: async (): Promise<void> => {
+            for (const name of Object.keys(definition.capabilities?.optional ?? {})) {
+              if (
+                !Object.hasOwn(options.bindings ?? {}, name) ||
+                options.bindings?.[name] === undefined
+              )
+                warn({ code: 'capability_unbound', name });
+            }
+            await router.checkDevelopmentWarnings(warn);
+          },
+        }),
   };
 }

@@ -8,6 +8,11 @@ import type { CapabilityBinding } from './capabilities.js';
 import { dataPolicy } from './capability-broker.js';
 import type { ConfirmationOptions } from './confirmations.js';
 import type { AgentDefinition, BindingsFor } from './definition.js';
+import {
+  checkPageDevelopmentWarnings,
+  createDevelopmentWarnings,
+  type DevelopmentWarning,
+} from './development.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
 import type { AppId, EffectId, InstanceId, PrincipalScope, RunId, SessionId } from './ids.js';
@@ -82,6 +87,8 @@ export interface RuntimeOptions<
   readonly appId: AppId;
   readonly executors: Adapters;
   readonly diagnostics?: (event: DiagnosticEvent) => void;
+  /** Opt-in, content-free development advice. Omit in production to skip all checks. */
+  readonly developmentWarnings?: (warning: DevelopmentWarning) => void;
   /** Checks routed model output before release; failures block the call. */
   readonly outputSafety?: OutputSafetyHook;
   readonly tracerProvider?: TracerProvider;
@@ -163,6 +170,11 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
     VERSION,
   );
   let disposal: Promise<void> | undefined;
+  const developmentWarnings =
+    options.developmentWarnings === undefined
+      ? undefined
+      : createDevelopmentWarnings(options.developmentWarnings);
+  if (developmentWarnings !== undefined) checkPageDevelopmentWarnings(developmentWarnings);
   return {
     async create(definition, createOptions) {
       if (disposal !== undefined) throw new GalaxieError('invalid', 'The runtime was disposed.');
@@ -186,7 +198,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
         !checkUiRequirements(ui, definition.ui)
       )
         throw new GalaxieError('unsupported', 'The required UI is not bound.');
-      const instance = createAgentInstance(
+      const { instance, checkDevelopmentWarnings } = createAgentInstance(
         definition,
         executor,
         ui === undefined ? createOptions : { ...createOptions, ui },
@@ -196,6 +208,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
           limits,
           policy,
           urlAllowlist,
+          ...(developmentWarnings === undefined ? {} : { developmentWarnings }),
           ...(outputSafety === undefined ? {} : { outputSafety }),
           ...(developmentTraceText === undefined ? {} : { developmentTraceText }),
         },
@@ -203,6 +216,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
         options.diagnostics,
       );
       instances.add(instance);
+      await checkDevelopmentWarnings?.();
       return instance;
     },
     dispose(): Promise<void> {
