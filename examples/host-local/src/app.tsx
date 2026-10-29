@@ -198,17 +198,19 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
   useEffect(() => {
     if (!host) return;
     void run(true);
+    const disposeHost = (): void => {
+      ownership.current?.unsubscribe?.();
+      void host.runtime.dispose().finally(() => ownership.current?.release());
+    };
     const discard = (event: PageTransitionEvent): void => {
       if (event.persisted) return;
       mounted.current = false;
-      ownership.current?.unsubscribe?.();
-      void host.runtime.dispose().finally(() => ownership.current?.release());
+      disposeHost();
     };
     window.addEventListener('pagehide', discard);
     return () => {
       window.removeEventListener('pagehide', discard);
-      ownership.current?.unsubscribe?.();
-      void host.runtime.dispose().finally(() => ownership.current?.release());
+      disposeHost();
     };
   }, [host, run]);
 
