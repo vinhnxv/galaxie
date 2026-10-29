@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from '@typescript/typescript6';
 
@@ -14,9 +14,9 @@ interface ImportReference {
 
 const problems: string[] = [];
 
-function files(directory: string, extension: string): string[] {
+function files(directory: string, extension: RegExp): string[] {
   return readdirSync(directory, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(extension))
+    .filter((entry) => entry.isFile() && extension.test(entry.name))
     .map((entry) => join(entry.parentPath, entry.name));
 }
 
@@ -97,7 +97,7 @@ if (
     'packages/core/package.json: core peers must be exactly @opentelemetry/api and zod',
   );
 
-for (const file of files('packages/core/src', '.ts')) {
+for (const file of files('packages/core/src', /\.[cm]?tsx?$/)) {
   for (const reference of imports(file)) {
     const { specifier, typeOnly } = reference;
     if (
@@ -111,7 +111,7 @@ for (const file of files('packages/core/src', '.ts')) {
   }
 }
 
-for (const file of files('packages/adapter-langgraph/src', '.ts')) {
+for (const file of files('packages/adapter-langgraph/src', /\.[cm]?tsx?$/)) {
   for (const { specifier } of imports(file)) {
     if (specifier.startsWith('@langchain/langgraph') && specifier !== '@langchain/langgraph/web')
       problems.push(
@@ -146,7 +146,7 @@ for (const field of [
     problems.push('packages/models/package.json: models must not depend on @galaxie/core');
 }
 
-for (const file of files('packages/models/src', '.ts')) {
+for (const file of files('packages/models/src', /\.[cm]?tsx?$/)) {
   for (const { specifier, hasTypes, dynamic } of imports(file)) {
     if (
       specifier.startsWith('./') ||
@@ -164,12 +164,42 @@ for (const file of files('packages/models/src', '.ts')) {
   }
 }
 
+for (const entry of readdirSync('packages', { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  for (const area of ['src', 'dist', ...(entry.name === 'react' ? ['test'] : [])]) {
+    const directory = join('packages', entry.name, area);
+    if (!existsSync(directory)) continue;
+    for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+      for (const { specifier } of imports(file)) {
+        const react = specifier === 'react' || specifier.startsWith('react/');
+        const reactDom = specifier === 'react-dom' || specifier.startsWith('react-dom/');
+        if (entry.name !== 'react') {
+          if (react || reactDom)
+            problems.push(`${file}: React imports belong only in packages/react`);
+          continue;
+        }
+        if (
+          specifier.startsWith('./') ||
+          specifier.startsWith('../') ||
+          specifier === '@galaxie/core' ||
+          react ||
+          specifier === 'zod' ||
+          (area === 'test' && (reactDom || specifier === 'vitest'))
+        )
+          continue;
+        problems.push(`${file}: forbidden React package import ${specifier}`);
+      }
+    }
+  }
+}
+
 for (const directory of [
   'packages/core/dist',
   'packages/adapter-langgraph/dist',
   'packages/models/dist',
+  'packages/react/dist',
 ]) {
-  for (const file of files(directory, '.js')) {
+  for (const file of files(directory, /\.[cm]?js$/)) {
     if (readFileSync(file, 'utf8').includes('async_hooks'))
       problems.push(`${file}: built packages must not contain async_hooks`);
     for (const { specifier } of imports(file)) {
