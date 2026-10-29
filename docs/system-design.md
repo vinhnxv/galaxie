@@ -240,7 +240,7 @@ The opt-in permits only JSON-encoded model input messages, model output messages
 
 ### 6.1. MCP client
 
-`@galaxie/tools-mcp` binds host-allowlisted tools as `mcp.<server>.<tool>@<version>` capabilities through SDK 1.32.1 Streamable HTTP, requiring negotiated protocol 2025-11-25. The host configures URL, destination, short-lived per-principal bearer callback, definition pins and policies. Input/output validation remains the broker's host schema contract; server schemas only contribute to the RFC 8785 SHA-256 pin. Host kinds override annotations, and write bindings require `approval: 'confirm'`, which core refuses with `unsupported` until confirmations ship.
+`@galaxie/tools-mcp` binds host-allowlisted tools as `mcp.<server>.<tool>@<version>` capabilities through SDK 1.32.1 Streamable HTTP, requiring negotiated protocol 2025-11-25. The host configures URL, destination, short-lived per-principal bearer callback, definition pins and policies. Input/output validation remains the broker's host schema contract; server schemas only contribute to the RFC 8785 SHA-256 pin. Host kinds override annotations, and write bindings require `approval: 'confirm'`, which dispatches only through the host confirmation gate (§8.3). Without `CreateOptions.confirmations` these bindings still fail `unsupported`.
 
 Each principal owns one client/transport and serial lane for token acquisition, listing and calling, making per-principal concurrency effectively one. Hosts call `closePrincipal` at sign-out and `close` at shutdown. The client advertises no sampling, elicitation or roots and rejects server requests with `-32601`. Pins are checked on connect, list-change notifications and a fresh complete listing before every call (at least one extra round trip per call). Direct SDK requests avoid compilation of remote output schemas under CSP. Listings have a ten-page cap and one aggregate wire budget. Pinning detects metadata changes only, never behavior behind unchanged metadata.
 
@@ -375,7 +375,19 @@ There is one render path for unanswered interactions: after a reload the host re
 
 ### 8.3. A capability call
 
-Per-instance bindings live at `runtime.create(definition, { bindings, ... })`, with instance-lifetime grants for `app`/`principal`/`instance` and explicit `start(input, { grants })` for run grants. Nodes call `host.capabilities.call(name, input, config)`; passing the node's `config` parents the capability span under that node. Input and output validate before dispatch and return respectively. Bindings with `approval: 'confirm'` still reject `unsupported`; confirmations remain unimplemented.
+Per-instance bindings live at `runtime.create(definition, { bindings, ... })`, with instance-lifetime grants for `app`/`principal`/`instance` and explicit `start(input, { grants })` for run grants. Nodes call `host.capabilities.call(name, input, config)`; passing the node's `config` parents the capability span under that node. Input and output validate before dispatch and return respectively. Bindings with `approval: 'confirm'` require the host confirmation gate described below; without `CreateOptions.confirmations` they still reject `unsupported`.
+
+`CreateOptions.confirmations` declares host-renderable `capabilities`, a live `policyRevision()` callback, optional `expiresInMs` (default 120000, safe integer 1000–600000) and optional host `AbortSignal`s. Creation fails `invalid` for malformed options or any bound `confirm` capability missing from the list; unknown list names are allowed. Each call requires a non-empty policy revision of at most 128 characters; a thrown callback or invalid return fails `unavailable` with fixed text.
+
+After validation, payload/label checks, the tool-call reservation and the journal read, core opens a confirmation only if a new effect will dispatch. Successful receipts replay without confirmation; unknown `retry: 'none'` writes fail without one. The in-memory approval binds the principal, capability, deep-frozen copy of plain JSON arguments, SHA-256 digest of the journal's canonical JSON, effect ID, policy revision and expiry. `invoke` receives that same copy and effect ID. Core rechecks the digest, policy revision, expiry and invalidation immediately before invocation; changing the original object cannot change the approved value.
+
+`snapshot.confirmations` is a frozen, request-ordered list of `{ id, capability, arguments, expiresAt }`, absent when none is open. It is in-page host data, separate from `run.pending`, executor events and agent components. `instance.respond(id, 'approve' | 'decline')` synchronously consumes the entry once, returning `{ status: 'approved' | 'declined' | 'stale' }`; malformed inputs, closed/unknown IDs and invalidated approvals return `stale` without throwing or publishing. Closing on run end is merged into the instance publication so failed snapshots never retain confirmations.
+
+Decline, expiry and configured logout/takeover abort signals fail the call `denied`. Fixed diagnostics are `confirmation_requested`, `confirmation_declined`, `confirmation_expired` and `confirmation_invalidated`, with `runId` only. A policy change at approval or dispatch also invalidates; disposal cancels and reports invalidation. Run cancellation/end cancels without a confirmation diagnostic; a wall-clock budget cancels the waiting call and fails the run `budget_exceeded`. Waiting holds no concurrency slot. The binding timeout starts after approval, while expiry and host signals still apply to an approved call waiting for a slot.
+
+The host renders a separate `ConfirmationPrompt` from `defineConfirmations` entries: fixed host titles/labels and rows derived from actual arguments. Values render as React text; missing or failing rows permit only decline. `AgentSurface` components still receive only `{ props, actions, status }`, with no confirmation ID or response method. See [React usage](../packages/react/README.md).
+
+Approvals live only in page memory: reload asks again. Same-origin code can call `respond`; the gate protects against model-controlled content, not page scripts (brief §9.9). The host must dispose the instance on logout and takeover and should also pass those signals. Backends must still authorize every write (B1). Expiry or decline does not undo a request already sent. Confirmation IDs and host text never enter traces, errors, run events or generated diagnostics; arguments stay out too, except for the existing policy-gated `developmentTraceText` span opt-in. Host-only `DiagnosticEvent.error` retains its existing binding-error handling and destination limits.
 
 With recovery, only host bindings of `kind: 'write'` use the effect journal. Core derives a lowercase UUID-shaped effect ID with SHA-256 over the session ID, segment key (resume `interactionId` or literal `start`), capability name and per-name call ordinal within the segment. Code and call order must be deterministic across replay; code before an interrupt must also be side-effect free. Repeated start segments in one session reuse the `start` key, so create a fresh session/instance for a new logical operation. Other kinds, and all calls without recovery, retain random effect IDs and no journal.
 
@@ -383,7 +395,7 @@ Each record includes a SHA-256 digest of canonical validated JSON input, with so
 
 | Stored state | Replay or transition |
 | --- | --- |
-| Absent, `planned` or `failed` | Persist `planned` after input validation and policy checks, then persist `dispatched` immediately before invoking. A failure after planning but before dispatch records `failed`. |
+| Absent, `planned` or `failed` | Persist `planned` after input validation, policy checks and any required approval, then persist `dispatched` immediately before invoking. A failure after planning but before dispatch records `failed`. |
 | `succeeded` | Return a fresh copy of the already validated output without invoking or rerunning schema transforms; reapply output labels and private strings. |
 | `dispatched` or `outcome_unknown` | Persist `outcome_unknown`. Retry only for `idempotent` or `idempotency-key`, reusing the effect ID. With `none`, fail `outcome_unknown` without invoking. |
 
@@ -399,7 +411,7 @@ Finite defaults are 25 steps, 50 tool calls, 300000 ms wall clock and 1048576 pa
 
 By default, capability spans contain only allowlisted metadata and fixed errors. The development trace opt-in may add validated, budgeted and policy-approved arguments under the label rules in §6; capability results are never recorded on capability spans. Galaxie adds no URLs, headers or binding error messages. The root records sorted labels and an exhausted budget's name. Host-only `capability_failed.error` diagnostics retain the binding's raw error and may contain private values; hosts must not forward them to a destination `private-user` may not reach. Generated diagnostic fields carry no such content. Timeout or cancellation drops late results without validation or labelling; a timed-out binding holds its concurrency slot until its promise settles.
 
-The new-write path below omits the deferred confirmation flow; the table above covers replay:
+The new-write path includes the optional confirmation gate; the table above covers replay:
 
 ```mermaid
 sequenceDiagram
@@ -407,12 +419,19 @@ sequenceDiagram
     participant G as Graph node
     participant B as Capability broker
     participant J as Effect journal
+    participant H as Host confirmation prompt
     participant X as Host binding
     G->>B: call progress.save@1 with arguments
     B->>B: granted? validate input, labels and argument shapes; reserve budget
+    B->>J: read existing receipt, if recovery is configured
+    opt Binding requires confirmation
+        B-->>H: publish frozen arguments in host snapshot
+        H->>B: single-use response
+    end
     B->>J: planned, with its effect ID
     B->>J: dispatched
-    B->>X: invoke(input, signal, effect ID, run, principal, agent)
+    B->>B: recheck approval, live policy and data labels
+    B->>X: invoke(approved input, signal, effect ID, run, principal, agent)
     X-->>B: result
     B->>B: validate output; label it (default app)
     B->>J: succeeded or outcome_unknown
@@ -423,7 +442,7 @@ sequenceDiagram
 - The binding's kind, destination class, timeout, concurrency, grant scope, approval and retry policy come from the host, never from the tool (brief §9.2).
 - With recovery, the effect ID is persisted before dispatch and the binding sends it as the idempotency key. An unknown `retry: 'none'` write is never fired again automatically (brief §12.3).
 - Only `write` bindings are journaled. Reads, device and UI bindings skip the journal.
-- Inbox payloads, journal inputs and stored capability outputs are not added to snapshots, events, spans or diagnostics. Snapshots expose only submission identity/status; spans retain allowlisted metadata and fixed outcome codes. The existing host-only `DiagnosticEvent.error` rules still apply to raw binding failures.
+- Confirmation snapshots expose frozen validated arguments only to the in-page host. Inbox payloads and stored capability outputs are not added to snapshots, events, spans or generated diagnostics. Other snapshots expose only submission identity/status; spans retain allowlisted metadata and fixed outcome codes. The existing host-only `DiagnosticEvent.error` rules still apply to raw binding failures.
 - Outbound requests carry an attribution header, for example `X-Galaxie-Agent`. It attributes; it never authorizes (ADR-0012 A8).
 
 ### 8.4. A model call
@@ -567,7 +586,7 @@ The SDK client uses `logLevel: 'off'`, overriding `OPENAI_LOG`. Explicit `organi
 
 A cross-origin host proxy must allow the app's origin and the request headers `authorization`, `content-type`, `x-stainless-lang`, `x-stainless-package-version`, `x-stainless-os`, `x-stainless-arch`, `x-stainless-runtime`, `x-stainless-runtime-version`, `x-stainless-retry-count`, `x-stainless-timeout` and `x-stainless-helper-method` (structured output). Re-check this set on SDK upgrades and allow any extra host-configured headers deliberately. User endpoints need equivalent CORS handling; Chrome's Local Network Access rules remain a host integration concern.
 
-The provider and routed integration tests use injected in-memory JSON/SSE responses on Node and headless Chromium, including credential rotation, failure hygiene, usage, structured output and cancellation. No real endpoint has been verified. MCP, confirmations, a second host and wiring this provider into host-local remain later M4 slices. Repair attempts, a consent UI component, lazy WebLLM chat-model construction and per-call provider caps from the router remain deferred. Tests download no weights, load no real WebLLM bundle and call no real `LanguageModel` global.
+The provider and routed integration tests use injected in-memory JSON/SSE responses on Node and headless Chromium, including credential rotation, failure hygiene, usage, structured output and cancellation. No real endpoint has been verified. A second host and wiring this provider into host-local remain later M4 slices. Repair attempts, a consent UI component, lazy WebLLM chat-model construction and per-call provider caps from the router remain deferred. Tests download no weights, load no real WebLLM bundle and call no real `LanguageModel` global.
 
 ### 8.5. Tab ownership and takeover
 
@@ -614,7 +633,7 @@ Each saver holds the principal generation read at open, default 0. Its versioned
 
 Host-local creates one watcher per page, including before model preparation. Sign out awaits storage invalidation before announcing. Its own abort and peer aborts share idempotent cleanup: remove the sessionStorage key, disable input, discard displayed results, dispose instance/runtime, release ownership and show "Signed out. Reload to continue." until reload opens a fresh saver. A failed wipe shows "Sign out failed" and announces nothing. `LocalHost.signOut()` uses a short-lived saver when its cached saver is missing, closed or disposed, so a former owner can sign out. Before a host exists, the same storage-only helper handles sign-out without model preparation.
 
-Every tab is notified when `BroadcastChannel` delivers; delivery failure is caught by the next write or persisted `pageshow` check. A synchronous loop can delay disposal and a remote request already sent may complete. Confirmation and approval invalidation remains M4 work. Hosts must clear their own non-galaxie storage and tokens. This API adds no authentication, deletes no shared model assets and has no local trace store to wipe. Node watcher tests, Chromium AT-13 and two-page host-local tests cover the implemented controls and rollback limits.
+Every tab is notified when `BroadcastChannel` delivers; delivery failure is caught by the next write or persisted `pageshow` check. A synchronous loop can delay disposal and a remote request already sent may complete. Hosts configuring confirmations should pass the watcher and ownership signals in `CreateOptions.confirmations.signals`; these invalidate pending and unused approvals immediately, while host disposal remains required. Hosts must clear their own non-galaxie storage and tokens. This API adds no authentication, deletes no shared model assets and has no local trace store to wipe. Node watcher tests, Chromium AT-13 and two-page host-local tests cover the implemented controls and rollback limits.
 
 ## 9. Security baseline map
 
@@ -624,7 +643,7 @@ Every tab is notified when `BroadcastChannel` delivers; delivery failure is caug
 | A2. Deny by default; validate request and response | Capability broker | `core` |
 | A3. No generic `fetch`, SQL or shell | Capability broker | `core` |
 | A4. Credentials never in prompts, state, checkpoints, traces or exports; allowlisted trace fields | Router, providers, tracing, storage | `core`, `models`, `storage-indexeddb` |
-| A5. Host-rendered, single-use confirmations bound to the call | Broker and the host's confirmation surface | `core`, `react` |
+| A5. Host-rendered, single-use confirmations bound to principal, arguments, effect, policy and expiry | Broker confirmation gate and separate host `ConfirmationPrompt` | `core`, `react` |
 | A6. No silent destination change; data labels | Model router, broker | `core` |
 | A7. Finite budgets | Runtime | `core` |
 | A8. HTTP attribution headers; per-call MCP `_meta` | Broker requests, MCP client | `core`, `tools-mcp` |
@@ -635,7 +654,7 @@ M1 enforces A1's headless URL share before an interaction becomes `pending`. `Ru
 
 Raw `stream` events are untrusted engine output and must not be rendered as UI. A LangGraph root `updates` chunk contains an interrupt before core sees its interaction, so even a rejected interaction's props remain in that raw stream and in its checkpoint. Snapshots, interaction/error events and rejection diagnostics do not expose those props. Any later path that exposes checkpoint pending state, including M3 reload, must apply the same URL check before publishing it. M1's all-string-leaves heuristic can reject text that starts with a URL-like token; the M2 registry will identify URL props by schema and reuse `isAllowedUrl`.
 
-M2 owns A1's rendering rules: no model-produced HTML or JavaScript, no auto-loaded resources, streamed text rendered as text, and interactions rendered only from validated `pending` state. A5 bindings refuse dispatch until confirmations exist. Model routing and consent cover M1's A6 share; later components gain their controls in their own milestones. The M1 exit requirement is A1–A4, A7 and A8, plus the lifecycle guarantees below (brief §16.3). These controls cover SDK paths and their documented limits (brief §9.9).
+M2 owns A1's rendering rules: no model-produced HTML or JavaScript, no auto-loaded resources, streamed text rendered as text, and interactions rendered only from validated `pending` state. A5 bindings dispatch only after the host gate approves their frozen arguments; without confirmation configuration they refuse dispatch with `unsupported`. Model routing and consent cover M1's A6 share; later components gain their controls in their own milestones. The M1 exit requirement is A1–A4, A7 and A8, plus the lifecycle guarantees below (brief §16.3). These controls cover SDK paths and their documented limits (brief §9.9).
 
 ### M1 coverage
 
@@ -651,6 +670,13 @@ The conformance files in both test columns run on Node and Chromium. Node packag
 | A8: attribution headers, which never authorize | [`capabilities.ts`](../packages/core/src/capabilities.ts), [`http-capability.ts`](../packages/core/src/http-capability.ts) | [`http-capability.test.ts`](../packages/core/test/http-capability.test.ts): `AE4 encodes path values and overwrites attribution headers after host credentials`; [`capabilities.test.ts`](../tests/conformance/capabilities.test.ts): the real-graph attribution case | [`capabilities.test.ts`](../tests/conformance/capabilities.test.ts): the same real-graph HTTP attribution case |
 | No duplicate runs on double start or repeated host reads | Run-slot claim and preparation memoization in [`agent-instance.ts`](../packages/core/src/agent-instance.ts) | [`runtime-guarantees.test.ts`](../tests/conformance/runtime-guarantees.test.ts): `two starts in one tick claim one slot before asynchronous validation`, `repeated preparation, subscriptions, snapshots and event reads never execute another command`; original [`runs.test.ts`](../packages/core/test/runs.test.ts) and [`dispatch.test.ts`](../packages/core/test/dispatch.test.ts) cases remain | [`runtime-guarantees.test.ts`](../tests/conformance/runtime-guarantees.test.ts): the same double-start and repeated-read cases |
 | Late results invalidated after cancellation | Active-segment checks in [`agent-instance.ts`](../packages/core/src/agent-instance.ts); run-bound model and capability ports | [`runtime-guarantees.test.ts`](../tests/conformance/runtime-guarantees.test.ts): `a model settlement after cancellation drops the late output and reports late_event`; [`broker.test.ts`](../packages/core/test/broker.test.ts): `AE5 timeout drops late results without validation or labels` | [`runtime-guarantees.test.ts`](../tests/conformance/runtime-guarantees.test.ts): the same latched model-settlement case |
+
+### M4 confirmation coverage
+
+| Guarantee | Implementation | Proof |
+| --- | --- | --- |
+| AT-28 / A5: registry text, look-alikes, replay, immutable arguments, expiry, logout and takeover | [`confirmations.ts`](../packages/core/src/confirmations.ts), [`host prompt`](../packages/react/src/confirmations.tsx) | [`confirmations.test.ts`](../tests/conformance/confirmations.test.ts) on Node and Chromium; [`core cases`](../packages/core/test/confirmations.test.ts) for timers, budgets, policy, journal ordering and snapshot identity; [`React cases`](../packages/react/test/confirmations.test.tsx) in Chromium for text-only rendering, fallback, agent-action isolation and Strict Mode |
+| Approved MCP writes carry the bound effect ID; decline never reaches the server | Existing MCP binding through the broker gate | [`mcp.test.ts`](../tests/conformance/mcp.test.ts) on Node and Chromium |
 
 ### M4 MCP coverage
 
