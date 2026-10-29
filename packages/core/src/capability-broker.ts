@@ -53,6 +53,12 @@ function failure(code: ErrorCode): GalaxieError {
   return new GalaxieError(code, toErrorInfo(code).message);
 }
 function storageFailure(error: unknown): ErrorCode {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    Object.getOwnPropertyDescriptor(error, 'invalidated')?.value === true
+  )
+    return 'stale';
   return typeof error === 'object' &&
     error !== null &&
     Object.getOwnPropertyDescriptor(error, 'fenced')?.value === true
@@ -179,7 +185,7 @@ class WriteJournal {
         this.#storeFailed = true;
         this.#reportFailure();
         const code = storageFailure(error);
-        if (!tolerateFailure || code === 'fenced') throw failure(code);
+        if (!tolerateFailure || code === 'fenced' || code === 'stale') throw failure(code);
       }
     });
     this.#tail = next.catch(() => {});

@@ -769,3 +769,134 @@ it('observes a failed sweep once and still restores the lesson', async () => {
     await context.close();
   }
 }, 60_000);
+
+it.each([false, true])(
+  'signs out both pages and reloads fresh, former owner=%s',
+  async (formerOwner) => {
+    const { page, context, requests, errors, consoleErrors } = await observe(mockOrigin);
+    try {
+      await page.goto(mockOrigin);
+      await page.getByRole('button', { name: 'Start', exact: true }).click();
+      await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+      const sessionId = await page.evaluate((key) => sessionStorage.getItem(key), sessionKey);
+      const second = await context.newPage();
+      await second.goto(mockOrigin);
+      await second.evaluate(({ key, value }) => sessionStorage.setItem(key, value), {
+        key: sessionKey,
+        value: sessionId as string,
+      });
+      await second.reload();
+      await second
+        .getByRole('alert')
+        .filter({ hasText: 'The lesson is active in another tab.' })
+        .waitFor();
+      if (formerOwner) {
+        await second.getByRole('button', { name: 'Use here', exact: true }).click();
+        await page
+          .getByRole('alert')
+          .filter({ hasText: 'The lesson moved to another tab.' })
+          .waitFor();
+        await second.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+      }
+      // A former owner has already disposed its runtime and closed its saver.
+      const source = formerOwner ? page : second;
+      await source
+        .getByRole('button', { name: 'Sign out', exact: true })
+        .waitFor({ timeout: 1000 });
+      await source.getByRole('button', { name: 'Sign out', exact: true }).click();
+      for (const current of [page, second]) {
+        await current
+          .getByRole('status')
+          .filter({ hasText: 'Signed out. Reload to continue.' })
+          .waitFor();
+        expect(await current.getByRole('button', { name: 'Start', exact: true }).isDisabled()).toBe(
+          true,
+        );
+        expect(await current.getByRole('radio').count()).toBe(0);
+        expect(await current.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBeNull();
+      }
+      await page.screenshot({ path: join(tmpdir(), 'galaxie-logout-desktop.png'), fullPage: true });
+      await second.setViewportSize({ width: 390, height: 844 });
+      await second.screenshot({
+        path: join(tmpdir(), 'galaxie-logout-mobile.png'),
+        fullPage: true,
+      });
+      expect(
+        await second.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      ).toBe(true);
+      for (const current of [page, second]) {
+        await current.reload();
+        await expect
+          .poll(() => current.getByRole('button', { name: 'Start', exact: true }).isEnabled())
+          .toBe(true);
+        expect(await current.getByRole('radio').count()).toBe(0);
+        expect(await current.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBeNull();
+      }
+      expect(errors).toEqual([]);
+      expect(consoleErrors).toEqual([]);
+      assertLocalRequests(requests, mockOrigin);
+    } finally {
+      await context.close();
+    }
+  },
+  60_000,
+);
+
+it('keeps the other page usable after a sign-out storage failure', async () => {
+  const { page, context, requests } = await observe(mockOrigin);
+  try {
+    await page.goto(mockOrigin);
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.getByRole('radio', { name: 'walk', exact: true }).waitFor();
+    const second = await context.newPage();
+    await second.goto(mockOrigin);
+    await second.evaluate(() => {
+      const put = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (
+        this: IDBObjectStore,
+        ...args: Parameters<IDBObjectStore['put']>
+      ) {
+        if (this.name === 'meta' && Array.isArray(args[1]) && args[1][2] === 'generation')
+          throw new DOMException('private-sign-out-canary', 'QuotaExceededError');
+        return put.apply(this, args);
+      };
+    });
+    await second.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await second.getByRole('alert').filter({ hasText: 'Sign out failed' }).waitFor();
+    expect(await second.locator('body').textContent()).not.toContain('private-sign-out-canary');
+    expect(await page.getByRole('radio', { name: 'walk', exact: true }).isEnabled()).toBe(true);
+    await page.getByRole('radio', { name: 'walk', exact: true }).check();
+    await page.getByRole('radio', { name: 'play', exact: true }).check();
+    await page.getByRole('radio', { name: 'drinks', exact: true }).check();
+    await page.getByRole('button', { name: 'Submit answers' }).click();
+    await page.getByRole('textbox').waitFor();
+    expect(await page.getByText('Signed out. Reload to continue.', { exact: true }).count()).toBe(
+      0,
+    );
+    assertLocalRequests(requests, mockOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it('signs out before model preparation without loading a model bundle', async () => {
+  const { page, context, requests, errors, consoleErrors } = await observe(defaultOrigin);
+  try {
+    await page.goto(defaultOrigin);
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Signed out. Reload to continue.' }).waitFor();
+    expect(
+      await page.getByRole('button', { name: 'Prepare models', exact: true }).isDisabled(),
+    ).toBe(true);
+    expect(await page.getByRole('button', { name: 'Start', exact: true }).isDisabled()).toBe(true);
+    for (const request of requests)
+      expect(new URL(request.url).pathname).not.toMatch(/\/(?:lib|worker)-/);
+    expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    assertLocalRequests(requests, defaultOrigin);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
