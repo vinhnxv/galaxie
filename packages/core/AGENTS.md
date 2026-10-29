@@ -34,6 +34,10 @@ const runtime = createRuntime({
 - Use `galaxieField` annotations for labels; labels come from trusted schemas.
 - Pass `recovery` alongside the same principal-scoped checkpointer when durable
   submission acceptance and write replay are required.
+- Recovery write IDs use the session, executor task scope, capability name and
+  per-scope call order. Keep call order within each task deterministic; a later
+  task receives new IDs. Calls without a task scope retain segment-based IDs,
+  so repeated unscoped starts require a fresh session for a new operation.
 - Dispose instances on logout and ownership loss; compose ownership explicitly.
 - Keep errors fixed and content-free; keep raw `DiagnosticEvent.error` host-only
   and never forward it where `private-user` data may not go.

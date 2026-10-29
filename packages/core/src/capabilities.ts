@@ -47,10 +47,11 @@ export interface CapabilityContext {
   readonly signal: AbortSignal;
   /**
    * Send this as the backend's idempotency key. With recovery, writes derive it from the session,
-   * resume interaction (or literal start), capability name and per-name call ordinal. Replays
-   * reuse it; call order must be deterministic. A new logical operation needs a fresh session,
-   * because repeated start segments in one session reuse IDs. Other calls use random IDs.
-   * Owner epochs and fencing remain M3 slice 5 work (ADR-0009).
+   * executor task scope, capability name and per-scope, per-name call ordinal. Re-executing a
+   * pending task reuses its IDs; call order within each task must be deterministic. A new task
+   * gets new IDs. Without a task scope, the resume interaction (or literal start) is the scope;
+   * repeated unscoped starts in one session reuse IDs, so use a fresh session for a new operation.
+   * Other calls use random IDs.
    */
   readonly effectId: EffectId;
   readonly runId: RunId;
@@ -84,7 +85,12 @@ export interface CapabilityPort {
   call(
     name: string,
     input: unknown,
-    options?: { readonly signal?: AbortSignal; readonly parent?: TraceHandle },
+    options?: {
+      readonly signal?: AbortSignal;
+      readonly parent?: TraceHandle;
+      /** Opaque, stable executor task namespace for recovery write identity. */
+      readonly effectScope?: string;
+    },
   ): Promise<unknown>;
 }
 

@@ -69,11 +69,11 @@ function storageFailure(error: unknown): ErrorCode {
 }
 async function journalEffectId(
   sessionId: SessionId,
-  segment: string,
+  scope: string,
   name: string,
   ordinal: number,
 ): Promise<EffectId> {
-  const hash = await digest([sessionId, segment, name, ordinal]);
+  const hash = await digest([sessionId, scope, name, ordinal]);
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${(
     (Number.parseInt(hash[16] as string, 16) & 3) | 8
   ).toString(16)}${hash.slice(17, 20)}-${hash.slice(20, 32)}` as EffectId;
@@ -362,8 +362,10 @@ export class CapabilityBroker {
         const compiled = this.#capabilities.get(name);
         const binding = compiled?.binding;
         const recovery = binding?.kind === 'write' ? run.recovery : undefined;
-        const ordinal = run.effectOrdinals.get(name) ?? 0;
-        if (recovery !== undefined) run.effectOrdinals.set(name, ordinal + 1);
+        const effectScope = options?.effectScope ?? run.segmentKey;
+        const ordinalKey = JSON.stringify([effectScope, name]);
+        const ordinal = run.effectOrdinals.get(ordinalKey) ?? 0;
+        if (recovery !== undefined) run.effectOrdinals.set(ordinalKey, ordinal + 1);
         let journal: WriteJournal | undefined;
         let approval: Approval | undefined;
         const span = run.tracing.startCapability(
@@ -462,7 +464,7 @@ export class CapabilityBroker {
             run.budget.reserveToolCall();
             if (recovery !== undefined) {
               const [effectId, inputDigest] = await Promise.all([
-                journalEffectId(run.sessionId, run.segmentKey, name, ordinal),
+                journalEffectId(run.sessionId, effectScope, name, ordinal),
                 digest(copyRecoveryJson(value)),
               ]);
               assertActive();

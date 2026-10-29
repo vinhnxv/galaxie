@@ -5,7 +5,7 @@ import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-lan
 import { type CapabilityContext, createRuntime } from '@galaxie/core';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import { Annotation, END, MemorySaver, START, StateGraph } from '@langchain/langgraph/web';
-import { expect, onTestFinished, test } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import { z } from 'zod';
 import { collect } from '../../packages/core/test/fake-executor.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
@@ -13,7 +13,7 @@ import { assistantRoles, assistantRouting } from './support/routing.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 
 test.each([true, false])(
-  'AT-35: parent effects before a child interrupt repeat on resume (recovery=%s)',
+  'AT-35: parent effects before a child interrupt replay only with recovery (recovery=%s)',
   async (withRecovery) => {
     const databaseName = `galaxie-subgraph-effects-${crypto.randomUUID()}`;
     const saver =
@@ -25,7 +25,9 @@ test.each([true, false])(
             principalScope: 'test',
           });
     const recovery = saver?.recovery ?? new MemoryRecoveryStore();
+    const journalReads = vi.spyOn(recovery, 'effect');
     const writes: CapabilityContext[] = [];
+    const receipts: unknown[] = [];
     let parentBodies = 0;
     const runtime = createRuntime({
       appId: 'subgraph-effects',
@@ -105,7 +107,7 @@ test.each([true, false])(
           return new StateGraph(state)
             .addNode('parent', async (value, config) => {
               parentBodies++;
-              await host.capabilities.call('save@1', { value: 'practice' }, config);
+              receipts.push(await host.capabilities.call('save@1', { value: 'practice' }, config));
               return child.invoke(value, config);
             })
             .addEdge(START, 'parent')
@@ -136,11 +138,14 @@ test.each([true, false])(
       output: { answer: { answer: 'continue' } },
     });
     expect(parentBodies).toBe(2);
-    // Characterization: resume starts a different journal segment. Recovery replays
-    // receipts within a segment, but does not deduplicate these parent-node effects.
-    expect(writes).toHaveLength(2);
+    expect(writes).toHaveLength(withRecovery ? 1 : 2);
     expect(writes[0]?.effectId).not.toBe(writes[1]?.effectId);
+    expect(receipts).toEqual([{ saved: true }, { saved: true }]);
     if (withRecovery) {
+      expect(journalReads.mock.calls.map(([, effectId]) => effectId)).toEqual([
+        writes[0]?.effectId,
+        writes[0]?.effectId,
+      ]);
       for (const write of writes)
         expect(await recovery.effect(instance.sessionId, write.effectId)).toMatchObject({
           status: 'succeeded',

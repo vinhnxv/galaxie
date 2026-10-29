@@ -72,9 +72,13 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
                 ? callbacks.getParentRunId()
                 : undefined;
             const parent = parentId === undefined ? undefined : run.handler.handleFor(parentId);
+            const effectScope =
+              config?.metadata?.['langgraph_checkpoint_ns'] ??
+              config?.configurable?.['checkpoint_ns'];
             return run.capabilities.call(name, input, {
               ...(config?.signal === undefined ? {} : { signal: config.signal }),
               ...(parent === undefined ? {} : { parent }),
+              ...(typeof effectScope === 'string' && effectScope.length > 0 ? { effectScope } : {}),
             });
           },
         },

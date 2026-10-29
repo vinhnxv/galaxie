@@ -142,6 +142,69 @@ async function crashAfterResult(
   await first.runtime.dispose();
 }
 
+test('task scope ordinals replay independently of interleaved task call order', async () => {
+  const store = await acceptedStore();
+  const contexts: CapabilityContext[] = [];
+  const invoke: CapabilityBinding['invoke'] = async (_input, context) => {
+    contexts.push(context);
+    return { receipt: context.effectId };
+  };
+  await crashAfterResult(store, invoke, async ({ capabilities }) => {
+    await capabilities.call('write@1', 'first', { effectScope: 'parent:task-1' });
+    await capabilities.call('write@1', 'child', { effectScope: 'parent:task-1|child:task-2' });
+    await capabilities.call('write@1', 'second', { effectScope: 'parent:task-1' });
+  });
+  expect(contexts).toHaveLength(3);
+  expect(new Set(contexts.map(({ effectId }) => effectId)).size).toBe(3);
+  const reads = vi.spyOn(store, 'effect');
+  const restored = await resume(store, invoke, async ({ capabilities }) => [
+    await capabilities.call('write@1', 'child', { effectScope: 'parent:task-1|child:task-2' }),
+    await capabilities.call('write@1', 'first', { effectScope: 'parent:task-1' }),
+    await capabilities.call('write@1', 'second', { effectScope: 'parent:task-1' }),
+    await capabilities.call('write@1', 'first', { effectScope: 'parent:task-3' }),
+  ]);
+  await vi.waitFor(() => expect(restored.instance.getSnapshot().run?.status).toBe('succeeded'));
+  expect(contexts).toHaveLength(4);
+  expect(new Set(contexts.map(({ effectId }) => effectId)).size).toBe(4);
+  expect(reads.mock.calls.map(([, effectId]) => effectId)).toEqual([
+    contexts[1]?.effectId,
+    contexts[0]?.effectId,
+    contexts[2]?.effectId,
+    contexts[3]?.effectId,
+  ]);
+  const runId = restored.instance.getSnapshot().run?.runId;
+  if (runId === undefined) throw new Error('Expected the restored run.');
+  expect((await collect(restored.instance.events(runId))).at(-1)).toMatchObject({
+    type: 'output',
+    output: [contexts[1], contexts[0], contexts[2], contexts[3]].map((context) => ({
+      receipt: context?.effectId,
+    })),
+  });
+});
+
+test('unscoped writes retain the resume segment identity and differ from start', async () => {
+  const store = await acceptedStore();
+  const contexts: CapabilityContext[] = [];
+  const invoke: CapabilityBinding['invoke'] = async (_input, context) => {
+    contexts.push(context);
+    return { receipt: context.effectId };
+  };
+  await crashAfterResult(store, invoke);
+  const restored = await resume(store, invoke, async ({ capabilities }) => [
+    await capabilities.call('write@1', 'first', { effectScope: interaction.interactionId }),
+    await capabilities.call('write@1', 'first', { effectScope: 'start' }),
+  ]);
+  await vi.waitFor(() => expect(restored.instance.getSnapshot().run?.status).toBe('succeeded'));
+  expect(contexts).toHaveLength(2);
+  expect(contexts[0]?.effectId).not.toBe(contexts[1]?.effectId);
+  const runId = restored.instance.getSnapshot().run?.runId;
+  if (runId === undefined) throw new Error('Expected the restored run.');
+  expect((await collect(restored.instance.events(runId))).at(-1)).toMatchObject({
+    type: 'output',
+    output: contexts.map(({ effectId }) => ({ receipt: effectId })),
+  });
+});
+
 test('a succeeded write receipt survives a crash before the resume checkpoint', async () => {
   const store = await acceptedStore();
   const invoked: CapabilityContext[] = [];
