@@ -176,6 +176,36 @@ const opaque: StandardSchema = {
 };
 const unreadable = z.object({ sentence: z.string() }).meta({ unsupported: true });
 test.each([
+  ['opaque', opaque],
+  ['rejected annotations', unreadable],
+] as const)(
+  'fallback private values block structured outbound arguments: %s',
+  async (_name, schema) => {
+    let error: unknown;
+    const { instance, runtime, event, invoke } = await fixture(
+      schema,
+      async function* ({ capabilities }) {
+        try {
+          await capabilities.call('send@1', sentence);
+        } catch (caught) {
+          error = caught;
+        }
+        yield { type: 'output', output: null };
+      },
+    );
+    try {
+      expect(await instance.dispatch(event)).toMatchObject({ status: 'accepted' });
+      await collect(instance.events(event.runId));
+      expect(instance.getSnapshot().run?.labels).toContain('private-user');
+      expect(error).toMatchObject({ code: 'denied' });
+      expect(invoke).not.toHaveBeenCalled();
+    } finally {
+      await runtime.dispose();
+    }
+  },
+);
+
+test.each([
   [z.strictObject({ sentence: z.string() }), { sentence }, ['app', 'public']],
   [opaque, { sentence }, ['private-user', 'public']],
   [opaque, { count: 1 }, ['public']],

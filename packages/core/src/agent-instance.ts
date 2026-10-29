@@ -68,15 +68,18 @@ interface SegmentRecord {
   tracing?: RunInstrumentation;
 }
 
-function containsText(value: unknown): boolean {
+function* payloadStrings(value: unknown): Generator<string, void> {
   const pending = [value];
   while (pending.length > 0) {
     const current = pending.pop();
-    if (typeof current === 'string' && current.length > 0) return true;
+    if (typeof current === 'string' && current.length > 0) yield current;
     if (typeof current === 'object' && current !== null)
       for (const child of Object.values(current)) pending.push(child);
   }
-  return false;
+}
+
+function containsText(value: unknown): boolean {
+  return payloadStrings(value).next().done !== true;
 }
 
 function terminal(run: RunRecord): boolean {
@@ -151,7 +154,9 @@ export function createAgentInstance(
       payloadAnnotations.set(schema, annotations);
     }
     if (annotations === null) {
-      if (containsText(payload)) run.labels.add('private-user');
+      const values = [...payloadStrings(payload)];
+      if (values.length > 0) run.labels.add('private-user');
+      registerPrivate(values, run.privateValues);
     } else {
       for (const label of annotations.labels) run.labels.add(label);
       registerPrivate(annotations.privateStrings(payload), run.privateValues);
