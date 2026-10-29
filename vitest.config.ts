@@ -5,7 +5,33 @@ import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
+import { mcpAdminCommand } from './tests/conformance/support/mcp-global.node.js';
+
 const alias = {
+  '@galaxie/tools-mcp': fileURLToPath(
+    new URL('./packages/tools-mcp/src/index.ts', import.meta.url),
+  ),
+  '@galaxie/example-mcp-server': fileURLToPath(
+    new URL('./examples/mcp-server/src/index.ts', import.meta.url),
+  ),
+  '@modelcontextprotocol/sdk/client/index.js': fileURLToPath(
+    new URL(
+      './packages/tools-mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js',
+      import.meta.url,
+    ),
+  ),
+  '@modelcontextprotocol/sdk/client/streamableHttp.js': fileURLToPath(
+    new URL(
+      './packages/tools-mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/client/streamableHttp.js',
+      import.meta.url,
+    ),
+  ),
+  '@modelcontextprotocol/sdk/types.js': fileURLToPath(
+    new URL(
+      './packages/tools-mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js',
+      import.meta.url,
+    ),
+  ),
   '@galaxie/storage-indexeddb': fileURLToPath(
     new URL('./packages/storage-indexeddb/src/index.ts', import.meta.url),
   ),
@@ -36,12 +62,15 @@ const alias = {
 };
 
 const config: ViteUserConfig = defineConfig({
+  server: { host: '127.0.0.1' },
   test: {
+    api: { host: '127.0.0.1' },
     projects: [
       {
         resolve: { alias },
         test: {
           name: 'node',
+          globalSetup: ['tests/conformance/support/mcp-global.node.ts'],
           include: [
             'packages/*/test/**/*.test.ts',
             'tests/conformance/**/*.test.ts',
@@ -68,6 +97,9 @@ const config: ViteUserConfig = defineConfig({
             'react/jsx-dev-runtime',
             '@langchain/langgraph/web',
             '@langchain/openai',
+            '@modelcontextprotocol/sdk/client/index.js',
+            '@modelcontextprotocol/sdk/client/streamableHttp.js',
+            '@modelcontextprotocol/sdk/types.js',
             '@langchain/langgraph-checkpoint',
             '@langchain/core/callbacks/base',
             '@langchain/core/language_models/chat_models',
@@ -83,6 +115,8 @@ const config: ViteUserConfig = defineConfig({
         },
         test: {
           name: 'browser',
+          api: { host: '127.0.0.1', port: 63315, strictPort: true },
+          globalSetup: ['support/mcp-global.node.ts'],
           include: [
             '**/*.test.ts',
             '**/*.test.tsx',
@@ -97,6 +131,7 @@ const config: ViteUserConfig = defineConfig({
           ],
           browser: {
             enabled: true,
+            commands: { mcpAdmin: mcpAdminCommand },
             provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium', name: 'browser (chromium)' }],
