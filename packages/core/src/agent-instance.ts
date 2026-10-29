@@ -5,6 +5,7 @@ import { type Context, context, type Tracer } from '@opentelemetry/api';
 import { type Annotations, readAnnotations } from './annotations.js';
 import { deadlineTimer, RunBudget } from './budgets.js';
 import { CapabilityBroker, registerPrivate } from './capability-broker.js';
+import { ConfirmationGate } from './confirmations.js';
 import type { AgentDefinition } from './definition.js';
 import {
   type ErrorCode,
@@ -197,12 +198,22 @@ export function createAgentInstance(
       });
     }
   };
+  const confirmations =
+    options.confirmations === undefined
+      ? undefined
+      : new ConfirmationGate(
+          options.confirmations,
+          options.principalScope,
+          () => publish(),
+          report,
+        );
   const broker = new CapabilityBroker(
     definition,
     options.bindings,
     instrumentation.policy,
     options.principalScope,
     report,
+    confirmations,
   );
   const router = new ModelRouter(
     definition,
@@ -217,6 +228,8 @@ export function createAgentInstance(
     if (disposing) throw new GalaxieError('invalid', 'The instance was disposed.');
   };
   const publish = (events?: RunEvents, afterSnapshot?: () => void): void => {
+    if (current !== undefined && terminal(current)) confirmations?.endRun(current.runId, disposing);
+    const pendingConfirmations = confirmations?.pending;
     const run: RunSnapshot | undefined =
       current === undefined
         ? undefined
@@ -241,6 +254,7 @@ export function createAgentInstance(
       ...(prepareError === undefined ? {} : { prepareError }),
       ...(run === undefined ? {} : { run }),
       ...(publishedRoutes === undefined ? {} : { routes: publishedRoutes }),
+      ...(pendingConfirmations === undefined ? {} : { confirmations: pendingConfirmations }),
     });
     // AbortSignal callbacks run synchronously and must observe the committed snapshot too.
     afterSnapshot?.();
@@ -589,6 +603,7 @@ export function createAgentInstance(
     instanceId,
     sessionId,
     getSnapshot: () => snapshot,
+    respond: (id, decision) => confirmations?.respond(id, decision) ?? { status: 'stale' },
     subscribe(listener): () => void {
       if (state !== 'disposed') listeners.add(listener);
       return () => listeners.delete(listener);

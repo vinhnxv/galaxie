@@ -6,6 +6,7 @@ import { createAgentInstance } from './agent-instance.js';
 import { budgetLimits } from './budgets.js';
 import type { CapabilityBinding } from './capabilities.js';
 import { dataPolicy } from './capability-broker.js';
+import type { ConfirmationOptions } from './confirmations.js';
 import type { AgentDefinition, BindingsFor } from './definition.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
@@ -38,6 +39,10 @@ export interface DiagnosticEvent {
     | 'late_result'
     | 'capability_failed'
     | 'effect_outcome_unknown'
+    | 'confirmation_requested'
+    | 'confirmation_declined'
+    | 'confirmation_expired'
+    | 'confirmation_invalidated'
     | 'model_failed'
     | 'output_blocked'
     | 'output_safety_failed'
@@ -60,6 +65,8 @@ export interface CreateOptions<Agent = unknown, Services = unknown> {
   readonly recovery?: RecoveryStore;
   readonly services?: Services;
   readonly bindings?: Readonly<Record<string, CapabilityBinding<never, unknown>>>;
+  /** Host-rendered, single-use capability approvals, held only in page memory. */
+  readonly confirmations?: ConfirmationOptions;
   /** Per-role providers, consent and ephemeral credentials (ADR-0006). */
   readonly models?: ModelRouting;
   /** Supported components, their actions and host-assigned surfaces. */

@@ -15,6 +15,12 @@ export type {
   RetryPolicy,
 } from './capabilities.js';
 export { attributionHeaders } from './capabilities.js';
+export type {
+  ConfirmationId,
+  ConfirmationOptions,
+  ConfirmationReceipt,
+  PendingConfirmation,
+} from './confirmations.js';
 export {
   type AgentDefinition,
   type BindingsFor,

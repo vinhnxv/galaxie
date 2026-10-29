@@ -44,6 +44,9 @@ export class FakeInstance implements AgentInstance<unknown, unknown> {
     status: 'cancelled' as const,
   }));
   readonly dispose: Mock<AgentInstance<unknown, unknown>['dispose']> = vi.fn(async () => {});
+  readonly respond: Mock<AgentInstance<unknown, unknown>['respond']> = vi.fn(() => ({
+    status: 'stale',
+  }));
   readonly events: Mock<AgentInstance<unknown, unknown>['events']> = vi.fn(
     async function* (): AsyncGenerator<RunEvent> {},
   );

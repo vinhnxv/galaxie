@@ -6,9 +6,11 @@ import { BudgetExceeded, deadlineTimer, type RunBudget } from './budgets.js';
 import type {
   CapabilityBinding,
   CapabilityContext,
+  CapabilityName,
   CapabilityPort,
   CapabilityRequest,
 } from './capabilities.js';
+import { type Approval, approvedCopy, type ConfirmationGate, digest } from './confirmations.js';
 import type { AgentDefinition } from './definition.js';
 import { type ErrorCode, GalaxieError, isGalaxieError, toErrorInfo } from './errors.js';
 import { getHttpCapability, type HttpDescriptor } from './http-capability.js';
@@ -64,21 +66,6 @@ function storageFailure(error: unknown): ErrorCode {
     Object.getOwnPropertyDescriptor(error, 'fenced')?.value === true
     ? 'fenced'
     : 'unavailable';
-}
-function canonical(value: RecoveryJson): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value !== null && typeof value === 'object')
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonical(value[key] as RecoveryJson)}`)
-      .join(',')}}`;
-  return JSON.stringify(value);
-}
-async function digest(value: RecoveryJson): Promise<string> {
-  const bytes = new TextEncoder().encode(canonical(value));
-  return [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes))]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
 }
 async function journalEffectId(
   sessionId: SessionId,
@@ -289,6 +276,7 @@ export interface BrokerRun {
 /** One broker per instance: grants and concurrency never cross principals or instances. */
 export class CapabilityBroker {
   readonly input: Annotations;
+  readonly #confirmations: ConfirmationGate | undefined;
   readonly #capabilities = new Map<string, Compiled>();
   readonly #policy: Policy;
   readonly #agent: AgentRef;
@@ -300,8 +288,10 @@ export class CapabilityBroker {
     policy: Policy,
     principal: string,
     report: (event: Omit<DiagnosticEvent, 'instanceId'>) => void,
+    confirmations?: ConfirmationGate,
   ) {
     this.#policy = policy;
+    this.#confirmations = confirmations;
     this.#principal = principal;
     this.#report = report;
     this.#agent = Object.freeze({ id: definition.id, version: definition.version, hash: '' });
@@ -341,6 +331,12 @@ export class CapabilityBroker {
           typeof binding.invoke !== 'function')
       )
         throw failure('invalid');
+      if (
+        binding?.approval === 'confirm' &&
+        confirmations !== undefined &&
+        !confirmations.capabilities.some((capability) => capability === name)
+      )
+        throw failure('invalid');
       const input = annotations(request.input);
       const output = annotations(request.output);
       const http = supplied === undefined ? undefined : getHttpCapability(supplied);
@@ -369,6 +365,7 @@ export class CapabilityBroker {
         const ordinal = run.effectOrdinals.get(name) ?? 0;
         if (recovery !== undefined) run.effectOrdinals.set(name, ordinal + 1);
         let journal: WriteJournal | undefined;
+        let approval: Approval | undefined;
         const span = run.tracing.startCapability(
           {
             ...(compiled === undefined ? {} : { name }),
@@ -427,15 +424,19 @@ export class CapabilityBroker {
             throw failure('denied');
           const slots = compiled.slots;
           if (binding.grantScope === 'run' && !run.grants.has(name)) throw failure('denied');
-          if (binding.approval === 'confirm') throw failure('unsupported');
+          if (binding.approval === 'confirm' && this.#confirmations === undefined)
+            throw failure('unsupported');
           run.signal.addEventListener('abort', runAbort, { once: true });
           options?.signal?.addEventListener('abort', callerAbort, { once: true });
-          clearTimer = deadlineTimer(binding.timeoutMs, () => {
-            if (!controller.signal.aborted) {
-              abortCode = 'timeout';
-              controller.abort();
-            }
-          });
+          const startDeadline = (): void => {
+            clearTimer = deadlineTimer(binding.timeoutMs, () => {
+              if (!controller.signal.aborted) {
+                abortCode = 'timeout';
+                controller.abort();
+              }
+            });
+          };
+          if (binding.approval !== 'confirm') startDeadline();
           const abortedPromise = new Promise<never>((_resolve, reject) => {
             aborted = () => reject(budgetFailure ?? failure(abortCode));
             controller.signal.addEventListener('abort', aborted, { once: true });
@@ -453,7 +454,8 @@ export class CapabilityBroker {
                 throw failure('invalid');
               }
             };
-            const value = await validate(compiled.request.input, input);
+            const validated = await validate(compiled.request.input, input);
+            const value = binding.approval === 'confirm' ? approvedCopy(validated) : validated;
             assertActive();
             run.budget.payload(value);
             checkPolicy(value);
@@ -488,9 +490,30 @@ export class CapabilityBroker {
                   });
                   throw failure('outcome_unknown');
                 }
-              } else {
-                await journal.write('planned');
               }
+              assertActive();
+            }
+            const effectId = journal?.effectId ?? (globalThis.crypto.randomUUID() as EffectId);
+            if (binding.approval === 'confirm' && this.#confirmations !== undefined) {
+              approval = await this.#confirmations.request(
+                name as CapabilityName,
+                value as RecoveryJson,
+                effectId,
+                run.runId,
+                controller.signal,
+                run.active,
+                (code) => {
+                  if (!controller.signal.aborted) {
+                    abortCode = code;
+                    controller.abort();
+                  }
+                },
+              );
+              assertActive();
+              startDeadline();
+            }
+            if (journal !== undefined) {
+              await journal.write('planned');
               assertActive();
             }
             const release = await slots.acquire(controller.signal);
@@ -505,9 +528,12 @@ export class CapabilityBroker {
                 assertActive();
                 checkPolicy(value);
               }
+              await approval?.check();
+              assertActive();
+              approval?.release();
               const context: CapabilityContext = {
                 signal: controller.signal,
-                effectId: journal?.effectId ?? (globalThis.crypto.randomUUID() as EffectId),
+                effectId,
                 runId: run.runId,
                 principalScope: this.#principal,
                 agent: this.#agent,
@@ -592,6 +618,7 @@ export class CapabilityBroker {
           throw failure(code);
         } finally {
           stopped = true;
+          approval?.release();
           settledRelease?.();
           clearTimer?.();
           run.signal.removeEventListener('abort', runAbort);

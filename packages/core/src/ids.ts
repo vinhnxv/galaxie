@@ -36,6 +36,9 @@ export type ViewRevision = Branded<string, 'ViewRevision'>;
 /** Identifies one external effect; it is also the effect's idempotency key (brief §12.3). */
 export type EffectId = Branded<string, 'EffectId'>;
 
+/** One host-only, single-use confirmation. Never exposed to the executor. */
+export type ConfirmationId = Branded<string, 'ConfirmationId'>;
+
 /** Correlates journal and trace events. */
 export type EventId = Branded<string, 'EventId'>;
 
