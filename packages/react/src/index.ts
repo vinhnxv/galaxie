@@ -19,6 +19,14 @@ export {
   type WritingPromptProps,
   type WritingSubmission,
 } from './components/index.js';
+export {
+  type ConfirmationEntry,
+  type ConfirmationField,
+  ConfirmationPrompt,
+  type ConfirmationPromptProps,
+  type ConfirmationRegistry,
+  defineConfirmations,
+} from './confirmations.js';
 export { useAgentSnapshot } from './hooks.js';
 export {
   type ActionDefinition,
