@@ -74,6 +74,7 @@ export interface Approval {
 }
 
 interface RecordEntry {
+  readonly order: number;
   readonly pending: PendingConfirmation;
   readonly runId: RunId;
   respond(decision: 'approve' | 'decline'): ConfirmationReceipt;
@@ -89,6 +90,7 @@ export class ConfirmationGate {
   readonly #report: (event: Omit<DiagnosticEvent, 'instanceId'>) => void;
   readonly #open = new Map<ConfirmationId, RecordEntry>();
   readonly #active = new Set<RecordEntry>();
+  #sequence = 0;
 
   constructor(
     options: ConfirmationOptions,
@@ -125,7 +127,9 @@ export class ConfirmationGate {
   get pending(): readonly PendingConfirmation[] | undefined {
     return this.#open.size === 0
       ? undefined
-      : Object.freeze([...this.#open.values()].map((entry) => entry.pending));
+      : Object.freeze(
+          [...this.#open.values()].sort((a, b) => a.order - b.order).map((entry) => entry.pending),
+        );
   }
 
   #revision(): string {
@@ -164,6 +168,7 @@ export class ConfirmationGate {
     active: () => boolean,
     invalidate: (code: ErrorCode) => void,
   ): Promise<Approval> {
+    const order = this.#sequence++;
     const inputDigest = await digest(value);
     const revision = this.#revision();
     const principal = this.#principal;
@@ -181,6 +186,7 @@ export class ConfirmationGate {
     const { promise, resolve, reject } = Promise.withResolvers<Approval>();
     let ended = false;
     let approved = false;
+    let responding = false;
     let error: GalaxieError | undefined;
     const cleanup = (): void => {
       clearTimeout(timer);
@@ -237,19 +243,26 @@ export class ConfirmationGate {
       },
     };
     const entry: RecordEntry = {
+      order,
       pending,
       runId,
       end,
       respond: (decision) => {
-        if (approved || !valid()) return { status: 'stale' };
-        if (decision === 'decline') {
-          end('denied', 'confirmation_declined');
-          return { status: 'declined' };
+        if (approved || responding) return { status: 'stale' };
+        responding = true;
+        try {
+          if (!valid()) return { status: 'stale' };
+          if (decision === 'decline') {
+            end('denied', 'confirmation_declined');
+            return { status: 'declined' };
+          }
+          approved = true;
+          close();
+          resolve(approval);
+          return { status: 'approved' };
+        } finally {
+          responding = false;
         }
-        approved = true;
-        close();
-        resolve(approval);
-        return { status: 'approved' };
       },
     };
     const aborted = (): void => end('cancelled');

@@ -528,9 +528,12 @@ export class CapabilityBroker {
                 assertActive();
                 checkPolicy(value);
               }
-              await approval?.check();
-              assertActive();
-              approval?.release();
+              if (approval !== undefined) {
+                await approval.check();
+                assertActive();
+                checkPolicy(value);
+                approval.release();
+              }
               const context: CapabilityContext = {
                 signal: controller.signal,
                 effectId,

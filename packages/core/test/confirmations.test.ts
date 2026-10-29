@@ -484,3 +484,145 @@ test('expiry after approval settles a call still waiting for a concurrency slot'
   held.resolve('ok');
   await f.events;
 });
+
+test('snapshot identity is stable until confirmation publication and stale responses do not publish', async () => {
+  const f = await fixture(denied());
+  await opened(f.instance);
+  const before = f.instance.getSnapshot();
+  expect(f.instance.getSnapshot()).toBe(before);
+  expect(Object.isFrozen(before)).toBe(true);
+  expect(Object.isFrozen(before.confirmations)).toBe(true);
+  expect(Object.isFrozen(pending(f.instance))).toBe(true);
+  const published = vi.fn();
+  f.instance.subscribe(published);
+  expect(f.instance.respond('unknown' as never, 'approve')).toEqual({ status: 'stale' });
+  expect(published).not.toHaveBeenCalled();
+  expect(f.instance.getSnapshot()).toBe(before);
+  f.instance.respond(pending(f.instance).id, 'decline');
+  const closed = f.instance.getSnapshot();
+  expect(closed).not.toBe(before);
+  expect(closed.confirmations).toBeUndefined();
+  expect(f.instance.getSnapshot()).toBe(closed);
+  await f.events;
+});
+
+test('publication lists concurrent requests in order and removes only the answered entry', async () => {
+  const f = await fixture(async function* ({ capabilities }) {
+    await Promise.all([
+      capabilities.call('write@1', { order: 1 }),
+      capabilities.call('write@1', { order: 2 }),
+    ]);
+    yield { type: 'output', output: null };
+  });
+  await opened(f.instance, 2);
+  expect(f.instance.getSnapshot().confirmations?.map((entry) => entry.arguments)).toEqual([
+    { order: 1 },
+    { order: 2 },
+  ]);
+  const [first, second] = f.instance.getSnapshot().confirmations ?? [];
+  f.instance.respond(second?.id as never, 'approve');
+  expect(f.instance.getSnapshot().confirmations).toEqual([first]);
+  f.instance.respond(first?.id as never, 'approve');
+  expect(f.instance.getSnapshot().confirmations).toBeUndefined();
+  await f.events;
+});
+
+test.each([null, undefined, 1, {}, Symbol('id')])(
+  'respond never throws on a bad ID: %j',
+  async (id) => {
+    const f = await fixture(denied());
+    await opened(f.instance);
+    const before = f.instance.getSnapshot();
+    expect(f.instance.respond(id as never, 'approve')).toEqual({ status: 'stale' });
+    expect(f.instance.getSnapshot()).toBe(before);
+    f.instance.respond(pending(f.instance).id, 'decline');
+    await f.events;
+  },
+);
+
+test.each([null, undefined, 1, {}, 'allow', Symbol('decision')])(
+  'respond never throws on a bad decision: %j',
+  async (decision) => {
+    const f = await fixture(denied());
+    await opened(f.instance);
+    const before = f.instance.getSnapshot();
+    expect(f.instance.respond(pending(f.instance).id, decision as never)).toEqual({
+      status: 'stale',
+    });
+    expect(f.instance.getSnapshot()).toBe(before);
+    f.instance.respond(pending(f.instance).id, 'decline');
+    await f.events;
+  },
+);
+
+test('a reentrant policy callback cannot consume an approval twice', async () => {
+  let reenter: (() => void) | undefined;
+  const f = await fixture(
+    async function* ({ capabilities }) {
+      await capabilities.call('write@1', {});
+      yield { type: 'output', output: null };
+    },
+    {
+      policyRevision: () => {
+        reenter?.();
+        return 'v1';
+      },
+    },
+  );
+  await opened(f.instance);
+  const id = pending(f.instance).id;
+  const nested: unknown[] = [];
+  reenter = () => {
+    reenter = undefined;
+    nested.push(f.instance.respond(id, 'approve'));
+  };
+  expect(f.instance.respond(id, 'approve')).toEqual({ status: 'approved' });
+  expect(nested).toEqual([{ status: 'stale' }]);
+  await f.events;
+  expect(f.invoke).toHaveBeenCalledTimes(1);
+});
+
+test('budget failure removes confirmations before snapshot subscribers and abort listeners observe it', async () => {
+  vi.useFakeTimers();
+  const observations: unknown[] = [];
+  const f = await fixture(
+    async function* ({ capabilities, signal }) {
+      signal.addEventListener('abort', () => observations.push(f.instance.getSnapshot()));
+      await expect(capabilities.call('write@1', {})).rejects.toMatchObject({ code: 'cancelled' });
+      yield { type: 'output', output: null };
+    },
+    {},
+    {},
+    { runtime: { budgets: { wallClockMs: 500 } } },
+  );
+  await opened(f.instance);
+  const snapshots: ReturnType<typeof f.instance.getSnapshot>[] = [];
+  f.instance.subscribe(() => snapshots.push(f.instance.getSnapshot()));
+  await vi.advanceTimersByTimeAsync(500);
+  await f.events;
+  expect(snapshots.length).toBeGreaterThan(0);
+  for (const snapshot of snapshots) {
+    expect(snapshot.run?.status).toBe('failed');
+    expect(snapshot.confirmations).toBeUndefined();
+  }
+  expect(observations).toEqual([f.instance.getSnapshot()]);
+});
+
+test('run completion closes unawaited confirmations without publishing stale entries', async () => {
+  const finish = deferred<void>();
+  const callSettled = deferred<void>();
+  const f = await fixture(async function* ({ capabilities }) {
+    void capabilities.call('write@1', {}).catch((error: unknown) => {
+      expect(error).toMatchObject({ code: 'cancelled' });
+      callSettled.resolve();
+    });
+    await finish.promise;
+    yield { type: 'output', output: null };
+  });
+  await opened(f.instance);
+  finish.resolve();
+  await f.events;
+  await callSettled.promise;
+  expect(f.instance.getSnapshot().confirmations).toBeUndefined();
+  expect(f.invoke).not.toHaveBeenCalled();
+});
