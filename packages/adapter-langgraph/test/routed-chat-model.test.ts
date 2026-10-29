@@ -23,7 +23,7 @@ import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { BuiltInAIChatModel } from '../../models/src/builtin-ai/chat-model.js';
-import { MockChatModel } from '../../models/src/mock.js';
+import { createMockLatch, MockChatModel } from '../../models/src/mock.js';
 import { WebLLMChatModel } from '../../models/src/webllm/chat-model.js';
 import { createWebLLMEngine } from '../../models/src/webllm/engine.js';
 import {
@@ -532,6 +532,42 @@ test('structured repair forwards the original messages, invalid reply and fixed 
   ]);
   expect(fixture.end).toHaveBeenCalledTimes(2);
 });
+test.each(['invoke', 'stream'] as const)(
+  'caller abort during a structured %s repair rejects without another dispatch',
+  async (mode) => {
+    const latch = createMockLatch();
+    const provider = new MockChatModel({
+      hello: { id: 'first', text: 'not json' },
+      'The previous reply did not match the required JSON Schema. Reply again with only JSON that matches the schema.':
+        {
+          id: 'repair',
+          text: 'still not json',
+          wait: latch,
+        },
+    });
+    const fixture = routed(provider, 2);
+    const structured = fixture.model.withStructuredOutput(answerSchema, { includeRaw: true });
+    const controller = new AbortController();
+    const reason = new Error('Host cancelled the structured call.');
+    const waiting = (async () => {
+      if (mode === 'invoke') return structured.invoke('hello', { signal: controller.signal });
+      const results = [];
+      for await (const result of await structured.stream('hello', { signal: controller.signal }))
+        results.push(result);
+      return results;
+    })();
+    const rejected = expect(waiting).rejects.toBe(reason);
+    try {
+      await latch.entered;
+      controller.abort(reason);
+      await rejected;
+      expect(provider.calls).toBe(2);
+      expect(fixture.begin).toHaveBeenCalledTimes(2);
+    } finally {
+      latch.release();
+    }
+  },
+);
 test.each(['zod', 'standard', 'json'] as const)(
   'routed structured output validates %s schemas and forwards constrained decoding',
   async (kind) => {
