@@ -26,7 +26,7 @@ import { BuiltInAIChatModel, checkBuiltInAI, prepareBuiltInAI } from '@galaxie/m
 import { loadWebLLMEngine, WebLLMChatModel, type WebLLMEngineHandle } from '@galaxie/models/webllm';
 import { createRegistry, educationComponents, type Registry } from '@galaxie/react';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
-import { hostAppId, hostLearnerId } from './session.js';
+import { hostAppId, hostLearnerId, invalidateLocalPrincipal } from './session.js';
 import { allowWorkerScript } from './trusted-types.js';
 
 // The core error vocabulary has no not_found code; this stays in the host binding.
@@ -66,6 +66,7 @@ export interface LocalHost {
   subscribeStorage(listener: () => void): () => void;
   acquireOwnership(takeover?: boolean): Promise<OwnershipResult>;
   deleteSession(sessionId: SessionId): Promise<void>;
+  signOut(): Promise<void>;
   createInstance(sessionId?: SessionId): Promise<AgentInstance<TutorInput, unknown>>;
 }
 
@@ -178,6 +179,12 @@ export function createLocalHost(models: LocalModels): LocalHost {
     async deleteSession(sessionId) {
       const checkpointer = await saver;
       await checkpointer?.deleteSession(sessionId);
+    },
+    async signOut() {
+      const checkpointer = disposed ? undefined : await saver?.catch(() => undefined);
+      if (checkpointer !== undefined && storageStatus !== 'superseded')
+        await checkpointer.invalidatePrincipal();
+      else await invalidateLocalPrincipal();
     },
     async createInstance(sessionId) {
       if (disposed) throw new GalaxieError('invalid', 'The runtime was disposed.');

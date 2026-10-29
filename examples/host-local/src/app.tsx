@@ -3,10 +3,12 @@
 
 import {
   type AgentInstance,
+  type InvalidationWatcher,
   isGalaxieError,
   type Ownership,
   type RunId,
   type SessionId,
+  watchInvalidation,
 } from '@galaxie/core';
 import {
   lessonFixture,
@@ -16,7 +18,7 @@ import {
 import { AgentSurface, useAgentSnapshot } from '@galaxie/react';
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { LocalHost, StorageStatus } from './runtime.js';
-import { sessionKey } from './session.js';
+import { hostAppId, hostLearnerId, invalidateLocalPrincipal, sessionKey } from './session.js';
 
 interface AppProps {
   readonly initialHost?: LocalHost;
@@ -63,6 +65,17 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
   const [checking, setChecking] = useState(initialHost !== undefined);
   const [blocked, setBlocked] = useState(false);
   const [moved, setMoved] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutFailed, setSignOutFailed] = useState(false);
+  const signingOutRef = useRef(false);
+  const signedOutRef = useRef(false);
+  const signOutDisposal = useRef<Promise<void> | undefined>(undefined);
+  const watcher = useRef<InvalidationWatcher | undefined>(undefined);
+  const currentHost = useRef(host);
+  const currentInstance = useRef(instance);
+  currentHost.current = host;
+  currentInstance.current = instance;
   const lost = useRef(false);
   const [retryRestore, setRetryRestore] = useState(false);
   const [recoverySession, setRecoverySession] = useState<SessionId>();
@@ -70,6 +83,68 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
   const ownership = useRef<SessionOwnership | undefined>(undefined);
   const starting = useRef(false);
   const mounted = useRef(true);
+
+  const finishSignOut = useCallback((): Promise<void> => {
+    if (signedOutRef.current) return signOutDisposal.current ?? Promise.resolve();
+    signedOutRef.current = true;
+    lost.current = true;
+    sessionStorage.removeItem(sessionKey);
+    const owner = ownership.current;
+    owner?.unsubscribe?.();
+    if (mounted.current) {
+      setSignedOut(true);
+      setMoved(false);
+      setError(undefined);
+      setSignOutFailed(false);
+      setChecking(false);
+      setRetryRestore(false);
+      setRecoverySession(undefined);
+      setInstance(undefined);
+      setScore(undefined);
+    }
+    signOutDisposal.current = (async () => {
+      try {
+        await currentInstance.current?.dispose();
+        await currentHost.current?.runtime.dispose();
+      } finally {
+        await owner?.handle.release();
+        if (ownership.current === owner) ownership.current = undefined;
+      }
+    })();
+    return signOutDisposal.current;
+  }, []);
+
+  useEffect(() => {
+    const next = watchInvalidation({ appId: hostAppId, principalScope: hostLearnerId });
+    watcher.current = next;
+    const invalidate = (): void => {
+      void finishSignOut().catch(() => {});
+    };
+    next.signal.addEventListener('abort', invalidate, { once: true });
+    return () => {
+      next.signal.removeEventListener('abort', invalidate);
+      next.close();
+      if (watcher.current === next) watcher.current = undefined;
+    };
+  }, [finishSignOut]);
+
+  const signOut = async (): Promise<void> => {
+    if (signingOutRef.current || signedOutRef.current) return;
+    signingOutRef.current = true;
+    setSigningOut(true);
+    setSignOutFailed(false);
+    try {
+      if (currentHost.current) await currentHost.current.signOut();
+      else await invalidateLocalPrincipal();
+      watcher.current?.announce();
+      await finishSignOut();
+    } catch {
+      if (mounted.current && !signedOutRef.current) setSignOutFailed(true);
+    } finally {
+      signingOutRef.current = false;
+      if (mounted.current) setSigningOut(false);
+    }
+  };
 
   useEffect(() => {
     mounted.current = true;
@@ -84,17 +159,18 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
   }, [host]);
 
   const prepare = async (): Promise<void> => {
-    if (lost.current || busy || host || !prepareModels) return;
+    if (lost.current || signingOutRef.current || busy || host || !prepareModels) return;
     setBusy(true);
     setError(undefined);
     try {
       const prepared = await prepareModels();
-      if (mounted.current) {
+      if (mounted.current && !lost.current) {
         setChecking(true);
         setHost(prepared);
       } else await prepared.runtime.dispose();
     } catch {
-      if (mounted.current) setError('Model preparation is unavailable. Try preparing again.');
+      if (mounted.current && !lost.current)
+        setError('Model preparation is unavailable. Try preparing again.');
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -143,7 +219,13 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
 
   const run = useCallback(
     async (restore: boolean, takeover = false): Promise<void> => {
-      if (!host || lost.current || starting.current || host.getStorageStatus() === 'superseded')
+      if (
+        !host ||
+        lost.current ||
+        signingOutRef.current ||
+        starting.current ||
+        host.getStorageStatus() === 'superseded'
+      )
         return;
       starting.current = true;
       setChecking(true);
@@ -253,6 +335,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
     if (
       !host ||
       lost.current ||
+      signingOutRef.current ||
       !recoverySession ||
       starting.current ||
       host.getStorageStatus() === 'superseded'
@@ -324,7 +407,7 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
           </p>
           <button
             type="button"
-            disabled={moved || busy || host !== undefined}
+            disabled={signedOut || signingOut || moved || busy || host !== undefined}
             onClick={() => void prepare()}
           >
             {busy ? 'Preparing models…' : 'Prepare models'}
@@ -334,6 +417,8 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
       <button
         type="button"
         disabled={
+          signedOut ||
+          signingOut ||
           moved ||
           !host ||
           instance !== undefined ||
@@ -347,14 +432,21 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
       >
         Start
       </button>
-      {moved ? <p role="alert">The lesson moved to another tab.</p> : null}
-      {storageStatus === 'superseded' ? <p role="alert">Reload to use the updated app</p> : null}
-      {storageStatus === 'quota' ? <p role="alert">Storage is full</p> : null}
+      <button type="button" disabled={signedOut || signingOut} onClick={() => void signOut()}>
+        Sign out
+      </button>
+      {signedOut ? <p role="status">Signed out. Reload to continue.</p> : null}
+      {signOutFailed && !signedOut ? <p role="alert">Sign out failed</p> : null}
+      {moved && !signedOut ? <p role="alert">The lesson moved to another tab.</p> : null}
+      {storageStatus === 'superseded' && !signedOut ? (
+        <p role="alert">Reload to use the updated app</p>
+      ) : null}
+      {storageStatus === 'quota' && !signedOut ? <p role="alert">Storage is full</p> : null}
       {error && !moved && storageStatus !== 'superseded' ? <p role="alert">{error}</p> : null}
-      {blocked && !moved ? (
+      {blocked && !moved && !signedOut ? (
         <button
           type="button"
-          disabled={moved || checking || storageStatus === 'superseded'}
+          disabled={signingOut || moved || checking || storageStatus === 'superseded'}
           onClick={() =>
             void (recoverySession
               ? startOver(true)
@@ -364,32 +456,32 @@ export function App({ initialHost, prepareModels }: AppProps): ReactElement {
           Use here
         </button>
       ) : null}
-      {recoverySession ? (
+      {recoverySession && !signedOut ? (
         <button
           type="button"
-          disabled={moved || checking || blocked || storageStatus === 'superseded'}
+          disabled={signingOut || moved || checking || blocked || storageStatus === 'superseded'}
           onClick={() => void startOver()}
         >
           Start over
         </button>
       ) : null}
-      {retryRestore ? (
+      {retryRestore && !signedOut ? (
         <button
           type="button"
-          disabled={moved || checking || storageStatus === 'superseded'}
+          disabled={signingOut || moved || checking || storageStatus === 'superseded'}
           onClick={() => void run(true)}
         >
           Retry
         </button>
       ) : null}
-      {host && instance ? (
+      {!signedOut && host && instance ? (
         <Lesson
           host={host}
           instance={instance}
           score={score}
-          disabled={moved || storageStatus === 'superseded'}
+          disabled={signingOut || moved || storageStatus === 'superseded'}
         />
-      ) : (
+      ) : signedOut ? null : (
         <p role="status">
           {checking ? 'Restoring lesson…' : host ? 'Ready' : 'Prepare models before starting.'}
         </p>
