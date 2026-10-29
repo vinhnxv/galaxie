@@ -670,6 +670,8 @@ Every tab is notified when `BroadcastChannel` delivers; delivery failure is caug
 
 ## 9. Security baseline map
 
+The [security review](security-review.md) maps every ADR-0012 baseline item and the OWASP Top 10 for LLM Applications (2025) to implementation, tests and host/author duties. The [prompt injection corpus](../tests/injection-corpus/README.md) runs 32 synthetic cases with an obedient-attacker mock on Node and Chromium through the real router, broker, interaction policy and MCP client. It adds no runtime control. The allowlisted-origin query case documents a host-owned URL constraint; raw engine streams and checkpoints remain data that hosts must not render as UI.
+
 | ADR-0012 part A | Enforced in | Package |
 | --- | --- | --- |
 | A1. No model-produced HTML or JS; URL allowlist; no auto-loaded resources | M1 interaction URL boundary; M2 registry renderer | `core`, later `react` |
