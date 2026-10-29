@@ -221,6 +221,36 @@ for (const area of ['src', 'dist']) {
   }
 }
 
+for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
+  for (const { specifier, typeOnly, dynamic } of imports(file)) {
+    if (
+      specifier === './mock-script.js' &&
+      (file !== 'examples/host-local/src/main.tsx' || !dynamic)
+    )
+      problems.push(
+        `${file}: the mock script must be dynamically imported only by the mode entry point`,
+      );
+    if (
+      specifier.startsWith('./') ||
+      specifier === '@galaxie/core' ||
+      specifier === '@galaxie/adapter-langgraph' ||
+      specifier === '@galaxie/example-english-tutor' ||
+      specifier === '@galaxie/react' ||
+      specifier === '@galaxie/models/webllm' ||
+      specifier === '@galaxie/models/webllm/worker' ||
+      specifier === '@galaxie/models/builtin-ai' ||
+      (specifier === '@galaxie/models/mock' && file === 'examples/host-local/src/mock-script.ts') ||
+      specifier === 'react' ||
+      specifier === 'react/jsx-runtime' ||
+      specifier === 'react-dom/client' ||
+      specifier === 'zod' ||
+      (specifier.startsWith('@langchain/core/') && typeOnly)
+    )
+      continue;
+    problems.push(`${file}: forbidden local host import ${specifier}`);
+  }
+}
+
 for (const directory of [
   'packages/core/dist',
   'packages/adapter-langgraph/dist',

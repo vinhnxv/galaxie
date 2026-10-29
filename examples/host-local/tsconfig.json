@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "paths": {
+      "@galaxie/core": ["../../packages/core/src/index.ts"],
+      "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
+      "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],
+      "@galaxie/models/webllm": ["../../packages/models/src/webllm/index.ts"],
+      "@galaxie/models/webllm/worker": ["../../packages/models/src/webllm/worker.ts"],
+      "@galaxie/models/builtin-ai": ["../../packages/models/src/builtin-ai/index.ts"],
+      "@galaxie/react": ["../../packages/react/src/index.ts"],
+      "@galaxie/example-english-tutor": ["../english-tutor/src/index.ts"],
+      "react": ["../../packages/react/node_modules/@types/react/index.d.ts"],
+      "react/*": ["../../packages/react/node_modules/@types/react/*.d.ts"],
+      "react-dom/*": ["../../packages/react/node_modules/@types/react-dom/*.d.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}
