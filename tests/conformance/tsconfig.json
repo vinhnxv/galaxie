@@ -6,6 +6,7 @@
     "types": ["node"],
     "resolveJsonModule": true,
     "paths": {
+      "@galaxie/storage-indexeddb": ["../../packages/storage-indexeddb/src/index.ts"],
       "@galaxie/react": ["../../packages/react/src/index.ts"],
       "@galaxie/models/builtin-ai": ["../../packages/models/src/builtin-ai/index.ts"],
       "@galaxie/core": ["../../packages/core/src/index.ts"],

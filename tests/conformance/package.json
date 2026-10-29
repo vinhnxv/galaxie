@@ -13,7 +13,9 @@
     "@opentelemetry/api": "1.10.0",
     "@opentelemetry/sdk-trace": "3.0.0",
     "@galaxie/models": "workspace:*",
-    "@galaxie/example-english-tutor": "workspace:*"
+    "@galaxie/example-english-tutor": "workspace:*",
+    "@galaxie/storage-indexeddb": "workspace:*",
+    "@langchain/langgraph-checkpoint": "1.2.0"
   },
   "devDependencies": {
     "react": "19.3.1",
