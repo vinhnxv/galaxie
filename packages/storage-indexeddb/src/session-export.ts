@@ -46,7 +46,6 @@ export interface SessionExport {
   }[];
 }
 
-/** Fixed replacement for values that cannot be represented, without invoking accessors/toJSON. */
 export const unavailableValue = '[unavailable]';
 
 export function exportValue(
@@ -99,7 +98,6 @@ export function exportValue(
   }
 }
 
-/** Export timestamps never echo arbitrary strings from a checkpoint. */
 export function exportTimestamp(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const time = Date.parse(value);

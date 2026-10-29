@@ -154,6 +154,13 @@ function compareCheckpoints(a: CheckpointRecord, b: CheckpointRecord): number {
   );
 }
 
+function compareWrites(a: WriteRecord, b: WriteRecord): number {
+  return compareWritesSortKeys(
+    writesSortKey(a.taskPath, a.key[5], a.key[6]),
+    writesSortKey(b.taskPath, b.key[5], b.key[6]),
+  );
+}
+
 /** Serializer-backed checkpoints; the host owns session identity and connection lifetime. */
 export class IndexedDBSaver extends BaseCheckpointSaver {
   readonly recovery: IndexedDBRecovery;
@@ -209,12 +216,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
   }
 
   async #pending(writes: WriteRecord[]): Promise<CheckpointPendingWrite[]> {
-    const ordered = writes.toSorted((a, b) =>
-      compareWritesSortKeys(
-        writesSortKey(a.taskPath, a.key[5], a.key[6]),
-        writesSortKey(b.taskPath, b.key[5], b.key[6]),
-      ),
-    );
+    const ordered = writes.toSorted(compareWrites);
     return Promise.all(
       ordered.map(
         async (write): Promise<CheckpointPendingWrite> => [
@@ -513,6 +515,9 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
       );
       const timestamps: string[] = [];
       const pending = new Set<string>();
+      const writesByCheckpoint = Map.groupBy(saved.writes, (write) =>
+        JSON.stringify(write.checkpoint),
+      );
       const latest = new Map<string, string>();
       for (const row of saved.rows)
         if ((latest.get(row.key[3]) ?? '') < row.key[4]) latest.set(row.key[3], row.key[4]);
@@ -537,15 +542,9 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         }
         if (timestamp !== null) timestamps.push(timestamp);
         const pendingWrites: (readonly [string, string, ReturnType<typeof exportValue>])[] = [];
-        const related = saved.writes.filter((write) => sameKey(write.checkpoint, row.key));
-        related.sort((a, b) =>
-          compareWritesSortKeys(
-            writesSortKey(a.taskPath, a.key[5], a.key[6]),
-            writesSortKey(b.taskPath, b.key[5], b.key[6]),
-          ),
-        );
+        const related = writesByCheckpoint.get(JSON.stringify(row.key)) ?? [];
+        related.sort(compareWrites);
         for (const write of related) {
-          // Default exports decode only interrupt writes to count IDs; values never escape.
           if (!personalContent && write.channel !== INTERRUPT) continue;
           let value: unknown;
           try {

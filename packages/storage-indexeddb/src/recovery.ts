@@ -121,7 +121,6 @@ function effect(value: unknown): StoredEffect {
   return copyJson(value) as unknown as StoredEffect;
 }
 
-/** Project only identity and status counts from one transaction's scoped records. */
 export async function readSessionSummary(
   tx: IDBTransaction,
   scope: readonly [string, string],

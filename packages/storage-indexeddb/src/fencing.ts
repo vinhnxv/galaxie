@@ -102,7 +102,6 @@ export class Fencing {
     );
   }
 
-  /** Exports remain readable after takeover, but never across principal logout. */
   read<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
     return transact(this.#db, [...stores, 'meta'], 'readonly', async (tx) => {
       await this.#checkGeneration(tx);
