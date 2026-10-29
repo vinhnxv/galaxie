@@ -14,13 +14,33 @@ const domGlobals = new Set(['document', 'window', 'DOMParser', 'HTMLElement', 'n
 const htmlAssignments = new Set(['innerHTML', 'outerHTML', 'srcdoc']);
 const htmlCalls = new Set(['insertAdjacentHTML', 'createContextualFragment']);
 
+function isAssignmentTarget(node: Rule.Node): boolean {
+  let target = node;
+  while (target.parent !== null) {
+    const parent = target.parent;
+    if (parent.type === 'AssignmentExpression') return parent.left === target;
+    if (
+      (parent.type === 'Property' &&
+        parent.value === target &&
+        parent.parent.type === 'ObjectPattern') ||
+      parent.type === 'ObjectPattern' ||
+      parent.type === 'ArrayPattern' ||
+      (parent.type === 'RestElement' && parent.argument === target) ||
+      (parent.type === 'AssignmentPattern' && parent.left === target)
+    )
+      target = parent;
+    else return false;
+  }
+  return false;
+}
+
 function htmlSinkName(context: Rule.RuleContext, node: Rule.Node): string | undefined {
-  if (node.type === 'AssignmentExpression' && node.left.type === 'MemberExpression') {
-    const name = staticPropertyName(node.left);
+  if (node.type === 'MemberExpression' && isAssignmentTarget(node)) {
+    const name = staticPropertyName(node);
     if (name !== undefined && htmlAssignments.has(name)) return name;
   }
   if (node.type !== 'CallExpression') return undefined;
-  const callee = node.callee;
+  const callee = node.callee.type === 'ChainExpression' ? node.callee.expression : node.callee;
   if (callee.type !== 'MemberExpression') return undefined;
   const name = staticPropertyName(callee);
   if (name !== undefined && htmlCalls.has(name)) return name;
@@ -48,7 +68,10 @@ function coveredAccess(context: Rule.RuleContext, node: Rule.Node): boolean {
     )
       return true;
   }
-  return outer.parent !== null && htmlSinkName(context, outer.parent) !== undefined;
+  return (
+    htmlSinkName(context, outer) !== undefined ||
+    (outer.parent !== null && htmlSinkName(context, outer.parent) !== undefined)
+  );
 }
 
 const rule: Rule.RuleModule = {
@@ -78,9 +101,11 @@ const rule: Rule.RuleModule = {
       Identifier: checkReference,
       MemberExpression(node) {
         if (isDynamicGlobal(context, node)) context.report({ node, messageId: 'dynamicGlobal' });
-        else checkReference(node);
+        else {
+          checkSink(node);
+          checkReference(node);
+        }
       },
-      AssignmentExpression: checkSink,
       CallExpression: checkSink,
       'JSXAttribute[name.name="dangerouslySetInnerHTML"]'(node: Rule.Node) {
         context.report({ node, messageId: 'htmlSink', data: { name: 'dangerouslySetInnerHTML' } });

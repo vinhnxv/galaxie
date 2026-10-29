@@ -332,3 +332,41 @@ it('keeps reports content-free and de-duplicates overlapping platform access', (
   ]);
   expect(JSON.stringify(messages)).not.toContain('PRIVATE_CONTENT');
 });
+
+it('distinguishes literal property keys from nested platform paths and dynamic keys', () => {
+  const messages = new Linter().verify(
+    `
+    globalThis['navigator.sendBeacon'];
+    globalThis['document.cookie'];
+    globalThis['navigator.storage'];
+    globalThis[true];
+    globalThis[null];
+    globalThis[1n];
+    globalThis[/fetch/];
+  `,
+    galaxie.configs.recommended,
+  );
+  expect(messages).toEqual([]);
+});
+
+tester.run('no-dom assignment targets and optional calls', rule('no-dom'), {
+  valid: [
+    '({ value: element.textContent } = input);',
+    '[element.textContent] = input;',
+    '({ [element.innerHTML]: value } = input);',
+    '({ value = element.innerHTML } = input);',
+  ],
+  invalid: [
+    invalid('(element?.insertAdjacentHTML)("beforeend", value);', 'htmlSink', 'insertAdjacentHTML'),
+    invalid('(element?.createContextualFragment)(value);', 'htmlSink', 'createContextualFragment'),
+    invalid('(document?.write)(value);', 'htmlSink', 'write'),
+    invalid('(globalThis.document?.writeln)(value);', 'htmlSink', 'writeln'),
+    invalid('({ value: element.innerHTML } = input);', 'htmlSink', 'innerHTML'),
+    invalid('[element.srcdoc] = input;', 'htmlSink', 'srcdoc'),
+    invalid('({ value: element.outerHTML = "" } = input);', 'htmlSink', 'outerHTML'),
+    invalid('({ value: [element.outerHTML] } = input);', 'htmlSink', 'outerHTML'),
+    invalid('[...element.innerHTML] = input;', 'htmlSink', 'innerHTML'),
+    invalid('({...element.innerHTML} = input);', 'htmlSink', 'innerHTML'),
+    invalid('({ value: document.body.innerHTML } = input);', 'htmlSink', 'innerHTML'),
+  ],
+});

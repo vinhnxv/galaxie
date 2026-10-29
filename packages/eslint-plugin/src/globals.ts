@@ -51,14 +51,18 @@ const storageGlobals = new Set([
 
 export function networkName(path: readonly string[] | undefined): string | undefined {
   if (path?.length === 1 && networkGlobals.has(path[0] ?? '')) return path[0];
-  if (path?.join('.') === 'navigator.sendBeacon') return 'navigator.sendBeacon';
+  if (path?.length === 2 && path[0] === 'navigator' && path[1] === 'sendBeacon')
+    return 'navigator.sendBeacon';
   return undefined;
 }
 
 export function storageName(path: readonly string[] | undefined): string | undefined {
   if (path?.length === 1 && storageGlobals.has(path[0] ?? '')) return path[0];
-  const name = path?.join('.');
-  return name === 'document.cookie' || name === 'navigator.storage' ? name : undefined;
+  if (path?.length === 2 && path[0] === 'document' && path[1] === 'cookie')
+    return 'document.cookie';
+  if (path?.length === 2 && path[0] === 'navigator' && path[1] === 'storage')
+    return 'navigator.storage';
+  return undefined;
 }
 
 export function globalPath(
@@ -77,10 +81,7 @@ export function globalPath(
 }
 
 export function isDynamicGlobal(context: Rule.RuleContext, node: Member): boolean {
+  if (!node.computed || node.property.type === 'Literal') return false;
   const object = globalPath(context, node.object);
-  return (
-    staticPropertyName(node) === undefined &&
-    object?.length === 1 &&
-    globalObjects.has(object[0] ?? '')
-  );
+  return object?.length === 1 && globalObjects.has(object[0] ?? '');
 }
