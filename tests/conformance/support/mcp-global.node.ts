@@ -5,13 +5,8 @@ import type { TestProject } from 'vitest/node';
 import { startMcpServer } from '../../../examples/mcp-server/src/index.js';
 import { toolPin } from '../../../packages/tools-mcp/src/index.js';
 import { mcpFixtures } from './mcp-commands.node.js';
-import { MCP_ORIGIN, type McpAction, type McpAdminState, type McpFixture } from './mcp-context.js';
+import { MCP_ORIGIN, type McpAdminState, type McpControl } from './mcp-context.js';
 
-export interface McpControl {
-  readonly fixture: McpFixture;
-  admin(action: McpAction): Promise<McpAdminState>;
-  close(): Promise<void>;
-}
 export async function createFixture(): Promise<McpControl> {
   const token = crypto.randomUUID();
   const otherToken = crypto.randomUUID();

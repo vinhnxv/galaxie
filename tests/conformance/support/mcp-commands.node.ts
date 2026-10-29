@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { BrowserCommand, TestProject } from 'vitest/node';
-import type { McpAction, McpAdminState } from './mcp-context.js';
-import type { McpControl } from './mcp-global.node.js';
+import type { McpAction, McpAdminState, McpControl } from './mcp-context.js';
 
 export function mcpFixtures(project: TestProject): Map<string, McpControl> {
   const registry = project.vitest as unknown as Record<symbol, Map<string, McpControl> | undefined>;

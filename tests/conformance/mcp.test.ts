@@ -23,9 +23,9 @@ import {
   MCP_ORIGIN,
   type McpAction,
   type McpAdminState,
+  type McpControl,
   type McpFixture,
 } from './support/mcp-context.js';
-import type { McpControl } from './support/mcp-global.node.js';
 
 let fixture: McpFixture;
 let local: McpControl | undefined;

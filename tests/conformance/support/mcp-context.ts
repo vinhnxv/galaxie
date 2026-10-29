@@ -19,6 +19,12 @@ export interface McpAdminState {
   readonly badOriginStatus?: number;
 }
 
+export interface McpControl {
+  readonly fixture: McpFixture;
+  admin(action: McpAction): Promise<McpAdminState>;
+  close(): Promise<void>;
+}
+
 declare module 'vitest' {
   interface ProvidedContext {
     mcp: McpFixture;
