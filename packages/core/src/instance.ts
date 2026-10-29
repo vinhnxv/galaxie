@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { CapabilityName } from './capabilities.js';
+import type { ConfirmationId, ConfirmationReceipt, PendingConfirmation } from './confirmations.js';
 import type { ErrorInfo } from './errors.js';
 import type { RunEvent } from './events.js';
 import type { InstanceId, InteractionId, RunId, SessionId } from './ids.js';
@@ -35,6 +36,8 @@ export interface AgentSnapshot<View> {
   readonly run?: RunSnapshot;
   /** Latest dispatched route per role; absent before the first call (ADR-0006). */
   readonly routes?: Readonly<Record<string, PublishedModelRoute>>;
+  /** In-page host data; absent when no confirmation is open. */
+  readonly confirmations?: readonly PendingConfirmation[];
   /** The agent's public projection of its state. */
   readonly view?: View;
 }
@@ -59,6 +62,8 @@ export interface AgentInstance<Input, View> {
   restore(options?: StartOptions): Promise<{ readonly runId: RunId } | undefined>;
   /** Checks the event against the pending interrupt, then records it in the submission inbox (ADR-0004). */
   dispatch(event: UserInteractionEvent): Promise<DispatchReceipt>;
+  /** Single-use host response; unknown or closed IDs return stale without throwing. */
+  respond(id: ConfirmationId, decision: 'approve' | 'decline'): ConfirmationReceipt;
   cancel(runId: RunId): Promise<CancelReceipt>;
   /** Replays then follows the current run; a stale ID rejects the first next(). Break detaches the consumer. */
   events(runId: RunId): AsyncIterable<RunEvent>;

@@ -128,6 +128,7 @@ async function run(
   name = 'mcp.lessons.lesson.lookup@1',
   principal = 'one',
   input: unknown = { lessonId: 'lesson-1' },
+  decision?: 'approve' | 'decline',
 ): Promise<{
   answer: unknown;
   error: unknown;
@@ -158,6 +159,14 @@ async function run(
   });
   const instance = await runtime.create(definition, {
     principalScope: principal,
+    ...(decision === undefined
+      ? {}
+      : {
+          confirmations: {
+            capabilities: ['mcp.lessons.progress.record@1'],
+            policyRevision: () => 'v1',
+          },
+        }),
     bindings,
     agent: (host) =>
       new StateGraph(Annotation.Root({ done: Annotation<boolean> }))
@@ -174,6 +183,11 @@ async function run(
         .addEdge('call', END)
         .compile(),
   });
+  if (decision !== undefined)
+    instance.subscribe(() => {
+      for (const pending of instance.getSnapshot().confirmations ?? [])
+        instance.respond(pending.id, decision);
+    });
   try {
     await instance.prepare();
     const { runId } = await instance.start({});
@@ -293,12 +307,42 @@ test('AT-33 rejects a bad Origin with 403; browsers observe the CORS failure', a
   expect((await run(bindings)).error).toMatchObject({ code: 'unavailable' });
 });
 
-test('write confirmations remain unsupported and never reach the server', async () => {
+test('an approved MCP write reaches the server once with its bound effect ID', async () => {
+  const { bindings } = client();
+  const name = 'mcp.lessons.progress.record@1';
+  const write = bindings[name];
+  if (write === undefined) throw new Error('Missing write binding.');
+  let effectId: string | undefined;
+  bindings[name] = {
+    ...write,
+    invoke: (input, context) => {
+      effectId = context.effectId;
+      return write.invoke(input, context);
+    },
+  };
+  const before = await admin('state');
+  const result = await run(bindings, name, 'one', { lessonId: 'lesson-1' }, 'approve');
+  expect(result.error).toBeUndefined();
+  const after = await admin('state');
+  expect(after.calls).toBe(before.calls + 1);
+  expect(effectId).toEqual(expect.any(String));
+  expect(after.meta['galaxie.dev/effect']).toBe(effectId);
+});
+
+test('a declined MCP write never reaches the server', async () => {
   const { bindings } = client();
   const before = await admin('state');
-  expect((await run(bindings, 'mcp.lessons.progress.record@1')).error).toMatchObject({
-    code: 'unsupported',
-  });
+  expect(
+    (
+      await run(
+        bindings,
+        'mcp.lessons.progress.record@1',
+        'one',
+        { lessonId: 'lesson-1' },
+        'decline',
+      )
+    ).error,
+  ).toMatchObject({ code: 'denied' });
   const after = await admin('state');
   expect(after.calls).toBe(before.calls);
   expect(after.counters).toEqual(before.counters);

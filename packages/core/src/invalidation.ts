@@ -22,7 +22,8 @@ export interface InvalidationWatcher {
  * abort signal with reason `'invalidated'`; other principals and malformed notices are ignored.
  * The host disables input, clears its own session/tokens, disposes and releases ownership on abort.
  * Delivery failure is caught by the next generation-checked write or persisted pageshow check.
- * Already-sent remote requests may complete; approval invalidation remains M4 work.
+ * Pass this signal through CreateOptions.confirmations.signals to invalidate approvals promptly.
+ * The host must still dispose the instance. Already-sent remote requests may complete.
  *
  * Close idempotently on page teardown. A closed watcher receives and announces nothing.
  */
