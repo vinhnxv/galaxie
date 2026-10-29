@@ -33,6 +33,7 @@ evidence, with the maintainer's decision pending.
 ## Storage and recovery
 
 - There is no unknown-outcome reconciliation API: an unknown `retry: 'none'` write remains blocked on restore, and the host must reconcile with its backend by effect ID before starting a potentially repeating operation ([effect recovery](system-design.md#83-a-capability-call)).
+- Recovery data is not migrated across builds. Write receipts recorded before task-scoped effect IDs are keyed by run segment, and a newer build cannot find them, so resuming such a session on a newer build can repeat a write, including a `retry: 'none'` write. No package has been released yet. Hosts must resume a session with the build that created it, or Start over and reconcile with the backend by effect ID before upgrading ([recovery contract](system-design.md#82-reload-and-crash-recovery)).
 - Reload recovery cannot finish an arbitrary intermediate checkpoint with no pending interrupt or replay later writes from that point ([recovery limits](system-design.md#82-reload-and-crash-recovery)).
 - Durable runtime-event history, session export/sync and cross-device recovery are not supplied by the checkpoint saver ([runtime contracts](system-design.md#6-core-runtime-and-contracts), [scope](galaxie-project-brief.md#52-outside-the-mvp)).
 - IndexedDB storage is not encrypted by the package and browser persistence is not permanence, so eviction can return a fresh start ([storage limits](../packages/storage-indexeddb/AGENTS.md#limits)).
