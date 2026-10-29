@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { StorageError } from './errors.js';
+import type { Fencing } from './fencing.js';
 import { prefixRange, validateKey } from './keys.js';
 import { touchSession } from './retention.js';
 import { requestResult, storageOperation, transact } from './schema.js';
@@ -122,10 +123,12 @@ function effect(value: unknown): StoredEffect {
 /** Durable JSON inbox and write receipts on the saver's principal-scoped connection. */
 export class IndexedDBRecovery {
   readonly #db: IDBDatabase;
+  readonly #fencing: Fencing;
   readonly #scope: readonly [string, string];
 
-  constructor(db: IDBDatabase, scope: readonly [string, string]) {
+  constructor(db: IDBDatabase, scope: readonly [string, string], fencing: Fencing) {
     this.#db = db;
+    this.#fencing = fencing;
     this.#scope = [...scope];
   }
 
@@ -139,7 +142,7 @@ export class IndexedDBRecovery {
     return storageOperation(this.#db, async () => {
       validateKey(sessionId);
       const saved = sessionRecord(record);
-      return transact(this.#db, ['meta'], 'readwrite', async (tx) => {
+      return this.#fencing.write(['meta'], async (tx) => {
         const store = tx.objectStore('meta');
         const key = [...this.#scope, 'session', sessionId];
         const existing: unknown = await requestResult(store.get(key));
@@ -170,7 +173,7 @@ export class IndexedDBRecovery {
     return storageOperation(this.#db, async () => {
       const key = this.#key(sessionId, entry.interactionId);
       const saved = submission({ ...entry, status: 'accepted' }, entry.interactionId);
-      return transact(this.#db, ['inbox', 'meta'], 'readwrite', async (tx) => {
+      return this.#fencing.write(['inbox', 'meta'], async (tx) => {
         await touchSession(tx, this.#scope, sessionId);
         const store = tx.objectStore('inbox');
         const existing: unknown = await requestResult(store.get(key));
@@ -187,7 +190,7 @@ export class IndexedDBRecovery {
   async consumeSubmission(sessionId: string, interactionId: string): Promise<void> {
     return storageOperation(this.#db, async () => {
       const key = this.#key(sessionId, interactionId);
-      await transact(this.#db, ['inbox', 'meta'], 'readwrite', async (tx) => {
+      await this.#fencing.write(['inbox', 'meta'], async (tx) => {
         await touchSession(tx, this.#scope, sessionId);
         const store = tx.objectStore('inbox');
         const existing: unknown = await requestResult(store.get(key));
@@ -240,7 +243,7 @@ export class IndexedDBRecovery {
     return storageOperation(this.#db, async () => {
       const key = this.#key(sessionId, effectId);
       const saved = effect(record);
-      await transact(this.#db, ['journal', 'meta'], 'readwrite', async (tx) => {
+      await this.#fencing.write(['journal', 'meta'], async (tx) => {
         await touchSession(tx, this.#scope, sessionId);
         const store = tx.objectStore('journal');
         const existing: unknown = await requestResult(store.get(key));

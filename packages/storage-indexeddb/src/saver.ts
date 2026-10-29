@@ -22,6 +22,7 @@ import {
 } from '@langchain/langgraph-checkpoint';
 import { decode, type Envelope, encode } from './envelope.js';
 import { StorageError, type StorageErrorCode } from './errors.js';
+import { Fencing } from './fencing.js';
 import {
   type CheckpointKey,
   checkpointKey,
@@ -149,18 +150,21 @@ function compareCheckpoints(a: CheckpointRecord, b: CheckpointRecord): number {
 /** Serializer-backed checkpoints; the host owns session identity and connection lifetime. */
 export class IndexedDBSaver extends BaseCheckpointSaver {
   readonly recovery: IndexedDBRecovery;
+  readonly fencing: Fencing;
   readonly #db: IDBDatabase;
   readonly #scope: [string, string];
 
-  private constructor(db: IDBDatabase, options: IndexedDBSaverOptions) {
+  private constructor(db: IDBDatabase, options: IndexedDBSaverOptions, fencing: Fencing) {
     super(options.serde);
     this.#db = db;
     manageConnection(db, options);
     this.#scope = [options.appId, options.principalScope];
-    this.recovery = new IndexedDBRecovery(db, this.#scope);
+    this.fencing = fencing;
+    this.recovery = new IndexedDBRecovery(db, this.#scope, fencing);
   }
 
   static async open(options: IndexedDBSaverOptions): Promise<IndexedDBSaver> {
+    let db: IDBDatabase | undefined;
     try {
       validateScope(options.appId);
       validateScope(options.principalScope);
@@ -169,13 +173,14 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         (typeof options.databaseName !== 'string' || options.databaseName.length === 0)
       )
         throw new StorageError('invalid');
-      const db = await openDatabase(
+      db = await openDatabase(
         options.databaseName ?? `galaxie:${options.appId}`,
         options.appId,
         options.principalScope,
       );
-      return new IndexedDBSaver(db, options);
+      return new IndexedDBSaver(db, options, await Fencing.open(db, options.appId));
     } catch (error) {
+      db?.close();
       throw observeError(options.onError, error);
     }
   }
@@ -362,7 +367,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         encode(this.serde, metadata),
       ]);
       const key = this.#key(thread, namespace, checkpoint.id);
-      await transact(this.#db, ['checkpoints', 'meta'], 'readwrite', async (tx) => {
+      await this.fencing.write(['checkpoints', 'meta'], async (tx) => {
         const meta = tx.objectStore('meta');
         const sequenceKey = [...this.#scope, 'sequence'];
         const current: unknown = await requestResult(meta.get(sequenceKey));
@@ -432,7 +437,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         })),
       );
       const checkpoint = this.#key(thread, namespace, id);
-      await transact(this.#db, ['writes', 'meta'], 'readwrite', async (tx) => {
+      await this.fencing.write(['writes', 'meta'], async (tx) => {
         await touchSession(tx, this.#scope, thread);
         const store = tx.objectStore('writes');
         const raw: unknown[] = await requestResult(store.getAll(prefixRange(checkpoint)));
@@ -461,18 +466,15 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
 
   async sweep(options?: SweepOptions): Promise<SweepResult> {
     return storageOperation(this.#db, async () => {
-      return await sweep(this.#db, this.#scope, options);
+      return await sweep(this.#db, this.#scope, this.fencing, options);
     });
   }
 
   async deleteSession(sessionId: string): Promise<void> {
     return storageOperation(this.#db, async () => {
       validateKey(sessionId);
-      await transact(
-        this.#db,
-        ['checkpoints', 'writes', 'inbox', 'journal', 'meta'],
-        'readwrite',
-        (tx) => deleteSessionRecords(tx, this.#scope, sessionId),
+      await this.fencing.write(['checkpoints', 'writes', 'inbox', 'journal', 'meta'], (tx) =>
+        deleteSessionRecords(tx, this.#scope, sessionId),
       );
     });
   }
@@ -480,7 +482,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
   override async deleteThread(threadId: string): Promise<void> {
     return storageOperation(this.#db, async () => {
       validateKey(threadId);
-      await transact(this.#db, ['checkpoints', 'writes', 'meta'], 'readwrite', async (tx) => {
+      await this.fencing.write(['checkpoints', 'writes', 'meta'], async (tx) => {
         const range = prefixRange([...this.#scope, threadId]);
         await requestResult(tx.objectStore('checkpoints').delete(range));
         await requestResult(tx.objectStore('writes').delete(range));
