@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { SessionId, Submission } from '@galaxie/core';
+import type { RecoveryStore, SessionId, Submission } from '@galaxie/core';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
 import * as web from '@langchain/langgraph/web';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, expectTypeOf, test } from 'vitest';
 import { CASE_NAMES, type CaseName, cases } from './cases/index.js';
 import branching from './golden/branching.json' with { type: 'json' };
 import capability from './golden/capability.json' with { type: 'json' };
@@ -95,6 +95,11 @@ const reloadCases = {
   'interrupt-durability-sync': interruptDurabilitySync,
   'interrupt-durability-exit': interruptDurabilityExit,
 } as const;
+
+test('the IndexedDB recovery port conforms structurally to the core contract', async () => {
+  const saver = await open();
+  expectTypeOf(saver.recovery).toMatchTypeOf<RecoveryStore>();
+});
 
 function rebuild(name: keyof typeof reloadCases, saver: IndexedDBSaver): ConformanceGraph {
   const fixture = cases[name];
