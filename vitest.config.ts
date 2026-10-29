@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 
-import { mcpAdminCommand } from './tests/conformance/support/mcp-commands.node.js';
+import {
+  mcpAdminCommand,
+  mcpCorpusAdminCommand,
+} from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
   eslint: fileURLToPath(
@@ -137,7 +140,7 @@ const config: ViteUserConfig = defineConfig({
           ],
           browser: {
             enabled: true,
-            commands: { mcpAdmin: mcpAdminCommand },
+            commands: { mcpAdmin: mcpAdminCommand, mcpCorpusAdmin: mcpCorpusAdminCommand },
             provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium', name: 'browser (chromium)' }],

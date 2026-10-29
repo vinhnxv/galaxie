@@ -9,7 +9,14 @@ export interface McpFixture {
   readonly otherToken: string;
   readonly pins: Readonly<Record<string, string>>;
 }
-export type McpAction = 'state' | 'description' | 'reset' | 'forget' | 'sampling' | 'bad-origin';
+export type McpAction =
+  | 'state'
+  | 'description'
+  | 'reset'
+  | 'forget'
+  | 'sampling'
+  | 'bad-origin'
+  | { readonly kind: 'set-description'; readonly description: string };
 export interface McpAdminState {
   readonly calls: number;
   readonly meta: Record<string, unknown>;
@@ -29,10 +36,12 @@ export interface McpControl {
 declare module 'vitest' {
   interface ProvidedContext {
     mcp: McpFixture;
+    mcpCorpus: McpFixture;
   }
 }
 declare module 'vitest/browser' {
   interface BrowserCommands {
     mcpAdmin(action: McpAction): Promise<McpAdminState>;
+    mcpCorpusAdmin(action: McpAction): Promise<McpAdminState>;
   }
 }

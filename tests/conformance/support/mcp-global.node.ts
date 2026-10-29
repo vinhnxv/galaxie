@@ -19,6 +19,8 @@ export async function createFixture(): Promise<McpControl> {
   return {
     fixture: { url: server.url, badUrl: badServer.url, token, otherToken, pins },
     async admin(action): Promise<McpAdminState> {
+      if (typeof action === 'object' && action.kind === 'set-description')
+        await server.admin.changeDescription('lesson.lookup', action.description);
       if (action === 'description')
         await server.admin.changeDescription('lesson.lookup', 'metadata-canary');
       if (action === 'reset') {
@@ -55,10 +57,14 @@ export async function createFixture(): Promise<McpControl> {
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const control = await createFixture();
+  const corpus = await createFixture();
   mcpFixtures(project).set(control.fixture.url, control);
+  mcpFixtures(project).set(corpus.fixture.url, corpus);
   project.provide('mcp', control.fixture);
+  project.provide('mcpCorpus', corpus.fixture);
   return async (): Promise<void> => {
     mcpFixtures(project).delete(control.fixture.url);
-    await control.close();
+    mcpFixtures(project).delete(corpus.fixture.url);
+    await Promise.all([control.close(), corpus.close()]);
   };
 }
