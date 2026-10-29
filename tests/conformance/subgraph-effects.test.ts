@@ -13,7 +13,7 @@ import { assistantRoles, assistantRouting } from './support/routing.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 
 test.each([true, false])(
-  'AT-35: parent effects before a child interrupt repeat on resume (recovery=%s)',
+  'AT-35: parent effects before a child interrupt replay only with recovery (recovery=%s)',
   async (withRecovery) => {
     const databaseName = `galaxie-subgraph-effects-${crypto.randomUUID()}`;
     const saver =

@@ -32,7 +32,13 @@ The role and provider must already be declared and bound by the host.
 - Pass `config` to `requestInteraction(request, config)`, including after an await.
 - Compile graphs with `host.langchain.checkpointer()` and call tools through
   `host.capabilities.call(name, input, config)`.
-- Put side effects after interrupts: resuming can re-execute the node prefix.
+- Pass node `config` to every capability call: its full checkpoint task namespace
+  scopes recovery writes. A pending parent task re-executed after a child interrupt
+  or restore replays its successful receipt when the host supplies recovery.
+- Keep each task's capability call order deterministic. Nested child tasks and
+  later tasks have separate scopes. Without recovery, host writes repeat.
+- Put side effects after interrupts, including effects outside the broker:
+  resuming can re-execute the node prefix.
 - Preserve native stream behavior; the host must project display data separately.
 - Routed `withStructuredOutput` repairs only when the host opts in per role.
   Forward caller config, `jsonSchema` and the one-based `repairAttempt` through
