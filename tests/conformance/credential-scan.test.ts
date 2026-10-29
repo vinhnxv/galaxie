@@ -136,6 +136,7 @@ test.each(['success', '401', 'transport-error'] as const)(
   async (mode) => {
     // Generated only in host test code, never supplied as agent input or model text.
     const canary = `fixture-provider-credential-${crypto.randomUUID()}`;
+    const sentence = `My private learner sentence ${crypto.randomUUID()}.`;
     const prompt = 'credential-scan-prompt-marker';
     const reply = 'credential-scan-reply-marker';
     const databaseName = `galaxie-credential-scan-${crypto.randomUUID()}`;
@@ -275,6 +276,13 @@ test.each(['success', '401', 'transport-error'] as const)(
     expect(requests).toHaveLength(1);
     const pausedRecords = saver === undefined ? [] : await storedRecords();
     expect(serialize(pausedRecords)).not.toContain(canary);
+    if (saver !== undefined) {
+      for (const personalContent of [false, true]) {
+        const exported = await saver.exportSession(instance.sessionId, { personalContent });
+        expect(exported.metadata.pendingInteractionCount).toBe(1);
+        expect(JSON.stringify(exported)).not.toContain(canary);
+      }
+    }
     const pending = instance.getSnapshot().run?.pending;
     if (pending === undefined) throw new Error('The scan fixture did not pause.');
     expect(
@@ -283,7 +291,7 @@ test.each(['success', '401', 'transport-error'] as const)(
         runId,
         ...pending,
         action: 'submit',
-        payload: {},
+        payload: { sentence },
       }),
     ).toMatchObject({ status: 'accepted' });
     const events = await collect(instance.events(runId));
@@ -330,6 +338,30 @@ test.each(['success', '401', 'transport-error'] as const)(
     expect(serialize(checkpoints)).not.toContain(canary);
     expect(serialize(await recovery.submissions(instance.sessionId))).not.toContain(canary);
     if (saver !== undefined) {
+      const metadataOnly = await saver.exportSession(instance.sessionId);
+      const personal = await saver.exportSession(instance.sessionId, { personalContent: true });
+      expect(metadataOnly.personalContent).toBe(false);
+      expect(metadataOnly).not.toHaveProperty('checkpoints');
+      expect(JSON.stringify(metadataOnly)).not.toContain(sentence);
+      expect(personal.personalContent).toBe(true);
+      expect(JSON.stringify(personal)).toContain(sentence);
+      for (const exported of [metadataOnly, personal]) {
+        expect(JSON.stringify(exported)).not.toContain(canary);
+        // Also inspect marked binary values so base64 cannot hide the credential.
+        const decodedBytes = JSON.stringify(exported, (_key, value: unknown) => {
+          if (
+            typeof value === 'object' &&
+            value !== null &&
+            'type' in value &&
+            value.type === 'base64' &&
+            'data' in value &&
+            typeof value.data === 'string'
+          )
+            return atob(value.data);
+          return value;
+        });
+        expect(decodedBytes).not.toContain(canary);
+      }
       const records = await storedRecords();
       for (const store of ['checkpoints', 'writes', 'inbox', 'journal', 'meta'])
         expect(
