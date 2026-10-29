@@ -35,8 +35,8 @@ export function transact<T>(
     let result: T;
     let failure: StorageError | undefined;
     tx.oncomplete = () => resolve(result);
-    tx.onerror = () => {
-      failure ??= storageError(tx.error);
+    tx.onerror = (event) => {
+      failure ??= storageError((event.target as IDBRequest<unknown>).error ?? tx.error);
     };
     tx.onabort = () =>
       reject(failure ?? storageError(tx.error ?? new DOMException('', 'AbortError')));
@@ -45,7 +45,11 @@ export function transact<T>(
         result = value;
       },
       (error: unknown) => {
-        failure = storageError(error);
+        // An external abort can invalidate the transaction between awaited requests.
+        failure =
+          error instanceof DOMException && error.name === 'TransactionInactiveError'
+            ? storageError(tx.error ?? new DOMException('', 'AbortError'))
+            : storageError(error);
         try {
           tx.abort();
         } catch {
