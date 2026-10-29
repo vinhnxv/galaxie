@@ -582,6 +582,8 @@ export class ModelRouter {
           assertActive();
           if (!allowed(descriptor.destination)) continue;
           if (availability.status === 'downloadable') {
+            // Without a download hook nobody refused: the provider is simply unavailable.
+            if (this.#download === undefined) continue;
             if (!(await this.#downloadApproval(role, providerId, availability, run, signal))) {
               assertActive();
               denied = true;

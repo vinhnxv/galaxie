@@ -131,7 +131,7 @@ test.each(['available', 'downloadable'] as const)(
   },
 );
 
-test.each(['false', 'missing', 'invalid', 'null', 'undefined', 'throw', 'reject'] as const)(
+test.each(['false', 'invalid', 'null', 'undefined', 'throw', 'reject'] as const)(
   'download %s is remembered as refusal',
   async (kind) => {
     const error = new Error('private host failure');
@@ -149,9 +149,7 @@ test.each(['false', 'missing', 'invalid', 'null', 'undefined', 'throw', 'reject'
     const { router, run, diagnostics } = fixture(
       {
         availability: () => downloadable,
-        ...(kind === 'missing'
-          ? {}
-          : { download: download as unknown as NonNullable<ModelRouting['download']> }),
+        download: download as unknown as NonNullable<ModelRouting['download']>,
       },
       { builtin: local },
     );
@@ -159,7 +157,7 @@ test.each(['false', 'missing', 'invalid', 'null', 'undefined', 'throw', 'reject'
       await expect(router.port(run).begin('assistant')).rejects.toMatchObject({
         code: 'denied',
       });
-    expect(download).toHaveBeenCalledTimes(kind === 'missing' ? 0 : 1);
+    expect(download).toHaveBeenCalledTimes(1);
     expect(diagnostics).toEqual(
       ['invalid', 'null', 'undefined'].includes(kind)
         ? [{ kind: 'model_failed', runId: run.runId }]
@@ -331,6 +329,11 @@ test('non-browser downloadable answers are unavailable without asking to downloa
   const { router, run } = fixture({ availability: () => downloadable, download }, { remote });
   await expect(router.port(run).begin('assistant')).rejects.toMatchObject({ code: 'unavailable' });
   expect(download).not.toHaveBeenCalled();
+});
+
+test('a downloadable provider without a download hook is unavailable, not denied', async () => {
+  const { router, run } = fixture({ availability: () => downloadable }, { builtin: local });
+  await expect(router.port(run).begin('assistant')).rejects.toMatchObject({ code: 'unavailable' });
 });
 
 test('all unavailable answers give unavailable', async () => {

@@ -125,7 +125,7 @@ export interface ModelRouting {
   readonly availability?: (
     request: ModelAvailabilityRequest,
   ) => ModelAvailability | Promise<ModelAvailability>;
-  /** Shared download decision; absence means refusal (ADR-0006). */
+  /** Shared download decision; without it, downloadable providers are unavailable (ADR-0006). */
   readonly download?: (request: ModelDownloadRequest) => boolean | Promise<boolean>;
   /** Per-call credential; never persisted by galaxie (ADR-0006). */
   readonly getCredential?: (request: ModelCredentialRequest) => string | Promise<string>;
