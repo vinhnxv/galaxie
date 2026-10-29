@@ -4,6 +4,7 @@
 import { Feedback } from './feedback.js';
 import { Progress } from './progress.js';
 import { Quiz } from './quiz.js';
+import { WritingPrompt } from './writing-prompt.js';
 
 export { Feedback, type FeedbackItem, type FeedbackProps } from './feedback.js';
 export { Progress, type ProgressProps } from './progress.js';
@@ -16,8 +17,16 @@ export {
   type QuizSubmission,
 } from './quiz.js';
 
-export const educationComponents: readonly [typeof Quiz, typeof Feedback, typeof Progress] = [
-  Quiz,
-  Feedback,
-  Progress,
-];
+export {
+  WritingPrompt,
+  type WritingPromptActions,
+  type WritingPromptProps,
+  type WritingSubmission,
+} from './writing-prompt.js';
+
+export const educationComponents: readonly [
+  typeof Quiz,
+  typeof Feedback,
+  typeof Progress,
+  typeof WritingPrompt,
+] = [Quiz, Feedback, Progress, WritingPrompt];
