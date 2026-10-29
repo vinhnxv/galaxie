@@ -166,12 +166,24 @@ async function answerLesson(page: Page): Promise<void> {
     .waitFor();
   await page.getByRole('button', { name: 'Allow', exact: true }).click();
   await page.getByRole('radio', { name: 'walk', exact: true }).check();
+  expect(
+    await page
+      .getByRole('list', { name: 'Model destinations' })
+      .getByRole('listitem')
+      .allTextContents(),
+  ).toEqual(['Quiz: Site quiz service (Host server)']);
   await page.getByRole('radio', { name: 'play', exact: true }).check();
   await page.getByRole('radio', { name: 'drinks', exact: true }).check();
   await page.getByRole('button', { name: 'Submit answers' }).click();
   await page.getByRole('textbox').fill(sentinelSentence);
   await page.getByRole('button', { name: 'Submit sentence' }).click();
   await page.getByText('info: Use walks with she: She walks to school.', { exact: true }).waitFor();
+  expect(
+    await page
+      .getByRole('list', { name: 'Model destinations' })
+      .getByRole('listitem')
+      .allTextContents(),
+  ).toEqual(['Quiz: Site quiz service (Host server)', 'Feedback: Browser feedback (In browser)']);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const confirmation = page.getByRole('group', { name: 'Save your score?', exact: true });
   await confirmation.waitFor();
@@ -191,9 +203,12 @@ it('completes the unchanged tutor through the proxy and confirms exactly one pro
   expect(await page.getByRole('progressbar').getAttribute('value')).toBe('2');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('status').filter({ hasText: 'Run: succeeded' }).waitFor();
-  expect(await page.locator('header').allTextContents()).toEqual([
-    'quiz.generate: host-servertutor.feedback: in-browser',
-  ]);
+  expect(
+    await page
+      .getByRole('list', { name: 'Model destinations' })
+      .getByRole('listitem')
+      .allTextContents(),
+  ).toEqual(['Quiz: Site quiz service (Host server)', 'Feedback: Browser feedback (In browser)']);
   const recorded = await state(origin);
   expect(recorded.progress).toEqual([
     { learnerId: 'demo-learner', lessonId: 'present-simple-1', score: 2, total: 3 },

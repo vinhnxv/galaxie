@@ -2,6 +2,27 @@
 
 Typed agent surfaces and a separate host confirmation prompt. Agent components receive only `props`, `actions` and `status`; the host owns instance creation, preparation and disposal.
 
+## Model destinations
+
+Mount the headless `ModelRoutes` beside the host's run status:
+
+```tsx
+import { ModelRoutes } from '@galaxie/react';
+
+<ModelRoutes
+  instance={instance}
+  labels={{
+    roles: { 'quiz.generate': 'Quiz', 'tutor.feedback': 'Feedback' },
+    providers: { quiz: 'Site quiz service', feedback: 'Browser feedback' },
+  }}
+  destinationLabels={{ 'in-browser': 'In this browser' }}
+/>;
+```
+
+It subscribes through `useAgentSnapshot(instance)` and lists each selected role in snapshot order as `<role>: <provider> (<destination>)`. Optional `labels.roles` and `labels.providers` are trusted host text; missing labels fall back to the snapshot's host-defined IDs. Default destination labels are `In browser`, `User device`, `User endpoint`, `Host server` and `Third party`. Optional `destinationLabels` overrides individual classes, including in the visible `changed from <previous destination>` notice required by ADR-0006.
+
+The `aria-live="polite"` container stays mounted before the first selection; the named `Model destinations` list appears only when routes exist. It has no `role="status"`, leaving the host's run status separate. All labels and identifiers render as React text; the component reads no model output, controls no consent and owns no instance lifecycle. Routes are per instance, not persisted: a restored session shows a role only after its next routed call. See [the model-call contract](../../docs/system-design.md#84-a-model-call) and [component tests](test/model-routes.test.tsx).
+
 ## Capability confirmations
 
 Register fixed host text and derive rows from the capability's validated arguments. Mount `ConfirmationPrompt` in the host tree, outside `AgentSurface` and the agent component registry.

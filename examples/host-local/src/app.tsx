@@ -15,7 +15,7 @@ import {
   ProgressInputSchema,
   type TutorInput,
 } from '@galaxie/example-english-tutor';
-import { AgentSurface, useAgentSnapshot } from '@galaxie/react';
+import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie/react';
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { LocalHost, StorageStatus } from './runtime.js';
 import { hostAppId, hostLearnerId, invalidateLocalPrincipal, sessionKey } from './session.js';
@@ -48,6 +48,18 @@ function Lesson({
         Run: {snapshot.run?.status ?? snapshot.state}
         {score ? `; Score: ${score}` : ''}
       </p>
+      <ModelRoutes
+        instance={instance}
+        labels={{
+          roles: { 'quiz.generate': 'Quiz', 'tutor.feedback': 'Feedback' },
+          providers: {
+            builtin: 'Chrome Built-in AI',
+            webllm: 'WebLLM',
+            quiz: 'Mock quiz',
+            review: 'Mock review',
+          },
+        }}
+      />
       <fieldset disabled={disabled}>
         <legend>Lesson</legend>
         <AgentSurface instance={instance} registry={host.registry} surfaceId="lesson-main" />
