@@ -250,9 +250,7 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
         try {
           const parsed = await parse(raw);
           return config?.includeRaw ? { raw, parsed } : parsed;
-        } catch {
-          // Only the fixed instruction accompanies the reply; validator errors are discarded.
-        }
+        } catch {}
         try {
           raw = await this.withConfig({ jsonSchema, repairAttempt }).invoke(
             [
