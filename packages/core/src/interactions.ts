@@ -3,7 +3,7 @@
 
 import { type ErrorInfo, GalaxieError } from './errors.js';
 import type { InstanceId, InteractionId, RunId, SurfaceId, ViewRevision } from './ids.js';
-import { containsPrivate } from './private-values.js';
+import { containsPrivateEncoded } from './private-values.js';
 import { isStandardSchema, type StandardSchema } from './schema.js';
 import { isHttpDestination } from './urls.js';
 
@@ -199,21 +199,6 @@ export function checkInteractionUrls(props: unknown, allowlist: readonly string[
   return checkInteractionUrlPolicy(props, allowlist);
 }
 
-function decodeUrl(value: string): string {
-  const spaced = value.replaceAll('+', ' ');
-  try {
-    return decodeURIComponent(spaced);
-  } catch {
-    return spaced.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
-      try {
-        return decodeURIComponent(run);
-      } catch {
-        return run;
-      }
-    });
-  }
-}
-
 export function checkInteractionUrlPolicy(
   props: unknown,
   allowlist: readonly string[],
@@ -226,11 +211,7 @@ export function checkInteractionUrlPolicy(
       if (!isAllowedUrl(candidate, allowlist)) return false;
       if (privateValues !== undefined && privateValues.size > 0) {
         for (const raw of props === candidate ? [props] : [props, candidate]) {
-          const decoded = decodeUrl(raw);
-          if (
-            [raw, decoded, decodeUrl(decoded)].some((form) => containsPrivate(form, privateValues))
-          )
-            return false;
+          if (containsPrivateEncoded(raw, privateValues)) return false;
         }
       }
       return true;

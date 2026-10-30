@@ -24,7 +24,7 @@ import {
   type DestinationAllowlist,
   labelsAllow,
 } from './policy.js';
-import { containsPrivate, registerPrivate } from './private-values.js';
+import { containsPrivateEncoded, registerPrivate } from './private-values.js';
 import {
   copyRecoveryJson,
   type EffectRecord,
@@ -401,7 +401,11 @@ export class CapabilityBroker {
           )
             throw failure('denied');
           if (!this.#policy['private-user'].allow.includes(binding.destination)) {
-            if (strings(value).some((candidate) => containsPrivate(candidate, run.privateValues)))
+            if (
+              strings(value).some((candidate) =>
+                containsPrivateEncoded(candidate, run.privateValues),
+              )
+            )
               throw failure('denied');
           }
         };
