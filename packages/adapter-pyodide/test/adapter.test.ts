@@ -190,7 +190,7 @@ test('framework selection declares only the implemented features and selects the
   const adapter = setup(workers, 'pydantic-ai');
   expect(adapter.id).toBe('pydantic-ai-python');
   expect(adapter.features).toEqual({
-    streaming: false,
+    streaming: true,
     interrupts: false,
     resume: false,
     checkpoints: false,
@@ -276,47 +276,111 @@ test.each(['allow', 'block', 'hook-error', 'no-bind'] as const)(
   },
 );
 
-test('split tool arguments are checked before forwarding the blocked fragment', async () => {
-  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
-  const workers: FixtureWorker[] = [];
-  const provider = {
-    async invoke() {
-      return new AIMessage('');
-    },
-    bindTools: () => provider,
-    async stream() {
-      return (async function* () {
+test.each([true, false])(
+  'split tool arguments are checked before forwarding the blocked fragment (indexed=%s)',
+  async (indexed) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const provider = {
+      async invoke() {
+        return new AIMessage('');
+      },
+      bindTools: () => provider,
+      async stream() {
+        return (async function* () {
+          yield new AIMessageChunk({
+            content: '',
+            tool_call_chunks: [
+              {
+                ...(indexed ? { index: 0 } : {}),
+                id: 'one',
+                name: 'double',
+                args: '{"value":"blo',
+              },
+            ],
+          });
+          yield new AIMessageChunk({
+            content: '',
+            tool_call_chunks: [{ ...(indexed ? { index: 0 } : {}), args: 'cked"}' }],
+          });
+        })();
+      },
+    } as unknown as BaseChatModel;
+    const executor = await setup(workers).prepare(
+      descriptor,
+      { chatModels: { model: provider } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('The fixture Worker is missing.');
+    modelRoundTrip(worker, false, { tools: offeredTools, stream: true });
+    const run = request();
+    vi.mocked(run.lease.checkOutput).mockImplementation(async (text) => {
+      if (text.includes('blocked')) throw new GalaxieError('denied', 'Policy denied the request.');
+    });
+    expect(await collect(executor.run(run.request))).toMatchObject([
+      { type: 'error', error: { code: 'denied' } },
+    ]);
+    const deltas = worker.sent.filter((message) => message.op === 'model-chunk');
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0]).toMatchObject({
+      payload: { content: '', toolCalls: [{ function: { arguments: '{"value":"blo' } }] },
+    });
+    expect(run.lease.checkOutput).toHaveBeenLastCalledWith('\n{"value":"blocked"}\none\ndouble', {
+      final: false,
+    });
+    await executor.dispose();
+  },
+);
+
+test.each(['block', 'hook-error'] as const)(
+  'growing tool-call IDs stay behind stream output checks: %s',
+  async (outcome) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const provider = {
+      async invoke() {
+        return new AIMessage('');
+      },
+      bindTools: () => provider,
+      async *stream() {
         yield new AIMessageChunk({
           content: '',
-          tool_call_chunks: [{ index: 0, id: 'one', name: 'double', args: '{"value":"blo' }],
+          tool_call_chunks: [{ index: 0, id: 'BLOCK', name: 'double', args: '{"value":' }],
         });
-        yield new AIMessageChunk({ content: '', tool_call_chunks: [{ index: 0, args: 'cked"}' }] });
-      })();
-    },
-  } as unknown as BaseChatModel;
-  const executor = await setup(workers).prepare(
-    descriptor,
-    { chatModels: { model: provider } },
-    preparation,
-  );
-  const worker = workers[0];
-  if (!worker) throw new Error('The fixture Worker is missing.');
-  modelRoundTrip(worker, false, { tools: offeredTools, stream: true });
-  const run = request();
-  vi.mocked(run.lease.checkOutput).mockImplementation(async (text) => {
-    if (text.includes('blocked')) throw new GalaxieError('denied', 'Policy denied the request.');
-  });
-  expect(await collect(executor.run(run.request))).toMatchObject([
-    { type: 'error', error: { code: 'denied' } },
-  ]);
-  const deltas = worker.sent.filter((message) => message.op === 'model-chunk');
-  expect(deltas).toHaveLength(1);
-  expect(deltas[0]).toMatchObject({
-    payload: { content: '', toolCalls: [{ function: { arguments: '{"value":"blo' } }] },
-  });
-  expect(run.lease.checkOutput).toHaveBeenLastCalledWith('\n{"value":"blocked"}', { final: false });
-  await executor.dispose();
-});
+        yield new AIMessageChunk({
+          content: '',
+          tool_call_chunks: [{ index: 0, id: 'ED_ID', args: '2}' }],
+        });
+      },
+    } as unknown as BaseChatModel;
+    const executor = await setup(workers, 'pydantic-ai').prepare(
+      descriptor,
+      { chatModels: { model: provider } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('The fixture Worker is missing.');
+    modelRoundTrip(worker, false, { tools: offeredTools, stream: true });
+    const run = request();
+    vi.mocked(run.lease.checkOutput).mockImplementation(async (text) => {
+      if (text.includes('BLOCKED_ID')) {
+        if (outcome === 'hook-error')
+          throw new GalaxieError('unavailable', 'The requested service is unavailable.');
+        throw new GalaxieError('denied', 'Policy denied the request.');
+      }
+    });
+    expect(await collect(executor.run(run.request))).toMatchObject([
+      { type: 'error', error: { code: outcome === 'block' ? 'denied' : 'unavailable' } },
+    ]);
+    const chunks = worker.sent.filter((message) => message.op === 'model-chunk');
+    expect(chunks).toHaveLength(1);
+    expect(JSON.stringify(chunks)).not.toContain('ED_ID');
+    expect(run.lease.end).not.toHaveBeenCalled();
+    expect(run.lease.fail).toHaveBeenCalledOnce();
+    await executor.dispose();
+  },
+);
 
 test('final checks retain complete tool arguments dropped by LangChain concatenation', async () => {
   vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
@@ -356,7 +420,7 @@ test('final checks retain complete tool arguments dropped by LangChain concatena
     { type: 'error', error: { code: 'denied' } },
   ]);
   expect(run.lease.checkOutput).toHaveBeenLastCalledWith(
-    '\n{"value":"blocked"}\n{"value":2}\nfragment',
+    '\n{"value":"blocked"}{"value":2}\n\n{"value":2}\nfragment',
     {
       final: true,
     },
@@ -483,52 +547,55 @@ test('validates descriptors and provider factories before fetching or constructi
   expect(workers).toEqual([]);
 });
 
-test('graph streams are delivered live with their executor, mode and path', async () => {
-  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
-  const workers: FixtureWorker[] = [];
-  const agent = await setup(workers).prepare(
-    descriptor,
-    { chatModels: {} },
-    { signal: preparation.signal },
-  );
-  const worker = workers[0];
-  if (!worker) throw new Error('Missing fixture Worker.');
-  let running: BridgeMessage | undefined;
-  worker.handle = (message) => {
-    if (message.kind === 'request' && message.op === 'run') {
-      running = message;
-      worker.emit({
-        v: BRIDGE_VERSION,
-        kind: 'notify',
-        id: `${message.id}/1`,
-        op: 'stream',
-        payload: [[], 'custom', { phase: 'working' }],
+test.each([undefined, 'pydantic-ai'] as const)(
+  'streams are delivered live with their executor, mode and path: %s',
+  async (framework) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const agent = await setup(workers, framework).prepare(
+      descriptor,
+      { chatModels: {} },
+      { signal: preparation.signal },
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('Missing fixture Worker.');
+    let running: BridgeMessage | undefined;
+    worker.handle = (message) => {
+      if (message.kind === 'request' && message.op === 'run') {
+        running = message;
+        worker.emit({
+          v: BRIDGE_VERSION,
+          kind: 'notify',
+          id: `${message.id}/1`,
+          op: 'stream',
+          payload: [[], 'custom', { phase: 'working' }],
+        });
+      }
+    };
+    const iterator = agent.run(request().request)[Symbol.asyncIterator]();
+    try {
+      expect(await iterator.next()).toEqual({
+        done: false,
+        value: {
+          type: 'stream',
+          executor: framework === 'pydantic-ai' ? 'pydantic-ai-python' : 'langgraph-python',
+          path: [],
+          mode: 'custom',
+          data: { phase: 'working' },
+        },
       });
+      if (!running) throw new Error('Missing run request.');
+      worker.emit(success(running, { output: 'finished' }, 'result'));
+      expect(await iterator.next()).toEqual({
+        done: false,
+        value: { type: 'output', output: 'finished' },
+      });
+      expect((await iterator.next()).done).toBe(true);
+    } finally {
+      await agent.dispose();
     }
-  };
-  const iterator = agent.run(request().request)[Symbol.asyncIterator]();
-  try {
-    expect(await iterator.next()).toEqual({
-      done: false,
-      value: {
-        type: 'stream',
-        executor: 'langgraph-python',
-        path: [],
-        mode: 'custom',
-        data: { phase: 'working' },
-      },
-    });
-    if (!running) throw new Error('Missing run request.');
-    worker.emit(success(running, { output: 'finished' }, 'result'));
-    expect(await iterator.next()).toEqual({
-      done: false,
-      value: { type: 'output', output: 'finished' },
-    });
-    expect((await iterator.next()).done).toBe(true);
-  } finally {
-    await agent.dispose();
-  }
-});
+  },
+);
 
 test.each([false, true])(
   'streamed model deltas pass growing and final output checks (block=%s)',

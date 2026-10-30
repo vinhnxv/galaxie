@@ -1,0 +1,53 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "stream abort"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [
+    {
+      "content": "First never returned.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "cancelled",
+    "message": "The run was cancelled."
+  },
+  "streams": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model-request",
+        "index": 0
+      }
+    },
+    {
+      "mode": "messages",
+      "data": [
+        {
+          "type": "ai",
+          "content": "First "
+        },
+        {}
+      ]
+    }
+  ]
+}

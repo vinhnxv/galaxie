@@ -28,3 +28,6 @@ dist/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Vitest browser-mode failure screenshots and attachments
+/.vitest/

@@ -154,5 +154,127 @@
         "text": "Never returned."
       }
     ]
+  },
+  "stream-text": {
+    "prompt": "stream text",
+    "replies": [
+      {
+        "text": "A streamed answer."
+      }
+    ]
+  },
+  "stream-tools": {
+    "prompt": "stream tools",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          },
+          {
+            "id": "double_2",
+            "name": "double",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The results are 6 and 8."
+      }
+    ]
+  },
+  "stream-tool-output": {
+    "prompt": "stream structured tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "output_1",
+            "name": "final_result",
+            "args": {
+              "value": 6
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "stream-output-retry": {
+    "prompt": "stream retry output",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "output_1",
+            "name": "final_result",
+            "args": {
+              "value": "invalid"
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "output_2",
+            "name": "final_result",
+            "args": {
+              "value": 6
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "stream-id-block": {
+    "prompt": "stream blocked id",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "BLOCKED_ID",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "stream-mid-block": {
+    "prompt": "stream mid block",
+    "replies": [
+      {
+        "text": "Allowed BLOCKED_TEXT hidden."
+      }
+    ]
+  },
+  "stream-final-mismatch": {
+    "prompt": "stream mismatch",
+    "replies": [
+      {
+        "text": "A streamed answer."
+      }
+    ]
+  },
+  "stream-abort": {
+    "prompt": "stream abort",
+    "replies": [
+      {
+        "text": "First never returned."
+      }
+    ]
   }
 }

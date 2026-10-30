@@ -3,14 +3,14 @@
 
 export const pydanticAiDriver: string = `
 import sys, json, asyncio, importlib, uuid
-from galaxie._bridge import install_transport, GalaxieError, receive_model_chunk
-from _galaxie_transport import request as _transport
+from galaxie._bridge import install_transport, GalaxieError, receive_model_chunk, notify_stream
+from _galaxie_transport import request as _transport, notify as _notify
 from pydantic_ai import Agent
 from galaxie.pydantic_ai import prepare_executor
 sys.path.insert(0, '/agent')
 async def _galaxie_request(raw):
     return await _transport(raw)
-install_transport(_galaxie_request)
+install_transport(_galaxie_request, _notify)
 Agent.instrument_all(False)
 _galaxie_conversations = {}
 try:
@@ -34,7 +34,10 @@ async def _galaxie_execute():
         session = payload['threadId']
         if session not in _galaxie_conversations:
             _galaxie_conversations[session] = str(uuid.uuid4())
-        output = await _galaxie_executor.run(payload['input'], _galaxie_conversations[session], payload['steps'])
+        output = await _galaxie_executor.run(
+            payload['input'], _galaxie_conversations[session], payload['steps'],
+            on_stream=lambda mode, data: notify_stream([], mode, data),
+        )
         return json.dumps({'ok': True, 'output': output}, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
     except GalaxieError as error:
         return json.dumps({'ok': False, 'code': error.code})

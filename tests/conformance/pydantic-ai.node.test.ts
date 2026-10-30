@@ -29,6 +29,10 @@ test.skipIf(!pythonWheelsAvailable).each(pydanticCases)(
       expect(fixture.workerErrors).toEqual([]);
       if (name === 'argument-block')
         expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED_ARGUMENT');
+      if (name === 'stream-id-block')
+        expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED_ID');
+      if (name === 'stream-mid-block')
+        expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED_TEXT');
     } finally {
       await fixture.cleanup();
     }

@@ -43,7 +43,7 @@ import {
 import { checkpointBytes } from './checkpoints.js';
 import { adapterFailure, failureCode } from './errors.js';
 import type { LockedWheel, PythonFramework } from './runtime-files.js';
-import { GrowingOutput, outputText, toolCalls, toolDeltas } from './tool-calls.js';
+import { GrowingOutput, outputText, toolCalls } from './tool-calls.js';
 
 export interface PyodideAgent {
   readonly baseUrl: string;
@@ -290,7 +290,7 @@ export function createPyodideAdapter(
       interrupts: langgraph,
       resume: langgraph,
       checkpoints: langgraph,
-      streaming: langgraph,
+      streaming: true,
       subgraphs: langgraph,
     },
     async prepare(agent, services, preparation) {
@@ -340,10 +340,6 @@ export function createPyodideAdapter(
           run.seen.add(message.id);
           if (!run.cancelled) {
             const [path, mode, data] = message.payload as StreamPayload;
-            if (!langgraph) {
-              client.close('unsupported');
-              return;
-            }
             run.streams.push({ type: 'stream', executor: executorId, path, mode, data });
             run.wake();
           }
@@ -500,7 +496,10 @@ export function createPyodideAdapter(
                   validateReply(chunk);
                   combined = combined === undefined ? chunk : combined.concat(chunk);
                   checked = offered ? growing.append(chunk) : (combined.content as string);
-                  await lease.checkOutput(checked, { final: false });
+                  const fragments = offered
+                    ? [...growing.toolCallIds(), ...growing.toolCallNames()]
+                    : [];
+                  await lease.checkOutput([checked, ...fragments].join('\n'), { final: false });
                   if (run.cancelled || run.request.signal.aborted || connection !== client)
                     throw adapterFailure('cancelled');
                   client.send({
@@ -510,7 +509,7 @@ export function createPyodideAdapter(
                     op: 'model-chunk',
                     payload: {
                       content: chunk.content,
-                      ...(offered ? { toolCalls: toolDeltas(chunk) } : {}),
+                      ...(offered ? { toolCalls: growing.deltas() } : {}),
                     },
                   });
                 }

@@ -3,7 +3,7 @@
   "requestReference": "pydantic_ai.models.openai.OpenAIChatModel._map_messages and _map_tool_definition; the hash-pinned openai SDK is CPython dev-only",
   "lanes": ["Node Pyodide", "real headless Chromium Pyodide"],
   "features": {
-    "streaming": false,
+    "streaming": true,
     "interrupts": false,
     "resume": false,
     "checkpoints": false,
@@ -18,20 +18,34 @@
     "prompted-output",
     "capability-denial",
     "argument-block",
-    "abort"
+    "abort",
+    "stream-text",
+    "stream-tools",
+    "stream-tool-output",
+    "stream-output-retry",
+    "stream-id-block",
+    "stream-mid-block",
+    "stream-final-mismatch",
+    "stream-abort"
   ],
   "differences": [],
   "normalizations": [
     "Assistant tool-only content null maps to the bridge's empty string.",
     "LangChain message roles and tool calls map back to OpenAI-format request messages; tool-call IDs and JSON argument strings remain compared.",
     "Reply transcripts project text and tool calls without provider-generated message IDs or timestamps.",
-    "Native cancellation and the runtime's cancelled event share the fixed cancelled code and message."
+    "Native cancellation and the runtime's cancelled event share the fixed cancelled code and message.",
+    "Text chunks follow the scripted word boundaries, and stream envelopes omit runtime-generated run/event IDs.",
+    "Streamed tool arguments compare as normalized JSON because the JavaScript provider serializes its parsed final arguments.",
+    "Both streaming projections use agent.iter so model-request markers correspond to actual request nodes; this uses the same node streaming API as run_stream_events without its background convenience task."
   ],
   "limits": [
     "A route without the tool-calling feature fails unavailable under the existing router semantics; a leased model without bindTools fails unsupported. Both fail before provider dispatch, without fallback.",
     "All model replies are deterministic scripts. Native conformance blocks socket connections; Pyodide fixtures block external requests and use verified local assets.",
     "The capability-denial fixture raises the same fixed denial from a native tool and the JavaScript broker binding.",
     "The argument-block fixture applies a native fixed-denial stand-in; the Pyodide lanes prove the JavaScript output-safety check blocks the arguments before Python receives them.",
-    "No streaming, approvals, durable conversations, reload behavior or real-model quality is claimed."
+    "The stream-id-block and stream-mid-block fixtures apply native fixed-denial stand-ins; the Pyodide lanes exercise JavaScript checks before forwarding the blocked fragment.",
+    "The final-mismatch fixture corrupts only the checked final bridge content in the Pyodide lanes; the native scripted stream emits the same fixed invalid outcome after its text deltas.",
+    "The stream-abort native fixture cancels after the first text chunk; Pyodide lanes cancel the runtime after the first host message event.",
+    "Approvals, durable conversations, reload behavior and real-model quality remain unclaimed."
   ]
 }
