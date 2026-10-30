@@ -21,6 +21,8 @@ factory.createPolicy('default', {
 const worker = new Worker(url, { type: 'module' });
 worker.addEventListener('message', (event) => {
   const message = JSON.parse(event.data as string) as Record<string, unknown>;
+  // Stream notifications precede the run result; they are neither a reply nor a failure.
+  if (message['kind'] === 'notify') return;
   events.push(
     message['type'] === 'violation'
       ? message
