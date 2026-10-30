@@ -285,7 +285,7 @@ export function createPyodideAdapter(
       resume: true,
       checkpoints: true,
       streaming: true,
-      subgraphs: false,
+      subgraphs: true,
     },
     async prepare(agent, services, preparation) {
       services = services === undefined ? { chatModels: {} } : services;

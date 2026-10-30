@@ -37,7 +37,7 @@ async def main():
     reload_directory = directory / "reload"
     if not arguments.check:
         reload_directory.mkdir(exist_ok=True)
-    for name in ("interrupt-resume", "interrupt-durability-sync", "interrupt-durability-exit"):
+    for name in ("interrupt-resume", "interrupt-durability-sync", "interrupt-durability-exit", "interrupt-subgraph"):
         encoded = json.dumps(await record_reload(name), ensure_ascii=False, indent=2, allow_nan=False) + "\n"
         path = reload_directory / f"{name}.json"
         if arguments.check:

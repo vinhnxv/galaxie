@@ -39,7 +39,7 @@ supplies `services.checkpoints: saver.byteRecords`, otherwise a Worker-owned mem
 saver. Durable restore also needs `recovery: saver.recovery` in the same scope.
 Without the port, lost Worker state makes pending/resume fail `unavailable`.
 Streaming is enabled for bounded JSON graph projections and checked model deltas;
-subgraphs remain disabled. Streams are live only and never replayed. Streamed model
+subgraphs preserve nested paths, child interrupts, resume and durable restore. Streams are live only and never replayed. Streamed model
 calls require a provider declaring `streaming`, including implicit graph message
 streaming from Python `ainvoke`. Growing text and final text are checked in JavaScript
 before forwarding; earlier allowed deltas cannot be retracted after a block.

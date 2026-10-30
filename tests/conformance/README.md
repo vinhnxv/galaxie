@@ -78,8 +78,7 @@ CPython 3.14 and LangGraph Python environment. Its modules expose `INPUT`, `SCRI
 `RESUMES` and `factory(checkpointer, model, capability, interaction)`. The optional
 ports default to deterministic local fixtures; the Pyodide harness injects galaxie's
 checkpointer and interaction helper. Node names, request values, mock replies and
-re-execution counters follow the JavaScript cases. This reference does not enable
-streaming, durable checkpoints or subgraphs in the Python executor.
+re-execution counters follow the JavaScript cases. The native reference remains independent of the Python executor.
 
 [`golden-python/`](golden-python/) contains the independent CPython transcripts:
 the four stream modes and paths, checkpoint history, pending interrupt IDs and
@@ -104,7 +103,7 @@ changes.
 
 The [Node Pyodide lane](pyodide.node.test.ts) and
 [built Chromium harness](../../examples/rag-browser/test/python-conformance.node.test.ts)
-run the four interrupt cases through the real Python adapter: `interrupt-resume`,
+run all twelve cases through the real Python adapter. The four original interrupt cases are: `interrupt-resume`,
 `interrupt-sequence`, `interrupt-durability-sync` and `interrupt-durability-exit`.
 They compare normalized pending IDs/values and final state/counters with the Python
 goldens, check stable committed-state reads and reject an already answered resume.
@@ -116,17 +115,25 @@ paths and final output against the native Python goldens. Separate probes cover
 checked model deltas, final usage, mid-stream output rejection, non-JSON and oversized
 chunk rejection, and stream-free event replay. Only the allowed prefix reaches Python
 after a block; later text never crosses the host-to-Worker bridge. Complete checkpoint
-histories are not compared on these lanes. General subgraph support remains disabled.
-All twelve cases run on the native CPython lane.
+histories are not compared on these lanes. `subgraph` and `interrupt-subgraph` also
+compare native stream paths, modes, output and pending values. `model-without-config`
+uses the JavaScript mock provider through the router without an explicit node config;
+`model-failure` maps to fixed `unavailable`, `capability` calls the JavaScript broker,
+and `step-limit` matches the native 25-step stream before fixed `budget_exceeded`.
+The [Python matrix](compatibility-matrix-python.json) records the text bridge's
+message-ID difference and error mappings. The Chromium harness builds once and runs
+separate tests with their own timeouts, at most two page loads per test and 39 overall.
 
-The three reload cases (`interrupt-resume` and both durability cases) additionally
+The four reload cases (`interrupt-resume`, both durability cases and `interrupt-subgraph`) additionally
 compare with native reconstruction references in `golden-python/reload/`. Node
 reconstructs the runtime and Worker with a test byte store; the Chromium harness
 disposes them, navigates to a fresh page, reopens IndexedDB and calls core
 `instance.restore()`. The pending ID/value survives, completed nodes stay completed,
-and final state/counters match the reference. Both lanes also reconcile an already
+and final state/counters match the reference. The three original reload cases also reconcile an already
 accepted answer and replay one host write across two parent executions around an
-interrupting child. That focused fixture does not enable the subgraphs feature.
+interrupting child. The subgraph reload restores `{ callSub: 1, s1: 0, sask: 1 }`.
+A separate nested-write probe verifies distinct parent call ordinals and a full
+three-part child task namespace; all three receipts replay on resume.
 The Node lane checks checkpoint settlement writes after cancellation. Native
 serializer tests check the actual twelve cases, RAG values and parent-effect fixture;
 only documented exception-string and tuple-array decoding is allowed to differ.

@@ -26,8 +26,44 @@ import { executePythonCase, pythonStageACases } from './support/python-stage-a.j
 import {
   executePythonStream,
   pythonStreamCases,
+  pythonStreamComparison,
   pythonStreamProbes,
+  recordPythonScopes,
 } from './support/python-streaming.js';
+
+test.skipIf(!pythonWheelsAvailable)(
+  'Node Pyodide preserves parent ordinals and full nested effect scopes',
+  async () => {
+    const fixture = await createPythonFixture({
+      sources: await pythonCaseSources('effect-scopes'),
+      module: 'selected',
+    });
+    try {
+      const actual = await executePythonStream(fixture.options, fixture.agent, 'effect-scopes');
+      expect(actual.error).toBeNull();
+      expect(actual.effects).toHaveLength(3);
+      expect(new Set(actual.effects).size).toBe(3);
+      expect(actual.final).toEqual({ ids: actual.effects, answer: 'inner answer' });
+      const data = actual.events['custom']?.map(({ data }) => data) as {
+        scope: string;
+        effectId: string;
+      }[];
+      expect(data).toHaveLength(6);
+      expect(data.slice(3)).toEqual(data.slice(0, 3));
+      expect(data.map(({ scope }) => scope.split('|').length)).toEqual([1, 1, 3, 1, 1, 3]);
+      expect(data[2]?.scope).toMatch(/^parent:.*\|child:.*\|write:/);
+      const scopes = { capabilities: [] as string[], streams: [] as string[] };
+      for (const raw of fixture.fromWorker) recordPythonScopes(raw, scopes);
+      expect(scopes.capabilities).toHaveLength(6);
+      expect(scopes.capabilities).toEqual(scopes.streams);
+      expect(actual.replayModes).toEqual([]);
+      expect(fixture.workerErrors).toEqual([]);
+    } finally {
+      await fixture.cleanup();
+    }
+  },
+  60000,
+);
 
 test.skipIf(!pythonWheelsAvailable).each([...pythonStreamCases, ...pythonStreamProbes])(
   'Node Pyodide streams bounded projections and checked model deltas: %s',
@@ -43,10 +79,23 @@ test.skipIf(!pythonWheelsAvailable).each([...pythonStreamCases, ...pythonStreamP
         const golden = JSON.parse(
           await readFile(new URL(`./golden-python/${name}.json`, import.meta.url), 'utf8'),
         );
-        expect(actual.error).toBeNull();
-        expect(actual.events).toEqual(golden.events);
+        expect(actual.error).toEqual(
+          name === 'model-failure'
+            ? { code: 'unavailable', message: 'The requested service is unavailable.' }
+            : name === 'step-limit'
+              ? { code: 'budget_exceeded', message: 'The budget limit was reached.' }
+              : null,
+        );
+        expect(pythonStreamComparison(name, actual.events)).toEqual(
+          pythonStreamComparison(name, golden.events),
+        );
         expect(actual.modes).toEqual(golden.modes);
         expect(actual.final).toEqual(golden.final);
+        expect(actual.pauses).toEqual(
+          (golden.pauses ?? []).map(({ interrupts }: { interrupts: unknown }) => ({ interrupts })),
+        );
+        expect(actual.modelCalls).toBe(name.startsWith('model-') ? 1 : 0);
+        expect(actual.capabilityCalls).toBe(name === 'capability' ? 1 : 0);
       } else if (name === 'allow') {
         expect(actual.error).toBeNull();
         expect(actual.final).toEqual({
@@ -117,6 +166,7 @@ test.skipIf(!pythonWheelsAvailable).each([...pythonReloadCases, 'parent-effects'
           undefined,
           accepted,
           name === 'parent-effects',
+          name === 'interrupt-subgraph' ? 'inner answer' : { answer: 'yes' },
         );
         const restored = await executePythonRestore(
           fixture.options,
@@ -125,6 +175,7 @@ test.skipIf(!pythonWheelsAvailable).each([...pythonReloadCases, 'parent-effects'
           initial.sessionId,
           accepted,
           name === 'parent-effects',
+          name === 'interrupt-subgraph' ? 'inner answer' : { answer: 'yes' },
         );
         if (!accepted) expect(restored.pending).toEqual(initial.pending);
         expect(restored.final).toEqual(golden.final);

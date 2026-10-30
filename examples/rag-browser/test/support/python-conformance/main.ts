@@ -17,9 +17,11 @@ import {
 } from '../../../../../tests/conformance/support/python-stage-a.js';
 import {
   executePythonStream,
+  type PythonScopeTrace,
   type PythonStreamResult,
   pythonStreamCases,
   pythonStreamProbes,
+  recordPythonScopes,
 } from '../../../../../tests/conformance/support/python-streaming.js';
 import workerUrl from '../python-parity/pyodide-worker.ts?worker&url';
 
@@ -31,7 +33,8 @@ const result: {
   error?: string;
   violations: string[];
   done: boolean;
-} = { violations: [], done: false };
+  scopes: PythonScopeTrace;
+} = { violations: [], done: false, scopes: { capabilities: [], streams: [] } };
 Object.assign(globalThis, { pythonConformance: result });
 addEventListener('securitypolicyviolation', (event) =>
   result.violations.push(event.effectiveDirective),
@@ -51,7 +54,9 @@ void (async () => {
   try {
     const query = new URLSearchParams(location.search);
     const name = query.get('case') ?? '';
-    const streaming = [...pythonStreamCases, ...pythonStreamProbes].some((item) => item === name);
+    const streaming = [...pythonStreamCases, ...pythonStreamProbes, 'effect-scopes'].some(
+      (item) => item === name,
+    );
     if (
       !(pythonStageACases as readonly string[]).includes(name) &&
       name !== 'parent-effects' &&
@@ -77,6 +82,7 @@ void (async () => {
             directive?: string;
           };
           if (message.type === 'violation') result.violations.push(message.directive ?? 'unknown');
+          else if (name === 'effect-scopes') recordPythonScopes(event.data, result.scopes);
         });
         return worker;
       },
@@ -87,7 +93,7 @@ void (async () => {
       entry: 'create_agent',
       files,
     };
-    if (streaming) {
+    if (streaming && !query.has('durable')) {
       result.stream = await executePythonStream(options, agent, name);
       return;
     }
@@ -105,6 +111,7 @@ void (async () => {
           query.get('session') ?? undefined,
           query.has('accepted'),
           name === 'parent-effects',
+          name === 'interrupt-subgraph' ? 'inner answer' : { answer: 'yes' },
         );
       } finally {
         saver.close();
