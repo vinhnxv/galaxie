@@ -3,7 +3,7 @@
 
 import { GalaxieError, type ModelCall, type RunRequest } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage, type StandardMessageStructure } from '@langchain/core/messages';
+import { AIMessage, AIMessageChunk, type StandardMessageStructure } from '@langchain/core/messages';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createPyodideAdapter, type PyodideWorkerPort } from '../src/adapter.js';
 import {
@@ -226,7 +226,7 @@ test('validates descriptors and provider factories before fetching or constructi
     interrupts: true,
     resume: true,
     checkpoints: true,
-    streaming: false,
+    streaming: true,
     subgraphs: false,
   });
   await expect(
@@ -245,6 +245,158 @@ test('validates descriptors and provider factories before fetching or constructi
   expect(fetcher).not.toHaveBeenCalled();
   expect(workers).toEqual([]);
 });
+
+test('graph streams are delivered live with their executor, mode and path', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const agent = await setup(workers).prepare(
+    descriptor,
+    { chatModels: {} },
+    { signal: preparation.signal },
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('Missing fixture Worker.');
+  let running: BridgeMessage | undefined;
+  worker.handle = (message) => {
+    if (message.kind === 'request' && message.op === 'run') {
+      running = message;
+      worker.emit({
+        v: BRIDGE_VERSION,
+        kind: 'notify',
+        id: `${message.id}/1`,
+        op: 'stream',
+        payload: [[], 'custom', { phase: 'working' }],
+      });
+    }
+  };
+  const iterator = agent.run(request().request)[Symbol.asyncIterator]();
+  try {
+    expect(await iterator.next()).toEqual({
+      done: false,
+      value: {
+        type: 'stream',
+        executor: 'langgraph-python',
+        path: [],
+        mode: 'custom',
+        data: { phase: 'working' },
+      },
+    });
+    if (!running) throw new Error('Missing run request.');
+    worker.emit(success(running, { output: 'finished' }, 'result'));
+    expect(await iterator.next()).toEqual({
+      done: false,
+      value: { type: 'output', output: 'finished' },
+    });
+    expect((await iterator.next()).done).toBe(true);
+  } finally {
+    await agent.dispose();
+  }
+});
+
+test.each([false, true])(
+  'streamed model deltas pass growing and final output checks (block=%s)',
+  async (block) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const visited: string[] = [];
+    const provider = {
+      invoke: vi.fn(),
+      async *stream() {
+        for (const content of ['allowed ', 'BLOCKED', ' LATER']) {
+          visited.push(content);
+          yield new AIMessageChunk<StandardMessageStructure>({
+            content,
+            usage_metadata: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+          });
+        }
+      },
+    } as unknown as BaseChatModel;
+    const agent = await setup(workers).prepare(
+      descriptor,
+      { chatModels: { model: provider } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('Missing fixture Worker.');
+    modelRoundTrip(worker);
+    const original = worker.handle;
+    worker.handle = (message) => {
+      if (message.kind === 'request' && message.op === 'run') {
+        worker.emit({
+          v: BRIDGE_VERSION,
+          kind: 'request',
+          op: 'model',
+          id: `${message.id}/1`,
+          payload: {
+            role: 'answer',
+            messages: [{ role: 'user', content: 'capital' }],
+            options: { stream: true },
+          },
+        });
+      } else original?.(message);
+    };
+    // Complete the fake graph from the terminal model response.
+    const handle = worker.handle;
+    worker.handle = (message) => {
+      if (message.kind === 'response' && message.op === 'model') {
+        const run = worker.sent.find((item) => item.kind === 'request' && item.op === 'run');
+        if (!run) throw new Error('Missing run request.');
+        worker.emit(
+          message.ok
+            ? success(run, { output: message.payload }, 'result')
+            : failure(run, message.error.code, 'result'),
+        );
+      } else handle?.(message);
+    };
+    const run = request();
+    vi.mocked(run.lease.checkOutput).mockImplementation(async (text) => {
+      if (block && text.includes('BLOCKED'))
+        throw new GalaxieError('denied', 'private hook detail');
+    });
+    try {
+      const events = await collect(agent.run(run.request));
+      expect(run.request.models.begin).toHaveBeenCalledWith('answer', {
+        signal: run.request.signal,
+        requires: ['streaming'],
+      });
+      const deltas = worker.sent
+        .filter((item) => item.kind === 'notify' && item.op === 'model-chunk')
+        .map((item) => ('payload' in item ? item.payload : undefined));
+      expect(deltas).toEqual(
+        (block ? ['allowed '] : ['allowed ', 'BLOCKED', ' LATER']).map((content) => ({ content })),
+      );
+      expect(run.lease.checkOutput).toHaveBeenCalledWith('allowed ', { final: false });
+      if (block) {
+        expect(events).toEqual([
+          { type: 'error', error: { code: 'denied', message: 'Policy denied the request.' } },
+        ]);
+        expect(visited).toEqual(['allowed ', 'BLOCKED']);
+        expect(JSON.stringify(worker.sent)).not.toContain('BLOCKED');
+        expect(JSON.stringify(worker.sent)).not.toContain('private hook detail');
+        expect(run.lease.fail).toHaveBeenCalledOnce();
+        expect(run.lease.end).not.toHaveBeenCalled();
+      } else {
+        expect(events).toEqual([
+          {
+            type: 'output',
+            output: {
+              content: 'allowed BLOCKED LATER',
+              usage: { input_tokens: 3, output_tokens: 3, total_tokens: 6 },
+            },
+          },
+        ]);
+        expect(run.lease.checkOutput).toHaveBeenLastCalledWith('allowed BLOCKED LATER', {
+          final: true,
+        });
+        expect(run.lease.end).toHaveBeenCalledWith({ inputTokens: 3, outputTokens: 3 });
+        expect(run.lease.fail).not.toHaveBeenCalled();
+      }
+      expect(provider.invoke).not.toHaveBeenCalled();
+    } finally {
+      await agent.dispose();
+    }
+  },
+);
 
 test('Worker termination does not finish settlement before an outstanding checkpoint commit', async () => {
   vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));

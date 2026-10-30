@@ -23,6 +23,73 @@ import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
 import { pythonCaseSources } from './support/python-cases.node.js';
 import { executePythonRestore, pythonReloadCases } from './support/python-restore.js';
 import { executePythonCase, pythonStageACases } from './support/python-stage-a.js';
+import {
+  executePythonStream,
+  pythonStreamCases,
+  pythonStreamProbes,
+} from './support/python-streaming.js';
+
+test.skipIf(!pythonWheelsAvailable).each([...pythonStreamCases, ...pythonStreamProbes])(
+  'Node Pyodide streams bounded projections and checked model deltas: %s',
+  async (name) => {
+    const fixture = await createPythonFixture({
+      sources: await pythonCaseSources(name),
+      module: 'selected',
+    });
+    try {
+      const actual = await executePythonStream(fixture.options, fixture.agent, name);
+      expect(actual.replayModes).toEqual([]);
+      if ((pythonStreamCases as readonly string[]).includes(name)) {
+        const golden = JSON.parse(
+          await readFile(new URL(`./golden-python/${name}.json`, import.meta.url), 'utf8'),
+        );
+        expect(actual.error).toBeNull();
+        expect(actual.events).toEqual(golden.events);
+        expect(actual.modes).toEqual(golden.modes);
+        expect(actual.final).toEqual(golden.final);
+      } else if (name === 'allow') {
+        expect(actual.error).toBeNull();
+        expect(actual.final).toEqual({
+          text: 'allowed BLOCKED LATER',
+          usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
+        });
+        expect(actual.checks.at(-1)).toEqual({ text: 'allowed BLOCKED LATER', final: true });
+      } else if (name === 'cancel') {
+        expect(actual.cancelled).toBe(true);
+        expect(actual.final).toBeNull();
+        expect(actual.events['custom']).toEqual([{ path: [], data: { seen: 'allowed ' } }]);
+        expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED');
+        expect(fixture.toWorker.join('\n')).not.toContain('LATER');
+        expect(fixture.counts.terminated).toBe(1);
+      } else if (name === 'close') {
+        expect(actual.closedWhileRunning).toBe(true);
+        expect(actual.error).toBeNull();
+        expect(actual.final).toEqual({ text: 'allowed ', usage: null });
+        expect(actual.nextRunOutput).toEqual({
+          text: 'allowed BLOCKED LATER',
+          usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
+        });
+      } else if (name === 'block' || name === 'close-block') {
+        expect(actual.error).toEqual({ code: 'denied', message: 'Policy denied the request.' });
+        expect(actual.events['custom']).toEqual([
+          { path: [], data: name === 'block' ? { seen: 'allowed ' } : { closed: true } },
+        ]);
+        expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED');
+        expect(fixture.toWorker.join('\n')).not.toContain('LATER');
+      } else {
+        expect(actual.error).toEqual({
+          code: 'unsupported',
+          message: 'This operation is unsupported.',
+        });
+        expect(fixture.fromWorker.join('\n')).not.toContain('UNSUPPORTED-PRIVATE');
+      }
+      expect(fixture.workerErrors).toEqual([]);
+    } finally {
+      await fixture.cleanup();
+    }
+  },
+  60000,
+);
 
 test.skipIf(!pythonWheelsAvailable).each([...pythonReloadCases, 'parent-effects'])(
   'Node Pyodide rebuilds a durable runtime against native reconstruction: %s',
@@ -300,7 +367,7 @@ def create_agent():
                 destination: 'in-browser',
                 modality: 'text',
                 languages: ['en'],
-                features: [],
+                features: ['streaming'],
                 pricing: { inputPerToken: 0, outputPerToken: 0 },
               },
             },
@@ -393,7 +460,7 @@ test.skipIf(!pythonWheelsAvailable)(
         },
       }))
         events.push(event);
-      expect(events).toEqual([
+      expect(events.filter((event) => event.type !== 'stream')).toEqual([
         {
           type: 'error',
           error: { code: 'budget_exceeded', message: 'The budget limit was reached.' },
@@ -453,7 +520,7 @@ test.skipIf(!pythonWheelsAvailable).each(['invalid', 'parallel', 'oversized', 's
       }))
         events.push(event);
       const code = kind === 'invalid' ? 'invalid' : 'unsupported';
-      expect(events).toEqual([
+      expect(events.filter((event) => event.type !== 'stream')).toEqual([
         {
           type: 'error',
           error: {

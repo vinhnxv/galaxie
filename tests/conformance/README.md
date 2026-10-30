@@ -111,9 +111,13 @@ goldens, check stable committed-state reads and reject an already answered resum
 The Chromium page rejects unknown case names with a fixed error and runs under the
 unchanged RAG CSP and Trusted Types policy, blocking external requests. It reuses the
 existing local wheel cache, skips when it is absent locally, and fails in CI if absent.
-These lanes do not compare public stream events or complete checkpoint histories.
-Streaming and general subgraph support remain disabled. All twelve cases run on the
-native CPython lane.
+The same lanes also compare `linear` and `branching` stream projections, mode order,
+paths and final output against the native Python goldens. Separate probes cover
+checked model deltas, final usage, mid-stream output rejection, non-JSON and oversized
+chunk rejection, and stream-free event replay. Only the allowed prefix reaches Python
+after a block; later text never crosses the host-to-Worker bridge. Complete checkpoint
+histories are not compared on these lanes. General subgraph support remains disabled.
+All twelve cases run on the native CPython lane.
 
 The three reload cases (`interrupt-resume` and both durability cases) additionally
 compare with native reconstruction references in `golden-python/reload/`. Node

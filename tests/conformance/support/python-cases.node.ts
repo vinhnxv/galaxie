@@ -4,7 +4,17 @@
 import { readFile } from 'node:fs/promises';
 
 export async function pythonCaseSources(name: string): Promise<Record<string, string>> {
-  const module = name.replaceAll('-', '_');
+  const module = [
+    'allow',
+    'block',
+    'cancel',
+    'close',
+    'close-block',
+    'non-json',
+    'oversized',
+  ].includes(name)
+    ? 'streaming'
+    : name.replaceAll('-', '_');
   const files = new Set(['fixture_support', 'interrupt_resume', module]);
   const sources: Record<string, string> = {};
   for (const file of files)

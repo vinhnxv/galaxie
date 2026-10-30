@@ -69,8 +69,9 @@ test('repeated preparation, subscriptions, snapshots and event reads never execu
       const detach = instance.subscribe(() => {});
       instance.getSnapshot();
       const events = instance.events(runId)[Symbol.asyncIterator]();
-      expect((await events.next()).value).toMatchObject({ type: 'stream' });
+      const next = events.next();
       await events.return?.();
+      expect((await next).done).toBe(true);
       detach();
     }
     expect(executor.prepareCalls).toBe(1);

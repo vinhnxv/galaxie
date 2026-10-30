@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 import type { RunId } from '../src/index.js';
 import { collect, deferred, flush, ready, stream } from './fake-executor.js';
 
-test('events replay five ordered events, follow live, and complete after one terminal event', async () => {
+test('stream events are live only and terminal events replay with their original sequence', async () => {
   const gate = deferred<void>();
   const { instance, runtime } = await ready([
     [
@@ -18,25 +18,15 @@ test('events replay five ordered events, follow live, and complete after one ter
   const { runId } = await instance.start('input');
   await flush();
   const iterator = instance.events(runId)[Symbol.asyncIterator]();
-  const seen = [];
-  for (let sequence = 0; sequence < 5; sequence++) {
-    const result = await iterator.next();
-    expect(result).toMatchObject({
-      done: false,
-      value: { type: 'stream', runId, sequence, data: sequence },
-    });
-    seen.push(result.value);
-  }
   const live = iterator.next();
   gate.resolve();
   const liveResult = await live;
   expect(liveResult).toMatchObject({ value: { type: 'stream', sequence: 5, data: 'live' } });
-  seen.push(liveResult.value);
   const output = await iterator.next();
   expect(output).toMatchObject({ value: { type: 'output', sequence: 6 } });
-  seen.push(output.value);
-  expect(new Set(seen.map((event) => event.eventId)).size).toBe(7);
+  expect(output.value?.eventId).not.toBe(liveResult.value?.eventId);
   await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
+  expect(await collect(instance.events(runId))).toEqual([output.value]);
   await runtime.dispose();
 });
 
@@ -67,12 +57,12 @@ test('breaking one consumer leaves other consumers and the executor attached', a
   ]);
   const { runId } = await instance.start('input');
   const following = instance.events(runId)[Symbol.asyncIterator]();
+  const leaving = instance.events(runId)[Symbol.asyncIterator]();
+  const first = leaving.next();
   await expect(following.next()).resolves.toMatchObject({ value: { sequence: 0 } });
   const pending = following.next();
-  for await (const event of instance.events(runId)) {
-    expect(event.sequence).toBe(0);
-    break;
-  }
+  expect((await first).value?.sequence).toBe(0);
+  await leaving.return?.();
   expect(instance.getSnapshot().run?.status).toBe('running');
   gate.resolve();
   await expect(pending).resolves.toMatchObject({ value: { sequence: 1, data: 'second' } });
