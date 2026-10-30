@@ -57,3 +57,41 @@ test('CPython and Pyodide locks agree on every shared distribution version', asy
   expect(versions.get('langchain-core')).toBe('1.7.0');
   expect(lock.packages.find((item) => item.name === 'msgpack')?.version).toBe('1.1.2');
 });
+
+test('framework wheel sets preserve the LangGraph inventory and keep provider SDKs out', async () => {
+  const inventory = lockedWheels;
+  for (const wheel of inventory) {
+    expect(wheel.frameworks, wheel.name).toBeDefined();
+    expect(wheel.frameworks?.length, wheel.name).toBeGreaterThan(0);
+    expect(
+      wheel.frameworks?.every((framework) => ['langgraph', 'pydantic-ai'].includes(framework)),
+    ).toBe(true);
+  }
+  const langgraph = inventory.filter((wheel) => wheel.frameworks?.includes('langgraph'));
+  expect(langgraph.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(6_042_342);
+  const fingerprint = langgraph
+    .map(
+      (wheel) =>
+        `${wheel.name} ${wheel.version} ${wheel.file} ${wheel.bytes} ${wheel.sha256} ${wheel.url}`,
+    )
+    .join('\n');
+  expect(createHash('sha256').update(fingerprint).digest('hex')).toBe(
+    'af0f855f9a3ad22e27237d198f94a690d7e05ca54ebeb9ae6b8b2de165582cd1',
+  );
+  const pydantic = inventory.filter((wheel) => wheel.frameworks?.includes('pydantic-ai'));
+  expect(pydantic.find((wheel) => wheel.name === 'pydantic-ai-slim')?.version).toBe('2.60.0');
+  expect(pydantic.find((wheel) => wheel.name === 'pydantic-graph')?.version).toBe('2.60.0');
+  expect(inventory.some((wheel) => ['openai', 'jiter', 'pydantic-ai'].includes(wheel.name))).toBe(
+    false,
+  );
+  const native = await readFile(new URL('../../python/uv.lock', import.meta.url), 'utf8');
+  for (const wheel of pydantic) {
+    const block = native
+      .split('[[package]]')
+      .find((item) => item.startsWith(`\nname = "${wheel.name}"\n`));
+    const uploadTimes = [...(block ?? '').matchAll(/upload-time = "([^"]+)"/g)];
+    expect(uploadTimes.length, wheel.name).toBeGreaterThan(0);
+    for (const match of uploadTimes)
+      expect(Date.parse(match[1] ?? '')).toBeLessThan(Date.parse('2026-10-23T17:00:00Z'));
+  }
+});

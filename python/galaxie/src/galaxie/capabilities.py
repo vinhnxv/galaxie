@@ -7,10 +7,20 @@ from typing import Any
 from ._bridge import GalaxieError, request
 
 
-async def call(name: str, input: Any, config: Mapping[str, Any] | None = None) -> Any:
+async def call(
+    name: str,
+    input: Any,
+    config: Mapping[str, Any] | None = None,
+    *,
+    effect_scope: str | None = None,
+) -> Any:
     if not isinstance(name, str) or not name:
         raise GalaxieError("invalid")
     payload = {"name": name, "input": input}
+    if effect_scope is not None:
+        if not isinstance(effect_scope, str) or not effect_scope or config is not None:
+            raise GalaxieError("invalid")
+        payload["effectScope"] = effect_scope
     if config is not None:
         metadata = config.get("metadata") or {}
         configurable = config.get("configurable") or {}

@@ -1,0 +1,37 @@
+{
+  "reference": "Native CPython 3.14 with pydantic-ai-slim 2.60.0 and pydantic-graph 2.60.0",
+  "requestReference": "pydantic_ai.models.openai.OpenAIChatModel._map_messages and _map_tool_definition; the hash-pinned openai SDK is CPython dev-only",
+  "lanes": ["Node Pyodide", "real headless Chromium Pyodide"],
+  "features": {
+    "streaming": false,
+    "interrupts": false,
+    "resume": false,
+    "checkpoints": false,
+    "subgraphs": false
+  },
+  "cases": [
+    "plain-text",
+    "capability",
+    "sequential-tools",
+    "tool-output",
+    "output-retry",
+    "prompted-output",
+    "capability-denial",
+    "argument-block",
+    "abort"
+  ],
+  "differences": [],
+  "normalizations": [
+    "Assistant tool-only content null maps to the bridge's empty string.",
+    "LangChain message roles and tool calls map back to OpenAI-format request messages; tool-call IDs and JSON argument strings remain compared.",
+    "Reply transcripts project text and tool calls without provider-generated message IDs or timestamps.",
+    "Native cancellation and the runtime's cancelled event share the fixed cancelled code and message."
+  ],
+  "limits": [
+    "A route without the tool-calling feature fails unavailable under the existing router semantics; a leased model without bindTools fails unsupported. Both fail before provider dispatch, without fallback.",
+    "All model replies are deterministic scripts. Native conformance blocks socket connections; Pyodide fixtures block external requests and use verified local assets.",
+    "The capability-denial fixture raises the same fixed denial from a native tool and the JavaScript broker binding.",
+    "The argument-block fixture applies a native fixed-denial stand-in; the Pyodide lanes prove the JavaScript output-safety check blocks the arguments before Python receives them.",
+    "No streaming, approvals, durable conversations, reload behavior or real-model quality is claimed."
+  ]
+}

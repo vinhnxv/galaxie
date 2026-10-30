@@ -1,0 +1,158 @@
+{
+  "plain-text": {
+    "prompt": "plain text",
+    "replies": [
+      {
+        "text": "A plain answer."
+      }
+    ]
+  },
+  "capability": {
+    "prompt": "one tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The result is 6."
+      }
+    ]
+  },
+  "sequential-tools": {
+    "prompt": "two tools",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 2
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_2",
+            "name": "double",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The result is 8."
+      }
+    ]
+  },
+  "tool-output": {
+    "prompt": "structured tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "output_1",
+            "name": "final_result",
+            "args": {
+              "value": 6
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "output-retry": {
+    "prompt": "retry output",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "output_1",
+            "name": "final_result",
+            "args": {
+              "value": "invalid"
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "output_2",
+            "name": "final_result",
+            "args": {
+              "value": 6
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "prompted-output": {
+    "prompt": "prompted output",
+    "replies": [
+      {
+        "text": "{\"value\":6}"
+      }
+    ]
+  },
+  "capability-denial": {
+    "prompt": "denied tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "argument-block": {
+    "prompt": "blocked argument",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": "BLOCKED_ARGUMENT"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "abort": {
+    "prompt": "abort call",
+    "replies": [
+      {
+        "text": "Never returned."
+      }
+    ]
+  }
+}

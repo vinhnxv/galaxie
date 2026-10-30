@@ -20,6 +20,7 @@ import {
   type AIMessageChunk,
   HumanMessage,
   SystemMessage,
+  ToolMessage,
 } from '@langchain/core/messages';
 import {
   type BootPayload,
@@ -41,7 +42,8 @@ import {
 } from './bridge.js';
 import { checkpointBytes } from './checkpoints.js';
 import { adapterFailure, failureCode } from './errors.js';
-import type { LockedWheel } from './runtime-files.js';
+import type { LockedWheel, PythonFramework } from './runtime-files.js';
+import { GrowingOutput, outputText, toolCalls, toolDeltas } from './tool-calls.js';
 
 export interface PyodideAgent {
   readonly baseUrl: string;
@@ -69,6 +71,7 @@ export interface PyodideBootEvent {
   readonly coldStartMs?: number;
 }
 export interface PyodideAdapterOptions {
+  readonly framework?: PythonFramework;
   readonly createWorker: () => PyodideWorkerPort;
   readonly runtimeUrl: string;
   readonly wheelsUrl: string;
@@ -277,15 +280,18 @@ async function source(response: Response): Promise<string> {
 export function createPyodideAdapter(
   options: PyodideAdapterOptions,
 ): ExecutorAdapter<PyodideAgent, PyodideServices> {
+  const framework = options?.framework ?? 'langgraph';
+  const executorId = framework === 'pydantic-ai' ? 'pydantic-ai-python' : 'langgraph-python';
+  const langgraph = framework === 'langgraph';
   return {
-    id: 'langgraph-python',
+    id: executorId,
     version: '0.0.0',
     features: {
-      interrupts: true,
-      resume: true,
-      checkpoints: true,
-      streaming: true,
-      subgraphs: true,
+      interrupts: langgraph,
+      resume: langgraph,
+      checkpoints: langgraph,
+      streaming: langgraph,
+      subgraphs: langgraph,
     },
     async prepare(agent, services, preparation) {
       services = services === undefined ? { chatModels: {} } : services;
@@ -294,7 +300,8 @@ export function createPyodideAdapter(
         !validServices(services, preparation.models) ||
         typeof options?.createWorker !== 'function' ||
         typeof options.runtimeUrl !== 'string' ||
-        !Array.isArray(options.localWheels)
+        !Array.isArray(options.localWheels) ||
+        !['langgraph', 'pydantic-ai'].includes(framework)
       )
         throw adapterFailure('invalid');
       const base = sourceBase(agent, options);
@@ -333,7 +340,11 @@ export function createPyodideAdapter(
           run.seen.add(message.id);
           if (!run.cancelled) {
             const [path, mode, data] = message.payload as StreamPayload;
-            run.streams.push({ type: 'stream', executor: 'langgraph-python', path, mode, data });
+            if (!langgraph) {
+              client.close('unsupported');
+              return;
+            }
+            run.streams.push({ type: 'stream', executor: executorId, path, mode, data });
             run.wake();
           }
           return;
@@ -407,9 +418,14 @@ export function createPyodideAdapter(
               });
             } else {
               const input = message.payload as ModelPayload;
+              const offered = (input.options.tools?.length ?? 0) > 0;
+              const requires = [
+                ...(input.options.stream ? ['streaming' as const] : []),
+                ...(offered ? ['tool-calling' as const] : []),
+              ];
               const lease = await run.request.models.begin(input.role, {
                 signal: run.request.signal,
-                ...(input.options.stream ? { requires: ['streaming'] as const } : {}),
+                ...(requires.length ? { requires } : {}),
               });
               call = { lease, settled: false };
               run.leases.add(call);
@@ -424,13 +440,38 @@ export function createPyodideAdapter(
                 typeof implementation === 'function'
                   ? implementation({ credential: lease.credential as string })
                   : implementation;
-              const messages = input.messages.map((item) =>
-                item.role === 'system'
-                  ? new SystemMessage(item.content)
-                  : item.role === 'user'
-                    ? new HumanMessage(item.content)
-                    : new AIMessage(item.content),
-              );
+              if (offered && typeof provider.bindTools !== 'function')
+                throw adapterFailure('unsupported');
+              const bound = offered
+                ? provider.bindTools?.(
+                    [...(input.options.tools ?? [])],
+                    input.options.toolChoice === undefined
+                      ? {}
+                      : { tool_choice: input.options.toolChoice },
+                  )
+                : provider;
+              if (!bound) throw adapterFailure('unsupported');
+              const messages = input.messages.map((item) => {
+                switch (item.role) {
+                  case 'system':
+                    return new SystemMessage(item.content);
+                  case 'user':
+                    return new HumanMessage(item.content);
+                  case 'tool':
+                    return new ToolMessage({
+                      content: item.content,
+                      tool_call_id: item.tool_call_id as string,
+                    });
+                  case 'assistant':
+                    return new AIMessage({
+                      content: item.content,
+                      additional_kwargs:
+                        item.toolCalls === undefined ? {} : { tool_calls: [...item.toolCalls] },
+                    });
+                  default:
+                    throw adapterFailure('invalid');
+                }
+              });
               const modelOptions = {
                 signal: run.request.signal,
                 ...(input.options.stop === undefined ? {} : { stop: [...input.options.stop] }),
@@ -439,23 +480,27 @@ export function createPyodideAdapter(
               const validateReply = (reply: AIMessage | AIMessageChunk): void => {
                 if (
                   typeof reply.content !== 'string' ||
-                  reply.tool_calls?.length ||
-                  reply.invalid_tool_calls?.length ||
-                  ('tool_call_chunks' in reply && reply.tool_call_chunks?.length) ||
-                  reply.additional_kwargs['tool_calls']
+                  (!offered &&
+                    (reply.tool_calls?.length ||
+                      reply.invalid_tool_calls?.length ||
+                      ('tool_call_chunks' in reply && reply.tool_call_chunks?.length) ||
+                      reply.additional_kwargs['tool_calls']))
                 )
                   throw adapterFailure('unsupported');
               };
               let reply: AIMessage | AIMessageChunk;
+              let checked = '';
               if (input.options.stream) {
                 let combined: AIMessageChunk | undefined;
-                const stream = await provider.stream(messages, modelOptions);
+                const growing = new GrowingOutput();
+                const stream = await bound.stream(messages, modelOptions);
                 for await (const chunk of stream) {
                   if (run.cancelled || run.request.signal.aborted || connection !== client)
                     throw adapterFailure('cancelled');
                   validateReply(chunk);
                   combined = combined === undefined ? chunk : combined.concat(chunk);
-                  await lease.checkOutput(combined.content as string, { final: false });
+                  checked = offered ? growing.append(chunk) : (combined.content as string);
+                  await lease.checkOutput(checked, { final: false });
                   if (run.cancelled || run.request.signal.aborted || connection !== client)
                     throw adapterFailure('cancelled');
                   client.send({
@@ -463,19 +508,33 @@ export function createPyodideAdapter(
                     kind: 'notify',
                     id: message.id,
                     op: 'model-chunk',
-                    payload: { content: chunk.content },
+                    payload: {
+                      content: chunk.content,
+                      ...(offered ? { toolCalls: toolDeltas(chunk) } : {}),
+                    },
                   });
                 }
                 if (!combined) throw adapterFailure('unavailable');
                 reply = combined;
-              } else reply = await provider.invoke(messages, modelOptions);
+              } else reply = await bound.invoke(messages, modelOptions);
               validateReply(reply);
-              await lease.checkOutput(reply.content as string, { final: true });
+              const calls = offered ? toolCalls(reply) : undefined;
+              const returnedText = offered ? outputText(reply) : (reply.content as string);
+              let finalText = returnedText;
+              if (input.options.stream && offered) {
+                finalText = checked;
+                if (!checked.includes(returnedText)) finalText += `\n${returnedText}`;
+              }
+              // Tool-call IDs are model text that Python receives, so they are checked too.
+              if (calls?.length)
+                finalText = [finalText, ...calls.map((call) => call.id)].join('\n');
+              await lease.checkOutput(finalText, { final: true });
               if (run.cancelled || run.request.signal.aborted) throw adapterFailure('cancelled');
               const reported: unknown = Reflect.get(reply, 'usage_metadata');
               if (reported !== undefined && !object(reported)) throw adapterFailure('invalid');
               const result = {
                 content: reply.content,
+                ...(calls ? { toolCalls: calls } : {}),
                 ...(reported === undefined
                   ? {}
                   : {
@@ -544,6 +603,7 @@ export function createPyodideAdapter(
           signal.addEventListener('abort', abort, { once: true });
           if (signal.aborted) abort();
           const payload: BootPayload = {
+            ...(framework === 'langgraph' ? {} : { framework }),
             runtimeUrl: options.runtimeUrl,
             wheelsUrl: options.wheelsUrl,
             localWheels: options.localWheels,
@@ -597,6 +657,7 @@ export function createPyodideAdapter(
           try {
             if (disposed || active) throw adapterFailure('invalid');
             const command = request.command;
+            if (!langgraph && command.type !== 'start') throw adapterFailure('unsupported');
             if (command.type === 'resume') {
               const interaction = await pending(request.sessionId);
               if (interaction?.interactionId !== command.interactionId)

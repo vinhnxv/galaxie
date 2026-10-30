@@ -1,0 +1,37 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "system",
+          "content": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{\"properties\": {\"value\": {\"type\": \"integer\"}}, \"required\": [\"value\"], \"title\": \"Answer\", \"type\": \"object\"}\n\nDon't include any text or Markdown fencing before or after.\n"
+        },
+        {
+          "role": "user",
+          "content": "prompted output"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [
+    {
+      "content": "{\"value\":6}",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "value": 6
+  },
+  "error": null
+}

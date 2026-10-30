@@ -1,0 +1,31 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "plain text"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [
+    {
+      "content": "A plain answer.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": "A plain answer.",
+  "error": null
+}

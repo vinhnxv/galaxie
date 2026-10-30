@@ -42,7 +42,9 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
     assets.push({ file, bytes: readFileSync(path) });
   };
   if (available) {
-    for (const wheel of [...lockedWheels, ...local])
+    for (const wheel of [...lockedWheels, ...local].filter(
+      (wheel) => wheel.frameworks === undefined || wheel.frameworks.includes('langgraph'),
+    ))
       add(`python/wheels/${wheel.file}`, join(cacheDirectory, wheel.file));
     for (const file of runtimeFiles) {
       const path = join(root, 'packages/adapter-pyodide/node_modules/pyodide', file.file);

@@ -1,0 +1,60 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "structured tool"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "final_result",
+            "description": "The final response which ends this conversation",
+            "parameters": {
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "title": "Answer",
+              "type": "object"
+            }
+          }
+        }
+      ],
+      "toolChoice": "required"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "output_1",
+          "name": "final_result",
+          "args": {
+            "value": 6
+          }
+        }
+      ]
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "value": 6
+  },
+  "error": null
+}

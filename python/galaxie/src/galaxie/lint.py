@@ -13,10 +13,22 @@ _MODULES = (
     "http.client", "socket", "openai", "anthropic", "cohere", "groq", "mistralai",
     "google.genai", "google.generativeai", "ollama", "litellm", "langchain_openai",
     "langchain_anthropic", "langchain_google_genai", "langchain_ollama",
+    "pydantic_ai.providers",
+    *("pydantic_ai.models." + module for module in (
+        "anthropic", "bedrock", "bedrock_mantle", "cerebras", "cohere", "crusoe",
+        "function", "github_copilot", "google", "groq", "huggingface", "mcp_sampling",
+        "mistral", "ollama", "openai", "openai_codex", "openai_decisions", "openrouter",
+        "snowflake", "system_one", "test", "typesafe", "xai", "zai",
+    )),
 )
 _PROVIDER = re.compile(
-    r"^(?:openai|anthropic|cohere|groq|mistral|mistralai|google-gla|google-vertex|"
-    r"ollama|litellm|azure|bedrock|huggingface|deepseek|openrouter):", re.IGNORECASE
+    r"^(?:gateway/)?(?:openai|openai-chat|openai-responses|openai-decisions|openai-codex|"
+    r"openai-chatgpt|anthropic|cohere|groq|grok|mistral|mistralai|google|google-cloud|"
+    r"google-gla|google-vertex|ollama|litellm|azure|azure-responses|bedrock|bedrock-mantle|"
+    r"huggingface|deepseek|openrouter|vercel|cerebras|system-one|crusoe|elevenlabs|xai|"
+    r"moonshotai|meta|fireworks|together|heroku|github|github-copilot|vllm|nebius|ovhcloud|"
+    r"alibaba|sambanova|sentence-transformers|snowflake|typesafe|voyageai|zai|test|function):",
+    re.IGNORECASE,
 )
 
 
@@ -38,6 +50,12 @@ def lint_source(source: str) -> None:
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and _PROVIDER.match(node.value):
             raise ValueError(_MESSAGE)
         if isinstance(node, ast.Call):
+            if (
+                isinstance(node.func, ast.Name) and node.func.id == "infer_model"
+            ) or (
+                isinstance(node.func, ast.Attribute) and node.func.attr == "infer_model"
+            ):
+                raise ValueError(_MESSAGE)
             dynamic = (
                 isinstance(node.func, ast.Name) and node.func.id == "__import__"
             ) or (

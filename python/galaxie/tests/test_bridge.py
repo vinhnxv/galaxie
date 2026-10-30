@@ -151,3 +151,30 @@ def test_unsolicited_model_chunk_is_rejected():
             'v': _bridge.VERSION, 'kind': 'notify', 'op': 'model-chunk',
             'id': 'missing', 'payload': {'content': 'PRIVATE'},
         }))
+
+
+def test_model_tool_shapes_are_closed_on_both_sides():
+    tool = {'type': 'function', 'function': {'name': 'double', 'parameters': {'type': 'object'}}}
+    call = {'id': 'one', 'type': 'function', 'function': {'name': 'double', 'arguments': '{"value":2}'}}
+    payload = {'role': 'answer', 'messages': [
+        {'role': 'assistant', 'content': '', 'toolCalls': [call]},
+        {'role': 'tool', 'content': '4', 'tool_call_id': 'one'},
+    ], 'options': {'tools': [tool], 'toolChoice': 'auto'}}
+    async def transport(raw):
+        message = json.loads(raw)
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': {'content': '', 'toolCalls': [call]}})
+    _bridge.install_transport(transport)
+    assert asyncio.run(_bridge.request('model', payload))['toolCalls'] == [call]
+    for malformed in [
+        {**payload, 'options': {'tools': [{**tool, 'secret': True}]}},
+        {**payload, 'messages': [{'role': 'assistant', 'content': '', 'toolCalls': [{**call, 'secret': True}]}]},
+        {**payload, 'messages': [{'role': 'tool', 'content': '4'}]},
+    ]:
+        with pytest.raises(GalaxieError, match='^The request is invalid\\.$'):
+            asyncio.run(_bridge.request('model', malformed))
+    async def invalid_reply(raw):
+        message = json.loads(raw)
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': {'content': '', 'toolCalls': [{**call, 'secret': True}]}})
+    _bridge.install_transport(invalid_reply)
+    with pytest.raises(GalaxieError, match='^The request is invalid\\.$'):
+        asyncio.run(_bridge.request('model', payload))

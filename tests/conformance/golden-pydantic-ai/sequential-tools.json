@@ -1,0 +1,216 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "two tools"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "two tools"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "double_1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":2}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "double_1",
+          "content": "{\"value\":4}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "two tools"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "double_1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":2}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "double_1",
+          "content": "{\"value\":4}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "double_2",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":4}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "double_2",
+          "content": "{\"value\":8}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "double_1",
+          "name": "double",
+          "args": {
+            "value": 2
+          }
+        }
+      ]
+    },
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "double_2",
+          "name": "double",
+          "args": {
+            "value": 4
+          }
+        }
+      ]
+    },
+    {
+      "content": "The result is 8.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 2
+      }
+    },
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 4
+      }
+    }
+  ],
+  "interactions": [],
+  "output": "The result is 8.",
+  "error": null
+}

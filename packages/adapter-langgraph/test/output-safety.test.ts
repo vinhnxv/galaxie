@@ -19,6 +19,7 @@ import {
 } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import { expect, test, vi } from 'vitest';
+import { toolCallChecks } from '../../../tests/conformance/support/tool-call-checks.js';
 import { definition, FakeExecutor } from '../../core/test/fake-executor.js';
 import { assertSpanTree, createSpanRecorder, serializeSpans } from '../../core/test/span-tree.js';
 import { MockChatModel } from '../../models/src/mock.js';
@@ -27,6 +28,30 @@ import { LangGraphTraceHandler } from '../src/trace-handler.js';
 
 const sentinel = 'blocked-canary-29bc';
 const text = `first ${sentinel} third`;
+
+test.each(toolCallChecks)('shared tool argument check: $name', async ({ message, checked }) => {
+  class CaseModel extends BaseChatModel {
+    override _llmType(): string {
+      return 'case';
+    }
+    override async _generate(): Promise<ChatResult> {
+      const reply = new AIMessage(message);
+      return { generations: [{ text: reply.text, message: reply }] };
+    }
+  }
+  const checks: string[] = [];
+  const f = await fixture(({ text }) => {
+    checks.push(text);
+    return 'allow';
+  }, new CaseModel({}));
+  try {
+    await f.model.invoke('hello');
+    expect(checks).toEqual([checked]);
+  } finally {
+    await f.runtime.dispose();
+    await f.recorder.provider.shutdown();
+  }
+});
 
 class Tokens extends BaseCallbackHandler {
   override name = 'tokens';
