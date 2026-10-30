@@ -39,6 +39,20 @@ test('keeps MVP acceptance rows and evidence citations consistent with the repos
   const statuses = ['automated', 'automated + real-device demonstration', 'partial', 'gap'];
   for (const [id, , status] of rows) expect(statuses, id).toContain(status);
 
+  const openItems = markdown.split(/^## Open items\b[^\n]*$/mu)[1] ?? '';
+  const partialEvidence = /^- \*\*Partial acceptance evidence:\*\* (.*(?:\n[ \t]+.*)*)/mu.exec(
+    openItems,
+  )?.[1];
+  expect(partialEvidence, 'Open items must name the partial acceptance evidence.').toBeDefined();
+  expect(
+    new Set(partialEvidence?.match(/AT-\d+/gu) ?? []),
+    'Open items must name exactly the partial and gap rows.',
+  ).toEqual(
+    new Set(
+      rows.filter(([, , status]) => status === 'partial' || status === 'gap').map(([id]) => id),
+    ),
+  );
+
   let quotedNames = 0;
   for (const [document, content] of [
     [record, markdown],
