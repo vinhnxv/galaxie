@@ -3,18 +3,23 @@
 
 """pydantic-ai models and capability tools backed by the JavaScript runtime."""
 
+import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from datetime import datetime, timezone
 from typing import Any
 
-from pydantic_ai import Agent, RunContext, Tool, capture_run_messages
+from pydantic_ai import Agent, AgentRunResult, RunContext, Tool, capture_run_messages
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (
-    ModelMessage, ModelRequest, ModelResponse, ModelResponsePart, RetryPromptPart, SystemPromptPart, TextPart, ToolCallPart, ToolReturnPart, UserPromptPart,
+    ModelMessage, ModelRequest, ModelResponse, ModelResponsePart, ModelResponseStreamEvent,
+    PartStartEvent, PartDeltaEvent, RetryPromptPart, SystemPromptPart, TextPart, TextPartDelta,
+    ToolCallPart, ToolReturnPart, UserPromptPart,
 )
-from pydantic_ai.models import Model, ModelRequestParameters
+from pydantic_ai.models import Model, ModelRequestParameters, StreamedResponse
 from pydantic_ai.models.instrumented import InstrumentedModel
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import RequestUsage, UsageLimits
@@ -38,6 +43,10 @@ def _call(part: ToolCallPart) -> dict[str, Any]:
         'id': part.tool_call_id, 'type': 'function',
         'function': {'name': part.tool_name, 'arguments': part.args_as_json_str()},
     }
+
+
+def _json_number(value: str) -> float:
+    return float(value) + 0.0
 
 
 def _messages(messages: list[ModelMessage], parameters: ModelRequestParameters) -> list[dict[str, Any]]:
@@ -149,10 +158,10 @@ class GalaxieModel(Model):
     def system(self) -> str:
         return 'galaxie'
 
-    async def request(
+    def _prepare(
         self, messages: list[ModelMessage], model_settings: ModelSettings | None,
         model_request_parameters: ModelRequestParameters,
-    ) -> ModelResponse:
+    ) -> tuple[dict[str, Any], ModelRequestParameters]:
         if (
             model_request_parameters.native_tools or model_request_parameters.thinking
             or model_request_parameters.allow_image_output
@@ -174,9 +183,115 @@ class GalaxieModel(Model):
         if tools:
             options['tools'] = tools
             options['toolChoice'] = 'auto' if parameters.allow_text_output else 'required'
-        payload = {'role': self.role, 'messages': _messages(messages, parameters), 'options': options}
+        return {'role': self.role, 'messages': _messages(messages, parameters), 'options': options}, parameters
+
+    async def request(
+        self, messages: list[ModelMessage], model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters,
+    ) -> ModelResponse:
+        payload, parameters = self._prepare(messages, model_settings, model_request_parameters)
         reply = await request('model', payload)
-        return _reply(reply, messages, {tool['function']['name'] for tool in tools}, self.role)
+        return _reply(reply, messages, set(parameters.declared_tool_defs), self.role)
+
+    @asynccontextmanager
+    async def request_stream(
+        self, messages: list[ModelMessage], model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters, run_context: RunContext[Any] | None = None,
+    ) -> AsyncIterator[StreamedResponse]:
+        payload, parameters = self._prepare(messages, model_settings, model_request_parameters)
+        payload['options']['stream'] = True
+        chunks: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+        task = asyncio.create_task(request('model', payload, on_model_chunk=chunks.put_nowait))
+        task.add_done_callback(lambda _: chunks.put_nowait(None))
+        response = _GalaxieStream(parameters, self.role, messages, chunks, task)
+        try:
+            yield response
+        finally:
+            await response.close_stream()
+
+
+class _GalaxieStream(StreamedResponse):
+    def __init__(
+        self, parameters: ModelRequestParameters, role: str, messages: list[ModelMessage],
+        chunks: asyncio.Queue[dict[str, Any] | None], task: asyncio.Task[Any],
+    ) -> None:
+        super().__init__(model_request_parameters=parameters)
+        self._role = role
+        self._messages = messages
+        self._chunks = chunks
+        self._task = task
+        self._timestamp = datetime.now(timezone.utc)
+
+    async def _get_event_iterator(self) -> AsyncIterator[ModelResponseStreamEvent]:
+        content: list[str] = []
+        calls: dict[int, dict[str, list[str]]] = {}
+        while (chunk := await self._chunks.get()) is not None:
+            delta = chunk['content']
+            content.append(delta)
+            if delta:
+                for event in self._parts_manager.handle_text_delta(vendor_part_id='text', content=delta):
+                    yield event
+            for fragment in chunk.get('toolCalls', []):
+                index = fragment['index']
+                if index not in calls:
+                    calls[index] = {'id': [], 'name': [], 'arguments': []}
+                call = calls[index]
+                call['id'].append(fragment.get('id', ''))
+                for key in ('name', 'arguments'):
+                    call[key].append(fragment['function'].get(key, ''))
+        value = await self._task
+        reply = _reply(value, self._messages, set(self.model_request_parameters.declared_tool_defs), self._role)
+        joined = [{
+            'id': ''.join(calls[index]['id']),
+            'function': {key: ''.join(calls[index][key]) for key in ('name', 'arguments')},
+        } for index in calls]
+        by_id = {call['id']: call for call in joined}
+        final_calls = value.get('toolCalls', [])
+        if ''.join(content) != value['content'] or len(joined) != len(final_calls) or len(by_id) != len(joined):
+            raise GalaxieError('invalid')
+        for final in final_calls:
+            streamed = by_id.get(final['id'])
+            # The JavaScript provider normalizes JSON arguments in its final reply.
+            if streamed is None or streamed['function']['name'] != final['function']['name']:
+                raise GalaxieError('invalid')
+            arguments = [item['function']['arguments'] for item in (streamed, final)]
+            try:
+                arguments = [json.dumps(
+                    json.loads(item, parse_int=_json_number, parse_float=_json_number),
+                    sort_keys=True, allow_nan=False,
+                ) for item in arguments]
+            except ValueError:
+                pass
+            if arguments[0] != arguments[1]:
+                raise GalaxieError('invalid')
+        self._usage = reply.usage
+        for index, part in enumerate(reply.parts):
+            if isinstance(part, ToolCallPart):
+                yield self._parts_manager.handle_tool_call_part(
+                    vendor_part_id=index, tool_name=part.tool_name,
+                    args=part.args_as_json_str(), tool_call_id=part.tool_call_id,
+                )
+
+    async def close_stream(self) -> None:
+        if not self._task.done():
+            self._task.cancel()
+        await asyncio.gather(self._task, return_exceptions=True)
+
+    @property
+    def model_name(self) -> str:
+        return self._role
+
+    @property
+    def provider_name(self) -> None:
+        return None
+
+    @property
+    def provider_url(self) -> None:
+        return None
+
+    @property
+    def timestamp(self) -> datetime:
+        return self._timestamp
 
 
 def capability_tool(
@@ -229,7 +344,38 @@ class Executor:
         self._conversations: dict[str, int] = {}
         agent.instrument = False
 
-    async def run(self, input: Any, conversation_id: str, steps: int) -> Any:
+    async def _run_stream(
+        self, prompt: str, options: dict[str, Any], on_stream: Callable[[str, Any], None],
+    ) -> AgentRunResult[Any]:
+        request_index = 0
+        async with self.agent.iter(prompt, **options) as run:
+            async for node in run:
+                if Agent.is_model_request_node(node):
+                    on_stream('updates', {'kind': 'model-request', 'index': request_index})
+                    request_index += 1
+                    async with node.stream(run.ctx) as events:
+                        async for event in events:
+                            if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                                text = event.part.content
+                            elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                                text = event.delta.content_delta
+                            else:
+                                continue
+                            if text:
+                                on_stream('messages', [{'type': 'ai', 'content': text}, {}])
+                elif Agent.is_call_tools_node(node):
+                    for index, part in enumerate(node.model_response.parts):
+                        if isinstance(part, ToolCallPart):
+                            on_stream('updates', {'kind': 'tool-call', 'name': part.tool_name, 'index': index})
+            result = run.result
+        if result is None:
+            raise GalaxieError('executor_error')
+        return result
+
+    async def run(
+        self, input: Any, conversation_id: str, steps: int, *,
+        on_stream: Callable[[str, Any], None] | None = None,
+    ) -> Any:
         _uninstrumented(self.agent)
         Agent.instrument_all(False)
         if self.prompt is None:
@@ -244,7 +390,11 @@ class Executor:
         token = _positions.set(position)
         with capture_run_messages() as messages:
             try:
-                result = await self.agent.run(prompt, conversation_id=conversation_id, usage_limits=UsageLimits(request_limit=steps), infer_name=False)
+                options = {'conversation_id': conversation_id, 'usage_limits': UsageLimits(request_limit=steps), 'infer_name': False}
+                if on_stream is None:
+                    result = await self.agent.run(prompt, **options)
+                else:
+                    result = await self._run_stream(prompt, options, on_stream)
             except UsageLimitExceeded:
                 raise GalaxieError('budget_exceeded') from None
             except UnexpectedModelBehavior:

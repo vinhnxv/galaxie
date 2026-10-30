@@ -84,7 +84,7 @@ def invalid_agent():
           mock: {
             destination: 'in-browser' as const,
             modality: 'text' as const,
-            features: [],
+            features: ['streaming' as const],
             languages: ['en'],
             pricing: { inputPerToken: 0, outputPerToken: 0 },
           },

@@ -1,0 +1,70 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "stream text"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [
+    {
+      "content": "A streamed answer.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": "A streamed answer.",
+  "error": null,
+  "streams": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model-request",
+        "index": 0
+      }
+    },
+    {
+      "mode": "messages",
+      "data": [
+        {
+          "type": "ai",
+          "content": "A "
+        },
+        {}
+      ]
+    },
+    {
+      "mode": "messages",
+      "data": [
+        {
+          "type": "ai",
+          "content": "streamed "
+        },
+        {}
+      ]
+    },
+    {
+      "mode": "messages",
+      "data": [
+        {
+          "type": "ai",
+          "content": "answer."
+        },
+        {}
+      ]
+    }
+  ]
+}

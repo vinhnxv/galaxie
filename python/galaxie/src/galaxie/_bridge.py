@@ -39,7 +39,7 @@ class GalaxieError(Exception):
 
 _transport: Callable[[str], Awaitable[str]] | None = None
 _notify: Callable[[str], None] | None = None
-_streams: dict[str, Callable[[str], None]] = {}
+_streams: dict[str, Callable[[dict[str, Any]], None]] = {}
 _ids = itertools.count(1)
 
 
@@ -152,6 +152,7 @@ def _model_chunk(value):
 
 async def request(
     op: str, payload: dict[str, Any], *, on_chunk: Callable[[str], None] | None = None,
+    on_model_chunk: Callable[[dict[str, Any]], None] | None = None,
 ) -> Any:
     if op not in ("model", "capability", "checkpoint"):
         raise GalaxieError("invalid")
@@ -161,9 +162,12 @@ async def request(
         raise GalaxieError('invalid')
     if _transport is None:
         raise GalaxieError("unavailable")
-    if on_chunk is not None and (
-        not callable(on_chunk) or op != 'model' or payload.get('options', {}).get('stream') is not True
-    ):
+    callback = on_model_chunk if on_model_chunk is not None else (
+        (lambda chunk: on_chunk(chunk['content'])) if on_chunk is not None else None
+    )
+    if (on_chunk is not None and on_model_chunk is not None) or (callback is not None and (
+        not callable(on_model_chunk or on_chunk) or op != 'model' or payload.get('options', {}).get('stream') is not True
+    )):
         raise GalaxieError('invalid')
     identifier = str(next(_ids))
     message = {"v": VERSION, "kind": "request", "id": identifier, "op": op, "payload": payload}
@@ -174,8 +178,8 @@ async def request(
     except (ValueError, TypeError, UnicodeError):
         raise GalaxieError("invalid") from None
     try:
-        if on_chunk is not None:
-            _streams[identifier] = on_chunk
+        if callback is not None:
+            _streams[identifier] = callback
         reply = await _transport(raw)
     except GalaxieError:
         raise
@@ -240,19 +244,12 @@ def receive_model_chunk(raw: str) -> None:
             or not _model_chunk(message['payload'])
         ):
             raise GalaxieError('invalid')
-        _streams[message['id']](message['payload']['content'])
+        _streams[message['id']](message['payload'])
     except (ValueError, TypeError, UnicodeError):
         raise GalaxieError('invalid') from None
 
 
 def _project_stream(value: Any) -> Any:
-    from langchain_core.messages import BaseMessage
-    from langgraph.types import Interrupt
-
-    if isinstance(value, Interrupt):
-        return {'id': value.id, 'value': _project_stream(value.value)}
-    if isinstance(value, BaseMessage):
-        return {'type': value.type, 'content': _project_stream(value.content), 'id': value.id}
     if isinstance(value, (list, tuple)):
         return [_project_stream(item) for item in value]
     if isinstance(value, dict):
@@ -261,6 +258,13 @@ def _project_stream(value: Any) -> Any:
         return {key: _project_stream(item) for key, item in value.items()}
     if value is None or type(value) in (str, bool, int, float):
         return value
+    from langchain_core.messages import BaseMessage
+    from langgraph.types import Interrupt
+
+    if isinstance(value, Interrupt):
+        return {'id': value.id, 'value': _project_stream(value.value)}
+    if isinstance(value, BaseMessage):
+        return {'type': value.type, 'content': _project_stream(value.content), 'id': value.id}
     raise GalaxieError('unsupported')
 
 

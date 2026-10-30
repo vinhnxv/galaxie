@@ -277,3 +277,136 @@ def test_tool_ids_from_previous_starts_may_repeat_with_distinct_scopes():
     assert asyncio.run(executor.run({'prompt': 'first'}, 'fixed', 5)) == 'done'
     assert asyncio.run(executor.run({'prompt': 'second'}, 'fixed', 5)) == 'done'
     assert [call['effectScope'] for call in calls] == ['pydantic-ai/fixed/1/0', 'pydantic-ai/fixed/5/0']
+
+
+def streaming_transport(chunks, reply, seen=None):
+    async def transport(raw):
+        message = json.loads(raw)
+        if seen is not None:
+            seen.append(message['payload'])
+        for chunk in chunks:
+            _bridge.receive_model_chunk(json.dumps({
+                **message, 'kind': 'notify', 'op': 'model-chunk', 'payload': chunk,
+            }))
+            await asyncio.sleep(0)
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
+    _bridge.install_transport(transport)
+
+
+def test_streamed_text_arrives_before_completion_and_usage_is_final():
+    seen = []
+    streaming_transport([{'content': 'first '}, {'content': 'second'}], {
+        'content': 'first second', 'usage': {'input_tokens': 3, 'output_tokens': 2, 'total_tokens': 5},
+    }, seen)
+    async def run():
+        from pydantic_ai.messages import PartStartEvent, PartDeltaEvent, TextPartDelta
+        deltas = []
+        async with GalaxieModel('answer').request_stream([], {'stop_sequences': ['stop']}, ModelRequestParameters()) as response:
+            async for event in response:
+                if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                    deltas.append(event.part.content)
+                elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                    deltas.append(event.delta.content_delta)
+            assert deltas == ['first ', 'second']
+            assert response.get().parts == [TextPart('first second')]
+            assert response.get().usage.input_tokens == 3
+            assert response.get().usage.output_tokens == 2
+    asyncio.run(run())
+    assert seen[0]['options'] == {'stream': True, 'stop': ['stop']}
+
+
+@pytest.mark.parametrize('reply', [
+    {'content': 'different'},
+    {'content': 'joined', 'toolCalls': [tool_call('lookup', '{}')]},
+])
+def test_stream_final_reply_must_match_joined_deltas(reply):
+    streaming_transport([{'content': 'joined'}], reply)
+    async def run():
+        async with GalaxieModel('answer').request_stream([], None, ModelRequestParameters(function_tools=[ToolDefinition(name='lookup')])) as response:
+            async for _ in response:
+                pass
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(run())
+    assert error.value.code == 'invalid'
+
+
+def test_streamed_tool_fragments_are_reassembled_and_validated_before_execution():
+    chunks = [
+        {'content': '', 'toolCalls': [{'index': 0, 'id': 'call_', 'type': 'function', 'function': {'name': 'look', 'arguments': '{"query":'}}]},
+        {'content': '', 'toolCalls': [{'index': 0, 'id': '1', 'type': 'function', 'function': {'name': 'up', 'arguments': ' "x"}'}}]},
+    ]
+    streaming_transport(chunks, {'content': '', 'toolCalls': [tool_call('lookup', '{"query":"x"}')]})
+    async def run():
+        async with GalaxieModel('answer').request_stream([], None, ModelRequestParameters(function_tools=[ToolDefinition(name='lookup')])) as response:
+            async for _ in response:
+                pass
+            part = response.get().parts[0]
+            assert isinstance(part, ToolCallPart)
+            assert (part.tool_name, part.tool_call_id, part.args_as_dict()) == ('lookup', 'call_1', {'query': 'x'})
+    asyncio.run(run())
+
+
+def test_abandoning_a_stream_cancels_and_drains_the_bridge_request():
+    cancelled = []
+    async def transport(raw: str) -> str:
+        message = json.loads(raw)
+        _bridge.receive_model_chunk(json.dumps({**message, 'kind': 'notify', 'op': 'model-chunk', 'payload': {'content': 'first'}}))
+        try:
+            return await asyncio.Future()
+        finally:
+            cancelled.append(True)
+    _bridge.install_transport(transport)
+    async def run():
+        async with GalaxieModel('answer').request_stream([], None, ModelRequestParameters()) as response:
+            async for _ in response:
+                break
+        assert not _bridge._streams
+    asyncio.run(run())
+    assert cancelled == [True]
+
+
+@pytest.mark.parametrize('raw,final', [
+    ('{"value":1.0}', '{"value":1}'),
+    ('{"value":1e0}', '{"value":1}'),
+    ('{"value":-0.0}', '{"value":0}'),
+    ('{"value":9007199254740993}', '{"value":9007199254740992}'),
+])
+def test_streamed_arguments_match_the_javascript_final_number_representation(raw, final):
+    streaming_transport([{'content': '', 'toolCalls': [{
+        'index': 0, 'id': 'one', 'type': 'function', 'function': {'name': 'lookup', 'arguments': raw},
+    }]}], {'content': '', 'toolCalls': [tool_call('lookup', final, 'one')]})
+    async def run():
+        async with GalaxieModel('answer').request_stream([], None, ModelRequestParameters(function_tools=[ToolDefinition(name='lookup')])) as response:
+            async for _ in response:
+                pass
+            part = response.get().parts[0]
+            assert isinstance(part, ToolCallPart)
+            assert part.args == final
+    asyncio.run(run())
+
+
+def test_streamed_argument_normalization_keeps_booleans_distinct_from_numbers():
+    streaming_transport([{'content': '', 'toolCalls': [{
+        'index': 0, 'id': 'one', 'type': 'function', 'function': {'name': 'lookup', 'arguments': '{"value":true}'},
+    }]}], {'content': '', 'toolCalls': [tool_call('lookup', '{"value":1}', 'one')]})
+    async def run():
+        async with GalaxieModel('answer').request_stream([], None, ModelRequestParameters(function_tools=[ToolDefinition(name='lookup')])) as response:
+            async for _ in response:
+                pass
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(run())
+    assert error.value.code == 'invalid'
+
+
+@pytest.mark.parametrize('final_order', [('one', 'zero'), ('zero', 'one')])
+def test_streamed_calls_align_by_identity_when_indices_arrive_out_of_order(final_order):
+    calls = {identifier: tool_call('lookup', '{}', identifier) for identifier in final_order}
+    streaming_transport([{'content': '', 'toolCalls': [
+        {'index': index, **calls[identifier]} for index, identifier in [(1, 'one'), (0, 'zero')]
+    ]}], {'content': '', 'toolCalls': [calls[identifier] for identifier in final_order]})
+    async def run():
+        async with GalaxieModel('answer').request_stream([], None, ModelRequestParameters(function_tools=[ToolDefinition(name='lookup')])) as response:
+            async for _ in response:
+                pass
+            assert [part.tool_call_id for part in response.get().parts if isinstance(part, ToolCallPart)] == list(final_order)
+    asyncio.run(run())

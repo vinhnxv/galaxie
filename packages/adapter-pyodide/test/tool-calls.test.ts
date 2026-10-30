@@ -52,3 +52,25 @@ test('Python receives parsed calls only, while raw mirrors stay in the checked t
   ]);
   expect(outputText(message)).toBe('\n{}\n');
 });
+
+test('parallel streamed calls without an index keep separate slots', () => {
+  const growing = new GrowingOutput();
+  growing.append(
+    new AIMessageChunk({
+      content: '',
+      tool_call_chunks: [{ id: 'one', name: 'lookup', args: '{"value":1}' }],
+    }),
+  );
+  expect(growing.deltas()).toMatchObject([{ index: 0, id: 'one' }]);
+  growing.append(
+    new AIMessageChunk({
+      content: '',
+      tool_call_chunks: [{ id: 'two', name: 'lookup', args: '{"value":2}' }],
+    }),
+  );
+  expect(growing.deltas()).toMatchObject([{ index: 1, id: 'two' }]);
+  growing.append(new AIMessageChunk({ content: '', tool_call_chunks: [{ args: '' }] }));
+  expect(growing.deltas()).toMatchObject([{ index: 1 }]);
+  expect(growing.toolCallIds()).toEqual(['one', 'two']);
+  expect(growing.toolCallNames()).toEqual(['lookup', 'lookup']);
+});

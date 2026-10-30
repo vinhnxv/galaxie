@@ -3,9 +3,10 @@
 
 import { createRuntime, defineAgentDefinition, GalaxieError, type RunEvent } from '@galaxie/core';
 import { createMockLatch, MockChatModel, type MockScript } from '@galaxie/models/mock';
+import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { BaseChatModel, type BindToolsInput } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage, ToolCall } from '@langchain/core/messages';
-import type { ChatResult } from '@langchain/core/outputs';
+import type { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';
 import { z } from 'zod';
 import {
   createPyodideAdapter,
@@ -24,6 +25,14 @@ export const pydanticCases = [
   'capability-denial',
   'argument-block',
   'abort',
+  'stream-text',
+  'stream-tools',
+  'stream-tool-output',
+  'stream-output-retry',
+  'stream-id-block',
+  'stream-mid-block',
+  'stream-final-mismatch',
+  'stream-abort',
 ] as const;
 interface Spec {
   readonly prompt: string;
@@ -34,6 +43,7 @@ export interface PydanticTranscript {
   readonly responses: unknown[];
   readonly capabilities: unknown[];
   readonly interactions: unknown[];
+  readonly streams?: unknown[];
   output: unknown;
   error: unknown;
 }
@@ -59,17 +69,20 @@ class RecordingModel extends BaseChatModel {
   readonly script: MockScript;
   readonly tools: BindToolsInput[];
   readonly choice: unknown;
+  readonly streamLatch: ReturnType<typeof createMockLatch> | undefined;
   constructor(
     script: MockScript,
     transcript: PydanticTranscript,
     tools: BindToolsInput[] = [],
     choice?: unknown,
+    streamLatch?: ReturnType<typeof createMockLatch>,
   ) {
     super({});
     this.script = script;
     this.transcript = transcript;
     this.tools = tools;
     this.choice = choice;
+    this.streamLatch = streamLatch;
     this.mock = tools.length
       ? new MockChatModel(script).bindTools(tools)
       : new MockChatModel(script);
@@ -81,7 +94,13 @@ class RecordingModel extends BaseChatModel {
     tools: BindToolsInput[],
     kwargs?: Partial<this['ParsedCallOptions']>,
   ): RecordingModel {
-    return new RecordingModel(this.script, this.transcript, tools, kwargs?.tool_choice);
+    return new RecordingModel(
+      this.script,
+      this.transcript,
+      tools,
+      kwargs?.tool_choice,
+      this.streamLatch,
+    );
   }
   override async _generate(
     messages: BaseMessage[],
@@ -101,6 +120,21 @@ class RecordingModel extends BaseChatModel {
     });
     return result;
   }
+
+  override async *_streamResponseChunks(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+    runManager?: CallbackManagerForLLMRun,
+  ): AsyncGenerator<ChatGenerationChunk> {
+    // Record the provider's complete scripted reply, including replies blocked during delivery.
+    await this._generate(messages, options);
+    let first = true;
+    for await (const chunk of this.mock._streamResponseChunks(messages, options, runManager)) {
+      yield chunk;
+      if (first) await this.streamLatch?.wait(options.signal);
+      first = false;
+    }
+  }
 }
 
 export async function executePydanticCase(
@@ -117,6 +151,7 @@ export async function executePydanticCase(
     responses: [],
     capabilities: [],
     interactions: [],
+    ...(name.startsWith('stream-') ? { streams: [] } : {}),
     output: null,
     error: null,
   };
@@ -129,12 +164,18 @@ export async function executePydanticCase(
       ...(name === 'abort' ? { wait: latch } : {}),
     })),
   };
-  const model = new RecordingModel(script, transcript);
+  const model = new RecordingModel(
+    script,
+    transcript,
+    [],
+    undefined,
+    name === 'stream-abort' ? latch : undefined,
+  );
   const runtime = createRuntime({
     appId: 'pydantic-conformance',
     executors: [createPyodideAdapter({ ...options, framework: 'pydantic-ai' })],
     budgets: { steps: 25, toolCalls: 10, tokens: 2000 },
-    outputSafety: ({ text }) => (text.includes('BLOCKED_ARGUMENT') ? 'block' : 'allow'),
+    outputSafety: ({ text }) => (/BLOCKED_(ARGUMENT|ID|TEXT)/.test(text) ? 'block' : 'allow'),
   });
   try {
     const instance = await runtime.create(
@@ -181,7 +222,7 @@ export async function executePydanticCase(
               destination: 'in-browser',
               modality: 'text',
               languages: ['en'],
-              features: ['tool-calling'],
+              features: ['tool-calling', 'streaming'],
               pricing: { inputPerToken: 0, outputPerToken: 0 },
             },
           },
@@ -193,7 +234,11 @@ export async function executePydanticCase(
     const { runId } = await instance.start({ prompt: spec.prompt });
     const events = (async (): Promise<RunEvent[]> => {
       const recorded: RunEvent[] = [];
-      for await (const event of instance.events(runId)) recorded.push(event);
+      for await (const event of instance.events(runId)) {
+        recorded.push(event);
+        if (name === 'stream-abort' && event.type === 'stream' && event.mode === 'messages')
+          await instance.cancel(runId);
+      }
       return recorded;
     })();
     if (name === 'abort') {
@@ -205,8 +250,12 @@ export async function executePydanticCase(
       else if (event.type === 'error') transcript.error = event.error;
       else if (event.type === 'cancelled')
         transcript.error = { code: 'cancelled', message: 'The run was cancelled.' };
-      else if (event.type === 'interaction' || event.type === 'stream')
-        transcript.interactions.push(event);
+      else if (event.type === 'interaction') transcript.interactions.push(event);
+      else if (event.type === 'stream') {
+        if (event.executor !== 'pydantic-ai-python' || event.path.length !== 0)
+          throw new Error('The stream has an unexpected executor or path.');
+        transcript.streams?.push({ mode: event.mode, data: event.data });
+      }
     }
     return JSON.parse(JSON.stringify(transcript)) as PydanticTranscript;
   } finally {
