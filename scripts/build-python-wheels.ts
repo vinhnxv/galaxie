@@ -8,6 +8,15 @@ import { fileURLToPath } from 'node:url';
 
 const directory = fileURLToPath(new URL('../.cache/python-wheels/', import.meta.url));
 await mkdir(directory, { recursive: true });
+// Build without isolation inside the synced, locked environment, which provides setuptools.
+const interpreter = fileURLToPath(
+  new URL(
+    process.platform === 'win32'
+      ? '../python/.venv/Scripts/python.exe'
+      : '../python/.venv/bin/python',
+    import.meta.url,
+  ),
+);
 const packages = [];
 for (const [name, version] of [
   ['galaxie', '0.0.0'],
@@ -24,6 +33,8 @@ for (const [name, version] of [
       '--wheel',
       '--offline',
       '--no-build-isolation',
+      '--python',
+      interpreter,
       '--out-dir',
       directory,
     ],
