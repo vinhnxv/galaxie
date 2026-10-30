@@ -200,10 +200,17 @@ export function checkInteractionUrls(props: unknown, allowlist: readonly string[
 }
 
 function decodeUrl(value: string): string {
+  const spaced = value.replaceAll('+', ' ');
   try {
-    return decodeURIComponent(value.replaceAll('+', ' '));
+    return decodeURIComponent(spaced);
   } catch {
-    return value;
+    return spaced.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
+      try {
+        return decodeURIComponent(run);
+      } catch {
+        return run;
+      }
+    });
   }
 }
 

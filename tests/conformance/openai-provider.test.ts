@@ -64,6 +64,135 @@ const schema = {
   additionalProperties: false,
 };
 
+test.each(['invoke', 'stream'] as const)(
+  'AT-24 a CORS-allowed loopback user-device model endpoint succeeds: %s',
+  async (mode) => {
+    const endpoint =
+      typeof window === 'undefined'
+        ? httpFixture.corsUrl
+        : httpFixture.corsUrl.replace('127.0.0.1', 'localhost');
+    const baseURL = `${endpoint}/v1`;
+    const reset = await fetch(httpFixture.adminUrl, { method: 'POST' });
+    expect(reset.status).toBe(200);
+    const { exporter, provider } = createSpanRecorder();
+    const diagnostics: DiagnosticEvent[] = [];
+    let answer = '';
+    let usage: unknown;
+    const runtime = createRuntime({
+      appId: 'loopback-success',
+      dataPolicy: { app: { allow: ['user-device'] } },
+      executors: [createLangGraphAdapter()],
+      tracerProvider: provider,
+      diagnostics: (event) => diagnostics.push(event),
+    });
+    try {
+      const instance = await runtime.create(definition, {
+        principalScope: 'test',
+        services: { chatModels: { endpoint: openAICompatible({ baseURL, model: 'fake' }) } },
+        models: {
+          providers: {
+            endpoint: {
+              destination: 'user-device',
+              modality: 'text',
+              features: ['streaming'],
+              pricing: { inputPerToken: 0, outputPerToken: 0 },
+              credential: true,
+            },
+          },
+          roles: { assistant: { providers: ['endpoint'], allow: ['user-device'], maxTokens: 100 } },
+          consent: () => true,
+          getCredential: () => 'loopback-credential-canary',
+        },
+        agent: (host) =>
+          new StateGraph(state)
+            .addNode('respond', async (_state, config) => {
+              const model = host.langchain.chatModel('assistant');
+              // Keep reply text out of graph state and native message events.
+              const callConfig = { ...config, tags: ['nostream'] };
+              if (mode === 'stream') {
+                for await (const chunk of await model.stream(
+                  'loopback-prompt-canary',
+                  callConfig,
+                )) {
+                  answer += chunk.text;
+                  usage = chunk.usage_metadata ?? usage;
+                }
+              } else {
+                model.disableStreaming = true;
+                const message = await model.invoke('loopback-prompt-canary', callConfig);
+                answer = message.text;
+                usage = message.usage_metadata;
+              }
+              return { answer: 'received' };
+            })
+            .addEdge(START, 'respond')
+            .addEdge('respond', END)
+            .compile(),
+      });
+      await instance.prepare();
+      const { runId } = await instance.start({});
+      const events = await collect(instance.events(runId));
+      await runtime.dispose();
+      await provider.forceFlush();
+      expect(answer).toBe('loopback reply');
+      expect(usage).toMatchObject({ input_tokens: 3, output_tokens: 2, total_tokens: 5 });
+      expect(events.at(-1)).toMatchObject({ type: 'output', output: { answer: 'received' } });
+      expect(events.filter((event) => event.type === 'error')).toEqual([]);
+      expect(instance.getSnapshot().run).toMatchObject({ status: 'succeeded' });
+      expect(instance.getSnapshot().routes?.['assistant']).toEqual({
+        providerId: 'endpoint',
+        destination: 'user-device',
+      });
+      const response = await fetch(httpFixture.adminUrl);
+      expect(response.status).toBe(200);
+      const recorded = (await response.json()) as HttpAdminState;
+      expect(recorded.requests.filter((request) => request.method === 'POST')).toEqual([
+        expect.objectContaining({ server: 'cors', path: '/v1/chat/completions', status: 200 }),
+      ]);
+      if (typeof window !== 'undefined') {
+        expect(recorded.requests).toContainEqual(
+          expect.objectContaining({
+            method: 'OPTIONS',
+            path: '/v1/chat/completions',
+            origin: HTTP_ORIGIN,
+            requestedMethod: 'POST',
+            status: 204,
+          }),
+        );
+        const headers = recorded.requests.find(
+          (request) => request.method === 'OPTIONS',
+        )?.requestedHeaders;
+        expect(headers).toContain('authorization');
+        expect(headers).toContain('content-type');
+      }
+      const spans = exporter.getFinishedSpans();
+      assertSpanTree(spans);
+      expect(
+        spans.filter((span) => span.attributes['gen_ai.operation.name'] === 'chat'),
+      ).toHaveLength(1);
+      const exposed = JSON.stringify({
+        events,
+        snapshot: instance.getSnapshot(),
+        diagnostics,
+        spans: serializeSpans(spans),
+      });
+      for (const marker of [
+        baseURL,
+        new URL(baseURL).host,
+        'localhost',
+        '127.0.0.1',
+        'loopback-prompt-canary',
+        'loopback-credential-canary',
+        'loopback reply',
+      ])
+        expect(exposed).not.toContain(marker);
+    } finally {
+      await runtime.dispose();
+      await provider.shutdown();
+    }
+  },
+);
+
 test.each([
   ['user-device', 'invoke'],
   ['user-device', 'stream'],

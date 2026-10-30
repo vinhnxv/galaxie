@@ -30,6 +30,10 @@ const urls = [
   `${origin}/${encoded}`,
   `${origin}/${encodeURIComponent(encoded)}`,
   `${origin}/search?q=${sentence}&malformed=%ZZ`,
+  `${origin}/search?q=${encoded}&malformed=%ZZ`,
+  `${origin}/search?q=${encodeURIComponent(encoded)}&malformed=%ZZ`,
+  `${origin}/search?q=${encoded.replaceAll('%20', '+')}&malformed=%ZZ`,
+  `${origin}/search?q=${encoded}&malformed=%80`,
   ...controlledQueries.flatMap((value) => [`${origin}/search?q=${value}`, `${origin}/${value}`]),
 ];
 
@@ -94,6 +98,8 @@ test.each(urls)('registered private text in a URL is denied: %s', async (url) =>
 
 test.each([
   ['unregistered value', `${origin}/search?q=unregistered-value`, undefined],
+  ['malformed escape', `${origin}/search?q=public+value&malformed=%ZZ`, undefined],
+  ['invalid UTF-8 run', `${origin}/search?q=public+value&malformed=%80`, undefined],
   ['third-party permission', urls[3] as string, { 'private-user': { allow: ['third-party'] } }],
 ] as const)('an allowlisted URL passes with %s', async (_name, url, policy) => {
   const f = await fixture(url, policy);

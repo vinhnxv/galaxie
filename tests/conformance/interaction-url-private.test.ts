@@ -37,6 +37,10 @@ test.each([
   encoded,
   encoded.replaceAll('%20', '+'),
   encodeURIComponent(encoded),
+  `${encoded}&malformed=%ZZ`,
+  `${encodeURIComponent(encoded)}&malformed=%ZZ`,
+  `${encoded.replaceAll('%20', '+')}&malformed=%ZZ`,
+  `${encoded}&malformed=%80`,
   ...['\t', '\n', '\r'].map((control) => encoded.replace('private', `pri${control}vate`)),
 ])(
   'AT-32 accepted private text cannot enter an allowlisted interaction query: %s',
