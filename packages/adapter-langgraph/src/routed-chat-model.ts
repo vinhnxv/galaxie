@@ -57,6 +57,8 @@ function plainObject(value: unknown): value is Record<string, unknown> {
 }
 
 const LEASE = Symbol('galaxie.model.lease');
+// Shared with provider wrappers; inject only after LangChain normalizes call options.
+const ROUTED_DESTINATION = Symbol.for('galaxie.model.destination');
 interface ActiveRun {
   readonly models: ModelPort;
   readonly handler: LangGraphTraceHandler;
@@ -379,7 +381,12 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     const call = await this.#take(options);
     try {
       if (runManager !== undefined) call.handler.setModelRoute(runManager.runId, call.lease);
-      const result = await call.provider._generate(messages, options, filteredManager(runManager));
+      const providerOptions = { ...options, [ROUTED_DESTINATION]: call.lease.destination };
+      const result = await call.provider._generate(
+        messages,
+        providerOptions,
+        filteredManager(runManager),
+      );
       await call.lease.checkOutput(
         result.generations.map((generation) => outputText(generation.message)).join('\n'),
         { final: true },
@@ -414,11 +421,12 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       const argumentsText: string[] = [];
       const fragmentSlots = new Map<string, number>();
       const providerManager = filteredManager(runManager);
+      const providerOptions = { ...options, [ROUTED_DESTINATION]: call.lease.destination };
       const chunks =
         call.provider.disableStreaming === true ||
         call.provider._streamResponseChunks === BaseChatModel.prototype._streamResponseChunks
-          ? this.#generateChunk(call.provider, messages, options, providerManager)
-          : call.provider._streamResponseChunks(messages, options, providerManager);
+          ? this.#generateChunk(call.provider, messages, providerOptions, providerManager)
+          : call.provider._streamResponseChunks(messages, providerOptions, providerManager);
       for await (const chunk of chunks) {
         text += chunk.text;
         const fragments = isAIMessageChunk(chunk.message)

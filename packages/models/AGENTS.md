@@ -38,6 +38,11 @@ await model.invoke('Hello');
   can serve multiple instances or runtimes in the same page through its shared FIFO.
 - Probe Built-in AI languages; prepare downloads only from an intentional click.
 - Use `openAICompatible` as a per-call factory with credentials from the host.
+- Every routed provider call receives the selected destination as adapter-owned
+  call metadata, for both factories and preconstructed models. Direct
+  OpenAI-compatible calls default to `user-endpoint`; set `destination` explicitly
+  for a host proxy. Network failures before any response on local user endpoints
+  fail `unreachable` with fixed likely causes; never fall back after dispatch.
 
 ## Never
 

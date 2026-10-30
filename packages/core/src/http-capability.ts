@@ -10,8 +10,9 @@ import {
   type HttpCapabilityOptions,
 } from './capabilities.js';
 import { type ErrorCode, GalaxieError, toErrorInfo } from './errors.js';
+import type { DestinationClass } from './policy.js';
 import { DEFAULT_BUDGETS } from './policy.js';
-import { isHttpDestination, isLoopback } from './urls.js';
+import { isHttpDestination, isLoopback, isPrivateAddress } from './urls.js';
 
 interface Placeholder {
   readonly name: string;
@@ -25,7 +26,12 @@ interface Template {
 }
 export interface HttpDescriptor {
   validate(annotations: Annotations, binding: CapabilityBinding): void;
-  invoke(input: unknown, context: CapabilityContext, payloadBytes: number): Promise<unknown>;
+  invoke(
+    input: unknown,
+    context: CapabilityContext,
+    payloadBytes: number,
+    destination: DestinationClass,
+  ): Promise<unknown>;
 }
 // The invoke identity also preserves the marker when a host shallow-copies a binding's policy.
 const descriptors = new WeakMap<object, HttpDescriptor>();
@@ -149,12 +155,14 @@ async function readBody(response: Response, cap: number): Promise<string> {
 }
 
 /** Host-literal HTTP binding. Cross-origin servers must allow both X-Galaxie attribution headers
- * in Access-Control-Allow-Headers; a failed preflight rejects unavailable. Headers never authorize. */
+ * in Access-Control-Allow-Headers; a failed preflight follows the destination's network error rule.
+ * Headers never authorize. */
 export function httpCapability<Input = unknown, Output = unknown>(
   supplied: HttpCapabilityOptions,
 ): CapabilityBinding<Input, Output> {
   const options = Object.freeze({ ...supplied });
   const compiled = template(options.url);
+  const hostname = new URL(compiled.origin).hostname;
   const validateDestination = (binding: Pick<CapabilityBinding, 'destination'>): void => {
     if (
       binding.destination === 'in-browser' ||
@@ -175,7 +183,7 @@ export function httpCapability<Input = unknown, Output = unknown>(
           fail('invalid');
       }
     },
-    async invoke(value, context, cap): Promise<unknown> {
+    async invoke(value, context, cap, destination): Promise<unknown> {
       if (typeof value !== 'object' || value === null || Array.isArray(value)) fail('invalid');
       const input = value as Record<string, unknown>;
       const url = filledUrl(options.url, compiled, input);
@@ -201,8 +209,17 @@ export function httpCapability<Input = unknown, Output = unknown>(
           signal: context.signal,
           ...(body === undefined ? {} : { body }),
         });
-      } catch {
-        return fail(context.signal.aborted ? 'cancelled' : 'unavailable');
+      } catch (error) {
+        if (context.signal.aborted) return fail('cancelled');
+        if (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name))
+          return fail('unavailable');
+        return fail(
+          destination === 'user-device' ||
+            (destination === 'user-endpoint' &&
+              (isLoopback(hostname) || isPrivateAddress(hostname)))
+            ? 'unreachable'
+            : 'unavailable',
+        );
       }
       if (response.status === 401 || response.status === 403) fail('denied');
       if (response.status >= 400 && response.status < 500) fail('invalid');
@@ -230,7 +247,12 @@ export function httpCapability<Input = unknown, Output = unknown>(
     approval: options.approval,
     retry: options.retry,
     invoke: async (input: Input, context: CapabilityContext): Promise<Output> =>
-      (await descriptor.invoke(input, context, DEFAULT_BUDGETS.payloadBytes)) as Output,
+      (await descriptor.invoke(
+        input,
+        context,
+        DEFAULT_BUDGETS.payloadBytes,
+        options.destination,
+      )) as Output,
   });
   descriptors.set(binding.invoke, descriptor);
   return binding;

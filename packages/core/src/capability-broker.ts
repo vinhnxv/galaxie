@@ -550,7 +550,12 @@ export class CapabilityBroker {
                 execution = Promise.resolve(
                   compiled.http === undefined
                     ? binding.invoke(value, context)
-                    : compiled.http.invoke(value, context, run.budget.limits.payloadBytes),
+                    : compiled.http.invoke(
+                        value,
+                        context,
+                        run.budget.limits.payloadBytes,
+                        binding.destination,
+                      ),
                 );
               } catch (error) {
                 execution = Promise.reject(error);

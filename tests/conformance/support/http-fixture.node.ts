@@ -68,6 +68,8 @@ export async function createHttpFixture(): Promise<HttpControl> {
       } else if (method === 'GET' && path === '/auth/required') {
         status = request.headers.authorization === 'Bearer fixture-token' ? 200 : 401;
         body = status === 200 ? { ok: true } : { error: HTTP_ERROR_BODY };
+      } else if (method === 'GET' && path === '/hang') {
+        status = 0;
       }
       requests.push({
         server: name,
@@ -81,6 +83,8 @@ export async function createHttpFixture(): Promise<HttpControl> {
         status,
         rejected,
       });
+      // The timeout fixture records arrival but sends no HTTP response.
+      if (status === 0) return;
       response.writeHead(status, { 'content-type': 'application/json' });
       response.end(status === 204 ? undefined : JSON.stringify(body));
     }),
@@ -95,8 +99,11 @@ export async function createHttpFixture(): Promise<HttpControl> {
     await close(cors);
     throw error;
   }
+  const closed = createServer();
+  const closedUrl = await listen(closed);
+  await close(closed);
   return {
-    fixture: { corsUrl, noCorsUrl, adminUrl: `${corsUrl}/__admin` },
+    fixture: { corsUrl, noCorsUrl, closedUrl, adminUrl: `${corsUrl}/__admin` },
     async close(): Promise<void> {
       await Promise.all(servers.map(close));
     },

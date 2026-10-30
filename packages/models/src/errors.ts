@@ -20,10 +20,12 @@ export type ModelUnavailableReason =
   | 'rate_limited'
   | 'endpoint_failed'
   | 'network';
-export type ModelErrorCode = 'unavailable' | 'invalid' | 'unsupported';
+export type ModelErrorCode = 'unavailable' | 'unreachable' | 'invalid' | 'unsupported';
 
 const messages: Record<ModelErrorCode, string> = {
   unavailable: 'The model provider is unavailable.',
+  unreachable:
+    'The endpoint did not answer. Local Network Access may be denied, CORS may not allow this app origin (for example OLLAMA_ORIGINS), or the server may be stopped.',
   invalid: 'The model request is invalid.',
   unsupported: 'The model operation is unsupported.',
 };

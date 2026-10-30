@@ -11,6 +11,68 @@ import { FakeOpenAIFetch } from './support/fake-openai-fetch.js';
 
 describe('OpenAI-compatible error classification', () => {
   it.each([
+    ['http://localhost:11434/v1', 'user-device', 'unreachable'],
+    ['http://127.0.0.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://10.0.0.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://172.31.0.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://192.168.0.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://169.254.1.1/v1', 'user-endpoint', 'unreachable'],
+    ['https://[fd00::1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://[fe80::1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://model.local/v1', 'user-endpoint', 'unreachable'],
+    ['https://[::ffff:127.0.0.1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://[::ffff:192.168.1.1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://[::ffff:169.254.1.1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://[::ffff:8.8.8.8]/v1', 'user-endpoint', 'unavailable'],
+    ['https://public.example/v1', 'user-device', 'unreachable'],
+    ['https://public.example/v1', 'user-endpoint', 'unavailable'],
+    ['https://10.example/v1', 'user-endpoint', 'unavailable'],
+    ['https://172.32.0.1/v1', 'user-endpoint', 'unavailable'],
+    ['http://localhost/v1', 'host-server', 'unavailable'],
+    ['http://localhost/v1', 'third-party', 'unavailable'],
+    ['http://localhost/v1', 'in-browser', 'unavailable'],
+  ] as const)('classifies a connection failure for %s (%s) as %s', (baseURL, destination, code) => {
+    const result = classifyOpenAIError(new OpenAIClient.APIConnectionError({}), {
+      baseURL,
+      destination,
+    });
+    expect(result).toEqual(code === 'unreachable' ? { code } : { code, reason: 'network' });
+  });
+
+  it('keeps HTTP statuses, timeouts and aborts outside unreachable classification', () => {
+    const endpoint = { baseURL: 'http://localhost/v1', destination: 'user-device' } as const;
+    for (const status of [401, 403, 408, 429, 500]) {
+      const error = OpenAIClient.APIError.generate(status, {}, '', new Headers());
+      expect(classifyOpenAIError(error, endpoint)).toEqual(classifyOpenAIError(error));
+    }
+    expect(classifyOpenAIError(new OpenAIClient.APIConnectionTimeoutError(), endpoint)).toEqual({
+      code: 'unavailable',
+      reason: 'endpoint_failed',
+    });
+    expect(classifyOpenAIError(new OpenAIClient.APIUserAbortError(), endpoint)).toBeUndefined();
+  });
+
+  it('does not turn a fetch timeout or abort wrapped by the SDK into unreachable', () => {
+    const endpoint = { baseURL: 'http://localhost/v1', destination: 'user-device' } as const;
+    expect(
+      classifyOpenAIError(
+        new OpenAIClient.APIConnectionError({
+          cause: new DOMException('timeout-marker', 'TimeoutError'),
+        }),
+        endpoint,
+      ),
+    ).toEqual({ code: 'unavailable', reason: 'endpoint_failed' });
+    expect(
+      classifyOpenAIError(
+        new OpenAIClient.APIConnectionError({
+          cause: new DOMException('abort-marker', 'AbortError'),
+        }),
+        endpoint,
+      ),
+    ).toBeUndefined();
+  });
+
+  it.each([
     [401, 'not_allowed'],
     [403, 'not_allowed'],
     [429, 'rate_limited'],
@@ -94,6 +156,47 @@ function fixture(options: ConstructorParameters<typeof FakeOpenAIFetch>[0] = {})
 }
 
 describe('OpenAI-compatible chat model', () => {
+  it.each([
+    [undefined, 'unreachable'],
+    ['user-device', 'unreachable'],
+    ['user-endpoint', 'unreachable'],
+    ['host-server', 'unavailable'],
+    ['third-party', 'unavailable'],
+    ['in-browser', 'unavailable'],
+  ] as const)('classifies direct calls with destination %s as %s', async (destination, code) => {
+    const fake = new FakeOpenAIFetch({ failure: true });
+    const model = openAICompatible({
+      baseURL: 'http://localhost/v1',
+      model: 'fake',
+      fetch: fake.fetch,
+      ...(destination === undefined ? {} : { destination }),
+    })({ credential });
+    const error = await model.invoke('prompt-canary').catch((failure: unknown) => failure);
+    expect(error).toMatchObject({ code });
+    expect(error).not.toHaveProperty('cause');
+    expect(String(error)).not.toContain('localhost');
+    expect(fake.requests).toHaveLength(1);
+  });
+
+  it.each(['read-error', 'eof'] as const)(
+    'keeps a local endpoint failure after an SSE response outside unreachable: %s',
+    async (mode) => {
+      const fake = new FakeOpenAIFetch({ truncate: true, streamFailure: mode === 'read-error' });
+      const model = openAICompatible({
+        baseURL: 'http://localhost/v1',
+        model: 'fake',
+        fetch: fake.fetch,
+      })({ credential });
+      await expect(
+        (async () => {
+          for await (const _chunk of await model.stream('hello')) {
+            /* drain */
+          }
+        })(),
+      ).rejects.toMatchObject({ name: 'ModelProviderError' });
+    },
+  );
+
   it.each([
     {
       usage: { prompt_tokens: 0, completion_tokens: 2, total_tokens: 2 },
