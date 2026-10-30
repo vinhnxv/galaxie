@@ -243,10 +243,56 @@ test('strict-CSP page indexes, answers, pastes, restores, evaluates and clears w
       .poll(() => page.getByText('Restored: 13 passages (1 pasted). Device: mock.').count())
       .toBe(1);
     await page.getByRole('button', { name: 'Prepare models', exact: true }).click();
+    const mockScriptUrl = observed.requests
+      .find((record) => record.includes('/assets/mock-script-'))
+      ?.split(' ')[0];
+    if (!mockScriptUrl) throw new Error('The mock model fixture was not loaded.');
+    await page.evaluate(`(async () => {
+      const { createMockModels } = await import(${JSON.stringify(mockScriptUrl)});
+      const prototype = Object.getPrototypeOf(createMockModels().chatModels.mock);
+      const calls = { count: 0 };
+      for (const method of ['_generate', '_streamResponseChunks']) {
+        const original = prototype[method];
+        prototype[method] = function (...args) {
+          calls.count++;
+          return Reflect.apply(original, this, args);
+        };
+      }
+      Object.assign(globalThis, { ragModelCalls: calls });
+    })()`);
+    const modelCalls = (): Promise<number> =>
+      page.evaluate(() => Reflect.get(globalThis, 'ragModelCalls').count);
     await question(page, 'Cobalt observatories');
     expect(await page.getByRole('list', { name: 'Cited passages' }).textContent()).toContain(
       pasted,
     );
+    const callsBeforeRemoval = await modelCalls();
+    expect(callsBeforeRemoval).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Remove downloaded model', exact: true }).click();
+    await expect
+      .poll(() =>
+        page.getByText('Build the index before asking a question.', { exact: true }).count(),
+      )
+      .toBe(1);
+    const ask = page.getByRole('button', { name: 'Ask', exact: true });
+    expect(await ask.isDisabled()).toBe(true);
+    expect(await page.getByLabel('Question', { exact: true }).isDisabled()).toBe(true);
+    const consent = page.getByRole('button', {
+      name: 'Download embedding model and build index',
+      exact: true,
+    });
+    expect(await consent.isVisible()).toBe(true);
+    await ask.evaluate((button: HTMLButtonElement) => button.click());
+    expect(await modelCalls()).toBe(callsBeforeRemoval);
+    await consent.click();
+    await expect
+      .poll(() => page.getByText('Restored: 13 passages (1 pasted). Device: mock.').count())
+      .toBe(1);
+    await question(page, 'Cobalt observatories');
+    expect(await page.getByRole('list', { name: 'Cited passages' }).textContent()).toContain(
+      pasted,
+    );
+    expect(await modelCalls()).toBeGreaterThan(callsBeforeRemoval);
     await question(page, 'Show an answer without citations.', 'hybrid');
     await expect
       .poll(() =>
