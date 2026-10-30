@@ -45,6 +45,10 @@ async function boot(input: BootPayload): Promise<number> {
     verified.set(url, bytes);
   }
   const { loadPyodide } = await import('pyodide');
+  // In Node, Pyodide caches packages under packageBaseUrl taken as a relative path; keep that
+  // copy of the verified bytes in a private temporary directory removed after installation.
+  const fs = node ? await import('node:fs') : undefined;
+  const cache = fs?.mkdtempSync(`${(await import('node:os')).tmpdir()}/galaxie-pyodide-`);
   const packages = Object.fromEntries(
     all.map((file) => [
       file.name.replaceAll('_', '-').toLowerCase(),
@@ -63,6 +67,7 @@ async function boot(input: BootPayload): Promise<number> {
   const py = await loadPyodide({
     indexURL: input.runtimeUrl,
     packageBaseUrl: input.wheelsUrl,
+    ...(cache === undefined ? {} : { packageCacheDir: cache }),
     lockFileContents: {
       info: {
         version: '314.0.7',
@@ -94,6 +99,7 @@ async function boot(input: BootPayload): Promise<number> {
     });
   } finally {
     globalThis.fetch = originalFetch;
+    if (cache !== undefined) fs?.rmSync(cache, { recursive: true, force: true });
   }
   await py.runPythonAsync(
     'import langgraph.graph\nimport langchain_core.messages\nimport galaxie\nimport ormsgpack',

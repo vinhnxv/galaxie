@@ -219,6 +219,9 @@ await import('./worker.mjs');
         server.closeAllConnections();
       });
       await rm(directory, { recursive: true, force: true });
+      // Pyodide must not cache packages under the loopback URL taken as a working-directory path.
+      if (existsSync(new URL(origin).protocol))
+        throw new Error('Pyodide wrote a package cache into the working directory.');
     },
   };
 }

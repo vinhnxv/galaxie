@@ -144,7 +144,7 @@ for (const area of ['src', 'dist', 'test']) {
         specifier.startsWith('../') ||
         specifier === '@galaxie/core' ||
         specifier.startsWith('@langchain/core/') ||
-        (worker && (specifier === 'pyodide' || specifier === 'node:worker_threads')) ||
+        (worker && ['pyodide', 'node:worker_threads', 'node:fs', 'node:os'].includes(specifier)) ||
         (area === 'test' &&
           (specifier.startsWith('node:') ||
             ['vitest', 'zod', '@galaxie/models/mock'].includes(specifier)))
@@ -469,7 +469,10 @@ for (const directory of [
     for (const { specifier } of imports(file)) {
       if (
         specifier.startsWith('node:') &&
-        !(file === 'packages/adapter-pyodide/dist/worker.js' && specifier === 'node:worker_threads')
+        !(
+          file === 'packages/adapter-pyodide/dist/worker.js' &&
+          ['node:worker_threads', 'node:fs', 'node:os'].includes(specifier)
+        )
       )
         problems.push(`${file}: built packages must not import ${specifier}`);
     }
