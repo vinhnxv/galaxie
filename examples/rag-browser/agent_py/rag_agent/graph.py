@@ -44,7 +44,7 @@ def create_agent() -> CompiledStateGraph:
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt(state["question"], state["passages"])),
         ], config)
-        return cite_answer(reply.content, state["passages"])
+        return cite_answer(reply.text, state["passages"])
 
     def review_passages(state: RagState, config: RunnableConfig) -> dict[str, Any]:
         submission = request_interaction({

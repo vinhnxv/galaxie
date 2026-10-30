@@ -9,7 +9,7 @@ from galaxie.capabilities import call
 from fixture_support import REQUEST, native_interaction
 
 
-class State(TypedDict):
+class State(TypedDict, total=False):
     value: int
     answer: Any
     saved: bool

@@ -11,8 +11,11 @@ RESUMES = []
 
 
 def factory(checkpointer, model=None, capability=None, interaction=None):
+    def increment(state: ValueState) -> dict[str, int]:
+        return {"value": state["value"] + 1}
+
     child = (StateGraph(ValueState)
-        .add_node("increment", lambda state: {"value": state["value"] + 1})
+        .add_node("increment", increment)
         .add_edge(START, "increment").add_edge("increment", END).compile())
     return (StateGraph(ValueState).add_node("child", child)
         .add_edge(START, "child").add_edge("child", END)

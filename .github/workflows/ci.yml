@@ -47,6 +47,8 @@ jobs:
       - run: pnpm exec playwright install --with-deps --only-shell chromium
       - run: CI=true pnpm test
       - run: pnpm test:python
+      - name: Type-check Python with pyright
+        run: pnpm run typecheck:python
       - run: pnpm run build
       - run: pnpm run check:deps
       - run: pnpm run check:docs

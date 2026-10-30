@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import asyncio
+from collections.abc import AsyncGenerator
+from typing import Any, cast
+
+from langchain_core.messages import AIMessageChunk
 
 from galaxie.langchain import GalaxieChatModel
 from langgraph.config import get_stream_writer
@@ -19,7 +23,8 @@ def factory(checkpointer, **kwargs):
             writer({'private': 'UNSUPPORTED-PRIVATE' * 60000})
             return {}
         if kind in ('close', 'close-block'):
-            stream = GalaxieChatModel(role='answer').astream('stream request', config)
+            # BaseChatModel.astream is typed as an iterator but returns an async generator.
+            stream = cast(AsyncGenerator[AIMessageChunk, None], GalaxieChatModel(role='answer').astream('stream request', config))
             chunk = await anext(stream)
             await stream.aclose()
             writer({'closed': True})
@@ -30,10 +35,11 @@ def factory(checkpointer, **kwargs):
         usage = None
         async for chunk in GalaxieChatModel(role='answer').astream('stream request', config):
             writer({'seen': chunk.content})
-            content += chunk.content
+            content += chunk.text
             if chunk.usage_metadata is not None:
                 usage = chunk.usage_metadata
         return {'text': content, 'usage': usage}
 
-    return (StateGraph(dict).add_node('respond', respond).add_edge(START, 'respond')
+    # A plain dict schema keeps LangGraph's single root-value channel, which the stub does not model.
+    return (StateGraph(cast(Any, dict)).add_node('respond', respond).add_edge(START, 'respond')
         .add_edge('respond', END).compile(checkpointer=checkpointer))

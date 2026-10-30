@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import asyncio
+from typing import Any, TypedDict
 
 import pytest
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
@@ -17,15 +19,20 @@ REQUEST = {
 }
 
 
+class AnswerState(TypedDict, total=False):
+    action: str
+    payload: Any
+
+
 def test_request_interaction_pauses_after_await_and_resumes_by_id():
     async def scenario():
         async def ask(state, config):
             await asyncio.sleep(0)
             return langgraph.request_interaction(REQUEST, config)
 
-        graph = (StateGraph(dict).add_node("ask", ask).add_edge(START, "ask")
+        graph = (StateGraph(AnswerState).add_node("ask", ask).add_edge(START, "ask")
             .add_edge("ask", END).compile(checkpointer=InMemorySaver()))
-        config = {"configurable": {"thread_id": "interaction-test"}}
+        config: RunnableConfig = {"configurable": {"thread_id": "interaction-test"}}
         await graph.ainvoke({}, config)
         state = await graph.aget_state(config)
         pending = state.tasks[0].interrupts[0]

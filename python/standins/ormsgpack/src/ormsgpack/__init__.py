@@ -11,7 +11,7 @@ It does not promise ormsgpack wire compatibility or general object support.
 
 import msgpack
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 __version__ = "1.13.0"
 Ext = msgpack.ExtType
@@ -26,7 +26,7 @@ OPT_REPLACE_SURROGATES = 32
 
 
 def packb(value: Any, *, default: Callable | None = None, option: int = 0) -> bytes:
-    return msgpack.packb(value, default=default, use_bin_type=True)
+    return cast(bytes, msgpack.packb(value, default=default, use_bin_type=True))
 
 
 def unpackb(

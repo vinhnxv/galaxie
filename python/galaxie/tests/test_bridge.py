@@ -10,6 +10,10 @@ from galaxie import GalaxieError
 from galaxie import _bridge, capabilities
 
 
+async def unused_transport(_: str) -> str:
+    raise AssertionError("The transport is not used.")
+
+
 def test_capability_forwards_input_and_full_effect_scope():
     recorded = []
 
@@ -114,7 +118,7 @@ def test_stream_projection_is_closed_and_limits_metadata():
     from langgraph.types import Interrupt
 
     notifications = []
-    _bridge.install_transport(lambda _: None, notifications.append)
+    _bridge.install_transport(unused_transport, notifications.append)
     _bridge.notify_stream(('node:task',), 'messages', (
         AIMessageChunk(id='reply', content='checked', response_metadata={'private': 'OMIT'}),
         {'langgraph_node': 'node', 'langgraph_checkpoint_ns': 'node:task', 'private': 'OMIT'},
@@ -135,7 +139,7 @@ def test_stream_projection_is_closed_and_limits_metadata():
 @pytest.mark.parametrize('data', [b'PRIVATE', {1: 'PRIVATE'}, float('nan'), object(), 'é' * 524289])
 def test_unsupported_stream_data_never_leaves_python(data):
     notifications = []
-    _bridge.install_transport(lambda _: None, notifications.append)
+    _bridge.install_transport(unused_transport, notifications.append)
     with pytest.raises(GalaxieError, match='^This operation is unsupported\\.$'):
         _bridge.notify_stream((), 'custom', data)
     assert notifications == []

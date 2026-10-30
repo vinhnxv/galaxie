@@ -10,13 +10,14 @@
   },
   "scripts": {
     "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json && tsc -p packages/adapter-pyodide/tsconfig.build.json && tsc -p packages/models/tsconfig.build.json && tsc -p packages/react/tsconfig.build.json && tsc -p examples/english-tutor/tsconfig.build.json && node scripts/build-manifest.ts examples/english-tutor && node scripts/build-manifest.ts examples/english-tutor --verify && pnpm --filter @galaxie/example-host-local build && tsc -p packages/storage-indexeddb/tsconfig.build.json && tsc -p examples/mcp-server/tsconfig.build.json && tsc -p packages/tools-mcp/tsconfig.build.json && pnpm --filter @galaxie/example-host-remote build && tsc -p packages/eslint-plugin/tsconfig.build.json && pnpm --filter @galaxie/example-rag-browser build",
-    "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run test:python && pnpm run build && pnpm run check:deps && pnpm run check:docs",
+    "check": "pnpm run check:license && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run test:python && pnpm run typecheck:python && pnpm run build && pnpm run check:deps && pnpm run check:docs",
     "check:license": "node scripts/check-license.ts",
     "check:docs": "node scripts/check-docs.ts",
     "format": "biome check --write .",
     "lint": "biome check .",
     "test": "vitest run",
     "test:python": "node scripts/test-python.ts",
+    "typecheck:python": "pyright",
     "typecheck": "tsc -p packages/core && tsc -p packages/core/test && tsc -p packages/adapter-langgraph && tsc -p packages/adapter-langgraph/test && tsc -p tests/conformance && tsc -p scripts && tsc -p packages/models && tsc -p packages/models/test && tsc -p packages/react && tsc -p packages/react/test && tsc -p examples/english-tutor && tsc -p examples/english-tutor/test && tsc -p examples/host-local && tsc -p examples/host-local/test && tsc -p packages/storage-indexeddb && tsc -p packages/storage-indexeddb/test && tsc -p examples/mcp-server && tsc -p examples/mcp-server/test && tsc -p packages/tools-mcp && tsc -p packages/tools-mcp/test && tsc -p examples/host-remote && tsc -p examples/host-remote/test && tsc -p packages/eslint-plugin && tsc -p packages/eslint-plugin/test && tsc -p examples/rag-browser && tsc -p examples/rag-browser/test && tsc -p packages/adapter-pyodide && tsc -p packages/adapter-pyodide/test",
     "typecheck:ts6": "tsc6 -p packages/core && tsc6 -p packages/core/test && tsc6 -p packages/adapter-langgraph && tsc6 -p packages/adapter-langgraph/test && tsc6 -p tests/conformance && tsc6 -p scripts && tsc6 -p packages/models && tsc6 -p packages/models/test && tsc6 -p packages/react && tsc6 -p packages/react/test && tsc6 -p examples/english-tutor && tsc6 -p examples/english-tutor/test && tsc6 -p examples/host-local && tsc6 -p examples/host-local/test && tsc6 -p packages/storage-indexeddb && tsc6 -p packages/storage-indexeddb/test && tsc6 -p examples/mcp-server && tsc6 -p examples/mcp-server/test && tsc6 -p packages/tools-mcp && tsc6 -p packages/tools-mcp/test && tsc6 -p examples/host-remote && tsc6 -p examples/host-remote/test && tsc6 -p packages/eslint-plugin && tsc6 -p packages/eslint-plugin/test && tsc6 -p examples/rag-browser && tsc6 -p examples/rag-browser/test && tsc6 -p packages/adapter-pyodide && tsc6 -p packages/adapter-pyodide/test",
     "conformance:update": "vitest run --project node tests/conformance/native.node.test.ts --update",
@@ -26,9 +27,10 @@
     "@biomejs/biome": "2.5.15",
     "@types/node": "24.19.2",
     "@typescript/typescript6": "6.0.2",
-    "typescript": "7.0.2",
-    "vitest": "5.0.5",
     "@vitest/browser-playwright": "5.0.5",
-    "playwright": "1.64.1"
+    "playwright": "1.64.1",
+    "pyright": "1.1.414",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
   }
 }

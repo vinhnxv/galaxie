@@ -34,7 +34,7 @@ class ScriptedModel(BaseChatModel):
 
     def _reply(self, messages):
         human = next((message for message in reversed(messages) if message.type == "human"), None)
-        entry = self.script.get(human.content if human is not None else None)
+        entry = self.script.get(human.text) if human is not None else None
         if entry is None:
             raise FixtureModelError("The fixture has no script for this human message.")
         if "error" in entry:
@@ -48,7 +48,7 @@ class ScriptedModel(BaseChatModel):
         ))])
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
-        return self._generate(messages, stop, run_manager, **kwargs)
+        return self._generate(messages, stop, **kwargs)
 
     async def _astream(self, messages, stop=None, run_manager=None, **kwargs):
         entry = self._reply(messages)

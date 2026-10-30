@@ -23,6 +23,9 @@ importers:
       playwright:
         specifier: 1.64.1
         version: 1.64.1
+      pyright:
+        specifier: 1.1.414
+        version: 1.1.414
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -1841,6 +1844,11 @@ packages:
     resolution: {integrity: sha512-0YvXxEhfEdpLfb/XkM2BFAeMROq0iMUX2bzzH9pOttyMcWkwq+HbE5uyuGD82LN7y2q+SNvi/6V5JEsOlD2R1A==}
     engines: {node: '>=18.0.0'}
 
+  pyright@1.1.414:
+    resolution: {integrity: sha512-FPZZb51jepDX4eP7TEYDeNFtmE3WgwkkEcJpvH3/QmUSsj0EAy3LXu+xB4T/FWDejtsXlCfFr/rbWFjwuwuXww==}
+    engines: {node: '>=14.0.0'}
+    hasBin: true
+
   qified@0.10.1:
     resolution: {integrity: sha512-+Owyggi9IxT1ePKGafcI87ubSmxol6smwJ+RAHDQlx9+9cPwFWDiKFFCPuWhr9ignlGpZ9vDQLw67N4dcTVFEA==}
     engines: {node: '>=20'}
@@ -3406,6 +3414,10 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  pyright@1.1.414:
+    optionalDependencies:
+      fsevents: 2.3.3
 
   qified@0.10.1:
     dependencies:

@@ -4,6 +4,7 @@
 import asyncio
 import json
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import empty_checkpoint
 
 from galaxie._bridge import install_transport
@@ -29,10 +30,11 @@ def test_checkpoint_bytes_reconstruct_with_a_fresh_saver():
         saver = GalaxieCheckpointer()
         checkpoint = empty_checkpoint()
         checkpoint["channel_values"] = {"text": "café", "bytes": b"\x00\xff", "tuple": (1, 2)}
-        config = {"configurable": {"thread_id": "session", "checkpoint_ns": ""}}
+        config: RunnableConfig = {"configurable": {"thread_id": "session", "checkpoint_ns": ""}}
         saved = await saver.aput(config, checkpoint, {"source": "loop", "step": 0, "parents": {}}, {})
         await saver.aput_writes(saved, [("answer", False)], "task", "parent")
         restored = await GalaxieCheckpointer().aget_tuple(config)
+        assert restored is not None
         assert restored.checkpoint["channel_values"] == {"text": "café", "bytes": b"\x00\xff", "tuple": [1, 2]}
         assert restored.pending_writes == [("task", "answer", False)]
         assert restored.metadata == {"source": "loop", "step": 0, "parents": {}}
