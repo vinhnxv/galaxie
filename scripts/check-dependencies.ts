@@ -128,6 +128,33 @@ for (const file of files('packages/adapter-langgraph/src', /\.[cm]?tsx?$/)) {
   }
 }
 
+for (const area of ['src', 'dist', 'test']) {
+  const directory = join('packages/adapter-pyodide', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (
+        specifier.startsWith('@langchain/langgraph') ||
+        specifier.startsWith('@galaxie/adapter-langgraph')
+      )
+        problems.push(`${file}: the Python adapter must not depend on the JavaScript executor`);
+      const worker = file === `${directory}/worker.${area === 'dist' ? 'js' : 'ts'}`;
+      if (
+        specifier.startsWith('./') ||
+        specifier.startsWith('../') ||
+        specifier === '@galaxie/core' ||
+        specifier.startsWith('@langchain/core/') ||
+        (worker && ['pyodide', 'node:worker_threads', 'node:fs', 'node:os'].includes(specifier)) ||
+        (area === 'test' &&
+          (specifier.startsWith('node:') ||
+            ['vitest', 'zod', '@galaxie/models/mock'].includes(specifier)))
+      )
+        continue;
+      problems.push(`${file}: forbidden Python adapter import ${specifier}`);
+    }
+  }
+}
+
 const models = JSON.parse(readFileSync('packages/models/package.json', 'utf8')) as {
   peerDependencies?: Record<string, unknown>;
   peerDependenciesMeta?: Record<string, { optional?: boolean }>;
@@ -341,6 +368,16 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
       ? resolve(dirname(file), specifier.split('?')[0] ?? '').replace(/\.[jt]sx?$/, '')
       : '';
     const mockScript = resolve('examples/rag-browser/src/host/mock-script');
+    if (
+      specifier === '@galaxie/adapter-pyodide' &&
+      file !== 'examples/rag-browser/src/host/runtime.ts'
+    )
+      problems.push(`${file}: only the host runtime may register the Python adapter`);
+    if (
+      specifier === '@galaxie/adapter-pyodide/worker' &&
+      file !== 'examples/rag-browser/src/host/pyodide-worker.ts'
+    )
+      problems.push(`${file}: only the host Python Worker entry may load Pyodide`);
     if (target === mockScript && (file !== 'examples/rag-browser/src/host/main.tsx' || !dynamic))
       problems.push(
         `${file}: the mock script must be dynamically imported only by the mode entry point`,
@@ -363,6 +400,8 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
       [
         '@galaxie/core',
         '@galaxie/adapter-langgraph',
+        '@galaxie/adapter-pyodide',
+        '@galaxie/adapter-pyodide/worker',
         '@galaxie/react',
         '@galaxie/models/webllm',
         '@galaxie/models/webllm/worker',
@@ -374,6 +413,7 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
         'react/jsx-runtime',
         'react-dom/client',
         'zod',
+        'virtual:rag-python',
       ].includes(specifier) ||
       specifier.startsWith('@langchain/core/') ||
       specifier.startsWith('onnxruntime-web/') ||
@@ -417,6 +457,7 @@ for (const area of ['src', 'server', 'test']) {
 for (const directory of [
   'packages/core/dist',
   'packages/adapter-langgraph/dist',
+  'packages/adapter-pyodide/dist',
   'packages/models/dist',
   'packages/react/dist',
   'packages/storage-indexeddb/dist',
@@ -426,7 +467,13 @@ for (const directory of [
     if (readFileSync(file, 'utf8').includes('async_hooks'))
       problems.push(`${file}: built packages must not contain async_hooks`);
     for (const { specifier } of imports(file)) {
-      if (specifier.startsWith('node:'))
+      if (
+        specifier.startsWith('node:') &&
+        !(
+          file === 'packages/adapter-pyodide/dist/worker.js' &&
+          ['node:worker_threads', 'node:fs', 'node:os'].includes(specifier)
+        )
+      )
         problems.push(`${file}: built packages must not import ${specifier}`);
     }
   }

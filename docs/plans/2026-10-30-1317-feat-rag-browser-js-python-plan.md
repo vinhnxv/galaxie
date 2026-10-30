@@ -2,6 +2,7 @@
 title: In-Browser RAG Example in JavaScript and Python - Plan
 type: feat
 date: 2026-10-30
+deepened: 2026-10-30
 artifact_contract: ce-unified-plan/v1
 product_contract_source: ce-plan-bootstrap
 execution: code
@@ -21,7 +22,8 @@ execution: code
   5. The project brief.
 - **Execution profile:** autonomous. Node 24, pnpm 11, uv with CPython 3.14, headless Chromium through Playwright.
   - Network is needed for `pnpm install`, `uv`, the Python wheel fetch script (U9), and the optional corpus and model downloads during manual checks. Tests never use the network.
-  - Stage 1 is U1–U8. Stage 2 is U9–U13. Open one pull request per stage against `main`, with stage 2 branched from stage 1, and run `pnpm check` before each.
+  - Stage 1 is U1–U8. Stage 2 is U9–U13. Open one pull request per stage against `main`, and run `pnpm check` before each.
+  - Stage 1 merged on 2026-10-30 in PR #60 (`9c660c4`). Stage 2 branches from current `main` and builds on the code described in "Stage 1 as Shipped", not on the stage 1 unit text where the two differ.
 - **Stop conditions:** stop, open a draft pull request that names the blocker, and report it when any of these happens:
   - A change to a public type exported by `packages/core` is required. Stage 2 must fit the existing `ExecutorAdapter`, `ModelPort` and `CapabilityPort` contracts.
   - An existing test assertion, golden, or the compatibility matrix would change.
@@ -29,7 +31,7 @@ execution: code
   - Any page or Worker (retrieval, WebLLM or Pyodide) needs a CSP or Trusted Types relaxation beyond KTD11, such as `'unsafe-eval'`, `'unsafe-inline'`, a `blob:` or `data:` script source, or a Trusted Types script policy. If only Pyodide needs it, stage 2 stops and stage 1 still ships.
   - A Python dependency has no Pyodide-compatible wheel and no same-name pure-Python stand-in under ADR-0018 decision 10.
   - `pnpm check` still fails after three focused attempts on the same cause.
-  - Stage 2 is blocked. Stage 1 still ships as its own pull request.
+  - Stage 2 is blocked for any other reason. Stage 1 has already shipped (PR #60).
 - **Who finishes:** the implementing agent opens the pull requests and stops. It never merges. If its environment forbids git operations, it leaves the work uncommitted on disk and reports that.
 
 ---
@@ -127,6 +129,8 @@ ADR-0018 says Python agents can run through Pyodide with all policy in JavaScrip
 
 ## Planning Contract
 
+Product Contract preservation: Product Contract unchanged. The 2026-10-30 stage 2 update reconciles U9–U13 with the merged stage 1 code and adds KTD17 and KTD18.
+
 ### Key Technical Decisions
 
 - KTD1. **One example package holds the host and both agents.** `examples/rag-browser` contains the host, the JavaScript graph and the Python graph. Splitting the agent into its own package, as `examples/english-tutor` does, only pays off with a generated manifest, which this plan does not build.
@@ -152,6 +156,7 @@ ADR-0018 says Python agents can run through Pyodide with all policy in JavaScrip
   - One record holds the saved index and the pasted passages, keyed by a fingerprint. The fingerprint is the SHA-256 of: the model revision, the KTD4 settings, the exact Transformers.js and `onnxruntime-web` versions, the tokenizer rule, the Orama schema version and the corpus file's SHA-256.
   - A fingerprint mismatch discards the record and rebuilds.
   - "Clear data" deletes the database. Each write replaces the whole record.
+  - As shipped, a second database, `galaxie-rag:epochs`, holds only content-free clear epochs for fencing. "Clear data" does not remove it.
   - Every cache write and "Clear data" run under one Web Lock named after the database. "Clear data" also posts a `BroadcastChannel` notice that makes other tabs' Workers drop their pasted passages and close their connection, so another tab cannot write deleted pasted text back.
   - "Clear data" keeps the downloaded model files in Cache Storage, and its label says so. A separate "Remove downloaded model" action deletes them.
   - The cache lives outside `@galaxie/storage-indexeddb`, so its retention sweep, principal scoping and logout wipe do not apply. Pasted text stays on the device until "Clear data" or browser eviction, and the page says so next to the paste box.
@@ -169,7 +174,8 @@ ADR-0018 says Python agents can run through Pyodide with all policy in JavaScrip
 - KTD12. **The Pyodide adapter is minimal and follows ADR-0018.** Its executor ID is `langgraph-python`, and all five `ExecutorFeatures` flags are false.
   - Bridge messages are `galaxie.bridge/v1` JSON of at most 1 MB, carrying the ops `boot`, `run`, `model`, `capability`, `abort` and `result`. Unknown or malformed messages get fixed errors on both sides (ADR-0018 decision 5).
   - Abort sends an `abort` message. If the Worker does not acknowledge within 500 ms, the adapter terminates it, fails the run `cancelled`, and boots a new Worker on the next run.
-  - The host supplies a `createWorker` function, so the host's Trusted Types policy stays in charge of the worker URL.
+  - The host supplies a `createWorker` function, so the host's Trusted Types policy stays in charge of the worker URL. It returns a minimal port: `postMessage(string)`, a message listener, an error listener and `terminate()`. The Chromium host wraps a Web `Worker`; Node tests wrap `worker_threads.Worker`. `worker.ts` uses `parentPort` when present and `self` otherwise.
+  - On Node there is no page origin and no Vite transform for `worker_threads`, and `pnpm test` runs before `pnpm build`. Node tests therefore bundle `worker.ts` with Vite into a temporary directory first, as `test/loop.node.test.ts` builds the host, and serve the agent sources, runtime files and wheels from a loopback server.
   - Services are `{ chatModels }`, keyed by provider ID with the same `BaseChatModel` or credential-factory shape as `LangGraphServices.chatModels`, so the host reuses its providers. `prepare` checks them against `ModelPreparation.providers`.
   - The `ModelPort` arrives per run in `RunRequest.models`, not at `prepare`. `RoutedChatModel` is not exported from `@galaxie/adapter-langgraph`, so the adapter runs the lease sequence itself for each bridge `model` op:
     1. `models.begin(role, { signal })`;
@@ -178,15 +184,26 @@ ADR-0018 says Python agents can run through Pyodide with all policy in JavaScrip
     4. `checkOutput(text, { final: true })` before replying;
     5. `end(usage)` from `usage_metadata`, or `fail()` on error.
   - The adapter may import `@langchain/core`. It never imports `@langchain/langgraph*` or `@galaxie/adapter-langgraph`.
+  - The agent value passed to `runtime.create` is a plain descriptor: the same-origin base URL of the agent sources, the list of source files, the module and entry function. The adapter fetches those files with `credentials: 'omit'` and writes them into the Pyodide file system before import.
+  - Bridge validation must not need code generation under strict CSP. Either hand-write the validators or build Zod schemas only after `z.config({ jitless: true })`, as stage 1's `src/host/zod-config.ts` does for the retrieval Worker.
+  - Pyodide has not been run under this CSP: the spike README lists browser CSP deployment as untested. U10 therefore boots Pyodide in Chromium under the stage 1 header first, before the bridge work. If that boot needs a KTD11 relaxation, stage 2 stops (Goal Capsule).
+  - Measured on 2026-10-30 (headless Chromium 156, stage 1 `cspHeader('mock')` on every response): Pyodide 314.0.7 boots in a module Worker, but its `isClassicWorker()` probe calls `importScripts("data:text/javascript,")`, which reports a `require-trusted-types-for` violation before throwing. Module Workers cannot use `importScripts`, so the Worker entry replaces `globalThis.importScripts` with a function that throws `TypeError` before loading Pyodide. The probe then returns `false` as before, without reaching the Trusted Types sink, and the boot reports zero violations. This changes no CSP directive; a test asserts that the shim stays in place and that the boot reports zero violations.
+  - After an abort, the adapter's `run` iterator settles once the Worker acknowledges or is terminated. That 500 ms is a Worker liveness bound, not a settlement timeout: core still owns settlement waits (`packages/core/src/executor.ts`, `ExecutorAgent.run`).
 - KTD13. **Python wheels are self-hosted and hash-pinned.** No runtime CDN is used.
   - The Pyodide runtime files come from the npm package `pyodide@314.0.7`.
-  - The Pyodide packages and PyPI wheels the graph needs are listed with SHA-256 in `python/requirements.lock`. The lock holds only the dependency closure of `langgraph` and `langchain-core` that the RAG graph resolves. Take versions from `spikes/python-bridge/requirements.json` but leave out `pydantic-ai-slim`, `pydantic-graph`, `httpx2`, `httpx2-jsfetch`, `genai-prices`, `griffelib`, `logfire-api`, `opentelemetry-api` and anything only they require. A fetch script downloads them into the git-ignored `.cache/python-wheels/`, checks every hash, and the host serves them same-origin.
-  - The Worker checks each locked file's SHA-256 again before installing it, through Pyodide's lockfile `sha256` with `checkIntegrity` or by installing from verified bytes.
+  - The Pyodide packages and PyPI wheels the graph needs are listed with SHA-256 in `python/requirements.lock`. The lock holds only the dependency closure of `langgraph` and `langchain-core` that the RAG graph resolves. Versions are resolved by uv under the 7-day release-age gate below, not copied from the spike: the spike's pins (`langgraph` 1.2.18, `langchain-core` 1.7.3 and others) were published after the gate's cutoff, so the lock takes the newest compatible versions that pass it (on 2026-10-30: `langgraph` 1.2.16, `langchain-core` at most 1.7.0, `langgraph-checkpoint` 4.3.0, `langgraph-sdk` 0.4.8, `langsmith` 0.14.12). Never add a per-package exception to the gate. Use `spikes/python-bridge/requirements.json` only to know which packages the closure needs; leave out `pydantic-ai-slim`, `pydantic-graph`, `httpx2`, `httpx2-jsfetch`, `genai-prices`, `griffelib`, `logfire-api`, `opentelemetry-api` and anything only they require. A fetch script downloads them into the git-ignored `.cache/python-wheels/`, checks every hash, and the host serves them same-origin.
+  - The Worker checks each locked file's SHA-256 again before installing it, through Pyodide's lockfile `sha256` with `checkIntegrity` or by installing from verified bytes. The expected hashes are built into the Worker bundle from the lock through `runtime-files.ts`, never read from a lockfile fetched at run time, so replacing a served wheel and a served lock together does not pass.
+  - The CPython test environment is pinned separately, because `requirements.lock` holds `wasm32` wheels CPython cannot install. `python/uv.lock`, committed with hashes, covers `python/galaxie`, the stand-in and the pytest dependencies; its `langgraph` and `langchain-core` closure matches `requirements.lock` version for version, and a Node check asserts the shared versions agree. Lock it with uv `exclude-newer` set 7 days back, mirroring the npm release-age gate, and pin `build-system.requires` to exact versions. CI runs `uv sync --locked` in the setup step; `pnpm test:python` runs `uv run --locked --offline pytest`, so tests never resolve or download.
   - The `galaxie` and `ormsgpack` wheels, the agent sources and Pyodide's own runtime files are build outputs served same-origin. They carry the same trust as the page's JavaScript bundle. `loadPyodide` fetches `pyodide.asm.wasm` and `pyodide.asm.mjs` itself from `indexURL`, so the Worker cannot bind those bytes. The adapter README states this limit. A host that serves these files from a CDN needs SRI or pinned hashes (ADR-0018 decision 10), which this example does not build.
-  - `uuid-utils` uses the Pyodide wheel 0.19.0. `ormsgpack` uses a same-name pure-Python stand-in, version 1.13.0, over `msgpack`.
+  - `uuid-utils` takes the PyPI wheel 0.19.0, which is not in Pyodide's package list, pinned by URL and SHA-256 as U9 states. `ormsgpack` uses a same-name pure-Python stand-in, version 1.13.0, over `msgpack`.
 - KTD14. **The Python `galaxie` package lives in `python/galaxie`, outside the pnpm workspace.** It is built into a wheel with uv. It contains `galaxie.langchain` (`GalaxieChatModel`) and `galaxie.capabilities` (`call`), plus a private bridge module that the tests replace with a fake transport. The stand-in sits in `python/standins/ormsgpack`.
 - KTD15. **A parity transcript records behavior, not timing or streaming.** It is a list of: each capability call's name and input, each model call's role and messages, and the final run output. JavaScript streams and stage 2 Python does not, so chunks and content-free events are left out. The golden transcript lives at `examples/rag-browser/test/golden/session.json`.
 - KTD16. **CI gains a Python lane in stage 2, delivered by U12.** Stage 1's `pnpm check` needs no Python. The workflow installs uv with CPython 3.14, the CPython line Pyodide 314 tracks, then runs the wheel fetch script before tests. `pnpm check` runs `pnpm test:python`, which runs pytest on CPython for the `galaxie` package and the parity graph. It fails with a fixed message naming uv when uv is missing.
+  - The CI job's `timeout-minutes` is 15 today. U12 may raise it to at most 25 when the measured job needs it, and records the measured duration in the PR.
+- KTD17. **One prompt and citation contract, read by both languages.** Stage 1 keeps the prompt in `src/agent/prompt.ts` and the citation rule in `src/agent/citations.ts`. U11 moves the prompt text to `examples/rag-browser/src/agent/prompt.json`, which both agents read, and moves the existing citation cases to `examples/rag-browser/test/fixtures/citation-cases.json`.
+  - The user message must be byte-identical across languages, because the mock model keys its reply on the exact human message (`src/host/mock-script.ts`). The passage block is the compact JSON of `[{ marker, id, title, text }]` in that key order. JavaScript uses `JSON.stringify`; Python uses `json.dumps(value, separators=(",", ":"), ensure_ascii=False)`. The shared case file includes non-ASCII text, quotes, backslashes and a newline, so any escaping difference shows up in tests.
+  - Citation markers match ASCII digits inside square brackets. A marker is valid when it is 1 to the passage count; invalid markers are removed from the answer text, and duplicates keep one citation in first-seen order. Every case in today's `citations.test.ts` moves into the JSON file unchanged; the test then reads the file, so no assertion changes.
+- KTD18. **Python tests need the verified wheel cache, and say so.** Vitest files that boot Pyodide check for `.cache/python-wheels/` first. When it is missing they skip with the fixed reason "Python wheels are not fetched; run the wheel fetch script" outside CI, and fail with that message when `CI` is set. This keeps `pnpm check` usable on a machine that has not fetched wheels, without letting CI pass by skipping.
 
 ### Pinned Inputs
 
@@ -293,10 +310,10 @@ examples/rag-browser/
   public/data/            git-ignored corpus output
   src/corpus.ts
   src/retrieval/          protocol, worker, embedder, mock embedder, model files, chunking, index, cache, client
-  src/agent/              definition, schemas, graph, prompt, citations, python definition (stage 2)
+  src/agent/              definition, schemas, graph, prompt (+ prompt.json, stage 2), citations, python definition (stage 2)
   src/host/               main, app, runtime, csp, trusted types, evaluate, mock script, webllm worker
-  agent_py/rag_agent/     graph.py, citations.py (stage 2)
-  test/                   fixtures, golden, unit, browser and node tests
+  agent_py/rag_agent/     graph.py, citations.py, prompt.py (stage 2)
+  test/                   fixtures (+ citation and prompt cases, stage 2), golden, unit, browser and node tests
 packages/adapter-pyodide/ (stage 2)
 python/galaxie/           (stage 2)
 python/standins/ormsgpack/ (stage 2)
@@ -309,6 +326,19 @@ docs/adr/0019-in-browser-retrieval.md
 - Chrome on the reference device can run the WebLLM Worker and the retrieval Worker on WebGPU at the same time. This has not been measured. If it fails, the page indexes before preparing chat models, and the README records the limit.
 - LangGraph Python's dependencies resolve on Pyodide 314.0.7 as they did in the spike, with the two package gaps the spike found.
 - The in-browser chat models write `[n]` markers often enough to cite passages. The manual default-mode run checks this over several validation questions, and the README records how often answers carried at least one valid citation.
+
+### Stage 1 as Shipped
+
+Stage 2 builds on these facts from PR #60. Where they differ from the U1–U8 text, they win.
+
+- **Agent.** `src/agent/graph.ts` has two nodes, `retrieve` and `generateAnswer`; the answer node is not named `answer` because that is a state key. State is `question`, `mode`, `passages`, `answer` and `citations`. The graph projects its output with native `withConfig({ outputKeys: ['answer', 'citations'] })` and searches with `k: 10`. It uses the host checkpointer, an in-memory saver per instance.
+- **Contracts.** `src/agent/definition.ts` declares `galaxie.rag-browser`, executor `langgraph-js`, the one capability `docs.search@1` and the role `rag.answer` (`local-only`, `en`). `src/agent/schemas.ts` holds `RagInputSchema`, `SearchInputSchema`, `SearchResultSchema` and `RagOutputSchema`.
+- **Prompt and citations.** The system prompt and `userPrompt(question, passages)` live in `src/agent/prompt.ts`; the marker rule lives in `src/agent/citations.ts`. KTD17 moves both into shared data.
+- **Host.** `createRagHost(retrieval, models)` in `src/host/runtime.ts` creates the runtime with only the LangGraph adapter, binds `docs.search@1`, and prepares one instance. `createMockModels()` in `src/host/mock-script.ts` builds a mock whose reply depends on the exact human message. `src/host/app.tsx` labels each answer "Answer · LangGraph.js". Retry indexing and persisted `pageshow` reload the page.
+- **Workers and CSP.** `src/host/trusted-types.ts` installs one `default` policy that allows exactly the retrieval and WebLLM worker URLs, created with `?worker&url`. `src/host/csp.ts` sets the header for both modes. Each Worker imports `src/host/zod-config.ts` before building schemas.
+- **Repository rules.** `scripts/check-dependencies.ts` holds an explicit allowlist of imports for `examples/rag-browser/src`, and agent files may import only other agent files. `tests/conformance/eslint-rag-agent.node.test.ts` lints `src/agent/`.
+- **Tests.** Unit tests sit in `examples/rag-browser/test/*.test.ts` and run on both Vitest projects. The built-host Playwright loop is `test/loop.node.test.ts`. The injection test expects an undeclared run grant to fail `invalid`, which is the existing core behavior.
+- **Deviations already documented in the README.** Clear fencing uses a separate content-free epoch database, `galaxie-rag:epochs`. In real mode the Worker fetches the corpus by fixed URL. Transformers.js fetches are denied.
 
 ---
 
@@ -546,27 +576,29 @@ docs/adr/0019-in-browser-retrieval.md
 
 - **Goal:** the Python proxies, the stand-in, and hash-pinned, self-hosted wheels.
 - **Requirements:** R13, R15.
-- **Dependencies:** U7.
+- **Dependencies:** U7 (merged).
 - **Files:**
   - `python/galaxie/pyproject.toml`
   - `python/galaxie/src/galaxie/__init__.py`, `_bridge.py`, `langchain.py`, `capabilities.py`
   - `python/galaxie/tests/test_bridge.py`, `python/galaxie/tests/test_langchain.py`
   - `python/standins/ormsgpack/pyproject.toml`, `python/standins/ormsgpack/src/ormsgpack/__init__.py`
-  - `python/requirements.lock`, `scripts/fetch-python-wheels.ts`, `scripts/build-python-wheels.ts`, `.gitignore`
+  - `python/requirements.lock`, `python/uv.lock`, `python/pyproject.toml` (uv workspace), `scripts/fetch-python-wheels.ts`, `scripts/build-python-wheels.ts`, `scripts/test/fetch-python-wheels.test.ts`, `.gitignore`
   - root `package.json`, for the `test:python` script
 - **Approach:**
   1. `_bridge.py` sends and awaits `galaxie.bridge/v1` requests through a transport installed at boot. It maps fixed error codes to a `GalaxieError` without content.
   2. `GalaxieChatModel` subclasses LangChain's `BaseChatModel`. It sends the role, the messages in the OpenAI-compatible shape and the options, and returns the checked reply. `capabilities.call(name, input, config)` forwards the call with the effect scope from `langgraph_checkpoint_ns` (ADR-0018 decision 6).
-  3. The `ormsgpack` stand-in exposes the functions LangGraph's serializer uses, over `msgpack`, at version 1.13.0, with the license notice of what it replaces.
-  4. `requirements.lock` lists every wheel and Pyodide package with version, URL and SHA-256, limited to the KTD13 dependency closure.
-  5. The fetch script downloads them into `.cache/python-wheels/` and refuses a mismatch. The build script runs `uv build` for `galaxie` and the stand-in into the same folder.
-- **Test scenarios:** run with pytest on CPython through `pnpm test:python`.
-  - A fake transport returning a reply makes `GalaxieChatModel.ainvoke` return it as an `AIMessage`.
-  - A fake transport returning `{ ok: false, error: { code: 'denied' } }` raises `GalaxieError` with code `denied` and the fixed message.
-  - A reply that is not valid bridge JSON raises the fixed `invalid` error.
-  - `capabilities.call` sends the name, the input and the effect scope taken from the config.
-  - The stand-in round-trips dicts, lists, bytes and nested values identically to `msgpack`.
-  - The fetch script rejects a wheel whose bytes do not match the lockfile hash. This is a Node test with an injected fetch.
+  3. The `ormsgpack` stand-in exposes the functions LangGraph's serializer uses (`packb`, `unpackb`, `Ext` and the error types the spike found), over `msgpack`, at version 1.13.0, with the license notice of what it replaces. Write it fresh from the spike README's description; never copy `spikes/python-bridge/standins.py`.
+  4. `requirements.lock` lists every wheel and Pyodide package with version, URL and SHA-256, limited to the KTD13 dependency closure. Start from `spikes/python-bridge/requirements.json`, remove the KTD13 exclusions, and keep what `langgraph` and `langchain-core` still need. Add `uuid-utils` 0.19.0 from PyPI by URL and hash.
+  5. The fetch script downloads them into `.cache/python-wheels/` with `credentials: 'omit'`, verifies every byte count and hash, and refuses a mismatch with a fixed error. It is an explicit network step, never run by tests. The build script runs `uv build` for `galaxie` and the stand-in into the same folder.
+  6. Commit `python/uv.lock` as KTD13 describes, and add the Node check that its `langgraph`/`langchain-core` closure matches `requirements.lock`.
+  7. Place the Node test of the fetch script where `pnpm test` already finds it. If `scripts/test/` is outside the Vitest include globs, put the test under `tests/conformance/` instead; do not widen the globs.
+- **Test scenarios:** pytest on CPython through `pnpm test:python`, unless noted.
+  - A fake transport returning a reply makes `GalaxieChatModel.ainvoke` return it as an `AIMessage`, with `usage_metadata` when the reply carries usage.
+  - A fake transport returning `{ ok: false, error: { code: 'denied' } }` raises `GalaxieError` with code `denied` and the fixed message, and no reply text.
+  - A reply that is not valid bridge JSON, has the wrong `v`, or has an unknown op raises the fixed `invalid` error.
+  - `capabilities.call` sends the name, the input and the effect scope taken from the config, and returns the checked output.
+  - The stand-in round-trips dicts, lists, bytes, nested values and `Ext` identically to `msgpack`.
+  - Node, with an injected fetch: the fetch script rejects a wheel whose bytes do not match the lockfile hash and leaves no file behind, and accepts matching bytes.
 - **Verification:** `pnpm test:python` passes, and the fetch script fills `.cache/python-wheels/` with every hash matching.
 
 ### U10. Pyodide adapter
@@ -574,63 +606,89 @@ docs/adr/0019-in-browser-retrieval.md
 - **Goal:** `@galaxie/adapter-pyodide`, an `ExecutorAdapter` that runs a LangGraph Python graph in a Worker through the bridge.
 - **Requirements:** R12, R13.
 - **Dependencies:** U9.
+- **Execution note:** start with the KTD12 CSP boot check. A dedicated Worker takes its CSP from its own script response, so this check must serve the stage 1 header on every response, as `test/loop.node.test.ts` does through Vite preview; Vitest browser mode does not. Build the bridge only after Pyodide boots, installs the locked set and imports LangGraph under that header.
 - **Files:**
-  - `packages/adapter-pyodide/package.json`, `README.md`, `AGENTS.md`
+  - `packages/adapter-pyodide/package.json`, `tsconfig.json`, `tsconfig.build.json`, `README.md`, `AGENTS.md`
   - `packages/adapter-pyodide/src/index.ts`, `adapter.ts`, `bridge.ts`, `worker.ts`, `runtime-files.ts`, `errors.ts`
-  - `packages/adapter-pyodide/test/bridge.test.ts`, `packages/adapter-pyodide/test/adapter.test.ts`, `packages/adapter-pyodide/test/adapter.node.test.ts`
-  - root `package.json`, `scripts/check-dependencies.ts`, `vitest.config.ts`
+  - `packages/adapter-pyodide/test/bridge.test.ts`, `packages/adapter-pyodide/test/adapter.test.ts`, `packages/adapter-pyodide/test/adapter.node.test.ts`, `examples/rag-browser/test/pyodide-csp.node.test.ts` (with a minimal fixture page)
+  - root `package.json` (build, typecheck and typecheck:ts6 entries), `scripts/check-dependencies.ts`, `vitest.config.ts` (an alias for the package source, and adding `packages/adapter-pyodide/test` to the browser project's include list if Chromium adapter tests live there), `pnpm-workspace.yaml` only if a build approval is needed
 - **Approach:**
-  1. `adapter.ts` implements `prepare` and the run lifecycle with the KTD12 ID, features and cancellation.
+  1. `adapter.ts` implements `prepare` and the run lifecycle with the KTD12 ID, features and cancellation. `prepare` validates the agent descriptor (KTD12) and the services, and checks `chatModels` against `ModelPreparation.providers` the way `packages/adapter-langgraph` does.
      - Model calls follow the KTD12 lease sequence with `RunRequest.models` and the host's `chatModels`, so routing, consent, output safety and usage settle in JavaScript.
-     - Capability calls go through `CapabilityPort.call`.
-  2. `bridge.ts` holds the message schemas and the size limit, used by both sides.
-  3. `worker.ts` is the Worker entry. It boots Pyodide from the host-supplied same-origin base URL, checks the SHA-256 of every locked wheel and package against the lockfile before installing it, then loads the agent module. `runtime-files.ts` lists the expected runtime file names and versions; KTD13 states which bytes the Worker can and cannot bind.
+     - Capability calls go through `RunRequest.capabilities.call` with the run signal and the effect scope from the bridge message.
+     - The run emits the same `ExecutorEvent` kinds the LangGraph adapter emits for a run with no interrupt, ending in the final output. Read `packages/adapter-langgraph/src/adapter.ts` for the shape; this adapter emits no stream chunks.
+  2. `bridge.ts` holds the message schemas and the size limit, used by both sides, built without code generation (KTD12).
+  3. `worker.ts` is the Worker entry. It boots Pyodide from the host-supplied same-origin base URL, checks the SHA-256 of every locked wheel and package against the lockfile before installing it, writes the agent sources into the file system, then imports the agent module. `runtime-files.ts` lists the expected runtime file names and versions; KTD13 states which bytes the Worker can and cannot bind.
   4. The package's `AGENTS.md` has the sections `check-docs` requires: Purpose, Entry points, Do, Never, Limits, Tests. Limits names the ADR-0018 decision 9 trust limits, the KTD13 runtime-file limit and KTD8's missing features.
-  5. Add `check:deps` rules: core never imports this package, and this package imports `@langchain/core` only, never `@langchain/langgraph*` or `@galaxie/adapter-langgraph`.
+  5. Add `check:deps` rules: core never imports this package; this package imports `@galaxie/core`, `@langchain/core`, and `zod` if the bridge uses it, and only `src/worker.ts` imports `pyodide`. It never imports `@langchain/langgraph*` or `@galaxie/adapter-langgraph`. Export the Worker entry as the `./worker` subpath. In the rag-browser allowlist, only `src/host/runtime.ts` may import `@galaxie/adapter-pyodide`, and only a new `src/host/pyodide-worker.ts`, mirroring `src/host/webllm-worker.ts`, may import `@galaxie/adapter-pyodide/worker`.
+  6. Add `pyodide@314.0.7` as an exact dependency of this package. It passes the release-age gate; the spike installed it under the same setting.
 - **Patterns to follow:**
   - `packages/adapter-langgraph/src/adapter.ts` for the adapter shape, fixed errors and span outcomes.
-  - The protocol in `spikes/python-bridge/worker.mjs`. Reimplement it in TypeScript; never copy spike code.
+  - The protocol in `spikes/python-bridge/worker.mjs` and `spikes/python-bridge/host.mjs`. Reimplement it in TypeScript; never copy spike code.
 - **Test scenarios:**
-  - Bridge: each op's valid message parses, and an unknown op, a missing `v`, the wrong `v`, or a message over 1 MB is rejected with the fixed error.
+  - CSP (`pyodide-csp.node.test.ts`, Playwright against a Vite preview that sends `cspHeader('mock')` on every response, Worker scripts included): with the Pyodide Worker URL in the Trusted Types allowlist, the Worker boots Pyodide, evaluates `1 + 1`, installs every KTD13 locked file from the verified cache and imports `langgraph.graph` and `langchain_core.messages`. No securitypolicyviolation fires in the page or the Worker; the Worker posts its own violation events back.
+  - Bridge: each op's valid message parses; an unknown op, a missing `v`, the wrong `v`, or a message over 1 MB is rejected with the fixed error.
   - Node, with a real Pyodide and a two-node test graph: a model call reaches the mock model through the router and the checked reply returns to Python.
-  - A capability call reaches the broker with its effect scope.
+  - A capability call reaches the broker with its effect scope, and an undeclared capability fails with the broker's existing error.
   - Output safety blocking a reply fails the run `denied`, and Python never receives the blocked text. Assert the Worker's received messages.
   - Abort during a model call fails the run `cancelled` and the Worker acknowledges.
   - Abort during a Python busy loop terminates the Worker after 500 ms, and the next run boots a fresh Worker and succeeds.
   - A locked wheel with one wrong byte fails boot with the fixed `unavailable` error and installs nothing.
   - Chromium: the same model and capability round trip works in a real Worker created through the host-supplied `createWorker`.
   - Credential scan: with a provider requiring a credential, no bridge message to the Worker contains the credential. Mirror the AT-23 scan.
-- **Verification:** the adapter tests pass on Node and Chromium, and `pnpm check` passes.
+- **Verification:** the adapter tests pass on Node and Chromium (KTD18 for the wheel cache), and `pnpm check` passes.
 
 ### U11. Python RAG agent and executor switch
 
 - **Goal:** the same RAG graph in LangGraph Python, selectable on the page.
 - **Requirements:** R12, R14.
 - **Dependencies:** U10.
-- **Files:** `examples/rag-browser/agent_py/rag_agent/__init__.py`, `examples/rag-browser/agent_py/rag_agent/graph.py`, `examples/rag-browser/agent_py/rag_agent/citations.py`, `examples/rag-browser/agent_py/tests/test_citations.py`, `examples/rag-browser/agent_py/tests/test_lint.py`, `python/galaxie/src/galaxie/lint.py`, `examples/rag-browser/src/agent/definition-python.ts`, `examples/rag-browser/src/host/runtime.ts`, `examples/rag-browser/src/host/app.tsx`, `examples/rag-browser/src/host/trusted-types.ts`, `examples/rag-browser/vite.config.ts`.
+- **Files:**
+  - `examples/rag-browser/agent_py/rag_agent/__init__.py`, `graph.py`, `citations.py`, `prompt.py`
+  - `examples/rag-browser/agent_py/tests/test_citations.py`, `test_prompt.py`, `test_lint.py`
+  - `python/galaxie/src/galaxie/lint.py`
+  - `examples/rag-browser/src/agent/prompt.json`, `prompt.ts`, `citations.ts`, `definition-python.ts`
+  - `examples/rag-browser/test/fixtures/citation-cases.json`, `test/fixtures/prompt-cases.json`, `test/citations.test.ts`, `test/prompt.test.ts`, `test/python-agent.node.test.ts`, `test/loop.node.test.ts`
+  - `examples/rag-browser/src/host/runtime.ts`, `app.tsx`, `trusted-types.ts`, `pyodide-worker.ts`, `csp.ts`, `examples/rag-browser/vite.config.ts`, `examples/rag-browser/package.json`
 - **Approach:**
-  1. `graph.py` mirrors `src/agent/graph.ts`: same nodes, state keys, prompt text and citation rules. Only model and capability wiring use the Python `galaxie` proxies.
-  2. Prompt text comes from one shared JSON file read by both agents, so the two prompts cannot drift.
-  3. `definition-python.ts` reuses the U5 schemas with executor `langgraph-python` and points at the Python module.
-  4. The host creates a second instance for the Python agent only when the visitor picks it.
-  5. The switch states the download and cold start measured from the KTD13 lock, not the spike's figures, and shows boot progress.
-  6. Switch states:
-     - the switch is disabled while a run is active;
+  1. Move the prompt text into `prompt.json` (KTD17). `prompt.ts` keeps its exports and builds the same strings from the JSON, so stage 1 behavior and tests stay unchanged. Move the citation cases into `citation-cases.json` and make `citations.test.ts` read them.
+  2. `graph.py` mirrors `src/agent/graph.ts`: nodes `retrieve` and `generateAnswer` (the same names as JavaScript, so the graphs read side by side), the same state keys, `k = 10`, the same prompt and citation rules, and output reduced to `answer` and `citations`. Only model and capability wiring use the Python `galaxie` proxies. It runs without a checkpointer (KTD8).
+  3. `definition-python.ts` declares `galaxie.rag-browser.python` with executor `langgraph-python` and reuses the stage 1 schemas, capability and role unchanged.
+  4. Executors are fixed when `createRuntime` runs, so `createRagHost` registers both adapters in its one `createRuntime` call. The Pyodide adapter creates no Worker and fetches nothing until `prepare`. The Python instance is created and prepared in that same runtime only when the visitor picks it, and binds `docs.search@1` to the same retrieval client.
+     - The page owns one `RagModels` for its lifetime. Today `RagHost.dispose()` also disposes the models; change that so the page disposes models only on `pagehide` or Clear data. Switching back to JavaScript disposes only the Python instance, so the shared WebLLM engine stays alive and no second engine loads.
+     - `RagHost` exposes the active instance. `app.tsx` subscribes to run status, cancels and renders `ModelRoutes` against the active instance. `dispose` covers both instances and the Pyodide Worker.
+     - Clear data and `pagehide` dispose the Python instance and reset the selection to JavaScript.
+  5. The host creates the Python instance only when the visitor picks it. Text next to the switch, visible before the pick, states the download size. The build computes it as the sum of every file the Python option serves: the KTD13 lock entries, the runtime files listed with byte counts in `runtime-files.ts`, the built `galaxie` and `ormsgpack` wheels and the agent sources. Never use the spike's figures. U13 adds the measured cold start, worded "about N s on headless Chromium in CI".
+  6. The switch is a labeled two-option radio group in the "Index and models" section, above Ask. Its states:
+     - disabled with the visible reason "Prepare chat models first." until models are prepared and the index is ready;
+     - disabled while a run is active;
+     - booting counts toward the page's `busy` state, so Ask, Prepare, Clear data and Evaluate are disabled during boot. A `role="status"` line announces only phase changes; elapsed time sits in a non-live element. A "Cancel Python boot" button terminates the Worker and returns the selection to JavaScript;
+     - ready reads "LangGraph Python ready";
+     - a boot failure shows a dedicated `role="alert"` message with fixed text beside the switch, with no Retry question button, returns the selection to JavaScript and moves focus to the JavaScript option. A reboot on the next run after an aborted run reuses the boot status text and the same failure rule;
      - a boot failure shows its fixed message and returns the selection to JavaScript;
      - a build without `.cache/python-wheels/` shows "Python version not included in this build" instead of the option;
-     - the selection resets to JavaScript on reload.
-  7. The Vite build copies `.cache/python-wheels/` and the agent sources into the output under fixed paths.
-  8. A minimal Python lint aid (ADR-0018 decision 9), run by `pnpm test:python`, scans `agent_py/` for `import js`, `pyodide.http`, `urllib`, `socket`, provider SDK imports and provider-prefixed model strings, and fails with a fixed message. Like the ESLint plugin it is a linting aid, not enforcement.
-- **Patterns to follow:** `spikes/python-bridge/agent.py` for the LangGraph Python graph shape; rewrite it, don't copy.
+     - the selection resets to JavaScript on reload, including the stage 1 persisted-`pageshow` reload.
+  7. Answers carry their executor: "Answer · LangGraph.js" or "Answer · LangGraph Python". Store the producing executor with the answer when its run starts and render the heading from that value, so a later switch never relabels an earlier answer. Switching clears the displayed answer. The page subtitle, now "JavaScript · LangGraph.js", reflects the selected executor.
+  8. Add the `pyodide-worker.ts` `?worker&url` to the `trusted-types.ts` allowlist. The Vite build copies `.cache/python-wheels/`, the Pyodide runtime files and the agent sources into the output under fixed paths. The page header stays unchanged; the Pyodide Worker script is served with `connect-src 'self'` in both modes and every other directive unchanged, narrowing ADR-0018 decision 9's `js` path to same-origin.
+  9. A minimal Python lint aid (ADR-0018 decision 9), run by `pnpm test:python`, parses `agent_py/` with Python's `ast` module. It flags any `import` or `from … import` of `js`, `pyodide_js`, `pyodide.http`, `pyodide.ffi`, `pyodide.code`, `urllib`, `http.client`, `socket` or provider SDKs, `__import__` and `importlib.import_module` calls naming them, and provider-prefixed model strings, and fails with a fixed message. Like the ESLint plugin it is a linting aid, not enforcement.
+- **Patterns to follow:** `spikes/python-bridge/agent.py` for the LangGraph Python graph shape; rewrite it, don't copy. `src/agent/graph.ts` for node and state names.
 - **Test scenarios:**
-  - `test_citations.py` runs the same cases as `citations.test.ts`, from one shared JSON case file, with identical results.
-  - Loop in mock mode: after switching to Python, a fixture question returns the same answer and citations as the JavaScript agent.
-  - Switching back to JavaScript disposes the Python instance and its Worker.
-  - Before the switch, no Pyodide file is requested. Assert this with request recording.
-  - Loop: a boot failure returns the selection to JavaScript with the fixed message, and the switch is disabled during a run.
-  - Each answer shows which executor produced it.
-  - `test_lint.py`: a planted `import js` is flagged, and the real `agent_py/` passes.
-- **Verification:** the loop tests pass headless with both executors.
+  - `test_citations.py` and `citations.test.ts` run every case in `citation-cases.json` with identical results, including markers `[0]`, `[11]`, `[007]` and repeated markers.
+  - `test_prompt.py` and `prompt.test.ts` build the user message for every case in `prompt-cases.json` and match the same expected string. Cases cover non-ASCII text, quotes, backslashes, a newline and zero passages.
+  - Node, through the Pyodide adapter: the Python agent on the mock fixture returns the same `{ answer, citations }` as the JavaScript agent for "capital of France".
+  - Node: with the obedient-attacker mock and an injected passage, the Python agent's only capability call is `docs.search@1`, and no interaction is produced.
+  - Loop in mock mode: after switching to Python, a fixture question returns the same answer and citations as the JavaScript agent, labeled "Answer · LangGraph Python".
+  - Loop: switching back to JavaScript disposes the Python instance and terminates its Worker, and the JavaScript agent then answers with the same model instance.
+  - Loop: Clear data and `pagehide` while Python is selected terminate the Worker and reset the selection to JavaScript.
+  - Loop: Cancel Python boot terminates the Worker and returns the selection to JavaScript; Ask is disabled during boot.
+  - Loop: an answer produced by JavaScript keeps its "Answer · LangGraph.js" heading until it is cleared by the switch.
+  - Loop: after the switch, the bytes recorded by request recording equal the stated download size.
+  - Loop (Chromium, default-mode header): a `fetch` from the Pyodide Worker to `https://huggingface.co` is blocked by CSP.
+  - Loop: before the switch, no Pyodide or wheel file is requested. Assert this with request recording.
+  - Loop: a boot failure (a served wheel with one changed byte) returns the selection to JavaScript with the fixed message, and the switch is disabled during a run.
+  - Loop: with no wheel cache in the build, the page shows "Python version not included in this build".
+  - `test_lint.py`: planted `import js`, `from js import fetch` and `import pyodide_js` are each flagged, and the real `agent_py/` passes.
+- **Verification:** all stage 1 tests still pass unchanged, and the loop tests pass headless with both executors.
 
 ### U12. Cross-language parity lane
 
@@ -639,18 +697,20 @@ docs/adr/0019-in-browser-retrieval.md
 - **Dependencies:** U11.
 - **Files:**
   - `examples/rag-browser/test/golden/session.json`, `examples/rag-browser/test/golden/script.json`
+  - `examples/rag-browser/test/support/transcript.ts`
   - `examples/rag-browser/test/parity.test.ts`, `examples/rag-browser/test/parity.node.test.ts`
   - `examples/rag-browser/agent_py/tests/test_parity.py`
   - root `package.json` (adding `test:python` to `check`), `.github/workflows/ci.yml`
 - **Approach:**
-  1. `script.json` fixes the session: questions, modes, the mock search results for each query, and the mock model replies. One recorder writes the KTD15 transcript.
-  2. JavaScript runs on Node and Chromium. Python runs through the adapter on Node and Chromium.
-  3. CPython runs the graph with a pytest harness that replays `script.json` through a fake transport.
-  4. All five transcripts must equal `session.json`, compared as JSON.
-  5. CI follows KTD16: set up uv with CPython 3.14, fetch and build wheels, then run the existing steps and `pnpm test:python`.
+  1. `script.json` fixes the session: questions, modes, the search result returned for each query, and the model reply for each user message. Every lane serves search results and replies from this file, so the lanes compare agent behavior only. To keep R14's mock-embedder claim, the search results in `script.json` are recorded from the fixture index built with the mock embedder, and a Node test asserts that live retrieval on that index returns exactly the recorded results for each scripted query. The session includes a passage with non-ASCII text, quotes, a backslash and a newline, and one query that returns no passages.
+  2. `transcript.ts` records the KTD15 transcript. Model messages are normalized to `{ role, content }` with role `system`, `user` or `assistant`, so LangChain message classes do not leak into the comparison.
+  3. JavaScript runs on Node and Chromium. Python runs through the adapter on Node and Chromium. CPython runs the graph under pytest, replaying `script.json` through a fake transport.
+  4. All five transcripts must equal `session.json`, compared as parsed JSON.
+  5. CI follows KTD16: set up uv with CPython 3.14, fetch and build wheels, then run the existing steps and `pnpm test:python`. Pin any new action by commit SHA, as the existing steps are.
 - **Test scenarios:**
   - All five lanes produce `session.json` exactly.
   - A unit test shows the comparator reports a difference between two transcripts that differ in one model reply.
+  - A unit test shows two transcripts that differ only in object key order compare equal.
 - **Verification:** the parity lane passes locally and in CI.
 
 ### U13. Stage 2 docs and evidence
@@ -658,14 +718,18 @@ docs/adr/0019-in-browser-retrieval.md
 - **Goal:** record what stage 2 proved and what it did not.
 - **Requirements:** R12–R14.
 - **Dependencies:** U12.
-- **Files:** `docs/adr/0018-python-agents-through-pyodide.md` (Verification section and Revisions line only), `examples/rag-browser/README.md`, `packages/adapter-pyodide/README.md`, `AGENTS.md`, `llms.txt`, `docs/unsupported.md`, `docs/device-matrix.md`, `README.md`.
+- **Files:** `docs/adr/0018-python-agents-through-pyodide.md` (Verification section and Revisions line only), `docs/adr/0019-in-browser-retrieval.md` (Verification only), `examples/rag-browser/README.md`, `packages/adapter-pyodide/README.md`, `AGENTS.md`, `llms.txt`, `docs/unsupported.md`, `docs/device-matrix.md`, `docs/system-design.md` (one pointer line), `README.md`.
 - **Approach:**
   1. In ADR-0018 Verification, record:
      - the parity lane and its five transcripts;
-     - the measured Python cold start and download on the reference device;
+     - the Pyodide boot under the stage 1 strict CSP;
+     - the measured Python cold start and download on Node and headless Chromium in CI, as demonstrations;
      - the KTD8 narrowing.
      State that the adapter turns off all five executor features, so decision 7 (checkpoints through the byte-record port) and the executor-aware `RecoverySession` remain unevidenced. Keep ADR-0018 Proposed: its success criteria include the tutor port.
-  2. List the unsupported Python features in `docs/unsupported.md`: interrupts, checkpoints, streaming, pydantic-ai and DSPy. Add the new lanes to the device matrix.
+  2. Add the measured headless-Chromium cold start to the switch text from U11, labeled as measured on headless Chromium in CI. Keep reference-device cold start only in the README.
+  3. Replace the README's "Python … not included in this JavaScript stage" row with the measured figures, and keep reference-device figures marked unmeasured until the maintainer runs them.
+  4. List the unsupported Python features in `docs/unsupported.md`: interrupts, checkpoints, streaming, pydantic-ai and DSPy. Add the new lanes to the device matrix.
+  5. Update the `AGENTS.md` project-status paragraph for rag-browser in place rather than adding a second one.
 - **Test expectation:** none, documentation only. `check:docs` covers the links.
 - **Verification:** `pnpm check` passes. ADR-0018 still reads Proposed, with the new evidence dated 2026-10-30 or later.
 
@@ -675,7 +739,7 @@ docs/adr/0019-in-browser-retrieval.md
 
 | Gate | Command or step | When |
 |---|---|---|
-| Full repo check | `pnpm check` | before each pull request, and after U7 and U12 |
+| Full repo check | `pnpm check` | before each pull request, and after U8 and U13 |
 | Python lane | `pnpm test:python` | U9–U12; also part of `pnpm check` from U12 |
 | Wheel fetch | the U9 fetch script, before tests | stage 2, locally and in CI |
 | Corpus build | `pnpm --filter @galaxie/example-rag-browser corpus` | once by hand; never in CI |
@@ -704,6 +768,8 @@ Format with `pnpm format`. Tests use mocks and the committed fixture only (R15).
 | Transformers.js 4.3.1 hangs on failed downloads | indexing never finishes | KTD3 own fetch with fixed errors; upgrade to 4.3.2 later |
 | Two WebGPU models at once on one device | device loss or slow indexing | Assumption recorded; index before preparing chat models; README limit |
 | First load holds the 174 MB weights about twice (issue #1827) | memory pressure on small devices | Desktop reference only; README limit |
-| A LangGraph Python dependency lacks a Pyodide wheel | stage 2 blocked | Stop condition; stage 1 ships alone |
+| A LangGraph Python dependency lacks a Pyodide wheel | stage 2 blocked | Stop condition; stage 1 already shipped |
+| Pyodide needs `'unsafe-eval'` or another KTD11 relaxation under the strict CSP | stage 2 blocked | U10 boots Pyodide under the stage 1 header first; stop condition |
+| Pyodide boot on Node and Chromium pushes CI past its time limit | CI fails | KTD16 allows raising the limit to 25 minutes; boot one Worker per test file |
 | Prompt or citation rules drift between languages | parity lane fails | Shared prompt JSON and shared citation cases (U11) |
 | SQuAD source URL moves | corpus script fails | Pinned SHA-256 gives a clear failure; the script accepts a different URL with the same hash |

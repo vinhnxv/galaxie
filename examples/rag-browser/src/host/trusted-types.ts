@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import retrievalUrl from '../retrieval/worker.ts?worker&url';
+import pyodideUrl from './pyodide-worker.ts?worker&url';
 import webllmUrl from './webllm-worker.ts?worker&url';
 
 interface TrustedTypesFactory {
@@ -23,7 +24,8 @@ export function allowWorkerScripts(): void {
     .trustedTypes;
   if (factory)
     factory.createPolicy('default', {
-      createScriptURL: (value) => checkWorkerUrl(value, [retrievalUrl, webllmUrl], location.href),
+      createScriptURL: (value) =>
+        checkWorkerUrl(value, [retrievalUrl, webllmUrl, pyodideUrl], location.href),
     });
   installed = true;
 }
@@ -34,4 +36,8 @@ export function createRetrievalWorker(): Worker {
 export function createWebLLMWorker(): Worker {
   allowWorkerScripts();
   return new Worker(webllmUrl, { type: 'module' });
+}
+export function createPyodideWorker(): Worker {
+  allowWorkerScripts();
+  return new Worker(pyodideUrl, { type: 'module' });
 }

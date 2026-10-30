@@ -11,6 +11,9 @@ import {
 } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
+  '@galaxie/adapter-pyodide': fileURLToPath(
+    new URL('./packages/adapter-pyodide/src/index.ts', import.meta.url),
+  ),
   '@orama/orama': fileURLToPath(
     new URL('./examples/rag-browser/node_modules/@orama/orama/dist/esm/index.js', import.meta.url),
   ),
@@ -134,12 +137,14 @@ const config: ViteUserConfig = defineConfig({
             '**/*.test.ts',
             '**/*.test.tsx',
             '../../packages/react/test/**/*.test.tsx',
+            '../../packages/adapter-pyodide/test/**/*.test.ts',
             '../../packages/storage-indexeddb/test/**/*.test.ts',
             '../../examples/*/test/**/*.test.ts',
           ],
           exclude: [
             ...configDefaults.exclude,
             '**/*.node.test.ts',
+            '../../packages/adapter-pyodide/test/**/*.node.test.ts',
             '../../examples/*/test/**/*.node.test.ts',
           ],
           browser: {

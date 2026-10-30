@@ -1,0 +1,34 @@
+[
+  {
+    "name": "ordinary passage",
+    "question": "capital of France",
+    "passages": [
+      {
+        "id": "france",
+        "title": "France",
+        "text": "Paris is the capital.",
+        "score": 1
+      }
+    ],
+    "expected": "Question: capital of France\nBEGIN_REFERENCE_DATA\n[{\"marker\":1,\"id\":\"france\",\"title\":\"France\",\"text\":\"Paris is the capital.\"}]\nEND_REFERENCE_DATA\nUse the numbered passages above."
+  },
+  {
+    "name": "non-ASCII quotes backslashes and newline",
+    "question": "What is \"café\"?\nA \\ B",
+    "passages": [
+      {
+        "id": "café",
+        "title": "\"École\" \\ archive",
+        "text": "Line one\nLine \"two\" \\ fin.",
+        "score": 0.5
+      }
+    ],
+    "expected": "Question: What is \"café\"?\nA \\ B\nBEGIN_REFERENCE_DATA\n[{\"marker\":1,\"id\":\"café\",\"title\":\"\\\"École\\\" \\\\ archive\",\"text\":\"Line one\\nLine \\\"two\\\" \\\\ fin.\"}]\nEND_REFERENCE_DATA\nUse the numbered passages above."
+  },
+  {
+    "name": "no passages",
+    "question": "Where?",
+    "passages": [],
+    "expected": "Question: Where?\nBEGIN_REFERENCE_DATA\n[]\nEND_REFERENCE_DATA\nNo passages were found."
+  }
+]

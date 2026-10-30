@@ -21,7 +21,7 @@
 - **`spikes/`:** three throwaway spikes: B0 (a 1.7B model on WebGPU), the local English tutor (a LangGraph.js agent on that model in Chrome) and [Spike C](../spikes/c-ui-path/README.md) (typed interrupt UI and session-checkpoint reload). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
 
-The maintained [browser-built RAG example](../examples/rag-browser/README.md) keeps retrieval behind a host read capability; [ADR-0019](adr/0019-in-browser-retrieval.md) records its separate Worker/cache design and unmeasured real-model paths.
+The maintained [browser-built RAG example](../examples/rag-browser/README.md) keeps retrieval behind a host read capability and offers an optional [Pyodide executor](../packages/adapter-pyodide/README.md) with policy in JavaScript; [ADR-0019](adr/0019-in-browser-retrieval.md) records its separate Worker/cache design and unmeasured real-model paths, while [ADR-0018](adr/0018-python-agents-through-pyodide.md) remains Proposed with Python persistence and the tutor port unevidenced.
 
 ## 2. System context and trust boundaries
 

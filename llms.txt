@@ -26,6 +26,7 @@
 
 - [Core README](packages/core/README.md): framework-neutral contracts and host runtime setup.
 - [LangGraph adapter README](packages/adapter-langgraph/README.md): a minimal graph and explicit config.
+- [Python adapter README](packages/adapter-pyodide/README.md): trusted Pyodide Workers, JSON bridge, JavaScript policy and missing executor features.
 - [Models README](packages/models/README.md): provider subpaths and the deterministic mock.
 - [React README](packages/react/README.md): surfaces and separate host confirmations.
 - [IndexedDB README](packages/storage-indexeddb/README.md): scoped checkpoints, recovery and storage lifecycle.
@@ -36,13 +37,14 @@
 
 - [Core AGENTS](packages/core/AGENTS.md): lifecycle, policy and content-free instrumentation rules.
 - [LangGraph adapter AGENTS](packages/adapter-langgraph/AGENTS.md): native semantics, config and unsupported interrupts.
+- [Python adapter AGENTS](packages/adapter-pyodide/AGENTS.md): Worker lifecycle, compiled wheel hashes, CSP and Python trust limits.
 - [Models AGENTS](packages/models/AGENTS.md): host registration and fake-only automated model tests.
 - [React AGENTS](packages/react/AGENTS.md): trusted registries, text rendering and host lifecycle.
 - [IndexedDB AGENTS](packages/storage-indexeddb/AGENTS.md): principal scope, fencing, recovery and deletion.
 - [MCP tools AGENTS](packages/tools-mcp/AGENTS.md): metadata pins, broker dispatch and sanitized errors.
 - [ESLint plugin AGENTS](packages/eslint-plugin/AGENTS.md): scope analysis without runtime enforcement.
 
-- [Browser-built RAG example](examples/rag-browser/README.md): JavaScript graph, verified embedding files, Orama Worker, cache lifecycle and unmeasured real-device paths.
+- [Browser-built RAG example](examples/rag-browser/README.md): JavaScript/Python graphs, five behavior-transcript lanes, verified embedding and Python files, Orama Worker and unmeasured real-device paths.
 
 ## Verification
 

@@ -3,12 +3,20 @@
 
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type UserConfigExport } from 'vite';
+import { pythonAssets } from './scripts/python-assets.js';
 import { cspHeader } from './src/host/csp.js';
 
 const config: UserConfigExport = defineConfig(({ mode }) => ({
   root: fileURLToPath(new URL('.', import.meta.url)),
+  plugins: [pythonAssets()],
   resolve: {
     alias: {
+      '@galaxie/adapter-pyodide/worker': fileURLToPath(
+        new URL('../../packages/adapter-pyodide/src/worker.ts', import.meta.url),
+      ),
+      '@galaxie/adapter-pyodide': fileURLToPath(
+        new URL('../../packages/adapter-pyodide/src/index.ts', import.meta.url),
+      ),
       '@galaxie/react': fileURLToPath(
         new URL('../../packages/react/src/index.ts', import.meta.url),
       ),
@@ -30,7 +38,13 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
       ),
     },
   },
-  worker: { format: 'es' },
+  worker: {
+    format: 'es',
+    rolldownOptions: {
+      external: ['pyodide'],
+      output: { paths: { pyodide: '/python/runtime/pyodide.mjs' } },
+    },
+  },
   optimizeDeps: { exclude: ['@huggingface/transformers', 'onnxruntime-web', '@mlc-ai/web-llm'] },
   build: {
     rolldownOptions: {

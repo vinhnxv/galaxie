@@ -1,0 +1,95 @@
+# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+# SPDX-License-Identifier: AGPL-3.0-only
+
+import asyncio
+import json
+
+import pytest
+
+from galaxie import GalaxieError
+from galaxie import _bridge, capabilities
+
+
+def test_capability_forwards_input_and_full_effect_scope():
+    recorded = []
+
+    async def transport(raw):
+        message = json.loads(raw)
+        recorded.append(message)
+        return json.dumps({**message, "kind": "response", "ok": True, "payload": {"value": 42}})
+
+    _bridge.install_transport(transport)
+    config = {"metadata": {"langgraph_checkpoint_ns": "parent:task|child:task"}}
+    assert asyncio.run(capabilities.call("math.double@1", {"value": 21}, config)) == {"value": 42}
+    assert recorded[0]["payload"] == {
+        "name": "math.double@1", "input": {"value": 21}, "effectScope": "parent:task|child:task"
+    }
+    assert recorded[0]["v"] == "galaxie.bridge/v1"
+    assert recorded[0]["op"] == "capability"
+
+
+def test_capability_accepts_explicit_checkpoint_namespace():
+    async def transport(raw):
+        message = json.loads(raw)
+        assert message["payload"]["effectScope"] == "explicit:task"
+        return json.dumps({**message, "kind": "response", "ok": True, "payload": None})
+
+    _bridge.install_transport(transport)
+    assert asyncio.run(capabilities.call("read@1", {}, {"configurable": {"checkpoint_ns": "explicit:task"}})) is None
+
+
+@pytest.mark.parametrize("response", ["not JSON", "[]"])
+def test_malformed_reply_has_fixed_invalid_error(response):
+    async def transport(_):
+        return response
+
+    _bridge.install_transport(transport)
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(capabilities.call("read@1", {}))
+    assert error.value.code == "invalid"
+    assert str(error.value) == "The request is invalid."
+
+
+@pytest.mark.parametrize("field,value", [("v", "wrong"), ("op", "unknown")])
+def test_reply_rejects_unknown_version_or_operation(field, value):
+    async def transport(raw):
+        message = json.loads(raw)
+        response = {**message, "kind": "response", "ok": True, "payload": None}
+        response[field] = value
+        return json.dumps(response)
+
+    _bridge.install_transport(transport)
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(capabilities.call("read@1", {}))
+    assert error.value.code == "invalid"
+    assert str(error.value) == "The request is invalid."
+
+
+def test_error_ignores_remote_text():
+    async def transport(raw):
+        message = json.loads(raw)
+        return json.dumps({"v": message["v"], "kind": "response", "id": message["id"], "op": message["op"], "ok": False, "error": {"code": "denied", "message": "PRIVATE REPLY"}})
+
+    _bridge.install_transport(transport)
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(capabilities.call("read@1", {}))
+    assert error.value.code == "denied"
+    assert str(error.value) == "Policy denied the request."
+
+
+def test_standin_round_trips_the_supported_msgpack_values():
+    import msgpack
+    import ormsgpack
+
+    for value in [{"nested": [1, None, True, {"bytes": b"abc"}]}, ["text", 3.5], ormsgpack.Ext(7, b"body")]:
+        packed = ormsgpack.packb(value)
+        assert packed == msgpack.packb(value, use_bin_type=True)
+        assert ormsgpack.unpackb(packed) == value
+
+
+def test_standin_supplies_the_langgraph_serializer_import_surface():
+    from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+
+    serializer = JsonPlusSerializer()
+    value = {"nested": [1, True, None], "bytes": b"body"}
+    assert serializer.loads_typed(serializer.dumps_typed(value)) == value

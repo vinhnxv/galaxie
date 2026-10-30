@@ -25,7 +25,19 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6
+        with:
+          version: "0.11.23"
+          python-version: "3.14"
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
       - run: pnpm install --frozen-lockfile
+      - name: Sync the pinned CPython environment
+        run: uv sync --project python --locked
+      - name: Fetch and build the pinned Python wheels
+        run: |
+          node scripts/fetch-python-wheels.ts
+          node scripts/build-python-wheels.ts
       - run: pnpm run check:license
       - run: pnpm exec biome ci .
       - name: Type-check with TypeScript 7
@@ -34,6 +46,7 @@ jobs:
         run: pnpm run typecheck:ts6
       - run: pnpm exec playwright install --with-deps --only-shell chromium
       - run: CI=true pnpm test
+      - run: pnpm test:python
       - run: pnpm run build
       - run: pnpm run check:deps
       - run: pnpm run check:docs
