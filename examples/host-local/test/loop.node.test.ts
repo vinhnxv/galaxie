@@ -170,6 +170,7 @@ it('completes the mock lesson without sentence egress and enforces the CSP', asy
   try {
     const response = await page.goto(mockOrigin);
     expect(response?.headers()['content-security-policy']).toBe(cspHeader('mock'));
+    expect(response?.headers()['content-security-policy']).toContain("form-action 'none'");
     const downloads: Download[] = [];
     page.on('download', (download) => downloads.push(download));
     for (const name of ['Export session summary', 'Export my answers'])

@@ -28,6 +28,8 @@ describe('host CSP', () => {
     expect(cspDirectives(mode)['require-trusted-types-for']).toEqual(["'script'"]);
     expect(cspDirectives(mode)['script-src']).toEqual(["'self'", "'wasm-unsafe-eval'"]);
     expect(cspDirectives(mode)['frame-ancestors']).toEqual(["'none'"]);
+    expect(cspDirectives(mode)['form-action']).toEqual(["'none'"]);
+    expect(cspHeader(mode).split('; ')).toContain("form-action 'none'");
     expect(cspHeader(mode)).not.toMatch(/'unsafe-inline'|'unsafe-eval'/);
   });
 });

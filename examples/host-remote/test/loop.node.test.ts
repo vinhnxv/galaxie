@@ -119,6 +119,7 @@ async function observe(origin: string, mobile = false): Promise<Observation> {
   });
   const response = await page.goto(origin);
   expect(response?.headers()['content-security-policy']).toBe(cspHeader());
+  expect(response?.headers()['content-security-policy']).toContain("form-action 'none'");
   return { context, page, requests, errors };
 }
 
