@@ -5,7 +5,8 @@ Date: 2026-10-30. Evidence baseline: `main` commit
 at `21b384af48bdb6fda88f17161ae89f7a0f0e9239`, which adds only the reviewed
 plan). This record supplies evidence for the maintainer's Go/Revise decision
 under [brief §18](galaxie-project-brief.md#18-verdict-demonstrations-and-engineering-checks-adr-0016).
-It makes no decision. No new real-model run, device run or measurement was
+It makes no decision itself. On 2026-10-30 the maintainer decided **Go**,
+with the open items below still open. No new real-model run, device run or measurement was
 performed for this record. The AT-20 closeout adds bounded structured-repair
 tests on Node and headless Chromium after that baseline, using mocks only.
 The AT-22 closeout adds selected-route display tests in headless Chromium and
@@ -150,7 +151,8 @@ Historical records are evidence, not code to import or promote.
 
 ## Open items for the maintainer's decision
 
-These are facts to consider, with no recommendation or verdict.
+These are facts the maintainer considered, with no recommendation or verdict.
+They remain open after the Go decision.
 
 - **Partial acceptance evidence:** AT-04 (worker/browser-owned traffic and audio), AT-24 (real endpoint/LNA), and AT-32 (allowed-URL/structured channels) have the limitations stated in their rows. No AT is classified `gap`; missing portions of these requirements are explicit gaps within `partial` rows.
 - **Unmeasured engineering check:** main-thread long tasks over 50 ms during real inference, as stated above and in [M2 not measured](m2-exit-record.md#not-measured).
