@@ -19,3 +19,12 @@ dist/
 
 # Generated corpus; build explicitly with the example corpus command.
 /examples/rag-browser/public/data/squad-dev.json
+
+# Verified Python wheels and local interpreter/build output.
+/.cache/
+/python/.venv/
+/python/**/build/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { pythonBuild } from 'virtual:rag-python';
 import { ModelRoutes } from '@galaxie/react';
 import { type ReactElement, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { type RagOutput, RagOutputSchema, type SearchMode } from '../agent/schemas.js';
@@ -14,10 +15,23 @@ export interface AppProps {
   corpus: Corpus | null;
   startIndex(): Promise<unknown>;
   prepareModels(): Promise<RagHost>;
+  disposeModels(): void;
 }
-export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps): ReactElement {
+export function App({
+  retrieval,
+  corpus,
+  startIndex,
+  prepareModels,
+  disposeModels,
+}: AppProps): ReactElement {
   const index = useSyncExternalStore(retrieval.subscribe, retrieval.getSnapshot);
   const [host, setHost] = useState<RagHost>();
+  const [active, setActive] = useState<RagHost['instance']>();
+  const [executor, setExecutor] = useState<'javascript' | 'python'>('javascript');
+  const [answerExecutor, setAnswerExecutor] = useState<'javascript' | 'python'>('javascript');
+  const [pythonPhase, setPythonPhase] = useState<RagHost['pythonPhase']>('idle');
+  const [bootSeconds, setBootSeconds] = useState(0);
+  const javascriptOption = useRef<HTMLInputElement>(null);
   const [preparing, setPreparing] = useState(false);
   const [question, setQuestion] = useState('');
   const [mode, setMode] = useState<SearchMode>('hybrid');
@@ -35,6 +49,7 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
     running ||
     preparing ||
     evaluating ||
+    pythonPhase === 'booting' ||
     index.status === 'building' ||
     index.status === 'downloading';
   const reason =
@@ -46,17 +61,39 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
   useEffect(() => {
     if (answer) answerHeading.current?.focus();
   }, [answer]);
-  useEffect(
-    () =>
-      host?.instance.subscribe(() =>
-        setRunStatus(host.instance.getSnapshot().run?.status ?? 'idle'),
-      ),
-    [host],
-  );
+  useEffect(() => {
+    const update = (): void => {
+      setActive(host?.instance);
+      setExecutor(host?.executor ?? 'javascript');
+      setPythonPhase(host?.pythonPhase ?? 'idle');
+    };
+    update();
+    return host?.subscribeExecutor(update);
+  }, [host]);
+  useEffect(() => {
+    const update = (): void => setRunStatus(active?.getSnapshot().run?.status ?? 'idle');
+    update();
+    return active?.subscribe(update);
+  }, [active]);
+  useEffect(() => {
+    if (host && pythonBuild.available) javascriptOption.current?.focus();
+  }, [host]);
+  useEffect(() => {
+    if (pythonPhase === 'failed' && !busy) javascriptOption.current?.focus();
+  }, [pythonPhase, busy]);
+  useEffect(() => {
+    if (pythonPhase !== 'booting') return;
+    const started = performance.now();
+    setBootSeconds(0);
+    const timer = setInterval(() => setBootSeconds((performance.now() - started) / 1000), 250);
+    return () => clearInterval(timer);
+  }, [pythonPhase]);
   useEffect(() => {
     const stop = (): void => {
       controller.current?.abort();
       void host?.dispose();
+      disposeModels();
+      setExecutor('javascript');
     };
     const restorePage = (event: PageTransitionEvent): void => {
       if (event.persisted) window.location.reload();
@@ -67,7 +104,7 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
       removeEventListener('pagehide', stop);
       removeEventListener('pageshow', restorePage);
     };
-  }, [host]);
+  }, [host, disposeModels]);
   const operation = async (action: () => Promise<unknown>, failure: string): Promise<void> => {
     setError(undefined);
     try {
@@ -82,6 +119,7 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
     try {
       setHost(await prepareModels());
     } catch {
+      disposeModels();
       setError('The chat models could not be prepared.');
     } finally {
       setPreparing(false);
@@ -92,9 +130,11 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
     setRunning(true);
     setAnswer(undefined);
     setError(undefined);
+    setAnswerExecutor(executor);
     try {
-      const { runId } = await host.instance.start({ question, mode });
-      for await (const event of host.instance.events(runId)) {
+      const instance = active ?? host.instance;
+      const { runId } = await instance.start({ question, mode });
+      for await (const event of instance.events(runId)) {
         if (event.type === 'output') setAnswer(RagOutputSchema.parse(event.output));
         else if (event.type === 'error') setError(event.error.message);
       }
@@ -108,6 +148,7 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
     if (index.status !== 'empty') return;
     controller.current?.abort();
     void host?.dispose();
+    disposeModels();
     setHost(undefined);
     setPaste('');
     setQuestion('');
@@ -115,7 +156,7 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
     setRows([]);
     setError(undefined);
     setRunStatus('idle');
-  }, [index.status, host]);
+  }, [index.status, host, disposeModels]);
   const clear = async (): Promise<void> => {
     await retrieval.clear();
   };
@@ -142,7 +183,10 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
   return (
     <main>
       <h1>Ask your documents</h1>
-      <p>Build an index and answer questions in this browser. JavaScript · LangGraph.js</p>
+      <p>
+        Build an index and answer questions in this browser.{' '}
+        {executor === 'python' ? 'Python · LangGraph Python' : 'JavaScript · LangGraph.js'}
+      </p>
       <section aria-labelledby="index-heading">
         <h2 id="index-heading">Index and models</h2>
         <p role="status">
@@ -207,6 +251,74 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
         >
           {preparing ? 'Preparing chat models…' : host ? 'Chat models prepared' : 'Prepare models'}
         </button>
+        {pythonBuild.available ? (
+          <>
+            <p>
+              Python adds{' '}
+              {Number(
+                document.querySelector<HTMLMetaElement>('meta[name="galaxie-python-bytes"]')
+                  ?.content ?? pythonBuild.bytes,
+              ).toLocaleString('en-US')}{' '}
+              bytes of download. Cold start was about 3 s in a local headless Chromium test.
+            </p>
+            {(!host || index.status !== 'ready') && (
+              <p id="executor-reason">Prepare chat models first.</p>
+            )}
+            <fieldset
+              disabled={busy || !host || index.status !== 'ready'}
+              aria-describedby={!host || index.status !== 'ready' ? 'executor-reason' : undefined}
+            >
+              <legend>Agent executor</legend>
+              <label>
+                <input
+                  ref={javascriptOption}
+                  type="radio"
+                  name="executor"
+                  value="javascript"
+                  checked={executor === 'javascript'}
+                  onChange={() => {
+                    setAnswer(undefined);
+                    void host?.selectExecutor('javascript');
+                  }}
+                />
+                LangGraph.js
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="executor"
+                  value="python"
+                  checked={executor === 'python'}
+                  onChange={() => {
+                    setAnswer(undefined);
+                    void host?.selectExecutor('python');
+                  }}
+                />
+                LangGraph Python
+              </label>
+            </fieldset>
+            <p role="status">
+              {pythonPhase === 'booting'
+                ? 'Preparing LangGraph Python…'
+                : pythonPhase === 'ready'
+                  ? 'LangGraph Python ready'
+                  : ''}
+            </p>
+            {pythonPhase === 'booting' && (
+              <>
+                <p>Elapsed: {bootSeconds.toFixed(1)} s</p>
+                <button type="button" onClick={() => void host?.cancelPythonBoot()}>
+                  Cancel Python boot
+                </button>
+              </>
+            )}
+            {pythonPhase === 'failed' && (
+              <p role="alert">The Python version could not be prepared.</p>
+            )}
+          </>
+        ) : (
+          <p>Python version not included in this build</p>
+        )}
       </section>
       <section aria-labelledby="ask-heading">
         <h2 id="ask-heading">Ask a question</h2>
@@ -243,16 +355,16 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
           <button
             type="button"
             onClick={() => {
-              const runId = host?.instance.getSnapshot().run?.runId;
-              if (runId) void host?.instance.cancel(runId);
+              const runId = active?.getSnapshot().run?.runId;
+              if (runId) void active?.cancel(runId);
             }}
           >
             Cancel answer
           </button>
         )}
-        {host && (
+        {active && (
           <ModelRoutes
-            instance={host.instance}
+            instance={active}
             labels={{
               roles: { 'rag.answer': 'Answer' },
               providers: { mock: 'Mock model', builtin: 'Chrome Built-in AI', webllm: 'WebLLM' },
@@ -270,7 +382,7 @@ export function App({ retrieval, corpus, startIndex, prepareModels }: AppProps):
         {answer && (
           <article>
             <h3 ref={answerHeading} tabIndex={-1}>
-              Answer · LangGraph.js
+              Answer · {answerExecutor === 'python' ? 'LangGraph Python' : 'LangGraph.js'}
             </h3>
             <p className="answer">{answer.answer}</p>
             {answer.citations.length === 0 && <p>No retrieved passage is cited for this answer.</p>}

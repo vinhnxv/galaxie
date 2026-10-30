@@ -1,0 +1,35 @@
+{
+  "name": "@galaxie/adapter-pyodide",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Worker-based LangGraph Python executor for galaxie.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": [
+    "./src/worker.ts",
+    "./dist/worker.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "default": "./dist/worker.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@galaxie/core": "workspace:*",
+    "pyodide": "314.0.7"
+  },
+  "peerDependencies": {
+    "@langchain/core": "~1.2.20"
+  },
+  "devDependencies": {
+    "@langchain/core": "1.2.20"
+  }
+}

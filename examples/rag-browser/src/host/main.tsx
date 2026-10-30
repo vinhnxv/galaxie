@@ -4,7 +4,7 @@
 import './zod-config.js';
 import { createRoot } from 'react-dom/client';
 import type { Corpus } from '../corpus.js';
-import type { RagHost } from './runtime.js';
+import type { RagHost, RagModels } from './runtime.js';
 
 const [
   { parseCorpus },
@@ -24,10 +24,18 @@ const retrieval = new RetrievalClient(createRetrievalWorker());
 const mock = import.meta.env.MODE === 'mock';
 let corpus: Corpus | null = null;
 let prepareModels: () => Promise<RagHost>;
+let models: RagModels | undefined;
+const disposeModels = (): void => {
+  models?.dispose?.();
+  models = undefined;
+};
 if (import.meta.env.MODE === 'mock') {
   const { createMockModels, mockCorpus } = await import('./mock-script.js');
   corpus = mockCorpus;
-  prepareModels = () => createRagHost(retrieval, createMockModels());
+  prepareModels = () => {
+    models ??= createMockModels();
+    return createRagHost(retrieval, models);
+  };
 } else {
   try {
     const response = await fetch('/data/squad-dev.json', {
@@ -36,7 +44,10 @@ if (import.meta.env.MODE === 'mock') {
     });
     if (response.ok) corpus = parseCorpus(await response.json());
   } catch {}
-  prepareModels = async () => createRagHost(retrieval, await prepareRealModels());
+  prepareModels = async () => {
+    models ??= await prepareRealModels();
+    return createRagHost(retrieval, models);
+  };
 }
 const startIndex = (): Promise<unknown> =>
   retrieval.init({
@@ -52,6 +63,7 @@ if (root)
       corpus={corpus}
       startIndex={startIndex}
       prepareModels={prepareModels}
+      disposeModels={disposeModels}
     />,
   );
 void startIndex().catch(() => {});

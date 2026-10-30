@@ -16,6 +16,8 @@ Configuration checked on 2026-10-30: [CI workflow](../.github/workflows/ci.yml),
 | --- | --- | --- | --- |
 | Node 24 | Unit and conformance tests, native LangGraph baseline, loopback HTTP/MCP and Node-driven browser loops | Scripted mock providers, fake WebGPU/engine resources, fake `LanguageModel`, injected fetch | [Conformance suite](../tests/conformance/README.md), `CI=true pnpm test`, configured 2026-10-30 |
 | Headless Chromium installed by Playwright 1.64.1 | Vitest browser project: parity, real DOM/IndexedDB/Web Locks/CSP paths and recovery/ownership controls; separate host loops also drive headless Chromium | Mock providers and fake model APIs; no real GPU inference or browser-managed model invocation | [Vitest configuration](../vitest.config.ts), [M3 automated evidence](m3-exit-record.md#acceptance-tests), configured 2026-10-30 |
+| CPython 3.14, uv-locked environment | Offline Python proxy, stand-in and RAG graph tests; native transcript reference | Real interpreter and LangGraph; fake bridge, deterministic model/retrieval replies | [Python test runner](../scripts/test-python.ts), `pnpm test:python`, configured 2026-10-30 |
+| Pyodide 314.0.7 on Node 24 and headless Chromium | Real dedicated Workers, hash-verified wheel installation, LangGraph graph execution and bridge lifecycle; Chromium boot also checks strict CSP/Trusted Types on every response | Real WASM interpreter and locked frameworks; deterministic JavaScript models and retrieval | [Python adapter](../packages/adapter-pyodide/README.md), [RAG example](../examples/rag-browser/README.md), configured 2026-10-30 |
 
 Playwright's Chromium is not the maintainer's Chrome 155. These lanes download
 no model weights, execute no real WebLLM engine and call no real `LanguageModel`
@@ -23,7 +25,7 @@ global. Host-loop tests verify that the real WebLLM bundle is not requested.
 The [injection corpus](../tests/injection-corpus/README.md) uses the deterministic
 obedient-attacker mock, not a robustness evaluation of a real model.
 
-The [browser-built RAG example](../examples/rag-browser/README.md) adds Node and headless Chromium lanes with a synthetic corpus, deterministic embeddings/chat and a fake Transformers engine. They cover retrieval, citations, injected directives, real module Workers, IndexedDB restore and clear fencing, strict CSP, keyboard controls and phone-width layout. Full SQuAD indexing, real EmbeddingGemma/WebGPU, citation quality and reference-device metrics remain unmeasured.
+The [browser-built RAG example](../examples/rag-browser/README.md) adds Node and headless Chromium lanes with a synthetic corpus, deterministic embeddings/chat and a fake Transformers engine. They cover retrieval, citations, injected directives, real module Workers, IndexedDB restore and clear fencing, strict CSP, keyboard controls and phone-width layout. The optional Python host loop adds lazy interpreter startup, executor switching, boot cancellation/failure and disposal. All five JavaScript/Pyodide/CPython transcript lanes match the shared golden. Real Pyodide execution does not imply real inference. [Local headless startup and response-body observations](../examples/rag-browser/README.md#local-python-observations) are demonstrations, separate from GitHub CI execution and the reference-device rows below. Full SQuAD indexing, real EmbeddingGemma/WebGPU, citation quality and reference-device metrics remain unmeasured.
 
 ## Real-device demonstrations
 

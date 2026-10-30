@@ -45,4 +45,5 @@ it('keeps a cached document alive and disposes resources when it is discarded', 
     vi.unstubAllGlobals();
     vi.resetModules();
   }
-});
+  // The first import of the host entry can be slow while the Pyodide suites load the machine.
+}, 30_000);

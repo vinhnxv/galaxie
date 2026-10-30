@@ -1,0 +1,167 @@
+[
+  {
+    "name": "keeps valid markers in first-seen order and removes out-of-range markers",
+    "passages": [
+      {
+        "id": "a",
+        "title": "A",
+        "text": "one",
+        "score": 1
+      },
+      {
+        "id": "b",
+        "title": "B",
+        "text": "two",
+        "score": 0.5
+      },
+      {
+        "id": "c",
+        "title": "C",
+        "text": "three",
+        "score": 0.2
+      }
+    ],
+    "reply": "Paris [2], [2], [7] and [1].",
+    "expected": {
+      "answer": "Paris [2], [2],  and [1].",
+      "citations": [
+        {
+          "marker": 2,
+          "passageId": "b",
+          "title": "B",
+          "text": "two"
+        },
+        {
+          "marker": 1,
+          "passageId": "a",
+          "title": "A",
+          "text": "one"
+        }
+      ]
+    }
+  },
+  {
+    "name": "keeps an answer without markers",
+    "passages": [
+      {
+        "id": "a",
+        "title": "A",
+        "text": "one",
+        "score": 1
+      },
+      {
+        "id": "b",
+        "title": "B",
+        "text": "two",
+        "score": 0.5
+      },
+      {
+        "id": "c",
+        "title": "C",
+        "text": "three",
+        "score": 0.2
+      }
+    ],
+    "reply": "No markers.",
+    "expected": {
+      "answer": "No markers.",
+      "citations": []
+    }
+  },
+  {
+    "name": "removes invalid markers when no passages exist",
+    "passages": [],
+    "reply": "Unknown [0] [9].",
+    "expected": {
+      "answer": "Unknown  .",
+      "citations": []
+    }
+  },
+  {
+    "name": "accepts leading ASCII zeros and preserves the original marker token",
+    "passages": [
+      {
+        "id": "1",
+        "title": "1",
+        "text": "1",
+        "score": 1
+      },
+      {
+        "id": "2",
+        "title": "2",
+        "text": "2",
+        "score": 1
+      },
+      {
+        "id": "3",
+        "title": "3",
+        "text": "3",
+        "score": 1
+      },
+      {
+        "id": "4",
+        "title": "4",
+        "text": "4",
+        "score": 1
+      },
+      {
+        "id": "5",
+        "title": "5",
+        "text": "5",
+        "score": 1
+      },
+      {
+        "id": "6",
+        "title": "6",
+        "text": "6",
+        "score": 1
+      },
+      {
+        "id": "7",
+        "title": "7",
+        "text": "7",
+        "score": 1
+      }
+    ],
+    "reply": "[0] [11] [007] [007] [٧]",
+    "expected": {
+      "answer": "  [007] [007] [٧]",
+      "citations": [
+        {
+          "marker": 7,
+          "passageId": "7",
+          "title": "7",
+          "text": "7"
+        }
+      ]
+    }
+  },
+  {
+    "name": "removes unsafe numeric markers",
+    "passages": [
+      {
+        "id": "a",
+        "title": "A",
+        "text": "one",
+        "score": 1
+      },
+      {
+        "id": "b",
+        "title": "B",
+        "text": "two",
+        "score": 0.5
+      },
+      {
+        "id": "c",
+        "title": "C",
+        "text": "three",
+        "score": 0.2
+      }
+    ],
+    "reply": "[9007199254740992]",
+    "expected": {
+      "answer": "",
+      "citations": []
+    }
+  }
+]
