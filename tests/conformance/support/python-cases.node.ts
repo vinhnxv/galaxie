@@ -23,6 +23,6 @@ export async function pythonCaseSources(name: string): Promise<Record<string, st
       'utf8',
     );
   sources['selected.py'] =
-    `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh\n# SPDX-License-Identifier: AGPL-3.0-only\nfrom ${module} import factory\nfrom galaxie.langgraph import checkpointer, request_interaction\ndef create_agent():\n    return factory(checkpointer(), interaction=request_interaction)\n`;
+    `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh\n# SPDX-License-Identifier: AGPL-3.0-only\nfrom ${module} import factory\nfrom galaxie.langgraph import checkpointer, request_interaction\nfrom galaxie.capabilities import call\n${['model-without-config', 'model-failure'].includes(name) ? 'from galaxie.langchain import GalaxieChatModel\n' : ''}def create_agent():\n    return factory(checkpointer(), interaction=request_interaction, capability=call${['model-without-config', 'model-failure'].includes(name) ? ", model=GalaxieChatModel(role='answer')" : ''})\n`;
   return sources;
 }

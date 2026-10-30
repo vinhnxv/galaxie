@@ -127,3 +127,28 @@ def test_parent_effect_checkpoint_values_round_trip_through_the_standin():
     asyncio.run(run())
     assert serializer.checked > 0
     assert serializer.mismatches == []
+
+
+def test_nested_effect_checkpoint_values_round_trip_through_the_standin():
+    from langgraph.types import Command
+    from effect_scopes import factory
+    from fixture_support import native_interaction
+
+    serializer = RoundTripSerializer()
+    identifier = "00000000-0000-4000-8000-000000000001"
+
+    async def capability(name, value, config):
+        return {"effectId": identifier}
+
+    async def run():
+        graph = factory(InMemorySaver(serde=serializer), capability, native_interaction)
+        config = {"configurable": {"thread_id": "serializer-nested-effects"}}
+        await graph.ainvoke({}, config)
+        state = await graph.aget_state(config)
+        pending = state.tasks[0].interrupts[0].id
+        result = await graph.ainvoke(Command(resume={pending: {"action": "submit", "payload": False}}), config)
+        assert result == {"ids": [identifier] * 3, "answer": False}
+
+    asyncio.run(run())
+    assert serializer.checked > 0
+    assert serializer.mismatches == []

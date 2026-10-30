@@ -1,0 +1,29 @@
+{
+  "reference": "Native CPython 3.14 with the pinned LangGraph Python environment",
+  "lanes": ["Node Pyodide", "real headless Chromium Pyodide"],
+  "differences": [
+    {
+      "case": "model-without-config",
+      "field": "events.messages[].data[0].id",
+      "comparison": "Omit message IDs before normalizing generated task UUIDs; compare all other projected message fields, mode order, paths and output.",
+      "reason": "The text-only bridge carries content and usage, not provider message IDs. Python LangChain generates fresh IDs."
+    },
+    {
+      "case": "model-failure",
+      "reference": "FixtureModelError",
+      "adapter": { "code": "unavailable", "message": "The requested service is unavailable." },
+      "reason": "The JavaScript provider boundary returns fixed content-free errors rather than framework or host exception text."
+    },
+    {
+      "case": "step-limit",
+      "reference": "GraphRecursionError",
+      "adapter": { "code": "budget_exceeded", "message": "The budget limit was reached." },
+      "reason": "The adapter maps native recursion exhaustion to the framework-neutral budget error after the same 25-step stream."
+    }
+  ],
+  "limits": [
+    "Pyodide lanes compare projected stream events for eight cases, and pending values and final counters for the four original interrupt cases; complete checkpoint histories are native-only.",
+    "Interrupt-subgraph reload compares the same pending ID/value and final counters after reconstruction; accepted-answer reconciliation is covered by the three original reload cases.",
+    "Models and capability replies are deterministic fixtures. No real model or external network is used."
+  ]
+}

@@ -227,7 +227,7 @@ test('validates descriptors and provider factories before fetching or constructi
     resume: true,
     checkpoints: true,
     streaming: true,
-    subgraphs: false,
+    subgraphs: true,
   });
   await expect(
     adapter.prepare(

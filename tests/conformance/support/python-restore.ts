@@ -5,6 +5,7 @@ import {
   createRuntime,
   defineAgentDefinition,
   type PendingInteraction,
+  type RecoveryJson,
   type RecoveryStore,
   type SessionId,
 } from '@galaxie/core';
@@ -19,6 +20,7 @@ export const pythonReloadCases = [
   'interrupt-resume',
   'interrupt-durability-sync',
   'interrupt-durability-exit',
+  'interrupt-subgraph',
 ] as const;
 export interface PythonRestoreResult {
   readonly sessionId: string;
@@ -39,6 +41,7 @@ export async function executePythonRestore(
   sessionId?: string,
   accepted = false,
   probeEffects = false,
+  answer: RecoveryJson = { answer: 'yes' },
 ): Promise<PythonRestoreResult> {
   const effects = { bodies: 0, writes: 0 };
   const runtime = createRuntime({
@@ -129,7 +132,7 @@ export async function executePythonRestore(
         await store.recovery.acceptSubmission(instance.sessionId, {
           interactionId: pending.interactionId,
           action: 'submit',
-          payload: { answer: 'yes' },
+          payload: answer,
         });
       return { sessionId: instance.sessionId, pending, ...(probeEffects ? { effects } : {}) };
     }
@@ -141,7 +144,7 @@ export async function executePythonRestore(
         runId: run.runId,
         ...pending,
         action: 'submit',
-        payload: { answer: 'yes' },
+        payload: answer,
       });
       if (receipt.status !== 'accepted') throw new Error('The Python answer was rejected.');
     }

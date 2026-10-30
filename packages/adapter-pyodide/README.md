@@ -62,7 +62,7 @@ reads committed state, and resume sends `{action, payload}` by interrupt ID. Com
 nodes do not re-run; the interrupted node does. Parallel or ID-less interrupts,
 static breakpoints and reusing an answered interaction fail `unsupported`.
 
-`interrupts`, `resume`, `checkpoints` and `streaming` are true. For durable sessions, supply
+`interrupts`, `resume`, `checkpoints`, `streaming` and `subgraphs` are true. For durable sessions, supply
 `services: { chatModels, checkpoints: saver.byteRecords }` and
 `recovery: saver.recovery` from the same app/principal-scoped
 [`IndexedDBSaver`](../storage-indexeddb/README.md#python-byte-checkpoints). The Worker
@@ -81,7 +81,9 @@ including writes and parent writes, must fit one 1 MiB bridge message after base
 The async Python saver requires a thread-scoped config for listing; synchronous
 saver methods and listing every session from Python are unsupported.
 
-`subgraphs` remains false. The `astream` loop emits live `values`, `updates`,
+Nested graphs preserve stream paths, child interrupts and resume. Durable restore
+uses the same scoped byte-record port, including child checkpoint namespaces.
+The `astream` loop emits live `values`, `updates`,
 `messages` and `custom` events with `executor: 'langgraph-python'` and path arrays,
 while preserving the graph's final output schema. Streams are not retained in the
 replayable event journal; subscribe before the chunks you need. Lifecycle events
@@ -131,17 +133,27 @@ and retrieval replies are synthetic. The [local observations](../../examples/rag
 record response-body bytes and fresh-Worker startup boundaries, separately from
 unmeasured GitHub CI and reference-device runs.
 
-The twelve [Python reference cases](../../tests/conformance/cases-python/) have
-native CPython goldens. `interrupt-resume`, `interrupt-sequence`,
-`interrupt-durability-sync` and `interrupt-durability-exit` match pending IDs/values
-and final state/counters on real Node Pyodide and real headless Chromium. The three single-interrupt reload cases also match native CPython reconstruction
-references after fresh Worker/runtime creation on Node and actual page reload with
-IndexedDB reopen in Chromium. Both lanes reconcile accepted answers and prove one
-host write across two executions of a parent containing an interrupting child. This
-is targeted write-recovery evidence, not general subgraph support. Node also checks
-checkpoint writes during cancellation settlement. Native serializer tests cover all
-twelve cases, the RAG fixtures and the parent-write fixture: exceptions decode as
-`repr` strings and tuples as msgpack arrays; other values retain strict equality.
+All twelve [Python reference cases](../../tests/conformance/cases-python/) pass on
+native CPython, Node Pyodide and real headless Chromium: linear, branching,
+subgraph, model-without-config, model-failure, capability, interrupt-resume,
+interrupt-sequence, interrupt-subgraph, both interrupt durability modes and step-limit.
+The eight non-Stage-A cases compare stream projections, mode order, paths and
+terminal output or fixed errors; the four original interrupt cases compare pending
+IDs/values and final state/counters. Model and capability probes use the JavaScript
+router and broker. The [Python comparison matrix](../../tests/conformance/compatibility-matrix-python.json)
+records generated message IDs and fixed error mappings; full checkpoint histories
+are not compared on Pyodide lanes.
+
+Four reload cases match native reconstruction after fresh Worker/runtime creation
+on Node and page navigation with IndexedDB reopen in Chromium. `interrupt-subgraph`
+restores the same pending interaction and finishes with `{ callSub: 1, s1: 0, sask: 1 }`.
+The three original reload cases also reconcile accepted answers. A separate
+parent-write probe proves one host write across two parent executions, including
+reopened storage. A nested probe proves distinct effect IDs for two parent calls
+and a child call, with the full three-part task namespace and stable receipt replay.
+Node also checks checkpoint writes during cancellation settlement. Native serializer
+tests cover all twelve cases, RAG and effect fixtures; exceptions decode as `repr`
+strings and tuples as msgpack arrays, with strict equality otherwise.
 No real model or device measurements were added.
 
 `linear` and `branching` also match the native Python stream events, mode order and

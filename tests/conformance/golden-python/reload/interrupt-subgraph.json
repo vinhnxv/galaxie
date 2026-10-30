@@ -1,0 +1,22 @@
+{
+  "samePending": true,
+  "final": {
+    "value": 1,
+    "answer": "inner answer",
+    "counts": {
+      "callSub": 1,
+      "s1": 0,
+      "sask": 1
+    }
+  },
+  "repeatedFinal": {
+    "value": 1,
+    "answer": "inner answer",
+    "counts": {
+      "callSub": 1,
+      "s1": 0,
+      "sask": 1
+    }
+  },
+  "repeatedUpdates": []
+}
