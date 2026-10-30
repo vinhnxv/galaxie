@@ -1,0 +1,19 @@
+{
+  "include": [
+    "python/galaxie/src",
+    "python/galaxie/tests",
+    "python/standins",
+    "examples/rag-browser/agent_py",
+    "tests/conformance/cases-python",
+    "scripts"
+  ],
+  "venvPath": "python",
+  "venv": ".venv",
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "standard",
+  "extraPaths": [
+    "python/galaxie/src",
+    "examples/rag-browser/agent_py",
+    "tests/conformance/cases-python"
+  ]
+}

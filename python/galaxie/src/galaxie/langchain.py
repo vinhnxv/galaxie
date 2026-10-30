@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -69,7 +69,7 @@ class GalaxieChatModel(BaseChatModel):
     async def _astream(
         self, messages: list[BaseMessage], stop: list[str] | None = None,
         run_manager=None, **kwargs: Any,
-    ) -> AsyncIterator[ChatGenerationChunk]:
+    ) -> AsyncGenerator[ChatGenerationChunk, None]:
         payload = self._payload(messages, stop)
         payload['options']['stream'] = True
         chunks: asyncio.Queue[str | None] = asyncio.Queue()

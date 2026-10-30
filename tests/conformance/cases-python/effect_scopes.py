@@ -9,7 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from fixture_support import REQUEST
 
 
-class State(TypedDict):
+class State(TypedDict, total=False):
     ids: list[str]
     answer: Any
 

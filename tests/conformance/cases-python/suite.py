@@ -40,7 +40,7 @@ def project(value: Any) -> Any:
     raise TypeError("The conformance value cannot be projected to JSON.")
 
 
-def normalize(transcript):
+def normalize(transcript: dict[str, Any]) -> Any:
     identifiers = {}
     interrupt_ids = {}
     for pause in transcript.get("pauses", []):

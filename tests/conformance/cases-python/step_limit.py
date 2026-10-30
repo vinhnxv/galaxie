@@ -11,6 +11,9 @@ RESUMES = []
 
 
 def factory(checkpointer, model=None, capability=None, interaction=None):
-    return (StateGraph(ValueState).add_node("loop", lambda state: {"value": state["value"] + 1})
+    def loop(state: ValueState) -> dict[str, int]:
+        return {"value": state["value"] + 1}
+
+    return (StateGraph(ValueState).add_node("loop", loop)
         .add_edge(START, "loop").add_edge("loop", "loop")
         .compile(checkpointer=checkpointer))

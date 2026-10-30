@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.types import Command
@@ -46,12 +47,12 @@ class RoundTripSerializer(JsonPlusSerializer):
         self.checked = 0
         self.mismatches = []
 
-    def dumps_typed(self, value):
-        encoded = super().dumps_typed(value)
+    def dumps_typed(self, obj):
+        encoded = super().dumps_typed(obj)
         decoded = self.loads_typed(encoded)
         self.checked += 1
-        if not strictly_equal(decoded, documented_decoded(value)):
-            self.mismatches.append((value, decoded))
+        if not strictly_equal(decoded, documented_decoded(obj)):
+            self.mismatches.append((obj, decoded))
         return encoded
 
 
@@ -96,7 +97,7 @@ def test_rag_checkpoint_values_round_trip_through_the_standin(monkeypatch, revie
 
             install_transport(transport)
             graph = rag.create_agent()
-            config = {"configurable": {"thread_id": f"rag-serializer-{index}"}}
+            config: RunnableConfig = {"configurable": {"thread_id": f"rag-serializer-{index}"}}
             output = await graph.ainvoke({**item["input"], "review": review}, config)
             if review:
                 pending = (await graph.aget_state(config)).tasks[0].interrupts[0]
@@ -124,7 +125,7 @@ def test_parent_effect_checkpoint_values_round_trip_through_the_standin():
 
     async def run():
         graph = factory(InMemorySaver(serde=serializer), capability=capability)
-        config = {"configurable": {"thread_id": "serializer-effects"}}
+        config: RunnableConfig = {"configurable": {"thread_id": "serializer-effects"}}
         await graph.ainvoke({"value": 1}, config)
         state = await graph.aget_state(config)
         identifier = state.tasks[0].interrupts[0].id
@@ -149,7 +150,7 @@ def test_nested_effect_checkpoint_values_round_trip_through_the_standin():
 
     async def run():
         graph = factory(InMemorySaver(serde=serializer), capability, native_interaction)
-        config = {"configurable": {"thread_id": "serializer-nested-effects"}}
+        config: RunnableConfig = {"configurable": {"thread_id": "serializer-nested-effects"}}
         await graph.ainvoke({}, config)
         state = await graph.aget_state(config)
         pending = state.tasks[0].interrupts[0].id

@@ -4,6 +4,7 @@
 import asyncio
 import json
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
@@ -33,7 +34,7 @@ def test_review_pauses_after_retrieval_and_answers_with_only_kept_passages(monke
 
     async def run():
         graph = create_agent()
-        config = {"configurable": {"thread_id": "review"}}
+        config: RunnableConfig = {"configurable": {"thread_id": "review"}}
         await graph.ainvoke({"question": "Which passage?", "mode": "hybrid", "review": True}, config)
         saved = await graph.aget_state(config)
         interrupt = saved.tasks[0].interrupts[0]

@@ -40,8 +40,8 @@ class GalaxieCheckpointer(BaseCheckpointSaver):
             raise GalaxieError("unsupported") from None
 
     def _tuple(self, value):
-        config = {"configurable": {"thread_id": value["sessionId"], "checkpoint_ns": value["namespace"], "checkpoint_id": value["id"]}}
-        parent = None if value["parentId"] is None else {"configurable": {**config["configurable"], "checkpoint_id": value["parentId"]}}
+        config: RunnableConfig = {"configurable": {"thread_id": value["sessionId"], "checkpoint_ns": value["namespace"], "checkpoint_id": value["id"]}}
+        parent: RunnableConfig | None = None if value["parentId"] is None else {"configurable": {**config["configurable"], "checkpoint_id": value["parentId"]}}
         return CheckpointTuple(config, self._decode(value["checkpoint"]), self._decode(value["metadata"]), parent,
             [(write["taskId"], write["channel"], self._decode(write["value"])) for write in value["writes"]])
 
@@ -56,13 +56,14 @@ class GalaxieCheckpointer(BaseCheckpointSaver):
     async def alist(self, config: RunnableConfig | None, *, filter=None, before=None, limit=None) -> AsyncIterator[CheckpointTuple]:
         if config is None:
             raise GalaxieError("unsupported")
-        payload = {"op": "list", **self._location(config)}
-        if "checkpoint_ns" not in config.get("configurable", {}):
+        payload: dict[str, Any] = {"op": "list", **self._location(config)}
+        configurable = config.get("configurable") or {}
+        if "checkpoint_ns" not in configurable:
             payload.pop("namespace")
-        if config.get("configurable", {}).get("checkpoint_id"):
-            payload["id"] = config["configurable"]["checkpoint_id"]
+        if configurable.get("checkpoint_id"):
+            payload["id"] = configurable["checkpoint_id"]
         if before is not None:
-            payload["before"] = before["configurable"]["checkpoint_id"]
+            payload["before"] = (before.get("configurable") or {})["checkpoint_id"]
         # Filtering happens after decoding; a pre-filter limit could hide matches.
         if limit is not None and not filter:
             payload["limit"] = limit
@@ -87,7 +88,7 @@ class GalaxieCheckpointer(BaseCheckpointSaver):
 
     async def aput_writes(self, config: RunnableConfig, writes, task_id: str, task_path: str = "") -> None:
         await bridge_request("checkpoint", {"op": "put-writes", **self._location(config),
-            "id": config["configurable"]["checkpoint_id"], "taskId": task_id, "taskPath": task_path,
+            "id": (config.get("configurable") or {})["checkpoint_id"], "taskId": task_id, "taskPath": task_path,
             "writes": [{"channel": channel, "index": WRITES_IDX_MAP.get(channel, index), "value": self._encode(value),
                         "interruptIds": [item.id for item in value] if channel == INTERRUPT else []}
                        for index, (channel, value) in enumerate(writes)]})

@@ -1,12 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 # SPDX-License-Identifier: AGPL-3.0-only
 
+from collections.abc import Mapping
 from typing import Any
 
 from ._bridge import GalaxieError, request
 
 
-async def call(name: str, input: Any, config: dict[str, Any] | None = None) -> Any:
+async def call(name: str, input: Any, config: Mapping[str, Any] | None = None) -> Any:
     if not isinstance(name, str) or not name:
         raise GalaxieError("invalid")
     payload = {"name": name, "input": input}

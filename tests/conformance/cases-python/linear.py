@@ -25,8 +25,11 @@ def factory(checkpointer, model=None, capability=None, interaction=None):
         ], config)
         return {"value": state["value"] + 1, "answer": reply.content}
 
+    def double(state: ValueState) -> dict[str, int]:
+        return {"value": state["value"] * 2}
+
     return (StateGraph(ValueState)
         .add_node("respond", respond)
-        .add_node("double", lambda state: {"value": state["value"] * 2})
+        .add_node("double", double)
         .add_edge(START, "respond").add_edge("respond", "double").add_edge("double", END)
         .compile(checkpointer=checkpointer))
