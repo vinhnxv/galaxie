@@ -24,20 +24,48 @@ Services are `{ chatModels }`, keyed by provider ID. Each entry is a LangChain
 the provider descriptor requires per-call credentials. Implementations are checked
 against core's preparation requirements. Credentials remain in JavaScript.
 
-`galaxie.bridge/v1` accepts JSON strings up to 1,048,576 UTF-8 bytes. It carries boot,
-run, model, capability, abort and result operations. Both directions validate the
+`galaxie.bridge/v2` accepts JSON strings up to 1,048,576 UTF-8 bytes. It carries boot,
+run, pending, model, capability, abort and result operations. Both directions validate the
 closed envelopes and payloads without code generation. Model replies reach Python
 only after output checks; usage settles the router lease, and failures charge its
 reservation. Capability calls preserve the full executor task namespace as the
 broker's effect scope. Errors carry fixed codes and messages, never exception text.
+Version 1, unknown operations and unexpected notifications are rejected. The closed
+`stream` and `model-chunk` notification shapes are reserved; neither is enabled yet.
+Oversized messages fail with the fixed `unsupported` error.
 
 Cancellation asks the Worker to abort. If no acknowledgment arrives within 500 ms,
 the adapter terminates it; the next run boots a fresh Worker. This is a Worker
 liveness bound, and core still owns run settlement. Late service replies cannot be
 sent to a cancelled Worker or a later run. Disposal terminates the interpreter.
 
-All five executor feature flags are false: interrupts, resume, checkpoints,
-streaming and subgraphs. Calls support text messages and optional stop strings;
+Interrupts and resume are enabled. Compile graphs with the Worker-owned saver:
+
+```python
+from galaxie.langgraph import checkpointer, request_interaction
+
+# Inside the zero-argument graph factory:
+graph = builder.compile(checkpointer=checkpointer())
+
+# Inside a node, including after an await:
+answer = request_interaction({
+    "surfaceId": "main", "viewRevision": "r1", "component": "example.Question/v1",
+    "props": {"question": "Continue?"},
+}, config)
+```
+
+`checkpointer()` fails `unavailable` outside a configured Worker. The Worker rejects
+a graph compiled with another saver, including no saver. Python checks request shape;
+JavaScript applies core's interaction parser and UI/URL policy. `pending(sessionId)`
+reads committed state, and resume sends `{action, payload}` by interrupt ID. Completed
+nodes do not re-run; the interrupted node does. Parallel or ID-less interrupts,
+static breakpoints and reusing an answered interaction fail `unsupported`.
+
+The saver is in memory. Cancelling a paused run closes its Worker; cancellation or
+Worker failure loses its sessions, and `pending()` or resume for them fails
+`unavailable`. A new session can start with a fresh Worker. `checkpoints`, `streaming`
+and `subgraphs` remain false. The internal `astream` loop emits no public stream
+events and preserves the graph's output schema. Calls support text messages and optional stop strings;
 tool calls, multimodal messages and streamed Python model output are unsupported.
 No durable Python session restore or byte-record storage port is provided.
 
@@ -68,3 +96,10 @@ tests exercise real Python with JavaScript model/broker controls; model inferenc
 and retrieval replies are synthetic. The [local observations](../../examples/rag-browser/README.md#local-python-observations)
 record response-body bytes and fresh-Worker startup boundaries, separately from
 unmeasured GitHub CI and reference-device runs.
+
+The twelve [Python reference cases](../../tests/conformance/cases-python/) have
+native CPython goldens. `interrupt-resume`, `interrupt-sequence`,
+`interrupt-durability-sync` and `interrupt-durability-exit` match pending IDs/values
+and final state/counters on real Node Pyodide and real headless Chromium. These
+durability configurations use the in-memory saver; they prove no reload restore,
+IndexedDB persistence, streaming or subgraph support.

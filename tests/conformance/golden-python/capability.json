@@ -1,0 +1,84 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 2
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 4
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "double": {
+            "value": 4
+          }
+        }
+      }
+    ],
+    "messages": [],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 4
+  },
+  "state": {
+    "values": {
+      "value": 4
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "double"
+      ],
+      "values": {
+        "value": 2
+      },
+      "parentCheckpointId": "<uuid:1>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 4
+      },
+      "parentCheckpointId": "<uuid:2>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  }
+}

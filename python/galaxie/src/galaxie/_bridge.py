@@ -6,7 +6,7 @@ import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-VERSION = "galaxie.bridge/v1"
+VERSION = "galaxie.bridge/v2"
 MAX_BYTES = 1_048_576
 ERROR_MESSAGES = {
     "invalid": "The request is invalid.",
@@ -61,7 +61,7 @@ async def request(op: str, payload: dict[str, Any]) -> Any:
     try:
         raw = json.dumps(message, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
         if len(raw.encode("utf-8")) > MAX_BYTES:
-            raise GalaxieError("invalid")
+            raise GalaxieError("unsupported")
     except (ValueError, TypeError, UnicodeError):
         raise GalaxieError("invalid") from None
     try:
@@ -71,8 +71,10 @@ async def request(op: str, payload: dict[str, Any]) -> Any:
     except Exception:
         raise GalaxieError("unavailable") from None
     try:
-        if not isinstance(reply, str) or len(reply.encode("utf-8")) > MAX_BYTES:
+        if not isinstance(reply, str):
             raise GalaxieError("invalid")
+        if len(reply.encode("utf-8")) > MAX_BYTES:
+            raise GalaxieError("unsupported")
         value = json.loads(reply, parse_constant=_invalid_constant)
         if (
             not isinstance(value, dict)
@@ -86,6 +88,7 @@ async def request(op: str, payload: dict[str, Any]) -> Any:
             if (
                 set(value) != {"v", "kind", "id", "op", "ok", "error"}
                 or not isinstance(value["error"], dict)
+                or set(value["error"]) != {"code"}
                 or value["error"].get("code") not in ERROR_MESSAGES
             ):
                 raise GalaxieError("invalid")

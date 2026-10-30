@@ -5,9 +5,12 @@ import {
   type ErrorCode,
   type ExecutorAdapter,
   type ExecutorEvent,
+  type InteractionId,
   type ModelCall,
   type ModelPreparation,
   type ModelUsage,
+  type PendingInteraction,
+  parseInteractionRequest,
   type RunRequest,
   toErrorInfo,
 } from '@galaxie/core';
@@ -24,6 +27,7 @@ import {
   MAX_BRIDGE_BYTES,
   type ModelPayload,
   type ModelReply,
+  type PendingReply,
   parseBridge,
   success,
   validPythonModule,
@@ -91,7 +95,7 @@ class Connection {
     if (this.closed) return;
     try {
       const message = parseBridge(event.data);
-      if (message.kind === 'request') {
+      if (message.kind !== 'response') {
         this.incoming(message);
         return;
       }
@@ -100,8 +104,8 @@ class Connection {
       this.pending.delete(message.id);
       if (message.ok) pending.resolve(message.payload);
       else pending.reject(adapterFailure(message.error.code));
-    } catch {
-      this.close('invalid');
+    } catch (error) {
+      this.close(failureCode(error, 'invalid'));
     }
   };
   private readonly error = (): void => {
@@ -263,8 +267,8 @@ export function createPyodideAdapter(
     id: 'langgraph-python',
     version: '0.0.0',
     features: {
-      interrupts: false,
-      resume: false,
+      interrupts: true,
+      resume: true,
       checkpoints: false,
       streaming: false,
       subgraphs: false,
@@ -283,6 +287,9 @@ export function createPyodideAdapter(
       let connection: Connection | undefined;
       let active: ActiveRun | undefined;
       let disposed = false;
+      const sessions = new Set<string>();
+      const lostSessions = new Set<string>();
+      const paused = new Map<string, () => void>();
       let sources: BootPayload['sources'];
       try {
         sources = await Promise.all(
@@ -425,6 +432,10 @@ export function createPyodideAdapter(
             },
             () => {
               if (connection === client) connection = undefined;
+              for (const session of sessions) lostSessions.add(session);
+              sessions.clear();
+              for (const release of paused.values()) release();
+              paused.clear();
               const run = active;
               if (run) for (const call of run.leases) finish(run, call);
             },
@@ -452,22 +463,56 @@ export function createPyodideAdapter(
         }
       };
       await boot(preparation.signal);
+      const pending = async (sessionId: string): Promise<PendingInteraction | undefined> => {
+        if (disposed) throw adapterFailure('invalid');
+        if (lostSessions.has(sessionId) || !connection) throw adapterFailure('unavailable');
+        const state = (await connection.request('pending', {
+          threadId: sessionId,
+        })) as PendingReply;
+        if (state.interrupts.length === 0) return undefined;
+        const first = state.interrupts[0];
+        if (!first?.id || new Set(state.interrupts.map((item) => item.id)).size !== 1)
+          throw adapterFailure('unsupported');
+        const request = parseInteractionRequest(first.value);
+        if (!request) throw adapterFailure('invalid');
+        return { interactionId: first.id as InteractionId, ...request };
+      };
       return {
         async *run(request): AsyncGenerator<ExecutorEvent> {
           let run: ActiveRun | undefined;
           let cancel: (() => void) | undefined;
           try {
             if (disposed || active) throw adapterFailure('invalid');
-            if (request.command.type !== 'start') throw adapterFailure('unsupported');
+            const command = request.command;
+            if (command.type === 'resume') {
+              const interaction = await pending(request.sessionId);
+              if (interaction?.interactionId !== command.interactionId)
+                throw adapterFailure('unsupported');
+            } else lostSessions.delete(request.sessionId);
+            paused.get(request.sessionId)?.();
+            paused.delete(request.sessionId);
             const client = await boot(request.signal);
             if (request.signal.aborted) throw adapterFailure('cancelled');
             const result = client.request(
               'run',
-              { input: request.command.input, steps: request.limits.steps },
+              {
+                threadId: request.sessionId,
+                steps: request.limits.steps,
+                ...(command.type === 'start'
+                  ? { input: command.input }
+                  : {
+                      resume: {
+                        interactionId: command.interactionId,
+                        action: command.action,
+                        payload: command.payload,
+                      },
+                    }),
+              },
               'result',
               (id) => {
                 run = { id, request, seen: new Set(), leases: new Set(), cancelled: false };
                 active = run;
+                sessions.add(request.sessionId);
                 const current = run;
                 cancel = (): void => {
                   if (current.cancelled) return;
@@ -492,8 +537,24 @@ export function createPyodideAdapter(
                 if (request.signal.aborted) cancel();
               },
             );
-            const output = (await result) as { output: unknown };
-            if (!request.signal.aborted) yield { type: 'output', output: output.output };
+            const output = (await result) as { output?: unknown; interrupted?: true };
+            if (!request.signal.aborted) {
+              if (output.interrupted) {
+                const interaction = await pending(request.sessionId);
+                if (
+                  !interaction ||
+                  (command.type === 'resume' && interaction.interactionId === command.interactionId)
+                )
+                  throw adapterFailure('unsupported');
+                const abortPaused = (): void => client.close('cancelled');
+                paused.set(request.sessionId, () =>
+                  request.signal.removeEventListener('abort', abortPaused),
+                );
+                request.signal.addEventListener('abort', abortPaused, { once: true });
+                if (request.signal.aborted) abortPaused();
+                else yield { type: 'interaction', interaction };
+              } else yield { type: 'output', output: output.output };
+            }
           } catch (error) {
             if (!request.signal.aborted)
               yield { type: 'error', error: toErrorInfo(failureCode(error)) };
@@ -504,9 +565,7 @@ export function createPyodideAdapter(
             if (active === run) active = undefined;
           }
         },
-        async pending() {
-          return undefined;
-        },
+        pending,
         async dispose() {
           disposed = true;
           connection?.close('cancelled');

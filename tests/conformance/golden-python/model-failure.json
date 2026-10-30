@@ -1,0 +1,57 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      }
+    ],
+    "updates": [],
+    "messages": [],
+    "custom": []
+  },
+  "modes": [
+    "values"
+  ],
+  "final": null,
+  "state": {
+    "values": {
+      "value": 1
+    },
+    "next": [
+      "fail"
+    ]
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "fail"
+      ],
+      "values": {
+        "value": 1
+      },
+      "parentCheckpointId": "<uuid:1>"
+    }
+  ],
+  "outcome": {
+    "status": "failed",
+    "errorType": "FixtureModelError"
+  }
+}

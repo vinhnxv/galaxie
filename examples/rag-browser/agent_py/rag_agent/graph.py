@@ -10,6 +10,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from galaxie.capabilities import call
 from galaxie.langchain import GalaxieChatModel
+from galaxie.langgraph import checkpointer
 
 from .citations import cite_answer
 from .prompt import system_prompt, user_prompt
@@ -50,4 +51,4 @@ def create_agent() -> CompiledStateGraph:
     graph.add_edge(START, "retrieve")
     graph.add_edge("retrieve", "generateAnswer")
     graph.add_edge("generateAnswer", END)
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer())

@@ -196,6 +196,7 @@ from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage
 from galaxie.capabilities import call
 from galaxie.langchain import GalaxieChatModel
+from galaxie.langgraph import checkpointer
 class State(TypedDict, total=False):
     question: str
     mode: str
@@ -221,7 +222,7 @@ def create_agent():
     graph.add_edge(START, 'retrieve')
     graph.add_edge('retrieve', 'generateAnswer')
     graph.add_edge('generateAnswer', END)
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer())
 `;
 
 test.skipIf(!pythonWheelsAvailable)(

@@ -1,0 +1,175 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 2
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 3,
+          "answer": "linear response"
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 6,
+          "answer": "linear response"
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "respond": {
+            "value": 3,
+            "answer": "linear response"
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "double": {
+            "value": 6
+          }
+        }
+      }
+    ],
+    "messages": [
+      {
+        "path": [],
+        "data": [
+          {
+            "type": "AIMessageChunk",
+            "content": "linear ",
+            "id": "reply-linear"
+          },
+          {
+            "langgraph_node": "respond",
+            "langgraph_checkpoint_ns": "respond:<uuid:1>"
+          }
+        ]
+      },
+      {
+        "path": [],
+        "data": [
+          {
+            "type": "AIMessageChunk",
+            "content": "response",
+            "id": "reply-linear"
+          },
+          {
+            "langgraph_node": "respond",
+            "langgraph_checkpoint_ns": "respond:<uuid:1>"
+          }
+        ]
+      },
+      {
+        "path": [],
+        "data": [
+          {
+            "type": "AIMessageChunk",
+            "content": "",
+            "id": "lc_run--<uuid:2>"
+          },
+          {
+            "langgraph_node": "respond",
+            "langgraph_checkpoint_ns": "respond:<uuid:1>"
+          }
+        ]
+      }
+    ],
+    "custom": [
+      {
+        "path": [],
+        "data": {
+          "phase": "respond",
+          "value": 2
+        }
+      }
+    ]
+  },
+  "modes": [
+    "values",
+    "custom",
+    "messages",
+    "messages",
+    "messages",
+    "updates",
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 6,
+    "answer": "linear response"
+  },
+  "state": {
+    "values": {
+      "value": 6,
+      "answer": "linear response"
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "respond"
+      ],
+      "values": {
+        "value": 2
+      },
+      "parentCheckpointId": "<uuid:3>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [
+        "double"
+      ],
+      "values": {
+        "value": 3,
+        "answer": "linear response"
+      },
+      "parentCheckpointId": "<uuid:4>"
+    },
+    {
+      "metadata": {
+        "step": 2,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 6,
+        "answer": "linear response"
+      },
+      "parentCheckpointId": "<uuid:5>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  }
+}

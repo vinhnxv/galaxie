@@ -137,10 +137,14 @@ version = "0.0.0"
 source = { editable = "galaxie" }
 dependencies = [
     { name = "langchain-core" },
+    { name = "langgraph" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "langchain-core", specifier = ">=1,<2" }]
+requires-dist = [
+    { name = "langchain-core", specifier = ">=1,<2" },
+    { name = "langgraph", specifier = ">=1,<2" },
+]
 
 [[package]]
 name = "galaxie-python-tests"

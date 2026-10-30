@@ -1,12 +1,21 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { ErrorCode } from '@galaxie/core';
+import { type ErrorCode, toErrorInfo } from '@galaxie/core';
 import type { LockedWheel } from './runtime-files.js';
 
-export const BRIDGE_VERSION: 'galaxie.bridge/v1' = 'galaxie.bridge/v1';
+export const BRIDGE_VERSION: 'galaxie.bridge/v2' = 'galaxie.bridge/v2';
 export const MAX_BRIDGE_BYTES: number = 1_048_576;
-export type BridgeOp = 'boot' | 'run' | 'model' | 'capability' | 'abort' | 'result';
+export type BridgeOp =
+  | 'boot'
+  | 'run'
+  | 'pending'
+  | 'model'
+  | 'capability'
+  | 'abort'
+  | 'result'
+  | 'stream'
+  | 'model-chunk';
 interface Envelope {
   readonly v: typeof BRIDGE_VERSION;
   readonly id: string;
@@ -15,6 +24,7 @@ interface Envelope {
 export type BridgeMessage = Envelope &
   (
     | { readonly kind: 'request'; readonly payload: unknown }
+    | { readonly kind: 'notify'; readonly payload: unknown }
     | { readonly kind: 'response'; readonly ok: true; readonly payload: unknown }
     | {
         readonly kind: 'response';
@@ -31,8 +41,17 @@ export interface BootPayload {
   readonly entry: string;
 }
 export interface RunPayload {
-  readonly input: unknown;
+  readonly threadId: string;
+  readonly input?: unknown;
+  readonly resume?: {
+    readonly interactionId: string;
+    readonly action: string;
+    readonly payload: unknown;
+  };
   readonly steps: number;
+}
+export interface PendingReply {
+  readonly interrupts: readonly { readonly id?: string; readonly value: unknown }[];
 }
 export interface ModelPayload {
   readonly role: string;
@@ -57,9 +76,10 @@ export interface CapabilityPayload {
 }
 
 export class BridgeValidationError extends Error {
-  readonly code: 'invalid' = 'invalid';
-  constructor() {
-    super('The request is invalid.');
+  readonly code: 'invalid' | 'unsupported';
+  constructor(code: 'invalid' | 'unsupported' = 'invalid') {
+    super(toErrorInfo(code).message);
+    this.code = code;
     this.name = 'BridgeValidationError';
   }
 }
@@ -163,11 +183,21 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
       );
     case 'run':
       return (
-        keys(value, ['input', 'steps']) &&
-        json(value['input']) &&
+        keys(value, ['threadId', 'steps'], ['input', 'resume']) &&
+        text(value['threadId']) &&
+        Object.hasOwn(value, 'input') !== Object.hasOwn(value, 'resume') &&
+        (Object.hasOwn(value, 'input')
+          ? json(value['input'])
+          : object(value['resume']) &&
+            keys(value['resume'], ['interactionId', 'action', 'payload']) &&
+            text(value['resume']['interactionId']) &&
+            text(value['resume']['action']) &&
+            json(value['resume']['payload'])) &&
         count(value['steps']) &&
         value['steps'] > 0
       );
+    case 'pending':
+      return keys(value, ['threadId']) && text(value['threadId']);
     case 'model':
       return (
         keys(value, ['role', 'messages', 'options']) &&
@@ -196,6 +226,8 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
     case 'abort':
       return keys(value, ['runId']) && text(value['runId']);
     case 'result':
+    case 'stream':
+    case 'model-chunk':
       return false;
   }
 }
@@ -232,8 +264,27 @@ function responsePayload(op: BridgeOp, value: unknown): boolean {
     case 'abort':
       return value === null;
     case 'result':
-      return object(value) && keys(value, ['output']) && json(value['output']);
+      return (
+        object(value) &&
+        ((keys(value, ['output']) && json(value['output'])) ||
+          (keys(value, ['interrupted']) && value['interrupted'] === true))
+      );
+    case 'pending':
+      return (
+        object(value) &&
+        keys(value, ['interrupts']) &&
+        Array.isArray(value['interrupts']) &&
+        value['interrupts'].every(
+          (item: unknown) =>
+            object(item) &&
+            keys(item, ['value'], ['id']) &&
+            (item['id'] === undefined || typeof item['id'] === 'string') &&
+            json(item['value']),
+        )
+      );
     case 'run':
+    case 'stream':
+    case 'model-chunk':
       return false;
   }
 }
@@ -242,10 +293,37 @@ function valid(value: unknown): value is BridgeMessage {
     !object(value) ||
     value['v'] !== BRIDGE_VERSION ||
     !text(value['id']) ||
-    !['boot', 'run', 'model', 'capability', 'abort', 'result'].includes(value['op'] as string)
+    ![
+      'boot',
+      'run',
+      'pending',
+      'model',
+      'capability',
+      'abort',
+      'result',
+      'stream',
+      'model-chunk',
+    ].includes(value['op'] as string)
   )
     return false;
   const op = value['op'] as BridgeOp;
+  if (value['kind'] === 'notify') {
+    if (!keys(value, ['v', 'kind', 'id', 'op', 'payload'])) return false;
+    const payload = value['payload'];
+    if (op === 'model-chunk')
+      return (
+        object(payload) && keys(payload, ['content']) && typeof payload['content'] === 'string'
+      );
+    return (
+      op === 'stream' &&
+      Array.isArray(payload) &&
+      payload.length === 3 &&
+      Array.isArray(payload[0]) &&
+      payload[0].every((item: unknown) => typeof item === 'string') &&
+      ['values', 'updates', 'messages', 'custom'].includes(payload[1] as string) &&
+      json(payload[2])
+    );
+  }
   if (value['kind'] === 'request')
     return (
       keys(value, ['v', 'kind', 'id', 'op', 'payload']) && requestPayload(op, value['payload'])
@@ -265,9 +343,10 @@ function valid(value: unknown): value is BridgeMessage {
   );
 }
 export function parseBridge(value: unknown): BridgeMessage {
+  if (typeof value === 'string' && new TextEncoder().encode(value).length > MAX_BRIDGE_BYTES)
+    throw new BridgeValidationError('unsupported');
   try {
-    if (typeof value !== 'string' || new TextEncoder().encode(value).length > MAX_BRIDGE_BYTES)
-      throw new BridgeValidationError();
+    if (typeof value !== 'string') throw new BridgeValidationError();
     const parsed: unknown = JSON.parse(value);
     if (!valid(parsed)) throw new BridgeValidationError();
     return parsed;
@@ -276,15 +355,16 @@ export function parseBridge(value: unknown): BridgeMessage {
   }
 }
 export function encodeBridge(message: BridgeMessage): string {
+  let encoded: string;
   try {
     if (!json(message) || !valid(message)) throw new BridgeValidationError();
-    const encoded = JSON.stringify(message);
-    if (new TextEncoder().encode(encoded).length > MAX_BRIDGE_BYTES)
-      throw new BridgeValidationError();
-    return encoded;
+    encoded = JSON.stringify(message);
   } catch {
     throw new BridgeValidationError();
   }
+  if (new TextEncoder().encode(encoded).length > MAX_BRIDGE_BYTES)
+    throw new BridgeValidationError('unsupported');
+  return encoded;
 }
 export function success(
   request: BridgeMessage,

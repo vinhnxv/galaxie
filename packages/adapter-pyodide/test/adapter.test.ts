@@ -19,6 +19,8 @@ type MessageListener = (event: { readonly data: unknown }) => void;
 class FixtureWorker implements PyodideWorkerPort {
   readonly sent: BridgeMessage[] = [];
   readonly listeners: Set<MessageListener> = new Set();
+  readonly errors: Set<() => void> = new Set();
+  pendingData: unknown = { interrupts: [] };
   terminated: boolean = false;
   bootAutomatically: boolean = true;
   handle: ((message: BridgeMessage) => void) | undefined;
@@ -33,6 +35,8 @@ class FixtureWorker implements PyodideWorkerPort {
           }),
         ),
       );
+    } else if (message.kind === 'request' && message.op === 'pending') {
+      queueMicrotask(() => this.emit(success(message, this.pendingData)));
     } else this.handle?.(message);
   }
   emit(message: BridgeMessage): void {
@@ -40,9 +44,11 @@ class FixtureWorker implements PyodideWorkerPort {
   }
   addEventListener(type: 'message' | 'error', listener: MessageListener | (() => void)): void {
     if (type === 'message') this.listeners.add(listener as MessageListener);
+    else this.errors.add(listener as () => void);
   }
   removeEventListener(type: 'message' | 'error', listener: MessageListener | (() => void)): void {
     if (type === 'message') this.listeners.delete(listener as MessageListener);
+    else this.errors.delete(listener as () => void);
   }
   terminate(): void {
     this.terminated = true;
@@ -168,8 +174,8 @@ test('validates descriptors and provider factories before fetching or constructi
   expect(workers).toEqual([]);
   expect(fetcher).not.toHaveBeenCalled();
   expect(adapter.features).toEqual({
-    interrupts: false,
-    resume: false,
+    interrupts: true,
+    resume: true,
     checkpoints: false,
     streaming: false,
     subgraphs: false,
@@ -326,12 +332,13 @@ test('broker failures cross as fixed codes without invoking the model', async ()
   await agent.dispose();
 });
 
-test('abort acknowledgment settles while an uncooperative model reply is ignored', async () => {
+test('routed model failures preserve fixed codes without exposing provider details', async () => {
   vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
   const workers: FixtureWorker[] = [];
-  const delayed = Promise.withResolvers<AIMessage>();
-  const invoke = vi.fn(() => delayed.promise);
-  const provider = { invoke } as unknown as BaseChatModel;
+  const provider = model();
+  vi.mocked(provider.invoke).mockRejectedValue(
+    new GalaxieError('unavailable', 'private provider detail'),
+  );
   const agent = await setup(workers).prepare(
     descriptor,
     { chatModels: { model: provider } },
@@ -340,25 +347,66 @@ test('abort acknowledgment settles while an uncooperative model reply is ignored
   const worker = workers[0];
   if (!worker) throw new Error('Missing fixture Worker.');
   modelRoundTrip(worker);
-  const original = worker.handle;
-  worker.handle = (message) => {
-    if (message.kind === 'request' && message.op === 'abort') worker.emit(success(message, null));
-    else original?.(message);
-  };
-  const controller = new AbortController();
-  const run = request(controller.signal);
-  const events = collect(agent.run(run.request));
-  await vi.waitFor(() => expect(invoke).toHaveBeenCalledOnce());
-  controller.abort();
-  expect(await events).toEqual([]);
-  expect(worker.terminated).toBe(true);
+  const run = request();
+  expect(await collect(agent.run(run.request))).toEqual([
+    {
+      type: 'error',
+      error: { code: 'unavailable', message: 'The requested service is unavailable.' },
+    },
+  ]);
   expect(run.lease.fail).toHaveBeenCalledOnce();
-  delayed.resolve(new AIMessage('LATE-REPLY'));
-  await Promise.resolve();
-  await Promise.resolve();
-  expect(JSON.stringify(worker.sent)).not.toContain('LATE-REPLY');
+  expect(worker.sent.map(encodeBridge).join('\n')).not.toContain('private provider detail');
   await agent.dispose();
 });
+
+test.each(['start', 'resume'] as const)(
+  'abort during %s settles while an uncooperative model reply is ignored',
+  async (command) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const delayed = Promise.withResolvers<AIMessage>();
+    const invoke = vi.fn(() => delayed.promise);
+    const provider = { invoke } as unknown as BaseChatModel;
+    const agent = await setup(workers).prepare(
+      descriptor,
+      { chatModels: { model: provider } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('Missing fixture Worker.');
+    modelRoundTrip(worker);
+    const original = worker.handle;
+    worker.handle = (message) => {
+      if (message.kind === 'request' && message.op === 'abort') worker.emit(success(message, null));
+      else original?.(message);
+    };
+    const controller = new AbortController();
+    const run = request(controller.signal);
+    if (command === 'resume') {
+      worker.pendingData = {
+        interrupts: [{ id: 'one', value: interactionRequest }],
+      };
+      run.request = {
+        ...run.request,
+        command: { type: 'resume', interactionId: 'one' as never, action: 'submit', payload: {} },
+      };
+    }
+    const events = collect(agent.run(run.request));
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledOnce());
+    controller.abort();
+    expect(await events).toEqual([]);
+    expect(worker.terminated).toBe(true);
+    await expect(agent.pending(run.request.sessionId)).rejects.toMatchObject({
+      code: 'unavailable',
+    });
+    expect(run.lease.fail).toHaveBeenCalledOnce();
+    delayed.resolve(new AIMessage('LATE-REPLY'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(JSON.stringify(worker.sent)).not.toContain('LATE-REPLY');
+    await agent.dispose();
+  },
+);
 
 test('a nonresponsive Worker is terminated at the liveness bound and the next run boots fresh', async () => {
   vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
@@ -419,7 +467,12 @@ test('cancelling preparation terminates a Worker whose boot has not completed', 
   expect(worker.terminated).toBe(true);
 });
 
-test('an invalid Worker reply terminates the connection with a content-free error', async () => {
+test.each([
+  '{"v":"unknown","secret":"private worker detail"}',
+  '{"v":"galaxie.bridge/v1","kind":"response","id":"run-2","op":"result","ok":true,"payload":{"output":{}}}',
+  '{"v":"galaxie.bridge/v2","kind":"request","id":"one","op":"unknown","payload":{}}',
+  '{"v":"galaxie.bridge/v2","kind":"notify","id":"one","op":"stream","payload":[[],"updates",{}]}',
+])('an invalid or unexpected Worker envelope terminates the connection: %s', async (raw) => {
   vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
   const workers: FixtureWorker[] = [];
   const agent = await setup(workers).prepare(
@@ -431,11 +484,169 @@ test('an invalid Worker reply terminates the connection with a content-free erro
   if (!worker) throw new Error('Missing fixture Worker.');
   const running = collect(agent.run(request().request));
   await vi.waitFor(() => expect(worker.sent.some((message) => message.op === 'run')).toBe(true));
-  for (const listener of worker.listeners)
-    listener({ data: '{"v":"unknown","secret":"private worker detail"}' });
+  for (const listener of worker.listeners) listener({ data: raw });
   expect(await running).toEqual([
     { type: 'error', error: { code: 'invalid', message: 'The request is invalid.' } },
   ]);
   expect(worker.terminated).toBe(true);
   await agent.dispose();
 });
+
+const interactionRequest = {
+  surfaceId: 'main',
+  viewRevision: 'r1',
+  component: 'conformance.Question/v1',
+  props: { question: 'Continue?' },
+};
+
+test('reads committed pending state, resumes by ID and refuses an already answered interaction', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const agent = await setup(workers).prepare(
+    descriptor,
+    { chatModels: { model: model() } },
+    preparation,
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('Missing fixture Worker.');
+  worker.handle = (message) => {
+    if (message.kind !== 'request' || message.op !== 'run') return;
+    const payload = message.payload as { resume?: unknown; threadId: string };
+    expect(payload.threadId).toBe('session');
+    if (payload.resume) {
+      expect(payload.resume).toEqual({
+        interactionId: 'pending-id',
+        action: 'submit',
+        payload: false,
+      });
+      worker.pendingData = { interrupts: [] };
+      worker.emit(success(message, { output: { answer: false } }, 'result'));
+    } else {
+      worker.pendingData = {
+        interrupts: [{ id: 'pending-id', value: interactionRequest }],
+      };
+      worker.emit(success(message, { interrupted: true }, 'result'));
+    }
+  };
+  const initial = request().request;
+  expect(await collect(agent.run(initial))).toEqual([
+    {
+      type: 'interaction',
+      interaction: {
+        interactionId: 'pending-id',
+        ...interactionRequest,
+      },
+    },
+  ]);
+  expect(await agent.pending(initial.sessionId)).toEqual({
+    interactionId: 'pending-id',
+    ...interactionRequest,
+  });
+  const resumed: RunRequest = {
+    ...initial,
+    command: {
+      type: 'resume',
+      interactionId: 'pending-id' as never,
+      action: 'submit',
+      payload: false,
+    },
+  };
+  expect(await collect(agent.run(resumed))).toEqual([
+    { type: 'output', output: { answer: false } },
+  ]);
+  expect(await agent.pending(initial.sessionId)).toBeUndefined();
+  expect(await collect(agent.run(resumed))).toEqual([
+    {
+      type: 'error',
+      error: {
+        code: 'unsupported',
+        message: 'This operation is unsupported.',
+      },
+    },
+  ]);
+  expect(worker.sent.filter((message) => message.op === 'run')).toHaveLength(2);
+  await agent.dispose();
+});
+
+test('pending rejects parallel, ID-less and static interrupts and validates the request in JavaScript', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const agent = await setup(workers).prepare(
+    descriptor,
+    { chatModels: { model: model() } },
+    preparation,
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('Missing fixture Worker.');
+  for (const interrupts of [
+    [
+      { id: 'one', value: interactionRequest },
+      { id: 'two', value: interactionRequest },
+    ],
+    [{ value: interactionRequest }],
+  ]) {
+    worker.pendingData = { interrupts };
+    await expect(agent.pending('session' as never)).rejects.toMatchObject({ code: 'unsupported' });
+  }
+  worker.pendingData = {
+    interrupts: [{ id: 'one', value: { ...interactionRequest, component: 'invalid' } }],
+  };
+  await expect(agent.pending('session' as never)).rejects.toMatchObject({ code: 'invalid' });
+  worker.pendingData = { interrupts: [] };
+  expect(await agent.pending('session' as never)).toBeUndefined();
+  worker.handle = (message) => {
+    if (message.kind === 'request' && message.op === 'run')
+      worker.emit(success(message, { interrupted: true }, 'result'));
+  };
+  expect(await collect(agent.run(request().request))).toEqual([
+    { type: 'error', error: { code: 'unsupported', message: 'This operation is unsupported.' } },
+  ]);
+  await agent.dispose();
+});
+
+test.each(['abort', 'crash'] as const)(
+  'lost paused state after %s fails unavailable without booting a fresh Worker',
+  async (reason) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const agent = await setup(workers).prepare(
+      descriptor,
+      { chatModels: { model: model() } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('Missing fixture Worker.');
+    worker.handle = (message) => {
+      if (message.kind === 'request' && message.op === 'run') {
+        worker.pendingData = {
+          interrupts: [{ id: 'one', value: interactionRequest }],
+        };
+        worker.emit(success(message, { interrupted: true }, 'result'));
+      }
+    };
+    const controller = new AbortController();
+    const initial = request(controller.signal).request;
+    expect(await collect(agent.run(initial))).toHaveLength(1);
+    if (reason === 'abort') controller.abort();
+    else for (const error of worker.errors) error();
+    await expect(agent.pending(initial.sessionId)).rejects.toMatchObject({
+      code: 'unavailable',
+      message: 'The requested service is unavailable.',
+    });
+    expect(
+      await collect(
+        agent.run({
+          ...request().request,
+          command: { type: 'resume', interactionId: 'one' as never, action: 'submit', payload: {} },
+        }),
+      ),
+    ).toEqual([
+      {
+        type: 'error',
+        error: { code: 'unavailable', message: 'The requested service is unavailable.' },
+      },
+    ]);
+    expect(workers).toHaveLength(1);
+    await agent.dispose();
+  },
+);

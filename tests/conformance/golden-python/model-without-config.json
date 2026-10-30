@@ -1,0 +1,134 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "answer": "implicit response"
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "implicit": {
+            "answer": "implicit response"
+          }
+        }
+      }
+    ],
+    "messages": [
+      {
+        "path": [],
+        "data": [
+          {
+            "type": "AIMessageChunk",
+            "content": "implicit ",
+            "id": "reply-implicit"
+          },
+          {
+            "langgraph_node": "implicit",
+            "langgraph_checkpoint_ns": "implicit:<uuid:1>"
+          }
+        ]
+      },
+      {
+        "path": [],
+        "data": [
+          {
+            "type": "AIMessageChunk",
+            "content": "response",
+            "id": "reply-implicit"
+          },
+          {
+            "langgraph_node": "implicit",
+            "langgraph_checkpoint_ns": "implicit:<uuid:1>"
+          }
+        ]
+      },
+      {
+        "path": [],
+        "data": [
+          {
+            "type": "AIMessageChunk",
+            "content": "",
+            "id": "lc_run--<uuid:2>"
+          },
+          {
+            "langgraph_node": "implicit",
+            "langgraph_checkpoint_ns": "implicit:<uuid:1>"
+          }
+        ]
+      }
+    ],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "messages",
+    "messages",
+    "messages",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 1,
+    "answer": "implicit response"
+  },
+  "state": {
+    "values": {
+      "value": 1,
+      "answer": "implicit response"
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "implicit"
+      ],
+      "values": {
+        "value": 1
+      },
+      "parentCheckpointId": "<uuid:3>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 1,
+        "answer": "implicit response"
+      },
+      "parentCheckpointId": "<uuid:4>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  }
+}

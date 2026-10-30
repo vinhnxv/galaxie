@@ -1,0 +1,196 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "__interrupt__": [
+            {
+              "id": "<interrupt:1>",
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "answer": {
+            "answer": "yes"
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "answer": {
+            "answer": "yes"
+          },
+          "counts": {
+            "prepare": 1,
+            "ask": 2
+          }
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "prepare": null
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "id": "<interrupt:1>",
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "ask": {
+            "answer": {
+              "answer": "yes"
+            }
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "finish": {
+            "counts": {
+              "prepare": 1,
+              "ask": 2
+            }
+          }
+        }
+      }
+    ],
+    "messages": [],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "updates",
+    "updates",
+    "values",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 1,
+    "answer": {
+      "answer": "yes"
+    },
+    "counts": {
+      "prepare": 1,
+      "ask": 2
+    }
+  },
+  "state": {
+    "values": {
+      "value": 1,
+      "answer": {
+        "answer": "yes"
+      },
+      "counts": {
+        "prepare": 1,
+        "ask": 2
+      }
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [
+        "ask"
+      ],
+      "values": {
+        "value": 1
+      },
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 3,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 1,
+        "answer": {
+          "answer": "yes"
+        },
+        "counts": {
+          "prepare": 1,
+          "ask": 2
+        }
+      },
+      "parentCheckpointId": "<uuid:1>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  },
+  "pauses": [
+    {
+      "interrupts": [
+        {
+          "id": "<interrupt:1>",
+          "value": {
+            "surfaceId": "main",
+            "viewRevision": "r1",
+            "component": "conformance.Question/v1",
+            "props": {
+              "question": "Continue?"
+            }
+          }
+        }
+      ],
+      "historyLength": 1
+    }
+  ]
+}

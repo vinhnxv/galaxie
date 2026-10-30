@@ -32,18 +32,18 @@ worker.addEventListener('message', (event) => {
   if (message['op'] === 'boot' && message['ok'])
     worker.postMessage(
       JSON.stringify({
-        v: 'galaxie.bridge/v1',
+        v: 'galaxie.bridge/v2',
         kind: 'request',
         id: 'run',
         op: 'run',
-        payload: { input: { value: 1 }, steps: 5 },
+        payload: { input: { value: 1 }, steps: 5, threadId: 'csp-test' },
       }),
     );
 });
 worker.addEventListener('error', () => events.push({ type: 'failed' }));
 worker.postMessage(
   JSON.stringify({
-    v: 'galaxie.bridge/v1',
+    v: 'galaxie.bridge/v2',
     kind: 'request',
     id: 'boot',
     op: 'boot',
@@ -54,7 +54,7 @@ worker.postMessage(
       sources: [
         {
           path: 'csp_agent.py',
-          text: 'from langgraph.graph import StateGraph, START, END\nfrom typing import TypedDict\nclass State(TypedDict):\n    value: int\ndef create_agent():\n    graph = StateGraph(State)\n    graph.add_node("double", lambda state: {"value": state["value"] * 2})\n    graph.add_edge(START, "double")\n    graph.add_edge("double", END)\n    return graph.compile()\n',
+          text: 'from langgraph.graph import StateGraph, START, END\nfrom galaxie.langgraph import checkpointer\nfrom typing import TypedDict\nclass State(TypedDict):\n    value: int\ndef create_agent():\n    graph = StateGraph(State)\n    graph.add_node("double", lambda state: {"value": state["value"] * 2})\n    graph.add_edge(START, "double")\n    graph.add_edge("double", END)\n    return graph.compile(checkpointer=checkpointer())\n',
         },
       ],
       module: 'csp_agent',

@@ -10,6 +10,7 @@ from rag_agent.graph import create_agent
 
 
 def test_cpython_matches_the_shared_behavioral_transcript(monkeypatch):
+    monkeypatch.setattr("rag_agent.graph.checkpointer", lambda: None)
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
     monkeypatch.setenv("LANGCHAIN_TRACING_V2", "false")
     directory = Path(__file__).resolve().parents[2] / "test" / "golden"
