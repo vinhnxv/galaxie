@@ -8,7 +8,7 @@ import sys
 
 import pytest
 from pydantic import BaseModel
-from pydantic_ai import Agent, NativeOutput, PromptedOutput
+from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults, NativeOutput, PromptedOutput
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.exceptions import UserError
 from pydantic_ai.messages import (
@@ -36,6 +36,108 @@ def transport_for(replies, seen=None):
 
 def tool_call(name, arguments, identifier='call_1'):
     return {'id': identifier, 'type': 'function', 'function': {'name': name, 'arguments': arguments}}
+
+
+def approval_executor(interaction=None):
+    agent = Agent(GalaxieModel('answer'), output_type=[str, DeferredToolRequests])
+    executed = []
+
+    @agent.tool_plain(requires_approval=True)
+    async def save(value: int) -> str:
+        executed.append(value)
+        return 'saved'
+
+    def display(requests):
+        return {'surfaceId': 'main', 'viewRevision': 'approval-1', 'component': 'tests.Approval/v1',
+                'props': {'arguments': requests.approvals[0].args_as_json_str()}}
+
+    return Executor(agent, interaction=interaction or display), executed
+
+
+@pytest.mark.parametrize('action,expected', [('approve', [7]), ('deny', [])])
+def test_deferred_approval_pauses_and_resumes_once(action, expected):
+    transport_for([{'content': '', 'toolCalls': [tool_call('save', '{"value":7}')]}, {'content': 'done'}])
+    executor, executed = approval_executor()
+
+    async def run():
+        assert await executor.run({'prompt': 'save'}, 'conversation', 5) is None
+        pending = executor.pending('conversation')
+        assert pending is not None
+        assert pending['value']['props'] == {'arguments': '{"value":7}'}
+        assert executed == []
+        answer = {'interactionId': pending['id'], 'action': action, 'payload': {'toolCallIds': ['call_1']}}
+        assert await executor.run(None, 'conversation', 5, resume=answer) == 'done'
+        assert executor.pending('conversation') is None
+        with pytest.raises(GalaxieError) as error:
+            await executor.run(None, 'conversation', 5, resume=answer)
+        assert error.value.code == 'stale'
+
+    asyncio.run(run())
+    assert executed == expected
+
+
+@pytest.mark.parametrize('answer,code', [
+    ({'interactionId': 'wrong', 'action': 'approve', 'payload': {'toolCallIds': ['call_1']}}, 'stale'),
+    ({'action': 'other', 'payload': {'toolCallIds': ['call_1']}}, 'invalid'),
+    ({'action': 'approve', 'payload': {'toolCallIds': []}}, 'invalid'),
+    ({'action': 'approve', 'payload': {'toolCallIds': ['call_1', 'call_1']}}, 'invalid'),
+])
+def test_deferred_default_resume_fails_closed(answer, code):
+    transport_for([{'content': '', 'toolCalls': [tool_call('save', '{"value":7}')]}])
+    executor, executed = approval_executor()
+
+    async def run():
+        await executor.run({'prompt': 'save'}, 'conversation', 5)
+        pending = executor.pending('conversation')
+        assert pending is not None
+        with pytest.raises(GalaxieError) as error:
+            await executor.run(None, 'conversation', 5, resume={'interactionId': pending['id'], **answer})
+        assert error.value.code == code
+        assert executor.pending('conversation') == pending
+
+    asyncio.run(run())
+    assert executed == []
+
+
+@pytest.mark.parametrize('value', [
+    {'bad': 'private text'},
+    {'surfaceId': 'main', 'viewRevision': 'r1', 'component': 'invalid', 'props': {}},
+    {'surfaceId': 'main', 'viewRevision': 'r1', 'component': 'tests.Approval/v1', 'props': {'value': float('nan')}},
+    {'surfaceId': 'main', 'viewRevision': 'r1', 'component': 'tests.Approval/v1', 'props': {'value': (1, 2)}},
+])
+def test_invalid_deferred_interaction_has_a_fixed_unsupported_error(value):
+    transport_for([{'content': '', 'toolCalls': [tool_call('save', '{"value":7}')]}])
+    executor, executed = approval_executor(lambda _: value)
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run({'prompt': 'save'}, 'conversation', 5))
+    assert (error.value.code, str(error.value)) == ('unsupported', 'This operation is unsupported.')
+    assert executor.pending('conversation') is None
+    assert executed == []
+
+
+@pytest.mark.parametrize('results', [
+    None, DeferredToolResults(), DeferredToolResults(approvals={'extra': True}),
+    DeferredToolResults(approvals=json.loads('{"call_1":"approve"}')),
+    DeferredToolResults(approvals={'call_1': True}, calls={'extra': 6}),
+])
+def test_author_resume_must_cover_every_deferred_call_before_any_tool_runs(results):
+    transport_for([{'content': '', 'toolCalls': [tool_call('save', '{"value":7}')]}])
+    executor, executed = approval_executor()
+    executor.resume = lambda *_: results
+
+    async def run():
+        await executor.run({'prompt': 'save'}, 'conversation', 5)
+        pending = executor.pending('conversation')
+        assert pending is not None
+        with pytest.raises(GalaxieError) as error:
+            await executor.run(None, 'conversation', 5, resume={
+                'interactionId': pending['id'], 'action': 'resolve', 'payload': {},
+            })
+        assert (error.value.code, str(error.value)) == ('invalid', 'The request is invalid.')
+        assert executor.pending('conversation') == pending
+
+    asyncio.run(run())
+    assert executed == []
 
 
 def test_text_reply_and_usage_are_mapped_without_a_provider():
@@ -410,3 +512,52 @@ def test_streamed_calls_align_by_identity_when_indices_arrive_out_of_order(final
                 pass
             assert [part.tool_call_id for part in response.get().parts if isinstance(part, ToolCallPart)] == list(final_order)
     asyncio.run(run())
+
+
+def test_effect_scopes_stay_distinct_across_approval_resumes_and_fresh_starts():
+    scopes = []
+    replies = iter([
+        {'content': '', 'toolCalls': [tool_call('save', '{"value":1}', 'c1')]},
+        {'content': '', 'toolCalls': [tool_call('save', '{"value":2}', 'c2')]},
+        {'content': 'done'},
+        {'content': '', 'toolCalls': [tool_call('save', '{"value":3}', 'c1')]},
+        {'content': 'done'},
+    ])
+
+    async def transport(raw):
+        message = json.loads(raw)
+        if message['op'] == 'capability':
+            scopes.append(message['payload']['effectScope'])
+            reply = {'saved': True}
+        else:
+            reply = next(replies)
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
+
+    _bridge.install_transport(transport)
+    tool = capability_tool('save', 'save@1', {'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value']})
+    tool.requires_approval = True
+    executor = Executor(
+        Agent(GalaxieModel('answer'), output_type=[str, DeferredToolRequests], tools=[tool]),
+        interaction=lambda requests: {'surfaceId': 'main', 'viewRevision': '1', 'component': 'tests.Approve/v1', 'props': {}},
+    )
+
+    def pending_id():
+        pending = executor.pending('c')
+        assert pending is not None
+        return pending['id']
+
+    async def scenario():
+        ids = []
+        await executor.run({'prompt': 'first'}, 'c', 9)
+        ids.append(pending_id())
+        await executor.run(None, 'c', 9, resume={'interactionId': ids[-1], 'action': 'approve', 'payload': {'toolCallIds': ['c1']}})
+        ids.append(pending_id())
+        assert await executor.run(None, 'c', 9, resume={'interactionId': ids[-1], 'action': 'approve', 'payload': {'toolCallIds': ['c2']}}) == 'done'
+        await executor.run({'prompt': 'second'}, 'c', 9)
+        ids.append(pending_id())
+        assert await executor.run(None, 'c', 9, resume={'interactionId': ids[-1], 'action': 'approve', 'payload': {'toolCallIds': ['c1']}}) == 'done'
+        return ids
+
+    ids = asyncio.run(scenario())
+    assert scopes == ['pydantic-ai/c/1/0', 'pydantic-ai/c/3/0', 'pydantic-ai/c/7/0']
+    assert len(set(ids)) == 3

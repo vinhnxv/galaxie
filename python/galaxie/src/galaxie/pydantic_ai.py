@@ -4,14 +4,18 @@
 """pydantic-ai models and capability tools backed by the JavaScript runtime."""
 
 import asyncio
+import hashlib
 import json
+import math
+import re
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from pydantic_ai import Agent, AgentRunResult, RunContext, Tool, capture_run_messages
+from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, RunContext, Tool, capture_run_messages
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (
@@ -328,12 +332,53 @@ def _uninstrumented(agent: Agent) -> None:
         raise GalaxieError('unsupported')
 
 
+def _interaction(value: Any) -> dict[str, Any]:
+    """Mirror the four-field JSON display contract without importing a framework."""
+    def json_value(item: Any, ancestors: set[int]) -> bool:
+        if item is None or type(item) in (str, bool, int):
+            return True
+        if type(item) is float:
+            return math.isfinite(item)
+        if type(item) not in (list, dict) or id(item) in ancestors:
+            return False
+        ancestors = ancestors | {id(item)}
+        return all(json_value(child, ancestors) for child in item) if type(item) is list else all(
+            type(key) is str and json_value(child, ancestors) for key, child in item.items()
+        )
+
+    if (
+        type(value) is not dict or set(value) != {'surfaceId', 'viewRevision', 'component', 'props'}
+        or any(type(value[key]) is not str or not value[key] for key in ('surfaceId', 'viewRevision', 'component'))
+        or re.fullmatch(r'[A-Za-z][\w-]*\.[A-Za-z][\w-]*/v\d+', value['component'], re.ASCII) is None
+        or type(value['props']) is not dict or not json_value(value, set())
+    ):
+        raise GalaxieError('unsupported')
+    return _json(value)
+
+
+@dataclass
+class _Pause:
+    position: int
+    messages: list[ModelMessage]
+    requests: DeferredToolRequests
+    interaction: dict[str, Any]
+
+
+@dataclass
+class _Conversation:
+    position: int = 0
+    pauses: int = 0
+    pending: _Pause | None = None
+
+
 class Executor:
     """Run an agent with explicit input and output projections."""
 
     def __init__(
-        self, agent: Agent, *, prompt: Callable[[Any], str] | None = None,
+        self, agent: Agent[Any, Any], *, prompt: Callable[[Any], str] | None = None,
         output: Callable[[Any], Any] | None = None,
+        interaction: Callable[[DeferredToolRequests], dict[str, Any]] | None = None,
+        resume: Callable[[DeferredToolRequests, str, Any], DeferredToolResults] | None = None,
     ) -> None:
         if not isinstance(agent, Agent):
             raise GalaxieError('unsupported')
@@ -341,11 +386,46 @@ class Executor:
         self.agent = agent
         self.prompt = prompt
         self.output = output
-        self._conversations: dict[str, int] = {}
+        self.interaction = interaction
+        self.resume = resume
+        self._conversations: dict[str, _Conversation] = {}
         agent.instrument = False
 
+    def pending(self, conversation_id: str) -> dict[str, Any] | None:
+        """Read the one pending interaction while this executor remains in memory."""
+        state = self._conversations.get(conversation_id)
+        return _json(state.pending.interaction) if state and state.pending else None
+
+    def _results(self, requests: DeferredToolRequests, action: str, payload: Any) -> DeferredToolResults:
+        approvals = {call.tool_call_id for call in requests.approvals}
+        calls = {call.tool_call_id for call in requests.calls}
+        try:
+            if self.resume is not None:
+                results = self.resume(requests, action, payload)
+            else:
+                if (
+                    action not in ('approve', 'deny') or calls
+                    or type(payload) is not dict or set(payload) != {'toolCallIds'}
+                    or type(payload['toolCallIds']) is not list
+                    or any(type(identifier) is not str for identifier in payload['toolCallIds'])
+                    or len(payload['toolCallIds']) != len(approvals)
+                    or set(payload['toolCallIds']) != approvals
+                ):
+                    raise GalaxieError('invalid')
+                results = DeferredToolResults(approvals={identifier: action == 'approve' for identifier in approvals})
+            if (
+                not isinstance(results, DeferredToolResults)
+                or set(results.approvals) != approvals or set(results.calls) != calls
+                or not set(results.metadata) <= approvals | calls
+            ):
+                raise GalaxieError('invalid')
+            results.to_tool_call_results()
+            return results
+        except Exception:
+            raise GalaxieError('invalid') from None
+
     async def _run_stream(
-        self, prompt: str, options: dict[str, Any], on_stream: Callable[[str, Any], None],
+        self, prompt: str | None, options: dict[str, Any], on_stream: Callable[[str, Any], None],
     ) -> AgentRunResult[Any]:
         request_index = 0
         async with self.agent.iter(prompt, **options) as run:
@@ -375,22 +455,37 @@ class Executor:
     async def run(
         self, input: Any, conversation_id: str, steps: int, *,
         on_stream: Callable[[str, Any], None] | None = None,
+        resume: dict[str, Any] | None = None,
     ) -> Any:
         _uninstrumented(self.agent)
         Agent.instrument_all(False)
-        if self.prompt is None:
+        if not isinstance(conversation_id, str) or not conversation_id:
+            raise GalaxieError('invalid')
+        state = self._conversations.setdefault(conversation_id, _Conversation())
+        options = {'conversation_id': conversation_id, 'usage_limits': UsageLimits(request_limit=steps), 'infer_name': False}
+        position = state.position
+        if resume is not None:
+            pause = state.pending
+            if pause is None or resume.get('interactionId') != pause.interaction['id']:
+                raise GalaxieError('stale')
+            if set(resume) != {'interactionId', 'action', 'payload'} or not isinstance(resume['action'], str):
+                raise GalaxieError('invalid')
+            options['deferred_tool_results'] = self._results(pause.requests, resume['action'], resume['payload'])
+            options['message_history'] = pause.messages
+            position = pause.position
+            prompt = None
+        elif self.prompt is None:
             if not isinstance(input, dict) or set(input) != {'prompt'} or not isinstance(input['prompt'], str):
                 raise GalaxieError('invalid')
             prompt = input['prompt']
         else:
             prompt = self.prompt(input)
-        if not isinstance(prompt, str) or not isinstance(conversation_id, str) or not conversation_id:
+        if resume is None and not isinstance(prompt, str):
             raise GalaxieError('invalid')
-        position = self._conversations.get(conversation_id, 0)
+        state.pending = None
         token = _positions.set(position)
         with capture_run_messages() as messages:
             try:
-                options = {'conversation_id': conversation_id, 'usage_limits': UsageLimits(request_limit=steps), 'infer_name': False}
                 if on_stream is None:
                     result = await self.agent.run(prompt, **options)
                 else:
@@ -400,8 +495,21 @@ class Executor:
             except UnexpectedModelBehavior:
                 raise GalaxieError('executor_error') from None
             finally:
-                self._conversations[conversation_id] = position + len(messages)
+                state.position = position + len(messages)
                 _positions.reset(token)
+        if isinstance(result.output, DeferredToolRequests):
+            try:
+                if self.interaction is None:
+                    raise GalaxieError('unsupported')
+                value = _interaction(self.interaction(result.output))
+            except Exception:
+                raise GalaxieError('unsupported') from None
+            identifier = hashlib.sha256(json.dumps([conversation_id, state.pauses]).encode()).hexdigest()
+            state.pauses += 1
+            state.pending = _Pause(position, result.all_messages(), result.output, {'id': identifier, 'value': value})
+            if on_stream is not None:
+                on_stream('updates', {'kind': 'deferred'})
+            return None
         return _json(self.output(result.output) if self.output else result.output)
 
 

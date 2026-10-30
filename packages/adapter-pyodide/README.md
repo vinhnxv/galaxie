@@ -1,7 +1,7 @@
 # @galaxie/adapter-pyodide
 
-An experimental executor adapter for trusted LangGraph Python graphs running in a
-dedicated Pyodide 314.0.7 module Worker. The graph uses the Python `galaxie` proxies;
+An experimental executor adapter for trusted LangGraph Python graphs and pydantic-ai
+agents running in a dedicated Pyodide 314.0.7 module Worker. Agents use the Python `galaxie` proxies;
 the existing JavaScript router and broker own routing, consent, labels, budgets,
 credentials, output checks and capability authorization.
 
@@ -124,6 +124,52 @@ build metadata defeats these artifact checks.
 See [coding guidance](AGENTS.md) and the [rag-browser example](../../examples/rag-browser/README.md)
 for setup and the measured verification limits. Tests use synthetic fixtures and
 mock models, with no real model or corpus download.
+
+For trusted pydantic-ai agents, select `framework: 'pydantic-ai'` and executor
+`pydantic-ai-python`. The entry returns an `Agent` or `galaxie.pydantic_ai.Executor`.
+The pinned runtime uses `pydantic-ai-slim==2.60.0` and `pydantic-graph==2.60.0`,
+without provider SDKs. Use `GalaxieModel(role)` for routed model calls and
+`capability_tool(...)` for broker-bound tools. JavaScript checks reply text,
+tool-call arguments, IDs and names on every growing chunk and at completion.
+Only checked reply text reaches `messages`; tool arguments and results do not.
+
+This executor declares `streaming`, `interrupts` and `resume` true; `checkpoints`
+and `subgraphs` remain false. Pending conversations live in Worker memory only.
+Cancellation or Worker loss discards pending state; subsequent pending/resume
+fails `unavailable`. Reload restore and a durable checkpoint service are unsupported.
+
+Include `DeferredToolRequests` in the agent's output types to pause on
+`requires_approval` or `CallDeferred`. Wrap the agent in `Executor(agent,
+interaction=..., resume=...)`. The author's synchronous `interaction(requests)`
+returns one `{ surfaceId, viewRevision, component, props }` request for all deferred
+calls in that response. Invalid requests fail with fixed `unsupported` errors.
+JavaScript still applies UI bindings, URL policy and accepted/consumed submission
+handling. Deferred arguments in display props must be checked text:
+use `call.args_as_json_str()` as text, never parse it into display directives or HTML.
+
+`pending(sessionId)` returns that interaction, and resume must name its interaction
+ID. Each pause gets an ID derived from the session's conversation identity and pause
+ordinal. Wrong or answered IDs fail `stale` without executing tools. Model tool-call
+IDs remain unique within retained conversation history; fresh starts in the same
+session may reuse them while receiving distinct interaction IDs and effect scopes.
+
+Without an author `resume`, the only accepted actions are exact `approve` and
+`deny`, with payload `{ "toolCallIds": ["every-pending-approval-id"] }`. The list
+must cover all approvals exactly once, with no external deferred calls. Approval
+executes the tools; denial supplies native denial results to the model. Unknown
+actions or incomplete payloads fail `invalid` without running a tool. For mixed
+decisions or external results, synchronous `resume(requests, action, payload)` must
+return `DeferredToolResults` covering every approval and external call exactly;
+the Python `Executor` rejects missing, extra or invalid results before execution. The
+author owns payload interpretation; the host binds its actions and payload schemas.
+Tool-call IDs must be unique across the history retained through an approve/resume
+chain, so a model that repeats an ID such as `call_0` within one chain fails
+`invalid`; a fresh start may reuse it.
+
+The [pydantic-ai matrix](../../tests/conformance/compatibility-matrix-pydantic-ai.json)
+records the native CPython, Node Pyodide and real headless Chromium cases. The
+deterministic mock still cannot script prompted-output retries whose
+`RetryPromptPart` has no tool name; deferred-tool resume does not need that path.
 
 The maintained RAG transcript matches across native CPython 3.14, Pyodide on Node
 and Chromium, and the JavaScript graph on Node and Chromium. A separate Chromium

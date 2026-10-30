@@ -191,8 +191,8 @@ test('framework selection declares only the implemented features and selects the
   expect(adapter.id).toBe('pydantic-ai-python');
   expect(adapter.features).toEqual({
     streaming: true,
-    interrupts: false,
-    resume: false,
+    interrupts: true,
+    resume: true,
     checkpoints: false,
     subgraphs: false,
   });
@@ -1067,74 +1067,98 @@ const interactionRequest = {
   props: { question: 'Continue?' },
 };
 
-test('reads committed pending state, resumes by ID and refuses an already answered interaction', async () => {
-  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
-  const workers: FixtureWorker[] = [];
-  const agent = await setup(workers).prepare(
-    descriptor,
-    { chatModels: { model: model() } },
-    preparation,
-  );
-  const worker = workers[0];
-  if (!worker) throw new Error('Missing fixture Worker.');
-  worker.handle = (message) => {
-    if (message.kind !== 'request' || message.op !== 'run') return;
-    const payload = message.payload as { resume?: unknown; threadId: string };
-    expect(payload.threadId).toBe('session');
-    if (payload.resume) {
-      expect(payload.resume).toEqual({
-        interactionId: 'pending-id',
+test.each([undefined, 'pydantic-ai'] as const)(
+  'reads pending state and resumes once: %s',
+  async (framework) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const agent = await setup(workers, framework).prepare(
+      descriptor,
+      { chatModels: { model: model() } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('Missing fixture Worker.');
+    worker.handle = (message) => {
+      if (message.kind !== 'request' || message.op !== 'run') return;
+      const payload = message.payload as { resume?: unknown; threadId: string };
+      expect(payload.threadId).toBe('session');
+      if (payload.resume) {
+        expect(payload.resume).toEqual({
+          interactionId: 'pending-id',
+          action: 'submit',
+          payload: false,
+        });
+        worker.pendingData = { interrupts: [] };
+        worker.emit(success(message, { output: { answer: false } }, 'result'));
+      } else {
+        worker.pendingData = {
+          interrupts: [{ id: 'pending-id', value: interactionRequest }],
+        };
+        worker.emit(success(message, { interrupted: true }, 'result'));
+      }
+    };
+    const initial = request().request;
+    expect(await collect(agent.run(initial))).toEqual([
+      {
+        type: 'interaction',
+        interaction: {
+          interactionId: 'pending-id',
+          ...interactionRequest,
+        },
+      },
+    ]);
+    expect(await agent.pending(initial.sessionId)).toEqual({
+      interactionId: 'pending-id',
+      ...interactionRequest,
+    });
+    const resumed: RunRequest = {
+      ...initial,
+      command: {
+        type: 'resume',
+        interactionId: 'pending-id' as never,
         action: 'submit',
         payload: false,
-      });
-      worker.pendingData = { interrupts: [] };
-      worker.emit(success(message, { output: { answer: false } }, 'result'));
-    } else {
-      worker.pendingData = {
-        interrupts: [{ id: 'pending-id', value: interactionRequest }],
-      };
-      worker.emit(success(message, { interrupted: true }, 'result'));
+      },
+    };
+    if (framework === 'pydantic-ai') {
+      expect(
+        await collect(
+          agent.run({
+            ...resumed,
+            command: {
+              type: 'resume',
+              interactionId: 'wrong' as never,
+              action: 'submit',
+              payload: false,
+            },
+          }),
+        ),
+      ).toEqual([
+        { type: 'error', error: { code: 'stale', message: 'The request targets stale state.' } },
+      ]);
+      expect(worker.sent.filter((message) => message.op === 'run')).toHaveLength(1);
     }
-  };
-  const initial = request().request;
-  expect(await collect(agent.run(initial))).toEqual([
-    {
-      type: 'interaction',
-      interaction: {
-        interactionId: 'pending-id',
-        ...interactionRequest,
+    expect(await collect(agent.run(resumed))).toEqual([
+      { type: 'output', output: { answer: false } },
+    ]);
+    expect(await agent.pending(initial.sessionId)).toBeUndefined();
+    expect(await collect(agent.run(resumed))).toEqual([
+      {
+        type: 'error',
+        error: {
+          code: framework === 'pydantic-ai' ? 'stale' : 'unsupported',
+          message:
+            framework === 'pydantic-ai'
+              ? 'The request targets stale state.'
+              : 'This operation is unsupported.',
+        },
       },
-    },
-  ]);
-  expect(await agent.pending(initial.sessionId)).toEqual({
-    interactionId: 'pending-id',
-    ...interactionRequest,
-  });
-  const resumed: RunRequest = {
-    ...initial,
-    command: {
-      type: 'resume',
-      interactionId: 'pending-id' as never,
-      action: 'submit',
-      payload: false,
-    },
-  };
-  expect(await collect(agent.run(resumed))).toEqual([
-    { type: 'output', output: { answer: false } },
-  ]);
-  expect(await agent.pending(initial.sessionId)).toBeUndefined();
-  expect(await collect(agent.run(resumed))).toEqual([
-    {
-      type: 'error',
-      error: {
-        code: 'unsupported',
-        message: 'This operation is unsupported.',
-      },
-    },
-  ]);
-  expect(worker.sent.filter((message) => message.op === 'run')).toHaveLength(2);
-  await agent.dispose();
-});
+    ]);
+    expect(worker.sent.filter((message) => message.op === 'run')).toHaveLength(2);
+    await agent.dispose();
+  },
+);
 
 test('pending rejects parallel, ID-less and static interrupts and validates the request in JavaScript', async () => {
   vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
@@ -1172,12 +1196,17 @@ test('pending rejects parallel, ID-less and static interrupts and validates the 
   await agent.dispose();
 });
 
-test.each(['abort', 'crash'] as const)(
-  'lost paused state after %s fails unavailable without booting a fresh Worker',
-  async (reason) => {
+test.each([
+  [undefined, 'abort'],
+  [undefined, 'crash'],
+  ['pydantic-ai', 'abort'],
+  ['pydantic-ai', 'crash'],
+] as const)(
+  'lost paused state for %s after %s fails unavailable without booting a fresh Worker',
+  async (framework, reason) => {
     vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
     const workers: FixtureWorker[] = [];
-    const agent = await setup(workers).prepare(
+    const agent = await setup(workers, framework).prepare(
       descriptor,
       { chatModels: { model: model() } },
       preparation,

@@ -276,5 +276,411 @@
         "text": "First never returned."
       }
     ]
+  },
+  "approval-approve": {
+    "prompt": "approval approve",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The deferred result is ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "approval-deny": {
+    "prompt": "approval deny",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The deferred result is ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "approval-mixed": {
+    "prompt": "approval mixed",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          },
+          {
+            "id": "approval_2",
+            "name": "double",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The deferred result is ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "resolve",
+        "payload": {
+          "approvals": {
+            "approval_1": true,
+            "approval_2": false
+          }
+        }
+      }
+    ]
+  },
+  "call-deferred": {
+    "prompt": "call deferred",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "external",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The deferred result is ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "resolve",
+        "payload": {
+          "calls": {
+            "approval_1": {
+              "value": 6
+            }
+          }
+        }
+      }
+    ]
+  },
+  "approval-stale": {
+    "prompt": "approval stale",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "approval-invalid-action": {
+    "prompt": "approval invalid action",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
+    ],
+    "answers": [
+      {
+        "action": "other",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "approval-incomplete": {
+    "prompt": "approval incomplete",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": []
+        }
+      }
+    ]
+  },
+  "approval-invalid-interaction": {
+    "prompt": "approval invalid interaction",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "approval-double-submit": {
+    "prompt": "approval double submit",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The deferred result is ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "approval-consecutive": {
+    "prompt": "approval consecutive",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_2",
+            "name": "double",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The deferred result is ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      },
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_2"]
+        }
+      }
+    ]
+  },
+  "approval-repeated-ids": {
+    "prompt": "approval repeated ids",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The deferred result is ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "approval-argument-block": {
+    "prompt": "approval argument block",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": "BLOCKED_ARGUMENT"
+            }
+          }
+        ]
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "stream-approval-approve": {
+    "prompt": "stream approval approve",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The deferred result is ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
+  },
+  "stream-approval-argument-block": {
+    "prompt": "stream approval argument block",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "args": {
+              "value": "BLOCKED_ARGUMENT"
+            }
+          }
+        ]
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "toolCallIds": ["approval_1"]
+        }
+      }
+    ]
   }
 }

@@ -2,15 +2,19 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from pydantic import BaseModel
-from pydantic_ai import Agent, PromptedOutput
+from pydantic_ai import Agent, CallDeferred, DeferredToolRequests, DeferredToolResults, PromptedOutput, Tool
 
-from galaxie.pydantic_ai import GalaxieModel, capability_tool
+from galaxie.pydantic_ai import Executor, GalaxieModel, capability_tool
 
 CASES = (
     'plain-text', 'capability', 'sequential-tools', 'tool-output', 'output-retry',
     'prompted-output', 'capability-denial', 'argument-block', 'abort',
     'stream-text', 'stream-tools', 'stream-tool-output', 'stream-output-retry',
     'stream-id-block', 'stream-mid-block', 'stream-final-mismatch', 'stream-abort',
+    'approval-approve', 'approval-deny', 'approval-mixed', 'call-deferred',
+    'approval-stale', 'approval-invalid-action', 'approval-incomplete', 'approval-invalid-interaction',
+    'approval-double-submit', 'approval-consecutive', 'approval-repeated-ids',
+    'approval-argument-block', 'stream-approval-approve', 'stream-approval-argument-block',
 )
 PARAMETERS = {'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'], 'additionalProperties': False}
 
@@ -23,6 +27,27 @@ def factory(name, model=None):
     if name not in CASES:
         raise ValueError('The conformance case is unknown.')
     tool = capability_tool('double', 'math.double@1', PARAMETERS, 'Double an integer.')
+    if name.startswith('approval-') or name.startswith('stream-approval-') or name == 'call-deferred':
+        tool.requires_approval = True
+        if name == 'call-deferred':
+            async def external(**arguments):
+                raise CallDeferred()
+            tool = Tool.from_schema(external, name='external', description='External result.', json_schema=PARAMETERS)
+        agent = Agent(
+            model or GalaxieModel('answer'), output_type=[str, DeferredToolRequests], tools=[tool],
+            instructions='Use the supplied tools and answer briefly.', system_prompt='You are a deterministic fixture.',
+            retries=1, name='conformance',
+        )
+        def interaction(requests):
+            if name == 'approval-invalid-interaction':
+                return {'surfaceId': 'main', 'viewRevision': 'approval-1', 'component': 'invalid', 'props': {}}
+            return {'surfaceId': 'main', 'viewRevision': 'approval-1', 'component': 'tests.Approval/v1', 'props': {
+                'calls': [{'id': call.tool_call_id, 'name': call.tool_name, 'arguments': call.args_as_json_str()}
+                          for call in requests.approvals + requests.calls],
+            }}
+        def resume(requests, action, payload):
+            return DeferredToolResults(**payload)
+        return Executor(agent, interaction=interaction, resume=resume if name in ('approval-mixed', 'call-deferred') else None)
     tools = [tool] if name in ('capability', 'sequential-tools', 'capability-denial', 'argument-block', 'stream-tools', 'stream-id-block') else []
     output_type = PromptedOutput(Answer) if name == 'prompted-output' else Answer if name in ('tool-output', 'output-retry', 'stream-tool-output', 'stream-output-retry') else str
     if name == 'stream-final-mismatch' and model is None:

@@ -13,7 +13,7 @@ import socket
 import sys
 from unittest.mock import patch
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
 from pydantic_ai.messages import (
     ModelResponse, ModelResponseStreamEvent, PartDeltaEvent, PartStartEvent,
     TextPart, TextPartDelta, ToolCallPart,
@@ -25,6 +25,7 @@ from pydantic_ai.usage import RequestUsage
 from pydantic_core import to_jsonable_python
 
 from galaxie import GalaxieError, capabilities
+from galaxie.pydantic_ai import Executor
 
 suite_spec = importlib.util.spec_from_file_location('pydantic_conformance_suite', Path(__file__).with_name('suite.py'))
 if suite_spec is None or suite_spec.loader is None:
@@ -88,6 +89,66 @@ class NativeStream(StreamedResponse):
         return self.response.timestamp
 
 
+async def run_agent(agent, prompt, options, streams=None):
+    if streams is None:
+        return await agent.run(prompt, **options)
+    request_index = 0
+    async with agent.iter(prompt, **options) as run:
+        async for node in run:
+            if Agent.is_model_request_node(node):
+                streams.append({'mode': 'updates', 'data': {'kind': 'model-request', 'index': request_index}})
+                request_index += 1
+                async with node.stream(run.ctx) as events:
+                    async for event in events:
+                        if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                            text = event.part.content
+                        elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                            text = event.delta.content_delta
+                        else:
+                            continue
+                        if text:
+                            streams.append({'mode': 'messages', 'data': [{'type': 'ai', 'content': text}, {}]})
+            elif Agent.is_call_tools_node(node):
+                for index, part in enumerate(node.model_response.parts):
+                    if isinstance(part, ToolCallPart):
+                        streams.append({'mode': 'updates', 'data': {'kind': 'tool-call', 'name': part.tool_name, 'index': index}})
+        if run.result is None:
+            raise GalaxieError('executor_error')
+        return run.result
+
+
+async def run_deferred(executor, spec, name, transcript):
+    pause = 0
+    for _ in range(2 if name == 'approval-repeated-ids' else 1):
+        result = await run_agent(executor.agent, spec['prompt'], {'conversation_id': 'conformance'}, transcript.get('streams'))
+        answer_index = 0
+        while isinstance(result.output, DeferredToolRequests):
+            requests = result.output
+            if name == 'approval-invalid-interaction':
+                raise GalaxieError('unsupported')
+            if 'streams' in transcript:
+                transcript['streams'].append({'mode': 'updates', 'data': {'kind': 'deferred'}})
+            transcript['interactions'].append({'interactionId': f'pause-{pause}', **executor.interaction(requests)})
+            pause += 1
+            if name == 'approval-stale':
+                raise GalaxieError('stale')
+            answer = spec['answers'][answer_index]
+            answer_index += 1
+            if name == 'approval-double-submit':
+                transcript['dispatches'] = ['accepted', 'rejected:duplicate']
+            if name in ('approval-mixed', 'call-deferred'):
+                results = DeferredToolResults(**answer['payload'])
+            else:
+                ids = [call.tool_call_id for call in requests.approvals]
+                if answer['action'] not in ('approve', 'deny') or answer['payload'] != {'toolCallIds': ids}:
+                    raise GalaxieError('invalid')
+                results = DeferredToolResults(approvals={identifier: answer['action'] == 'approve' for identifier in ids})
+            result = await run_agent(executor.agent, None, {
+                'conversation_id': 'conformance', 'message_history': result.all_messages(), 'deferred_tool_results': results,
+            }, transcript.get('streams'))
+        transcript['output'] = to_jsonable_python(result.output)
+
+
 async def _run_case(name):
     spec = json.loads(Path(__file__).with_name('fixtures.json').read_text())[name]
     transcript = {'requests': [], 'responses': [], 'capabilities': [], 'interactions': [], 'output': None, 'error': None}
@@ -138,10 +199,10 @@ async def _run_case(name):
             transcript['requests'].append(normalized(request))
             if name == 'abort':
                 raise asyncio.CancelledError()
-            entry = spec['replies'][len(transcript['responses'])]
+            entry = spec['replies'][len(transcript['responses']) % len(spec['replies'])]
             response = {'content': entry['text'], 'toolCalls': entry.get('toolCalls', [])}
             transcript['responses'].append(normalized(response))
-            if name == 'argument-block':
+            if name == 'argument-block' or name.endswith('approval-argument-block'):
                 raise GalaxieError('denied')
             return ModelResponse(
                 parts=([TextPart(entry['text'])] if entry['text'] else []) + [
@@ -161,33 +222,11 @@ async def _run_case(name):
     Agent.instrument_all(False)
     try:
         agent = suite.factory(name, ScriptedModel())
-        if streaming:
-            request_index = 0
-            async with agent.iter(spec['prompt'], conversation_id='conformance') as run:
-                async for node in run:
-                    if Agent.is_model_request_node(node):
-                        transcript['streams'].append({'mode': 'updates', 'data': {'kind': 'model-request', 'index': request_index}})
-                        request_index += 1
-                        async with node.stream(run.ctx) as events:
-                            async for event in events:
-                                if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
-                                    text = event.part.content
-                                elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
-                                    text = event.delta.content_delta
-                                else:
-                                    continue
-                                if text:
-                                    transcript['streams'].append({'mode': 'messages', 'data': [{'type': 'ai', 'content': text}, {}]})
-                    elif Agent.is_call_tools_node(node):
-                        for index, part in enumerate(node.model_response.parts):
-                            if isinstance(part, ToolCallPart):
-                                transcript['streams'].append({'mode': 'updates', 'data': {'kind': 'tool-call', 'name': part.tool_name, 'index': index}})
-                result = run.result
-                if result is None:
-                    raise GalaxieError('executor_error')
+        if isinstance(agent, Executor):
+            await run_deferred(agent, spec, name, transcript)
         else:
-            result = await agent.run(spec['prompt'], conversation_id='conformance')
-        transcript['output'] = to_jsonable_python(result.output)
+            result = await run_agent(agent, spec['prompt'], {'conversation_id': 'conformance'}, transcript.get('streams'))
+            transcript['output'] = to_jsonable_python(result.output)
     except asyncio.CancelledError:
         transcript['error'] = {'code': 'cancelled', 'message': 'The run was cancelled.'}
     except GalaxieError as error:
