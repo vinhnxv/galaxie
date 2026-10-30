@@ -84,6 +84,21 @@ list describes that historical slice; current evidence below takes precedence.
 | AT-35 | Interrupt limits | automated | [adapter.node.test.ts](../tests/conformance/adapter.node.test.ts): `rejects the %s interrupt shape`; [galaxie.test.ts](../tests/conformance/galaxie.test.ts): `%s differences exactly match the compatibility matrix` (interrupt-subgraph case); [subgraph-effects.test.ts](../tests/conformance/subgraph-effects.test.ts): `AT-35: parent effects before a child interrupt replay only with recovery (recovery=%s)`; [subgraph-effect-scopes.test.ts](../tests/conformance/subgraph-effect-scopes.test.ts): `AT-35: recovery preserves parent write receipts across %s` | Simultaneous interrupts are rejected. On Node/Chromium, recovery with explicit node config gives two parent bodies but one host write, replaying the successful receipt under the same task-scoped effect ID. Restore uses a fresh instance and, in Chromium, a reopened IndexedDB saver. Two writes in one parent task have distinct stable ordinals; nested child tasks and later tasks have distinct IDs. Without recovery, the host write still runs twice. Call order within a task must be deterministic; effects outside the broker are not deduplicated ([limits](unsupported.md#execution-and-langgraph)). |
 | AT-36 | Trace spans | automated | [tracing.test.ts](../tests/conformance/tracing.test.ts): `AT-36 one real graph contains run, node, routed model and capability spans in one tree`; [tracing.test.ts](../tests/conformance/tracing.test.ts): `AT-36 failed model and capability spans omit errors and credentials with text opt-in %s`; [tracing.test.ts](../tests/conformance/tracing.test.ts): `development trace text requires opt-in and a label-allowed destination`; [tracing.test.ts](../tests/conformance/tracing.test.ts): `duplicate browser-only destinations still exclude trace text`; [no-network.test.ts](../tests/conformance/no-network.test.ts): `a real adapter success, failure and cancellation lifecycle makes no outbound request without an SDK` | In-memory exporter and mock models; no live collector/exporter connection. Host-only raw diagnostic errors must never be exported as telemetry. |
 
+## Accessibility evidence
+
+The keyboard, focus, labels and error-state requirement in
+[brief §17](galaxie-project-brief.md#testing-and-evidence) has headless Chromium
+evidence in [education-a11y.test.tsx](../tests/conformance/education-a11y.test.tsx):
+`%s supports keyboard completion, rejection and retry` exercises Quiz and
+WritingPrompt through `AgentSurface`, with real Tab, arrow, Space, typing and
+Enter events. It checks accessible names, disabled controls allowing Tab to leave,
+fixed rejection alerts, alert focus, retained selections/drafts and clearing on
+resubmit. The same file covers every error code, clearing on idle/submitting/accepted,
+no initial focus movement (including initial rejection under Strict Mode) and no
+repeated focus movement within rejection. Dispatch status identifies no invalid
+field, so the documented focus target is the alert. Tests use a fake instance and
+call no model; screen readers and a broader accessibility audit remain unmeasured.
+
 ## Engineering checks
 
 These are the fixed bars in [brief §18](galaxie-project-brief.md#18-verdict-demonstrations-and-engineering-checks-adr-0016), not a release decision.

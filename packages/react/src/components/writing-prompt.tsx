@@ -11,6 +11,7 @@ import {
   defineComponent,
 } from '../registry.js';
 import { longTextSchema, shortTextSchema } from './schemas.js';
+import { SubmissionError } from './submission-error.js';
 
 export interface WritingPromptProps {
   readonly title?: string | undefined;
@@ -74,7 +75,12 @@ function WritingPromptView({
         disabled={busy}
         onChange={(event) => setDraft(event.target.value)}
       />
-      <button type="submit" disabled={busy || sentence.length === 0}>
+      <SubmissionError id={`${inputId}-error`} status={status} />
+      <button
+        type="submit"
+        disabled={busy || sentence.length === 0}
+        aria-describedby={typeof status === 'object' ? `${inputId}-error` : undefined}
+      >
         {actions.submit.label}
       </button>
     </form>
