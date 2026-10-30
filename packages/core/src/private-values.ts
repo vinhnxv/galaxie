@@ -22,3 +22,23 @@ export function containsPrivate(value: string, registered: ReadonlySet<string>):
       return true;
   return false;
 }
+
+function percentDecode(value: string): string {
+  const spaced = value.replaceAll('+', ' ');
+  try {
+    return decodeURIComponent(spaced);
+  } catch {
+    return spaced.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
+      try {
+        return decodeURIComponent(run);
+      } catch {
+        return run;
+      }
+    });
+  }
+}
+
+export function containsPrivateEncoded(value: string, registered: ReadonlySet<string>): boolean {
+  const decoded = percentDecode(value);
+  return [value, decoded, percentDecode(decoded)].some((form) => containsPrivate(form, registered));
+}

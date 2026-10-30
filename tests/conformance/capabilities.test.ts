@@ -10,7 +10,7 @@ import {
   httpCapability,
 } from '@galaxie/core';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { binding, brokerFixture, collect } from '../../packages/core/test/fake-executor.js';
 
@@ -18,6 +18,66 @@ test('classic Zod exposes Standard JSON Schema in this runtime', () => {
   const standard = z.string()['~standard'].jsonSchema;
   expect(typeof standard?.input).toBe('function');
   expect(typeof standard?.output).toBe('function');
+});
+
+test('AT-32 encoded private tool output cannot enter a structured capability argument', async () => {
+  const sentence = 'My private tool output stays here';
+  const candidate = encodeURIComponent(sentence);
+  const invoke = vi.fn(async () => null);
+  let denied: unknown;
+  const fixture = await brokerFixture({
+    requests: {
+      'read@1': {
+        input: z.null(),
+        output: z.string().meta(galaxieField({ label: 'private-user' })),
+        kind: 'read',
+      },
+      'send@1': {
+        input: z.object({
+          handle: z
+            .string()
+            .regex(/^[A-Za-z0-9%]+$/)
+            .max(256),
+        }),
+        output: z.null(),
+        kind: 'read',
+      },
+    },
+    bindings: {
+      'read@1': binding({ invoke: async () => sentence }),
+      'send@1': binding({ destination: 'host-server', invoke }),
+    },
+    scripts: [
+      async function* ({ capabilities }) {
+        const output = await capabilities.call('read@1', null);
+        try {
+          await capabilities.call('send@1', { handle: encodeURIComponent(String(output)) });
+        } catch (error) {
+          denied = error;
+        }
+        yield { type: 'output', output: null };
+      },
+    ],
+  });
+  try {
+    const { runId } = await fixture.instance.start('public input');
+    const events = await collect(fixture.instance.events(runId));
+    expect(fixture.instance.getSnapshot().run).toMatchObject({
+      status: 'succeeded',
+      labels: ['app', 'private-user'],
+    });
+    expect(fixture.scriptErrors).toEqual([]);
+    expect(denied).toBeInstanceOf(GalaxieError);
+    expect(denied).toMatchObject({ code: 'denied', message: 'Policy denied the request.' });
+    expect(denied).not.toHaveProperty('cause');
+    expect(invoke).not.toHaveBeenCalled();
+    expect(fixture.diagnostics).toEqual([]);
+    const observation = JSON.stringify([events, fixture.instance.getSnapshot(), denied]);
+    expect(observation).not.toContain(sentence);
+    expect(observation).not.toContain(candidate);
+  } finally {
+    await fixture.runtime.dispose();
+  }
 });
 test('a real graph calls bound capabilities, denies an unbound call and attributes HTTP in Node and Chromium', async () => {
   const requests: Array<{ url: string; headers: Headers }> = [];

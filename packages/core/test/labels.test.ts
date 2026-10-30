@@ -325,3 +325,86 @@ test('shared label checks cover every default destination and empty labels', () 
     true,
   );
 });
+
+const privateSentence = 'My private sentence stays here';
+const percentEncoded = encodeURIComponent(privateSentence);
+test.each([
+  ['percent', percentEncoded],
+  ['plus', percentEncoded.replaceAll('%20', '+')],
+  ['double', encodeURIComponent(percentEncoded)],
+  ['malformed', `${percentEncoded}%ZZ`],
+  ['double with malformed', `${encodeURIComponent(percentEncoded)}%ZZ`],
+])('broker guards encoded private strings and keys: %s', async (_name, candidate) => {
+  for (const argument of [{ nested: [{ handle: candidate }] }, { [candidate]: 1 }]) {
+    for (const allowed of [false, true]) {
+      const invoke = vi.fn(async (_input: unknown) => null);
+      const schema =
+        'nested' in argument
+          ? z.object({ nested: z.array(z.object({ handle: z.enum([candidate]) })) })
+          : z.record(z.enum([candidate]), z.number());
+      const fixture = await brokerFixture({
+        input: z.string().meta(galaxieField({ label: 'private-user' })),
+        requests: { 'echo@1': { input: schema, output: z.null(), kind: 'read' } },
+        bindings: { 'echo@1': binding({ destination: 'host-server', invoke }) },
+        ...(allowed ? { dataPolicy: { 'private-user': { allow: ['host-server'] } } } : {}),
+        scripts: [
+          async function* ({ capabilities }) {
+            const call = capabilities.call('echo@1', argument);
+            if (allowed) await expect(call).resolves.toBeNull();
+            else {
+              await expect(call).rejects.toMatchObject({
+                code: 'denied',
+                message: 'Policy denied the request.',
+              });
+              await expect(call).rejects.not.toHaveProperty('cause');
+            }
+            yield { type: 'output', output: null };
+          },
+        ],
+      });
+      try {
+        const { runId } = await fixture.instance.start(privateSentence);
+        const events = await collect(fixture.instance.events(runId));
+        expect(fixture.scriptErrors).toEqual([]);
+        expect(invoke).toHaveBeenCalledTimes(allowed ? 1 : 0);
+        if (allowed) expect(invoke.mock.calls[0]?.[0]).toEqual(argument);
+        expect(fixture.diagnostics).toEqual([]);
+        const observation = JSON.stringify([events, fixture.instance.getSnapshot()]);
+        expect(observation).not.toContain(privateSentence);
+        expect(observation).not.toContain(candidate);
+      } finally {
+        await fixture.runtime.dispose();
+      }
+    }
+  }
+});
+
+test('broker allows an unregistered encoded structured value', async () => {
+  const candidate = encodeURIComponent('An unrelated public sentence');
+  const invoke = vi.fn(async () => null);
+  const fixture = await brokerFixture({
+    input: z.string().meta(galaxieField({ label: 'private-user' })),
+    requests: {
+      'echo@1': {
+        input: z.object({ handle: z.enum([candidate]) }),
+        output: z.null(),
+        kind: 'read',
+      },
+    },
+    bindings: { 'echo@1': binding({ destination: 'host-server', invoke }) },
+    scripts: [
+      async function* ({ capabilities }) {
+        await expect(capabilities.call('echo@1', { handle: candidate })).resolves.toBeNull();
+        yield { type: 'output', output: null };
+      },
+    ],
+  });
+  try {
+    const { runId } = await fixture.instance.start(privateSentence);
+    await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  } finally {
+    await fixture.runtime.dispose();
+  }
+});
