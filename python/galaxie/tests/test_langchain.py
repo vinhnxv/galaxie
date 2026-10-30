@@ -36,7 +36,7 @@ def test_model_propagates_a_fixed_denial_without_reply_text():
         return json.dumps({
             "v": message["v"], "kind": "response", "id": message["id"],
             "op": "model", "ok": False,
-            "error": {"code": "denied", "message": "PRIVATE REPLY"},
+            "error": {"code": "denied"},
         })
 
     _bridge.install_transport(transport)

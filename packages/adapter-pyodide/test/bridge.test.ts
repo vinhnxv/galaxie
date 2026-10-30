@@ -4,7 +4,7 @@
 import { expect, test } from 'vitest';
 import { encodeBridge, failure, parseBridge, success } from '../src/bridge.js';
 
-const version = 'galaxie.bridge/v1';
+const version = 'galaxie.bridge/v2';
 const payloads = {
   boot: {
     runtimeUrl: 'https://example.test/python/',
@@ -14,7 +14,8 @@ const payloads = {
     module: 'agent',
     entry: 'create_agent',
   },
-  run: { input: { question: 'hello' }, steps: 4 },
+  run: { input: { question: 'hello' }, steps: 4, threadId: 'session' },
+  pending: { threadId: 'session' },
   model: { role: 'answer', messages: [{ role: 'user', content: 'hello' }], options: {} },
   capability: { name: 'docs.search@1', input: { query: 'hello' }, effectScope: 'node:task' },
   abort: { runId: 'run-1' },
@@ -44,7 +45,7 @@ test('rejects unknown versions, operations, payloads and oversized UTF-8 message
     'not json',
     JSON.stringify({ kind: 'request', id: 'one', op: 'run', payload: payloads.run }),
     JSON.stringify({
-      v: 'galaxie.bridge/v2',
+      v: 'galaxie.bridge/v1',
       kind: 'request',
       id: 'one',
       op: 'run',
@@ -81,8 +82,51 @@ test('rejects unknown versions, operations, payloads and oversized UTF-8 message
       ok: false,
       error: { code: 'unknown', message: 'secret' },
     }),
-    'é'.repeat(524289),
   ]) {
     expect(() => parseBridge(value)).toThrow('The request is invalid.');
   }
+});
+
+test('oversized bridge messages fail unsupported without retaining their content', () => {
+  expect(() => parseBridge('é'.repeat(524289))).toThrow('This operation is unsupported.');
+});
+
+test('v2 resume, pending and notifications have closed payloads', () => {
+  for (const message of [
+    {
+      kind: 'request',
+      op: 'run',
+      payload: {
+        threadId: 's',
+        steps: 4,
+        resume: { interactionId: 'i', action: 'submit', payload: false },
+      },
+    },
+    {
+      kind: 'response',
+      op: 'pending',
+      ok: true,
+      payload: { interrupts: [{ id: 'i', value: {} }] },
+    },
+    { kind: 'response', op: 'result', ok: true, payload: { interrupted: true } },
+    { kind: 'notify', op: 'stream', payload: [[], 'updates', { node: {} }] },
+    { kind: 'notify', op: 'model-chunk', payload: { content: 'checked delta' } },
+  ]) {
+    const raw = JSON.stringify({ v: version, id: 'one', ...message });
+    expect(encodeBridge(parseBridge(raw))).toBe(raw);
+  }
+  for (const message of [
+    {
+      kind: 'request',
+      op: 'run',
+      payload: { ...payloads.run, resume: { interactionId: 'i', action: 'submit', payload: {} } },
+    },
+    { kind: 'request', op: 'pending', payload: { threadId: 's', extra: true } },
+    { kind: 'notify', op: 'pending', payload: {} },
+    { kind: 'notify', op: 'stream', payload: [[], 'unknown', null] },
+    { kind: 'notify', op: 'model-chunk', payload: { content: 'delta', credential: 'secret' } },
+  ])
+    expect(() => parseBridge(JSON.stringify({ v: version, id: 'one', ...message }))).toThrow(
+      'The request is invalid.',
+    );
 });

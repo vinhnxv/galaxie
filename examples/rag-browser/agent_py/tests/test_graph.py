@@ -10,7 +10,8 @@ from rag_agent.graph import create_agent
 from rag_agent.prompt import system_prompt, user_prompt
 
 
-def test_graph_uses_host_proxies_and_projects_its_output():
+def test_graph_uses_host_proxies_and_projects_its_output(monkeypatch):
+    monkeypatch.setattr("rag_agent.graph.checkpointer", lambda: None)
     passages = [{"id": "france", "title": "France", "text": "Paris is the capital.", "score": 1}]
     requests = []
 

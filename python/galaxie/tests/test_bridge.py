@@ -24,7 +24,7 @@ def test_capability_forwards_input_and_full_effect_scope():
     assert recorded[0]["payload"] == {
         "name": "math.double@1", "input": {"value": 21}, "effectScope": "parent:task|child:task"
     }
-    assert recorded[0]["v"] == "galaxie.bridge/v1"
+    assert recorded[0]["v"] == "galaxie.bridge/v2"
     assert recorded[0]["op"] == "capability"
 
 
@@ -50,7 +50,7 @@ def test_malformed_reply_has_fixed_invalid_error(response):
     assert str(error.value) == "The request is invalid."
 
 
-@pytest.mark.parametrize("field,value", [("v", "wrong"), ("op", "unknown")])
+@pytest.mark.parametrize("field,value", [("v", "galaxie.bridge/v1"), ("op", "unknown"), ("kind", "notify")])
 def test_reply_rejects_unknown_version_or_operation(field, value):
     async def transport(raw):
         message = json.loads(raw)
@@ -65,7 +65,7 @@ def test_reply_rejects_unknown_version_or_operation(field, value):
     assert str(error.value) == "The request is invalid."
 
 
-def test_error_ignores_remote_text():
+def test_error_rejects_extra_remote_text():
     async def transport(raw):
         message = json.loads(raw)
         return json.dumps({"v": message["v"], "kind": "response", "id": message["id"], "op": message["op"], "ok": False, "error": {"code": "denied", "message": "PRIVATE REPLY"}})
@@ -73,8 +73,22 @@ def test_error_ignores_remote_text():
     _bridge.install_transport(transport)
     with pytest.raises(GalaxieError) as error:
         asyncio.run(capabilities.call("read@1", {}))
-    assert error.value.code == "denied"
-    assert str(error.value) == "Policy denied the request."
+    assert error.value.code == "invalid"
+    assert str(error.value) == "The request is invalid."
+
+
+def test_unknown_outgoing_operation_is_rejected():
+    with pytest.raises(GalaxieError, match="^The request is invalid\\.$"):
+        asyncio.run(_bridge.request("unknown", {}))
+
+
+def test_oversized_reply_is_unsupported():
+    async def transport(_):
+        return "é" * 524289
+
+    _bridge.install_transport(transport)
+    with pytest.raises(GalaxieError, match="^This operation is unsupported\\.$"):
+        asyncio.run(capabilities.call("read@1", {}))
 
 
 def test_standin_round_trips_the_supported_msgpack_values():

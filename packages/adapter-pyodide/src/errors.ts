@@ -9,7 +9,7 @@ export function adapterFailure(code: ErrorCode): GalaxieError {
 }
 export function failureCode(error: unknown, fallback: ErrorCode = 'executor_error'): ErrorCode {
   return error instanceof BridgeValidationError
-    ? 'invalid'
+    ? error.code
     : isGalaxieError(error)
       ? error.code
       : fallback;

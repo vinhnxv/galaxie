@@ -1,0 +1,783 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 0
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 2
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 3
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 4
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 5
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 6
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 7
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 8
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 9
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 10
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 11
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 12
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 13
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 14
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 15
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 16
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 17
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 18
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 19
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 20
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 21
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 22
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 23
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 24
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 25
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 1
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 2
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 3
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 4
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 5
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 6
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 7
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 8
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 9
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 10
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 11
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 12
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 13
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 14
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 15
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 16
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 17
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 18
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 19
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 20
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 21
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 22
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 23
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 24
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "loop": {
+            "value": 25
+          }
+        }
+      }
+    ],
+    "messages": [],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": null,
+  "state": {
+    "values": {
+      "value": 25
+    },
+    "next": [
+      "loop"
+    ]
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 0
+      },
+      "parentCheckpointId": "<uuid:1>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 1
+      },
+      "parentCheckpointId": "<uuid:2>"
+    },
+    {
+      "metadata": {
+        "step": 2,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 2
+      },
+      "parentCheckpointId": "<uuid:3>"
+    },
+    {
+      "metadata": {
+        "step": 3,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 3
+      },
+      "parentCheckpointId": "<uuid:4>"
+    },
+    {
+      "metadata": {
+        "step": 4,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 4
+      },
+      "parentCheckpointId": "<uuid:5>"
+    },
+    {
+      "metadata": {
+        "step": 5,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 5
+      },
+      "parentCheckpointId": "<uuid:6>"
+    },
+    {
+      "metadata": {
+        "step": 6,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 6
+      },
+      "parentCheckpointId": "<uuid:7>"
+    },
+    {
+      "metadata": {
+        "step": 7,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 7
+      },
+      "parentCheckpointId": "<uuid:8>"
+    },
+    {
+      "metadata": {
+        "step": 8,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 8
+      },
+      "parentCheckpointId": "<uuid:9>"
+    },
+    {
+      "metadata": {
+        "step": 9,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 9
+      },
+      "parentCheckpointId": "<uuid:10>"
+    },
+    {
+      "metadata": {
+        "step": 10,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 10
+      },
+      "parentCheckpointId": "<uuid:11>"
+    },
+    {
+      "metadata": {
+        "step": 11,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 11
+      },
+      "parentCheckpointId": "<uuid:12>"
+    },
+    {
+      "metadata": {
+        "step": 12,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 12
+      },
+      "parentCheckpointId": "<uuid:13>"
+    },
+    {
+      "metadata": {
+        "step": 13,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 13
+      },
+      "parentCheckpointId": "<uuid:14>"
+    },
+    {
+      "metadata": {
+        "step": 14,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 14
+      },
+      "parentCheckpointId": "<uuid:15>"
+    },
+    {
+      "metadata": {
+        "step": 15,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 15
+      },
+      "parentCheckpointId": "<uuid:16>"
+    },
+    {
+      "metadata": {
+        "step": 16,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 16
+      },
+      "parentCheckpointId": "<uuid:17>"
+    },
+    {
+      "metadata": {
+        "step": 17,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 17
+      },
+      "parentCheckpointId": "<uuid:18>"
+    },
+    {
+      "metadata": {
+        "step": 18,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 18
+      },
+      "parentCheckpointId": "<uuid:19>"
+    },
+    {
+      "metadata": {
+        "step": 19,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 19
+      },
+      "parentCheckpointId": "<uuid:20>"
+    },
+    {
+      "metadata": {
+        "step": 20,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 20
+      },
+      "parentCheckpointId": "<uuid:21>"
+    },
+    {
+      "metadata": {
+        "step": 21,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 21
+      },
+      "parentCheckpointId": "<uuid:22>"
+    },
+    {
+      "metadata": {
+        "step": 22,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 22
+      },
+      "parentCheckpointId": "<uuid:23>"
+    },
+    {
+      "metadata": {
+        "step": 23,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 23
+      },
+      "parentCheckpointId": "<uuid:24>"
+    },
+    {
+      "metadata": {
+        "step": 24,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 24
+      },
+      "parentCheckpointId": "<uuid:25>"
+    },
+    {
+      "metadata": {
+        "step": 25,
+        "source": "loop"
+      },
+      "next": [
+        "loop"
+      ],
+      "values": {
+        "value": 25
+      },
+      "parentCheckpointId": "<uuid:26>"
+    }
+  ],
+  "outcome": {
+    "status": "failed",
+    "errorType": "GraphRecursionError"
+  }
+}

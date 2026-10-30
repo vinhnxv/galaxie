@@ -24,4 +24,4 @@ galaxie = { workspace = true }
 ormsgpack = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["galaxie/tests", "../examples/rag-browser/agent_py/tests"]
+testpaths = ["galaxie/tests", "../examples/rag-browser/agent_py/tests", "../tests/conformance/cases-python"]

@@ -71,6 +71,50 @@ Both galaxie lanes import only `/web`. During the first `prepare`, the adapter i
 
 The table lists tested behavior rather than every LangChain context API. The adapter does not import Node context modules or replace an existing context instance.
 
+## Native Python reference
+
+[`cases-python/`](cases-python/) ports all twelve graph cases to the pinned native
+CPython 3.14 and LangGraph Python environment. Its modules expose `INPUT`, `SCRIPT`,
+`RESUMES` and `factory(checkpointer, model, capability, interaction)`. The optional
+ports default to deterministic local fixtures; the Pyodide harness injects galaxie's
+checkpointer and interaction helper. Node names, request values, mock replies and
+re-execution counters follow the JavaScript cases. This reference does not enable
+streaming, durable checkpoints or subgraphs in the Python executor.
+
+[`golden-python/`](golden-python/) contains the independent CPython transcripts:
+the four stream modes and paths, checkpoint history, pending interrupt IDs and
+values, final state and fixed error types. Generated UUIDs and interrupt IDs are
+normalized. Message projections retain only `type`, `content`, `id` and the
+`langgraph_node`/`langgraph_checkpoint_ns` metadata subset. The Python goldens do
+not change the JavaScript goldens or compatibility matrix.
+
+`pnpm test:python` verifies these references, including the interrupting node's
+re-execution and reconstructed-graph counters. Reconstruction shares an in-memory
+saver inside CPython; it proves no browser reload or durable storage. The subgraph
+counter after reconstruction is `{ callSub: 1, s1: 0, sask: 1 }`; the other reload
+references have `{ prepare: 0, ask: 1 }`. Repeating a completed native resume emits
+no node updates and preserves the completed state.
+
+Regenerate intentionally with
+`python/.venv/bin/python -I scripts/record-python-conformance.py`; run it with
+`--check` to compare every encoded golden byte for byte without writing. The
+recorder uses only the installed pinned environment and deterministic fixtures,
+with framework tracing disabled. Review regenerated Python goldens as reference
+changes.
+
+The [Node Pyodide lane](pyodide.node.test.ts) and
+[built Chromium harness](../../examples/rag-browser/test/python-conformance.node.test.ts)
+run the four interrupt cases through the real Python adapter: `interrupt-resume`,
+`interrupt-sequence`, `interrupt-durability-sync` and `interrupt-durability-exit`.
+They compare normalized pending IDs/values and final state/counters with the Python
+goldens, check stable committed-state reads and reject an already answered resume.
+The Chromium page rejects unknown case names with a fixed error and runs under the
+unchanged RAG CSP and Trusted Types policy, blocking external requests. It reuses the
+existing local wheel cache, skips when it is absent locally, and fails in CI if absent.
+These lanes do not compare stream events or checkpoint histories yet; those executor
+features remain disabled. Durability uses memory only, with no browser reload or
+IndexedDB reopen claim. All twelve cases currently run on the native CPython lane.
+
 ## Running the suite
 
 - `pnpm check` runs the repository's license, lint, both TypeScript compilers, Node/Chromium tests, build and dependency checks.
