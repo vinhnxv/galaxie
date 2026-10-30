@@ -11,6 +11,9 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
   plugins: [pythonAssets()],
   resolve: {
     alias: {
+      '@galaxie/storage-indexeddb': fileURLToPath(
+        new URL('../../packages/storage-indexeddb/src/index.ts', import.meta.url),
+      ),
       '@galaxie/adapter-pyodide/worker': fileURLToPath(
         new URL('../../packages/adapter-pyodide/src/worker.ts', import.meta.url),
       ),

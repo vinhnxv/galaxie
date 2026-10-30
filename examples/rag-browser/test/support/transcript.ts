@@ -10,6 +10,7 @@ import type { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';
 import { ragDefinition } from '../../src/agent/definition.js';
 import { createRagAgent } from '../../src/agent/graph.js';
 import type { RagInput, RagOutput, SearchInput, SearchResult } from '../../src/agent/schemas.js';
+import { reviewRegistry } from '../../src/host/review-passages.js';
 import type { IndexedPassage } from '../../src/retrieval/index.js';
 import script from '../golden/script.json' with { type: 'json' };
 import golden from '../golden/session.json' with { type: 'json' };
@@ -20,6 +21,7 @@ export interface TranscriptMessage {
 }
 
 export type TranscriptEntry =
+  | { readonly type: 'interaction'; readonly component: string; readonly props: unknown }
   | { readonly type: 'capability'; readonly name: string; readonly input: SearchInput }
   | {
       readonly type: 'model';
@@ -153,6 +155,7 @@ export async function replayJavaScript(source: ParityScript): Promise<Transcript
   try {
     const instance = await runtime.create(ragDefinition, {
       principalScope: 'fixture',
+      ui: reviewRegistry.bindings({ surfaces: ['rag-review'] }),
       agent: createRagAgent(),
       services: { chatModels: { mock: replay.model } },
       models: {

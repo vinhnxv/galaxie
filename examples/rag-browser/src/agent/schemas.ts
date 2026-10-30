@@ -8,6 +8,7 @@ export type SearchMode = 'fulltext' | 'vector' | 'hybrid';
 export interface RagInput {
   question: string;
   mode: SearchMode;
+  review?: boolean | undefined;
 }
 export interface SearchInput {
   query: string;
@@ -37,7 +38,24 @@ const mode = z.enum(['fulltext', 'vector', 'hybrid']).meta(galaxieField({ shape:
 export const RagInputSchema: z.ZodType<RagInput, RagInput> = z.strictObject({
   question: privateText(4000),
   mode,
+  review: z.boolean().optional(),
 });
+export interface ReviewPassagesProps {
+  passages: { id: string; title: string }[];
+}
+export interface ReviewSubmission {
+  keptIds: string[];
+}
+export const ReviewPassagesSchema: z.ZodType<ReviewPassagesProps, ReviewPassagesProps> = z
+  .strictObject({
+    passages: z.array(z.strictObject({ id: privateText(200), title: z.string().max(200) })).max(10),
+  })
+  .meta(galaxieField({ label: 'private-user' }));
+export const ReviewSubmissionSchema: z.ZodType<ReviewSubmission, ReviewSubmission> = z
+  .strictObject({
+    keptIds: z.array(privateText(200)).max(10),
+  })
+  .meta(galaxieField({ label: 'private-user' }));
 export const SearchInputSchema: z.ZodType<SearchInput, SearchInput> = z.strictObject({
   query: privateText(4000),
   mode,

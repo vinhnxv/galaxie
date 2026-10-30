@@ -10,13 +10,14 @@ import { build, type PreviewServer, preview } from 'vite';
 import { expect, test } from 'vitest';
 import { cspHeader } from '../src/host/csp.js';
 import { missingPythonWheels, pythonWheelsAvailable } from './support/python.node.js';
+import { reviewExpected } from './support/review.js';
 import { assertTranscript, goldenTranscript } from './support/transcript.js';
 
-test.skipIf(!pythonWheelsAvailable)(
+test.skipIf(!pythonWheelsAvailable).each([false, true])(
   pythonWheelsAvailable
-    ? 'Pyodide in Chromium replays the shared behavioral transcript under strict CSP'
+    ? 'Pyodide in Chromium replays the shared behavioral transcript under strict CSP (review=%s)'
     : missingPythonWheels,
-  async () => {
+  async (review) => {
     const directory = await mkdtemp(join(tmpdir(), 'galaxie-python-parity-'));
     const root = fileURLToPath(new URL('./support/python-parity/', import.meta.url));
     const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
@@ -78,7 +79,7 @@ test.skipIf(!pythonWheelsAvailable)(
           bodies.push(response.body().then((body) => ({ path, bytes: body.length })));
       });
       const page = await context.newPage();
-      await page.goto(origin);
+      await page.goto(`${origin}/${review ? '?review' : ''}`, { timeout: 15000 });
       await page.waitForFunction(() => Reflect.get(globalThis, 'pythonParity')?.done, {
         timeout: 60000,
       });
@@ -86,7 +87,7 @@ test.skipIf(!pythonWheelsAvailable)(
       expect(result.error).toBeUndefined();
       expect(typeof result.coldStartMs).toBe('number');
       expect(result.violations).toEqual([]);
-      assertTranscript(result.transcript, goldenTranscript);
+      assertTranscript(result.transcript, review ? reviewExpected : goldenTranscript);
       expect(external).toEqual([]);
       expect(responseHeaders.length).toBeGreaterThan(5);
       expect(responseHeaders.every((value) => value === header)).toBe(true);

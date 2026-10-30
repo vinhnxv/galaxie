@@ -6,20 +6,34 @@ import { createLangGraphAdapter, type LangGraphServices } from '@galaxie/adapter
 import { createPyodideAdapter } from '@galaxie/adapter-pyodide';
 import {
   type AgentInstance,
+  acquireOwnership,
   type CapabilityBinding,
   createRuntime,
   type ModelDescriptor,
   type ModelRouting,
+  type Ownership,
+  type RunId,
   type Runtime,
+  type SessionId,
 } from '@galaxie/core';
 import { BuiltInAIChatModel, checkBuiltInAI, prepareBuiltInAI } from '@galaxie/models/builtin-ai';
 import { loadWebLLMEngine, WebLLMChatModel } from '@galaxie/models/webllm';
+import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import { z } from 'zod';
 import { ragDefinition } from '../agent/definition.js';
 import { pythonRagDefinition } from '../agent/definition-python.js';
 import { createRagAgent } from '../agent/graph.js';
 import type { RagInput, SearchInput, SearchResult } from '../agent/schemas.js';
 import type { RetrievalClient } from '../retrieval/client.js';
+import { reviewRegistry } from './review-passages.js';
 import { createPyodideWorker, createWebLLMWorker } from './trusted-types.js';
+
+const reviewKey = 'galaxie.rag-browser.review';
+const savedReviewSchema = z.strictObject({
+  executor: z.enum(['javascript', 'python']),
+  sessionId: z.string().min(1).max(128),
+});
+type SavedReview = z.infer<typeof savedReviewSchema>;
 
 export interface RagModels {
   chatModels: LangGraphServices['chatModels'];
@@ -32,6 +46,12 @@ export interface RagHost {
   readonly executor: 'javascript' | 'python';
   readonly pythonPhase: 'idle' | 'booting' | 'ready' | 'failed';
   readonly pythonColdStartMs: number | undefined;
+  readonly reviewing: boolean;
+  readonly reviewStatus: 'idle' | 'owner' | 'busy' | 'lost';
+  readonly reviewRestoreFailed: boolean;
+  start(input: RagInput): Promise<{ runId: RunId }>;
+  restoreReview(takeover?: boolean): Promise<void>;
+  startOver(): Promise<void>;
   selectExecutor(executor: 'javascript' | 'python'): Promise<void>;
   cancelPythonBoot(): Promise<void>;
   subscribeExecutor(listener: () => void): () => void;
@@ -57,6 +77,13 @@ export async function createRagHost(
   let pythonColdStartMs: number | undefined;
   let generation = 0;
   let disposed = false;
+  let saver: IndexedDBSaver | undefined;
+  let ownership: Ownership | undefined;
+  let review: AgentInstance<RagInput, unknown> | undefined;
+  let unsubscribeReview: (() => void) | undefined;
+  let reviewStatus: RagHost['reviewStatus'] = 'idle';
+  let reviewRestoreFailed = false;
+  let failedReviewReference: SavedReview | undefined;
   const listeners = new Set<() => void>();
   const publish = (): void => {
     if (!disposed) for (const listener of listeners) listener();
@@ -79,7 +106,7 @@ export async function createRagHost(
       if (disposed || executor !== 'python') return;
       pythonPhase = event.phase;
       if (event.coldStartMs !== undefined) pythonColdStartMs = event.coldStartMs;
-      if (event.phase === 'failed') void leavePython().catch(() => {});
+      if (event.phase === 'failed' && active !== review) void leavePython().catch(() => {});
       publish();
     },
   });
@@ -91,6 +118,120 @@ export async function createRagHost(
       ? { developmentWarnings: (warning) => console.warn('[galaxie]', warning.code) }
       : {}),
   });
+  const pythonAgent = {
+    baseUrl: new URL('/python/agent/', location.href).href,
+    files: [
+      'rag_agent/__init__.py',
+      'rag_agent/graph.py',
+      'rag_agent/citations.py',
+      'rag_agent/prompt.py',
+      'rag_agent/prompt.json',
+    ],
+    module: 'rag_agent.graph',
+    entry: 'create_agent',
+  };
+  const ui = reviewRegistry.bindings({ surfaces: ['rag-review'] });
+  const readSavedReview = (): SavedReview | undefined => {
+    const value = localStorage.getItem(reviewKey);
+    if (value === null) return undefined;
+    const parsed = savedReviewSchema.safeParse(JSON.parse(value));
+    if (!parsed.success) throw new Error('The saved review reference is invalid.');
+    return parsed.data;
+  };
+  const dispose = async (): Promise<void> => {
+    if (disposed) return;
+    disposed = true;
+    generation++;
+    await runtime.dispose();
+    saver?.close();
+    await ownership?.release();
+    listeners.clear();
+  };
+  const openReviewStore = async (takeover = false): Promise<IndexedDBSaver | undefined> => {
+    saver ??= await IndexedDBSaver.open({ appId: 'rag-browser', principalScope: 'visitor' });
+    if (!ownership) {
+      const result = await acquireOwnership({
+        appId: 'rag-browser',
+        fence: saver.fencing,
+        takeover,
+        onHandoverRequest: () => {
+          reviewStatus = 'lost';
+          publish();
+          return dispose();
+        },
+      });
+      if (result.status === 'busy') {
+        reviewStatus = 'busy';
+        publish();
+        return undefined;
+      }
+      ownership = result.ownership;
+      ownership.signal.addEventListener(
+        'abort',
+        () => {
+          if (disposed || ownership?.lostReason === 'released') return;
+          reviewStatus = 'lost';
+          publish();
+          void dispose();
+        },
+        { once: true },
+      );
+    }
+    if (disposed || !(await ownership.verify())) throw new Error('Review ownership was lost.');
+    await saver.sweep();
+    reviewStatus = 'owner';
+    return saver;
+  };
+  const openReview = async (saved?: SavedReview, takeover = false): Promise<boolean> => {
+    const store = await openReviewStore(takeover);
+    if (!store) return false;
+    const common = {
+      principalScope: 'visitor',
+      ...(saved ? { sessionId: saved.sessionId as SessionId } : {}),
+      recovery: store.recovery,
+      models: models.routing,
+      bindings: { 'docs.search@1': search },
+      ui,
+    };
+    review =
+      executor === 'python'
+        ? await runtime.create(pythonRagDefinition, {
+            ...common,
+            agent: pythonAgent,
+            services: { chatModels: models.chatModels, checkpoints: store.byteRecords },
+          })
+        : await runtime.create(ragDefinition, {
+            ...common,
+            agent: createRagAgent(),
+            services: { chatModels: models.chatModels, checkpointer: store },
+          });
+    active = review;
+    reviewStatus = 'owner';
+    const prepared = review;
+    await prepared.prepare();
+    if (disposed || active !== prepared || review !== prepared)
+      throw new Error('The review was closed during preparation.');
+    if (saved) {
+      try {
+        await prepared.restore();
+      } catch {
+        reviewRestoreFailed = true;
+        publish();
+        return true;
+      }
+    }
+    unsubscribeReview = review.subscribe(() => {
+      // Disposal cancels the live run but must retain the durable pending review reference.
+      if (disposed) return;
+      const run = review?.getSnapshot().run;
+      if (run?.status === 'waiting_input')
+        localStorage.setItem(reviewKey, JSON.stringify({ executor, sessionId: review?.sessionId }));
+      else if (run && ['succeeded', 'failed', 'cancelled'].includes(run.status))
+        localStorage.removeItem(reviewKey);
+    });
+    publish();
+    return true;
+  };
   let lastSearchCount: number | undefined;
   const search: CapabilityBinding<SearchInput, SearchResult> = {
     kind: 'read',
@@ -113,10 +254,11 @@ export async function createRagHost(
       services: { chatModels: models.chatModels },
       models: models.routing,
       bindings: { 'docs.search@1': search },
+      ui,
     });
     active = javascript;
     await javascript.prepare();
-    return {
+    const host: RagHost = {
       runtime,
       get instance() {
         return active;
@@ -130,6 +272,76 @@ export async function createRagHost(
       get pythonColdStartMs() {
         return pythonColdStartMs;
       },
+      get reviewing() {
+        return (review !== undefined && active === review) || failedReviewReference !== undefined;
+      },
+      get reviewStatus() {
+        return reviewStatus;
+      },
+      get reviewRestoreFailed() {
+        return reviewRestoreFailed;
+      },
+      async start(input) {
+        if (disposed) throw new Error('The runtime was disposed.');
+        if (input.review) {
+          if (review) await host.startOver();
+          const previous = python;
+          python = undefined;
+          await previous?.dispose();
+          if (!(await openReview())) throw new Error('The review is open in another tab.');
+        } else {
+          const selected = executor;
+          if (selected === 'python' && !python) await host.selectExecutor('python');
+          if (executor !== selected)
+            throw new Error('The requested executor could not be prepared.');
+          active = executor === 'python' ? (python ?? javascript) : javascript;
+          publish();
+        }
+        return active.start(input);
+      },
+      async restoreReview(takeover = false) {
+        let saved = readSavedReview();
+        if (!saved && takeover) {
+          if (!(await openReviewStore(true))) return;
+          saved = readSavedReview();
+          if (!saved) {
+            await ownership?.release();
+            ownership = undefined;
+            reviewStatus = 'idle';
+            publish();
+            return;
+          }
+        }
+        if (!saved) return;
+        if (saved.executor === 'python' && !pythonBuild.available) {
+          if (!(await openReviewStore(takeover))) return;
+          failedReviewReference = saved;
+          reviewRestoreFailed = true;
+          publish();
+          return;
+        }
+        executor = saved.executor;
+        publish();
+        await openReview(saved, takeover);
+      },
+      async startOver() {
+        const sessionId = review?.sessionId ?? failedReviewReference?.sessionId;
+        if (!sessionId || !ownership || !(await ownership.verify()))
+          throw new Error('Review ownership is required.');
+        unsubscribeReview?.();
+        await review?.dispose();
+        await saver?.deleteSession(sessionId);
+        localStorage.removeItem(reviewKey);
+        review = undefined;
+        reviewRestoreFailed = false;
+        failedReviewReference = undefined;
+        active = executor === 'python' ? (python ?? javascript) : javascript;
+        if (executor === 'python' && !python) pythonPhase = 'idle';
+        reviewStatus = 'idle';
+        await ownership.release();
+        ownership = undefined;
+        publish();
+      },
       subscribeExecutor(listener) {
         listeners.add(listener);
         return () => {
@@ -137,6 +349,7 @@ export async function createRagHost(
         };
       },
       async cancelPythonBoot() {
+        if (active === review) return;
         pythonPhase = 'idle';
         await leavePython();
       },
@@ -155,21 +368,11 @@ export async function createRagHost(
         try {
           const next = await runtime.create(pythonRagDefinition, {
             principalScope: 'visitor',
-            agent: {
-              baseUrl: new URL('/python/agent/', location.href).href,
-              files: [
-                'rag_agent/__init__.py',
-                'rag_agent/graph.py',
-                'rag_agent/citations.py',
-                'rag_agent/prompt.py',
-                'rag_agent/prompt.json',
-              ],
-              module: 'rag_agent.graph',
-              entry: 'create_agent',
-            },
+            agent: pythonAgent,
             services: { chatModels: models.chatModels },
             models: models.routing,
             bindings: { 'docs.search@1': search },
+            ui,
           });
           if (disposed || current !== generation) {
             await next.dispose();
@@ -191,15 +394,12 @@ export async function createRagHost(
         }
       },
       getLastSearchCount: () => lastSearchCount,
-      async dispose() {
-        disposed = true;
-        generation++;
-        await runtime.dispose();
-        listeners.clear();
-      },
+      dispose,
     };
+    await host.restoreReview();
+    return host;
   } catch (error) {
-    await runtime.dispose();
+    await dispose();
     throw error;
   }
 }
