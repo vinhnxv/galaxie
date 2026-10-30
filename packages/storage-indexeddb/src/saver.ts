@@ -21,6 +21,7 @@ import {
   WRITES_IDX_MAP,
   writesSortKey,
 } from '@langchain/langgraph-checkpoint';
+import { type ByteCheckpointPort, parseByteRequest } from './byte-records.js';
 import { decode, type Envelope, encode } from './envelope.js';
 import { StorageError, type StorageErrorCode } from './errors.js';
 import { Fencing, generation } from './fencing.js';
@@ -68,6 +69,8 @@ export interface IndexedDBSaverOptions {
 }
 
 interface CheckpointRecord {
+  readonly executor?: 'langgraph-python';
+  readonly timestamp?: string;
   readonly v: 1;
   readonly key: CheckpointKey;
   readonly thread: string[];
@@ -81,6 +84,8 @@ interface CheckpointRecord {
 }
 
 interface WriteRecord {
+  readonly executor?: 'langgraph-python';
+  readonly interruptIds?: readonly string[];
   readonly v: 1;
   readonly key: [...CheckpointKey, string, number];
   readonly thread: string[];
@@ -121,7 +126,9 @@ function readCheckpoint(value: unknown): CheckpointRecord {
     !('metadata' in value) ||
     !(value['parentId'] === null || typeof value['parentId'] === 'string') ||
     !positive(value['threadOrder']) ||
-    !positive(value['namespaceOrder'])
+    !positive(value['namespaceOrder']) ||
+    ('executor' in value &&
+      (value['executor'] !== 'langgraph-python' || exportTimestamp(value['timestamp']) === null))
   )
     throw new StorageError('corrupt');
   return value as unknown as CheckpointRecord;
@@ -140,7 +147,11 @@ function readWrite(value: unknown): WriteRecord {
     typeof value['channel'] !== 'string' ||
     typeof value['taskPath'] !== 'string' ||
     !positive(value['order']) ||
-    !('value' in value)
+    !('value' in value) ||
+    ('executor' in value &&
+      (value['executor'] !== 'langgraph-python' ||
+        !Array.isArray(value['interruptIds']) ||
+        !value['interruptIds'].every((id: unknown) => typeof id === 'string' && id.length > 0)))
   )
     throw new StorageError('corrupt');
   return value as unknown as WriteRecord;
@@ -164,6 +175,7 @@ function compareWrites(a: WriteRecord, b: WriteRecord): number {
 /** Serializer-backed checkpoints; the host owns session identity and connection lifetime. */
 export class IndexedDBSaver extends BaseCheckpointSaver {
   readonly recovery: IndexedDBRecovery;
+  readonly byteRecords: ByteCheckpointPort;
   readonly #fencing: Fencing;
   readonly #db: IDBDatabase;
   readonly #scope: [string, string];
@@ -175,6 +187,9 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     this.#scope = [options.appId, options.principalScope];
     this.#fencing = fencing;
     this.recovery = new IndexedDBRecovery(db, this.#scope, fencing);
+    this.byteRecords = Object.freeze({
+      request: (value: unknown): Promise<unknown> => this.#byteRequest(value),
+    });
   }
 
   get fencing(): Pick<Fencing, 'claim' | 'current'> {
@@ -294,11 +309,20 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
       const saved = await transact(this.#db, ['checkpoints', 'writes'], 'readonly', async (tx) => {
         const store = tx.objectStore('checkpoints');
         const key = this.#key(thread, namespace, id);
-        const raw: unknown = id
-          ? await requestResult(store.get(key))
-          : (await requestResult(store.openCursor(prefixRange(key.slice(0, 4)), 'prev')))?.value;
+        let raw: unknown;
+        if (id) raw = await requestResult(store.get(key));
+        else {
+          let cursor = await requestResult(store.openCursor(prefixRange(key.slice(0, 4)), 'prev'));
+          while (cursor && readCheckpoint(cursor.value).executor !== undefined) {
+            const request = cursor.request;
+            cursor.continue();
+            cursor = await requestResult(request);
+          }
+          raw = cursor?.value;
+        }
         if (raw === undefined) return undefined;
         const row = readCheckpoint(raw);
+        if (row.executor !== undefined) return undefined;
         const storeWrites = tx.objectStore('writes');
         const writes: unknown[] = await requestResult(storeWrites.getAll(prefixRange(row.key)));
         const parent: unknown[] =
@@ -337,6 +361,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
       });
       let limit = options?.limit;
       for (const row of saved.rows.sort(compareCheckpoints)) {
+        if (row.executor !== undefined) continue;
         if (namespace !== undefined && row.key[3] !== namespace) continue;
         if (id && row.key[4] !== id) continue;
         if (typeof before === 'string' && before && row.key[4] >= before) continue;
@@ -383,51 +408,71 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         encode(this.serde, copyCheckpoint(checkpoint)),
         encode(this.serde, metadata),
       ]);
-      const key = this.#key(thread, namespace, checkpoint.id);
-      await this.#fencing.write(['checkpoints', 'meta'], async (tx) => {
-        const meta = tx.objectStore('meta');
-        const sequenceKey = [...this.#scope, 'sequence'];
-        const current: unknown = await requestResult(meta.get(sequenceKey));
-        if (
-          current !== undefined &&
-          (!object(current) || current['v'] !== 1 || !positive(current['sequence']))
-        )
-          throw new StorageError('corrupt');
-        let sequence = object(current) ? (current['sequence'] as number) : 0;
-        const order = async (key: string[]): Promise<number> => {
-          const stored: unknown = await requestResult(meta.get(key));
-          if (stored !== undefined) {
-            if (!object(stored) || stored['v'] !== 1 || !positive(stored['order']))
-              throw new StorageError('corrupt');
-            return stored['order'];
-          }
-          sequence++;
-          if (!positive(sequence)) throw new StorageError('unavailable');
-          await requestResult(meta.put({ v: 1, order: sequence }, key));
-          return sequence;
-        };
-        const threadOrder = await order([...this.#scope, 'thread', thread]);
-        const namespaceOrder = await order([...this.#scope, 'namespace', thread, namespace]);
-        await requestResult(meta.put({ v: 1, sequence }, sequenceKey));
-        const savedAt = storageClock.now();
-        await touchSession(tx, this.#scope, thread, savedAt);
-        const row: CheckpointRecord = {
-          savedAt,
-          v: 1,
-          key,
-          thread: key.slice(0, 3),
-          namespace: key.slice(0, 4),
-          checkpoint: encodedCheckpoint,
-          metadata: encodedMetadata,
-          parentId: parent ?? null,
-          threadOrder,
-          namespaceOrder,
-        };
-        await requestResult(tx.objectStore('checkpoints').put(row));
-      });
+      await this.#storeCheckpoint(
+        thread,
+        namespace,
+        checkpoint.id,
+        parent ?? null,
+        encodedCheckpoint,
+        encodedMetadata,
+      );
       return {
         configurable: { thread_id: thread, checkpoint_ns: namespace, checkpoint_id: checkpoint.id },
       };
+    });
+  }
+
+  async #storeCheckpoint(
+    thread: string,
+    namespace: string,
+    id: string,
+    parentId: string | null,
+    checkpoint: Envelope,
+    metadata: Envelope,
+    timestamp?: string,
+  ): Promise<void> {
+    const key = this.#key(thread, namespace, id);
+    await this.#fencing.write(['checkpoints', 'meta'], async (tx) => {
+      const meta = tx.objectStore('meta');
+      const sequenceKey = [...this.#scope, 'sequence'];
+      const current: unknown = await requestResult(meta.get(sequenceKey));
+      if (
+        current !== undefined &&
+        (!object(current) || current['v'] !== 1 || !positive(current['sequence']))
+      )
+        throw new StorageError('corrupt');
+      let sequence = object(current) ? (current['sequence'] as number) : 0;
+      const order = async (key: string[]): Promise<number> => {
+        const stored: unknown = await requestResult(meta.get(key));
+        if (stored !== undefined) {
+          if (!object(stored) || stored['v'] !== 1 || !positive(stored['order']))
+            throw new StorageError('corrupt');
+          return stored['order'];
+        }
+        sequence++;
+        if (!positive(sequence)) throw new StorageError('unavailable');
+        await requestResult(meta.put({ v: 1, order: sequence }, key));
+        return sequence;
+      };
+      const threadOrder = await order([...this.#scope, 'thread', thread]);
+      const namespaceOrder = await order([...this.#scope, 'namespace', thread, namespace]);
+      await requestResult(meta.put({ v: 1, sequence }, sequenceKey));
+      const savedAt = storageClock.now();
+      await touchSession(tx, this.#scope, thread, savedAt);
+      const row: CheckpointRecord = {
+        savedAt,
+        v: 1,
+        key,
+        thread: key.slice(0, 3),
+        namespace: key.slice(0, 4),
+        checkpoint,
+        metadata,
+        parentId,
+        threadOrder,
+        namespaceOrder,
+        ...(timestamp === undefined ? {} : { executor: 'langgraph-python' as const, timestamp }),
+      };
+      await requestResult(tx.objectStore('checkpoints').put(row));
     });
   }
 
@@ -453,30 +498,170 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           index: WRITES_IDX_MAP[channel] || index,
         })),
       );
-      const checkpoint = this.#key(thread, namespace, id);
-      await this.#fencing.write(['writes', 'meta'], async (tx) => {
-        await touchSession(tx, this.#scope, thread);
-        const store = tx.objectStore('writes');
-        const raw: unknown[] = await requestResult(store.getAll(prefixRange(checkpoint)));
-        const existing = raw.map(readWrite);
-        let order = existing.reduce((max, row) => Math.max(max, row.order), 0);
-        for (const write of serialized) {
-          const previous = existing.find(
-            (row) => row.key[5] === taskId && row.key[6] === write.index,
-          );
-          if (previous !== undefined && write.index >= 0) continue;
-          const row: WriteRecord = {
-            v: 1,
-            key: [...checkpoint, taskId, write.index],
-            checkpoint,
-            thread: checkpoint.slice(0, 3),
-            channel: write.channel,
-            value: write.value,
-            taskPath,
-            order: previous?.order ?? ++order,
-          };
-          await requestResult(store.put(row));
+      await this.#storeWrites(thread, namespace, id, serialized, taskId, taskPath);
+    });
+  }
+
+  async #storeWrites(
+    thread: string,
+    namespace: string,
+    id: string,
+    serialized: readonly {
+      readonly channel: string;
+      readonly value: Envelope;
+      readonly index: number;
+      readonly interruptIds?: readonly string[];
+    }[],
+    taskId: string,
+    taskPath: string,
+    python = false,
+  ): Promise<void> {
+    const checkpoint = this.#key(thread, namespace, id);
+    await this.#fencing.write(['writes', 'meta'], async (tx) => {
+      await touchSession(tx, this.#scope, thread);
+      const store = tx.objectStore('writes');
+      const raw: unknown[] = await requestResult(store.getAll(prefixRange(checkpoint)));
+      const existing = raw.map(readWrite);
+      let order = existing.reduce((max, row) => Math.max(max, row.order), 0);
+      for (const write of serialized) {
+        const previous = existing.find(
+          (row) => row.key[5] === taskId && row.key[6] === write.index,
+        );
+        if (previous !== undefined && write.index >= 0) continue;
+        const row: WriteRecord = {
+          v: 1,
+          key: [...checkpoint, taskId, write.index],
+          checkpoint,
+          thread: checkpoint.slice(0, 3),
+          channel: write.channel,
+          value: write.value,
+          taskPath,
+          order: previous?.order ?? ++order,
+          ...(python
+            ? { executor: 'langgraph-python' as const, interruptIds: write.interruptIds ?? [] }
+            : {}),
+        };
+        await requestResult(store.put(row));
+      }
+    });
+  }
+
+  async #byteRequest(value: unknown): Promise<unknown> {
+    return storageOperation(this.#db, async () => {
+      const input = parseByteRequest(value);
+      if (input.op === 'delete') {
+        await this.#deleteThreadRecords(input.sessionId);
+        return null;
+      }
+      if (input.op === 'put') {
+        await this.#storeCheckpoint(
+          input.sessionId,
+          input.namespace,
+          input.id,
+          input.parentId,
+          input.checkpoint,
+          input.metadata,
+          input.timestamp,
+        );
+        return null;
+      }
+      if (input.op === 'put-writes') {
+        await this.#storeWrites(
+          input.sessionId,
+          input.namespace,
+          input.id,
+          input.writes,
+          input.taskId,
+          input.taskPath,
+          true,
+        );
+        return null;
+      }
+      return transact(this.#db, ['checkpoints', 'writes'], 'readonly', async (tx) => {
+        const range = prefixRange([
+          ...this.#scope,
+          input.sessionId,
+          ...(input.namespace === undefined ? [] : [input.namespace]),
+        ]);
+        const checkpoints = tx.objectStore('checkpoints');
+        let rows: unknown[];
+        if (input.op === 'get') {
+          let raw: unknown;
+          if (input.id !== undefined)
+            raw = await requestResult(
+              checkpoints.get(this.#key(input.sessionId, input.namespace, input.id)),
+            );
+          else {
+            const request = checkpoints.openCursor(range, 'prev');
+            let cursor = await requestResult(request);
+            while (cursor && readCheckpoint(cursor.value).executor !== 'langgraph-python') {
+              cursor.continue();
+              cursor = await requestResult(request);
+            }
+            raw = cursor?.value;
+          }
+          rows = raw === undefined ? [] : [raw];
+        } else rows = await requestResult(checkpoints.getAll(range));
+        const writes = tx.objectStore('writes');
+        const writesByCheckpoint = new Map<string, unknown[]>();
+        const readWrites = async (key: CheckpointKey): Promise<unknown[]> => {
+          const id = JSON.stringify(key);
+          const saved = writesByCheckpoint.get(id);
+          if (saved !== undefined) return saved;
+          const rows: unknown[] = await requestResult(writes.getAll(prefixRange(key)));
+          writesByCheckpoint.set(id, rows);
+          return rows;
+        };
+        const binary = (value: Envelope): { type: string; bytes: Uint8Array } => {
+          if (
+            value?.v !== 1 ||
+            typeof value.type !== 'string' ||
+            !(value.bytes instanceof Uint8Array)
+          )
+            throw new StorageError('corrupt');
+          return { type: value.type, bytes: value.bytes };
+        };
+        const pending = (rows: unknown[]): unknown[] =>
+          rows
+            .map(readWrite)
+            .filter((row) => row.executor === 'langgraph-python')
+            .sort(compareWrites)
+            .map((row) => ({
+              taskId: row.key[5],
+              channel: row.channel,
+              value: binary(row.value),
+              taskPath: row.taskPath,
+              index: row.key[6],
+            }));
+        const selected = rows
+          .map(readCheckpoint)
+          .filter(
+            (row) =>
+              row.executor === 'langgraph-python' &&
+              (input.id === undefined || row.key[4] === input.id) &&
+              (input.op !== 'list' || input.before === undefined || row.key[4] < input.before),
+          )
+          .sort((a, b) => (a.key[4] > b.key[4] ? -1 : a.key[4] < b.key[4] ? 1 : 0))
+          .slice(0, input.op === 'get' ? 1 : input.limit);
+        const tuples = [];
+        for (const row of selected) {
+          const related = await readWrites(row.key);
+          const parent: unknown[] =
+            row.parentId === null
+              ? []
+              : await readWrites(this.#key(input.sessionId, row.key[3], row.parentId));
+          tuples.push({
+            sessionId: input.sessionId,
+            namespace: row.key[3],
+            id: row.key[4],
+            parentId: row.parentId,
+            checkpoint: binary(row.checkpoint),
+            metadata: binary(row.metadata),
+            writes: pending(related),
+            parentWrites: pending(parent),
+          });
         }
+        return input.op === 'get' ? (tuples[0] ?? null) : tuples;
       });
     });
   }
@@ -531,12 +716,21 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         let timestamp: string | null = null;
         let channelValues = exportValue(unavailableValue);
         try {
-          const checkpoint = await decode(this.serde, row.checkpoint);
-          if (!object(checkpoint) || !object(checkpoint['channel_values']))
-            throw new StorageError('corrupt');
-          timestamp = exportTimestamp(checkpoint['ts']);
-          if (timestamp === null) unrecoverable = true;
-          if (personalContent) channelValues = exportValue(checkpoint['channel_values']);
+          if (row.executor === 'langgraph-python') {
+            timestamp = exportTimestamp(row.timestamp);
+            if (personalContent)
+              channelValues = exportValue({
+                type: row.checkpoint.type,
+                bytes: row.checkpoint.bytes,
+              });
+          } else {
+            const checkpoint = await decode(this.serde, row.checkpoint);
+            if (!object(checkpoint) || !object(checkpoint['channel_values']))
+              throw new StorageError('corrupt');
+            timestamp = exportTimestamp(checkpoint['ts']);
+            if (timestamp === null) unrecoverable = true;
+            if (personalContent) channelValues = exportValue(checkpoint['channel_values']);
+          }
         } catch {
           unrecoverable = true;
         }
@@ -548,15 +742,21 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           if (!personalContent && write.channel !== INTERRUPT) continue;
           let value: unknown;
           try {
-            value = await decode(this.serde, write.value);
+            value =
+              write.executor === 'langgraph-python'
+                ? { type: write.value.type, bytes: write.value.bytes }
+                : await decode(this.serde, write.value);
           } catch {
             unrecoverable = true;
             value = unavailableValue;
           }
           if (write.channel === INTERRUPT && latest.get(row.key[3]) === row.key[4]) {
-            for (const interrupt of Array.isArray(value) ? value : [value])
-              if (object(interrupt) && typeof interrupt['id'] === 'string')
-                pending.add(interrupt['id']);
+            if (write.executor === 'langgraph-python')
+              for (const id of write.interruptIds ?? []) pending.add(id);
+            else
+              for (const interrupt of Array.isArray(value) ? value : [value])
+                if (object(interrupt) && typeof interrupt['id'] === 'string')
+                  pending.add(interrupt['id']);
           }
           if (personalContent)
             pendingWrites.push(Object.freeze([write.key[5], write.channel, exportValue(value)]));
@@ -639,14 +839,18 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
   override async deleteThread(threadId: string): Promise<void> {
     return storageOperation(this.#db, async () => {
       validateKey(threadId);
-      await this.#fencing.write(['checkpoints', 'writes', 'meta'], async (tx) => {
-        const range = prefixRange([...this.#scope, threadId]);
-        await requestResult(tx.objectStore('checkpoints').delete(range));
-        await requestResult(tx.objectStore('writes').delete(range));
-        const meta = tx.objectStore('meta');
-        await requestResult(meta.delete([...this.#scope, 'thread', threadId]));
-        await requestResult(meta.delete(prefixRange([...this.#scope, 'namespace', threadId])));
-      });
+      await this.#deleteThreadRecords(threadId);
+    });
+  }
+
+  async #deleteThreadRecords(threadId: string): Promise<void> {
+    await this.#fencing.write(['checkpoints', 'writes', 'meta'], async (tx) => {
+      const range = prefixRange([...this.#scope, threadId]);
+      await requestResult(tx.objectStore('checkpoints').delete(range));
+      await requestResult(tx.objectStore('writes').delete(range));
+      const meta = tx.objectStore('meta');
+      await requestResult(meta.delete([...this.#scope, 'thread', threadId]));
+      await requestResult(meta.delete(prefixRange([...this.#scope, 'namespace', threadId])));
     });
   }
 }

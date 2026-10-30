@@ -54,6 +54,34 @@ Disposal cancels a nonterminal run and waits for executor settlement, so it must
 
 The saver implements `BaseCheckpointSaver`: `getTuple`, `list`, `put`, `putWrites` and `deleteThread`. The adapter accepts it through `services.checkpointer`. `saver.recovery` structurally implements core's [`RecoveryStore`](../../docs/system-design.md#6-core-runtime-and-contracts) on the same connection and scope, without importing core. Supply it whenever durable acceptance and write replay are needed; omitting it keeps core's in-memory inbox, random effect IDs and no journal. `close()` is idempotent. Reopening the same database, app and principal reads the committed checkpoints, submissions and effect receipts. Preserve `instance.sessionId` (the graph's `thread_id`) and use compatible graph code.
 
+## Python byte checkpoints
+
+For the Python adapter, pass `services: { chatModels, checkpoints: saver.byteRecords }`
+and `recovery: saver.recovery`. Compile the Python graph with
+`galaxie.langgraph.checkpointer()`. The Worker serializes checkpoints and pending
+writes; JavaScript stores their opaque bytes in the existing version-1 envelopes
+and key layout, marked `executor: 'langgraph-python'`. The JavaScript saver's
+`getTuple` and `list` skip these marked records. No storage schema or version changes.
+
+`byteRecords.request(value)` accepts the closed operations `get`, `list`, `put`,
+`put-writes` and `delete`, all with a `sessionId`. Reads and writes use `namespace`
+(and checkpoint `id` where needed); `list` optionally filters `namespace`, `id`,
+`before` and `limit`. A `put` supplies `parentId`, `timestamp`, `checkpoint` and
+`metadata`; each serialized value is `{ type, bytes: Uint8Array }`. `put-writes`
+supplies `taskId`, `taskPath` and writes with `channel`, `index`, serialized `value`
+and `interruptIds`. The Python saver derives these fields from committed engine
+state. A tuple returns its checkpoint, metadata, writes and parent writes. `delete`
+removes the thread's checkpoints and writes; `deleteSession` also removes recovery
+records. Base64 appears only on the Worker bridge.
+
+The port uses the same fenced write helpers, app/principal scope, retention,
+explicit deletion and principal wipe as the JavaScript saver. Export reads marker
+timestamps and interrupt IDs without invoking the JavaScript serializer. An explicit
+personal-content export represents serialized values as their type tag and marked
+base64 bytes; it does not deserialize Python objects. A tuple or list must fit the
+bridge's 1 MiB limit after base64 encoding, or the operation fails `unsupported`.
+Hosts still compose ownership and dispose the runtime before closing the saver.
+
 ## Restoring a pending interaction
 
 Store `instance.sessionId` per app and authenticated principal when the run reaches `waiting_input`. On reload, open a saver for the same app and principal and give it to a new runtime instance:
@@ -75,9 +103,11 @@ if (run === undefined) await restored.dispose();
 
 `storedSessionId` is a `SessionId` from the original instance and must be a lowercase RFC 4122 UUID. Core cannot verify ownership: keep session IDs, checkpointer and recovery store scoped to the same app and authenticated principal. The inbox holds learner answers and the journal holds capability outputs; both are principal data, as private as checkpoints, and must stay on-device. An adopted instance cannot `start()`; when nothing is pending, dispose it and create a fresh instance for a new session.
 
-With a recovery store, `start()` records `{ agentId, agentVersion }` before starting its segment. `recordSession(sessionId, record)` inserts only when absent and returns the stored identity; `session(sessionId)` reads it. Records are validated plain strings inside versioned envelopes in `meta`. A recording failure rejects start with fixed text: `stale` for invalidated principal storage, otherwise `unavailable`. Restore reads the identity before checkpoints: a different agent ID or version, or a missing record, rejects `unsupported`, reports `restore_failed` and publishes no run. Missing metadata cannot prove that old code created the session. MVP migrations are not supported; no stored data is deleted by this refusal.
+With a recovery store, `start()` records `{ agentId, agentVersion, executorId }` before starting its segment. `recordSession(sessionId, record)` inserts only when absent and returns the stored identity; `session(sessionId)` reads it. Records are validated plain strings inside versioned envelopes in `meta`. A recording failure rejects start with fixed text: `stale` for invalidated principal storage, otherwise `unavailable`. Restore reads the identity before checkpoints: a different agent ID or version, or a missing record, rejects `unsupported`, reports `restore_failed` and publishes no run. Missing metadata cannot prove that old code created the session. MVP migrations are not supported; no stored data is deleted by this refusal.
 
-After the version check, restore reconciles submissions with the checkpoint before publishing a run. A matching accepted answer passes current URL/UI, action, payload schema and budget checks, gains the schema's labels/private strings and resumes automatically with status `running`. Resolved entries become consumed; an unanswered interrupt renders normally. With no interrupt, restore returns `undefined`. Dispatch waits for atomic durable acceptance before returning `accepted` or resuming, and existing accepted or consumed records reject `duplicate`. Consumption follows checkpoint-confirmed output or a new interaction; errors and cancellation leave the answer accepted. A failed consume is reported for later reconciliation without failing an otherwise successful run.
+The executor ID comes from the adapter. A different executor rejects restore with `unsupported` and "The saved session uses a different executor." before pending-state reads or inbox reconciliation. Legacy two-key IndexedDB identities read as `langgraph-js`, without a rewrite or database upgrade; new writes and other recovery stores require all three non-empty strings. Export includes `metadata.agent.executorId`.
+
+After the identity check, restore reconciles submissions with the checkpoint before publishing a run. A matching accepted answer passes current URL/UI, action, payload schema and budget checks, gains the schema's labels/private strings and resumes automatically with status `running`. Resolved entries become consumed; an unanswered interrupt renders normally. With no interrupt, restore returns `undefined`. Dispatch waits for atomic durable acceptance before returning `accepted` or resuming, and existing accepted or consumed records reject `duplicate`. Consumption follows checkpoint-confirmed output or a new interaction; errors and cancellation leave the answer accepted. A failed consume is reported for later reconciliation without failing an otherwise successful run.
 
 The restored run has a fresh run ID and fresh budgets. It conservatively carries every label (`public`, `app`, `private-user`) because prior labels are not persisted; its private-value registry starts empty and is repopulated from accepted payloads and replayed outputs. It uses newly validated grants and opens its first run span on resume. The host-only `restore_failed.error` diagnostic may carry raw error evidence; never forward it to a destination `private-user` may not reach. Core adds no inbox or journal content to diagnostics, snapshots, events or spans.
 

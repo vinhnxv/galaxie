@@ -120,6 +120,7 @@ async function fixture(store = new MemoryRecoveryStore(), scripts: Script[] = []
   await store.recordSession(instance.sessionId, {
     agentId: definition.id,
     agentVersion: definition.version,
+    executorId: 'fake',
   });
   return { instance, executor, store };
 }

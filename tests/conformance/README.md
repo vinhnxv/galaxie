@@ -111,9 +111,21 @@ goldens, check stable committed-state reads and reject an already answered resum
 The Chromium page rejects unknown case names with a fixed error and runs under the
 unchanged RAG CSP and Trusted Types policy, blocking external requests. It reuses the
 existing local wheel cache, skips when it is absent locally, and fails in CI if absent.
-These lanes do not compare stream events or checkpoint histories yet; those executor
-features remain disabled. Durability uses memory only, with no browser reload or
-IndexedDB reopen claim. All twelve cases currently run on the native CPython lane.
+These lanes do not compare public stream events or complete checkpoint histories.
+Streaming and general subgraph support remain disabled. All twelve cases run on the
+native CPython lane.
+
+The three reload cases (`interrupt-resume` and both durability cases) additionally
+compare with native reconstruction references in `golden-python/reload/`. Node
+reconstructs the runtime and Worker with a test byte store; the Chromium harness
+disposes them, navigates to a fresh page, reopens IndexedDB and calls core
+`instance.restore()`. The pending ID/value survives, completed nodes stay completed,
+and final state/counters match the reference. Both lanes also reconcile an already
+accepted answer and replay one host write across two parent executions around an
+interrupting child. That focused fixture does not enable the subgraphs feature.
+The Node lane checks checkpoint settlement writes after cancellation. Native
+serializer tests check the actual twelve cases, RAG values and parent-effect fixture;
+only documented exception-string and tuple-array decoding is allowed to differ.
 
 ## Running the suite
 

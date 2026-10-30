@@ -46,7 +46,7 @@ describe.skipIf(typeof indexedDB === 'undefined')('IndexedDB recovery', () => {
     const name = `galaxie-session-record-${crypto.randomUUID()}`;
     const first = await open(name);
     const second = await open(name);
-    const record = { agentId: 'tests/agent', agentVersion: '1.0.0' };
+    const record = { agentId: 'tests/agent', executorId: 'langgraph-js', agentVersion: '1.0.0' };
     expect(await first.recovery.session('session')).toBeUndefined();
     const values = await Promise.all([
       first.recovery.recordSession('session', record),
@@ -69,8 +69,11 @@ describe.skipIf(typeof indexedDB === 'undefined')('IndexedDB recovery', () => {
   });
 
   test.each([
-    { v: 99, value: { agentId: 'tests/agent', agentVersion: '1.0.0' } },
-    { v: 1, value: { agentId: 'tests/agent', agentVersion: 1 } },
+    { v: 1, value: { agentId: 'a', agentVersion: '1', executorId: 'python', extra: true } },
+    { v: 1, value: { agentId: 'a', agentVersion: '1', executorId: '' } },
+    { v: 1, value: { agentId: 'a', agentVersion: '1', executorId: 1 } },
+    { v: 99, value: { agentId: 'tests/agent', executorId: 'langgraph-js', agentVersion: '1.0.0' } },
+    { v: 1, value: { agentId: 'tests/agent', executorId: 'langgraph-js', agentVersion: 1 } },
   ])('refuses corrupt session envelopes without replacing them: %#', async (record) => {
     const name = `galaxie-session-corrupt-${crypto.randomUUID()}`;
     const saver = await open(name);
@@ -83,7 +86,11 @@ describe.skipIf(typeof indexedDB === 'undefined')('IndexedDB recovery', () => {
       });
       await expect(saver.recovery.session('session')).rejects.toEqual(new StorageError('corrupt'));
       await expect(
-        saver.recovery.recordSession('session', { agentId: 'tests/agent', agentVersion: '1.0.0' }),
+        saver.recovery.recordSession('session', {
+          agentId: 'tests/agent',
+          executorId: 'langgraph-js',
+          agentVersion: '1.0.0',
+        }),
       ).rejects.toEqual(new StorageError('corrupt'));
       expect(
         await transact(db, ['meta'], 'readonly', (tx) =>
@@ -93,6 +100,35 @@ describe.skipIf(typeof indexedDB === 'undefined')('IndexedDB recovery', () => {
     } finally {
       db.close();
     }
+  });
+
+  test('reads legacy session identity after reopen without rewriting its v1 envelope', async () => {
+    const name = `galaxie-legacy-${crypto.randomUUID()}`;
+    const first = await open(name);
+    const db = await openDatabase(name, 'app', 'user');
+    const key = ['app', 'user', 'session', 'session'];
+    const record = { v: 1, value: { agentId: 'tests/legacy', agentVersion: '1' } };
+    await transact(db, ['meta'], 'readwrite', (tx) =>
+      requestResult(tx.objectStore('meta').put(record, key)),
+    );
+    first.close();
+    const reopened = await open(name);
+    const expected = { ...record.value, executorId: 'langgraph-js' };
+    expect(await reopened.recovery.session('session')).toEqual(expected);
+    expect(
+      await reopened.recovery.recordSession('session', {
+        ...expected,
+        executorId: 'langgraph-python',
+      }),
+    ).toEqual(expected);
+    expect((await reopened.exportSession('session')).metadata.agent).toEqual(expected);
+    expect(
+      await transact(db, ['meta'], 'readonly', (tx) =>
+        requestResult(tx.objectStore('meta').get(key)),
+      ),
+    ).toEqual(record);
+    expect(db.version).toBe(1);
+    db.close();
   });
 
   test('accepts once across connections and keeps consumed entries as duplicate receipts', async () => {

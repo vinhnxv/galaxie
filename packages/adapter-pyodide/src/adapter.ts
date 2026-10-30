@@ -33,6 +33,7 @@ import {
   validPythonModule,
   validSourcePath,
 } from './bridge.js';
+import { checkpointBytes } from './checkpoints.js';
 import { adapterFailure, failureCode } from './errors.js';
 import type { LockedWheel } from './runtime-files.js';
 
@@ -47,6 +48,7 @@ export type PyodideChatModel =
   | ((options: { readonly credential: string }) => BaseChatModel);
 export interface PyodideServices {
   readonly chatModels: Readonly<Record<string, PyodideChatModel>>;
+  readonly checkpoints?: { request(value: unknown): Promise<unknown> };
 }
 export interface PyodideWorkerPort {
   postMessage(message: string): void;
@@ -156,6 +158,7 @@ interface ActiveRun {
   readonly request: RunRequest;
   readonly seen: Set<string>;
   readonly leases: Set<LeasedCall>;
+  readonly checkpoints: Set<Promise<void>>;
   cancelled: boolean;
   cancellation?: Promise<void>;
   finishCancellation?: () => void;
@@ -187,6 +190,9 @@ function validAgent(agent: unknown): agent is PyodideAgent {
 function validServices(services: unknown, models?: ModelPreparation): services is PyodideServices {
   if (
     !object(services) ||
+    (services['checkpoints'] !== undefined &&
+      (!object(services['checkpoints']) ||
+        typeof services['checkpoints']['request'] !== 'function')) ||
     !object(services['chatModels']) ||
     !Object.values(services['chatModels']).every(
       (model) =>
@@ -269,7 +275,7 @@ export function createPyodideAdapter(
     features: {
       interrupts: true,
       resume: true,
-      checkpoints: false,
+      checkpoints: true,
       streaming: false,
       subgraphs: false,
     },
@@ -290,6 +296,7 @@ export function createPyodideAdapter(
       const sessions = new Set<string>();
       const lostSessions = new Set<string>();
       const paused = new Map<string, () => void>();
+      const reads = new Map<string, { sessionId: string; seen: Set<string> }>();
       let sources: BootPayload['sources'];
       try {
         sources = await Promise.all(
@@ -309,6 +316,49 @@ export function createPyodideAdapter(
       }
 
       const dispatch = (client: Connection, message: BridgeMessage): void => {
+        if (message.kind === 'request' && message.op === 'checkpoint') {
+          const input = message.payload as { op: string; sessionId: string };
+          const run = active;
+          const runContext = run !== undefined && message.id.startsWith(`${run.id}/`);
+          const read = reads.get(message.id.slice(0, message.id.indexOf('/')));
+          const context = runContext ? { sessionId: run.request.sessionId, seen: run.seen } : read;
+          if (
+            !services.checkpoints ||
+            !context ||
+            input.sessionId !== context.sessionId ||
+            (!runContext && !['get', 'list'].includes(input.op))
+          ) {
+            client.send(failure(message, 'stale'));
+            return;
+          }
+          if (context.seen.has(message.id)) {
+            client.close('invalid');
+            return;
+          }
+          context.seen.add(message.id);
+          const operation = (async () => {
+            try {
+              const value = await services.checkpoints?.request(
+                checkpointBytes(message.payload, 'decode'),
+              );
+              if (connection === client)
+                client.send(success(message, checkpointBytes(value, 'encode')));
+            } catch (error) {
+              if (connection === client) {
+                try {
+                  client.send(failure(message, failureCode(error, 'unavailable')));
+                } catch {
+                  client.close('invalid');
+                }
+              }
+            }
+          })();
+          if (runContext) {
+            run.checkpoints.add(operation);
+            void operation.finally(() => run.checkpoints.delete(operation));
+          }
+          return;
+        }
         if (message.kind !== 'request' || (message.op !== 'model' && message.op !== 'capability')) {
           client.close('invalid');
           return;
@@ -450,6 +500,7 @@ export function createPyodideAdapter(
             sources,
             module: agent.module,
             entry: agent.entry,
+            ...(services.checkpoints === undefined ? {} : { checkpoints: true }),
           };
           const ready = (await client.request('boot', payload)) as { coldStartMs: number };
           options.onBoot?.({ phase: 'ready', coldStartMs: ready.coldStartMs });
@@ -465,10 +516,19 @@ export function createPyodideAdapter(
       await boot(preparation.signal);
       const pending = async (sessionId: string): Promise<PendingInteraction | undefined> => {
         if (disposed) throw adapterFailure('invalid');
-        if (lostSessions.has(sessionId) || !connection) throw adapterFailure('unavailable');
-        const state = (await connection.request('pending', {
-          threadId: sessionId,
-        })) as PendingReply;
+        if (services.checkpoints === undefined && (lostSessions.has(sessionId) || !connection))
+          throw adapterFailure('unavailable');
+        const client = await boot(new AbortController().signal);
+        let contextId: string | undefined;
+        let state: PendingReply;
+        try {
+          state = (await client.request('pending', { threadId: sessionId }, 'pending', (id) => {
+            contextId = id;
+            reads.set(id, { sessionId, seen: new Set() });
+          })) as PendingReply;
+        } finally {
+          if (contextId !== undefined) reads.delete(contextId);
+        }
         if (state.interrupts.length === 0) return undefined;
         const first = state.interrupts[0];
         if (!first?.id || new Set(state.interrupts.map((item) => item.id)).size !== 1)
@@ -510,7 +570,14 @@ export function createPyodideAdapter(
               },
               'result',
               (id) => {
-                run = { id, request, seen: new Set(), leases: new Set(), cancelled: false };
+                run = {
+                  id,
+                  request,
+                  seen: new Set(),
+                  leases: new Set(),
+                  checkpoints: new Set(),
+                  cancelled: false,
+                };
                 active = run;
                 sessions.add(request.sessionId);
                 const current = run;
@@ -560,6 +627,7 @@ export function createPyodideAdapter(
               yield { type: 'error', error: toErrorInfo(failureCode(error)) };
           } finally {
             if (run?.cancellation) await run.cancellation;
+            if (run) await Promise.allSettled(run.checkpoints);
             if (cancel) request.signal.removeEventListener('abort', cancel);
             if (run) for (const call of run.leases) finish(run, call);
             if (active === run) active = undefined;

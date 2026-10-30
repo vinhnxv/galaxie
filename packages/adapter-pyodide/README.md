@@ -19,13 +19,13 @@ be local because native ESM cannot import an HTTP module; agent files and wheels
 still be served from loopback. The host serves runtime assets together and supplies
 the two locally built wheel records, including their byte sizes and SHA-256 hashes.
 
-Services are `{ chatModels }`, keyed by provider ID. Each entry is a LangChain
+Services are `{ chatModels, checkpoints? }`; `chatModels` is keyed by provider ID. Each entry is a LangChain
 `BaseChatModel`, or a function receiving `{ credential }` and returning a model when
 the provider descriptor requires per-call credentials. Implementations are checked
 against core's preparation requirements. Credentials remain in JavaScript.
 
 `galaxie.bridge/v2` accepts JSON strings up to 1,048,576 UTF-8 bytes. It carries boot,
-run, pending, model, capability, abort and result operations. Both directions validate the
+run, pending, checkpoint, model, capability, abort and result operations. Both directions validate the
 closed envelopes and payloads without code generation. Model replies reach Python
 only after output checks; usage settles the router lease, and failures charge its
 reservation. Capability calls preserve the full executor task namespace as the
@@ -61,13 +61,30 @@ reads committed state, and resume sends `{action, payload}` by interrupt ID. Com
 nodes do not re-run; the interrupted node does. Parallel or ID-less interrupts,
 static breakpoints and reusing an answered interaction fail `unsupported`.
 
-The saver is in memory. Cancelling a paused run closes its Worker; cancellation or
-Worker failure loses its sessions, and `pending()` or resume for them fails
-`unavailable`. A new session can start with a fresh Worker. `checkpoints`, `streaming`
-and `subgraphs` remain false. The internal `astream` loop emits no public stream
-events and preserves the graph's output schema. Calls support text messages and optional stop strings;
-tool calls, multimodal messages and streamed Python model output are unsupported.
-No durable Python session restore or byte-record storage port is provided.
+`interrupts`, `resume` and `checkpoints` are true. For durable sessions, supply
+`services: { chatModels, checkpoints: saver.byteRecords }` and
+`recovery: saver.recovery` from the same app/principal-scoped
+[`IndexedDBSaver`](../storage-indexeddb/README.md#python-byte-checkpoints). The Worker
+injects `GalaxieCheckpointer`; Python serializes state and writes, and JavaScript
+owns storage, fencing and recovery. A fresh runtime can restore the same pending
+interaction after IndexedDB reopen; completed nodes do not re-run. Accepted answers
+reconcile and successful broker writes replay under their full task namespace.
+Keep capability call order deterministic within each task and pass its explicit config.
+
+Without `checkpoints`, the injected saver remains in memory: cancellation or Worker
+loss discards those sessions and pending/resume fails `unavailable`. With durable
+storage, pending can boot a fresh Worker and read the saved session. Pending bridge
+contexts allow only same-session checkpoint reads; a cancelled run permits checkpoint
+writes until settlement or the existing 500 ms Worker bound. The complete tuple,
+including writes and parent writes, must fit one 1 MiB bridge message after base64.
+The async Python saver requires a thread-scoped config for listing; synchronous
+saver methods and listing every session from Python are unsupported.
+
+`streaming` and `subgraphs` remain false. The internal `astream` loop emits no public
+stream events and preserves the graph's output schema. Calls support text messages
+and optional stop strings; tool calls, multimodal messages and streamed Python model
+output are unsupported. The RAG application's default sessions remain in memory;
+this change adds no review UI or persistent RAG session flow.
 
 Python code is trusted under [ADR-0018](../../docs/adr/0018-python-agents-through-pyodide.md).
 It can import `js` and use the Worker's APIs. A dedicated Worker does not isolate
@@ -100,6 +117,12 @@ unmeasured GitHub CI and reference-device runs.
 The twelve [Python reference cases](../../tests/conformance/cases-python/) have
 native CPython goldens. `interrupt-resume`, `interrupt-sequence`,
 `interrupt-durability-sync` and `interrupt-durability-exit` match pending IDs/values
-and final state/counters on real Node Pyodide and real headless Chromium. These
-durability configurations use the in-memory saver; they prove no reload restore,
-IndexedDB persistence, streaming or subgraph support.
+and final state/counters on real Node Pyodide and real headless Chromium. The three single-interrupt reload cases also match native CPython reconstruction
+references after fresh Worker/runtime creation on Node and actual page reload with
+IndexedDB reopen in Chromium. Both lanes reconcile accepted answers and prove one
+host write across two executions of a parent containing an interrupting child. This
+is targeted write-recovery evidence, not general subgraph support. Node also checks
+checkpoint writes during cancellation settlement. Native serializer tests cover all
+twelve cases, the RAG fixtures and the parent-write fixture: exceptions decode as
+`repr` strings and tuples as msgpack arrays; other values retain strict equality.
+No real model or device measurements were added.

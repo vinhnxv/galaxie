@@ -55,7 +55,7 @@ Stage 2 of the RAG example shipped the Python executor with all five flags false
 
 **Compatibility**
 
-- R10. The pinned `ormsgpack` stand-in round-trips every value the Python conformance cases and the RAG graph checkpoint; byte identity with real `ormsgpack` is not required, because Python sessions are only written and read through the stand-in.
+- R10. The pinned `ormsgpack` stand-in round-trips every value the Python conformance cases and the RAG graph checkpoint; byte identity with real `ormsgpack` is not required, because Python sessions are only written and read through the stand-in. Values LangGraph's `JsonPlusSerializer` encodes lossily by design, such as exceptions in error writes (stored as their string form), count as round-tripping when they decode to that documented form; only a stand-in-specific loss is a stop condition.
 - R11. The LangGraph.js adapter, its goldens and the compatibility matrix stay unchanged; the JavaScript RAG executor keeps working.
 
 **Example**

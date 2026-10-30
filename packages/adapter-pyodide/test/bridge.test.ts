@@ -19,6 +19,7 @@ const payloads = {
   model: { role: 'answer', messages: [{ role: 'user', content: 'hello' }], options: {} },
   capability: { name: 'docs.search@1', input: { query: 'hello' }, effectScope: 'node:task' },
   abort: { runId: 'run-1' },
+  checkpoint: { op: 'get', sessionId: 's', namespace: '' },
 };
 
 test('validates each request and checked response using JSON only', () => {
@@ -89,6 +90,87 @@ test('rejects unknown versions, operations, payloads and oversized UTF-8 message
 
 test('oversized bridge messages fail unsupported without retaining their content', () => {
   expect(() => parseBridge('é'.repeat(524289))).toThrow('This operation is unsupported.');
+});
+
+test('checkpoint sub-operations and byte envelopes are closed and bounded after base64', () => {
+  const binary = { type: 'msgpack', bytes: 'AP+A' };
+  const location = { sessionId: 's', namespace: '' };
+  for (const payload of [
+    { op: 'get', ...location },
+    { op: 'list', ...location, before: 'id', limit: 1 },
+    {
+      op: 'put',
+      ...location,
+      id: 'id',
+      parentId: null,
+      checkpoint: binary,
+      metadata: binary,
+      timestamp: '2026-10-30T00:00:00Z',
+    },
+    {
+      op: 'put-writes',
+      ...location,
+      id: 'id',
+      taskId: 'task',
+      taskPath: 'parent',
+      writes: [{ index: -3, channel: '__interrupt__', value: binary, interruptIds: ['i'] }],
+    },
+    { op: 'delete', sessionId: 's' },
+  ]) {
+    const raw = JSON.stringify({
+      v: version,
+      kind: 'request',
+      id: 'one',
+      op: 'checkpoint',
+      payload,
+    });
+    expect(encodeBridge(parseBridge(raw))).toBe(raw);
+  }
+  for (const payload of [
+    { op: 'unknown', ...location },
+    { op: 'get', ...location, credential: 'private' },
+    {
+      op: 'put',
+      ...location,
+      id: 'id',
+      parentId: null,
+      checkpoint: { ...binary, bytes: 'invalid base64' },
+      metadata: binary,
+      timestamp: 'now',
+    },
+  ])
+    expect(() =>
+      parseBridge(
+        JSON.stringify({ v: version, kind: 'request', id: 'one', op: 'checkpoint', payload }),
+      ),
+    ).toThrow('The request is invalid.');
+  const tuple = {
+    ...location,
+    id: 'id',
+    parentId: null,
+    checkpoint: { type: 'bytes', bytes: 'A'.repeat(600000) },
+    metadata: binary,
+    writes: [],
+    parentWrites: [
+      {
+        taskId: 'parent',
+        channel: 'value',
+        value: { type: 'bytes', bytes: 'A'.repeat(600000) },
+        index: 0,
+        taskPath: '',
+      },
+    ],
+  };
+  expect(() =>
+    encodeBridge({
+      v: version,
+      kind: 'response',
+      id: 'one',
+      op: 'checkpoint',
+      ok: true,
+      payload: tuple,
+    }),
+  ).toThrow('This operation is unsupported.');
 });
 
 test('v2 resume, pending and notifications have closed payloads', () => {

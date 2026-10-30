@@ -31,7 +31,7 @@ function send(value: BridgeMessage): void {
 let python: Awaited<ReturnType<typeof import('pyodide').loadPyodide>> | undefined;
 let booting = false;
 let active: { id: string; settled: Promise<void> } | undefined;
-let reading = false;
+let reading: { id: string } | undefined;
 const pending = new Map<string, { request: BridgeMessage; resolve(value: string): void }>();
 async function boot(input: BootPayload): Promise<number> {
   const started = performance.now();
@@ -117,9 +117,17 @@ async function boot(input: BootPayload): Promise<number> {
   py.registerJsModule('_galaxie_transport', {
     request(raw: string): Promise<string> {
       const message = parseBridge(raw);
-      if (!active || message.kind !== 'request' || !['model', 'capability'].includes(message.op))
+      const context = active ?? reading;
+      if (
+        !context ||
+        message.kind !== 'request' ||
+        !['model', 'capability', 'checkpoint'].includes(message.op) ||
+        (!active &&
+          (message.op !== 'checkpoint' ||
+            !['get', 'list'].includes((message.payload as { op: string }).op)))
+      )
         throw new Error('invalid');
-      const id = `${active.id}/${message.id}`;
+      const id = `${context.id}/${message.id}`;
       return new Promise((resolve) => {
         pending.set(id, { request: message, resolve });
         send({ ...message, id });
@@ -128,6 +136,7 @@ async function boot(input: BootPayload): Promise<number> {
   });
   py.globals['set']('_galaxie_module', input.module);
   py.globals['set']('_galaxie_entry', input.entry);
+  py.globals['set']('_galaxie_durable', input.checkpoints === true);
   await py.runPythonAsync(`
 import sys, json, asyncio, importlib
 from galaxie._bridge import install_transport, GalaxieError
@@ -135,12 +144,12 @@ from _galaxie_transport import request as _transport
 from langgraph.errors import GraphRecursionError
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
-from galaxie.langgraph import _install_checkpointer, checkpointer
+from galaxie.langgraph import _install_checkpointer, checkpointer, GalaxieCheckpointer
 sys.path.insert(0, '/agent')
 async def _galaxie_request(raw):
     return await _transport(raw)
 install_transport(_galaxie_request)
-_install_checkpointer(InMemorySaver())
+_install_checkpointer(GalaxieCheckpointer() if _galaxie_durable else InMemorySaver())
 try:
     _galaxie_graph = getattr(importlib.import_module(_galaxie_module), _galaxie_entry)()
     if getattr(_galaxie_graph, 'checkpointer', None) is not checkpointer():
@@ -294,7 +303,7 @@ async function receive(data: unknown): Promise<void> {
         send(failure(request, 'invalid'));
         return;
       }
-      reading = true;
+      reading = { id: request.id };
       try {
         python.globals['set'](
           '_galaxie_thread',
@@ -311,7 +320,7 @@ async function receive(data: unknown): Promise<void> {
             : failure(request, state.code),
         );
       } finally {
-        reading = false;
+        reading = undefined;
       }
     } else if (request.op === 'abort') {
       if (active && (request.payload as { runId: string }).runId === active.id) {

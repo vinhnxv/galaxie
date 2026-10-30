@@ -217,6 +217,7 @@ describe('session agent version', () => {
     expect(await store.session(fixture.instance.sessionId)).toEqual({
       agentId: definition.id,
       agentVersion: definition.version,
+      executorId: fixture.executor.id,
     });
     await fixture.runtime.dispose();
   });
@@ -242,6 +243,7 @@ describe('session agent version', () => {
     await store.recordSession(fixture.instance.sessionId, {
       agentId: definition.id,
       agentVersion: '2.0.0',
+      executorId: 'fake',
     });
     await expect(fixture.instance.start('input')).rejects.toMatchObject({ code: 'unavailable' });
     expect(fixture.instance.getSnapshot().run).toBeUndefined();
@@ -249,14 +251,15 @@ describe('session agent version', () => {
     expect(await store.session(fixture.instance.sessionId)).toEqual({
       agentId: definition.id,
       agentVersion: '2.0.0',
+      executorId: 'fake',
     });
     await fixture.runtime.dispose();
   });
 
   test.each([
     undefined,
-    { agentId: 'tests/other', agentVersion: '1.0.0' },
-    { agentId: definition.id, agentVersion: '2.0.0' },
+    { agentId: 'tests/other', executorId: 'fake', agentVersion: '1.0.0' },
+    { agentId: definition.id, executorId: 'fake', agentVersion: '2.0.0' },
   ])('refuses missing or incompatible metadata before reading pending: %j', async (record) => {
     const store = new MemoryRecoveryStore();
     const sessionId = crypto.randomUUID() as SessionId;
@@ -280,6 +283,7 @@ describe('session agent version', () => {
     await store.recordSession(sessionId, {
       agentId: definition.id,
       agentVersion: definition.version,
+      executorId: 'fake',
     });
     const fixture = await lifecycleFixture(store, sessionId);
     store.submissions = async () => {
@@ -293,8 +297,16 @@ describe('session agent version', () => {
   test.each([
     null,
     {},
-    { agentId: 5, agentVersion: '1.0.0' },
-    { agentId: definition.id, agentVersion: '1.0.0', extra: 'private-version-canary' },
+    { agentId: definition.id, agentVersion: definition.version },
+    { agentId: definition.id, agentVersion: definition.version, executorId: '' },
+    { agentId: definition.id, agentVersion: definition.version, executorId: 1 },
+    { agentId: 5, executorId: 'fake', agentVersion: '1.0.0' },
+    {
+      agentId: definition.id,
+      executorId: 'fake',
+      agentVersion: '1.0.0',
+      extra: 'private-version-canary',
+    },
   ])('refuses malformed session metadata without publication: %j', async (record) => {
     const store = new MemoryRecoveryStore();
     store.session = async () => record as never;
@@ -321,6 +333,40 @@ describe('session agent version', () => {
     );
     await fixture.runtime.dispose();
   });
+
+  test('refuses an executor mismatch before pending or inbox reconciliation', async () => {
+    const store = new MemoryRecoveryStore();
+    const sessionId = crypto.randomUUID() as SessionId;
+    store.sessions.set(sessionId, {
+      agentId: definition.id,
+      agentVersion: definition.version,
+      executorId: 'other-executor',
+    });
+    const fixture = await lifecycleFixture(store, sessionId);
+    const pendingRead = vi.spyOn(fixture.executor.agent, 'pending');
+    const inboxRead = vi.spyOn(store, 'submissions');
+    await expect(fixture.instance.restore()).rejects.toMatchObject({
+      code: 'unsupported',
+      message: 'The saved session uses a different executor.',
+    });
+    expect(pendingRead).not.toHaveBeenCalled();
+    expect(inboxRead).not.toHaveBeenCalled();
+    expect(fixture.diagnostics).toContainEqual(expect.objectContaining({ kind: 'restore_failed' }));
+    await fixture.runtime.dispose();
+  });
+
+  test('refuses to start against another executor identity', async () => {
+    const store = new MemoryRecoveryStore();
+    const fixture = await lifecycleFixture(store);
+    store.sessions.set(fixture.instance.sessionId, {
+      agentId: definition.id,
+      agentVersion: definition.version,
+      executorId: 'other-executor',
+    });
+    await expect(fixture.instance.start('input')).rejects.toMatchObject({ code: 'unavailable' });
+    expect(fixture.executor.requests).toHaveLength(0);
+    await fixture.runtime.dispose();
+  });
 });
 
 describe('fenced storage outcomes', () => {
@@ -334,6 +380,7 @@ describe('fenced storage outcomes', () => {
       await store.recordSession(fixture.instance.sessionId, {
         agentId: definition.id,
         agentVersion: definition.version,
+        executorId: 'fake',
       });
       const fail = async (): Promise<never> => {
         throw fenced();

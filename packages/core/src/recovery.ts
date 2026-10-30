@@ -17,6 +17,7 @@ export type RecoveryJson =
 export interface RecoverySession {
   readonly agentId: string;
   readonly agentVersion: string;
+  readonly executorId: string;
 }
 
 /** An answer and its durable receipt. Returned identifiers deliberately carry no core brand. */
@@ -120,11 +121,13 @@ export function validateSession(value: unknown): RecoverySession | undefined {
     copy === null ||
     Array.isArray(copy) ||
     typeof copy !== 'object' ||
-    Object.keys(copy).length !== 2 ||
+    Object.keys(copy).length !== 3 ||
     typeof copy['agentId'] !== 'string' ||
     copy['agentId'].length === 0 ||
     typeof copy['agentVersion'] !== 'string' ||
-    copy['agentVersion'].length === 0
+    copy['agentVersion'].length === 0 ||
+    typeof copy['executorId'] !== 'string' ||
+    copy['executorId'].length === 0
   )
     return corrupt();
   return copy as unknown as RecoverySession;

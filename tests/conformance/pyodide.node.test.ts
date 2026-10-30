@@ -17,9 +17,62 @@ import {
 } from '../../examples/rag-browser/test/support/python.node.js';
 import { createPyodideAdapter } from '../../packages/adapter-pyodide/src/adapter.js';
 import { BRIDGE_VERSION, parseBridge } from '../../packages/adapter-pyodide/src/bridge.js';
+import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import { createMockLatch, MockChatModel } from '../../packages/models/src/mock.js';
+import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
 import { pythonCaseSources } from './support/python-cases.node.js';
+import { executePythonRestore, pythonReloadCases } from './support/python-restore.js';
 import { executePythonCase, pythonStageACases } from './support/python-stage-a.js';
+
+test.skipIf(!pythonWheelsAvailable).each([...pythonReloadCases, 'parent-effects'])(
+  'Node Pyodide rebuilds a durable runtime against native reconstruction: %s',
+  async (name) => {
+    const fixture = await createPythonFixture({
+      sources: await pythonCaseSources(name),
+      module: 'selected',
+    });
+    const golden =
+      name === 'parent-effects'
+        ? { final: { value: 1, answer: { answer: 'yes' }, saved: true } }
+        : JSON.parse(
+            await readFile(new URL(`./golden-python/reload/${name}.json`, import.meta.url), 'utf8'),
+          );
+    try {
+      for (const accepted of [false, true]) {
+        const store = {
+          checkpoints: new MemoryByteCheckpoints(),
+          recovery: new MemoryRecoveryStore(),
+        };
+        const initial = await executePythonRestore(
+          fixture.options,
+          fixture.agent,
+          store,
+          undefined,
+          accepted,
+          name === 'parent-effects',
+        );
+        const restored = await executePythonRestore(
+          fixture.options,
+          fixture.agent,
+          store,
+          initial.sessionId,
+          accepted,
+          name === 'parent-effects',
+        );
+        if (!accepted) expect(restored.pending).toEqual(initial.pending);
+        expect(restored.final).toEqual(golden.final);
+        expect(restored.consumed).toBe(true);
+        if (name === 'parent-effects') {
+          expect(initial.effects).toEqual({ bodies: 1, writes: 1 });
+          expect(restored.effects).toEqual({ bodies: 1, writes: 0 });
+        }
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  },
+  90000,
+);
 
 test.skipIf(!pythonWheelsAvailable).each(pythonStageACases)(
   pythonWheelsAvailable
@@ -177,9 +230,12 @@ test.skipIf(!pythonWheelsAvailable)(
   30000,
 );
 
-test.skipIf(!pythonWheelsAvailable)(
-  'cancelling a resumed Python model call settles cancelled and loses in-memory state',
-  async () => {
+test.skipIf(!pythonWheelsAvailable).each([false, true])(
+  'cancelling a resumed Python model call drains checkpoint settlement (durable=%s)',
+  async (durable) => {
+    const bytes = new MemoryByteCheckpoints();
+    let cancelling = false;
+    const settledWrites: unknown[] = [];
     const fixture = await createPythonFixture({
       sources: {
         'selected.py': `
@@ -192,7 +248,7 @@ def create_agent():
     async def chat(state, config):
         await GalaxieChatModel(role='answer').ainvoke('delayed', config)
         return {}
-    return StateGraph(dict).add_node('ask', ask).add_node('chat', chat).add_edge(START, 'ask').add_edge('ask', 'chat').add_edge('chat', END).compile(checkpointer=checkpointer())
+    return StateGraph(dict).add_node('ask', ask).add_node('chat', chat).add_edge(START, 'ask').add_edge('ask', 'chat').add_edge('chat', END).compile(checkpointer=checkpointer()).with_config({'configurable': {'__pregel_durability': 'exit'}})
 `,
       },
       module: 'selected',
@@ -216,6 +272,24 @@ def create_agent():
           principalScope: 'fixture',
           agent: fixture.agent,
           services: {
+            ...(durable
+              ? {
+                  checkpoints: {
+                    async request(value: unknown): Promise<unknown> {
+                      const result = await bytes.request(value);
+                      if (
+                        cancelling &&
+                        typeof value === 'object' &&
+                        value !== null &&
+                        'op' in value &&
+                        ['put', 'put-writes'].includes(String(value.op))
+                      )
+                        settledWrites.push(value);
+                      return result;
+                    },
+                  },
+                }
+              : {}),
             chatModels: {
               mock: new MockChatModel({ delayed: { id: 'delayed', text: 'late', wait: latch } }),
             },
@@ -257,11 +331,26 @@ def create_agent():
         return result;
       })();
       await latch.entered;
+      cancelling = true;
       await instance.cancel(runId);
       expect((await events).some((event) => event.type === 'cancelled')).toBe(true);
       expect(instance.getSnapshot().run?.status).toBe('cancelled');
       await expect.poll(() => fixture.counts.terminated, { timeout: 2000 }).toBe(1);
       expect(fixture.toWorker.join('\n')).not.toContain('late');
+      if (durable) {
+        expect(settledWrites.length).toBeGreaterThan(0);
+        expect(bytes.rows.size).toBeGreaterThan(0);
+        const fresh = await createPyodideAdapter(fixture.options).prepare(
+          fixture.agent,
+          { chatModels: {}, checkpoints: bytes },
+          { signal: new AbortController().signal },
+        );
+        try {
+          expect(await fresh.pending(instance.sessionId)).toBeUndefined();
+        } finally {
+          await fresh.dispose();
+        }
+      }
     } finally {
       latch.release();
       await runtime.dispose();

@@ -10,7 +10,7 @@ import { openDatabase, requestResult, transact } from '../src/schema.js';
 const savers: IndexedDBSaver[] = [];
 const databases: string[] = [];
 const config = { configurable: { thread_id: 'session', checkpoint_ns: '', checkpoint_id: '001' } };
-const identity = { agentId: 'tests/invalidation', agentVersion: '1' };
+const identity = { agentId: 'tests/invalidation', executorId: 'langgraph-js', agentVersion: '1' };
 const answer = { interactionId: 'question', action: 'submit', payload: 'private answer' };
 const effect = { status: 'dispatched', inputDigest: 'a'.repeat(64) } as const;
 
