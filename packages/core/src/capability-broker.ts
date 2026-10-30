@@ -24,6 +24,7 @@ import {
   type DestinationAllowlist,
   labelsAllow,
 } from './policy.js';
+import { containsPrivate, registerPrivate } from './private-values.js';
 import {
   copyRecoveryJson,
   type EffectRecord,
@@ -179,21 +180,12 @@ class WriteJournal {
     return next;
   }
 }
-function normalize(value: string): string {
-  return value.toLowerCase().replace(/\s+/gu, ' ').trim();
-}
 function strings(value: unknown): string[] {
   if (typeof value === 'string') return [value];
   if (Array.isArray(value)) return value.flatMap(strings);
   if (typeof value === 'object' && value !== null)
     return Object.entries(value).flatMap(([key, value]) => [key, ...strings(value)]);
   return [];
-}
-export function registerPrivate(values: Iterable<string>, registered: Set<string>): void {
-  for (const value of values) {
-    const normalized = normalize(value);
-    if (normalized.length >= 8) registered.add(normalized);
-  }
 }
 
 interface Slot {
@@ -409,15 +401,8 @@ export class CapabilityBroker {
           )
             throw failure('denied');
           if (!this.#policy['private-user'].allow.includes(binding.destination)) {
-            for (const candidateValue of strings(value)) {
-              const candidate = normalize(candidateValue);
-              for (const registered of run.privateValues)
-                if (
-                  candidate.includes(registered) ||
-                  (candidate.length >= 8 && registered.includes(candidate))
-                )
-                  throw failure('denied');
-            }
+            if (strings(value).some((candidate) => containsPrivate(candidate, run.privateValues)))
+              throw failure('denied');
           }
         };
         try {
