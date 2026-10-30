@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "tests" / "conformance" / "cases-python"))
 os.environ["LANGSMITH_TRACING"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 
-from suite import CASE_NAMES, record_case
+from suite import CASE_NAMES, record_case, record_reload
 
 
 async def main():
@@ -34,6 +34,18 @@ async def main():
         else:
             path.write_text(encoded)
         print(f"{'Verified' if arguments.check else 'Recorded'} {name}")
+    reload_directory = directory / "reload"
+    if not arguments.check:
+        reload_directory.mkdir(exist_ok=True)
+    for name in ("interrupt-resume", "interrupt-durability-sync", "interrupt-durability-exit"):
+        encoded = json.dumps(await record_reload(name), ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+        path = reload_directory / f"{name}.json"
+        if arguments.check:
+            if path.read_text() != encoded:
+                raise SystemExit(f"The native Python reload golden differs: {name}.")
+        else:
+            path.write_text(encoded)
+        print(f"{'Verified' if arguments.check else 'Recorded'} reload {name}")
 
 
 if __name__ == "__main__":

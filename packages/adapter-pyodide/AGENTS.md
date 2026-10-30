@@ -29,14 +29,16 @@ See the [README](README.md) and [Python ADR](../../docs/adr/0018-python-agents-t
 
 Do not import LangGraph.js or the LangGraph.js adapter, expose a credential to the
 Worker, add a provider or policy implementation in Python, relax CSP, or copy spike code.
-Do not add durable checkpoints or recovery without the separate contract work.
+Keep byte checkpoints on the host's scoped port; Python must never access IndexedDB.
 
 ## Limits
 
-Interrupts and resume use the Worker-owned in-memory saver, injected through
-`galaxie.langgraph.checkpointer()`. Graphs must compile with that exact object.
-Checkpoint persistence, streaming and subgraphs remain disabled. Lost Worker state
-makes pending/resume fail `unavailable`; a fresh run can boot another Worker.
+Interrupts, resume and checkpoints are enabled. `galaxie.langgraph.checkpointer()`
+returns the exact saver graphs must compile with: `GalaxieCheckpointer` when the host
+supplies `services.checkpoints: saver.byteRecords`, otherwise a Worker-owned memory
+saver. Durable restore also needs `recovery: saver.recovery` in the same scope.
+Without the port, lost Worker state makes pending/resume fail `unavailable`.
+Streaming and subgraphs remain disabled.
 The adapter supports text-only, nonstreaming model calls. Python code
 is trusted and can import `js`; a Worker is not an isolation boundary. CSP constrains
 Worker requests, while a lint aid remains advisory. Runtime loader, WASM and standard

@@ -256,6 +256,7 @@ test.each(['accepted', 'consumed'] as const)(
     await store.recordSession(instance.sessionId, {
       agentId: definition.id,
       agentVersion: definition.version,
+      executorId: 'fake',
     });
     await instance.prepare();
     const restored = await instance.restore();
@@ -334,6 +335,7 @@ test('restore validates returned records before publishing a run', async () => {
   await store.recordSession(instance.sessionId, {
     agentId: definition.id,
     agentVersion: definition.version,
+    executorId: 'fake',
   });
   await instance.prepare();
   await expect(instance.restore()).rejects.toMatchObject({
@@ -370,6 +372,7 @@ async function restoreFixture(
   await store.recordSession(instance.sessionId, {
     agentId: definition.id,
     agentVersion: definition.version,
+    executorId: 'fake',
   });
   await instance.prepare();
   return { runtime, instance, executor, diagnostics };
@@ -714,6 +717,7 @@ test('automatic resume restores schema-labelled private strings before capabilit
   await store.recordSession(instance.sessionId, {
     agentId: definition.id,
     agentVersion: definition.version,
+    executorId: 'fake',
   });
   await instance.prepare();
   await instance.restore();

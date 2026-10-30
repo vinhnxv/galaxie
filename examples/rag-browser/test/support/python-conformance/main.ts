@@ -3,7 +3,13 @@
 
 /// <reference types="vite/client" />
 
+import '../../../src/host/zod-config.js';
 import type { PyodideAdapterOptions } from '@galaxie/adapter-pyodide';
+import { IndexedDBSaver } from '../../../../../packages/storage-indexeddb/src/index.js';
+import {
+  executePythonRestore,
+  type PythonRestoreResult,
+} from '../../../../../tests/conformance/support/python-restore.js';
 import {
   executePythonCase,
   type PythonCaseTranscript,
@@ -14,6 +20,7 @@ import workerUrl from '../python-parity/pyodide-worker.ts?worker&url';
 declare const PYTHON_LOCAL_WHEELS: PyodideAdapterOptions['localWheels'];
 const result: {
   transcript?: PythonCaseTranscript;
+  restore?: PythonRestoreResult;
   error?: string;
   violations: string[];
   done: boolean;
@@ -35,38 +42,60 @@ factory.createPolicy('default', {
 
 void (async () => {
   try {
-    const name = new URLSearchParams(location.search).get('case') ?? '';
-    if (!(pythonStageACases as readonly string[]).includes(name))
+    const query = new URLSearchParams(location.search);
+    const name = query.get('case') ?? '';
+    if (!(pythonStageACases as readonly string[]).includes(name) && name !== 'parent-effects')
       throw new Error('The conformance case is unknown.');
     const module = name.replaceAll('-', '_');
     const files = [...new Set(['fixture_support', 'interrupt_resume', module])].map(
       (file) => `${file}.py`,
     );
     files.push('selected.py');
+    const options: PyodideAdapterOptions = {
+      runtimeUrl: new URL('/python/runtime/', location.href).href,
+      wheelsUrl: new URL('/python/wheels/', location.href).href,
+      localWheels: PYTHON_LOCAL_WHEELS,
+      createWorker() {
+        const worker = new Worker(url, { type: 'module' });
+        worker.addEventListener('message', (event) => {
+          const message = JSON.parse(event.data as string) as {
+            type?: string;
+            directive?: string;
+          };
+          if (message.type === 'violation') result.violations.push(message.directive ?? 'unknown');
+        });
+        return worker;
+      },
+    };
+    const agent = {
+      baseUrl: new URL(`/conformance/${name}/`, location.href).href,
+      module: 'selected',
+      entry: 'create_agent',
+      files,
+    };
+    if (query.has('durable')) {
+      const saver = await IndexedDBSaver.open({
+        appId: 'python-restore',
+        principalScope: 'fixture',
+        databaseName: `python-restore-${name}`,
+      });
+      try {
+        result.restore = await executePythonRestore(
+          options,
+          agent,
+          { checkpoints: saver.byteRecords, recovery: saver.recovery },
+          query.get('session') ?? undefined,
+          query.has('accepted'),
+          name === 'parent-effects',
+        );
+      } finally {
+        saver.close();
+      }
+      return;
+    }
     result.transcript = await executePythonCase(
-      {
-        runtimeUrl: new URL('/python/runtime/', location.href).href,
-        wheelsUrl: new URL('/python/wheels/', location.href).href,
-        localWheels: PYTHON_LOCAL_WHEELS,
-        createWorker() {
-          const worker = new Worker(url, { type: 'module' });
-          worker.addEventListener('message', (event) => {
-            const message = JSON.parse(event.data as string) as {
-              type?: string;
-              directive?: string;
-            };
-            if (message.type === 'violation')
-              result.violations.push(message.directive ?? 'unknown');
-          });
-          return worker;
-        },
-      },
-      {
-        baseUrl: new URL(`/conformance/${name}/`, location.href).href,
-        module: 'selected',
-        entry: 'create_agent',
-        files,
-      },
+      options,
+      agent,
       name,
       { value: 1 },
       name === 'interrupt-sequence'

@@ -123,6 +123,7 @@ test.each([urls[3] as string, ...controlledQueries.map((value) => `${origin}/sea
       await f.store.recordSession(sessionId, {
         agentId: f.privateDefinition.id,
         agentVersion: f.privateDefinition.version,
+        executorId: 'fake',
       });
       const interactionId = 'previous-writing' as InteractionId;
       await f.store.acceptSubmission(sessionId, {

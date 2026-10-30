@@ -23,6 +23,7 @@ class FixtureWorker implements PyodideWorkerPort {
   pendingData: unknown = { interrupts: [] };
   terminated: boolean = false;
   bootAutomatically: boolean = true;
+  pendingAutomatically: boolean = true;
   handle: ((message: BridgeMessage) => void) | undefined;
   postMessage(raw: string): void {
     const message = parseBridge(raw);
@@ -35,7 +36,11 @@ class FixtureWorker implements PyodideWorkerPort {
           }),
         ),
       );
-    } else if (message.kind === 'request' && message.op === 'pending') {
+    } else if (
+      message.kind === 'request' &&
+      message.op === 'pending' &&
+      this.pendingAutomatically
+    ) {
       queueMicrotask(() => this.emit(success(message, this.pendingData)));
     } else this.handle?.(message);
   }
@@ -166,6 +171,50 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+test.each([
+  { op: 'get', sessionId: 'session', allowed: true },
+  { op: 'get', sessionId: 'other', allowed: false },
+  { op: 'delete', sessionId: 'session', allowed: false },
+])(
+  'pending checkpoint context only permits same-session reads: %j',
+  async ({ op, sessionId, allowed }) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const checkpoints = { request: vi.fn(async () => null) };
+    const agent = await setup(workers).prepare(
+      descriptor,
+      { chatModels: { model: model() }, checkpoints },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('The fixture Worker is missing.');
+    worker.pendingAutomatically = false;
+    let pending: BridgeMessage | undefined;
+    worker.handle = (message) => {
+      if (message.kind === 'request' && message.op === 'pending') {
+        pending = message;
+        worker.emit({
+          v: BRIDGE_VERSION,
+          kind: 'request',
+          op: 'checkpoint',
+          id: `${message.id}/1`,
+          payload: { op, sessionId, ...(op === 'get' ? { namespace: '' } : {}) },
+        });
+      } else if (message.kind === 'response' && message.op === 'checkpoint' && pending) {
+        expect(message.ok).toBe(allowed);
+        if (!message.ok) expect(message.error.code).toBe('stale');
+        worker.emit(success(pending, { interrupts: [] }));
+      }
+    };
+    try {
+      expect(await agent.pending('session' as never)).toBeUndefined();
+      expect(checkpoints.request).toHaveBeenCalledTimes(allowed ? 1 : 0);
+    } finally {
+      await agent.dispose();
+    }
+  },
+);
+
 test('validates descriptors and provider factories before fetching or constructing a Worker', async () => {
   const fetcher = vi.fn(async () => new Response('def create_agent(): pass'));
   vi.stubGlobal('fetch', fetcher);
@@ -176,7 +225,7 @@ test('validates descriptors and provider factories before fetching or constructi
   expect(adapter.features).toEqual({
     interrupts: true,
     resume: true,
-    checkpoints: false,
+    checkpoints: true,
     streaming: false,
     subgraphs: false,
   });
@@ -195,6 +244,69 @@ test('validates descriptors and provider factories before fetching or constructi
   ).rejects.toMatchObject({ code: 'invalid' });
   expect(fetcher).not.toHaveBeenCalled();
   expect(workers).toEqual([]);
+});
+
+test('Worker termination does not finish settlement before an outstanding checkpoint commit', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const entered = Promise.withResolvers<void>();
+  const commit = Promise.withResolvers<void>();
+  const agent = await setup(workers).prepare(
+    descriptor,
+    {
+      chatModels: { model: model() },
+      checkpoints: {
+        async request(): Promise<unknown> {
+          entered.resolve();
+          await commit.promise;
+          return null;
+        },
+      },
+    },
+    preparation,
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('The fixture Worker is missing.');
+  worker.handle = (message) => {
+    if (message.kind === 'request' && message.op === 'run')
+      worker.emit({
+        v: BRIDGE_VERSION,
+        kind: 'request',
+        op: 'checkpoint',
+        id: `${message.id}/1`,
+        payload: {
+          op: 'put',
+          sessionId: 'session',
+          namespace: '',
+          id: 'checkpoint',
+          parentId: null,
+          checkpoint: { type: 'null', bytes: '' },
+          metadata: { type: 'null', bytes: '' },
+          timestamp: '2026-10-30T00:00:00Z',
+        },
+      });
+  };
+  vi.useFakeTimers();
+  const controller = new AbortController();
+  let settled = false;
+  const running = collect(agent.run(request(controller.signal).request)).then((events) => {
+    settled = true;
+    return events;
+  });
+  try {
+    await entered.promise;
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(worker.terminated).toBe(true);
+    expect(settled).toBe(false);
+    commit.resolve();
+    expect(await running).toEqual([]);
+    expect(settled).toBe(true);
+  } finally {
+    commit.resolve();
+    await running;
+    await agent.dispose();
+  }
 });
 
 test('routes capability task scopes and checked model replies while keeping credentials on the host', async () => {

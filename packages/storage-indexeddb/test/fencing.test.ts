@@ -26,7 +26,7 @@ async function open(
 const config = { configurable: { thread_id: 'session', checkpoint_ns: '', checkpoint_id: '001' } };
 const answer = { interactionId: 'question', action: 'submit', payload: 'private answer' };
 const effect = { status: 'dispatched', inputDigest: 'a'.repeat(64) } as const;
-const identity = { agentId: 'tests/fencing', agentVersion: '1' };
+const identity = { agentId: 'tests/fencing', executorId: 'langgraph-js', agentVersion: '1' };
 async function seed(saver: IndexedDBSaver): Promise<void> {
   await saver.put(
     config,

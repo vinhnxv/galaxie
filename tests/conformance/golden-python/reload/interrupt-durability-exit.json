@@ -1,0 +1,24 @@
+{
+  "samePending": true,
+  "final": {
+    "value": 1,
+    "answer": {
+      "answer": "yes"
+    },
+    "counts": {
+      "prepare": 0,
+      "ask": 1
+    }
+  },
+  "repeatedFinal": {
+    "value": 1,
+    "answer": {
+      "answer": "yes"
+    },
+    "counts": {
+      "prepare": 0,
+      "ask": 1
+    }
+  },
+  "repeatedUpdates": []
+}

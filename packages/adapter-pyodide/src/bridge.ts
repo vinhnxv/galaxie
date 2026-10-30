@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { type ErrorCode, toErrorInfo } from '@galaxie/core';
+import { validCheckpointReply, validCheckpointRequest } from './checkpoints.js';
 import type { LockedWheel } from './runtime-files.js';
 
 export const BRIDGE_VERSION: 'galaxie.bridge/v2' = 'galaxie.bridge/v2';
@@ -15,7 +16,8 @@ export type BridgeOp =
   | 'abort'
   | 'result'
   | 'stream'
-  | 'model-chunk';
+  | 'model-chunk'
+  | 'checkpoint';
 interface Envelope {
   readonly v: typeof BRIDGE_VERSION;
   readonly id: string;
@@ -33,6 +35,7 @@ export type BridgeMessage = Envelope &
       }
   );
 export interface BootPayload {
+  readonly checkpoints?: boolean;
   readonly runtimeUrl: string;
   readonly wheelsUrl: string;
   readonly localWheels: readonly LockedWheel[];
@@ -163,7 +166,12 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
   switch (op) {
     case 'boot':
       return (
-        keys(value, ['runtimeUrl', 'wheelsUrl', 'localWheels', 'sources', 'module', 'entry']) &&
+        keys(
+          value,
+          ['runtimeUrl', 'wheelsUrl', 'localWheels', 'sources', 'module', 'entry'],
+          ['checkpoints'],
+        ) &&
+        (value['checkpoints'] === undefined || typeof value['checkpoints'] === 'boolean') &&
         text(value['runtimeUrl']) &&
         text(value['wheelsUrl']) &&
         Array.isArray(value['localWheels']) &&
@@ -198,6 +206,8 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
       );
     case 'pending':
       return keys(value, ['threadId']) && text(value['threadId']);
+    case 'checkpoint':
+      return validCheckpointRequest(value);
     case 'model':
       return (
         keys(value, ['role', 'messages', 'options']) &&
@@ -233,6 +243,8 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
 }
 function responsePayload(op: BridgeOp, value: unknown): boolean {
   switch (op) {
+    case 'checkpoint':
+      return validCheckpointReply(value);
     case 'boot':
       return (
         object(value) &&
@@ -303,6 +315,7 @@ function valid(value: unknown): value is BridgeMessage {
       'result',
       'stream',
       'model-chunk',
+      'checkpoint',
     ].includes(value['op'] as string)
   )
     return false;

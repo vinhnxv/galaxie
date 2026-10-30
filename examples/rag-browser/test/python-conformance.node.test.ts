@@ -9,6 +9,7 @@ import { type Browser, chromium } from 'playwright';
 import { build, type PreviewServer, preview } from 'vite';
 import { expect, test } from 'vitest';
 import { pythonCaseSources } from '../../../tests/conformance/support/python-cases.node.js';
+import { pythonReloadCases } from '../../../tests/conformance/support/python-restore.js';
 import { pythonStageACases } from '../../../tests/conformance/support/python-stage-a.js';
 import { cspHeader } from '../src/host/csp.js';
 import { missingPythonWheels, pythonWheelsAvailable } from './support/python.node.js';
@@ -29,7 +30,10 @@ test.skipIf(!pythonWheelsAvailable)(
       ),
     );
     const sources = await Promise.all(
-      pythonStageACases.map(async (name) => ({ name, files: await pythonCaseSources(name) })),
+      [...pythonStageACases, 'parent-effects'].map(async (name) => ({
+        name,
+        files: await pythonCaseSources(name),
+      })),
     );
     const header = cspHeader('mock');
     let server: PreviewServer | undefined;
@@ -135,6 +139,51 @@ test.skipIf(!pythonWheelsAvailable)(
         ]);
       }
       expect(external).toEqual([]);
+      for (const name of [...pythonReloadCases, 'parent-effects']) {
+        const golden =
+          name === 'parent-effects'
+            ? { final: { value: 1, answer: { answer: 'yes' }, saved: true } }
+            : JSON.parse(
+                await readFile(
+                  new URL(
+                    `../../../tests/conformance/golden-python/reload/${name}.json`,
+                    import.meta.url,
+                  ),
+                  'utf8',
+                ),
+              );
+        for (const accepted of [false, true]) {
+          const suffix = accepted ? '&accepted=1' : '';
+          await page.goto(`${origin}/?case=${name}&durable=1${suffix}`);
+          await page.waitForFunction(
+            () => Reflect.get(globalThis, 'pythonConformance')?.done,
+            undefined,
+            { timeout: 60000 },
+          );
+          const initial = await page.evaluate(() => Reflect.get(globalThis, 'pythonConformance'));
+          expect(initial.error, `${name}: start`).toBeUndefined();
+          expect(initial.violations, `${name}: start accepted=${accepted}`).toEqual([]);
+          await page.goto(
+            `${origin}/?case=${name}&durable=1&session=${initial.restore.sessionId}${suffix}`,
+          );
+          await page.waitForFunction(
+            () => Reflect.get(globalThis, 'pythonConformance')?.done,
+            undefined,
+            { timeout: 60000 },
+          );
+          const restored = await page.evaluate(() => Reflect.get(globalThis, 'pythonConformance'));
+          expect(restored.error, `${name}: restore`).toBeUndefined();
+          expect(restored.violations).toEqual([]);
+          if (!accepted) expect(restored.restore.pending).toEqual(initial.restore.pending);
+          expect(restored.restore.final, name).toEqual(golden.final);
+          expect(restored.restore.consumed).toBe(true);
+          if (name === 'parent-effects') {
+            expect(initial.restore.effects).toEqual({ bodies: 1, writes: 1 });
+            expect(restored.restore.effects).toEqual({ bodies: 1, writes: 0 });
+          }
+        }
+      }
+      expect(external).toEqual([]);
       expect(headers.length).toBeGreaterThan(5);
       expect(headers.every((value) => value === header)).toBe(true);
     } finally {
@@ -149,5 +198,5 @@ test.skipIf(!pythonWheelsAvailable)(
       await rm(directory, { recursive: true, force: true });
     }
   },
-  90000,
+  180000,
 );

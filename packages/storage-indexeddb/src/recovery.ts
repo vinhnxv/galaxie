@@ -19,6 +19,7 @@ export type RecoveryValue =
 export interface StoredSession {
   readonly agentId: string;
   readonly agentVersion: string;
+  readonly executorId: string;
 }
 
 export interface StoredSubmission {
@@ -79,15 +80,25 @@ function envelope(value: unknown): unknown {
   return value['value'];
 }
 
-function sessionRecord(value: unknown): StoredSession {
+function sessionRecord(value: unknown, legacy = false): StoredSession {
   const copy = copyJson(value);
   if (
+    legacy &&
+    object(copy) &&
+    Object.keys(copy).length === 2 &&
+    'agentId' in copy &&
+    'agentVersion' in copy
+  )
+    return sessionRecord({ ...copy, executorId: 'langgraph-js' });
+  if (
     !object(copy) ||
-    Object.keys(copy).length !== 2 ||
+    Object.keys(copy).length !== 3 ||
     typeof copy['agentId'] !== 'string' ||
     copy['agentId'].length === 0 ||
     typeof copy['agentVersion'] !== 'string' ||
-    copy['agentVersion'].length === 0
+    copy['agentVersion'].length === 0 ||
+    typeof copy['executorId'] !== 'string' ||
+    copy['executorId'].length === 0
   )
     throw new StorageError('corrupt');
   return copy as unknown as StoredSession;
@@ -129,7 +140,7 @@ export async function readSessionSummary(
   const stored: unknown = await requestResult(
     tx.objectStore('meta').get([...scope, 'session', sessionId]),
   );
-  const agent = stored === undefined ? null : Object.freeze(sessionRecord(envelope(stored)));
+  const agent = stored === undefined ? null : Object.freeze(sessionRecord(envelope(stored), true));
   const submissions = { count: 0, accepted: 0, consumed: 0 };
   const effects = {
     count: 0,
@@ -190,7 +201,7 @@ export class IndexedDBRecovery {
         const store = tx.objectStore('meta');
         const key = [...this.#scope, 'session', sessionId];
         const existing: unknown = await requestResult(store.get(key));
-        const stored = existing === undefined ? saved : sessionRecord(envelope(existing));
+        const stored = existing === undefined ? saved : sessionRecord(envelope(existing), true);
         await touchSession(tx, this.#scope, sessionId);
         if (existing === undefined) await requestResult(store.put({ v: 1, value: saved }, key));
         return stored;
@@ -205,7 +216,7 @@ export class IndexedDBRecovery {
         const stored: unknown = await requestResult(
           tx.objectStore('meta').get([...this.#scope, 'session', sessionId]),
         );
-        return stored === undefined ? undefined : sessionRecord(envelope(stored));
+        return stored === undefined ? undefined : sessionRecord(envelope(stored), true);
       });
     });
   }

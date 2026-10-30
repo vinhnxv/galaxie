@@ -12,7 +12,7 @@ import { requestResult } from '../src/schema.js';
 
 const savers: IndexedDBSaver[] = [];
 const databases = new Set<string>();
-const identity = { agentId: 'tests/export', agentVersion: '1.0.0' };
+const identity = { agentId: 'tests/export', executorId: 'langgraph-js', agentVersion: '1.0.0' };
 const sentence = 'My private learner sentence.';
 
 async function open(

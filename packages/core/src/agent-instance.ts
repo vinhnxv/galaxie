@@ -736,11 +736,16 @@ export function createAgentInstance(
             const recording = options.recovery.recordSession(sessionId, {
               agentId: definition.id,
               agentVersion: definition.version,
+              executorId: adapter.id,
             });
             checkpointChecks.add(recording);
             try {
               const stored = validateSession(await recording);
-              if (stored?.agentId !== definition.id || stored.agentVersion !== definition.version)
+              if (
+                stored?.agentId !== definition.id ||
+                stored.agentVersion !== definition.version ||
+                stored.executorId !== adapter.id
+              )
                 throw new GalaxieError('unavailable', toErrorInfo('unavailable').message);
             } finally {
               checkpointChecks.delete(recording);
@@ -812,6 +817,14 @@ export function createAgentInstance(
               throw new GalaxieError(code, toErrorInfo(code).message);
             }
             assertUsable();
+            if (stored !== undefined && stored.executorId !== adapter.id) {
+              const error = new GalaxieError(
+                'unsupported',
+                'The saved session uses a different executor.',
+              );
+              report({ kind: 'restore_failed', error });
+              throw error;
+            }
             if (stored?.agentId !== definition.id || stored.agentVersion !== definition.version) {
               const error = new GalaxieError(
                 'unsupported',

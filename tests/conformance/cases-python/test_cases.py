@@ -67,6 +67,9 @@ def test_reconstructed_graph_resumes_only_the_unfinished_nodes(name):
     assert transcript["samePending"] is True
     assert transcript["repeatedFinal"] == transcript["final"]
     assert transcript["repeatedUpdates"] == []
+    if name != "interrupt-subgraph":
+        expected = json.loads((DIRECTORY.parent / "golden-python" / "reload" / f"{name}.json").read_text())
+        assert transcript == expected
 
 
 def test_all_twelve_reference_cases_are_present():

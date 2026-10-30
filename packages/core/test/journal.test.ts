@@ -111,6 +111,7 @@ async function resume(
   await store.recordSession(sessionId, {
     agentId: definition.id,
     agentVersion: definition.version,
+    executorId: 'fake',
   });
   await instance.prepare();
   await instance.restore();
