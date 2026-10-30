@@ -1,0 +1,133 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "call deferred"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "external",
+            "description": "External result.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "call deferred"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "approval_1",
+              "type": "function",
+              "function": {
+                "name": "external",
+                "arguments": "{\"value\":3}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "approval_1",
+          "content": "{\"value\":6}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "external",
+            "description": "External result.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "approval_1",
+          "name": "external",
+          "args": {
+            "value": 3
+          }
+        }
+      ]
+    },
+    {
+      "content": "The deferred result is ready.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [
+    {
+      "interactionId": "pause-0",
+      "surfaceId": "main",
+      "viewRevision": "approval-1",
+      "component": "tests.Approval/v1",
+      "props": {
+        "calls": [
+          {
+            "id": "approval_1",
+            "name": "external",
+            "arguments": "{\"value\":3}"
+          }
+        ]
+      }
+    }
+  ],
+  "output": "The deferred result is ready.",
+  "error": null
+}

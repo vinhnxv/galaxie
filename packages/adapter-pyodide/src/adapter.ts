@@ -287,8 +287,8 @@ export function createPyodideAdapter(
     id: executorId,
     version: '0.0.0',
     features: {
-      interrupts: langgraph,
-      resume: langgraph,
+      interrupts: true,
+      resume: true,
       checkpoints: langgraph,
       streaming: true,
       subgraphs: langgraph,
@@ -656,11 +656,10 @@ export function createPyodideAdapter(
           try {
             if (disposed || active) throw adapterFailure('invalid');
             const command = request.command;
-            if (!langgraph && command.type !== 'start') throw adapterFailure('unsupported');
             if (command.type === 'resume') {
               const interaction = await pending(request.sessionId);
               if (interaction?.interactionId !== command.interactionId)
-                throw adapterFailure('unsupported');
+                throw adapterFailure(langgraph ? 'unsupported' : 'stale');
             } else lostSessions.delete(request.sessionId);
             paused.get(request.sessionId)?.();
             paused.delete(request.sessionId);

@@ -33,10 +33,25 @@ export const pydanticCases = [
   'stream-mid-block',
   'stream-final-mismatch',
   'stream-abort',
+  'approval-approve',
+  'approval-deny',
+  'approval-mixed',
+  'call-deferred',
+  'approval-stale',
+  'approval-invalid-action',
+  'approval-incomplete',
+  'approval-invalid-interaction',
+  'approval-double-submit',
+  'approval-consecutive',
+  'approval-repeated-ids',
+  'approval-argument-block',
+  'stream-approval-approve',
+  'stream-approval-argument-block',
 ] as const;
 interface Spec {
   readonly prompt: string;
   readonly replies: readonly { readonly text: string; readonly toolCalls?: readonly ToolCall[] }[];
+  readonly answers?: readonly { readonly action: string; readonly payload: unknown }[];
 }
 export interface PydanticTranscript {
   readonly requests: unknown[];
@@ -44,6 +59,7 @@ export interface PydanticTranscript {
   readonly capabilities: unknown[];
   readonly interactions: unknown[];
   readonly streams?: unknown[];
+  dispatches?: string[];
   output: unknown;
   error: unknown;
 }
@@ -199,6 +215,19 @@ export async function executePydanticCase(
         principalScope: 'fixture',
         agent,
         services: { chatModels: { mock: model } },
+        ui: {
+          surfaces: ['main'],
+          components: {
+            'tests.Approval/v1': {
+              actions: Object.fromEntries(
+                ['approve', 'deny', 'resolve', 'other'].map((action) => [
+                  action,
+                  { payload: z.unknown() },
+                ]),
+              ),
+            },
+          },
+        },
         bindings: {
           'math.double@1': {
             kind: 'read',
@@ -231,30 +260,72 @@ export async function executePydanticCase(
       },
     );
     await instance.prepare();
-    const { runId } = await instance.start({ prompt: spec.prompt });
-    const events = (async (): Promise<RunEvent[]> => {
-      const recorded: RunEvent[] = [];
-      for await (const event of instance.events(runId)) {
-        recorded.push(event);
-        if (name === 'stream-abort' && event.type === 'stream' && event.mode === 'messages')
-          await instance.cancel(runId);
+    const ids = new Set<string>();
+    for (let round = 0; round < (name === 'approval-repeated-ids' ? 2 : 1); round++) {
+      const { runId } = await instance.start({ prompt: spec.prompt });
+      let answerIndex = 0;
+      const events = (async (): Promise<RunEvent[]> => {
+        const recorded: RunEvent[] = [];
+        for await (const event of instance.events(runId)) {
+          recorded.push(event);
+          if (name === 'stream-abort' && event.type === 'stream' && event.mode === 'messages')
+            await instance.cancel(runId);
+          if (event.type === 'interaction') {
+            const pending = instance.getSnapshot().run?.pending;
+            if (!pending || ids.has(pending.interactionId))
+              throw new Error('The pending interaction is missing or reused.');
+            ids.add(pending.interactionId);
+            const answer = spec.answers?.[answerIndex++];
+            if (!answer) throw new Error('The deferred answer is missing.');
+            const submission = {
+              instanceId: instance.instanceId,
+              runId,
+              ...pending,
+              ...answer,
+              ...(name === 'approval-stale'
+                ? { interactionId: 'wrong' as typeof pending.interactionId }
+                : {}),
+            };
+            const receipts = await Promise.all([
+              instance.dispatch(submission),
+              ...(name === 'approval-double-submit' ? [instance.dispatch(submission)] : []),
+            ]);
+            if (name === 'approval-double-submit')
+              transcript.dispatches = receipts.map((receipt) =>
+                receipt.status === 'accepted' ? 'accepted' : `rejected:${receipt.error.code}`,
+              );
+            if (name === 'approval-stale') {
+              const receipt = receipts[0];
+              if (receipt?.status !== 'rejected') throw new Error('The stale answer was accepted.');
+              transcript.error = receipt.error;
+              break;
+            }
+            if (receipts[0]?.status !== 'accepted')
+              throw new Error('The deferred answer was rejected.');
+          }
+        }
+        return recorded;
+      })();
+      if (name === 'abort') {
+        await latch.entered;
+        await instance.cancel(runId);
       }
-      return recorded;
-    })();
-    if (name === 'abort') {
-      await latch.entered;
-      await instance.cancel(runId);
-    }
-    for (const event of await events) {
-      if (event.type === 'output') transcript.output = event.output;
-      else if (event.type === 'error') transcript.error = event.error;
-      else if (event.type === 'cancelled')
-        transcript.error = { code: 'cancelled', message: 'The run was cancelled.' };
-      else if (event.type === 'interaction') transcript.interactions.push(event);
-      else if (event.type === 'stream') {
-        if (event.executor !== 'pydantic-ai-python' || event.path.length !== 0)
-          throw new Error('The stream has an unexpected executor or path.');
-        transcript.streams?.push({ mode: event.mode, data: event.data });
+      for (const event of await events) {
+        if (event.type === 'output') transcript.output = event.output;
+        else if (event.type === 'error') transcript.error = event.error;
+        else if (event.type === 'cancelled')
+          transcript.error = { code: 'cancelled', message: 'The run was cancelled.' };
+        else if (event.type === 'interaction') {
+          const pending = event.interaction;
+          transcript.interactions.push({
+            ...pending,
+            interactionId: `pause-${transcript.interactions.length}`,
+          });
+        } else if (event.type === 'stream') {
+          if (event.executor !== 'pydantic-ai-python' || event.path.length !== 0)
+            throw new Error('The stream has an unexpected executor or path.');
+          transcript.streams?.push({ mode: event.mode, data: event.data });
+        }
       }
     }
     return JSON.parse(JSON.stringify(transcript)) as PydanticTranscript;

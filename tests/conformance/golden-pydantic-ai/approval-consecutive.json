@@ -1,0 +1,247 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "approval consecutive"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "approval consecutive"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "approval_1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":3}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "approval_1",
+          "content": "{\"value\":6}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "approval consecutive"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "approval_1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":3}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "approval_1",
+          "content": "{\"value\":6}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "approval_2",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":4}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "approval_2",
+          "content": "{\"value\":8}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "approval_1",
+          "name": "double",
+          "args": {
+            "value": 3
+          }
+        }
+      ]
+    },
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "approval_2",
+          "name": "double",
+          "args": {
+            "value": 4
+          }
+        }
+      ]
+    },
+    {
+      "content": "The deferred result is ready.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 3
+      }
+    },
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 4
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "interactionId": "pause-0",
+      "surfaceId": "main",
+      "viewRevision": "approval-1",
+      "component": "tests.Approval/v1",
+      "props": {
+        "calls": [
+          {
+            "id": "approval_1",
+            "name": "double",
+            "arguments": "{\"value\":3}"
+          }
+        ]
+      }
+    },
+    {
+      "interactionId": "pause-1",
+      "surfaceId": "main",
+      "viewRevision": "approval-1",
+      "component": "tests.Approval/v1",
+      "props": {
+        "calls": [
+          {
+            "id": "approval_2",
+            "name": "double",
+            "arguments": "{\"value\":4}"
+          }
+        ]
+      }
+    }
+  ],
+  "output": "The deferred result is ready.",
+  "error": null
+}
