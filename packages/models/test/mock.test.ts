@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { HumanMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, ToolMessage } from '@langchain/core/messages';
 import { expect, test } from 'vitest';
-import { createMockLatch, MockChatModel, MockModelError } from '../src/mock.js';
+import { createMockLatch, MockChatModel, MockModelError, type MockScript } from '../src/mock.js';
 
 const usage = { input_tokens: 2, output_tokens: 3, total_tokens: 5 };
 test('invoke returns scripted text and usage and counts calls', async () => {
@@ -72,4 +72,74 @@ test('metadata uses configured names and the last human message selects the repl
     ls_provider: 'galaxie-mock',
     ls_model_name: 'mock-1',
   });
+});
+
+const tools = [{ type: 'function', function: { name: 'double', parameters: { type: 'object' } } }];
+const toolCalls = [{ id: 'call-1', name: 'double', args: { value: 3 } }];
+const sequence: MockScript = {
+  calculate: [
+    { id: 'tool-reply', text: '', toolCalls },
+    { id: 'text-reply', text: 'Six.' },
+  ],
+};
+
+test('tool sequences advance from conversation history and survive a fresh model', async () => {
+  const original = new MockChatModel(sequence);
+  const model = original.bindTools(tools);
+  const first = await model.invoke('calculate');
+  expect(first.tool_calls).toEqual(toolCalls);
+  expect(first.content).toBe('');
+  const history = [
+    new HumanMessage('calculate'),
+    first,
+    new ToolMessage({ content: '6', tool_call_id: 'call-1' }),
+  ];
+  expect((await model.invoke(history)).content).toBe('Six.');
+  expect((await new MockChatModel(sequence).bindTools(tools).invoke(history)).content).toBe('Six.');
+  expect((await model.invoke('calculate')).tool_calls).toEqual(toolCalls);
+  expect(original.calls).toBe(3);
+});
+
+test('only assistant tool-call turns after the last human advance a sequence', async () => {
+  const model = new MockChatModel(sequence).bindTools(tools);
+  const reply = await model.invoke([
+    new HumanMessage('previous'),
+    new AIMessage({ content: '', tool_calls: toolCalls }),
+    new HumanMessage('calculate'),
+    new AIMessage('some text'),
+  ]);
+  expect(reply.tool_calls).toEqual(toolCalls);
+});
+
+test('streamed argument fragments reassemble with tool identity and final-only usage', async () => {
+  const model = new MockChatModel({
+    calculate: { id: 'tool-reply', text: '', toolCalls, usage },
+  }).bindTools(tools);
+  const chunks = [];
+  for await (const chunk of await model.stream('calculate')) chunks.push(chunk);
+  expect(chunks.length).toBeGreaterThan(1);
+  const joined = chunks.reduce((left, right) => left.concat(right));
+  expect(joined.tool_calls).toMatchObject(toolCalls);
+  expect(
+    chunks
+      .flatMap((chunk) => chunk.tool_call_chunks ?? [])
+      .map((chunk) => chunk.args)
+      .join(''),
+  ).toBe('{"value":3}');
+  expect(chunks.slice(0, -1).every((chunk) => chunk.usage_metadata === undefined)).toBe(true);
+  expect(chunks.at(-1)?.usage_metadata).toEqual(usage);
+});
+
+test('a bound copy rejects unoffered tools without changing the original binding', async () => {
+  const original = new MockChatModel(sequence);
+  const bound = original.bindTools(tools);
+  const unoffered = original.bindTools([
+    { type: 'function', function: { name: 'other', parameters: { type: 'object' } } },
+  ]);
+  await expect(unoffered.invoke('calculate')).rejects.toMatchObject({
+    name: 'MockModelError',
+    message: 'The mock tool call was not offered.',
+  });
+  await expect(original.invoke('calculate')).rejects.toBeInstanceOf(MockModelError);
+  expect((await bound.invoke('calculate')).tool_calls).toEqual(toolCalls);
 });

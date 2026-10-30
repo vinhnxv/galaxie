@@ -5,7 +5,8 @@
     "python/standins",
     "examples/rag-browser/agent_py",
     "tests/conformance/cases-python",
-    "scripts"
+    "scripts",
+    "tests/conformance/cases-pydantic-ai"
   ],
   "venvPath": "python",
   "venv": ".venv",
@@ -15,5 +16,16 @@
     "python/galaxie/src",
     "examples/rag-browser/agent_py",
     "tests/conformance/cases-python"
+  ],
+  "exclude": ["**/build", "**/node_modules", "**/__pycache__", "**/.*"],
+  "executionEnvironments": [
+    {
+      "root": "tests/conformance/cases-pydantic-ai",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai"]
+    },
+    {
+      "root": "scripts/record-pydantic-ai-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai"]
+    }
   ]
 }

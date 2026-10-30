@@ -3,7 +3,7 @@
 
 import { type ErrorCode, toErrorInfo } from '@galaxie/core';
 import { validCheckpointReply, validCheckpointRequest } from './checkpoints.js';
-import type { LockedWheel } from './runtime-files.js';
+import type { LockedWheel, PythonFramework } from './runtime-files.js';
 
 export const BRIDGE_VERSION: 'galaxie.bridge/v2' = 'galaxie.bridge/v2';
 export const MAX_BRIDGE_BYTES: number = 1_048_576;
@@ -35,6 +35,7 @@ export type BridgeMessage = Envelope &
       }
   );
 export interface BootPayload {
+  readonly framework?: PythonFramework;
   readonly checkpoints?: boolean;
   readonly runtimeUrl: string;
   readonly wheelsUrl: string;
@@ -59,10 +60,41 @@ export interface PendingReply {
 export interface ModelPayload {
   readonly role: string;
   readonly messages: readonly {
-    readonly role: 'system' | 'user' | 'assistant';
+    readonly role: 'system' | 'user' | 'assistant' | 'tool';
     readonly content: string;
+    readonly toolCalls?: readonly ToolCall[];
+    readonly tool_call_id?: string;
   }[];
-  readonly options: { readonly stop?: readonly string[]; readonly stream?: boolean };
+  readonly options: {
+    readonly stop?: readonly string[];
+    readonly stream?: boolean;
+    readonly tools?: readonly ToolDefinition[];
+    readonly toolChoice?:
+      | 'auto'
+      | 'none'
+      | 'required'
+      | { readonly type: 'function'; readonly function: { readonly name: string } };
+  };
+}
+export interface ToolDefinition {
+  readonly type: 'function';
+  readonly function: {
+    readonly name: string;
+    readonly description?: string;
+    readonly parameters: Readonly<Record<string, unknown>>;
+    readonly strict?: boolean;
+  };
+}
+export interface ToolCall {
+  readonly id: string;
+  readonly type: 'function';
+  readonly function: { readonly name: string; readonly arguments: string };
+}
+export interface ToolCallDelta {
+  readonly index: number;
+  readonly id?: string;
+  readonly type?: 'function';
+  readonly function: { readonly name?: string; readonly arguments?: string };
 }
 export type StreamPayload = readonly [
   readonly string[],
@@ -71,6 +103,7 @@ export type StreamPayload = readonly [
 ];
 export interface ModelReply {
   readonly content: string;
+  readonly toolCalls?: readonly ToolCall[];
   readonly usage?: {
     readonly input_tokens: number;
     readonly output_tokens: number;
@@ -140,7 +173,14 @@ export function validPythonModule(value: unknown): value is string {
 function wheel(value: unknown): boolean {
   return (
     object(value) &&
-    keys(value, ['name', 'version', 'file', 'bytes', 'sha256'], ['url']) &&
+    keys(value, ['name', 'version', 'file', 'bytes', 'sha256'], ['url', 'frameworks']) &&
+    (value['frameworks'] === undefined ||
+      (Array.isArray(value['frameworks']) &&
+        value['frameworks'].length > 0 &&
+        new Set(value['frameworks']).size === value['frameworks'].length &&
+        value['frameworks'].every(
+          (framework: unknown) => framework === 'langgraph' || framework === 'pydantic-ai',
+        ))) &&
     text(value['name']) &&
     text(value['version']) &&
     typeof value['file'] === 'string' &&
@@ -166,6 +206,71 @@ function json(value: unknown, ancestors = new Set<object>()): boolean {
   ancestors.delete(value);
   return valid;
 }
+function toolDefinition(value: unknown): boolean {
+  return (
+    object(value) &&
+    keys(value, ['type', 'function']) &&
+    value['type'] === 'function' &&
+    object(value['function']) &&
+    keys(value['function'], ['name', 'parameters'], ['description', 'strict']) &&
+    text(value['function']['name']) &&
+    object(value['function']['parameters']) &&
+    json(value['function']['parameters']) &&
+    (value['function']['description'] === undefined ||
+      typeof value['function']['description'] === 'string') &&
+    (value['function']['strict'] === undefined || typeof value['function']['strict'] === 'boolean')
+  );
+}
+export function validToolCall(value: unknown): value is ToolCall {
+  return (
+    object(value) &&
+    keys(value, ['id', 'type', 'function']) &&
+    text(value['id']) &&
+    value['id'].length <= 128 &&
+    value['type'] === 'function' &&
+    object(value['function']) &&
+    keys(value['function'], ['name', 'arguments']) &&
+    text(value['function']['name']) &&
+    typeof value['function']['arguments'] === 'string'
+  );
+}
+function toolChoice(value: unknown): boolean {
+  return (
+    ['auto', 'none', 'required'].includes(value as string) ||
+    (object(value) &&
+      keys(value, ['type', 'function']) &&
+      value['type'] === 'function' &&
+      object(value['function']) &&
+      keys(value['function'], ['name']) &&
+      text(value['function']['name']))
+  );
+}
+function modelMessage(value: unknown): boolean {
+  if (!object(value) || typeof value['content'] !== 'string') return false;
+  if (value['role'] === 'tool')
+    return keys(value, ['role', 'content', 'tool_call_id']) && text(value['tool_call_id']);
+  if (value['role'] === 'assistant')
+    return (
+      keys(value, ['role', 'content'], ['toolCalls']) &&
+      (value['toolCalls'] === undefined ||
+        (Array.isArray(value['toolCalls']) && value['toolCalls'].every(validToolCall)))
+    );
+  return ['system', 'user'].includes(value['role'] as string) && keys(value, ['role', 'content']);
+}
+function toolDelta(value: unknown): boolean {
+  return (
+    object(value) &&
+    keys(value, ['index', 'function'], ['id', 'type']) &&
+    count(value['index']) &&
+    (value['id'] === undefined || text(value['id'])) &&
+    (value['type'] === undefined || value['type'] === 'function') &&
+    object(value['function']) &&
+    keys(value['function'], [], ['name', 'arguments']) &&
+    (value['function']['name'] === undefined || typeof value['function']['name'] === 'string') &&
+    (value['function']['arguments'] === undefined ||
+      typeof value['function']['arguments'] === 'string')
+  );
+}
 function requestPayload(op: BridgeOp, value: unknown): boolean {
   if (!object(value)) return false;
   switch (op) {
@@ -174,8 +279,11 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
         keys(
           value,
           ['runtimeUrl', 'wheelsUrl', 'localWheels', 'sources', 'module', 'entry'],
-          ['checkpoints'],
+          ['checkpoints', 'framework'],
         ) &&
+        (value['framework'] === undefined ||
+          value['framework'] === 'langgraph' ||
+          value['framework'] === 'pydantic-ai') &&
         (value['checkpoints'] === undefined || typeof value['checkpoints'] === 'boolean') &&
         text(value['runtimeUrl']) &&
         text(value['wheelsUrl']) &&
@@ -218,15 +326,14 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
         keys(value, ['role', 'messages', 'options']) &&
         text(value['role']) &&
         Array.isArray(value['messages']) &&
-        value['messages'].every(
-          (message: unknown) =>
-            object(message) &&
-            keys(message, ['role', 'content']) &&
-            ['system', 'user', 'assistant'].includes(message['role'] as string) &&
-            typeof message['content'] === 'string',
-        ) &&
+        value['messages'].every(modelMessage) &&
         object(value['options']) &&
-        keys(value['options'], [], ['stop', 'stream']) &&
+        keys(value['options'], [], ['stop', 'stream', 'tools', 'toolChoice']) &&
+        (value['options']['tools'] === undefined ||
+          (Array.isArray(value['options']['tools']) &&
+            value['options']['tools'].every(toolDefinition))) &&
+        (value['options']['toolChoice'] === undefined ||
+          toolChoice(value['options']['toolChoice'])) &&
         (value['options']['stream'] === undefined ||
           typeof value['options']['stream'] === 'boolean') &&
         (value['options']['stop'] === undefined ||
@@ -263,7 +370,9 @@ function responsePayload(op: BridgeOp, value: unknown): boolean {
     case 'model': {
       if (
         !object(value) ||
-        !keys(value, ['content'], ['usage']) ||
+        !keys(value, ['content'], ['usage', 'toolCalls']) ||
+        (value['toolCalls'] !== undefined &&
+          (!Array.isArray(value['toolCalls']) || !value['toolCalls'].every(validToolCall))) ||
         typeof value['content'] !== 'string'
       )
         return false;
@@ -332,7 +441,11 @@ function valid(value: unknown): value is BridgeMessage {
     const payload = value['payload'];
     if (op === 'model-chunk')
       return (
-        object(payload) && keys(payload, ['content']) && typeof payload['content'] === 'string'
+        object(payload) &&
+        keys(payload, ['content'], ['toolCalls']) &&
+        typeof payload['content'] === 'string' &&
+        (payload['toolCalls'] === undefined ||
+          (Array.isArray(payload['toolCalls']) && payload['toolCalls'].every(toolDelta)))
       );
     return (
       op === 'stream' &&

@@ -5,6 +5,12 @@ import { expect, test } from 'vitest';
 import { encodeBridge, failure, parseBridge, success } from '../src/bridge.js';
 
 const version = 'galaxie.bridge/v2';
+const tool = { type: 'function', function: { name: 'double', parameters: { type: 'object' } } };
+const toolCall = {
+  id: 'call_1',
+  type: 'function',
+  function: { name: 'double', arguments: '{"value":2}' },
+};
 const payloads = {
   boot: {
     runtimeUrl: 'https://example.test/python/',
@@ -211,4 +217,74 @@ test('v2 resume, pending and notifications have closed payloads', () => {
     expect(() => parseBridge(JSON.stringify({ v: version, id: 'one', ...message }))).toThrow(
       'The request is invalid.',
     );
+});
+
+test('tool definitions, calls, results and argument deltas have closed JSON shapes', () => {
+  const messages = [
+    { role: 'user', content: 'double two' },
+    { role: 'assistant', content: '', toolCalls: [toolCall] },
+    { role: 'tool', content: '4', tool_call_id: 'call_1' },
+  ];
+  const offered = {
+    role: 'answer',
+    messages,
+    options: {
+      tools: [tool, { ...tool, function: { ...tool.function, name: 'other' } }],
+      toolChoice: 'auto',
+    },
+  };
+  for (const message of [
+    { kind: 'request', op: 'model', payload: offered },
+    { kind: 'response', op: 'model', ok: true, payload: { content: '', toolCalls: [toolCall] } },
+    {
+      kind: 'notify',
+      op: 'model-chunk',
+      payload: {
+        content: '',
+        toolCalls: [
+          {
+            index: 0,
+            id: 'call_1',
+            type: 'function',
+            function: { name: 'double', arguments: '{' },
+          },
+        ],
+      },
+    },
+  ]) {
+    const raw = JSON.stringify({ v: version, id: 'one', ...message });
+    expect(encodeBridge(parseBridge(raw))).toBe(raw);
+  }
+  for (const payload of [
+    { ...offered, options: { tools: [{ ...tool, secret: true }] } },
+    {
+      ...offered,
+      messages: [{ role: 'assistant', content: '', toolCalls: [{ ...toolCall, secret: true }] }],
+    },
+    { ...offered, messages: [{ role: 'tool', content: '4' }] },
+    {
+      ...offered,
+      options: {
+        tools: [tool],
+        toolChoice: { type: 'function', function: { name: 'double', secret: true } },
+      },
+    },
+  ])
+    expect(() =>
+      parseBridge(JSON.stringify({ v: version, id: 'one', kind: 'request', op: 'model', payload })),
+    ).toThrow('The request is invalid.');
+  expect(() =>
+    parseBridge(
+      JSON.stringify({
+        v: version,
+        id: 'one',
+        kind: 'notify',
+        op: 'model-chunk',
+        payload: {
+          content: '',
+          toolCalls: [{ index: 0, function: { arguments: '{', secret: true } }],
+        },
+      }),
+    ),
+  ).toThrow('The request is invalid.');
 });

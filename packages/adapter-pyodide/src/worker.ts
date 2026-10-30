@@ -13,6 +13,7 @@ import {
   success,
 } from './bridge.js';
 import { adapterFailure, failureCode } from './errors.js';
+import { pydanticAiDriver } from './pydantic-ai-driver.js';
 import { lockedWheels } from './runtime-files.js';
 
 // Module Workers cannot run classic scripts. Pyodide probes importScripts with a data URL;
@@ -35,7 +36,10 @@ let reading: { id: string } | undefined;
 const pending = new Map<string, { request: BridgeMessage; resolve(value: string): void }>();
 async function boot(input: BootPayload): Promise<number> {
   const started = performance.now();
-  const all = [...lockedWheels, ...input.localWheels];
+  const framework = input.framework ?? 'langgraph';
+  const all = [...lockedWheels, ...input.localWheels].filter(
+    (wheel) => wheel.frameworks === undefined || wheel.frameworks.includes(framework),
+  );
   const verified = new Map<string, Uint8Array<ArrayBuffer>>();
   for (const file of all) {
     const url = new URL(file.file, input.wheelsUrl).href;
@@ -106,7 +110,9 @@ async function boot(input: BootPayload): Promise<number> {
     if (cache !== undefined) fs?.rmSync(cache, { recursive: true, force: true });
   }
   await py.runPythonAsync(
-    'import langgraph.graph\nimport langchain_core.messages\nimport galaxie\nimport ormsgpack',
+    framework === 'pydantic-ai'
+      ? 'import pydantic_ai\nimport galaxie'
+      : 'import langgraph.graph\nimport langchain_core.messages\nimport galaxie\nimport ormsgpack',
   );
   py.FS.mkdirTree('/agent');
   for (const source of input.sources) {
@@ -148,7 +154,10 @@ async function boot(input: BootPayload): Promise<number> {
   py.globals['set']('_galaxie_module', input.module);
   py.globals['set']('_galaxie_entry', input.entry);
   py.globals['set']('_galaxie_durable', input.checkpoints === true);
-  await py.runPythonAsync(`
+  await py.runPythonAsync(
+    framework === 'pydantic-ai'
+      ? pydanticAiDriver
+      : `
 import sys, json, asyncio, importlib
 from galaxie._bridge import install_transport, GalaxieError, notify_stream, receive_model_chunk
 from _galaxie_transport import request as _transport, notify as _notify
@@ -226,7 +235,8 @@ async def _galaxie_execute():
         return json.dumps({'ok': False, 'code': 'cancelled'})
     except Exception:
         return json.dumps({'ok': False, 'code': 'executor_error'})
-`);
+`,
+  );
   const ready = JSON.parse(py.runPython('json.dumps(_galaxie_ready)')) as {
     ok: boolean;
     code: ErrorCode;

@@ -57,6 +57,99 @@ def _invalid_constant(_: str) -> None:
     raise GalaxieError("invalid")
 
 
+def _keys(value, required, optional=()):
+    return isinstance(value, dict) and set(required) <= value.keys() <= set(required) | set(optional)
+
+
+def _tool_call(value):
+    return (
+        _keys(value, ('id', 'type', 'function')) and _text(value['id'])
+        and len(value['id']) <= 128 and value['type'] == 'function'
+        and _keys(value['function'], ('name', 'arguments'))
+        and _text(value['function']['name']) and isinstance(value['function']['arguments'], str)
+    )
+
+
+def _tool_definition(value):
+    return (
+        _keys(value, ('type', 'function')) and value['type'] == 'function'
+        and _keys(value['function'], ('name', 'parameters'), ('description', 'strict'))
+        and _text(value['function']['name']) and isinstance(value['function']['parameters'], dict)
+        and ('description' not in value['function'] or isinstance(value['function']['description'], str))
+        and ('strict' not in value['function'] or type(value['function']['strict']) is bool)
+    )
+
+
+def _model_message(value):
+    if not isinstance(value, dict) or not isinstance(value.get('content'), str):
+        return False
+    role = value.get('role')
+    if role == 'tool':
+        return _keys(value, ('role', 'content', 'tool_call_id')) and _text(value['tool_call_id'])
+    if role == 'assistant':
+        return _keys(value, ('role', 'content'), ('toolCalls',)) and (
+            'toolCalls' not in value or isinstance(value['toolCalls'], list)
+            and all(_tool_call(call) for call in value['toolCalls'])
+        )
+    return role in ('system', 'user') and _keys(value, ('role', 'content'))
+
+
+def _model_request(value):
+    if not (
+        _keys(value, ('role', 'messages', 'options')) and _text(value['role'])
+        and isinstance(value['messages'], list) and all(_model_message(message) for message in value['messages'])
+        and _keys(value['options'], (), ('stop', 'stream', 'tools', 'toolChoice'))
+    ):
+        return False
+    options = value['options']
+    if 'stop' in options and not (isinstance(options['stop'], (list, tuple)) and all(isinstance(item, str) for item in options['stop'])):
+        return False
+    if 'stream' in options and type(options['stream']) is not bool:
+        return False
+    if 'tools' in options and not (isinstance(options['tools'], list) and all(_tool_definition(item) for item in options['tools'])):
+        return False
+    if 'toolChoice' in options:
+        choice = options['toolChoice']
+        if choice not in ('auto', 'none', 'required') and not (
+            _keys(choice, ('type', 'function')) and choice['type'] == 'function'
+            and _keys(choice['function'], ('name',)) and _text(choice['function']['name'])
+        ):
+            return False
+    return True
+
+
+def _model_reply(value):
+    if not (_keys(value, ('content',), ('usage', 'toolCalls')) and isinstance(value['content'], str)):
+        return False
+    if 'toolCalls' in value and not (isinstance(value['toolCalls'], list) and all(_tool_call(item) for item in value['toolCalls'])):
+        return False
+    if 'usage' in value:
+        usage = value['usage']
+        if not (_keys(usage, ('input_tokens', 'output_tokens', 'total_tokens')) and all(type(item) is int and item >= 0 for item in usage.values()) and usage['input_tokens'] + usage['output_tokens'] == usage['total_tokens']):
+            return False
+    return True
+
+
+def _model_chunk(value):
+    if not (_keys(value, ('content',), ('toolCalls',)) and isinstance(value['content'], str)):
+        return False
+    if 'toolCalls' not in value:
+        return True
+    if not isinstance(value['toolCalls'], list):
+        return False
+    for call in value['toolCalls']:
+        if not (
+            _keys(call, ('index', 'function'), ('id', 'type'))
+            and type(call['index']) is int and call['index'] >= 0
+            and ('id' not in call or _text(call['id']))
+            and ('type' not in call or call['type'] == 'function')
+            and _keys(call['function'], (), ('name', 'arguments'))
+            and all(isinstance(item, str) for item in call['function'].values())
+        ):
+            return False
+    return True
+
+
 async def request(
     op: str, payload: dict[str, Any], *, on_chunk: Callable[[str], None] | None = None,
 ) -> Any:
@@ -64,6 +157,8 @@ async def request(
         raise GalaxieError("invalid")
     if op == "checkpoint" and not _checkpoint_request(payload):
         raise GalaxieError("invalid")
+    if op == 'model' and not _model_request(payload):
+        raise GalaxieError('invalid')
     if _transport is None:
         raise GalaxieError("unavailable")
     if on_chunk is not None and (
@@ -115,6 +210,8 @@ async def request(
             "v", "kind", "id", "op", "ok", "payload"
         }:
             raise GalaxieError("invalid")
+        if op == 'model' and not _model_reply(value['payload']):
+            raise GalaxieError('invalid')
         if op == "checkpoint":
             reply = value["payload"]
             operation = payload["op"]
@@ -140,8 +237,7 @@ def receive_model_chunk(raw: str) -> None:
             or message['v'] != VERSION or message['kind'] != 'notify'
             or message['op'] != 'model-chunk' or not isinstance(message['id'], str)
             or message['id'] not in _streams or not isinstance(message['payload'], dict)
-            or set(message['payload']) != {'content'}
-            or not isinstance(message['payload']['content'], str)
+            or not _model_chunk(message['payload'])
         ):
             raise GalaxieError('invalid')
         _streams[message['id']](message['payload']['content'])

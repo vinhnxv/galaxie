@@ -3,10 +3,10 @@ name = "galaxie-python-tests"
 version = "0.0.0"
 license = "AGPL-3.0-only"
 requires-python = ">=3.14,<3.15"
-dependencies = ["galaxie", "ormsgpack==1.13.0", "langgraph>=1,<2"]
+dependencies = ["galaxie[pydantic-ai]", "ormsgpack==1.13.0", "langgraph>=1,<2"]
 
 [dependency-groups]
-dev = ["pytest==8.4.2", "setuptools==80.9.0", "wheel==0.45.1"]
+dev = ["pytest==8.4.2", "setuptools==80.9.0", "wheel==0.45.1", "openai==3.37.0"]
 
 [tool.uv]
 package = false
@@ -24,4 +24,4 @@ galaxie = { workspace = true }
 ormsgpack = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["galaxie/tests", "../examples/rag-browser/agent_py/tests", "../tests/conformance/cases-python"]
+testpaths = ["galaxie/tests", "../examples/rag-browser/agent_py/tests", "../tests/conformance/cases-python", "../tests/conformance/cases-pydantic-ai"]

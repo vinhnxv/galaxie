@@ -11,6 +11,7 @@ import {
   type BridgeMessage,
   encodeBridge,
   failure,
+  type ModelPayload,
   parseBridge,
   success,
 } from '../src/bridge.js';
@@ -70,8 +71,12 @@ const preparation = {
   signal: new AbortController().signal,
   models: { roles: ['answer'], providers: { model: { credential: false } } },
 };
-function setup(workers: FixtureWorker[]): ReturnType<typeof createPyodideAdapter> {
+function setup(
+  workers: FixtureWorker[],
+  framework?: 'pydantic-ai',
+): ReturnType<typeof createPyodideAdapter> {
   return createPyodideAdapter({
+    ...(framework === undefined ? {} : { framework }),
     createWorker: () => {
       const worker = new FixtureWorker();
       workers.push(worker);
@@ -125,7 +130,11 @@ async function collect(source: AsyncIterable<unknown>): Promise<unknown[]> {
   for await (const event of source) events.push(event);
   return events;
 }
-function modelRoundTrip(worker: FixtureWorker, capability = false): void {
+function modelRoundTrip(
+  worker: FixtureWorker,
+  capability = false,
+  options: ModelPayload['options'] = {},
+): void {
   let run: BridgeMessage | undefined;
   worker.handle = (message) => {
     if (message.kind === 'request' && message.op === 'run') {
@@ -141,7 +150,7 @@ function modelRoundTrip(worker: FixtureWorker, capability = false): void {
               input: { query: 'capital' },
               effectScope: 'parent:task|child:task',
             }
-          : { role: 'answer', messages: [{ role: 'user', content: 'capital' }], options: {} },
+          : { role: 'answer', messages: [{ role: 'user', content: 'capital' }], options },
       });
     } else if (message.kind === 'response' && message.op === 'capability' && run) {
       if (!message.ok) worker.emit(failure(run, message.error.code, 'result'));
@@ -169,6 +178,234 @@ function modelRoundTrip(worker: FixtureWorker, capability = false): void {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+const offeredTools: NonNullable<ModelPayload['options']['tools']> = [
+  { type: 'function', function: { name: 'double', parameters: { type: 'object' } } },
+];
+
+test('framework selection declares only the implemented features and selects the boot driver', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const adapter = setup(workers, 'pydantic-ai');
+  expect(adapter.id).toBe('pydantic-ai-python');
+  expect(adapter.features).toEqual({
+    streaming: false,
+    interrupts: false,
+    resume: false,
+    checkpoints: false,
+    subgraphs: false,
+  });
+  expect(setup([]).features).toEqual({
+    streaming: true,
+    interrupts: true,
+    resume: true,
+    checkpoints: true,
+    subgraphs: true,
+  });
+  const executor = await adapter.prepare(
+    descriptor,
+    { chatModels: { model: model() } },
+    preparation,
+  );
+  expect(workers[0]?.sent[0]).toMatchObject({ op: 'boot', payload: { framework: 'pydantic-ai' } });
+  await executor.dispose();
+});
+
+test.each(['allow', 'block', 'hook-error', 'no-bind'] as const)(
+  'tool calls bind the leased provider and stay behind final output checks: %s',
+  async (outcome) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const provider = model();
+    vi.mocked(provider.invoke).mockResolvedValue(
+      new AIMessageChunk({
+        content: '',
+        tool_calls: [{ id: 'one', name: 'double', args: { value: 'blocked' } }],
+      }),
+    );
+    if (outcome !== 'no-bind') provider.bindTools = vi.fn(() => provider);
+    const executor = await setup(workers).prepare(
+      descriptor,
+      { chatModels: { model: provider } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('The fixture Worker is missing.');
+    modelRoundTrip(worker, false, { tools: offeredTools, toolChoice: 'required' });
+    const run = request();
+    vi.mocked(run.lease.checkOutput).mockImplementation(async () => {
+      if (outcome === 'block') throw new GalaxieError('denied', 'Policy denied the request.');
+      if (outcome === 'hook-error') throw new Error('PRIVATE HOOK DETAIL');
+    });
+    const result = await collect(executor.run(run.request));
+    expect(run.request.models.begin).toHaveBeenCalledWith(
+      'answer',
+      expect.objectContaining({ requires: ['tool-calling'] }),
+    );
+    expect(run.request.models.begin).toHaveBeenCalledTimes(1);
+    if (outcome === 'allow') {
+      expect(provider.bindTools).toHaveBeenCalledWith(offeredTools, { tool_choice: 'required' });
+      expect(run.lease.checkOutput).toHaveBeenCalledWith('\n{"value":"blocked"}\none', {
+        final: true,
+      });
+      expect(result).toMatchObject([
+        {
+          type: 'output',
+          output: {
+            content: '',
+            toolCalls: [{ id: 'one', function: { arguments: '{"value":"blocked"}' } }],
+          },
+        },
+      ]);
+      expect(run.lease.end).toHaveBeenCalledTimes(1);
+    } else {
+      const code =
+        outcome === 'block' ? 'denied' : outcome === 'hook-error' ? 'unavailable' : 'unsupported';
+      expect(result).toMatchObject([{ type: 'error', error: { code } }]);
+      expect(
+        worker.sent
+          .filter((message) => message.kind === 'response' && message.op === 'model')
+          .every((message) => !('ok' in message) || !message.ok),
+      ).toBe(true);
+      expect(JSON.stringify(worker.sent)).not.toContain('PRIVATE HOOK DETAIL');
+      expect(run.lease.fail).toHaveBeenCalledTimes(1);
+      if (outcome === 'no-bind') expect(provider.invoke).not.toHaveBeenCalled();
+    }
+    await executor.dispose();
+  },
+);
+
+test('split tool arguments are checked before forwarding the blocked fragment', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const provider = {
+    async invoke() {
+      return new AIMessage('');
+    },
+    bindTools: () => provider,
+    async stream() {
+      return (async function* () {
+        yield new AIMessageChunk({
+          content: '',
+          tool_call_chunks: [{ index: 0, id: 'one', name: 'double', args: '{"value":"blo' }],
+        });
+        yield new AIMessageChunk({ content: '', tool_call_chunks: [{ index: 0, args: 'cked"}' }] });
+      })();
+    },
+  } as unknown as BaseChatModel;
+  const executor = await setup(workers).prepare(
+    descriptor,
+    { chatModels: { model: provider } },
+    preparation,
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('The fixture Worker is missing.');
+  modelRoundTrip(worker, false, { tools: offeredTools, stream: true });
+  const run = request();
+  vi.mocked(run.lease.checkOutput).mockImplementation(async (text) => {
+    if (text.includes('blocked')) throw new GalaxieError('denied', 'Policy denied the request.');
+  });
+  expect(await collect(executor.run(run.request))).toMatchObject([
+    { type: 'error', error: { code: 'denied' } },
+  ]);
+  const deltas = worker.sent.filter((message) => message.op === 'model-chunk');
+  expect(deltas).toHaveLength(1);
+  expect(deltas[0]).toMatchObject({
+    payload: { content: '', toolCalls: [{ function: { arguments: '{"value":"blo' } }] },
+  });
+  expect(run.lease.checkOutput).toHaveBeenLastCalledWith('\n{"value":"blocked"}', { final: false });
+  await executor.dispose();
+});
+
+test('final checks retain complete tool arguments dropped by LangChain concatenation', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const provider = {
+    async invoke() {
+      return new AIMessage('');
+    },
+    bindTools: () => provider,
+    async stream() {
+      return (async function* () {
+        yield new AIMessageChunk({
+          content: '',
+          tool_calls: [{ id: 'complete', name: 'double', args: { value: 'blocked' } }],
+        });
+        yield new AIMessageChunk({
+          content: '',
+          tool_call_chunks: [{ index: 0, id: 'fragment', name: 'double', args: '{"value":2}' }],
+        });
+      })();
+    },
+  } as unknown as BaseChatModel;
+  const executor = await setup(workers).prepare(
+    descriptor,
+    { chatModels: { model: provider } },
+    preparation,
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('The fixture Worker is missing.');
+  modelRoundTrip(worker, false, { tools: offeredTools, stream: true });
+  const run = request();
+  vi.mocked(run.lease.checkOutput).mockImplementation(async (text, { final }) => {
+    if (final && text.includes('blocked'))
+      throw new GalaxieError('denied', 'Policy denied the request.');
+  });
+  expect(await collect(executor.run(run.request))).toMatchObject([
+    { type: 'error', error: { code: 'denied' } },
+  ]);
+  expect(run.lease.checkOutput).toHaveBeenLastCalledWith(
+    '\n{"value":"blocked"}\n{"value":2}\nfragment',
+    {
+      final: true,
+    },
+  );
+  await executor.dispose();
+});
+
+test('final checks include normalized arguments returned after escaped streaming fragments', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const provider = {
+    async invoke() {
+      return new AIMessage('');
+    },
+    bindTools: () => provider,
+    async stream() {
+      return (async function* () {
+        yield new AIMessageChunk({
+          content: '',
+          tool_call_chunks: [
+            { index: 0, id: 'one', name: 'double', args: '{"value":"\\u0062locked"}' },
+          ],
+        });
+      })();
+    },
+  } as unknown as BaseChatModel;
+  const executor = await setup(workers).prepare(
+    descriptor,
+    { chatModels: { model: provider } },
+    preparation,
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('The fixture Worker is missing.');
+  modelRoundTrip(worker, false, { tools: offeredTools, stream: true });
+  const run = request();
+  vi.mocked(run.lease.checkOutput).mockImplementation(async (text) => {
+    if (text.includes('blocked')) throw new GalaxieError('denied', 'Policy denied the request.');
+  });
+  expect(await collect(executor.run(run.request))).toMatchObject([
+    { type: 'error', error: { code: 'denied' } },
+  ]);
+  expect(run.lease.checkOutput).toHaveBeenLastCalledWith(
+    '\n{"value":"\\u0062locked"}\n\n{"value":"blocked"}\none',
+    { final: true },
+  );
+  expect(
+    worker.sent.filter((message) => message.kind === 'response' && message.op === 'model'),
+  ).toMatchObject([{ ok: false, error: { code: 'denied' } }]);
+  await executor.dispose();
 });
 
 test.each([

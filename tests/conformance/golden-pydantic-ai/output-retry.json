@@ -1,0 +1,127 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "retry output"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "final_result",
+            "description": "The final response which ends this conversation",
+            "parameters": {
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "title": "Answer",
+              "type": "object"
+            }
+          }
+        }
+      ],
+      "toolChoice": "required"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "retry output"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "output_1",
+              "type": "function",
+              "function": {
+                "name": "final_result",
+                "arguments": "{\"value\":\"invalid\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "output_1",
+          "content": "{\"error\":[{\"type\":\"int_parsing\",\"loc\":[\"value\"],\"msg\":\"Input should be a valid integer, unable to parse string as an integer\",\"input\":\"invalid\"}]}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "final_result",
+            "description": "The final response which ends this conversation",
+            "parameters": {
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "title": "Answer",
+              "type": "object"
+            }
+          }
+        }
+      ],
+      "toolChoice": "required"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "output_1",
+          "name": "final_result",
+          "args": {
+            "value": "invalid"
+          }
+        }
+      ]
+    },
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "output_2",
+          "name": "final_result",
+          "args": {
+            "value": 6
+          }
+        }
+      ]
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "value": 6
+  },
+  "error": null
+}

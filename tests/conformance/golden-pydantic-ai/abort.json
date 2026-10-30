@@ -1,0 +1,29 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "abort call"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "cancelled",
+    "message": "The run was cancelled."
+  }
+}

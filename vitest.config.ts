@@ -121,6 +121,7 @@ const config: ViteUserConfig = defineConfig({
             '@langchain/core/messages',
             '@langchain/core/outputs',
             '@langchain/core/utils/json_schema',
+            '@langchain/core/utils/function_calling',
             '@langchain/core/language_models/structured_output',
             '@langchain/core/output_parsers',
             '@langchain/core/runnables',

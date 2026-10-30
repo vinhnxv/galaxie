@@ -29,6 +29,155 @@ const passages = [
 ];
 
 test.skipIf(!pythonWheelsAvailable)(
+  'both Python frameworks run in one runtime and reject an invalid pydantic entry',
+  async () => {
+    const fixture = await createPythonFixture({
+      module: 'agents',
+      sources: {
+        'agents.py': `
+def create_agent():
+    from typing import TypedDict
+    from langgraph.graph import StateGraph, START, END
+    from galaxie.langgraph import checkpointer
+    class State(TypedDict, total=False):
+        question: str
+        mode: str
+        answer: str
+        citations: list
+    graph = StateGraph(State)
+    graph.add_node('answer', lambda _: {'answer': 'LangGraph', 'citations': []})
+    graph.add_edge(START, 'answer')
+    graph.add_edge('answer', END)
+    return graph.compile(checkpointer=checkpointer())
+def create_pydantic_agent():
+    from pydantic_ai import Agent
+    from galaxie.pydantic_ai import Executor, GalaxieModel
+    return Executor(Agent(GalaxieModel('rag.answer')), prompt=lambda value: value['question'], output=lambda answer: {'answer': answer, 'citations': []})
+def create_tool_agent():
+    from pydantic_ai import Agent
+    from galaxie.pydantic_ai import Executor, GalaxieModel, capability_tool
+    tool = capability_tool('search', 'docs.search@1', {'type': 'object', 'properties': {'query': {'type': 'string'}}})
+    return Executor(Agent(GalaxieModel('rag.answer'), tools=[tool]), prompt=lambda value: value['question'])
+def invalid_agent():
+    return object()
+`,
+      },
+    });
+    const pydantic = createPyodideAdapter({ ...fixture.options, framework: 'pydantic-ai' });
+    const runtime = createRuntime({
+      appId: 'both-python-frameworks',
+      executors: [createPyodideAdapter(fixture.options), pydantic],
+      outputSafety: () => 'allow',
+    });
+    const latch = createMockLatch();
+    try {
+      const services = {
+        chatModels: {
+          mock: new MockChatModel({
+            hello: { text: 'Pydantic', id: 'answer' },
+            slow: { text: 'late', id: 'late', wait: latch },
+          }),
+        },
+      };
+      const models = {
+        providers: {
+          mock: {
+            destination: 'in-browser' as const,
+            modality: 'text' as const,
+            features: [],
+            languages: ['en'],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+          },
+        },
+        roles: {
+          'rag.answer': { providers: ['mock'], allow: ['in-browser' as const], maxTokens: 100 },
+        },
+      };
+      const binding = {
+        kind: 'read' as const,
+        destination: 'in-browser' as const,
+        timeoutMs: 5000,
+        concurrency: 1,
+        grantScope: 'instance' as const,
+        approval: 'none' as const,
+        retry: 'none' as const,
+        invoke: async () => ({ passages: [] }),
+      };
+      for (const [executor, entry, answer] of [
+        ['langgraph-python', 'create_agent', 'LangGraph'],
+        ['pydantic-ai-python', 'create_pydantic_agent', 'Pydantic'],
+      ]) {
+        const instance = await runtime.create(
+          { ...pythonRagDefinition, executor: executor as string },
+          {
+            principalScope: 'fixture',
+            agent: { ...fixture.agent, entry: entry as string },
+            services,
+            models,
+            bindings: { 'docs.search@1': binding },
+          },
+        );
+        await instance.prepare();
+        const run = await instance.start({ question: 'hello', mode: 'hybrid' });
+        expect(
+          (await events(instance.events(run.runId))).find((event) => event.type === 'output'),
+        ).toMatchObject({ output: { answer, citations: [] } });
+        if (executor === 'pydantic-ai-python') {
+          const slow = await instance.start({ question: 'slow', mode: 'hybrid' });
+          const cancelled = events(instance.events(slow.runId));
+          await latch.entered;
+          await instance.cancel(slow.runId);
+          expect((await cancelled).some((event) => event.type === 'cancelled')).toBe(true);
+          const next = await instance.start({ question: 'hello', mode: 'hybrid' });
+          expect(
+            (await events(instance.events(next.runId))).find((event) => event.type === 'output'),
+          ).toMatchObject({ output: { answer: 'Pydantic', citations: [] } });
+        }
+      }
+      const noTools = await runtime.create(
+        { ...pythonRagDefinition, executor: 'pydantic-ai-python' },
+        {
+          principalScope: 'fixture',
+          agent: { ...fixture.agent, entry: 'create_tool_agent' },
+          services,
+          models,
+          bindings: { 'docs.search@1': binding },
+        },
+      );
+      await noTools.prepare();
+      const callsBefore = services.chatModels.mock.calls;
+      const unavailable = await noTools.start({ question: 'hello', mode: 'hybrid' });
+      expect(
+        (await events(noTools.events(unavailable.runId))).find((event) => event.type === 'error'),
+      ).toMatchObject({
+        error: { code: 'unavailable', message: 'The requested service is unavailable.' },
+      });
+      expect(services.chatModels.mock.calls).toBe(callsBefore);
+      const invalid = await runtime.create(
+        { ...pythonRagDefinition, executor: 'pydantic-ai-python' },
+        {
+          principalScope: 'fixture',
+          agent: { ...fixture.agent, entry: 'invalid_agent' },
+          services,
+          models,
+          bindings: { 'docs.search@1': binding },
+        },
+      );
+      await expect(invalid.prepare()).rejects.toMatchObject({
+        code: 'unsupported',
+        message: 'This operation is unsupported.',
+      });
+      expect(fixture.workerErrors).toEqual([]);
+    } finally {
+      latch.release();
+      await runtime.dispose();
+      await fixture.cleanup();
+    }
+  },
+  60000,
+);
+
+test.skipIf(!pythonWheelsAvailable)(
   pythonWheelsAvailable
     ? 'real Node Python graph uses routed models and broker scopes without exposing credentials or blocked output'
     : missingPythonWheels,

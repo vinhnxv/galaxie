@@ -2,15 +2,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
-import { BaseChatModel, type LangSmithParams } from '@langchain/core/language_models/chat_models';
+import {
+  BaseChatModel,
+  type BindToolsInput,
+  type LangSmithParams,
+} from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
   AIMessageChunk,
   type BaseMessage,
   type StandardMessageStructure,
+  type ToolCall,
+  type ToolCallChunk,
   type UsageMetadata,
 } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
+import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
 
 export class MockModelError extends Error {
   constructor(message: string) {
@@ -51,19 +58,21 @@ export type MockScriptEntry =
   | {
       readonly id: string;
       readonly text: string;
+      readonly toolCalls?: readonly ToolCall[];
       readonly usage?: UsageMetadata;
       readonly wait?: MockLatch;
     }
   | { readonly error: Error };
 
-export type MockScript = Readonly<Record<string, MockScriptEntry>>;
+export type MockScript = Readonly<Record<string, MockScriptEntry | readonly MockScriptEntry[]>>;
 
 /** Deterministic scripted provider for tests and CI; performs no network requests. */
 export class MockChatModel extends BaseChatModel {
   readonly #script: MockScript;
   readonly #provider: string;
   readonly #model: string;
-  #calls = 0;
+  #counts = { calls: 0 };
+  #tools: ReadonlySet<string> = new Set();
 
   constructor(
     script: MockScript,
@@ -84,24 +93,45 @@ export class MockChatModel extends BaseChatModel {
   }
 
   get calls(): number {
-    return this.#calls;
+    return this.#counts.calls;
+  }
+
+  override bindTools(tools: BindToolsInput[]): MockChatModel {
+    const bound = new MockChatModel(this.#script, {
+      provider: this.#provider,
+      model: this.#model,
+    });
+    bound.#tools = new Set(tools.map((tool) => convertToOpenAITool(tool).function.name));
+    bound.#counts = this.#counts;
+    return bound;
   }
 
   async #reply(
     messages: BaseMessage[],
     signal?: AbortSignal,
   ): Promise<Exclude<MockScriptEntry, { readonly error: Error }>> {
-    this.#calls++;
-    const human = messages.findLast((message) => message.type === 'human');
-    const entry =
+    this.#counts.calls++;
+    const humanIndex = messages.findLastIndex((message) => message.type === 'human');
+    const human = messages[humanIndex];
+    const scripted =
       typeof human?.content === 'string'
         ? Object.hasOwn(this.#script, human.content)
           ? this.#script[human.content]
           : undefined
         : undefined;
+    const turns = messages
+      .slice(humanIndex + 1)
+      .filter(
+        (message) => AIMessage.isInstance(message) && (message.tool_calls?.length ?? 0) > 0,
+      ).length;
+    const entry: MockScriptEntry | undefined = Array.isArray(scripted)
+      ? scripted[turns]
+      : (scripted as MockScriptEntry | undefined);
     if (entry === undefined)
       throw new MockModelError('The mock has no script for this human message.');
     if ('error' in entry) throw entry.error;
+    if (entry.toolCalls?.some((call) => !this.#tools.has(call.name)))
+      throw new MockModelError('The mock tool call was not offered.');
     await entry.wait?.wait(signal);
     signal?.throwIfAborted();
     return entry;
@@ -119,6 +149,7 @@ export class MockChatModel extends BaseChatModel {
           message: new AIMessage<StandardMessageStructure>({
             id: entry.id,
             content: entry.text,
+            ...(entry.toolCalls === undefined ? {} : { tool_calls: [...entry.toolCalls] }),
             ...(entry.usage === undefined ? {} : { usage_metadata: entry.usage }),
           }),
         },
@@ -132,21 +163,43 @@ export class MockChatModel extends BaseChatModel {
     runManager?: CallbackManagerForLLMRun,
   ): AsyncGenerator<ChatGenerationChunk> {
     const entry = await this.#reply(messages, options.signal);
-    const words = entry.text.match(/\S+\s*/g) ?? [''];
-    for (const [index, word] of words.entries()) {
+    const parts: { text: string; calls?: ToolCallChunk[] }[] = (
+      entry.text.match(/\S+\s*/g) ?? []
+    ).map((text) => ({ text }));
+    for (const [index, call] of (entry.toolCalls ?? []).entries()) {
+      const args = JSON.stringify(call.args);
+      const split = Math.ceil(args.length / 2);
+      parts.push(
+        {
+          text: '',
+          calls: [
+            {
+              index,
+              name: call.name,
+              ...(call.id === undefined ? {} : { id: call.id }),
+              args: args.slice(0, split),
+            },
+          ],
+        },
+        { text: '', calls: [{ index, args: args.slice(split) }] },
+      );
+    }
+    if (parts.length === 0) parts.push({ text: '' });
+    for (const [index, part] of parts.entries()) {
       options.signal?.throwIfAborted();
       const chunk = new ChatGenerationChunk({
-        text: word,
+        text: part.text,
         message: new AIMessageChunk<StandardMessageStructure>({
           id: entry.id,
-          content: word,
-          ...(index === words.length - 1 && entry.usage !== undefined
+          content: part.text,
+          ...(part.calls === undefined ? {} : { tool_call_chunks: part.calls }),
+          ...(index === parts.length - 1 && entry.usage !== undefined
             ? { usage_metadata: entry.usage }
             : {}),
         }),
       });
       yield chunk;
-      await runManager?.handleLLMNewToken(word, undefined, undefined, undefined, undefined, {
+      await runManager?.handleLLMNewToken(part.text, undefined, undefined, undefined, undefined, {
         chunk,
       });
     }
