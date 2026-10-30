@@ -5,3 +5,8 @@ packages:
 
 # Resolve only versions published at least 7 days ago, to limit exposure to compromised releases.
 minimumReleaseAge: 10080
+
+allowBuilds:
+  onnxruntime-node: false
+  sharp: false
+  protobufjs: false

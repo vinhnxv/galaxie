@@ -334,6 +334,57 @@ for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
   }
 }
 
+for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
+  for (const { specifier, dynamic } of imports(file)) {
+    const relative = specifier.startsWith('./') || specifier.startsWith('../');
+    const target = relative
+      ? resolve(dirname(file), specifier.split('?')[0] ?? '').replace(/\.[jt]sx?$/, '')
+      : '';
+    const mockScript = resolve('examples/rag-browser/src/host/mock-script');
+    if (target === mockScript && (file !== 'examples/rag-browser/src/host/main.tsx' || !dynamic))
+      problems.push(
+        `${file}: the mock script must be dynamically imported only by the mode entry point`,
+      );
+    if (
+      (specifier === '@huggingface/transformers' || specifier.startsWith('onnxruntime-web/')) &&
+      !file.startsWith('examples/rag-browser/src/retrieval/')
+    )
+      problems.push(`${file}: embedding dependencies belong only in the retrieval Worker`);
+    if (
+      file.startsWith('examples/rag-browser/src/agent/') &&
+      relative &&
+      !target.startsWith(`${resolve('examples/rag-browser/src/agent')}/`)
+    )
+      problems.push(
+        `${file}: the agent must use host ports instead of importing host or retrieval code`,
+      );
+    if (
+      (relative && target.startsWith(`${resolve('examples/rag-browser')}/`)) ||
+      [
+        '@galaxie/core',
+        '@galaxie/adapter-langgraph',
+        '@galaxie/react',
+        '@galaxie/models/webllm',
+        '@galaxie/models/webllm/worker',
+        '@galaxie/models/builtin-ai',
+        '@langchain/langgraph/web',
+        '@orama/orama',
+        '@huggingface/transformers',
+        'react',
+        'react/jsx-runtime',
+        'react-dom/client',
+        'zod',
+      ].includes(specifier) ||
+      specifier.startsWith('@langchain/core/') ||
+      specifier.startsWith('onnxruntime-web/') ||
+      (specifier === '@galaxie/models/mock' &&
+        file === 'examples/rag-browser/src/host/mock-script.ts')
+    )
+      continue;
+    problems.push(`${file}: forbidden RAG example import ${specifier}`);
+  }
+}
+
 for (const area of ['src', 'server', 'test']) {
   const directory = join('examples/host-remote', area);
   for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {

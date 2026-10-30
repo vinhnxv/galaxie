@@ -1,0 +1,105 @@
+/* SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh */
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+:root {
+  font-family: system-ui, sans-serif;
+  color: #172b36;
+  background: #f4f7f6;
+  line-height: 1.55;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 48rem;
+  margin: auto;
+  padding: 1.5rem;
+}
+h1 {
+  font-size: clamp(2rem, 6vw, 3rem);
+  line-height: 1.15;
+}
+section,
+footer {
+  background: white;
+  border: 1px solid #cfdbd8;
+  border-radius: 0.6rem;
+  padding: 1.2rem;
+  margin: 1rem 0;
+}
+label {
+  display: block;
+  font-weight: 600;
+  margin-top: 1rem;
+}
+textarea,
+select,
+button {
+  font: inherit;
+  box-sizing: border-box;
+}
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 6rem;
+  padding: 0.65rem;
+  border: 1px solid #617b7b;
+  border-radius: 0.3rem;
+}
+select,
+button {
+  padding: 0.6rem;
+  margin: 0.5rem 0.5rem 0.5rem 0;
+  max-width: 100%;
+}
+button {
+  border: 1px solid #215b51;
+  border-radius: 0.3rem;
+  color: white;
+  background: #215b51;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+:focus-visible {
+  outline: 3px solid #b76600;
+  outline-offset: 3px;
+}
+[role="alert"] {
+  color: #9e221b;
+}
+p,
+code,
+strong {
+  overflow-wrap: anywhere;
+}
+.answer,
+li p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+th,
+td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #cfdbd8;
+  text-align: left;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+@media (max-width: 480px) {
+  main {
+    padding: 0.7rem;
+  }
+  section,
+  footer {
+    padding: 0.85rem;
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "@galaxie/example-rag-browser",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser-built retrieval and a LangGraph.js agent with cited answers.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "corpus": "node scripts/build-corpus.ts"
+  },
+  "dependencies": {
+    "@galaxie/core": "workspace:*",
+    "@galaxie/adapter-langgraph": "workspace:*",
+    "@galaxie/models": "workspace:*",
+    "@galaxie/react": "workspace:*",
+    "@huggingface/transformers": "4.3.1",
+    "@orama/orama": "3.1.18",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "@langchain/core": "1.2.20",
+    "@langchain/langgraph": "1.5.1",
+    "zod": "4.6.7",
+    "@mlc-ai/web-llm": "0.2.86"
+  },
+  "devDependencies": {
+    "vite": "8.3.4",
+    "playwright": "1.64.1"
+  }
+}

@@ -23,6 +23,8 @@ global. Host-loop tests verify that the real WebLLM bundle is not requested.
 The [injection corpus](../tests/injection-corpus/README.md) uses the deterministic
 obedient-attacker mock, not a robustness evaluation of a real model.
 
+The [browser-built RAG example](../examples/rag-browser/README.md) adds Node and headless Chromium lanes with a synthetic corpus, deterministic embeddings/chat and a fake Transformers engine. They cover retrieval, citations, injected directives, real module Workers, IndexedDB restore and clear fencing, strict CSP, keyboard controls and phone-width layout. Full SQuAD indexing, real EmbeddingGemma/WebGPU, citation quality and reference-device metrics remain unmeasured.
+
 ## Real-device demonstrations
 
 | Device and browser | Date and record | What was real | Limits |

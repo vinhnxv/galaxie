@@ -42,6 +42,8 @@
 - [MCP tools AGENTS](packages/tools-mcp/AGENTS.md): metadata pins, broker dispatch and sanitized errors.
 - [ESLint plugin AGENTS](packages/eslint-plugin/AGENTS.md): scope analysis without runtime enforcement.
 
+- [Browser-built RAG example](examples/rag-browser/README.md): JavaScript graph, verified embedding files, Orama Worker, cache lifecycle and unmeasured real-device paths.
+
 ## Verification
 
 - [Conformance suite](tests/conformance/README.md): parity lanes, explicit-config rules and protected goldens.

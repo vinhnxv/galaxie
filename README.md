@@ -45,6 +45,8 @@ Routing, labels, consent and model budgets cover calls through `host.langchain.c
 
 The M4 documentation slice adds package coding guidance, an AI-facing index, tracing and host integration guides, a tested device matrix, and an offline documentation check in `pnpm check`.
 
+[`examples/rag-browser`](examples/rag-browser/README.md) builds an Orama retrieval index in a Worker, supports pasted text and answers through a LangGraph.js agent with citations and in-browser routing. Mock Node/Chromium tests exercise strict CSP, retrieval, cache restore, clear fencing and injected instructions. Full-corpus and real-model demonstrations remain unmeasured; Python is follow-up work.
+
 ## Intended use and disclaimer
 
 galaxie is experimental, pre-release software, provided "as is", without warranty of any kind. Sections 15 to 17 of the [AGPL](LICENSE) (disclaimer of warranty and limitation of liability) apply.
