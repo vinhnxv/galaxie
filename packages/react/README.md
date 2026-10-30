@@ -2,6 +2,23 @@
 
 Typed agent surfaces and a separate host confirmation prompt. Agent components receive only `props`, `actions` and `status`; the host owns instance creation, preparation and disposal.
 
+## Education components
+
+`educationComponents` includes headless `Quiz`, `WritingPrompt`, `Feedback` and `Progress` entries. Quiz uses native radio groups with fieldsets and legends; WritingPrompt uses a labelled textarea. Their named submit buttons work by keyboard. Inputs and submit buttons are disabled while submitting or accepted; Tab can still leave the form.
+
+Quiz and WritingPrompt show one `role="alert"` when `status` is `{ rejected: code }`, and link the submit button to it with `aria-describedby`. Rejection re-enables inputs and preserves the selection or draft for retry. The messages are fixed English, selected only by the error code:
+
+| Code | Message |
+| --- | --- |
+| `invalid` | Check your answer and try again. |
+| `duplicate` | This answer was already sent. |
+| `stale` | This question is no longer active. |
+| All other codes | Your answer could not be sent. Try again. |
+
+Dispatch status does not identify an invalid field, so focus moves to the alert when an already-mounted component enters rejection. Initial render never moves focus, even with a rejected status, and rerenders or code changes within rejection do not move it again. The alert sits immediately before submit: Tab reaches that button for retry. Any later `idle`, `submitting` or `accepted` status removes the alert and its description link.
+
+Hosts may wrap these reference components to provide their own language or presentation; no i18n configuration is provided. Alert messages never include model text, props or drafts. Model-produced props remain React text. [Chromium accessibility tests](../../tests/conformance/education-a11y.test.tsx) cover keyboard completion, labels, rejection, focus and retry through the surface with a fake instance; no model is called. These checks do not constitute an accessibility audit or assistive-technology testing.
+
 ## Model destinations
 
 Mount the headless `ModelRoutes` beside the host's run status:
