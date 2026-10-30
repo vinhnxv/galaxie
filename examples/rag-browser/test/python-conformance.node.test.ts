@@ -198,5 +198,6 @@ test.skipIf(!pythonWheelsAvailable)(
       await rm(directory, { recursive: true, force: true });
     }
   },
-  180000,
+  // About 21 page loads each boot Pyodide; hosted runners take roughly ten seconds per boot.
+  600000,
 );
