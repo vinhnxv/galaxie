@@ -10,6 +10,7 @@ import {
   defineComponent,
 } from '../registry.js';
 import { idSchema, longTextSchema, shortTextSchema, uniqueIds } from './schemas.js';
+import { SubmissionError } from './submission-error.js';
 
 export interface QuizOption {
   readonly id: string;
@@ -123,7 +124,12 @@ function QuizView({
           ))}
         </fieldset>
       ))}
-      <button type="submit" disabled={busy || !complete}>
+      <SubmissionError id={`${formId}-error`} status={status} />
+      <button
+        type="submit"
+        disabled={busy || !complete}
+        aria-describedby={typeof status === 'object' ? `${formId}-error` : undefined}
+      >
         {actions.submit.label}
       </button>
     </form>
