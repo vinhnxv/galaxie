@@ -1,0 +1,672 @@
+{
+  "version": "156.0.8078.4",
+  "boot": {
+    "runtimeMs": 871,
+    "readyMs": 5322,
+    "versions": {
+      "micropip": "0.11.1",
+      "ormsgpack": "1.13.0",
+      "msgpack": "1.1.2",
+      "uuid_utils": "0.19.0",
+      "httpx2-jsfetch": "1.0",
+      "httpx2": "2.16.0",
+      "genai-prices": "0.2.0",
+      "griffelib": "2.4.1",
+      "idna": "3.20",
+      "langchain-protocol": "0.0.20",
+      "certifi": "2026.10.23",
+      "langgraph-prebuilt": "1.1.1",
+      "opentelemetry-api": "1.45.2",
+      "langgraph-sdk": "0.4.10",
+      "langgraph-checkpoint": "4.3.1",
+      "langchain-core": "1.7.3",
+      "langgraph": "1.2.18",
+      "tenacity": "9.2.1",
+      "requests-toolbelt": "1.0.0",
+      "logfire-api": "5.4.0",
+      "pydantic-graph": "2.63.0",
+      "langsmith": "0.14.16",
+      "websockets": "17.3",
+      "pydantic-ai-slim": "2.63.0",
+      "annotated-types": "0.7.0",
+      "jsonpointer": "3.1.1",
+      "jsonpatch": "1.33",
+      "typing-inspection": "0.4.2",
+      "distro": "1.9.0",
+      "pycparser": "3.0",
+      "xxhash": "3.6.0",
+      "charset-normalizer": "3.4.7",
+      "sniffio": "1.3.1",
+      "typing_extensions": "4.15.0",
+      "cffi": "2.0.0",
+      "httpx": "0.28.1",
+      "anyio": "4.13.0",
+      "PyYAML": "6.0.3",
+      "packaging": "26.1",
+      "urllib3": "2.6.3",
+      "requests": "2.33.1",
+      "orjson": "3.11.8",
+      "zstandard": "0.25.0",
+      "pydantic": "2.12.5",
+      "pydantic_core": "2.41.5"
+    },
+    "downloads": [
+      {
+        "url": "http://127.0.0.1:55381/node_modules/pyodide/pyodide-lock.json",
+        "status": 200,
+        "bytes": 119077,
+        "sha256": "5dc2fc119108bc148c7457dc86e7675b5c87e1cafd420b9c34c1eaef7b36c010"
+      },
+      {
+        "url": "http://127.0.0.1:55381/node_modules/pyodide/python_stdlib.zip",
+        "status": 200,
+        "bytes": 2545637,
+        "sha256": "fa1957e5777068fc4f7437f96d860ae2fbe9c19732ba06c84e004ec16dd7dd7a"
+      },
+      {
+        "url": "http://127.0.0.1:55381/node_modules/pyodide/pyodide.asm.wasm",
+        "status": 200,
+        "bytes": 9598218,
+        "sha256": "cc36e3cab04fdfc9a63ff13eb52eae2b911bf46c025cc7b281f394bd3de1d5e6"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/micropip-0.11.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 115486,
+        "sha256": "e2d52886594fd4cd0d0847110a1c34ae0134d3a970eb4496d3b5eb31ee2d8af6"
+      },
+      {
+        "url": "http://127.0.0.1:55381/.cache/ormsgpack-1.13.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 1902,
+        "sha256": "0358ab0f0ecd6b7b0f7d1ee0923ec042ccbf8ace1fcfd65c8d4b59102fd6fb58"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/msgpack-1.1.2-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+        "status": 200,
+        "bytes": 50624,
+        "sha256": "6f33ca4ae9f5f2bff8759a8b21a7544f7a5a595ad3e848e179eb9f86458dbc22"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/f1/9a/7a0a0dad166db9f4437f3d259e47ce74d552ccc50d8aa63d05b2510e3096/uuid_utils-0.19.0-cp310-abi3-pyemscripten_2026_0_wasm32.whl",
+        "status": 200,
+        "bytes": 103069,
+        "sha256": "23868cdc4dfa71021fec6cf43fbb83797345362ac1c866b50dbf17f479587413"
+      },
+      {
+        "url": "http://127.0.0.1:55381/requirements.json",
+        "status": 200,
+        "bytes": 1011,
+        "sha256": "fc36c10e474b69abf71adb3b6425d00c7d3cb83e06beef9f88c5e286cc6cf9c9"
+      },
+      {
+        "url": "https://pypi.org/simple/httpx2-jsfetch/",
+        "status": 200,
+        "bytes": 2245,
+        "sha256": "1d236ffc82ab9f4828fae4bee5f601729e1765af1996632166b8f20ffe890060"
+      },
+      {
+        "url": "https://pypi.org/simple/genai-prices/",
+        "status": 200,
+        "bytes": 79236,
+        "sha256": "b03e13e80a1a84a5161fe47de3af839305ac53ea2713a113f72d20af90e71842"
+      },
+      {
+        "url": "https://pypi.org/simple/httpx2/",
+        "status": 200,
+        "bytes": 24712,
+        "sha256": "0c73e2b3a1cadf665ee59a96598485ade1e600b0e9599f61bafdc5c4fe71213c"
+      },
+      {
+        "url": "https://pypi.org/simple/griffelib/",
+        "status": 200,
+        "bytes": 10590,
+        "sha256": "56fe93b9155933a9033e60e2557c3c7c4ce350f90d31e3edbade4c9b721903c9"
+      },
+      {
+        "url": "https://pypi.org/simple/certifi/",
+        "status": 200,
+        "bytes": 79219,
+        "sha256": "55938697e655745383dc87e26c87676071e0de5c59ba713e908408481841de3d"
+      },
+      {
+        "url": "https://pypi.org/simple/idna/",
+        "status": 200,
+        "bytes": 38802,
+        "sha256": "0bb074e13eeab85764ae0b58f43a40fe70d7155ac7485d849e435f5b8df12811"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/9b/43/832f631d32e4f1211caa2ba368317739fe71f0b8530e4c9d15dc454bac2a/httpx2_jsfetch-1.0-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 913,
+        "sha256": "58a9efe7b701dc35b5665868689e390722f972660795a358eecaa41c2d8b071b"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/9b/43/832f631d32e4f1211caa2ba368317739fe71f0b8530e4c9d15dc454bac2a/httpx2_jsfetch-1.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 6382,
+        "sha256": "cb916b707601e69a07721aabc8f3f6659be3a6893bc1ff5c6f9e02241df2da32"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/0e/2a/c2369565aa7dde5ea33de724acae7cc753f9d19239daea0000779102f4b5/genai_prices-0.2.0-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 13655,
+        "sha256": "0d7bb5be260105cd107f57b23e920b16d402dd24b103578c77a319572562c968"
+      },
+      {
+        "url": "https://pypi.org/simple/langchain-protocol/",
+        "status": 200,
+        "bytes": 14394,
+        "sha256": "e04637897ab090eac2140deb2c8039697f883c394a2b4290405a33b6999ea90b"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 97880,
+        "sha256": "fd2c5d7909e8d86fe92d53020c310ca0e4e431b838c207c5754b9bbf0308d49a"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 10019,
+        "sha256": "192f20046200ff50911a7278c21dfbee1e1a4c6fa7943227afe9231d28defc3f"
+      },
+      {
+        "url": "https://pypi.org/simple/langgraph-prebuilt/",
+        "status": 200,
+        "bytes": 48873,
+        "sha256": "4130fe67cceab60d63093de58e9623911655f5f2c87c620ca3a7db89178500fa"
+      },
+      {
+        "url": "https://pypi.org/simple/langgraph-sdk/",
+        "status": 200,
+        "bytes": 115385,
+        "sha256": "121d0360aa06765cff9ff235d569a9cdee7173a1bf680704b5771e2aafdc4b56"
+      },
+      {
+        "url": "https://pypi.org/simple/opentelemetry-api/",
+        "status": 200,
+        "bytes": 91313,
+        "sha256": "d64ae9330487294b5ec9c387b31c20439beb73523224bb1e38828e843ee943cf"
+      },
+      {
+        "url": "https://pypi.org/simple/langgraph-checkpoint/",
+        "status": 200,
+        "bytes": 68192,
+        "sha256": "9e9bb05e97044e495180ef423f4feecc2ee2ae2f77955f5fd6ec834b2f62d683"
+      },
+      {
+        "url": "https://pypi.org/simple/langchain-core/",
+        "status": 200,
+        "bytes": 343928,
+        "sha256": "5a2b4a3465f7bab7f285d0e684032bf2fdb5cbf27c6f2cafc4efeab9772514b8"
+      },
+      {
+        "url": "https://pypi.org/simple/langgraph/",
+        "status": 200,
+        "bytes": 298677,
+        "sha256": "5d5b4bce15b462c0bc929d1562682cccd196eeb6881f749cec8eaa84758ca032"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/0e/2a/c2369565aa7dde5ea33de724acae7cc753f9d19239daea0000779102f4b5/genai_prices-0.2.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 168199,
+        "sha256": "21ede75742043b3489a6cec3ad5722782640b34676563c6c755b52061812e6a3"
+      },
+      {
+        "url": "https://pypi.org/simple/logfire-api/",
+        "status": 200,
+        "bytes": 186778,
+        "sha256": "d2bc1604bea4b63e8febb4a81b17a9015091899d874f5b81a19660c91e6c9ec7"
+      },
+      {
+        "url": "https://pypi.org/simple/tenacity/",
+        "status": 200,
+        "bytes": 53161,
+        "sha256": "6ff579458b9bebc8509e5ceaea922eee5e08838f38cf279abc0b75432c4307fd"
+      },
+      {
+        "url": "https://pypi.org/simple/requests-toolbelt/",
+        "status": 200,
+        "bytes": 21832,
+        "sha256": "216ad763d79a8045e24c9cb82f96a9d4a5cc601dda986dc4a7c4ec9ea103ab45"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/de/02/1156d5f5307f573b901b14373848b84e69ca6cab09169b8cc97d16a181f9/griffelib-2.4.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 172983,
+        "sha256": "76bc562f936ad1ce198d2cf6d0731bd5c92a7d934b69ef828ef22ee0ffdb62ce"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/de/02/1156d5f5307f573b901b14373848b84e69ca6cab09169b8cc97d16a181f9/griffelib-2.4.1-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 1886,
+        "sha256": "94663ad94ba5c142d7ab55ba780792ce20c5724255b6d80afff04aec22db2ea2"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 2526,
+        "sha256": "e463e38f7fe7da36a11e6d3fecc5dfa5b97be8c8022620400750d79ae7d842bc"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 7207,
+        "sha256": "dbd8c14c1e4ca1e0c9824a6dbc7cbbf78884f38eb52d91148cd3025f671e4b85"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/02/4b/f1c99a0b27c5ff8b4b131c0d6e62012c17cc424089efe213767db927afd2/langchain_protocol-0.0.20-py3-none-any.whl",
+        "status": 200,
+        "bytes": 7347,
+        "sha256": "3c935e5e46b0f6f9cb52f45ba7cfa53d1b9fa80c82c4a277d47f03e07f7385b1"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl",
+        "status": 200,
+        "bytes": 69583,
+        "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/02/4b/f1c99a0b27c5ff8b4b131c0d6e62012c17cc424089efe213767db927afd2/langchain_protocol-0.0.20-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 2406,
+        "sha256": "18e3ee4b2dd8feefab5c13d254efae6bbfec0c7d793b2422fac5ec3c1c0c15d9"
+      },
+      {
+        "url": "https://pypi.org/simple/langsmith/",
+        "status": 200,
+        "bytes": 627400,
+        "sha256": "b9ecca6a892c8fdb651324cc7db9ea89aa027ed0927ef0c1b7ee007b3e1e200c"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl",
+        "status": 200,
+        "bytes": 135082,
+        "sha256": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1"
+      },
+      {
+        "url": "https://pypi.org/simple/pydantic-ai-slim/",
+        "status": 200,
+        "bytes": 438720,
+        "sha256": "d73edcaef6135de2bf2574ceed340c59aa7a0f4c32d2c65764e2f89655dcf39c"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/38/26/4da2c6ae8b9fe73c3c09cf32c058415c5041e773fd00219c5e0d76588c23/langgraph_prebuilt-1.1.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 42254,
+        "sha256": "fae17c22562e501940eb7aa052a15c58a431febbabf33f8ad172e1b44354a7e4"
+      },
+      {
+        "url": "https://pypi.org/simple/pydantic-graph/",
+        "status": 200,
+        "bytes": 412890,
+        "sha256": "23295dddc87babff24737fe6c37ebd3497e84d5ddc792e0d29b8903526fd28b5"
+      },
+      {
+        "url": "https://pypi.org/simple/websockets/",
+        "status": 200,
+        "bytes": 1757428,
+        "sha256": "4d8eb7705180de46f2557c144356a308b3241a066bfd79c516d7899a9be952f5"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/38/26/4da2c6ae8b9fe73c3c09cf32c058415c5041e773fd00219c5e0d76588c23/langgraph_prebuilt-1.1.1-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 6915,
+        "sha256": "0c378432b6201dcf4b6641e642ce9f03e353515a155f15501a91fa7cdd401496"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/a9/2d/610db864d7513158cebb8f36cc88e67e73bd6c7aa1905ef18d89e1281c81/opentelemetry_api-1.45.2-py3-none-any.whl",
+        "status": 200,
+        "bytes": 60335,
+        "sha256": "2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/a9/2d/610db864d7513158cebb8f36cc88e67e73bd6c7aa1905ef18d89e1281c81/opentelemetry_api-1.45.2-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 1411,
+        "sha256": "aa93f63be0d6d1f662966e67b22a77c0d9966752e3a32ad87c1347f595cea7cb"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/36/0c/c14a178c018fffdb818a7e098cb28d6ecead53a07e161a03c083003ff137/langgraph_sdk-0.4.10-py3-none-any.whl",
+        "status": 200,
+        "bytes": 167854,
+        "sha256": "306ede340814e79332812e3b5a8bda2587a09657c95e14e5c7af3370e06c22fe"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/36/0c/c14a178c018fffdb818a7e098cb28d6ecead53a07e161a03c083003ff137/langgraph_sdk-0.4.10-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 5099,
+        "sha256": "8789a80a6c4060a076debd3e885141025ce77d0586b40cf7bc351d577aa35242"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/f3/40/4251d676b5c585d42175c901175d4bff56e22939625e18bcef781fc3e893/langgraph_checkpoint-4.3.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 58093,
+        "sha256": "215a826935c8db4d9676e79fd95943e5b3847d78604390898e1d98581cc594e5"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/f3/40/4251d676b5c585d42175c901175d4bff56e22939625e18bcef781fc3e893/langgraph_checkpoint-4.3.1-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 6674,
+        "sha256": "9e59af41fb620215449b7c13fdb27f3e001379dfe03ca2d799781d29e816c226"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/b4/c6/88bcc77899601e09a428d9c764e41ac3e7ede161384f85b9a2a8a828f81d/langchain_core-1.7.3-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 4781,
+        "sha256": "fe778ebb823f27acca4e01548f006db33ef72abe24084ba37f44d2a083885c34"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/64/ee/c0548039e6523b97891b97e9fe7ce567385673cbbd6e817b735100484a42/langgraph-1.2.18-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 4870,
+        "sha256": "dd30c73a820a681099e79fbd5e20b2319dc3083444ed2a62759c52a2341ce2bd"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/4c/03/1e412a0bbae5d7cab75cf2645aa6e330835db95d76c20b9912af495dcd6a/logfire_api-5.4.0-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 972,
+        "sha256": "47cc9c9ef5aa1200434d64ed20cb33d7eb56a744ed05df67c92977778929cca7"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/d6/26/1ff2b0721ac66a3ec5b1402b333110b352ab0a8724052ac279a7b82d40c4/tenacity-9.2.1-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 1450,
+        "sha256": "1d30f0b4cd3cf1ad585400f9ea9c424e64c630ea63e57209a1f16fce72e68eb7"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/3f/51/d4db610ef29373b879047326cbf6fa98b6c1969d6f6dc423279de2b1be2c/requests_toolbelt-1.0.0-py2.py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 14638,
+        "sha256": "fa52f26237cc8d148d25c5746fdca499a56d0e765e69095cc3564a07cce23967"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/b4/c6/88bcc77899601e09a428d9c764e41ac3e7ede161384f85b9a2a8a828f81d/langchain_core-1.7.3-py3-none-any.whl",
+        "status": 200,
+        "bytes": 577074,
+        "sha256": "460c214bf31495d7b7e0a879e408dbfda677fd53fd879da786c1b966a4f6bff6"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/64/ee/c0548039e6523b97891b97e9fe7ce567385673cbbd6e817b735100484a42/langgraph-1.2.18-py3-none-any.whl",
+        "status": 200,
+        "bytes": 260837,
+        "sha256": "f430f28ea7fbc129c3cf7dc31c19c33dc27d93aeebd25c6d64fd5c1bad93d27d"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/d6/26/1ff2b0721ac66a3ec5b1402b333110b352ab0a8724052ac279a7b82d40c4/tenacity-9.2.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 32310,
+        "sha256": "9e56f17539296baab7beabb08b92f6ee3d7be92d8be72d763360677c2ad6580e"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/3f/51/d4db610ef29373b879047326cbf6fa98b6c1969d6f6dc423279de2b1be2c/requests_toolbelt-1.0.0-py2.py3-none-any.whl",
+        "status": 200,
+        "bytes": 54481,
+        "sha256": "cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/11/3a/9a072c02a22089ddf20f0f33ea95bee5a5951b31839f118b04f27b94be6e/langsmith-0.14.16-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 39816,
+        "sha256": "d6d6f76ea46fdfc5666af883fa28f80ed3c5e963909973ce09e9158894ae93be"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/4c/03/1e412a0bbae5d7cab75cf2645aa6e330835db95d76c20b9912af495dcd6a/logfire_api-5.4.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 154066,
+        "sha256": "00297901da03e350bcf4ebe3d829f3617ebbe62b000e5d53d3c485223c258204"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/b2/70/93c22c81829c7739fc24241eedc0bdadb4294859014d3a9ae667db0cf5c5/pydantic_ai_slim-2.63.0-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 7581,
+        "sha256": "9fedf3e59d3f2df31c40fee49d1991d17744a7b12dcf4c0481569b6ab731e1de"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/98/da/4e35663fc8c174b583c908975e9cb2a24c3ee55b714adbff8974b0472f61/pydantic_graph-2.63.0-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 4184,
+        "sha256": "7c6eed27d68d5e612c3d3cbb7bda10f72643a01e1f72d95ac7c55d1d3881e8ae"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/d7/b0/3f01fcb3406662f6deb1e3e72b34dd0979e993991c0b7435a9e12bc14f02/websockets-17.3-py3-none-any.whl.metadata",
+        "status": 200,
+        "bytes": 6336,
+        "sha256": "009da5d5f96cd7290c0095c4f87e6cdf18e1ea0da5f3b34d8d5cdfac44ffaf72"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/98/da/4e35663fc8c174b583c908975e9cb2a24c3ee55b714adbff8974b0472f61/pydantic_graph-2.63.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 53642,
+        "sha256": "803eef2c9b24798d0d13372f7e9d1600920abb96e114368c7add7a57436cb7b2"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/11/3a/9a072c02a22089ddf20f0f33ea95bee5a5951b31839f118b04f27b94be6e/langsmith-0.14.16-py3-none-any.whl",
+        "status": 200,
+        "bytes": 933680,
+        "sha256": "b9ea1a57622b0788b181d78605f974fb206c5f6f75793076ffec23cef4d904c8"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/d7/b0/3f01fcb3406662f6deb1e3e72b34dd0979e993991c0b7435a9e12bc14f02/websockets-17.3-py3-none-any.whl",
+        "status": 200,
+        "bytes": 212375,
+        "sha256": "dc2b495a92b3971966bf102e73589f950db3ec1ca6713265355ce7771d97b199"
+      },
+      {
+        "url": "https://files.pythonhosted.org/packages/b2/70/93c22c81829c7739fc24241eedc0bdadb4294859014d3a9ae667db0cf5c5/pydantic_ai_slim-2.63.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 2682890,
+        "sha256": "0694051caa2357ddac4e98ec69e1ae509e20cffc2f4a658217fbd35e83b96339"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/annotated_types-0.7.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 11963,
+        "sha256": "6541523b4b16c1953d2fc9b82fb86c540eea9f78fca329ab371ed13a8b0faa51"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/jsonpointer-3.1.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 7659,
+        "sha256": "86fc06e5e9ebeb9c39b2ba4a3d45b82f4d644f825b0cf9f6fbba5607dbf0dd56"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/jsonpatch-1.33-py2.py3-none-any.whl",
+        "status": 200,
+        "bytes": 12898,
+        "sha256": "3cbe52638c03deac6bfad33b355d09c8b75fe3e9b2f55883675e5e1d8836c034"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/typing_inspection-0.4.2-py3-none-any.whl",
+        "status": 200,
+        "bytes": 14610,
+        "sha256": "deb989630985f7a7296b90357a947a804a7612cecbb6439d6e71128e01f61051"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/distro-1.9.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 20277,
+        "sha256": "b18cf6e1488fabd5e83f00b77549a5f4d5dde566dbe88fc2da212747ff99f920"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pycparser-3.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 48172,
+        "sha256": "0b4cbc12c42e25df55343342fb0da45b189181e4f360602f9721db2016fc3a4b"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/xxhash-3.6.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+        "status": 200,
+        "bytes": 16543,
+        "sha256": "656db48ee4f1e13356e0a82e2a3ba43be6a879ccc9fd7b49f7ff062f7be905d6"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/charset_normalizer-3.4.7-py3-none-any.whl",
+        "status": 200,
+        "bytes": 61958,
+        "sha256": "9e437ef92fa51f06eedeb1ef092c0a887bd24fe0d40b1e900191117ce1653121"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/sniffio-1.3.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 9560,
+        "sha256": "1e0f350ca8eac5252c1af9a8d93a7edd70056c1eddf5661f6950688094d1f670"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/typing_extensions-4.15.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 44613,
+        "sha256": "4fec68770a05408e668a4fa53d6bf4f0f684b9dacf820c7c5d6e97d3ad225e29"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/cffi-2.0.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+        "status": 200,
+        "bytes": 148947,
+        "sha256": "9ae1a61096321cef7248e02293f42d000fa87b73a3e795705a2444290590459d"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/httpx-0.28.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 77457,
+        "sha256": "830cb1ec73bb4c46f2e38ebeb3dd50ffb45f62b804dd040519d34fe36f8fdfc7"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/anyio-4.13.0-py3-none-any.whl",
+        "status": 200,
+        "bytes": 114353,
+        "sha256": "ea08c971f29d33d940864407ceb08601836ac8924d3b4f27db6612ed47faeafc"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/requests-2.33.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 64947,
+        "sha256": "6d62c51c4e7707386bfc2ef54845c16cdaeb99606c064357cccfe4d621285175"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyyaml-6.0.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+        "status": 200,
+        "bytes": 112901,
+        "sha256": "a05d2a48c13ed72a8c60c73b30b753a25c3a591bb66c15428b7e95e69a9e806f"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/packaging-26.1-py3-none-any.whl",
+        "status": 200,
+        "bytes": 95852,
+        "sha256": "565acbbea54da30348b6d68b6a54373e6f777987db9f1db6966b4b3a5060d303"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/urllib3-2.6.3-py3-none-any.whl",
+        "status": 200,
+        "bytes": 131580,
+        "sha256": "86b7c1af060597b115bcde5e36798039ca50b221afe14aa03d3437ac09b02a75"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/orjson-3.11.8-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+        "status": 200,
+        "bytes": 151833,
+        "sha256": "1dfad46c65f40626eee81b31e1808fa5c48bed1a604f9babe81688381b40fc43"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/zstandard-0.25.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+        "status": 200,
+        "bytes": 291107,
+        "sha256": "7b9bc17ef94d75ee3f372b9113a6644edd222c28a0a54c331769468cb8e0407d"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pydantic-2.12.5-py3-none-any.whl",
+        "status": 200,
+        "bytes": 463578,
+        "sha256": "04854875001e07a8a74d87b7c80296cba168773d8c9804e232d695f82484d7d7"
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pydantic_core-2.41.5-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+        "status": 200,
+        "bytes": 1310164,
+        "sha256": "54703fa42a0d4d574283cfb8f08050ba7820c9a42b0a21bc1286407d9a9e54da"
+      },
+      {
+        "url": "http://127.0.0.1:55381/agent.py",
+        "status": 200,
+        "bytes": 6885,
+        "sha256": "085e5ce2dd39ef3450b2be73d75d50520479957b85deead0b906fc8e124dbe50"
+      }
+    ]
+  },
+  "coldStartMs": 5328.299999952316,
+  "graph": {
+    "interactionId": "96135f4d40d459d576538bb153728c20",
+    "request": {
+      "surfaceId": "main",
+      "viewRevision": "spike-1",
+      "component": "education.Quiz/v1",
+      "props": {
+        "question": "Continue?"
+      }
+    },
+    "entries": {
+      "model": 1,
+      "capability": 1,
+      "interaction": 1
+    },
+    "scopes": ["capability:22641277-8a1d-53c9-9d1e-13ffca0b7eda"]
+  },
+  "resumed": {
+    "state": {
+      "text": "mock graph reply",
+      "doubled": 42,
+      "action": "submit"
+    },
+    "entries": {
+      "model": 1,
+      "capability": 1,
+      "interaction": 2
+    }
+  },
+  "agent": {
+    "output": "mock agent reply: 42",
+    "requests": 2
+  },
+  "abort": {
+    "cancelled": true,
+    "code": "cancelled"
+  },
+  "abortMs": 0.7999999523162842,
+  "calls": [
+    {
+      "op": "model"
+    },
+    {
+      "op": "capability",
+      "scope": "capability:22641277-8a1d-53c9-9d1e-13ffca0b7eda"
+    },
+    {
+      "op": "model"
+    },
+    {
+      "op": "capability",
+      "scope": "pydantic-run"
+    },
+    {
+      "op": "model"
+    },
+    {
+      "op": "model"
+    }
+  ],
+  "events": [
+    {
+      "kind": "rejected",
+      "code": "invalid",
+      "message": "The bridge message is invalid."
+    },
+    {
+      "v": "galaxie.bridge/v1",
+      "kind": "aborted",
+      "id": "abort-1"
+    }
+  ],
+  "mockCalls": 4,
+  "busyAbortAcknowledged": false,
+  "forcedTerminationMs": 31.100000143051147
+}
