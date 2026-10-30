@@ -853,7 +853,6 @@ export function createAgentInstance(
           }
           assertUsable();
           if (pending === undefined) return undefined;
-          // Historical submissions have no schema identity; restore conservatively treats their text as private.
           const privateValues = new Set<string>();
           for (const submission of inbox.values())
             registerPrivate(payloadStrings(submission.payload), privateValues);

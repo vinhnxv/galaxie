@@ -32,7 +32,13 @@ const writing: PendingInteraction = {
   props: { text: 'Write a practice sentence.' },
 };
 
-test.each([sentence, encoded, encoded.replaceAll('%20', '+'), encodeURIComponent(encoded)])(
+test.each([
+  sentence,
+  encoded,
+  encoded.replaceAll('%20', '+'),
+  encodeURIComponent(encoded),
+  ...['\t', '\n', '\r'].map((control) => encoded.replace('private', `pri${control}vate`)),
+])(
   'AT-32 accepted private text cannot enter an allowlisted interaction query: %s',
   async (query) => {
     const url = `${origin}/collect?q=${query}`;

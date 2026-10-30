@@ -18,6 +18,9 @@ import { MemoryRecoveryStore } from './support/memory-recovery-store.js';
 const sentence = 'My private sentence stays here';
 const origin = 'https://example.test';
 const encoded = encodeURIComponent(sentence);
+const controlledQueries = ['\t', '\n', '\r'].map((control) =>
+  encoded.replace('private', `pri${control}vate`),
+);
 const urls = [
   `${origin}/search?q=${sentence}`,
   `${origin}/search?q=${encoded}`,
@@ -27,6 +30,7 @@ const urls = [
   `${origin}/${encoded}`,
   `${origin}/${encodeURIComponent(encoded)}`,
   `${origin}/search?q=${sentence}&malformed=%ZZ`,
+  ...controlledQueries.flatMap((value) => [`${origin}/search?q=${value}`, `${origin}/${value}`]),
 ];
 
 async function fixture(url: string, dataPolicy?: DataPolicy) {
@@ -104,42 +108,45 @@ test.each([
   }
 });
 
-test('restored pending URLs are checked against recovered submission strings', async () => {
-  const f = await fixture(urls[3] as string);
-  try {
-    const sessionId = f.instance.sessionId;
-    await f.store.recordSession(sessionId, {
-      agentId: f.privateDefinition.id,
-      agentVersion: f.privateDefinition.version,
-    });
-    const interactionId = 'previous-writing' as InteractionId;
-    await f.store.acceptSubmission(sessionId, {
-      interactionId,
-      action: 'submit',
-      payload: { sentence },
-    });
-    await f.store.consumeSubmission(sessionId, interactionId);
-    const restored = await f.runtime.create(f.privateDefinition, {
-      principalScope: 'learner',
-      agent: {},
-      recovery: f.store,
-      sessionId,
-    });
-    await restored.prepare();
-    await expect(restored.restore()).rejects.toMatchObject({
-      code: 'denied',
-      message: 'Policy denied the request.',
-    });
-    expect(restored.getSnapshot().run).toBeUndefined();
-    expect(f.diagnostics).toContainEqual({
-      kind: 'interaction_rejected',
-      instanceId: restored.instanceId,
-    });
-    expect(f.warnings).toContainEqual({ code: 'url_blocked', instanceId: restored.instanceId });
-    expect(JSON.stringify([restored.getSnapshot(), f.diagnostics, f.warnings])).not.toContain(
-      origin,
-    );
-  } finally {
-    await f.runtime.dispose();
-  }
-});
+test.each([urls[3] as string, ...controlledQueries.map((value) => `${origin}/search?q=${value}`)])(
+  'restored pending URLs are checked against recovered submission strings: %s',
+  async (url) => {
+    const f = await fixture(url);
+    try {
+      const sessionId = f.instance.sessionId;
+      await f.store.recordSession(sessionId, {
+        agentId: f.privateDefinition.id,
+        agentVersion: f.privateDefinition.version,
+      });
+      const interactionId = 'previous-writing' as InteractionId;
+      await f.store.acceptSubmission(sessionId, {
+        interactionId,
+        action: 'submit',
+        payload: { sentence },
+      });
+      await f.store.consumeSubmission(sessionId, interactionId);
+      const restored = await f.runtime.create(f.privateDefinition, {
+        principalScope: 'learner',
+        agent: {},
+        recovery: f.store,
+        sessionId,
+      });
+      await restored.prepare();
+      await expect(restored.restore()).rejects.toMatchObject({
+        code: 'denied',
+        message: 'Policy denied the request.',
+      });
+      expect(restored.getSnapshot().run).toBeUndefined();
+      expect(f.diagnostics).toContainEqual({
+        kind: 'interaction_rejected',
+        instanceId: restored.instanceId,
+      });
+      expect(f.warnings).toContainEqual({ code: 'url_blocked', instanceId: restored.instanceId });
+      expect(JSON.stringify([restored.getSnapshot(), f.diagnostics, f.warnings])).not.toContain(
+        origin,
+      );
+    } finally {
+      await f.runtime.dispose();
+    }
+  },
+);

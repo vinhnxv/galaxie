@@ -207,7 +207,6 @@ function decodeUrl(value: string): string {
   }
 }
 
-/** Internal run-aware URL check; public origin checks keep their existing contract. */
 export function checkInteractionUrlPolicy(
   props: unknown,
   allowlist: readonly string[],
@@ -218,12 +217,14 @@ export function checkInteractionUrlPolicy(
       const candidate = urlCandidate(props);
       if (candidate === undefined) return true;
       if (!isAllowedUrl(candidate, allowlist)) return false;
-      if (privateValues !== undefined) {
-        const decoded = decodeUrl(props);
-        if (
-          [props, decoded, decodeUrl(decoded)].some((form) => containsPrivate(form, privateValues))
-        )
-          return false;
+      if (privateValues !== undefined && privateValues.size > 0) {
+        for (const raw of props === candidate ? [props] : [props, candidate]) {
+          const decoded = decodeUrl(raw);
+          if (
+            [raw, decoded, decodeUrl(decoded)].some((form) => containsPrivate(form, privateValues))
+          )
+            return false;
+        }
       }
       return true;
     }
