@@ -15,7 +15,12 @@ import {
   toErrorInfo,
 } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import {
+  AIMessage,
+  type AIMessageChunk,
+  HumanMessage,
+  SystemMessage,
+} from '@langchain/core/messages';
 import {
   type BootPayload,
   BRIDGE_VERSION,
@@ -29,6 +34,7 @@ import {
   type ModelReply,
   type PendingReply,
   parseBridge,
+  type StreamPayload,
   success,
   validPythonModule,
   validSourcePath,
@@ -159,6 +165,8 @@ interface ActiveRun {
   readonly seen: Set<string>;
   readonly leases: Set<LeasedCall>;
   readonly checkpoints: Set<Promise<void>>;
+  readonly streams: ExecutorEvent[];
+  wake(): void;
   cancelled: boolean;
   cancellation?: Promise<void>;
   finishCancellation?: () => void;
@@ -276,7 +284,7 @@ export function createPyodideAdapter(
       interrupts: true,
       resume: true,
       checkpoints: true,
-      streaming: false,
+      streaming: true,
       subgraphs: false,
     },
     async prepare(agent, services, preparation) {
@@ -316,6 +324,20 @@ export function createPyodideAdapter(
       }
 
       const dispatch = (client: Connection, message: BridgeMessage): void => {
+        if (message.kind === 'notify' && message.op === 'stream') {
+          const run = active;
+          if (!run || !message.id.startsWith(`${run.id}/`) || run.seen.has(message.id)) {
+            client.close('invalid');
+            return;
+          }
+          run.seen.add(message.id);
+          if (!run.cancelled) {
+            const [path, mode, data] = message.payload as StreamPayload;
+            run.streams.push({ type: 'stream', executor: 'langgraph-python', path, mode, data });
+            run.wake();
+          }
+          return;
+        }
         if (message.kind === 'request' && message.op === 'checkpoint') {
           const input = message.payload as { op: string; sessionId: string };
           const run = active;
@@ -387,6 +409,7 @@ export function createPyodideAdapter(
               const input = message.payload as ModelPayload;
               const lease = await run.request.models.begin(input.role, {
                 signal: run.request.signal,
+                ...(input.options.stream ? { requires: ['streaming'] as const } : {}),
               });
               call = { lease, settled: false };
               run.leases.add(call);
@@ -408,19 +431,46 @@ export function createPyodideAdapter(
                     ? new HumanMessage(item.content)
                     : new AIMessage(item.content),
               );
-              const reply = await provider.invoke(messages, {
+              const modelOptions = {
                 signal: run.request.signal,
                 ...(input.options.stop === undefined ? {} : { stop: [...input.options.stop] }),
                 [Symbol.for('galaxie.model.destination')]: lease.destination,
-              });
-              if (
-                typeof reply.content !== 'string' ||
-                reply.tool_calls?.length ||
-                reply.invalid_tool_calls?.length ||
-                reply.additional_kwargs['tool_calls']
-              )
-                throw adapterFailure('unsupported');
-              await lease.checkOutput(reply.content, { final: true });
+              };
+              const validateReply = (reply: AIMessage | AIMessageChunk): void => {
+                if (
+                  typeof reply.content !== 'string' ||
+                  reply.tool_calls?.length ||
+                  reply.invalid_tool_calls?.length ||
+                  ('tool_call_chunks' in reply && reply.tool_call_chunks?.length) ||
+                  reply.additional_kwargs['tool_calls']
+                )
+                  throw adapterFailure('unsupported');
+              };
+              let reply: AIMessage | AIMessageChunk;
+              if (input.options.stream) {
+                let combined: AIMessageChunk | undefined;
+                const stream = await provider.stream(messages, modelOptions);
+                for await (const chunk of stream) {
+                  if (run.cancelled || run.request.signal.aborted || connection !== client)
+                    throw adapterFailure('cancelled');
+                  validateReply(chunk);
+                  combined = combined === undefined ? chunk : combined.concat(chunk);
+                  await lease.checkOutput(combined.content as string, { final: false });
+                  if (run.cancelled || run.request.signal.aborted || connection !== client)
+                    throw adapterFailure('cancelled');
+                  client.send({
+                    v: BRIDGE_VERSION,
+                    kind: 'notify',
+                    id: message.id,
+                    op: 'model-chunk',
+                    payload: { content: chunk.content },
+                  });
+                }
+                if (!combined) throw adapterFailure('unavailable');
+                reply = combined;
+              } else reply = await provider.invoke(messages, modelOptions);
+              validateReply(reply);
+              await lease.checkOutput(reply.content as string, { final: true });
               if (run.cancelled || run.request.signal.aborted) throw adapterFailure('cancelled');
               const reported: unknown = Reflect.get(reply, 'usage_metadata');
               if (reported !== undefined && !object(reported)) throw adapterFailure('invalid');
@@ -541,6 +591,9 @@ export function createPyodideAdapter(
         async *run(request): AsyncGenerator<ExecutorEvent> {
           let run: ActiveRun | undefined;
           let cancel: (() => void) | undefined;
+          let outcome: { output?: unknown; interrupted?: true } | undefined;
+          let failed: { error: unknown } | undefined;
+          let wake = (): void => {};
           try {
             if (disposed || active) throw adapterFailure('invalid');
             const command = request.command;
@@ -576,6 +629,8 @@ export function createPyodideAdapter(
                   seen: new Set(),
                   leases: new Set(),
                   checkpoints: new Set(),
+                  streams: [],
+                  wake: () => wake(),
                   cancelled: false,
                 };
                 active = run;
@@ -604,7 +659,27 @@ export function createPyodideAdapter(
                 if (request.signal.aborted) cancel();
               },
             );
-            const output = (await result) as { output?: unknown; interrupted?: true };
+            void result.then(
+              (value) => {
+                outcome = value as typeof outcome;
+                wake();
+              },
+              (error: unknown) => {
+                failed = { error };
+                wake();
+              },
+            );
+            for (;;) {
+              const events = run?.streams.splice(0) ?? [];
+              for (const event of events) if (!request.signal.aborted) yield event;
+              if (run?.streams.length) continue;
+              if (outcome || failed) break;
+              await new Promise<void>((resolve) => {
+                wake = resolve;
+              });
+            }
+            if (failed) throw failed.error;
+            const output = outcome as { output?: unknown; interrupted?: true };
             if (!request.signal.aborted) {
               if (output.interrupted) {
                 const interaction = await pending(request.sessionId);
@@ -626,6 +701,7 @@ export function createPyodideAdapter(
             if (!request.signal.aborted)
               yield { type: 'error', error: toErrorInfo(failureCode(error)) };
           } finally {
+            if (run && !outcome && !failed) cancel?.();
             if (run?.cancellation) await run.cancellation;
             if (run) await Promise.allSettled(run.checkpoints);
             if (cancel) request.signal.removeEventListener('abort', cancel);

@@ -7,7 +7,8 @@ import type { EventId, RunId } from './ids.js';
 export class RunEvents {
   private readonly runId: RunId;
   private readonly buffer: RunEvent[] = [];
-  private readonly consumers: Set<() => void> = new Set();
+  private readonly consumers: Set<{ queue: (RunEvent | undefined)[]; flush(): void }> = new Set();
+  private sequence: number = 0;
   private ended: boolean = false;
 
   constructor(runId: RunId) {
@@ -15,36 +16,37 @@ export class RunEvents {
   }
 
   append(event: ExecutorEvent | { readonly type: 'cancelled' }): void {
-    this.buffer.push(
-      Object.freeze({
-        ...event,
-        eventId: globalThis.crypto.randomUUID() as EventId,
-        runId: this.runId,
-        sequence: this.buffer.length,
-      }),
-    );
+    const recorded = Object.freeze({
+      ...event,
+      eventId: globalThis.crypto.randomUUID() as EventId,
+      runId: this.runId,
+      sequence: this.sequence++,
+    });
+    if (event.type !== 'stream') this.buffer.push(recorded);
+    for (const consumer of this.consumers) consumer.queue.push(recorded);
     this.ended = ['output', 'error', 'cancelled'].includes(event.type);
   }
 
   /** Called after the corresponding snapshot has been replaced. */
   notify(): void {
-    for (const consumer of this.consumers) consumer();
+    for (const consumer of this.consumers) consumer.flush();
   }
 
   iterate(assertCurrent: () => void): AsyncIterable<RunEvent> {
     const owner = this;
     return {
       [Symbol.asyncIterator](): AsyncIterableIterator<RunEvent> {
-        let sequence = 0;
         let detached = false;
         let checked = false;
         const pending: Array<(result: IteratorResult<RunEvent>) => void> = [];
+        const queue: (RunEvent | undefined)[] = [];
+        let cursor = 0;
         const done = (): IteratorResult<RunEvent> => ({ done: true, value: undefined });
         const flush = (): void => {
           while (pending.length > 0) {
-            const event = owner.buffer[sequence];
+            const event = queue[cursor];
             if (!detached && event !== undefined) {
-              sequence++;
+              queue[cursor++] = undefined;
               pending.shift()?.({ done: false, value: event });
             } else if (detached || owner.ended) {
               pending.shift()?.(done());
@@ -52,10 +54,16 @@ export class RunEvents {
               break;
             }
           }
-          if (detached || (owner.ended && sequence === owner.buffer.length)) {
-            owner.consumers.delete(flush);
+          if (cursor === queue.length) {
+            queue.length = 0;
+            cursor = 0;
+          }
+          if (detached || (owner.ended && queue.length === 0)) {
+            owner.consumers.delete(consumer);
+            queue.length = 0;
           }
         };
+        const consumer = { queue, flush };
         return {
           [Symbol.asyncIterator](): AsyncIterableIterator<RunEvent> {
             return this;
@@ -66,6 +74,8 @@ export class RunEvents {
               checked = true;
               try {
                 assertCurrent();
+                queue.push(...owner.buffer);
+                owner.consumers.add(consumer);
               } catch (error) {
                 detached = true;
                 return Promise.reject(error);
@@ -73,7 +83,6 @@ export class RunEvents {
             }
             return new Promise((resolve) => {
               pending.push(resolve);
-              owner.consumers.add(flush);
               flush();
             });
           },

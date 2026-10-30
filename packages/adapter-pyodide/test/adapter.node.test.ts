@@ -82,7 +82,7 @@ test.skipIf(!pythonWheelsAvailable)(
             mock: {
               destination: 'in-browser',
               modality: 'text',
-              features: [],
+              features: ['streaming'],
               languages: ['en'],
               pricing: { inputPerToken: 0, outputPerToken: 0 },
               credential: true,
@@ -251,7 +251,7 @@ test.skipIf(!pythonWheelsAvailable)(
             mock: {
               destination: 'in-browser',
               modality: 'text',
-              features: [],
+              features: ['streaming'],
               languages: ['en'],
               pricing: { inputPerToken: 0, outputPerToken: 0 },
             },

@@ -15,12 +15,19 @@ import {
   type PythonCaseTranscript,
   pythonStageACases,
 } from '../../../../../tests/conformance/support/python-stage-a.js';
+import {
+  executePythonStream,
+  type PythonStreamResult,
+  pythonStreamCases,
+  pythonStreamProbes,
+} from '../../../../../tests/conformance/support/python-streaming.js';
 import workerUrl from '../python-parity/pyodide-worker.ts?worker&url';
 
 declare const PYTHON_LOCAL_WHEELS: PyodideAdapterOptions['localWheels'];
 const result: {
   transcript?: PythonCaseTranscript;
   restore?: PythonRestoreResult;
+  stream?: PythonStreamResult;
   error?: string;
   violations: string[];
   done: boolean;
@@ -44,9 +51,16 @@ void (async () => {
   try {
     const query = new URLSearchParams(location.search);
     const name = query.get('case') ?? '';
-    if (!(pythonStageACases as readonly string[]).includes(name) && name !== 'parent-effects')
+    const streaming = [...pythonStreamCases, ...pythonStreamProbes].some((item) => item === name);
+    if (
+      !(pythonStageACases as readonly string[]).includes(name) &&
+      name !== 'parent-effects' &&
+      !streaming
+    )
       throw new Error('The conformance case is unknown.');
-    const module = name.replaceAll('-', '_');
+    const module = (pythonStreamProbes as readonly string[]).includes(name)
+      ? 'streaming'
+      : name.replaceAll('-', '_');
     const files = [...new Set(['fixture_support', 'interrupt_resume', module])].map(
       (file) => `${file}.py`,
     );
@@ -73,6 +87,10 @@ void (async () => {
       entry: 'create_agent',
       files,
     };
+    if (streaming) {
+      result.stream = await executePythonStream(options, agent, name);
+      return;
+    }
     if (query.has('durable')) {
       const saver = await IndexedDBSaver.open({
         appId: 'python-restore',

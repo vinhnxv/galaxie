@@ -107,3 +107,43 @@ def test_standin_supplies_the_langgraph_serializer_import_surface():
     serializer = JsonPlusSerializer()
     value = {"nested": [1, True, None], "bytes": b"body"}
     assert serializer.loads_typed(serializer.dumps_typed(value)) == value
+
+
+def test_stream_projection_is_closed_and_limits_metadata():
+    from langchain_core.messages import AIMessageChunk
+    from langgraph.types import Interrupt
+
+    notifications = []
+    _bridge.install_transport(lambda _: None, notifications.append)
+    _bridge.notify_stream(('node:task',), 'messages', (
+        AIMessageChunk(id='reply', content='checked', response_metadata={'private': 'OMIT'}),
+        {'langgraph_node': 'node', 'langgraph_checkpoint_ns': 'node:task', 'private': 'OMIT'},
+    ))
+    assert json.loads(notifications[-1])['payload'] == [
+        ['node:task'], 'messages', [
+            {'type': 'AIMessageChunk', 'content': 'checked', 'id': 'reply'},
+            {'langgraph_node': 'node', 'langgraph_checkpoint_ns': 'node:task'},
+        ],
+    ]
+    assert 'OMIT' not in notifications[-1]
+    _bridge.notify_stream((), 'updates', {'__interrupt__': (Interrupt(id='one', value={'question': 'Continue?'}),)})
+    assert json.loads(notifications[-1])['payload'][2] == {
+        '__interrupt__': [{'id': 'one', 'value': {'question': 'Continue?'}}],
+    }
+
+
+@pytest.mark.parametrize('data', [b'PRIVATE', {1: 'PRIVATE'}, float('nan'), object(), 'é' * 524289])
+def test_unsupported_stream_data_never_leaves_python(data):
+    notifications = []
+    _bridge.install_transport(lambda _: None, notifications.append)
+    with pytest.raises(GalaxieError, match='^This operation is unsupported\\.$'):
+        _bridge.notify_stream((), 'custom', data)
+    assert notifications == []
+
+
+def test_unsolicited_model_chunk_is_rejected():
+    with pytest.raises(GalaxieError, match='^The request is invalid\\.$'):
+        _bridge.receive_model_chunk(json.dumps({
+            'v': _bridge.VERSION, 'kind': 'notify', 'op': 'model-chunk',
+            'id': 'missing', 'payload': {'content': 'PRIVATE'},
+        }))

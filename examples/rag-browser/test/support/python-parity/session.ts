@@ -32,7 +32,7 @@ export async function executePythonTranscript(
           mock: {
             destination: 'in-browser',
             modality: 'text',
-            features: [],
+            features: ['streaming'],
             languages: ['en'],
             pricing: { inputPerToken: 0, outputPerToken: 0 },
           },

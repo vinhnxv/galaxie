@@ -82,7 +82,7 @@ export async function executePythonCase(
           paused = true;
         } else if (event.type === 'output') transcript.final = event.output;
         else if (event.type === 'error') throw new Error(event.error.message);
-        else throw new Error('Unexpected executor event.');
+        else if (event.type !== 'stream') throw new Error('Unexpected executor event.');
       }
       if (!paused) break;
       const answer = resumes[transcript.pauses.length - 1];

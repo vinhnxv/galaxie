@@ -62,8 +62,13 @@ export interface ModelPayload {
     readonly role: 'system' | 'user' | 'assistant';
     readonly content: string;
   }[];
-  readonly options: { readonly stop?: readonly string[] };
+  readonly options: { readonly stop?: readonly string[]; readonly stream?: boolean };
 }
+export type StreamPayload = readonly [
+  readonly string[],
+  'values' | 'updates' | 'messages' | 'custom',
+  unknown,
+];
 export interface ModelReply {
   readonly content: string;
   readonly usage?: {
@@ -221,7 +226,9 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
             typeof message['content'] === 'string',
         ) &&
         object(value['options']) &&
-        keys(value['options'], [], ['stop']) &&
+        keys(value['options'], [], ['stop', 'stream']) &&
+        (value['options']['stream'] === undefined ||
+          typeof value['options']['stream'] === 'boolean') &&
         (value['options']['stop'] === undefined ||
           (Array.isArray(value['options']['stop']) &&
             value['options']['stop'].every((item: unknown) => typeof item === 'string')))
@@ -370,9 +377,14 @@ export function parseBridge(value: unknown): BridgeMessage {
 export function encodeBridge(message: BridgeMessage): string {
   let encoded: string;
   try {
-    if (!json(message) || !valid(message)) throw new BridgeValidationError();
+    if (!json(message))
+      throw new BridgeValidationError(
+        message.kind === 'notify' && message.op === 'stream' ? 'unsupported' : 'invalid',
+      );
+    if (!valid(message)) throw new BridgeValidationError();
     encoded = JSON.stringify(message);
-  } catch {
+  } catch (error) {
+    if (error instanceof BridgeValidationError) throw error;
     throw new BridgeValidationError();
   }
   if (new TextEncoder().encode(encoded).length > MAX_BRIDGE_BYTES)

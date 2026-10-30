@@ -38,8 +38,12 @@ returns the exact saver graphs must compile with: `GalaxieCheckpointer` when the
 supplies `services.checkpoints: saver.byteRecords`, otherwise a Worker-owned memory
 saver. Durable restore also needs `recovery: saver.recovery` in the same scope.
 Without the port, lost Worker state makes pending/resume fail `unavailable`.
-Streaming and subgraphs remain disabled.
-The adapter supports text-only, nonstreaming model calls. Python code
+Streaming is enabled for bounded JSON graph projections and checked model deltas;
+subgraphs remain disabled. Streams are live only and never replayed. Streamed model
+calls require a provider declaring `streaming`, including implicit graph message
+streaming from Python `ainvoke`. Growing text and final text are checked in JavaScript
+before forwarding; earlier allowed deltas cannot be retracted after a block.
+The adapter supports asynchronous text-only model calls and streaming. Python code
 is trusted and can import `js`; a Worker is not an isolation boundary. CSP constrains
 Worker requests, while a lint aid remains advisory. Runtime loader, WASM and standard
 library bytes share the page build's trust; the adapter does not bind their bytes.

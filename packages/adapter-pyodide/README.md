@@ -30,8 +30,9 @@ closed envelopes and payloads without code generation. Model replies reach Pytho
 only after output checks; usage settles the router lease, and failures charge its
 reservation. Capability calls preserve the full executor task namespace as the
 broker's effect scope. Errors carry fixed codes and messages, never exception text.
-Version 1, unknown operations and unexpected notifications are rejected. The closed
-`stream` and `model-chunk` notification shapes are reserved; neither is enabled yet.
+Version 1, unknown operations and unexpected notifications are rejected. Worker
+`stream` notifications carry graph chunks; host `model-chunk` notifications carry
+checked text deltas for an open streamed model call.
 Oversized messages fail with the fixed `unsupported` error.
 
 Cancellation asks the Worker to abort. If no acknowledgment arrives within 500 ms,
@@ -61,7 +62,7 @@ reads committed state, and resume sends `{action, payload}` by interrupt ID. Com
 nodes do not re-run; the interrupted node does. Parallel or ID-less interrupts,
 static breakpoints and reusing an answered interaction fail `unsupported`.
 
-`interrupts`, `resume` and `checkpoints` are true. For durable sessions, supply
+`interrupts`, `resume`, `checkpoints` and `streaming` are true. For durable sessions, supply
 `services: { chatModels, checkpoints: saver.byteRecords }` and
 `recovery: saver.recovery` from the same app/principal-scoped
 [`IndexedDBSaver`](../storage-indexeddb/README.md#python-byte-checkpoints). The Worker
@@ -80,11 +81,27 @@ including writes and parent writes, must fit one 1 MiB bridge message after base
 The async Python saver requires a thread-scoped config for listing; synchronous
 saver methods and listing every session from Python are unsupported.
 
-`streaming` and `subgraphs` remain false. The internal `astream` loop emits no public
-stream events and preserves the graph's output schema. Calls support text messages
-and optional stop strings; tool calls, multimodal messages and streamed Python model
-output are unsupported. The RAG application's default sessions remain in memory;
-this change adds no review UI or persistent RAG session flow.
+`subgraphs` remains false. The `astream` loop emits live `values`, `updates`,
+`messages` and `custom` events with `executor: 'langgraph-python'` and path arrays,
+while preserving the graph's final output schema. Streams are not retained in the
+replayable event journal; subscribe before the chunks you need. Lifecycle events
+keep their original identities and sequence numbers on replay, with gaps for streams.
+Interrupts project to `{id, value}`, tuples to arrays, and messages to
+`{type, content, id}`. Message metadata includes only `langgraph_node` and
+`langgraph_checkpoint_ns`. Other values must be JSON; non-JSON or oversized chunks
+fail `unsupported` without their content.
+
+`GalaxieChatModel` supports asynchronous text generation and streaming, with optional
+stop strings. Streamed calls require a provider declaring `streaming`; graph message
+streaming can select this path even for Python `ainvoke`. JavaScript checks each
+growing reply before sending its delta to Python, then checks the complete text and
+settles usage before the terminal response. A block fails `denied` and stops later
+deltas; previously allowed text cannot be retracted. The final Python chunk carries
+usage without repeating text. Tool calls and multimodal messages remain unsupported.
+Raw graph streams can contain working state and bypass routed-model output checks;
+hosts must select the checked message projection before rendering text. The RAG
+application still renders only its final result, and default sessions remain in
+memory; no review UI or persistent RAG session flow is added.
 
 Python code is trusted under [ADR-0018](../../docs/adr/0018-python-agents-through-pyodide.md).
 It can import `js` and use the Worker's APIs. A dedicated Worker does not isolate
@@ -126,3 +143,10 @@ checkpoint writes during cancellation settlement. Native serializer tests cover 
 twelve cases, the RAG fixtures and the parent-write fixture: exceptions decode as
 `repr` strings and tuples as msgpack arrays; other values retain strict equality.
 No real model or device measurements were added.
+
+`linear` and `branching` also match the native Python stream events, mode order and
+paths on Node Pyodide and real Chromium. Both lanes prove checked deltas and final
+usage, cancellation after a checked delta, early public stream close followed by
+terminal model settlement and another run, a mid-stream block with only the allowed prefix observed in Python, fixed
+failures for non-JSON/oversized chunks, and stream-free event replay. Chromium keeps
+the existing CSP and Trusted Types policy and blocks external requests.

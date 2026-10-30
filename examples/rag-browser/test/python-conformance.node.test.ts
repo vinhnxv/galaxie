@@ -11,12 +11,16 @@ import { expect, test } from 'vitest';
 import { pythonCaseSources } from '../../../tests/conformance/support/python-cases.node.js';
 import { pythonReloadCases } from '../../../tests/conformance/support/python-restore.js';
 import { pythonStageACases } from '../../../tests/conformance/support/python-stage-a.js';
+import {
+  pythonStreamCases,
+  pythonStreamProbes,
+} from '../../../tests/conformance/support/python-streaming.js';
 import { cspHeader } from '../src/host/csp.js';
 import { missingPythonWheels, pythonWheelsAvailable } from './support/python.node.js';
 
 test.skipIf(!pythonWheelsAvailable)(
   pythonWheelsAvailable
-    ? 'real Chromium Pyodide matches native interrupt cases under strict CSP'
+    ? 'real Chromium Pyodide matches native interrupts, restore and streams under strict CSP'
     : missingPythonWheels,
   async () => {
     const directory = await mkdtemp(join(tmpdir(), 'galaxie-python-conformance-'));
@@ -30,10 +34,12 @@ test.skipIf(!pythonWheelsAvailable)(
       ),
     );
     const sources = await Promise.all(
-      [...pythonStageACases, 'parent-effects'].map(async (name) => ({
-        name,
-        files: await pythonCaseSources(name),
-      })),
+      [...pythonStageACases, ...pythonStreamCases, ...pythonStreamProbes, 'parent-effects'].map(
+        async (name) => ({
+          name,
+          files: await pythonCaseSources(name),
+        }),
+      ),
     );
     const header = cspHeader('mock');
     let server: PreviewServer | undefined;
@@ -139,6 +145,65 @@ test.skipIf(!pythonWheelsAvailable)(
         ]);
       }
       expect(external).toEqual([]);
+      for (const name of [...pythonStreamCases, ...pythonStreamProbes]) {
+        await page.goto(`${origin}/?case=${name}`);
+        await page.waitForFunction(
+          () => Reflect.get(globalThis, 'pythonConformance')?.done,
+          undefined,
+          { timeout: 60000 },
+        );
+        const result = await page.evaluate(() => Reflect.get(globalThis, 'pythonConformance'));
+        expect(result.error, name).toBeUndefined();
+        expect(result.violations, name).toEqual([]);
+        const actual = result.stream;
+        expect(actual.replayModes).toEqual([]);
+        if ((pythonStreamCases as readonly string[]).includes(name)) {
+          const golden = JSON.parse(
+            await readFile(
+              new URL(`../../../tests/conformance/golden-python/${name}.json`, import.meta.url),
+              'utf8',
+            ),
+          );
+          expect(actual.error, name).toBeNull();
+          expect(actual.events, name).toEqual(golden.events);
+          expect(actual.modes, name).toEqual(golden.modes);
+          expect(actual.final, name).toEqual(golden.final);
+        } else if (name === 'allow') {
+          expect(actual.error).toBeNull();
+          expect(actual.final).toEqual({
+            text: 'allowed BLOCKED LATER',
+            usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
+          });
+          expect(actual.checks.at(-1)).toEqual({ text: 'allowed BLOCKED LATER', final: true });
+        } else if (name === 'cancel') {
+          expect(actual.cancelled).toBe(true);
+          expect(actual.final).toBeNull();
+          expect(actual.events.custom).toEqual([{ path: [], data: { seen: 'allowed ' } }]);
+          expect(JSON.stringify(actual.events)).not.toContain('BLOCKED');
+          expect(JSON.stringify(actual.events)).not.toContain('LATER');
+        } else if (name === 'close') {
+          expect(actual.closedWhileRunning).toBe(true);
+          expect(actual.error).toBeNull();
+          expect(actual.final).toEqual({ text: 'allowed ', usage: null });
+          expect(actual.nextRunOutput).toEqual({
+            text: 'allowed BLOCKED LATER',
+            usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
+          });
+        } else if (name === 'block' || name === 'close-block') {
+          expect(actual.error).toEqual({ code: 'denied', message: 'Policy denied the request.' });
+          expect(actual.events.custom).toEqual([
+            { path: [], data: name === 'block' ? { seen: 'allowed ' } : { closed: true } },
+          ]);
+          expect(JSON.stringify(actual.events)).not.toContain('BLOCKED');
+          expect(JSON.stringify(actual.events)).not.toContain('LATER');
+        } else {
+          expect(actual.error).toEqual({
+            code: 'unsupported',
+            message: 'This operation is unsupported.',
+          });
+          expect(JSON.stringify(actual.events)).not.toContain('UNSUPPORTED-PRIVATE');
+        }
+      }
       for (const name of [...pythonReloadCases, 'parent-effects']) {
         const golden =
           name === 'parent-effects'
@@ -198,6 +263,6 @@ test.skipIf(!pythonWheelsAvailable)(
       await rm(directory, { recursive: true, force: true });
     }
   },
-  // About 21 page loads each boot Pyodide; hosted runners take roughly ten seconds per boot.
+  // About 28 page loads each boot Pyodide; hosted runners take roughly ten seconds per boot.
   600000,
 );

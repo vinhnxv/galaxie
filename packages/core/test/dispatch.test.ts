@@ -414,7 +414,6 @@ test('one event iterator replays and follows every segment exactly once', async 
     ],
   });
   const events = instance.events(runId)[Symbol.asyncIterator]();
-  expect((await events.next()).value).toMatchObject({ type: 'stream', sequence: 0 });
   expect((await events.next()).value).toMatchObject({ type: 'interaction', sequence: 1 });
   const next = events.next();
   await instance.dispatch(event);

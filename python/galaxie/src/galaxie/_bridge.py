@@ -38,27 +38,38 @@ class GalaxieError(Exception):
 
 
 _transport: Callable[[str], Awaitable[str]] | None = None
+_notify: Callable[[str], None] | None = None
+_streams: dict[str, Callable[[str], None]] = {}
 _ids = itertools.count(1)
 
 
-def install_transport(transport: Callable[[str], Awaitable[str]]) -> None:
-    global _transport
-    if not callable(transport):
+def install_transport(
+    transport: Callable[[str], Awaitable[str]], notify: Callable[[str], None] | None = None,
+) -> None:
+    global _transport, _notify
+    if not callable(transport) or (notify is not None and not callable(notify)):
         raise GalaxieError("invalid")
     _transport = transport
+    _notify = notify
 
 
 def _invalid_constant(_: str) -> None:
     raise GalaxieError("invalid")
 
 
-async def request(op: str, payload: dict[str, Any]) -> Any:
+async def request(
+    op: str, payload: dict[str, Any], *, on_chunk: Callable[[str], None] | None = None,
+) -> Any:
     if op not in ("model", "capability", "checkpoint"):
         raise GalaxieError("invalid")
     if op == "checkpoint" and not _checkpoint_request(payload):
         raise GalaxieError("invalid")
     if _transport is None:
         raise GalaxieError("unavailable")
+    if on_chunk is not None and (
+        not callable(on_chunk) or op != 'model' or payload.get('options', {}).get('stream') is not True
+    ):
+        raise GalaxieError('invalid')
     identifier = str(next(_ids))
     message = {"v": VERSION, "kind": "request", "id": identifier, "op": op, "payload": payload}
     try:
@@ -68,11 +79,15 @@ async def request(op: str, payload: dict[str, Any]) -> Any:
     except (ValueError, TypeError, UnicodeError):
         raise GalaxieError("invalid") from None
     try:
+        if on_chunk is not None:
+            _streams[identifier] = on_chunk
         reply = await _transport(raw)
     except GalaxieError:
         raise
     except Exception:
         raise GalaxieError("unavailable") from None
+    finally:
+        _streams.pop(identifier, None)
     try:
         if not isinstance(reply, str):
             raise GalaxieError("invalid")
@@ -111,6 +126,72 @@ async def request(op: str, payload: dict[str, Any]) -> Any:
         return value["payload"]
     except (ValueError, TypeError, UnicodeError):
         raise GalaxieError("invalid") from None
+
+
+def receive_model_chunk(raw: str) -> None:
+    try:
+        if not isinstance(raw, str):
+            raise GalaxieError('invalid')
+        if len(raw.encode('utf-8')) > MAX_BYTES:
+            raise GalaxieError('unsupported')
+        message = json.loads(raw, parse_constant=_invalid_constant)
+        if (
+            not isinstance(message, dict) or set(message) != {'v', 'kind', 'id', 'op', 'payload'}
+            or message['v'] != VERSION or message['kind'] != 'notify'
+            or message['op'] != 'model-chunk' or not isinstance(message['id'], str)
+            or message['id'] not in _streams or not isinstance(message['payload'], dict)
+            or set(message['payload']) != {'content'}
+            or not isinstance(message['payload']['content'], str)
+        ):
+            raise GalaxieError('invalid')
+        _streams[message['id']](message['payload']['content'])
+    except (ValueError, TypeError, UnicodeError):
+        raise GalaxieError('invalid') from None
+
+
+def _project_stream(value: Any) -> Any:
+    from langchain_core.messages import BaseMessage
+    from langgraph.types import Interrupt
+
+    if isinstance(value, Interrupt):
+        return {'id': value.id, 'value': _project_stream(value.value)}
+    if isinstance(value, BaseMessage):
+        return {'type': value.type, 'content': _project_stream(value.content), 'id': value.id}
+    if isinstance(value, (list, tuple)):
+        return [_project_stream(item) for item in value]
+    if isinstance(value, dict):
+        if any(not isinstance(key, str) for key in value):
+            raise GalaxieError('unsupported')
+        return {key: _project_stream(item) for key, item in value.items()}
+    if value is None or type(value) in (str, bool, int, float):
+        return value
+    raise GalaxieError('unsupported')
+
+
+def notify_stream(path, mode, data) -> None:
+    if _notify is None:
+        raise GalaxieError('unavailable')
+    try:
+        if not isinstance(path, (list, tuple)) or any(not isinstance(item, str) for item in path):
+            raise GalaxieError('unsupported')
+        if mode not in ('values', 'updates', 'messages', 'custom'):
+            raise GalaxieError('unsupported')
+        if mode == 'messages':
+            message, metadata = data
+            data = [message, {key: metadata[key] for key in (
+                'langgraph_node', 'langgraph_checkpoint_ns',
+            ) if key in metadata}]
+        raw = json.dumps({
+            'v': VERSION, 'kind': 'notify', 'id': str(next(_ids)), 'op': 'stream',
+            'payload': [list(path), mode, _project_stream(data)],
+        }, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
+        if len(raw.encode('utf-8')) > MAX_BYTES:
+            raise GalaxieError('unsupported')
+        _notify(raw)
+    except GalaxieError:
+        raise
+    except Exception:
+        raise GalaxieError('unsupported') from None
 
 
 def _text(value):

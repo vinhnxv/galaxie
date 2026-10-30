@@ -30,7 +30,7 @@ function send(value: BridgeMessage): void {
 }
 let python: Awaited<ReturnType<typeof import('pyodide').loadPyodide>> | undefined;
 let booting = false;
-let active: { id: string; settled: Promise<void> } | undefined;
+let active: { id: string; settled: Promise<void>; modelReplies: Promise<string>[] } | undefined;
 let reading: { id: string } | undefined;
 const pending = new Map<string, { request: BridgeMessage; resolve(value: string): void }>();
 async function boot(input: BootPayload): Promise<number> {
@@ -115,6 +115,12 @@ async function boot(input: BootPayload): Promise<number> {
     py.FS.writeFile(destination, source.text);
   }
   py.registerJsModule('_galaxie_transport', {
+    notify(raw: string): void {
+      const message = parseBridge(raw);
+      if (!active || message.kind !== 'notify' || message.op !== 'stream')
+        throw adapterFailure('invalid');
+      send({ ...message, id: `${active.id}/${message.id}` });
+    },
     request(raw: string): Promise<string> {
       const message = parseBridge(raw);
       const context = active ?? reading;
@@ -128,10 +134,15 @@ async function boot(input: BootPayload): Promise<number> {
       )
         throw new Error('invalid');
       const id = `${context.id}/${message.id}`;
-      return new Promise((resolve) => {
-        pending.set(id, { request: message, resolve });
-        send({ ...message, id });
-      });
+      const reply = Promise.withResolvers<string>();
+      pending.set(id, { request: message, resolve: reply.resolve });
+      if (
+        message.op === 'model' &&
+        (message.payload as { options: { stream?: boolean } }).options.stream
+      )
+        active?.modelReplies.push(reply.promise);
+      send({ ...message, id });
+      return reply.promise;
     },
   });
   py.globals['set']('_galaxie_module', input.module);
@@ -139,8 +150,8 @@ async function boot(input: BootPayload): Promise<number> {
   py.globals['set']('_galaxie_durable', input.checkpoints === true);
   await py.runPythonAsync(`
 import sys, json, asyncio, importlib
-from galaxie._bridge import install_transport, GalaxieError
-from _galaxie_transport import request as _transport
+from galaxie._bridge import install_transport, GalaxieError, notify_stream, receive_model_chunk
+from _galaxie_transport import request as _transport, notify as _notify
 from langgraph.errors import GraphRecursionError
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
@@ -148,7 +159,7 @@ from galaxie.langgraph import _install_checkpointer, checkpointer, GalaxieCheckp
 sys.path.insert(0, '/agent')
 async def _galaxie_request(raw):
     return await _transport(raw)
-install_transport(_galaxie_request)
+install_transport(_galaxie_request, _notify)
 _install_checkpointer(GalaxieCheckpointer() if _galaxie_durable else InMemorySaver())
 try:
     _galaxie_graph = getattr(importlib.import_module(_galaxie_module), _galaxie_entry)()
@@ -201,6 +212,7 @@ async def _galaxie_execute():
             value, config, stream_mode=['values', 'updates', 'messages', 'custom'],
             subgraphs=True, output_keys=_galaxie_graph.output_channels,
         ):
+            notify_stream(path, mode, data)
             if not path and mode == 'values':
                 output = data
             if not path and mode == 'updates' and isinstance(data, dict) and '__interrupt__' in data:
@@ -246,7 +258,28 @@ async function receive(data: unknown): Promise<void> {
     return;
   }
   if (request.kind === 'notify') {
-    send(failure(request, 'invalid'));
+    const call = pending.get(request.id);
+    if (
+      request.op !== 'model-chunk' ||
+      !active ||
+      !python ||
+      !request.id.startsWith(`${active.id}/`) ||
+      call?.request.kind !== 'request' ||
+      call.request.op !== 'model' ||
+      (call.request.payload as { options: { stream?: boolean } }).options.stream !== true
+    ) {
+      send(failure(request, 'invalid'));
+      return;
+    }
+    try {
+      python.globals['set'](
+        '_galaxie_notification',
+        encodeBridge({ ...request, id: call.request.id }),
+      );
+      python.runPython('receive_model_chunk(_galaxie_notification)');
+    } catch (error) {
+      send(failure(request, failureCode(error, 'invalid')));
+    }
     return;
   }
   try {
@@ -271,7 +304,7 @@ async function receive(data: unknown): Promise<void> {
       const payload = request.payload as RunPayload;
       py.globals['set']('_galaxie_input', JSON.stringify(payload));
       const done = Promise.withResolvers<void>();
-      active = { id: request.id, settled: done.promise };
+      active = { id: request.id, settled: done.promise, modelReplies: [] };
       try {
         const value = JSON.parse(await py.runPythonAsync('await _galaxie_execute()')) as {
           ok: boolean;
@@ -279,7 +312,15 @@ async function receive(data: unknown): Promise<void> {
           interrupted?: true;
           code?: string;
         };
-        if (value.ok)
+        if (value.ok) {
+          // Public model streams may close before their inner generator drains the call.
+          // Keep the run context alive through checked deltas and terminal settlement.
+          const replies = await Promise.all(active.modelReplies);
+          for (const raw of replies) {
+            const reply = parseBridge(raw);
+            if (reply.kind !== 'response') throw adapterFailure('invalid');
+            if (!reply.ok) throw adapterFailure(reply.error.code);
+          }
           send(
             success(
               request,
@@ -287,7 +328,7 @@ async function receive(data: unknown): Promise<void> {
               'result',
             ),
           );
-        else send(failure(request, value.code as ErrorCode, 'result'));
+        } else send(failure(request, value.code as ErrorCode, 'result'));
       } catch (error) {
         send(failure(request, failureCode(error, 'executor_error'), 'result'));
       } finally {
