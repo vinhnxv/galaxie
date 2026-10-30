@@ -39,6 +39,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0016](0016-parity-demonstrations-and-otel-traces.md) | Parity is the verdict, metrics are demonstrations, traces are OpenTelemetry spans | Accepted |
 | [0017](0017-framework-neutral-contracts.md) | Framework-neutral contracts, with an adapter per framework | Accepted |
 | [0018](0018-python-agents-through-pyodide.md) | Python agents through Pyodide in a worker, with policy kept in JavaScript | Proposed |
+| [0019](0019-in-browser-retrieval.md) | Browser-built retrieval in a maintained example | Proposed |
 
 ## Template
 

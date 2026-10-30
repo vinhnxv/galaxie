@@ -56,6 +56,10 @@ evidence, with the maintainer's decision pending.
 - The output-safety hook covers routed reply text and tool-call arguments only, cannot retract already-allowed chunks, and does not cover direct models, capability results or every display callback ([output handling](security-review.md#owasp-top-10-for-llm-applications-2025)).
 - Development warnings and lint rules are best-effort advice rather than runtime containment or exhaustive CSP/credential scans ([warnings](system-design.md#development-warnings), [lint limits](../packages/eslint-plugin/README.md)).
 
+## Browser-built retrieval example
+
+The [RAG example](../examples/rag-browser/README.md) has JavaScript only, with no Python executor, durable question/answer session restore, individual pasted-passage deletion or prebuilt pinned-index format. Its separate retrieval cache has no principal scoping, retention sweep or logout wipe. Concurrent builds can replace whole records; clear uses cross-tab invalidation and a durable content-free generation fence. Browser eviction loses the index. WebGPU is required, with no WASM inference fallback. Full-corpus indexing, real-model retrieval/citation quality, reference-device performance and simultaneous embedding/chat GPU memory use remain unmeasured. The existing WebLLM context limit can reject large prompts.
+
 ## Platforms and evidence
 
 - Firefox, Safari, mobile devices, other GPUs and other OS/device combinations have no real-device evidence in the published matrix ([untested configurations](device-matrix.md#untested-or-unmeasured)).

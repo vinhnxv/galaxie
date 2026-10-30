@@ -16,3 +16,6 @@ dist/
 # Local tool data on the maintainer's machine (see AGENTS.md): the CodeGraph index and the Beads backlog
 /.codegraph/
 /.beads/
+
+# Generated corpus; build explicitly with the example corpus command.
+/examples/rag-browser/public/data/squad-dev.json

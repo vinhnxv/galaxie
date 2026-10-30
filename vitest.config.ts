@@ -11,6 +11,9 @@ import {
 } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
+  '@orama/orama': fileURLToPath(
+    new URL('./examples/rag-browser/node_modules/@orama/orama/dist/esm/index.js', import.meta.url),
+  ),
   eslint: fileURLToPath(
     new URL('./packages/eslint-plugin/node_modules/eslint/lib/api.js', import.meta.url),
   ),
@@ -98,7 +101,7 @@ const config: ViteUserConfig = defineConfig({
         root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
         resolve: { alias },
         optimizeDeps: {
-          exclude: ['@mlc-ai/web-llm'],
+          exclude: ['@mlc-ai/web-llm', '@huggingface/transformers', 'onnxruntime-web'],
           include: [
             'react',
             'react-dom/client',
@@ -120,6 +123,7 @@ const config: ViteUserConfig = defineConfig({
             '@langchain/core/runnables',
             '@opentelemetry/sdk-trace',
             'zod',
+            '@orama/orama',
           ],
         },
         test: {

@@ -1,0 +1,133 @@
+{
+  "format": "galaxie.rag-corpus/v1",
+  "license": "CC BY-SA 4.0",
+  "attribution": "Original synthetic fixture by the galaxie example authors; no SQuAD text. SQuAD v1.1: Rajpurkar et al. (2016), CC BY-SA 4.0.",
+  "source": {
+    "url": "https://example.invalid/synthetic-corpus",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "passages": [
+    {
+      "id": "p1",
+      "title": "Cities",
+      "text": "Paris is the capital of France. The Seine flows through Paris."
+    },
+    {
+      "id": "p2",
+      "title": "Cities",
+      "text": "Lisbon is the capital of Portugal. Its trams climb steep hills."
+    },
+    {
+      "id": "p3",
+      "title": "Cities",
+      "text": "Oslo is the capital of Norway. Its waterfront has ferries."
+    },
+    {
+      "id": "p4",
+      "title": "Cities",
+      "text": "The café in Lyon serves tea. A naïve traveler orders a pastry."
+    },
+    {
+      "id": "p5",
+      "title": "Gardens",
+      "text": "Sunflowers turn toward sunlight. Bees visit their yellow flowers."
+    },
+    {
+      "id": "p6",
+      "title": "Gardens",
+      "text": "Mint grows beside the garden path. Its leaves smell fresh."
+    },
+    {
+      "id": "p7",
+      "title": "Gardens",
+      "text": "An oak tree shades the pond. Ducks nest near its roots."
+    },
+    {
+      "id": "p8",
+      "title": "Gardens",
+      "text": "A greenhouse protects tomatoes from cold nights."
+    },
+    {
+      "id": "p9",
+      "title": "Science",
+      "text": "The moon reflects sunlight. Its rocky surface has craters."
+    },
+    {
+      "id": "p10",
+      "title": "Science",
+      "text": "Copper conducts electricity. Wires carry current through a circuit."
+    },
+    {
+      "id": "p11",
+      "title": "Science",
+      "text": "A prism separates white light into a spectrum of colors."
+    },
+    {
+      "id": "p12",
+      "title": "Science",
+      "text": "Water freezes at zero degrees Celsius under ordinary pressure."
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "question": "What is the capital of France?",
+      "answers": ["Paris"],
+      "passageId": "p1"
+    },
+    {
+      "id": "q2",
+      "question": "What is the capital of Portugal?",
+      "answers": ["Lisbon"],
+      "passageId": "p2"
+    },
+    {
+      "id": "q3",
+      "question": "What is the capital of Norway?",
+      "answers": ["Oslo"],
+      "passageId": "p3"
+    },
+    {
+      "id": "q4",
+      "question": "Where does the traveler order a pastry?",
+      "answers": ["café"],
+      "passageId": "p4"
+    },
+    {
+      "id": "q5",
+      "question": "Which flowers do bees visit?",
+      "answers": ["Sunflowers"],
+      "passageId": "p5"
+    },
+    {
+      "id": "q6",
+      "question": "Which leaves smell fresh?",
+      "answers": ["Mint"],
+      "passageId": "p6"
+    },
+    {
+      "id": "q7",
+      "question": "Where do ducks nest?",
+      "answers": ["oak"],
+      "passageId": "p7"
+    },
+    {
+      "id": "q8",
+      "question": "What protects tomatoes?",
+      "answers": ["greenhouse"],
+      "passageId": "p8"
+    },
+    {
+      "id": "q9",
+      "question": "What reflects sunlight?",
+      "answers": ["moon"],
+      "passageId": "p9"
+    },
+    {
+      "id": "q10",
+      "question": "What conducts electricity?",
+      "answers": ["Copper"],
+      "passageId": "p10"
+    }
+  ]
+}

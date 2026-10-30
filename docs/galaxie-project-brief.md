@@ -1469,7 +1469,7 @@ Nothing below starts unless the M4 decision is **Go** and the phase's own entry 
 | Third-party MCP servers with OAuth 2.1 + PKCE | A real host needs it; a token storage, refresh and revocation design is reviewed; ADR-0011 updated | Tokens never in checkpoints or traces; per-server consent UI |
 | OpenAPI operations as capabilities | A host has an OpenAPI spec and asks for it | Host allowlists operations; same schema and classification rules |
 | Transformers.js for non-LLM tasks | A use case: safety classifier, embeddings for retrieval, or ASR | Explicit `device`; measured on reference devices |
-| Retrieval over public documents (§1.4) | A host with public documents asks for it; the index format, its update path and its download size are designed | The prebuilt index is a pinned asset; embeddings and search run on the device; private or fast-changing documents stay behind a backend capability |
+| Retrieval over public documents (§1.4) | A host with public documents asks for it; the index format, its update path and its download size are designed | The prebuilt index is a pinned asset; embeddings and search run on the device; private or fast-changing documents stay behind a backend capability. [ADR-0019](adr/0019-in-browser-retrieval.md) opens the browser-built example gate; the prebuilt pinned-index format and update path remain undesigned. |
 | Voice push-to-talk | Text loop is stable; audio permissions designed (§4.4) | ASR/TTS are capabilities, not agents |
 | BYOK direct to a provider | An ADR accepts the risk; host opt-in flag; keys in memory only | May never become a default |
 
