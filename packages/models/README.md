@@ -53,7 +53,9 @@ be distinguished by page code. The selected provider never falls back after
 dispatch. HTTP statuses, cancellation and timeouts keep their existing mappings;
 other destinations and public user endpoints keep `unavailable` network errors.
 
-The LangGraph adapter passes the selected destination to the credentialed factory.
+The LangGraph adapter supplies the selected destination on every provider dispatch,
+including preconstructed models and concurrent roles sharing one model. This
+call metadata stays out of SDK requests and leaves constructor settings unchanged.
 Direct calls default to `user-endpoint`; supply `destination: 'host-server'` or
 `'third-party'` when using a proxy directly. This classification neither resolves
 DNS nor broadens permitted URLs: LAN URLs still require HTTPS. Errors contain no

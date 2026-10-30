@@ -20,6 +20,10 @@ describe('OpenAI-compatible error classification', () => {
     ['https://[fd00::1]/v1', 'user-endpoint', 'unreachable'],
     ['https://[fe80::1]/v1', 'user-endpoint', 'unreachable'],
     ['https://model.local/v1', 'user-endpoint', 'unreachable'],
+    ['https://[::ffff:127.0.0.1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://[::ffff:192.168.1.1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://[::ffff:169.254.1.1]/v1', 'user-endpoint', 'unreachable'],
+    ['https://[::ffff:8.8.8.8]/v1', 'user-endpoint', 'unavailable'],
     ['https://public.example/v1', 'user-device', 'unreachable'],
     ['https://public.example/v1', 'user-endpoint', 'unavailable'],
     ['https://10.example/v1', 'user-endpoint', 'unavailable'],
@@ -152,6 +156,28 @@ function fixture(options: ConstructorParameters<typeof FakeOpenAIFetch>[0] = {})
 }
 
 describe('OpenAI-compatible chat model', () => {
+  it.each([
+    [undefined, 'unreachable'],
+    ['user-device', 'unreachable'],
+    ['user-endpoint', 'unreachable'],
+    ['host-server', 'unavailable'],
+    ['third-party', 'unavailable'],
+    ['in-browser', 'unavailable'],
+  ] as const)('classifies direct calls with destination %s as %s', async (destination, code) => {
+    const fake = new FakeOpenAIFetch({ failure: true });
+    const model = openAICompatible({
+      baseURL: 'http://localhost/v1',
+      model: 'fake',
+      fetch: fake.fetch,
+      ...(destination === undefined ? {} : { destination }),
+    })({ credential });
+    const error = await model.invoke('prompt-canary').catch((failure: unknown) => failure);
+    expect(error).toMatchObject({ code });
+    expect(error).not.toHaveProperty('cause');
+    expect(String(error)).not.toContain('localhost');
+    expect(fake.requests).toHaveLength(1);
+  });
+
   it.each(['read-error', 'eof'] as const)(
     'keeps a local endpoint failure after an SSE response outside unreachable: %s',
     async (mode) => {

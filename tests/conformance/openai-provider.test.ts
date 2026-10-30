@@ -9,7 +9,7 @@ import {
   defineAgentDefinition,
 } from '@galaxie/core';
 import { MockChatModel } from '@galaxie/models/mock';
-import { openAICompatible } from '@galaxie/models/openai';
+import { OpenAICompatibleChatModel, openAICompatible } from '@galaxie/models/openai';
 import type { BaseMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { afterAll, beforeAll, expect, inject, test, vi } from 'vitest';
@@ -25,7 +25,12 @@ import {
   FakeOpenAIFetch,
   type FakeOpenAIOptions,
 } from '../../packages/models/test/support/fake-openai-fetch.js';
-import type { HttpControl, HttpFixture } from './support/http-context.js';
+import {
+  HTTP_ORIGIN,
+  type HttpAdminState,
+  type HttpControl,
+  type HttpFixture,
+} from './support/http-context.js';
 
 let httpFixture: HttpFixture;
 let httpControl: HttpControl | undefined;
@@ -74,6 +79,59 @@ test.skipIf(typeof window === 'undefined')(
   'AT-24 a no-CORS user-device model endpoint is unreachable without fallback',
   async () => {
     await unreachableEndpoint(httpFixture.noCorsUrl, 'user-device', 'invoke');
+    const response = await fetch(httpFixture.adminUrl);
+    expect(response.status).toBe(200);
+    const recorded = (await response.json()) as HttpAdminState;
+    expect(recorded.requests).toContainEqual(
+      expect.objectContaining({
+        server: 'no-cors',
+        method: 'OPTIONS',
+        path: '/chat/completions',
+        origin: HTTP_ORIGIN,
+        requestedMethod: 'POST',
+        status: 204,
+      }),
+    );
+    expect(
+      recorded.requests.filter(
+        (request) => request.server === 'no-cors' && request.method === 'POST',
+      ),
+    ).toHaveLength(0);
+  },
+);
+
+test.each([
+  ['user-device', 'invoke'],
+  ['user-device', 'stream'],
+  ['user-endpoint', 'invoke'],
+  ['user-endpoint', 'stream'],
+  ['host-server', 'invoke'],
+  ['host-server', 'stream'],
+  ['third-party', 'invoke'],
+  ['third-party', 'stream'],
+  ['in-browser', 'invoke'],
+  ['in-browser', 'stream'],
+] as const)('AT-24 preconstructed loopback model endpoint: %s %s', async (destination, mode) => {
+  const baseURL = httpFixture.closedUrl.replace('127.0.0.1', 'localhost');
+  const model = new OpenAICompatibleChatModel(
+    { baseURL, model: 'fake' },
+    'endpoint-credential-canary',
+  );
+  await unreachableEndpoint(baseURL, destination, mode, model);
+});
+
+test.each(['invoke', 'stream'] as const)(
+  'AT-24 concurrent roles share a preconstructed model: %s',
+  async (mode) => {
+    const baseURL = httpFixture.closedUrl.replace('127.0.0.1', 'localhost');
+    const model = new OpenAICompatibleChatModel(
+      { baseURL, model: 'fake' },
+      'endpoint-credential-canary',
+    );
+    await Promise.all([
+      unreachableEndpoint(baseURL, 'user-device', mode, model),
+      unreachableEndpoint(baseURL, 'host-server', mode, model),
+    ]);
   },
 );
 
@@ -81,6 +139,7 @@ async function unreachableEndpoint(
   baseURL: string,
   destination: DestinationClass,
   mode: 'invoke' | 'stream',
+  preconstructed?: OpenAICompatibleChatModel,
 ): Promise<void> {
   // Distinguish the endpoint host from Vitest's source URLs in browser error stacks.
   baseURL = baseURL.replace('127.0.0.1', 'localhost');
@@ -103,7 +162,7 @@ async function unreachableEndpoint(
       principalScope: 'test',
       services: {
         chatModels: {
-          endpoint: openAICompatible({ baseURL, model: 'fake' }),
+          endpoint: preconstructed ?? openAICompatible({ baseURL, model: 'fake' }),
           fallback,
         },
       },
@@ -114,7 +173,7 @@ async function unreachableEndpoint(
             modality: 'text',
             features: ['streaming'],
             pricing: { inputPerToken: 0, outputPerToken: 0 },
-            credential: true,
+            credential: preconstructed === undefined,
           },
           fallback: {
             destination: 'in-browser',

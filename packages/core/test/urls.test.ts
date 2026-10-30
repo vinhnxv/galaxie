@@ -15,6 +15,11 @@ test.each([
   '[fdff::1]',
   '[fe80::1]',
   '[febf::1]',
+  '[::ffff:127.0.0.1]',
+  '[::ffff:10.0.0.1]',
+  '[::ffff:172.16.0.1]',
+  '[::ffff:192.168.1.1]',
+  '[::ffff:169.254.1.1]',
   'model.local',
   'MODEL.LOCAL.',
 ])('recognizes the LAN or private hostname %s without resolving DNS', (host) => {
@@ -30,6 +35,8 @@ test.each([
   '[2001:db8::1]',
   '[fe7f::1]',
   '[fec0::1]',
+  '[::ffff:8.8.8.8]',
+  '[::ffff:172.32.0.1]',
   '10.example',
   'model.local.example',
 ])('does not classify the public hostname %s as private', (host) => {

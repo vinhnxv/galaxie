@@ -207,6 +207,38 @@ test('AT-24 a closed loopback user-device HTTP capability is unreachable', async
     expect(result.publicFields).not.toContain(marker);
 });
 
+test('AT-24 a host fetch timeout stays unavailable while the broker signal is active', async () => {
+  let brokerSignal: AbortSignal | undefined;
+  const result = await run(
+    'items.get@1',
+    http('/hang', {
+      destination: 'user-device',
+      timeoutMs: 4000,
+      fetch: (url, init) => {
+        brokerSignal = init?.signal ?? undefined;
+        return fetch(url, {
+          ...init,
+          signal: AbortSignal.any([
+            brokerSignal ?? new AbortController().signal,
+            AbortSignal.timeout(1000),
+          ]),
+        });
+      },
+    }),
+    { id: 'item-1' },
+  );
+  expectFailure(result, 'unavailable');
+  expect(brokerSignal?.aborted).toBe(false);
+  expect((await recorded()).requests).toContainEqual(
+    expect.objectContaining({
+      server: 'cors',
+      method: 'GET',
+      path: '/hang',
+      status: 0,
+    }),
+  );
+});
+
 test('AT-29 tags an HTTP read with the agent identity and run ID', async () => {
   const result = await run('items.get@1', http('/public/items/{id}'), { id: 'item-1' });
   expect(result.error).toBeUndefined();

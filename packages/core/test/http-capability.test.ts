@@ -34,6 +34,7 @@ test.each([
   ['http://127.0.0.1/x/{id}', 'user-endpoint', 'unreachable'],
   ['https://192.168.1.1/x/{id}', 'user-endpoint', 'unreachable'],
   ['https://model.local/x/{id}', 'user-endpoint', 'unreachable'],
+  ['https://[::ffff:192.168.1.1]/x/{id}', 'user-endpoint', 'unreachable'],
   ['https://api.example/x/{id}', 'user-endpoint', 'unavailable'],
   ['http://localhost/x/{id}', 'host-server', 'unavailable'],
 ] as const)(
@@ -49,6 +50,29 @@ test.each([
     expect(result.error).not.toHaveProperty('cause');
     expect(result.publicFields).not.toContain('transport-marker');
     expect(result.publicFields).not.toContain(new URL(url).hostname);
+  },
+);
+
+test.each(['TimeoutError', 'AbortError'])(
+  'preserves unavailable for an independent host fetch %s',
+  async (name) => {
+    const result = await call(
+      httpCapability(
+        options({
+          url: 'http://localhost/x/{id}',
+          destination: 'user-device',
+          fetch: async (_url, init) => {
+            expect(init?.signal?.aborted).toBe(false);
+            throw new DOMException('transport-error-marker', name);
+          },
+        }),
+      ),
+      inputSchema,
+      { id: 'a/b' },
+    );
+    expect(result.error).toMatchObject({ code: 'unavailable' });
+    expect(result.error).not.toHaveProperty('cause');
+    expect(result.publicFields).not.toContain('transport-error-marker');
   },
 );
 

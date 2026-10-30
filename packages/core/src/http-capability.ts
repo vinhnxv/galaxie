@@ -209,8 +209,10 @@ export function httpCapability<Input = unknown, Output = unknown>(
           signal: context.signal,
           ...(body === undefined ? {} : { body }),
         });
-      } catch {
+      } catch (error) {
         if (context.signal.aborted) return fail('cancelled');
+        if (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name))
+          return fail('unavailable');
         return fail(
           destination === 'user-device' ||
             (destination === 'user-endpoint' &&
