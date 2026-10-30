@@ -26,4 +26,5 @@ export const ragDefinition: RagDefinition = defineAgentDefinition({
     },
   },
   models: { 'rag.answer': { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
+  ui: { catalog: 'rag/v1', components: ['ReviewPassages'], surfaces: ['rag-review'] },
 });

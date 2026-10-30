@@ -40,7 +40,10 @@ class RagMockModel extends MockChatModel {
     messages: BaseMessage[],
     options: this['ParsedCallOptions'],
   ): AsyncGenerator<ChatGenerationChunk> {
-    yield* script(messages)._streamResponseChunks(messages, options);
+    for await (const chunk of script(messages)._streamResponseChunks(messages, options)) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 35));
+      yield chunk;
+    }
   }
 }
 export function createMockModels(): RagModels {

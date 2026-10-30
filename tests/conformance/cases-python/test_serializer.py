@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from langgraph.types import Command
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import suite
@@ -69,7 +70,8 @@ def test_checkpoint_values_round_trip_through_the_standin(name, monkeypatch):
     assert serializer.mismatches == []
 
 
-def test_rag_checkpoint_values_round_trip_through_the_standin(monkeypatch):
+@pytest.mark.parametrize("review", [False, True])
+def test_rag_checkpoint_values_round_trip_through_the_standin(monkeypatch, review):
     from galaxie._bridge import install_transport
 
     directory = Path(__file__).resolve().parents[3] / "examples" / "rag-browser"
@@ -95,7 +97,12 @@ def test_rag_checkpoint_values_round_trip_through_the_standin(monkeypatch):
             install_transport(transport)
             graph = rag.create_agent()
             config = {"configurable": {"thread_id": f"rag-serializer-{index}"}}
-            output = await graph.ainvoke(item["input"], config)
+            output = await graph.ainvoke({**item["input"], "review": review}, config)
+            if review:
+                pending = (await graph.aget_state(config)).tasks[0].interrupts[0]
+                output = await graph.ainvoke(Command(resume={pending.id: {
+                    "action": "submit", "payload": {"keptIds": [p["id"] for p in item["search"]["passages"]]},
+                }}), config)
             assert output == [entry["output"] for entry in expected if entry["type"] == "output"][index]
             state = await graph.aget_state(config)
             assert state.values["passages"] == item["search"]["passages"]

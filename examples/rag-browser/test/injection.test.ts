@@ -10,6 +10,7 @@ import {
 } from '../../../tests/conformance/support/obedient-attacker.js';
 import { ragDefinition } from '../src/agent/definition.js';
 import { createRagAgent } from '../src/agent/graph.js';
+import { reviewRegistry } from '../src/host/review-passages.js';
 
 const attacks: Directive[] = [
   {
@@ -44,6 +45,7 @@ test.each(attacks)(
     });
     const instance = await runtime.create(ragDefinition, {
       principalScope: 'test',
+      ui: reviewRegistry.bindings({ surfaces: ['rag-review'] }),
       agent: createRagAgent(),
       services: { chatModels: { attacker: model } },
       models: {

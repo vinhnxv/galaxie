@@ -3,6 +3,7 @@
 
 import '../../../src/host/zod-config.js';
 import { pythonBuild } from 'virtual:rag-python';
+import { replayJavaScriptReview, reviewExpected } from '../review.js';
 import { assertTranscript, goldenTranscript, type TranscriptEntry } from '../transcript.js';
 import workerUrl from './pyodide-worker.ts?worker&url';
 import { executePythonTranscript } from './session.js';
@@ -31,6 +32,7 @@ factory.createPolicy('default', {
 
 void (async () => {
   try {
+    const review = new URL(location.href).searchParams.has('review');
     result.transcript = await executePythonTranscript(
       {
         runtimeUrl: new URL('/python/runtime/', location.href).href,
@@ -64,8 +66,10 @@ void (async () => {
         module: 'rag_agent.graph',
         entry: 'create_agent',
       },
+      review,
     );
-    assertTranscript(result.transcript, goldenTranscript);
+    assertTranscript(result.transcript, review ? reviewExpected : goldenTranscript);
+    if (review) assertTranscript(await replayJavaScriptReview(), result.transcript);
   } catch (error) {
     result.error = error instanceof Error ? error.message : 'Python parity failed.';
   } finally {

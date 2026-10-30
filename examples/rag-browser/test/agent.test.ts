@@ -8,6 +8,7 @@ import { expect, test, vi } from 'vitest';
 import { ragDefinition } from '../src/agent/definition.js';
 import { createRagAgent } from '../src/agent/graph.js';
 import { systemPrompt, userPrompt } from '../src/agent/prompt.js';
+import { reviewRegistry } from '../src/host/review-passages.js';
 
 test('routes retrieval and answers through the broker and projects cited output', async () => {
   const passages = [
@@ -31,6 +32,7 @@ test('routes retrieval and answers through the broker and projects cited output'
   const calls: unknown[] = [];
   const instance = await runtime.create(ragDefinition, {
     principalScope: 'test',
+    ui: reviewRegistry.bindings({ surfaces: ['rag-review'] }),
     agent: createRagAgent(),
     services: { chatModels: { mock: model } },
     models: {

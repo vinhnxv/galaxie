@@ -9,6 +9,7 @@ import {
   ObedientAttacker,
 } from '../../../tests/conformance/support/obedient-attacker.js';
 import { pythonRagDefinition } from '../src/agent/definition-python.js';
+import { reviewRegistry } from '../src/host/review-passages.js';
 import {
   createPythonFixture,
   missingPythonWheels,
@@ -52,6 +53,7 @@ test.skipIf(!pythonWheelsAvailable).each(attacks)(
     try {
       const instance = await runtime.create(pythonRagDefinition, {
         principalScope: 'fixture',
+        ui: reviewRegistry.bindings({ surfaces: ['rag-review'] }),
         agent: fixture.agent,
         services: { chatModels: { attacker: model } },
         models: {

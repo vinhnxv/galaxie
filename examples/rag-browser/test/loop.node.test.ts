@@ -514,7 +514,9 @@ async function preparePythonHost(page: Page): Promise<void> {
     .poll(() => page.getByRole('button', { name: 'Prepare models', exact: true }).isEnabled())
     .toBe(true);
   await page.getByRole('button', { name: 'Prepare models', exact: true }).click();
-  await expect.poll(() => page.getByText('Chat models prepared', { exact: true }).count()).toBe(1);
+  await expect
+    .poll(() => page.getByText('Chat models prepared', { exact: true }).count(), { timeout: 30000 })
+    .toBe(1);
 }
 async function selectPython(page: Page): Promise<void> {
   await page.getByLabel('LangGraph Python', { exact: true }).check();
@@ -525,6 +527,330 @@ async function selectPython(page: Page): Promise<void> {
     .toBe(1);
 }
 const pythonTest = test.skipIf(!pythonAvailable);
+
+async function beginReview(page: Page, executor: 'javascript' | 'python'): Promise<void> {
+  await preparePythonHost(page);
+  if (executor === 'python') await selectPython(page);
+  await page.getByLabel('Review passages before answering', { exact: true }).check();
+  await page.getByLabel('Question', { exact: true }).fill('capital');
+  await page.getByLabel('Search mode').selectOption('fulltext');
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
+  await page.getByRole('group', { name: 'Review retrieved passages' }).waitFor({ timeout: 30000 });
+  await expect.poll(() => page.getByText('Run: waiting_input', { exact: true }).count()).toBe(1);
+}
+
+test('review handover preserves the pending session and disables the former owner', async () => {
+  const { page, errors } = await observe(mockOrigin);
+  try {
+    await beginReview(page, 'javascript');
+    const second = await page.context().newPage();
+    second.on('pageerror', (error) => errors.push(error.message));
+    await second.goto(mockOrigin, { timeout: 15000 });
+    await preparePythonHost(second);
+    await second.getByRole('button', { name: 'Use here', exact: true }).click();
+    await second
+      .getByRole('group', { name: 'Review retrieved passages' })
+      .waitFor({ timeout: 15000 });
+    await page
+      .getByText('The review moved to another tab. Reload to continue.', { exact: true })
+      .waitFor();
+    expect(await page.getByRole('button', { name: 'Ask', exact: true }).isDisabled()).toBe(true);
+    await second.getByRole('button', { name: 'Answer with kept passages' }).click();
+    await second.getByRole('heading', { name: 'Answer · LangGraph.js', exact: true }).waitFor();
+    expect(errors).toEqual([]);
+  } finally {
+    await page.context().close();
+  }
+}, 30000);
+
+test('an evicted review can be explicitly deleted before returning to the default flow', async () => {
+  const { page, errors } = await observe(mockOrigin);
+  try {
+    await beginReview(page, 'javascript');
+    await page.reload({ timeout: 15000 });
+    await page.evaluate(async () => {
+      const request = indexedDB.deleteDatabase('galaxie:rag-browser');
+      await new Promise<void>((resolve, reject) => {
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => reject(new Error('Review storage is still open.'));
+      });
+    });
+    await preparePythonHost(page);
+    await page
+      .getByText('The saved review could not be restored. Start over to delete it.', {
+        exact: true,
+      })
+      .waitFor();
+    await page.getByRole('button', { name: 'Start over', exact: true }).click();
+    await question(page, 'capital of France');
+    expect(
+      await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')),
+    ).toBeNull();
+    expect(errors).toEqual([]);
+  } finally {
+    await page.context().close();
+  }
+}, 30000);
+
+test('a Python-disabled build can delete a saved Python review reference and use JavaScript', async () => {
+  const { page, errors } = await observe(noPythonOrigin);
+  try {
+    await page.evaluate(() =>
+      localStorage.setItem(
+        'galaxie.rag-browser.review',
+        JSON.stringify({ executor: 'python', sessionId: crypto.randomUUID() }),
+      ),
+    );
+    await preparePythonHost(page);
+    await page
+      .getByText('The saved review could not be restored. Start over to delete it.', {
+        exact: true,
+      })
+      .waitFor();
+    expect(await page.evaluate(() => Reflect.get(globalThis, 'ragPythonWorkers').created)).toBe(0);
+    await page.getByRole('button', { name: 'Start over', exact: true }).click();
+    await question(page, 'capital of France');
+    expect(
+      await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')),
+    ).toBeNull();
+    expect(errors).toEqual([]);
+  } finally {
+    await page.context().close();
+  }
+}, 15000);
+
+test('review takeover remains usable after the former owner has completed its review', async () => {
+  const { page, errors } = await observe(mockOrigin);
+  try {
+    await beginReview(page, 'javascript');
+    await page.getByRole('button', { name: 'Answer with kept passages' }).click();
+    await page.getByRole('heading', { name: 'Answer · LangGraph.js', exact: true }).waitFor();
+    expect(
+      await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')),
+    ).toBeNull();
+    const second = await page.context().newPage();
+    second.on('pageerror', (error) => errors.push(error.message));
+    await prepareAfterNavigation();
+    async function prepareAfterNavigation(): Promise<void> {
+      await second.goto(mockOrigin, { timeout: 15000 });
+      await preparePythonHost(second);
+      await second.getByLabel('Review passages before answering', { exact: true }).check();
+      await second.getByLabel('Question', { exact: true }).fill('capital');
+      await second.getByRole('button', { name: 'Ask', exact: true }).click();
+    }
+    await second.getByRole('button', { name: 'Use here', exact: true }).click();
+    await expect
+      .poll(() => second.getByRole('button', { name: 'Ask', exact: true }).isEnabled())
+      .toBe(true);
+    await second.getByRole('button', { name: 'Ask', exact: true }).click();
+    await second
+      .getByRole('group', { name: 'Review retrieved passages' })
+      .waitFor({ timeout: 15000 });
+    await page
+      .getByText('The review moved to another tab. Reload to continue.', { exact: true })
+      .waitFor();
+    expect(errors).toEqual([]);
+  } finally {
+    await page.context().close();
+  }
+}, 30000);
+
+pythonTest(
+  'review boot keeps its Python executor while the default boot cancel control is absent',
+  async () => {
+    const { page, errors } = await observe(mockOrigin);
+    const gate = Promise.withResolvers<void>();
+    try {
+      await preparePythonHost(page);
+      await selectPython(page);
+      await page.context().route('**/python/wheels/*.whl', async (route) => {
+        await gate.promise;
+        await route.continue();
+      });
+      await page.getByLabel('Review passages before answering', { exact: true }).check();
+      await page.getByLabel('Question', { exact: true }).fill('capital');
+      await page.getByRole('button', { name: 'Ask', exact: true }).click();
+      await page.getByText('Preparing LangGraph Python…', { exact: true }).waitFor();
+      expect(
+        await page.getByRole('button', { name: 'Cancel Python boot', exact: true }).count(),
+      ).toBe(0);
+      gate.resolve();
+      await page
+        .getByRole('group', { name: 'Review retrieved passages' })
+        .waitFor({ timeout: 30000 });
+      await page.getByRole('button', { name: 'Answer with kept passages' }).click();
+      await page.getByRole('heading', { name: 'Answer · LangGraph Python', exact: true }).waitFor();
+      expect(errors).toEqual([]);
+    } finally {
+      gate.resolve();
+      await page.context().close();
+    }
+  },
+  60000,
+);
+
+for (const executor of ['javascript', 'python'] as const) {
+  test.skipIf(executor === 'python' && !pythonAvailable)(
+    `review drops a passage and streams a cited answer: ${executor}`,
+    async () => {
+      const { page, requests, errors } = await observe(mockOrigin);
+      try {
+        await beginReview(page, executor);
+        const review = page.getByRole('group', { name: 'Review retrieved passages' });
+        expect(await review.getByRole('checkbox').count()).toBe(3);
+        expect(await review.textContent()).not.toContain('Paris is the capital');
+        await review.getByRole('checkbox', { name: 'Cities (p1)', exact: true }).uncheck();
+        await review.getByRole('checkbox', { name: 'Cities (p3)', exact: true }).uncheck();
+        await review.getByRole('button', { name: 'Answer with kept passages' }).click();
+        await page.getByLabel('Streaming answer', { exact: true }).waitFor();
+        await page
+          .getByRole('heading', {
+            name: executor === 'python' ? 'Answer · LangGraph Python' : 'Answer · LangGraph.js',
+            exact: true,
+          })
+          .waitFor();
+        const citations = await page.getByRole('list', { name: 'Cited passages' }).textContent();
+        expect(citations).toContain('Lisbon');
+        expect(citations).not.toContain('Paris');
+        expect(await page.getByText('Retrieval subgraph streamed.', { exact: true }).count()).toBe(
+          1,
+        );
+        expect(
+          containsSubmittedText(requests, [
+            'capital',
+            pasted,
+            'Paris is the capital of France.',
+            'Lisbon is the capital of Portugal.',
+          ]),
+        ).toBe(false);
+        expect(await page.evaluate(() => Reflect.get(globalThis, 'ragViolations'))).toEqual([]);
+        expect(errors).toEqual([]);
+        await page.setViewportSize({ width: 390, height: 844 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true,
+        );
+        await page.screenshot({
+          path: `/tmp/galaxie-rag-review-${executor}-mobile.png`,
+          fullPage: true,
+        });
+      } finally {
+        await page.context().close();
+      }
+    },
+    60000,
+  );
+
+  test.skipIf(executor === 'python' && !pythonAvailable)(
+    `review reload restores, resumes and deletes its session: ${executor}`,
+    async () => {
+      const { page, requests, errors } = await observe(mockOrigin);
+      try {
+        await beginReview(page, executor);
+        const reference = await page.evaluate(() =>
+          localStorage.getItem('galaxie.rag-browser.review'),
+        );
+        expect(reference).not.toBeNull();
+        const before = await page
+          .getByRole('group', { name: 'Review retrieved passages' })
+          .textContent();
+        await page.reload({ timeout: 15000 });
+        await preparePythonHost(page);
+        await page
+          .getByRole('group', { name: 'Review retrieved passages' })
+          .waitFor({ timeout: 30000 });
+        expect(
+          await page.getByRole('group', { name: 'Review retrieved passages' }).textContent(),
+        ).toBe(before);
+        expect(await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review'))).toBe(
+          reference,
+        );
+        if (executor === 'python')
+          expect(await page.getByLabel('LangGraph Python', { exact: true }).isChecked()).toBe(true);
+        await page
+          .getByRole('group', { name: 'Review retrieved passages' })
+          .getByRole('checkbox', { name: 'Cities (p1)', exact: true })
+          .uncheck();
+        await page
+          .getByRole('group', { name: 'Review retrieved passages' })
+          .getByRole('checkbox', { name: 'Cities (p3)', exact: true })
+          .uncheck();
+        await page.getByRole('button', { name: 'Answer with kept passages' }).click();
+        await page
+          .getByRole('heading', {
+            name: executor === 'python' ? 'Answer · LangGraph Python' : 'Answer · LangGraph.js',
+            exact: true,
+          })
+          .waitFor();
+        expect(await page.getByRole('list', { name: 'Cited passages' }).textContent()).toContain(
+          'Lisbon',
+        );
+        await page.getByRole('button', { name: 'Start over', exact: true }).click();
+        await expect
+          .poll(() => page.getByRole('button', { name: 'Start over', exact: true }).count())
+          .toBe(0);
+        expect(
+          await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')),
+        ).toBeNull();
+        const sessionId = (JSON.parse(reference ?? '{}') as { sessionId: string }).sessionId;
+        expect(
+          await page.evaluate(async (sessionId) => {
+            const request = indexedDB.open('galaxie:rag-browser');
+            const db = await new Promise<IDBDatabase>((resolve, reject) => {
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+            });
+            try {
+              const stores = ['checkpoints', 'writes', 'inbox', 'journal'];
+              const tx = db.transaction(stores, 'readonly');
+              const counts = await Promise.all(
+                stores.map(
+                  (name) =>
+                    new Promise<number>((resolve, reject) => {
+                      const request = tx.objectStore(name).getAllKeys();
+                      request.onsuccess = () =>
+                        resolve(
+                          request.result.filter(
+                            (key) => Array.isArray(key) && key.includes(sessionId),
+                          ).length,
+                        );
+                      request.onerror = () => reject(request.error);
+                    }),
+                ),
+              );
+              return counts.reduce((sum, count) => sum + count, 0);
+            } finally {
+              db.close();
+            }
+          }, sessionId),
+        ).toBe(0);
+        await page.reload({ timeout: 15000 });
+        await preparePythonHost(page);
+        expect(
+          await page.getByLabel('Review passages before answering', { exact: true }).isChecked(),
+        ).toBe(false);
+        await question(page, 'capital of France');
+        expect(
+          await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')),
+        ).toBeNull();
+        expect(await page.getByRole('button', { name: 'Start over', exact: true }).count()).toBe(0);
+        expect(
+          containsSubmittedText(requests, [
+            'capital',
+            'Paris is the capital of France.',
+            'Lisbon is the capital of Portugal.',
+          ]),
+        ).toBe(false);
+        expect(await page.evaluate(() => Reflect.get(globalThis, 'ragViolations'))).toEqual([]);
+        expect(errors).toEqual([]);
+      } finally {
+        await page.context().close();
+      }
+    },
+    60000,
+  );
+}
+
 pythonTest(
   'Python switches lazily, preserves cited answers and returns to the prepared JavaScript model',
   async () => {

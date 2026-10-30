@@ -9,14 +9,17 @@ import {
 import { createRuntime } from '@galaxie/core';
 import { pythonRagDefinition } from '../../../src/agent/definition-python.js';
 import type { RagOutput } from '../../../src/agent/schemas.js';
+import { reviewRegistry } from '../../../src/host/review-passages.js';
+import { recordReview, reviewScript } from '../review.js';
 import { createTranscriptReplay, parityScript, type TranscriptEntry } from '../transcript.js';
 
 export async function executePythonTranscript(
   options: PyodideAdapterOptions,
   agent: PyodideAgent,
+  review = false,
 ): Promise<TranscriptEntry[]> {
   const transcript: TranscriptEntry[] = [];
-  const replay = createTranscriptReplay(parityScript, transcript);
+  const replay = createTranscriptReplay(review ? reviewScript : parityScript, transcript);
   const runtime = createRuntime({
     appId: 'rag-python-parity',
     executors: [createPyodideAdapter(options)],
@@ -25,6 +28,7 @@ export async function executePythonTranscript(
   try {
     const instance = await runtime.create(pythonRagDefinition, {
       principalScope: 'fixture',
+      ui: reviewRegistry.bindings({ surfaces: ['rag-review'] }),
       agent,
       services: { chatModels: { mock: replay.model } },
       models: {
@@ -53,6 +57,12 @@ export async function executePythonTranscript(
       },
     });
     await instance.prepare();
+    if (review) {
+      const stream = await recordReview(instance, transcript);
+      if (!stream.subgraph || stream.text !== 'Paris is the capital [1]. [9]')
+        throw new Error('The review stream differs.');
+      return transcript;
+    }
     for (const item of parityScript.session) {
       const { runId } = await instance.start(item.input);
       for await (const event of instance.events(runId)) {

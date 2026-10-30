@@ -2,13 +2,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { pythonBuild } from 'virtual:rag-python';
-import { ModelRoutes } from '@galaxie/react';
+import type { RunId } from '@galaxie/core';
+import { AgentSurface, ModelRoutes } from '@galaxie/react';
 import { type ReactElement, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { type RagOutput, RagOutputSchema, type SearchMode } from '../agent/schemas.js';
 import { attribution, type Corpus } from '../corpus.js';
 import type { RetrievalClient } from '../retrieval/client.js';
 import { type EvaluationRow, evaluate } from './evaluate.js';
+import { reviewRegistry } from './review-passages.js';
 import type { RagHost } from './runtime.js';
+import { answerDelta } from './stream.js';
 
 export interface AppProps {
   retrieval: RetrievalClient;
@@ -40,13 +43,24 @@ export function App({
   const [error, setError] = useState<string>();
   const [running, setRunning] = useState(false);
   const [runStatus, setRunStatus] = useState('idle');
+  const [runId, setRunId] = useState<RunId>();
+  const [review, setReview] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<RagHost['reviewStatus']>('idle');
+  const [reviewRestoreFailed, setReviewRestoreFailed] = useState(false);
+  const [streamedAnswer, setStreamedAnswer] = useState('');
+  const [retrievalStreamed, setRetrievalStreamed] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
   const [evalProgress, setEvalProgress] = useState('');
   const [rows, setRows] = useState<EvaluationRow[]>([]);
   const controller = useRef<AbortController | undefined>(undefined);
   const answerHeading = useRef<HTMLHeadingElement>(null);
+  const requestedRun = useRef<RunId | undefined>(undefined);
   const busy =
     running ||
+    reviewing ||
+    reviewStatus === 'lost' ||
+    reviewStatus === 'busy' ||
     preparing ||
     evaluating ||
     pythonPhase === 'booting' ||
@@ -66,15 +80,64 @@ export function App({
       setActive(host?.instance);
       setExecutor(host?.executor ?? 'javascript');
       setPythonPhase(host?.pythonPhase ?? 'idle');
+      setReviewing(host?.reviewing ?? false);
+      setReviewStatus(host?.reviewStatus ?? 'idle');
+      setReviewRestoreFailed(host?.reviewRestoreFailed ?? false);
+      if (host?.reviewing) {
+        setReview(true);
+        setAnswerExecutor(host.executor);
+      }
     };
     update();
     return host?.subscribeExecutor(update);
   }, [host]);
   useEffect(() => {
-    const update = (): void => setRunStatus(active?.getSnapshot().run?.status ?? 'idle');
+    const update = (): void => {
+      const run = active?.getSnapshot().run;
+      setRunStatus(run?.status ?? 'idle');
+      setRunId(run?.runId);
+      setRunning(run?.status === 'running' || run?.status === 'queued');
+    };
     update();
     return active?.subscribe(update);
   }, [active]);
+  useEffect(() => {
+    if (!active || !runId) return;
+    const run = active.getSnapshot().run;
+    if (run?.runId !== runId) return;
+    if (
+      !['queued', 'running', 'waiting_input'].includes(run.status) &&
+      runId !== requestedRun.current
+    )
+      return;
+    const iterator = active.events(runId)[Symbol.asyncIterator]();
+    let stopped = false;
+    void (async () => {
+      try {
+        while (!stopped) {
+          const next = await iterator.next();
+          if (stopped || next.done) break;
+          const event = next.value;
+          if (event.type === 'output') setAnswer(RagOutputSchema.parse(event.output));
+          else if (event.type === 'error' && host?.pythonPhase !== 'failed')
+            setError(event.error.message);
+          else if (event.type === 'stream') {
+            const delta = answerDelta(event);
+            if (delta) setStreamedAnswer((text) => text + delta);
+            if (event.path.some((path) => path.startsWith('retrieval:')))
+              setRetrievalStreamed(true);
+          }
+        }
+      } catch {
+        if (!stopped && host?.pythonPhase !== 'failed')
+          setError('The question could not be answered.');
+      }
+    })();
+    return () => {
+      stopped = true;
+      void iterator.return?.();
+    };
+  }, [active, runId, host]);
   useEffect(() => {
     if (host && pythonBuild.available) javascriptOption.current?.focus();
   }, [host]);
@@ -131,16 +194,14 @@ export function App({
     setAnswer(undefined);
     setError(undefined);
     setAnswerExecutor(executor);
+    setStreamedAnswer('');
+    setRetrievalStreamed(false);
     try {
-      const instance = active ?? host.instance;
-      const { runId } = await instance.start({ question, mode });
-      for await (const event of instance.events(runId)) {
-        if (event.type === 'output') setAnswer(RagOutputSchema.parse(event.output));
-        else if (event.type === 'error') setError(event.error.message);
-      }
+      requestedRun.current = (
+        await host.start({ question, mode, ...(review ? { review: true } : {}) })
+      ).runId;
     } catch {
-      setError('The question could not be answered.');
-    } finally {
+      if (host.pythonPhase !== 'failed') setError('The question could not be answered.');
       setRunning(false);
     }
   };
@@ -158,6 +219,7 @@ export function App({
     setRunStatus('idle');
   }, [index.status, host, disposeModels]);
   const clear = async (): Promise<void> => {
+    if (host?.reviewing) await host.startOver();
     await retrieval.clear();
   };
   const runEvaluation = async (): Promise<void> => {
@@ -277,6 +339,7 @@ export function App({
                   value="javascript"
                   checked={executor === 'javascript'}
                   onChange={() => {
+                    requestedRun.current = undefined;
                     setAnswer(undefined);
                     void host?.selectExecutor('javascript');
                   }}
@@ -290,6 +353,7 @@ export function App({
                   value="python"
                   checked={executor === 'python'}
                   onChange={() => {
+                    requestedRun.current = undefined;
                     setAnswer(undefined);
                     void host?.selectExecutor('python');
                   }}
@@ -307,9 +371,11 @@ export function App({
             {pythonPhase === 'booting' && (
               <>
                 <p>Elapsed: {bootSeconds.toFixed(1)} s</p>
-                <button type="button" onClick={() => void host?.cancelPythonBoot()}>
-                  Cancel Python boot
-                </button>
+                {!reviewing && (
+                  <button type="button" onClick={() => void host?.cancelPythonBoot()}>
+                    Cancel Python boot
+                  </button>
+                )}
               </>
             )}
             {pythonPhase === 'failed' && (
@@ -351,6 +417,71 @@ export function App({
           Ask
         </button>
         <p role="status">Run: {runStatus}</p>
+        <label>
+          <input
+            type="checkbox"
+            checked={review}
+            disabled={busy}
+            onChange={(event) => setReview(event.target.checked)}
+          />
+          Review passages before answering
+        </label>
+        <p>
+          Review sessions stay on this device until Start over, retention cleanup or browser
+          eviction. Review selections reset on reload.
+        </p>
+        {reviewStatus === 'busy' && (
+          <p role="status">
+            The review is open in another tab.{' '}
+            <button
+              type="button"
+              disabled={preparing}
+              onClick={() =>
+                void operation(async () => {
+                  setPreparing(true);
+                  try {
+                    await host?.restoreReview(true);
+                  } finally {
+                    setPreparing(false);
+                  }
+                }, 'The review could not be restored.')
+              }
+            >
+              Use here
+            </button>
+          </p>
+        )}
+        {reviewStatus === 'lost' && (
+          <p role="alert">The review moved to another tab. Reload to continue.</p>
+        )}
+        {reviewRestoreFailed && (
+          <p role="alert">The saved review could not be restored. Start over to delete it.</p>
+        )}
+        {reviewing && active && (
+          <>
+            <AgentSurface instance={active} registry={reviewRegistry} surfaceId="rag-review" />
+            <button
+              type="button"
+              disabled={running || reviewStatus !== 'owner'}
+              onClick={() =>
+                void operation(async () => {
+                  await host?.startOver();
+                  setAnswer(undefined);
+                  setStreamedAnswer('');
+                  setReview(false);
+                }, 'The review could not be deleted.')
+              }
+            >
+              Start over
+            </button>
+          </>
+        )}
+        {retrievalStreamed && <p>Retrieval subgraph streamed.</p>}
+        {!answer && streamedAnswer && (
+          <p role="status" aria-label="Streaming answer">
+            {streamedAnswer}
+          </p>
+        )}
         {running && (
           <button
             type="button"

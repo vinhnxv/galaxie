@@ -369,6 +369,11 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
       : '';
     const mockScript = resolve('examples/rag-browser/src/host/mock-script');
     if (
+      specifier === '@galaxie/storage-indexeddb' &&
+      file !== 'examples/rag-browser/src/host/runtime.ts'
+    )
+      problems.push(`${file}: only the host runtime may open review storage`);
+    if (
       specifier === '@galaxie/adapter-pyodide' &&
       file !== 'examples/rag-browser/src/host/runtime.ts'
     )
@@ -414,6 +419,7 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
         'react-dom/client',
         'zod',
         'virtual:rag-python',
+        '@galaxie/storage-indexeddb',
       ].includes(specifier) ||
       specifier.startsWith('@langchain/core/') ||
       specifier.startsWith('onnxruntime-web/') ||

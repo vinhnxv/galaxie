@@ -102,8 +102,9 @@ deltas; previously allowed text cannot be retracted. The final Python chunk carr
 usage without repeating text. Tool calls and multimodal messages remain unsupported.
 Raw graph streams can contain working state and bypass routed-model output checks;
 hosts must select the checked message projection before rendering text. The RAG
-application still renders only its final result, and default sessions remain in
-memory; no review UI or persistent RAG session flow is added.
+application renders checked answer-node messages and its final result as React
+text. Default sessions remain in memory; opt-in passage review uses a registered
+interaction and scoped durable checkpoints on either executor.
 
 Python code is trusted under [ADR-0018](../../docs/adr/0018-python-agents-through-pyodide.md).
 It can import `js` and use the Worker's APIs. A dedicated Worker does not isolate
@@ -155,6 +156,16 @@ Node also checks checkpoint writes during cancellation settlement. Native serial
 tests cover all twelve cases, RAG and effect fixtures; exceptions decode as `repr`
 strings and tuples as msgpack arrays, with strict equality otherwise.
 No real model or device measurements were added.
+
+The RAG example also offers opt-in passage review on both executors: retrieval runs
+in a subgraph, a registered interaction selects passage IDs, and the answer streams
+through JavaScript output checks. Shared Node and real Chromium transcripts compare
+capability inputs, ID/title-only props and the kept-passage answer. Separate bounded
+Chromium page tests restore pending reviews from reopened IndexedDB, resume them,
+delete their sessions and return to the default in-memory flow. Review instances use
+the saver's recovery store and fenced Web Lock ownership. See the [mock command and
+review steps](../../examples/rag-browser/README.md#passage-review-with-mock-models).
+The hands-on Chrome review remains with the reviewer; no real-model result is claimed.
 
 `linear` and `branching` also match the native Python stream events, mode order and
 paths on Node Pyodide and real Chromium. Both lanes prove checked deltas and final
