@@ -32,19 +32,25 @@ async function close(server: Server): Promise<void> {
 
 export async function createHttpFixture(): Promise<HttpControl> {
   const requests: HttpRequestRecord[] = [];
+  const completion = { id: 'loopback-completion', created: 0, model: 'fake' };
+  const usage = { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 };
   const servers = (['cors', 'no-cors'] as const).map((name) =>
-    createServer((request, response) => {
+    createServer(async (request, response) => {
       request.resume();
+      const path = request.url ?? '';
       if (name === 'cors') {
         response.setHeader('Access-Control-Allow-Origin', HTTP_ORIGIN);
         response.setHeader('Vary', 'Origin');
         response.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+        // Keep each chat test's preflight visible in its own request log.
+        if (path === '/v1/chat/completions') response.setHeader('Access-Control-Max-Age', '0');
         response.setHeader(
           'Access-Control-Allow-Headers',
-          'content-type, authorization, x-galaxie-agent, x-galaxie-run',
+          path === '/v1/chat/completions'
+            ? 'content-type, authorization, x-stainless-lang, x-stainless-package-version, x-stainless-os, x-stainless-arch, x-stainless-runtime, x-stainless-runtime-version, x-stainless-retry-count, x-stainless-timeout, x-stainless-helper-method'
+            : 'content-type, authorization, x-galaxie-agent, x-galaxie-run',
         );
       }
-      const path = request.url ?? '';
       const method = request.method ?? '';
       if (name === 'cors' && path === '/__admin' && method !== 'OPTIONS') {
         if (method === 'POST') requests.length = 0;
@@ -56,8 +62,32 @@ export async function createHttpFixture(): Promise<HttpControl> {
       let status = 404;
       let rejected = false;
       let body: unknown = { error: 'not_found' };
+      let streaming = false;
       if (method === 'OPTIONS') {
         status = 204;
+      } else if (name === 'cors' && method === 'POST' && path === '/v1/chat/completions') {
+        try {
+          request.setEncoding('utf8');
+          let input = '';
+          for await (const chunk of request) input += chunk;
+          streaming = (JSON.parse(input) as { stream?: boolean }).stream === true;
+          status = 200;
+          body = {
+            ...completion,
+            object: 'chat.completion',
+            choices: [
+              {
+                index: 0,
+                finish_reason: 'stop',
+                message: { role: 'assistant', content: 'loopback reply' },
+              },
+            ],
+            usage,
+          };
+        } catch {
+          status = 400;
+          body = { error: 'invalid_request' };
+        }
       } else if (method === 'GET' && /^\/public\/items\/[^/]+$/.test(path)) {
         status = 200;
         body = { id: path.slice('/public/items/'.length), title: 'Fixture item' };
@@ -85,6 +115,23 @@ export async function createHttpFixture(): Promise<HttpControl> {
       });
       // The timeout fixture records arrival but sends no HTTP response.
       if (status === 0) return;
+      if (streaming) {
+        response.writeHead(200, { 'content-type': 'text/event-stream' });
+        const deltas = [{ role: 'assistant', content: 'loopback ' }, { content: 'reply' }, {}];
+        for (const [index, delta] of deltas.entries())
+          response.write(
+            `data: ${JSON.stringify({
+              ...completion,
+              object: 'chat.completion.chunk',
+              choices: [{ index: 0, delta, finish_reason: index === 2 ? 'stop' : null }],
+            })}\n\n`,
+          );
+        response.write(
+          `data: ${JSON.stringify({ ...completion, object: 'chat.completion.chunk', choices: [], usage })}\n\n`,
+        );
+        response.end('data: [DONE]\n\n');
+        return;
+      }
       response.writeHead(status, { 'content-type': 'application/json' });
       response.end(status === 204 ? undefined : JSON.stringify(body));
     }),
