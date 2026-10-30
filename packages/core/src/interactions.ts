@@ -3,6 +3,7 @@
 
 import { type ErrorInfo, GalaxieError } from './errors.js';
 import type { InstanceId, InteractionId, RunId, SurfaceId, ViewRevision } from './ids.js';
+import { containsPrivate } from './private-values.js';
 import { isStandardSchema, type StandardSchema } from './schema.js';
 import { isHttpDestination } from './urls.js';
 
@@ -195,16 +196,46 @@ function urlCandidate(value: string): string | undefined {
 
 /** M1 examines every JSON string leaf; the M2 registry will identify URL props by schema. */
 export function checkInteractionUrls(props: unknown, allowlist: readonly string[]): boolean {
+  return checkInteractionUrlPolicy(props, allowlist);
+}
+
+function decodeUrl(value: string): string {
+  try {
+    return decodeURIComponent(value.replaceAll('+', ' '));
+  } catch {
+    return value;
+  }
+}
+
+export function checkInteractionUrlPolicy(
+  props: unknown,
+  allowlist: readonly string[],
+  privateValues?: ReadonlySet<string>,
+): boolean {
   try {
     if (typeof props === 'string') {
       const candidate = urlCandidate(props);
-      return candidate === undefined || isAllowedUrl(candidate, allowlist);
+      if (candidate === undefined) return true;
+      if (!isAllowedUrl(candidate, allowlist)) return false;
+      if (privateValues !== undefined && privateValues.size > 0) {
+        for (const raw of props === candidate ? [props] : [props, candidate]) {
+          const decoded = decodeUrl(raw);
+          if (
+            [raw, decoded, decodeUrl(decoded)].some((form) => containsPrivate(form, privateValues))
+          )
+            return false;
+        }
+      }
+      return true;
     }
-    if (Array.isArray(props)) return props.every((value) => checkInteractionUrls(value, allowlist));
+    if (Array.isArray(props))
+      return props.every((value) => checkInteractionUrlPolicy(value, allowlist, privateValues));
     return (
       props === null ||
       typeof props !== 'object' ||
-      Object.values(props).every((value) => checkInteractionUrls(value, allowlist))
+      Object.values(props).every((value) =>
+        checkInteractionUrlPolicy(value, allowlist, privateValues),
+      )
     );
   } catch {
     return false;

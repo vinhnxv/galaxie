@@ -4,7 +4,7 @@
 import { type Context, context, type Tracer } from '@opentelemetry/api';
 import { type Annotations, readAnnotations } from './annotations.js';
 import { deadlineTimer, RunBudget } from './budgets.js';
-import { CapabilityBroker, registerPrivate } from './capability-broker.js';
+import { CapabilityBroker } from './capability-broker.js';
 import { ConfirmationGate } from './confirmations.js';
 import type { AgentDefinition } from './definition.js';
 import type { DevelopmentWarning, DevelopmentWarningReporter } from './development.js';
@@ -26,11 +26,12 @@ import type {
   PendingInteraction,
   Submission,
 } from './interactions.js';
-import { checkInteractionBindings, checkInteractionUrls } from './interactions.js';
+import { checkInteractionBindings, checkInteractionUrlPolicy } from './interactions.js';
 import type { InstanceState, RunStatus } from './lifecycle.js';
 import { ModelRouter } from './model-router.js';
 import type { OutputSafetyHook, PublishedModelRoute, SelectedModelRoute } from './models.js';
 import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
+import { registerPrivate } from './private-values.js';
 import { copyRecoveryJson, validateSession, validateSubmissions } from './recovery.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
@@ -343,13 +344,22 @@ export function createAgentInstance(
   // Raw stream events remain untrusted engine output and must never be rendered as UI.
   const interactionError = (
     interaction: PendingInteraction,
+    privateValues: ReadonlySet<string>,
   ):
     | {
         readonly reason: 'url' | 'binding';
         readonly error: ErrorInfo;
       }
     | undefined => {
-    if (!checkInteractionUrls(interaction.props, instrumentation.urlAllowlist))
+    if (
+      !checkInteractionUrlPolicy(
+        interaction.props,
+        instrumentation.urlAllowlist,
+        instrumentation.policy['private-user'].allow.includes('third-party')
+          ? undefined
+          : privateValues,
+      )
+    )
       return { reason: 'url', error: toErrorInfo('denied') };
     if (options.ui !== undefined && !checkInteractionBindings(options.ui, interaction))
       return { reason: 'binding', error: toErrorInfo('unsupported') };
@@ -410,7 +420,7 @@ export function createAgentInstance(
         return;
       }
       {
-        const error = interactionError(event.interaction);
+        const error = interactionError(event.interaction, run.privateValues);
         if (error !== undefined) {
           failRun(run, error.error);
           report({ kind: 'interaction_rejected', runId: run.runId });
@@ -843,7 +853,10 @@ export function createAgentInstance(
           }
           assertUsable();
           if (pending === undefined) return undefined;
-          const error = interactionError(pending);
+          const privateValues = new Set<string>();
+          for (const submission of inbox.values())
+            registerPrivate(payloadStrings(submission.payload), privateValues);
+          const error = interactionError(pending, privateValues);
           if (error !== undefined) {
             report({ kind: 'interaction_rejected' });
             if (error.reason === 'url') warnBlockedUrl(pending);
@@ -855,7 +868,7 @@ export function createAgentInstance(
             controller: new AbortController(),
             capabilityController: new AbortController(),
             labels: new Set<DataLabel>(['public', 'app', 'private-user']),
-            privateValues: new Set(),
+            privateValues,
             submittedText: true,
             grants,
             events: new RunEvents(runId),
