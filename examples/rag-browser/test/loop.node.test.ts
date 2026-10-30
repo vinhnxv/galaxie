@@ -563,6 +563,53 @@ test('review handover preserves the pending session and disables the former owne
   }
 }, 30000);
 
+test('a failed first preparation after reload can be retried and restores the pending review', async () => {
+  const { page, errors } = await observe(mockOrigin);
+  try {
+    await beginReview(page, 'javascript');
+    const reference = await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review'));
+    expect(reference).not.toBeNull();
+    // Fails the first open of the review database in each new document, so preparation rejects once.
+    await page.context().addInitScript(() => {
+      const open = IDBFactory.prototype.open;
+      let failed = false;
+      IDBFactory.prototype.open = function (this: IDBFactory, name: string, version?: number) {
+        if (!failed && name === 'galaxie:rag-browser') {
+          failed = true;
+          throw new DOMException('Simulated preparation failure.', 'UnknownError');
+        }
+        return version === undefined ? open.call(this, name) : open.call(this, name, version);
+      };
+    });
+    await page.reload({ timeout: 15000 });
+    const prepare = page.getByRole('button', { name: 'Prepare models', exact: true });
+    await expect.poll(() => prepare.isEnabled()).toBe(true);
+    await prepare.click();
+    await page.getByText('The chat models could not be prepared.', { exact: true }).waitFor();
+    await expect.poll(() => prepare.isEnabled()).toBe(true);
+    expect(await page.getByRole('button', { name: 'Ask', exact: true }).isDisabled()).toBe(true);
+    expect(await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review'))).toBe(
+      reference,
+    );
+    await prepare.click();
+    await page.getByText('Chat models prepared', { exact: true }).waitFor({ timeout: 30000 });
+    expect(await page.getByText('The chat models could not be prepared.').count()).toBe(0);
+    const review = page.getByRole('group', { name: 'Review retrieved passages' });
+    await review.waitFor({ timeout: 30000 });
+    await review.getByRole('checkbox', { name: 'Cities (p1)', exact: true }).uncheck();
+    await review.getByRole('checkbox', { name: 'Cities (p3)', exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Answer with kept passages' }).click();
+    await page.getByRole('heading', { name: 'Answer · LangGraph.js', exact: true }).waitFor();
+    expect(await page.getByRole('list', { name: 'Cited passages' }).textContent()).toContain(
+      'Lisbon',
+    );
+    expect(await page.evaluate(() => Reflect.get(globalThis, 'ragViolations'))).toEqual([]);
+    expect(errors).toEqual([]);
+  } finally {
+    await page.context().close();
+  }
+}, 30000);
+
 test('an evicted review can be explicitly deleted before returning to the default flow', async () => {
   const { page, errors } = await observe(mockOrigin);
   try {
