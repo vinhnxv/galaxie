@@ -38,6 +38,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0015](0015-licensing-agpl-with-commercial-license.md) | License: AGPL-3.0 with a commercial license | Accepted |
 | [0016](0016-parity-demonstrations-and-otel-traces.md) | Parity is the verdict, metrics are demonstrations, traces are OpenTelemetry spans | Accepted |
 | [0017](0017-framework-neutral-contracts.md) | Framework-neutral contracts, with an adapter per framework | Accepted |
+| [0018](0018-python-agents-through-pyodide.md) | Python agents through Pyodide in a worker, with policy kept in JavaScript | Proposed |
 
 ## Template
 
