@@ -76,6 +76,73 @@ def test_deferred_approval_pauses_and_resumes_once(action, expected):
     assert executed == expected
 
 
+def test_conversation_snapshot_restores_history_usage_and_the_same_pending_approval():
+    transport_for([{'content': '', 'toolCalls': [tool_call('save', '{"value":7}')]}])
+    original, _ = approval_executor()
+
+    async def run():
+        await original.run({'prompt': 'save'}, 'stable-conversation', 5)
+        pending = original.pending('stable-conversation')
+        assert pending is not None
+        checkpoint, metadata = original._snapshot('stable-conversation')
+        conversation = json.loads(checkpoint)
+        assert conversation['conversation_id'] == 'stable-conversation'
+        assert conversation['usage']['requests'] == 1
+        assert conversation['deferred_tool_requests']['approvals'][0]['tool_call_id'] == 'call_1'
+        restored, executed = approval_executor()
+        assert restored._restore(checkpoint, metadata) == 'stable-conversation'
+        assert restored.pending('stable-conversation') == pending
+        seen = []
+        transport_for([{'content': 'done'}], seen)
+        assert await restored.run(None, 'stable-conversation', 5, resume={
+            'interactionId': pending['id'], 'action': 'approve', 'payload': {'toolCallIds': ['call_1']},
+        }) == 'done'
+        assert executed == [7]
+        assert seen[0]['messages'][0] == {'role': 'user', 'content': 'save'}
+        checkpoint, metadata = restored._snapshot('stable-conversation')
+        assert json.loads(checkpoint)['usage']['requests'] == 2
+        completed, _ = approval_executor()
+        completed._restore(checkpoint, metadata)
+        assert completed.pending('stable-conversation') is None
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('mutation', ['bytes', 'missing-history', 'missing-identity', 'invalid-pending', 'wrong-position', 'wrong-version', 'duplicate-call', 'tampered-props'])
+def test_corrupted_conversation_snapshot_fails_closed_without_losing_other_conversations(mutation):
+    transport_for([{'content': '', 'toolCalls': [tool_call('save', '{"value":7}')]}])
+    original, _ = approval_executor()
+    asyncio.run(original.run({'prompt': 'save'}, 'saved', 5))
+    checkpoint, metadata = original._snapshot('saved')
+    conversation, meta = json.loads(checkpoint), json.loads(metadata)
+    if mutation == 'bytes':
+        checkpoint = b'private corrupt bytes'
+    elif mutation == 'missing-history':
+        conversation['messages'] = 'invalid'
+    elif mutation == 'missing-identity':
+        del conversation['conversation_id']
+    elif mutation == 'invalid-pending':
+        meta['pending']['interaction']['value']['component'] = 'private invalid'
+    elif mutation == 'wrong-position':
+        meta['pending']['position'] += 1
+    elif mutation == 'wrong-version':
+        meta['v'] = True
+    elif mutation == 'tampered-props':
+        meta['pending']['interaction']['value']['props'] = {'misleading': True}
+    else:
+        conversation['deferred_tool_requests']['approvals'] *= 2
+    if mutation != 'bytes':
+        checkpoint = json.dumps(conversation).encode()
+    restored, executed = approval_executor()
+    restored._restore(*original._snapshot('saved'))
+    before = restored.pending('saved')
+    with pytest.raises(GalaxieError) as error:
+        restored._restore(checkpoint, json.dumps(meta).encode())
+    assert (error.value.code, str(error.value)) == ('unrecoverable', 'Stored state cannot be recovered.')
+    assert restored.pending('saved') == before
+    assert executed == []
+
+
 @pytest.mark.parametrize('answer,code', [
     ({'interactionId': 'wrong', 'action': 'approve', 'payload': {'toolCallIds': ['call_1']}}, 'stale'),
     ({'action': 'other', 'payload': {'toolCallIds': ['call_1']}}, 'invalid'),
@@ -561,3 +628,17 @@ def test_effect_scopes_stay_distinct_across_approval_resumes_and_fresh_starts():
     ids = asyncio.run(scenario())
     assert scopes == ['pydantic-ai/c/1/0', 'pydantic-ai/c/3/0', 'pydantic-ai/c/7/0']
     assert len(set(ids)) == 3
+
+
+def test_snapshot_bound_to_one_session_is_rejected_for_another():
+    transport_for([{'content': '', 'toolCalls': [tool_call('save', '{"value":7}')]}])
+    original, _ = approval_executor()
+    asyncio.run(original.run({'prompt': 'save'}, 'saved', 5))
+    checkpoint, metadata = original._snapshot('saved', 'session-a')
+    restored, executed = approval_executor()
+    with pytest.raises(GalaxieError) as error:
+        restored._restore(checkpoint, metadata, 'session-b')
+    assert error.value.code == 'unrecoverable'
+    assert restored.pending('saved') is None
+    assert restored._restore(checkpoint, metadata, 'session-a') == 'saved'
+    assert executed == []

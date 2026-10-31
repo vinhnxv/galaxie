@@ -289,7 +289,7 @@ export function createPyodideAdapter(
     features: {
       interrupts: true,
       resume: true,
-      checkpoints: langgraph,
+      checkpoints: true,
       streaming: true,
       subgraphs: langgraph,
     },
@@ -368,7 +368,7 @@ export function createPyodideAdapter(
           const operation = (async () => {
             try {
               const value = await services.checkpoints?.request(
-                checkpointBytes(message.payload, 'decode'),
+                checkpointBytes({ ...(message.payload as object), executor: executorId }, 'decode'),
               );
               if (connection === client)
                 client.send(success(message, checkpointBytes(value, 'encode')));

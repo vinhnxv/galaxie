@@ -6,7 +6,7 @@
     "streaming": true,
     "interrupts": true,
     "resume": true,
-    "checkpoints": false,
+    "checkpoints": true,
     "subgraphs": false
   },
   "cases": [
@@ -51,7 +51,8 @@
     "Text chunks follow the scripted word boundaries, and stream envelopes omit runtime-generated run/event IDs.",
     "Streamed tool arguments compare as normalized JSON because the JavaScript provider serializes its parsed final arguments.",
     "Both streaming projections use agent.iter so model-request markers correspond to actual request nodes; this uses the same node streaming API as run_stream_events without its background convenience task.",
-    "Interaction IDs normalize to pause ordinals after the Pyodide lanes verify uniqueness across consecutive pauses and fresh runs; model tool-call IDs are unchanged."
+    "Interaction IDs normalize to pause ordinals after the Pyodide lanes verify uniqueness across consecutive pauses and fresh runs; model tool-call IDs are unchanged.",
+    "Reload variants use the existing case goldens. Native CPython roundtrips ConversationTypeAdapter bytes between fresh agents; Node recreates Workers and Chromium reloads pages with reopened IndexedDB. Restored interaction IDs are compared before transcript normalization."
   ],
   "limits": [
     "A route without the tool-calling feature fails unavailable under the existing router semantics; a leased model without bindTools fails unsupported. Both fail before provider dispatch, without fallback.",
@@ -61,12 +62,34 @@
     "The stream-id-block and stream-mid-block fixtures apply native fixed-denial stand-ins; the Pyodide lanes exercise JavaScript checks before forwarding the blocked fragment.",
     "The final-mismatch fixture corrupts only the checked final bridge content in the Pyodide lanes; the native scripted stream emits the same fixed invalid outcome after its text deltas.",
     "The stream-abort native fixture cancels after the first text chunk; Pyodide lanes cancel the runtime after the first host message event.",
-    "Pending state lives in Worker memory only and is lost on cancellation or Worker loss. Durable checkpoints, reload restore, subgraphs and real-model quality remain unclaimed.",
+    "Without the byte-record port, pending state lives in Worker memory only and is lost on cancellation or Worker loss. With the scoped port and recovery, snapshots cover pause and completion boundaries; arbitrary mid-run continuation, subgraphs and real-model quality remain unclaimed.",
     "The approval-stale native fixture applies the fixed stale outcome; Pyodide lanes exercise the core dispatch identity check, while adapter tests independently verify stale resume IDs before Worker dispatch.",
     "The native double-submit fixture records the expected accepted/duplicate receipts; both Pyodide lanes exercise the real core accepted/consumed inbox and compare a single tool execution.",
     "The repeated-ID case uses fresh starts within one session. IDs repeated within retained conversation history still fail invalid before tools run, preserving the existing model-response validation.",
     "Deferred arguments in interaction props are checked JSON text only. Blocked arguments never reach Python or publish an interaction; streamed arguments remain absent from stream events.",
     "The approval argument-block native fixtures apply fixed-denial stand-ins; both Pyodide lanes exercise the JavaScript growing and final output checks.",
-    "The mock cannot script prompted-output retries without a tool name. This residual is unchanged; deferred resume does not need that path."
+    "The mock cannot script prompted-output retries without a tool name. This residual is unchanged; durable restore does not need that path.",
+    "Subgraphs stay false: child-agent deferrals do not propagate to the parent, and pydantic-graph 2.60 has no persistence module matching nested interrupt/stream semantics."
+  ],
+  "reloadCases": [
+    "approval-approve",
+    "approval-deny",
+    "approval-mixed",
+    "call-deferred",
+    "approval-consecutive",
+    "stream-approval-approve",
+    "approval-invalid-action",
+    "approval-incomplete"
+  ],
+  "durabilityProbes": [
+    "accepted-answer reconciliation",
+    "approved write receipt replay after Worker loss",
+    "unapproved write receipt replay after resume and Worker loss",
+    "changed replay input fails unrecoverable",
+    "corrupt snapshot isolation",
+    "RecoverySession executor mismatch",
+    "closed-set byte tags, exports, logout and epoch fencing",
+    "same-Worker restore after a failed completion checkpoint commit",
+    "completion clears orphan interrupt rows before committing"
   ]
 }
