@@ -61,7 +61,7 @@ export async function createPythonFixture(input: PythonFixtureInput = {}): Promi
   else {
     for (const file of [
       '__init__.py',
-      ...(input.framework === 'pydantic-ai' ? [] : ['graph.py']),
+      ...(!input.framework || input.framework === 'langgraph' ? ['graph.py'] : []),
       'citations.py',
       'prompt.py',
     ])
@@ -77,6 +77,12 @@ export async function createPythonFixture(input: PythonFixtureInput = {}): Promi
       for (const file of ['__init__.py', 'agent.py'])
         sources[`rag_pydantic_ai/${file}`] = await readFile(
           join(repository, 'examples/rag-browser/agent_py/rag_pydantic_ai', file),
+          'utf8',
+        );
+    if (input.framework === 'dspy')
+      for (const file of ['__init__.py', 'agent.py'])
+        sources[`rag_dspy/${file}`] = await readFile(
+          join(repository, 'examples/rag-browser/agent_py/rag_dspy', file),
           'utf8',
         );
   }
@@ -214,7 +220,11 @@ await import('./worker.mjs');
       files: Object.keys(sources),
       module:
         input.module ??
-        (input.framework === 'pydantic-ai' ? 'rag_pydantic_ai.agent' : 'rag_agent.graph'),
+        (input.framework === 'dspy'
+          ? 'rag_dspy.agent'
+          : input.framework === 'pydantic-ai'
+            ? 'rag_pydantic_ai.agent'
+            : 'rag_agent.graph'),
       entry: input.entry ?? 'create_agent',
     },
     origin,

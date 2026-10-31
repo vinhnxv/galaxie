@@ -181,12 +181,62 @@ has no tool name, using the mock's opt-in assistant-turn sequencing.
 [Built Chromium page tests](../../examples/rag-browser/test/loop.node.test.ts) cover
 lazy selection, joined checked text deltas, selected-executor byte totals,
 pending-review reload through reopened scoped IndexedDB, kept-passage resume,
-Start over deletion, switching all three executors and an injected-passage output
+Start over deletion, switching all four executors and an injected-passage output
 block. The pydantic-ai review is an approval, with no subgraph path. Tests use mock
 models only and retain the page/Worker CSP and Trusted Types policy. The
 [documented mock command](../../examples/rag-browser/README.md#passage-review-with-mock-models)
-serves all three executors; the pydantic-ai hands-on Chrome check belongs to the
-Claude reviewer and remains unverified.
+serves all four executors. A mock-only hands-on Chrome check of DSPy (2026-10-31)
+covered a cited answer, review with two kept passages, reload restore of the executor and pending review, resume and Start over.
+
+## DSPy custom engines and replay
+
+The separate [DSPy matrix](compatibility-matrix-dspy.json) lists 48 scripted
+cases against pinned DSPy 3.4.1. The [native recorder](../../scripts/record-dspy-conformance.py)
+checks 38 independent CPython goldens using DSPy's own
+`lm15_boundary.request_kwargs`; the durable cases use separate driver and host
+restore probes, including native driver tests. Provider SDKs never enter the Worker. Predict, ChainOfThought, ChatAdapter,
+non-streaming JSONAdapter, ReAct, ReActV2 and native/text-parsed tools compare
+requests, results, fixed errors and declared field streams across CPython, Node
+Pyodide and headless Chromium. Existing goldens and matrices remain unchanged.
+
+The executor declares streaming, interrupts, resume and checkpoints true, subgraphs
+false. Pauses unwind the whole program and resume against a canonical-request
+journal. Authors must keep execution deterministic apart from model, capability
+and interaction calls. Replay emits one content-free count, no field text or live
+model calls; divergence fails `unrecoverable` before later live calls. Reload/fault
+probes cover accepted-answer reconciliation, write receipts, corrupted/versioned
+records, exports, logout and app-epoch fencing. Restored input and journal results
+register private strings through core's framework-neutral `registerRestoredData`
+hook before restored URL validation or any live outbound call. Pauses fit the
+1 MiB bridge envelope; completion stores compact counters without personal input
+or journal data. Work beyond the last committed pause may run again after loss.
+
+An `Executor` with `stream_fields` always streams and needs a provider declaring
+streaming. Fields must identify exactly one predictor's plain-`str` output.
+Streaming ReActV2 requires `next_thought` annotated as `str`. A field header
+indented on its line is not streamed; final ChatAdapter parsing still returns its
+value. JSONAdapter streaming and ChatAdapter JSON fallback are unsupported.
+Ordinary ReAct author tool exceptions become observations with a five-frame
+traceback, including paths/source lines, sent in the next routed model request.
+Galaxie failures instead terminate before that call with fixed codes.
+
+Focused commands from the repository root:
+
+```sh
+pnpm exec vitest run --project node tests/conformance/dspy.node.test.ts tests/conformance/dspy-restore.node.test.ts
+pnpm exec vitest run --project node examples/rag-browser/test/dspy-conformance.node.test.ts
+python/.venv/bin/python -I scripts/record-dspy-conformance.py --check
+```
+
+`pnpm test:python` also checks native transcripts and journal validation. All lanes
+use pinned local wheels, synthetic replies and blocked external requests, with
+unchanged CSP and Trusted Types. The maintained RAG tests add input-owned search,
+review before any model sees passage text, kept-only citations, checked answer
+streams, selected-executor byte totals, reload/resume and Start over. They extend
+the [page loop](../../examples/rag-browser/test/loop.node.test.ts) and add
+[CPython](../../examples/rag-browser/agent_py/tests/test_dspy_agent.py) and
+[Node Pyodide](../../examples/rag-browser/test/dspy-agent.node.test.ts) checks;
+real-model format reliability, hands-on review and device performance are unmeasured.
 
 ## Running the suite
 

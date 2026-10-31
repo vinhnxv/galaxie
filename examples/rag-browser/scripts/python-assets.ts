@@ -38,7 +38,7 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
         }
       ).packages
     : [];
-  const frameworks: readonly PythonFramework[] = ['langgraph', 'pydantic-ai'];
+  const frameworks: readonly PythonFramework[] = ['langgraph', 'pydantic-ai', 'dspy'];
   const assets: { file: string; bytes: Uint8Array; frameworks: readonly PythonFramework[] }[] = [];
   const add = (file: string, path: string, selected = frameworks): void => {
     assets.push({ file, bytes: readFileSync(path), frameworks: selected });
@@ -63,6 +63,12 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
         `python/agent/rag_pydantic_ai/${file}`,
         join(root, 'examples/rag-browser/agent_py/rag_pydantic_ai', file),
         ['pydantic-ai'],
+      );
+    for (const file of ['__init__.py', 'agent.py'])
+      add(
+        `python/agent/rag_dspy/${file}`,
+        join(root, 'examples/rag-browser/agent_py/rag_dspy', file),
+        ['dspy'],
       );
     add(
       'python/agent/rag_agent/prompt.json',
@@ -90,7 +96,7 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
     },
     load(id) {
       return id === '\0rag-python'
-        ? `export const pythonBuild = ${JSON.stringify({ available: included, bytes: included ? bytes : { langgraph: 0, 'pydantic-ai': 0 }, localWheels: included ? local : [] })};`
+        ? `export const pythonBuild = ${JSON.stringify({ available: included, bytes: included ? bytes : { langgraph: 0, 'pydantic-ai': 0, dspy: 0 }, localWheels: included ? local : [] })};`
         : undefined;
     },
     generateBundle() {
@@ -116,7 +122,7 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
         return frameworks.map((framework) => ({
           tag: 'meta',
           attrs: {
-            name: framework === 'langgraph' ? 'galaxie-python-bytes' : 'galaxie-pydantic-ai-bytes',
+            name: framework === 'langgraph' ? 'galaxie-python-bytes' : `galaxie-${framework}-bytes`,
             content: String(included ? (bytes[framework] ?? 0) + workerBytes : 0),
           },
           injectTo: 'head' as const,

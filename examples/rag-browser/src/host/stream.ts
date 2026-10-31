@@ -3,20 +3,29 @@
 
 import type { RunEvent } from '@galaxie/core';
 
-/** A pydantic-ai model request starts a new turn, so earlier tool-call or retry text is not the answer. */
 export function startsModelTurn(event: RunEvent): boolean {
   return (
     event.type === 'stream' &&
-    event.executor === 'pydantic-ai-python' &&
     event.mode === 'updates' &&
     typeof event.data === 'object' &&
     event.data !== null &&
-    Reflect.get(event.data, 'kind') === 'model-request'
+    ((event.executor === 'pydantic-ai-python' &&
+      Reflect.get(event.data, 'kind') === 'model-request') ||
+      (event.executor === 'dspy-python' && Reflect.get(event.data, 'kind') === 'model'))
   );
 }
 
 /** Render only checked answer message text, never graph state or tool results. */
 export function answerDelta(event: RunEvent): string {
+  if (event.type === 'stream' && event.executor === 'dspy-python') {
+    return event.mode === 'messages' &&
+      event.data !== null &&
+      typeof event.data === 'object' &&
+      Reflect.get(event.data, 'field') === 'answer' &&
+      typeof Reflect.get(event.data, 'text') === 'string'
+      ? (Reflect.get(event.data, 'text') as string)
+      : '';
+  }
   if (event.type !== 'stream' || event.mode !== 'messages' || !Array.isArray(event.data)) return '';
   const [message, metadata] = event.data as unknown[];
   if (

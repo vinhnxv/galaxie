@@ -67,3 +67,20 @@ test('marks each pydantic-ai model request as a new answer turn', () => {
   expect(startsModelTurn({ ...request, executor: 'langgraph-python' })).toBe(false);
   expect(startsModelTurn(stream({ kind: 'model-request', index: 1 }))).toBe(false);
 });
+
+test('DSPy displays only its checked answer field and resets for each model call', () => {
+  const event: RunEvent = {
+    ...stream({ field: 'answer', text: 'Answer [1]' }),
+    executor: 'dspy-python',
+  };
+  expect(answerDelta(event)).toBe('Answer [1]');
+  expect(answerDelta({ ...event, data: { field: 'reasoning', text: 'Hidden rationale.' } })).toBe(
+    '',
+  );
+  expect(answerDelta({ ...event, mode: 'updates' })).toBe('');
+  expect(answerDelta({ ...event, executor: 'fixture' })).toBe('');
+  const request = { ...event, mode: 'updates', data: { kind: 'model', index: 1 } };
+  expect(startsModelTurn(request)).toBe(true);
+  expect(startsModelTurn({ ...request, data: { kind: 'replayed', count: 1 } })).toBe(false);
+  expect(startsModelTurn({ ...request, mode: 'messages' })).toBe(false);
+});
