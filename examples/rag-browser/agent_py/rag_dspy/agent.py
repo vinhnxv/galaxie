@@ -15,7 +15,9 @@ from rag_agent.prompt import system_prompt, user_prompt
 class Answer(dspy.Signature):
     question: str = dspy.InputField()
     passages: str = dspy.InputField()
-    answer: str = dspy.OutputField()
+    answer: str = dspy.OutputField(
+        desc="The answer, citing each supporting passage inline with its [n] marker, for example [1]."
+    )
 
 
 def kept_passages(submission: dict[str, Any], passages: list[dict[str, Any]]) -> list[dict[str, Any]]:

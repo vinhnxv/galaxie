@@ -105,10 +105,14 @@ The evaluation button samples up to 200 validation questions with a fixed seed. 
 | Full-text, vector and hybrid per-query latency | Unmeasured |
 | Actual embedding/chat download bytes and time | Unmeasured; declared file totals above |
 | Validation recall@1/5/10 and MRR with EmbeddingGemma | Unmeasured |
-| Real-model citation frequency and correctness | Unmeasured |
+| Real-model citation frequency and correctness | Unmeasured; one DSPy observation is recorded below |
 | Reference-device Python download and cold start | Unmeasured; local synthetic test-lane observations are recorded separately below |
 
 No Apple M5 Pro/Chrome real-model demonstration is claimed here. Two WebGPU models on one device, memory pressure (including initial weight-buffer duplication), device-loss behavior and the cost of foregoing model cache reuse remain unmeasured. WebLLM's 4,096-token context can reject large retrieved prompts; the passage character cap is not a token guarantee. The README reports no answer-quality score or performance threshold. A fixed public corpus in a host application should normally ship as a prebuilt, pinned index, as [brief §1.4](../../docs/galaxie-project-brief.md#14-example-deployments-vision) describes; this example builds in the browser to demonstrate indexing arbitrary text.
+
+### DSPy real-model observation
+
+On 2026-10-31 a hands-on Chrome check ran DSPy Python with Chrome Built-in AI as the answer provider over five pasted passages. Before the `answer` output field described the `[n]` marker requirement, the model returned a correct but uncited `1994` both with and without review, while LangGraph.js cited the supporting passage for the same question. With that field description, two questions produced answers whose markers cited the matching passages. This is a single local observation, not a citation-rate measurement; WebLLM and other providers were not tried.
 
 ### Local Python observations
 
