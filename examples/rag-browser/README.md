@@ -112,7 +112,7 @@ No Apple M5 Pro/Chrome real-model demonstration is claimed here. Two WebGPU mode
 
 ### DSPy real-model observation
 
-On 2026-10-31 a hands-on Chrome check ran DSPy Python with Chrome Built-in AI as the answer provider over five pasted passages. Before the `answer` output field described the `[n]` marker requirement, the model returned a correct but uncited `1994` both with and without review, while LangGraph.js cited the supporting passage for the same question. With that field description, two questions produced answers whose markers cited the matching passages. This is a single local observation, not a citation-rate measurement; WebLLM and other providers were not tried.
+On 2026-10-31 a hands-on Chrome check ran DSPy Python with Chrome Built-in AI as the answer provider over five pasted passages. Before the `answer` output field described the `[n]` marker requirement, the model returned a correct but uncited `1994` both with and without review, while LangGraph.js cited the supporting passage for the same question. With that field description, two questions produced answers whose markers cited the matching passages. A temporary local build that preferred WebLLM (Qwen2.5 1.5B) asked the same two questions with the field description: DSPy answered the first without a marker and cited all five passages, relevant or not, for the second. LangGraph.js on WebLLM answered the second without a marker and cited an unrelated passage for the first, so marker reliability on that model is weak for both executors. These are single local observations, not citation-rate measurements.
 
 ### Local Python observations
 
