@@ -40,7 +40,7 @@ import {
   validPythonModule,
   validSourcePath,
 } from './bridge.js';
-import { checkpointBytes } from './checkpoints.js';
+import { checkpointBytes, dspyCheckpointValues } from './checkpoints.js';
 import { adapterFailure, failureCode } from './errors.js';
 import type { LockedWheel, PythonFramework } from './runtime-files.js';
 import { GrowingOutput, outputText, toolCalls } from './tool-calls.js';
@@ -278,6 +278,13 @@ async function source(response: Response): Promise<string> {
   return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 }
 
+/** Passes only the restore hook into a checkpoint read context. */
+function restoredDataOptions(request: RunRequest): Pick<RunRequest, 'registerRestoredData'> {
+  return request.registerRestoredData === undefined
+    ? {}
+    : { registerRestoredData: request.registerRestoredData };
+}
+
 export function createPyodideAdapter(
   options: PyodideAdapterOptions,
 ): ExecutorAdapter<PyodideAgent, PyodideServices> {
@@ -295,7 +302,7 @@ export function createPyodideAdapter(
     features: {
       interrupts: true,
       resume: true,
-      checkpoints: framework !== 'dspy',
+      checkpoints: true,
       streaming: true,
       subgraphs: langgraph,
     },
@@ -317,7 +324,14 @@ export function createPyodideAdapter(
       const sessions = new Set<string>();
       const lostSessions = new Set<string>();
       const paused = new Map<string, () => void>();
-      const reads = new Map<string, { sessionId: string; seen: Set<string> }>();
+      const reads = new Map<
+        string,
+        {
+          sessionId: string;
+          seen: Set<string>;
+          registerRestoredData?: (value: unknown) => void;
+        }
+      >();
       let sources: BootPayload['sources'];
       try {
         sources = await Promise.all(
@@ -356,7 +370,13 @@ export function createPyodideAdapter(
           const run = active;
           const runContext = run !== undefined && message.id.startsWith(`${run.id}/`);
           const read = reads.get(message.id.slice(0, message.id.indexOf('/')));
-          const context = runContext ? { sessionId: run.request.sessionId, seen: run.seen } : read;
+          const context = runContext
+            ? {
+                sessionId: run.request.sessionId,
+                seen: run.seen,
+                registerRestoredData: run.request.registerRestoredData,
+              }
+            : read;
           if (
             !services.checkpoints ||
             !context ||
@@ -376,6 +396,25 @@ export function createPyodideAdapter(
               const value = await services.checkpoints?.request(
                 checkpointBytes({ ...(message.payload as object), executor: executorId }, 'decode'),
               );
+              if (framework === 'dspy' && input.op === 'get' && value !== null) {
+                let restored: unknown;
+                try {
+                  restored = dspyCheckpointValues(value);
+                } catch {
+                  throw adapterFailure('unrecoverable');
+                }
+                if (restored !== undefined) {
+                  if (!context.registerRestoredData) throw adapterFailure('unsupported');
+                  try {
+                    context.registerRestoredData(restored);
+                  } catch (error) {
+                    const code = failureCode(error, 'unrecoverable');
+                    throw adapterFailure(
+                      code === 'stale' || code === 'cancelled' ? code : 'unrecoverable',
+                    );
+                  }
+                }
+              }
               if (connection === client)
                 client.send(success(message, checkpointBytes(value, 'encode')));
             } catch (error) {
@@ -631,7 +670,10 @@ export function createPyodideAdapter(
         }
       };
       await boot(preparation.signal);
-      const pending = async (sessionId: string): Promise<PendingInteraction | undefined> => {
+      const pending = async (
+        sessionId: string,
+        readOptions?: Pick<RunRequest, 'registerRestoredData'>,
+      ): Promise<PendingInteraction | undefined> => {
         if (disposed) throw adapterFailure('invalid');
         if (services.checkpoints === undefined && (lostSessions.has(sessionId) || !connection))
           throw adapterFailure('unavailable');
@@ -641,7 +683,7 @@ export function createPyodideAdapter(
         try {
           state = (await client.request('pending', { threadId: sessionId }, 'pending', (id) => {
             contextId = id;
-            reads.set(id, { sessionId, seen: new Set() });
+            reads.set(id, { sessionId, seen: new Set(), ...readOptions });
           })) as PendingReply;
         } finally {
           if (contextId !== undefined) reads.delete(contextId);
@@ -665,7 +707,7 @@ export function createPyodideAdapter(
             if (disposed || active) throw adapterFailure('invalid');
             const command = request.command;
             if (command.type === 'resume') {
-              const interaction = await pending(request.sessionId);
+              const interaction = await pending(request.sessionId, restoredDataOptions(request));
               if (interaction?.interactionId !== command.interactionId)
                 throw adapterFailure(langgraph ? 'unsupported' : 'stale');
             } else lostSessions.delete(request.sessionId);
@@ -750,7 +792,7 @@ export function createPyodideAdapter(
             const output = outcome as { output?: unknown; interrupted?: true };
             if (!request.signal.aborted) {
               if (output.interrupted) {
-                const interaction = await pending(request.sessionId);
+                const interaction = await pending(request.sessionId, restoredDataOptions(request));
                 if (
                   !interaction ||
                   (command.type === 'resume' && interaction.interactionId === command.interactionId)

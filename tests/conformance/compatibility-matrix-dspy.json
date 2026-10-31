@@ -6,7 +6,7 @@
     "streaming": true,
     "interrupts": true,
     "resume": true,
-    "checkpoints": false,
+    "checkpoints": true,
     "subgraphs": false
   },
   "cases": [
@@ -47,7 +47,17 @@
     "pause-changed-write",
     "pause-concurrent",
     "pause-oversize",
-    "pause-new-run"
+    "pause-new-run",
+    "durable-module",
+    "durable-model-replay",
+    "durable-two",
+    "durable-frontier-write",
+    "durable-private-input",
+    "durable-private-result",
+    "durable-oversize-completion",
+    "durable-url-input",
+    "durable-url-result",
+    "durable-large-pauses"
   ],
   "differences": [],
   "normalizations": [
@@ -70,9 +80,27 @@
     "Streaming ReActV2 requires next_thought annotated as str; an unmodified ReActV2 program cannot stream that field.",
     "A field header indented on its line is not streamed; the final output carries ChatAdapter.parse's value.",
     "An Executor with stream_fields always streams and needs a provider that declares streaming.",
-    "Pauses and resume use an in-memory journal and require deterministic author code apart from model, capability and interaction calls. Checkpoints and subgraphs remain false; no persistence or RAG executor selection ships in this stage.",
+    "Pauses and resume require deterministic author code apart from model, capability and interaction calls. Session-bound byte records persist journals and counters; subgraphs remains false. RAG executor selection is deferred.",
     "Native pause cases use an independent in-memory replay controller with full canonical request equality; DSPy supplies no native pause primitive.",
     "Journals are limited to 1 MiB before a pause is published. A pause while earlier concurrent calls are unfinished fails unsupported.",
-    "Replay emits no model field text or per-call progress and reports one content-free replay count. Replayed capability values are not re-registered as private strings."
+    "Replay emits no model field text or per-call progress and reports one content-free replay count. Restored run input and replayed results register private strings with core before restored interaction URL validation and before any live model call.",
+    "Durable cases run the Worker driver natively on CPython with a fake byte port and receipt journal, and through core on Node and Chromium. IndexedDB, inbox and host policy assertions run in JavaScript; DSPy has no native durable session primitive.",
+    "The 1 MiB bound includes base64 byte envelopes. Completion always stores a compact marker without input or journal, so an oversize completion keeps its output, stores no private data and cannot resurrect a stale pause or reuse write scopes; only an oversize pause fails unsupported before it is published."
+  ],
+  "reloadChecks": [
+    "accepted submission reconciliation",
+    "receipt replay after Worker loss",
+    "changed frontier write rejected",
+    "unfinished write outcome_unknown",
+    "cross-executor refusal before snapshot reads",
+    "dspy version and journal format refusal",
+    "session binding",
+    "corrupt record isolation",
+    "content-free default export and tagged personal export",
+    "logout and app-epoch fencing",
+    "orphan interrupt replacement",
+    "failed completion commit recovery",
+    "rejected private interaction URLs remain rejected after restore before publication",
+    "two 200 kB pending requests restore within the aggregate byte-reply limit"
   ]
 }

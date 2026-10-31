@@ -38,6 +38,9 @@ export interface RunRequest {
   readonly capabilities: CapabilityPort;
   /** Every model call is authorized and reserved through this run's router (ADR-0006). */
   readonly models: ModelPort;
+  /** Re-register checkpoint JSON as private before replay can reach a live outbound call.
+   * Optional for hosts implementing RunRequest directly; adapters needing it must fail closed. */
+  readonly registerRestoredData?: (value: unknown) => void;
   readonly limits: { readonly steps: number };
 }
 
@@ -49,8 +52,11 @@ export interface ExecutorAgent {
    * Core alone bounds settlement waits; executors must not add their own timeout.
    */
   run(request: RunRequest): AsyncIterable<ExecutorEvent>;
-  /** Reads the pending interaction from committed state (ADR-0004); undefined when nothing is pending. */
-  pending(sessionId: SessionId): Promise<PendingInteraction | undefined>;
+  /** Reads committed pending state (ADR-0004), registering restored data before the caller validates it. */
+  pending(
+    sessionId: SessionId,
+    options?: Pick<RunRequest, 'registerRestoredData'>,
+  ): Promise<PendingInteraction | undefined>;
   /** Releases what the executor owns (brief §8.3). */
   dispose(): Promise<void>;
 }
