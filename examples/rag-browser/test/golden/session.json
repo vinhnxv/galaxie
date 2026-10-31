@@ -33,6 +33,13 @@
           "title": "France",
           "text": "Paris is the capital of France."
         }
+      ],
+      "sources": [
+        {
+          "passageId": "paris",
+          "title": "France",
+          "text": "Paris is the capital of France."
+        }
       ]
     }
   },
@@ -66,6 +73,13 @@
       "citations": [
         {
           "marker": 1,
+          "passageId": "cafe",
+          "title": "Café \"Guide\"",
+          "text": "The café in Lyon serves tea. The guide uses C:\\notes.\nA naïve traveler orders a pastry."
+        }
+      ],
+      "sources": [
+        {
           "passageId": "cafe",
           "title": "Café \"Guide\"",
           "text": "The café in Lyon serves tea. The guide uses C:\\notes.\nA naïve traveler orders a pastry."
@@ -107,6 +121,13 @@
           "title": "Astronomy",
           "text": "The moon reflects sunlight. Its rocky surface has craters."
         }
+      ],
+      "sources": [
+        {
+          "passageId": "moon",
+          "title": "Astronomy",
+          "text": "The moon reflects sunlight. Its rocky surface has craters."
+        }
       ]
     }
   },
@@ -137,7 +158,8 @@
     "type": "output",
     "output": {
       "answer": "No passages support an answer.",
-      "citations": []
+      "citations": [],
+      "sources": []
     }
   }
 ]

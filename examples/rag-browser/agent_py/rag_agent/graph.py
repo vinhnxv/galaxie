@@ -25,6 +25,7 @@ class RagInput(TypedDict):
 class RagOutput(TypedDict):
     answer: str
     citations: list[dict[str, Any]]
+    sources: list[dict[str, Any]]
 
 
 class RagState(RagInput, RagOutput):

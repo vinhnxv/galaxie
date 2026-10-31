@@ -584,6 +584,22 @@ export function App({
                 </li>
               ))}
             </ol>
+            {answer.citations.length === 0 && answer.sources.length > 0 && (
+              <>
+                <p id="sources-note">
+                  The model placed no passage marker. These passages were sent to it; the answer may
+                  draw on any of them.
+                </p>
+                <ul aria-label="Passages sent to the model" aria-describedby="sources-note">
+                  {answer.sources.map((source) => (
+                    <li key={source.passageId}>
+                      <strong>{source.title}</strong>
+                      <p>{source.text}</p>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </article>
         )}
       </section>

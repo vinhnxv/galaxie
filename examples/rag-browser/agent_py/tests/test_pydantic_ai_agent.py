@@ -45,7 +45,7 @@ def test_retrieval_and_citations_use_the_broker_result():
     result = asyncio.run(create_agent().run({"question": "Which passage?", "mode": "hybrid"}, "rag", 5))
     assert result == {"answer": "Kept [2]. Invalid .", "citations": [{
         "marker": 2, "passageId": "keep", "title": "Kept", "text": "Kept private passage.",
-    }]}
+    }], "sources": [{"passageId": "drop", "title": "Dropped", "text": "Dropped private passage."}, {"passageId": "keep", "title": "Kept", "text": "Kept private passage."}]}
     capability = [request["payload"] for request in seen if request["op"] == "capability"]
     assert len(capability) == 1
     assert capability[0]["name"] == "docs.search@1"
@@ -83,7 +83,7 @@ def test_review_restores_then_cites_only_kept_broker_passages():
     }))
     assert result == {"answer": "Kept [1]. Invalid .", "citations": [{
         "marker": 1, "passageId": "keep", "title": "Kept", "text": "Kept private passage.",
-    }]}
+    }], "sources": [{"passageId": "keep", "title": "Kept", "text": "Kept private passage."}]}
     assert all(request["op"] != "capability" for request in seen)
     returns = [message for message in seen[-1]["payload"]["messages"] if message["role"] == "tool"]
     assert json.loads(returns[-1]["content"]) == {"passages": PASSAGES[1:]}

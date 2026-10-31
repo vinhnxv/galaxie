@@ -34,7 +34,7 @@ def test_program_owns_retrieval_arguments_and_citation_projection():
     result = asyncio.run(create_agent().run({"question": "Which passage?", "mode": "hybrid"}, "rag", 5))
     assert result == {"answer": "Kept [2]. Invalid .", "citations": [{
         "marker": 2, "passageId": "keep", "title": "Kept", "text": "Kept private passage.",
-    }]}
+    }], "sources": [{"passageId": "drop", "title": "Dropped", "text": "Dropped private passage."}, {"passageId": "keep", "title": "Kept", "text": "Kept private passage."}]}
     assert [request["op"] for request in seen] == ["capability", "model"]
     assert seen[0]["payload"] == {
         "name": "docs.search@1", "input": {"query": "Which passage?", "mode": "hybrid", "k": 10},
@@ -72,7 +72,7 @@ def test_review_restores_and_only_kept_passage_text_reaches_the_model():
     }))
     assert result == {"answer": "Kept [1]. Invalid .", "citations": [{
         "marker": 1, "passageId": "keep", "title": "Kept", "text": "Kept private passage.",
-    }]}
+    }], "sources": [{"passageId": "keep", "title": "Kept", "text": "Kept private passage."}]}
     assert [request["op"] for request in seen] == ["model"]
     messages = json.dumps(seen[0]["payload"]["messages"])
     assert "Dropped private passage." not in messages

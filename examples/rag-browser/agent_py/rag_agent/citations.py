@@ -27,4 +27,5 @@ def cite_answer(reply: str, passages: list[dict[str, Any]]) -> dict[str, Any]:
             })
         return match.group(0)
 
-    return {"answer": re.sub(r"\[([0-9]+)\]", replace, reply), "citations": citations}
+    sources = [{"passageId": p["id"], "title": p["title"], "text": p["text"]} for p in passages]
+    return {"answer": re.sub(r"\[([0-9]+)\]", replace, reply), "citations": citations, "sources": sources}

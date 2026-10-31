@@ -320,7 +320,12 @@ test('strict-CSP page indexes, answers, pastes, restores, evaluates and clears w
         page.getByText('No retrieved passage is cited for this answer.', { exact: true }).count(),
       )
       .toBe(1);
+    expect(await page.getByRole('list', { name: 'Cited passages' }).locator('li').count()).toBe(0);
+    expect(
+      await page.getByRole('list', { name: 'Passages sent to the model' }).locator('li').count(),
+    ).toBeGreaterThan(0);
     await question(page, 'zzzxxyynothing');
+    expect(await page.getByRole('list', { name: 'Passages sent to the model' }).count()).toBe(0);
     await expect
       .poll(() =>
         page

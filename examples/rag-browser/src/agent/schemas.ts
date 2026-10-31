@@ -24,9 +24,16 @@ export interface Citation {
   title: string;
   text: string;
 }
+export interface Source {
+  passageId: string;
+  title: string;
+  text: string;
+}
 export interface RagOutput {
   answer: string;
   citations: Citation[];
+  /** Every passage sent to the model, so hosts can list them when no marker is cited. */
+  sources: Source[];
 }
 const privateText = (max: number): z.ZodString =>
   z
@@ -86,5 +93,8 @@ export const RagOutputSchema: z.ZodType<RagOutput, RagOutput> = z.strictObject({
         text: z.string(),
       }),
     )
+    .max(10),
+  sources: z
+    .array(z.strictObject({ passageId: z.string(), title: z.string(), text: z.string() }))
     .max(10),
 });

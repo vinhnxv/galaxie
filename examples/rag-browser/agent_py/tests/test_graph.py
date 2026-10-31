@@ -32,6 +32,7 @@ def test_graph_uses_host_proxies_and_projects_its_output(monkeypatch):
     assert result == {
         "answer": "Paris [1]. ",
         "citations": [{"marker": 1, "passageId": "france", "title": "France", "text": "Paris is the capital."}],
+        "sources": [{"passageId": "france", "title": "France", "text": "Paris is the capital."}],
     }
     assert [request["op"] for request in requests] == ["capability", "model"]
     assert requests[0]["payload"]["name"] == "docs.search@1"
