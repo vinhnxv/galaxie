@@ -8,6 +8,7 @@ import type { Plugin, PreviewServer, ViteDevServer } from 'vite';
 import {
   type LockedWheel,
   lockedWheels,
+  type PythonFramework,
   runtimeFiles,
 } from '../../../packages/adapter-pyodide/src/runtime-files.js';
 import { cspHeader } from '../src/host/csp.js';
@@ -37,32 +38,45 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
         }
       ).packages
     : [];
-  const assets: { file: string; bytes: Uint8Array }[] = [];
-  const add = (file: string, path: string): void => {
-    assets.push({ file, bytes: readFileSync(path) });
+  const frameworks: readonly PythonFramework[] = ['langgraph', 'pydantic-ai'];
+  const assets: { file: string; bytes: Uint8Array; frameworks: readonly PythonFramework[] }[] = [];
+  const add = (file: string, path: string, selected = frameworks): void => {
+    assets.push({ file, bytes: readFileSync(path), frameworks: selected });
   };
   if (available) {
-    for (const wheel of [...lockedWheels, ...local].filter(
-      (wheel) => wheel.frameworks === undefined || wheel.frameworks.includes('langgraph'),
-    ))
-      add(`python/wheels/${wheel.file}`, join(cacheDirectory, wheel.file));
+    for (const wheel of [...lockedWheels, ...local])
+      add(`python/wheels/${wheel.file}`, join(cacheDirectory, wheel.file), wheel.frameworks);
     for (const file of runtimeFiles) {
       const path = join(root, 'packages/adapter-pyodide/node_modules/pyodide', file.file);
       const bytes = readFileSync(path);
       if (bytes.length !== file.bytes) throw new Error('The Python runtime inventory is invalid.');
-      assets.push({ file: `python/runtime/${file.file}`, bytes });
+      assets.push({ file: `python/runtime/${file.file}`, bytes, frameworks });
     }
     for (const file of ['__init__.py', 'graph.py', 'citations.py', 'prompt.py'])
       add(
         `python/agent/rag_agent/${file}`,
         join(root, 'examples/rag-browser/agent_py/rag_agent', file),
+        file === 'graph.py' ? ['langgraph'] : frameworks,
+      );
+    for (const file of ['__init__.py', 'agent.py'])
+      add(
+        `python/agent/rag_pydantic_ai/${file}`,
+        join(root, 'examples/rag-browser/agent_py/rag_pydantic_ai', file),
+        ['pydantic-ai'],
       );
     add(
       'python/agent/rag_agent/prompt.json',
       join(root, 'examples/rag-browser/src/agent/prompt.json'),
     );
   }
-  const bytes = assets.reduce((sum, asset) => sum + asset.bytes.length, 0);
+  const bytes = Object.fromEntries(
+    frameworks.map((framework) => [
+      framework,
+      assets
+        .filter((asset) => asset.frameworks.includes(framework))
+        .reduce((sum, asset) => sum + asset.bytes.length, 0),
+    ]),
+  );
   let included = available;
   return {
     name: 'rag-python-assets',
@@ -76,7 +90,7 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
     },
     load(id) {
       return id === '\0rag-python'
-        ? `export const pythonBuild = ${JSON.stringify({ available: included, bytes: included ? bytes : 0, localWheels: included ? local : [] })};`
+        ? `export const pythonBuild = ${JSON.stringify({ available: included, bytes: included ? bytes : { langgraph: 0, 'pydantic-ai': 0 }, localWheels: included ? local : [] })};`
         : undefined;
     },
     generateBundle() {
@@ -99,16 +113,14 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
                 : entry.source.length),
           0,
         );
-        return [
-          {
-            tag: 'meta',
-            attrs: {
-              name: 'galaxie-python-bytes',
-              content: String(included ? bytes + workerBytes : 0),
-            },
-            injectTo: 'head',
+        return frameworks.map((framework) => ({
+          tag: 'meta',
+          attrs: {
+            name: framework === 'langgraph' ? 'galaxie-python-bytes' : 'galaxie-pydantic-ai-bytes',
+            content: String(included ? (bytes[framework] ?? 0) + workerBytes : 0),
           },
-        ];
+          injectTo: 'head' as const,
+        }));
       },
     },
   };

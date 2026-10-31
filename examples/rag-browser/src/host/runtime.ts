@@ -21,6 +21,7 @@ import { loadWebLLMEngine, WebLLMChatModel } from '@galaxie/models/webllm';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import { z } from 'zod';
 import { ragDefinition } from '../agent/definition.js';
+import { pydanticAiRagDefinition } from '../agent/definition-pydantic-ai.js';
 import { pythonRagDefinition } from '../agent/definition-python.js';
 import { createRagAgent } from '../agent/graph.js';
 import type { RagInput, SearchInput, SearchResult } from '../agent/schemas.js';
@@ -30,10 +31,11 @@ import { createPyodideWorker, createWebLLMWorker } from './trusted-types.js';
 
 const reviewKey = 'galaxie.rag-browser.review';
 const savedReviewSchema = z.strictObject({
-  executor: z.enum(['javascript', 'python']),
+  executor: z.enum(['javascript', 'python', 'pydantic-ai']),
   sessionId: z.string().min(1).max(128),
 });
 type SavedReview = z.infer<typeof savedReviewSchema>;
+export type RagExecutor = 'javascript' | 'python' | 'pydantic-ai';
 
 export interface RagModels {
   chatModels: LangGraphServices['chatModels'];
@@ -43,7 +45,8 @@ export interface RagModels {
 export interface RagHost {
   runtime: Runtime;
   instance: AgentInstance<RagInput, unknown>;
-  readonly executor: 'javascript' | 'python';
+  readonly executor: RagExecutor;
+  readonly pydanticAiAvailable: boolean;
   readonly pythonPhase: 'idle' | 'booting' | 'ready' | 'failed';
   readonly pythonColdStartMs: number | undefined;
   readonly reviewing: boolean;
@@ -52,7 +55,7 @@ export interface RagHost {
   start(input: RagInput): Promise<{ runId: RunId }>;
   restoreReview(takeover?: boolean): Promise<void>;
   startOver(): Promise<void>;
-  selectExecutor(executor: 'javascript' | 'python'): Promise<void>;
+  selectExecutor(executor: RagExecutor): Promise<void>;
   cancelPythonBoot(): Promise<void>;
   subscribeExecutor(listener: () => void): () => void;
   getLastSearchCount(): number | undefined;
@@ -72,7 +75,11 @@ export async function createRagHost(
   let javascript: AgentInstance<RagInput, unknown>;
   let python: AgentInstance<RagInput, unknown> | undefined;
   let active: AgentInstance<RagInput, unknown>;
-  let executor: 'javascript' | 'python' = 'javascript';
+  let executor: RagExecutor = 'javascript';
+  const pydanticAiAvailable =
+    models.routing.roles['rag.answer']?.providers.some((provider) =>
+      models.routing.providers[provider]?.features.includes('tool-calling'),
+    ) ?? false;
   let pythonPhase: RagHost['pythonPhase'] = 'idle';
   let pythonColdStartMs: number | undefined;
   let generation = 0;
@@ -97,22 +104,26 @@ export async function createRagHost(
     publish();
     await previous?.dispose();
   };
-  const pyodide = createPyodideAdapter({
-    createWorker: createPyodideWorker,
-    runtimeUrl: new URL('/python/runtime/', location.href).href,
-    wheelsUrl: new URL('/python/wheels/', location.href).href,
-    localWheels: pythonBuild.localWheels,
-    onBoot(event) {
-      if (disposed || executor !== 'python') return;
-      pythonPhase = event.phase;
-      if (event.coldStartMs !== undefined) pythonColdStartMs = event.coldStartMs;
-      if (event.phase === 'failed' && active !== review) void leavePython().catch(() => {});
-      publish();
-    },
-  });
+  const pythonAdapter = (
+    framework: 'langgraph' | 'pydantic-ai',
+  ): ReturnType<typeof createPyodideAdapter> =>
+    createPyodideAdapter({
+      framework,
+      createWorker: createPyodideWorker,
+      runtimeUrl: new URL('/python/runtime/', location.href).href,
+      wheelsUrl: new URL('/python/wheels/', location.href).href,
+      localWheels: pythonBuild.localWheels,
+      onBoot(event) {
+        if (disposed || executor !== (framework === 'langgraph' ? 'python' : 'pydantic-ai')) return;
+        pythonPhase = event.phase;
+        if (event.coldStartMs !== undefined) pythonColdStartMs = event.coldStartMs;
+        if (event.phase === 'failed' && active !== review) void leavePython().catch(() => {});
+        publish();
+      },
+    });
   const runtime = createRuntime({
     appId: 'rag-browser',
-    executors: [createLangGraphAdapter(), pyodide],
+    executors: [createLangGraphAdapter(), pythonAdapter('langgraph'), pythonAdapter('pydantic-ai')],
     outputSafety: ({ text }) => (text.includes('GALAXIE_BLOCK_DEMO') ? 'block' : 'allow'),
     ...(import.meta.env.DEV
       ? { developmentWarnings: (warning) => console.warn('[galaxie]', warning.code) }
@@ -130,6 +141,25 @@ export async function createRagHost(
     module: 'rag_agent.graph',
     entry: 'create_agent',
   };
+  const pydanticAiAgent = {
+    ...pythonAgent,
+    files: [
+      'rag_agent/__init__.py',
+      'rag_agent/citations.py',
+      'rag_agent/prompt.py',
+      'rag_agent/prompt.json',
+      'rag_pydantic_ai/__init__.py',
+      'rag_pydantic_ai/agent.py',
+    ],
+    module: 'rag_pydantic_ai.agent',
+  };
+  const selectedPython = (): {
+    definition: typeof pythonRagDefinition;
+    agent: typeof pythonAgent;
+  } =>
+    executor === 'pydantic-ai'
+      ? { definition: pydanticAiRagDefinition, agent: pydanticAiAgent }
+      : { definition: pythonRagDefinition, agent: pythonAgent };
   const ui = reviewRegistry.bindings({ surfaces: ['rag-review'] });
   const readSavedReview = (): SavedReview | undefined => {
     const value = localStorage.getItem(reviewKey);
@@ -194,10 +224,10 @@ export async function createRagHost(
       ui,
     };
     review =
-      executor === 'python'
-        ? await runtime.create(pythonRagDefinition, {
+      executor !== 'javascript'
+        ? await runtime.create(selectedPython().definition, {
             ...common,
-            agent: pythonAgent,
+            agent: selectedPython().agent,
             services: { chatModels: models.chatModels, checkpoints: store.byteRecords },
           })
         : await runtime.create(ragDefinition, {
@@ -266,6 +296,7 @@ export async function createRagHost(
       get executor() {
         return executor;
       },
+      pydanticAiAvailable,
       get pythonPhase() {
         return pythonPhase;
       },
@@ -291,10 +322,10 @@ export async function createRagHost(
           if (!(await openReview())) throw new Error('The review is open in another tab.');
         } else {
           const selected = executor;
-          if (selected === 'python' && !python) await host.selectExecutor('python');
+          if (selected !== 'javascript' && !python) await host.selectExecutor(selected);
           if (executor !== selected)
             throw new Error('The requested executor could not be prepared.');
-          active = executor === 'python' ? (python ?? javascript) : javascript;
+          active = executor !== 'javascript' ? (python ?? javascript) : javascript;
           publish();
         }
         return active.start(input);
@@ -313,7 +344,10 @@ export async function createRagHost(
           }
         }
         if (!saved) return;
-        if (saved.executor === 'python' && !pythonBuild.available) {
+        if (
+          saved.executor !== 'javascript' &&
+          (!pythonBuild.available || (saved.executor === 'pydantic-ai' && !pydanticAiAvailable))
+        ) {
           if (!(await openReviewStore(takeover))) return;
           failedReviewReference = saved;
           reviewRestoreFailed = true;
@@ -335,8 +369,8 @@ export async function createRagHost(
         review = undefined;
         reviewRestoreFailed = false;
         failedReviewReference = undefined;
-        active = executor === 'python' ? (python ?? javascript) : javascript;
-        if (executor === 'python' && !python) pythonPhase = 'idle';
+        active = executor !== 'javascript' ? (python ?? javascript) : javascript;
+        if (executor !== 'javascript' && !python) pythonPhase = 'idle';
         reviewStatus = 'idle';
         await ownership.release();
         ownership = undefined;
@@ -355,20 +389,32 @@ export async function createRagHost(
       },
       async selectExecutor(selected) {
         if (disposed) return;
+        if (review || failedReviewReference) return;
         if (selected === 'javascript') {
           pythonPhase = 'idle';
           await leavePython();
           return;
         }
-        if (!pythonBuild.available || python || pythonPhase === 'booting') return;
+        if (
+          !pythonBuild.available ||
+          (selected === 'pydantic-ai' && !pydanticAiAvailable) ||
+          pythonPhase === 'booting'
+        )
+          return;
+        if (executor === selected && python) return;
         const current = ++generation;
-        executor = 'python';
+        const previous = python;
+        python = undefined;
+        active = javascript;
+        executor = selected;
         pythonPhase = 'booting';
         publish();
         try {
-          const next = await runtime.create(pythonRagDefinition, {
+          await previous?.dispose();
+          if (disposed || current !== generation) return;
+          const next = await runtime.create(selectedPython().definition, {
             principalScope: 'visitor',
-            agent: pythonAgent,
+            agent: selectedPython().agent,
             services: { chatModels: models.chatModels },
             models: models.routing,
             bindings: { 'docs.search@1': search },

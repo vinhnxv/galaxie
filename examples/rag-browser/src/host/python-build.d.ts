@@ -4,7 +4,7 @@
 declare module 'virtual:rag-python' {
   export const pythonBuild: {
     readonly available: boolean;
-    readonly bytes: number;
+    readonly bytes: Readonly<Record<'langgraph' | 'pydantic-ai', number>>;
     readonly localWheels: readonly {
       readonly name: string;
       readonly version: string;
