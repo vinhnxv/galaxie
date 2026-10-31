@@ -40,6 +40,7 @@ export interface PythonFixture {
   cleanup(): Promise<void>;
 }
 export interface PythonFixtureInput {
+  readonly framework?: 'langgraph' | 'pydantic-ai';
   readonly sources?: Readonly<Record<string, string>>;
   readonly module?: string;
   readonly entry?: string;
@@ -58,7 +59,12 @@ export async function createPythonFixture(input: PythonFixtureInput = {}): Promi
   const sources: Record<string, string> = {};
   if (input.sources) Object.assign(sources, input.sources);
   else {
-    for (const file of ['__init__.py', 'graph.py', 'citations.py', 'prompt.py'])
+    for (const file of [
+      '__init__.py',
+      ...(input.framework === 'pydantic-ai' ? [] : ['graph.py']),
+      'citations.py',
+      'prompt.py',
+    ])
       sources[`rag_agent/${file}`] = await readFile(
         join(repository, 'examples/rag-browser/agent_py/rag_agent', file),
         'utf8',
@@ -67,6 +73,12 @@ export async function createPythonFixture(input: PythonFixtureInput = {}): Promi
       join(repository, 'examples/rag-browser/src/agent/prompt.json'),
       'utf8',
     );
+    if (input.framework === 'pydantic-ai')
+      for (const file of ['__init__.py', 'agent.py'])
+        sources[`rag_pydantic_ai/${file}`] = await readFile(
+          join(repository, 'examples/rag-browser/agent_py/rag_pydantic_ai', file),
+          'utf8',
+        );
   }
   const assets = new Map<string, Uint8Array>();
   for (const [path, text] of Object.entries(sources))
@@ -143,6 +155,7 @@ await import('./worker.mjs');
   const enteredBusyLoop = Promise.withResolvers<void>();
   return {
     options: {
+      ...(input.framework ? { framework: input.framework } : {}),
       runtimeUrl: runtime,
       wheelsUrl: `${origin}/python/wheels/`,
       localWheels: local.packages,
@@ -199,7 +212,9 @@ await import('./worker.mjs');
     agent: {
       baseUrl: `${origin}/python/agent/`,
       files: Object.keys(sources),
-      module: input.module ?? 'rag_agent.graph',
+      module:
+        input.module ??
+        (input.framework === 'pydantic-ai' ? 'rag_pydantic_ai.agent' : 'rag_agent.graph'),
       entry: input.entry ?? 'create_agent',
     },
     origin,

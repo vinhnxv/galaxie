@@ -10,8 +10,8 @@ import { attribution, type Corpus } from '../corpus.js';
 import type { RetrievalClient } from '../retrieval/client.js';
 import { type EvaluationRow, evaluate } from './evaluate.js';
 import { reviewRegistry } from './review-passages.js';
-import type { RagHost } from './runtime.js';
-import { answerDelta } from './stream.js';
+import type { RagExecutor, RagHost } from './runtime.js';
+import { answerDelta, startsModelTurn } from './stream.js';
 
 export interface AppProps {
   retrieval: RetrievalClient;
@@ -19,6 +19,13 @@ export interface AppProps {
   startIndex(): Promise<unknown>;
   prepareModels(): Promise<RagHost>;
   disposeModels(): void;
+}
+function pythonBytes(framework: 'langgraph' | 'pydantic-ai'): string {
+  const meta = framework === 'langgraph' ? 'galaxie-python-bytes' : 'galaxie-pydantic-ai-bytes';
+  return Number(
+    document.querySelector<HTMLMetaElement>(`meta[name="${meta}"]`)?.content ??
+      pythonBuild.bytes[framework],
+  ).toLocaleString('en-US');
 }
 export function App({
   retrieval,
@@ -30,8 +37,14 @@ export function App({
   const index = useSyncExternalStore(retrieval.subscribe, retrieval.getSnapshot);
   const [host, setHost] = useState<RagHost>();
   const [active, setActive] = useState<RagHost['instance']>();
-  const [executor, setExecutor] = useState<'javascript' | 'python'>('javascript');
-  const [answerExecutor, setAnswerExecutor] = useState<'javascript' | 'python'>('javascript');
+  const [executor, setExecutor] = useState<RagExecutor>('javascript');
+  const [answerExecutor, setAnswerExecutor] = useState<RagExecutor>('javascript');
+  const executorName = (choice: RagExecutor): string =>
+    choice === 'javascript'
+      ? 'LangGraph.js'
+      : choice === 'python'
+        ? 'LangGraph Python'
+        : 'pydantic-ai Python';
   const [pythonPhase, setPythonPhase] = useState<RagHost['pythonPhase']>('idle');
   const [bootSeconds, setBootSeconds] = useState(0);
   const javascriptOption = useRef<HTMLInputElement>(null);
@@ -122,6 +135,7 @@ export function App({
           else if (event.type === 'error' && host?.pythonPhase !== 'failed')
             setError(event.error.message);
           else if (event.type === 'stream') {
+            if (startsModelTurn(event)) setStreamedAnswer('');
             const delta = answerDelta(event);
             if (delta) setStreamedAnswer((text) => text + delta);
             if (event.path.some((path) => path.startsWith('retrieval:')))
@@ -247,7 +261,7 @@ export function App({
       <h1>Ask your documents</h1>
       <p>
         Build an index and answer questions in this browser.{' '}
-        {executor === 'python' ? 'Python · LangGraph Python' : 'JavaScript · LangGraph.js'}
+        {executor === 'javascript' ? 'JavaScript' : 'Python'} · {executorName(executor)}
       </p>
       <section aria-labelledby="index-heading">
         <h2 id="index-heading">Index and models</h2>
@@ -316,13 +330,15 @@ export function App({
         {pythonBuild.available ? (
           <>
             <p>
-              Python adds{' '}
-              {Number(
-                document.querySelector<HTMLMetaElement>('meta[name="galaxie-python-bytes"]')
-                  ?.content ?? pythonBuild.bytes,
-              ).toLocaleString('en-US')}{' '}
-              bytes of download. Cold start was about 3 s in a local headless Chromium test.
+              LangGraph Python adds {pythonBytes('langgraph')} bytes of download. Cold start depends
+              on this device.
             </p>
+            {host?.pydanticAiAvailable && (
+              <p>
+                pydantic-ai Python adds {pythonBytes('pydantic-ai')} bytes of download. Cold start
+                depends on this device.
+              </p>
+            )}
             {(!host || index.status !== 'ready') && (
               <p id="executor-reason">Prepare chat models first.</p>
             )}
@@ -360,12 +376,28 @@ export function App({
                 />
                 LangGraph Python
               </label>
+              {host?.pydanticAiAvailable && (
+                <label>
+                  <input
+                    type="radio"
+                    name="executor"
+                    value="pydantic-ai"
+                    checked={executor === 'pydantic-ai'}
+                    onChange={() => {
+                      requestedRun.current = undefined;
+                      setAnswer(undefined);
+                      void host.selectExecutor('pydantic-ai');
+                    }}
+                  />
+                  pydantic-ai Python
+                </label>
+              )}
             </fieldset>
             <p role="status">
               {pythonPhase === 'booting'
-                ? 'Preparing LangGraph Python…'
+                ? `Preparing ${executorName(executor)}…`
                 : pythonPhase === 'ready'
-                  ? 'LangGraph Python ready'
+                  ? `${executorName(executor)} ready`
                   : ''}
             </p>
             {pythonPhase === 'booting' && (
@@ -513,7 +545,7 @@ export function App({
         {answer && (
           <article>
             <h3 ref={answerHeading} tabIndex={-1}>
-              Answer · {answerExecutor === 'python' ? 'LangGraph Python' : 'LangGraph.js'}
+              Answer · {executorName(answerExecutor)}
             </h3>
             <p className="answer">{answer.answer}</p>
             {answer.citations.length === 0 && <p>No retrieved passage is cited for this answer.</p>}

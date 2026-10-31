@@ -71,17 +71,24 @@ export class MockChatModel extends BaseChatModel {
   readonly #script: MockScript;
   readonly #provider: string;
   readonly #model: string;
+  readonly #sequence: 'tool-calls' | 'assistant-turns';
   #counts = { calls: 0 };
   #tools: ReadonlySet<string> = new Set();
 
   constructor(
     script: MockScript,
-    options: { readonly provider?: string; readonly model?: string } = {},
+    options: {
+      readonly provider?: string;
+      readonly model?: string;
+      /** Count every assistant turn after the last scripted prompt, including text retries. */
+      readonly sequence?: 'tool-calls' | 'assistant-turns';
+    } = {},
   ) {
     super({});
     this.#script = script;
     this.#provider = options.provider ?? 'galaxie-mock';
     this.#model = options.model ?? 'mock-1';
+    this.#sequence = options.sequence ?? 'tool-calls';
   }
 
   override _llmType(): string {
@@ -100,6 +107,7 @@ export class MockChatModel extends BaseChatModel {
     const bound = new MockChatModel(this.#script, {
       provider: this.#provider,
       model: this.#model,
+      sequence: this.#sequence,
     });
     bound.#tools = new Set(tools.map((tool) => convertToOpenAITool(tool).function.name));
     bound.#counts = this.#counts;
@@ -111,7 +119,12 @@ export class MockChatModel extends BaseChatModel {
     signal?: AbortSignal,
   ): Promise<Exclude<MockScriptEntry, { readonly error: Error }>> {
     this.#counts.calls++;
-    const humanIndex = messages.findLastIndex((message) => message.type === 'human');
+    const humanIndex = messages.findLastIndex(
+      (message) =>
+        message.type === 'human' &&
+        (this.#sequence === 'tool-calls' ||
+          (typeof message.content === 'string' && Object.hasOwn(this.#script, message.content))),
+    );
     const human = messages[humanIndex];
     const scripted =
       typeof human?.content === 'string'
@@ -122,7 +135,9 @@ export class MockChatModel extends BaseChatModel {
     const turns = messages
       .slice(humanIndex + 1)
       .filter(
-        (message) => AIMessage.isInstance(message) && (message.tool_calls?.length ?? 0) > 0,
+        (message) =>
+          AIMessage.isInstance(message) &&
+          (this.#sequence === 'assistant-turns' || (message.tool_calls?.length ?? 0) > 0),
       ).length;
     const entry: MockScriptEntry | undefined = Array.isArray(scripted)
       ? scripted[turns]

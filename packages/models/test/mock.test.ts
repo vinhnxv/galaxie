@@ -111,6 +111,34 @@ test('only assistant tool-call turns after the last human advance a sequence', a
   expect(reply.tool_calls).toEqual(toolCalls);
 });
 
+test('assistant-turn sequences script text retries from history across fresh and bound models', async () => {
+  const script: MockScript = {
+    'Return a number.': [
+      { id: 'invalid', text: 'not JSON' },
+      { id: 'corrected', text: '{"value":6}' },
+    ],
+    'Another question.': [{ id: 'another', text: 'New answer.' }],
+  };
+  const options = { sequence: 'assistant-turns' as const };
+  const model = new MockChatModel(script, options);
+  const first = await model.invoke('Return a number.');
+  expect(first.content).toBe('not JSON');
+  const history = [
+    new HumanMessage('Return a number.'),
+    first,
+    new HumanMessage('Invalid JSON: please return a JSON object.'),
+  ];
+  expect((await model.invoke(history)).content).toBe('{"value":6}');
+  const fresh = new MockChatModel(script, options).bindTools(tools);
+  const chunks = [];
+  for await (const chunk of await fresh.stream(history)) chunks.push(chunk.content);
+  expect(chunks.join('')).toBe('{"value":6}');
+  expect((await fresh.invoke([...history, new HumanMessage('Another question.')])).content).toBe(
+    'New answer.',
+  );
+  expect((await fresh.invoke('Return a number.')).content).toBe('not JSON');
+});
+
 test('streamed argument fragments reassemble with tool identity and final-only usage', async () => {
   const model = new MockChatModel({
     calculate: { id: 'tool-reply', text: '', toolCalls, usage },

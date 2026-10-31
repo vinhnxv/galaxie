@@ -68,7 +68,7 @@
     "The repeated-ID case uses fresh starts within one session. IDs repeated within retained conversation history still fail invalid before tools run, preserving the existing model-response validation.",
     "Deferred arguments in interaction props are checked JSON text only. Blocked arguments never reach Python or publish an interaction; streamed arguments remain absent from stream events.",
     "The approval argument-block native fixtures apply fixed-denial stand-ins; both Pyodide lanes exercise the JavaScript growing and final output checks.",
-    "The mock cannot script prompted-output retries without a tool name. This residual is unchanged; durable restore does not need that path.",
+    "The mock's opt-in assistant-turn sequencing scripts prompted-output retries without a tool name, including a fresh provider given the same history. The RAG Node Pyodide tests exercise this retry; the prompted-output golden covers successful parsing without a retry.",
     "Subgraphs stay false: child-agent deferrals do not propagate to the parent, and pydantic-graph 2.60 has no persistence module matching nested interrupt/stream semantics."
   ],
   "reloadCases": [

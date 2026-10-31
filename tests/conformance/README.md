@@ -172,6 +172,22 @@ The built Chromium lane is
 `uv run --locked --offline python -I ../scripts/record-pydantic-ai-conformance.py --check`
 from `python/` reproduces the existing pydantic-ai goldens without writing them.
 
+The maintained RAG example adds the third executor without changing the LangGraph
+RAG golden. [Native agent tests](../../examples/rag-browser/agent_py/tests/test_pydantic_ai_agent.py)
+and [Node Pyodide tests](../../examples/rag-browser/test/pydantic-ai-agent.node.test.ts)
+cover capability retrieval, cited text output, deferred passage approval and resume
+validation. The Node tests also exercise a prompted-output retry whose retry part
+has no tool name, using the mock's opt-in assistant-turn sequencing.
+[Built Chromium page tests](../../examples/rag-browser/test/loop.node.test.ts) cover
+lazy selection, joined checked text deltas, selected-executor byte totals,
+pending-review reload through reopened scoped IndexedDB, kept-passage resume,
+Start over deletion, switching all three executors and an injected-passage output
+block. The pydantic-ai review is an approval, with no subgraph path. Tests use mock
+models only and retain the page/Worker CSP and Trusted Types policy. The
+[documented mock command](../../examples/rag-browser/README.md#passage-review-with-mock-models)
+serves all three executors; the pydantic-ai hands-on Chrome check belongs to the
+Claude reviewer and remains unverified.
+
 ## Running the suite
 
 - `pnpm check` runs the repository's license, lint, both TypeScript compilers, Node/Chromium tests, build and dependency checks.

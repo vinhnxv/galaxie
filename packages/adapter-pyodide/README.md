@@ -6,14 +6,16 @@ the existing JavaScript router and broker own routing, consent, labels, budgets,
 credentials, output checks and capability authorization.
 
 The host supplies `createPyodideAdapter({ createWorker, runtimeUrl, wheelsUrl,
-localWheels, onBoot? })`. `createWorker` returns a port with `postMessage(string)`,
+localWheels, onBoot?, framework? })`. The default framework is `langgraph`;
+`framework: 'pydantic-ai'` selects the separate pydantic-ai executor. `createWorker` returns a port with `postMessage(string)`,
 message and error listeners, and `terminate()`. A browser `Worker` satisfies that
 shape. Node hosts wrap `worker_threads.Worker`. Constructing the adapter fetches
 nothing and starts no Worker; `prepare` loads the source files and boots the interpreter.
 
 The agent descriptor is `{ baseUrl, files, module, entry }`. Source paths are relative
 Python or JSON files, the module is a dotted Python import name, and the entry is a
-zero-argument function returning the graph. Sources and wheels are same-origin in
+zero-argument function returning a LangGraph graph, or an `Agent`/`Executor` for
+the pydantic-ai framework. Sources and wheels are same-origin in
 the browser and fetched with credentials omitted. On Node, the runtime directory may
 be local because native ESM cannot import an HTTP module; agent files and wheels may
 still be served from loopback. The host serves runtime assets together and supplies
@@ -62,7 +64,8 @@ reads committed state, and resume sends `{action, payload}` by interrupt ID. Com
 nodes do not re-run; the interrupted node does. Parallel or ID-less interrupts,
 static breakpoints and reusing an answered interaction fail `unsupported`.
 
-`interrupts`, `resume`, `checkpoints`, `streaming` and `subgraphs` are true. For durable sessions, supply
+For LangGraph Python, `interrupts`, `resume`, `checkpoints`, `streaming` and
+`subgraphs` are true. For durable sessions, supply
 `services: { chatModels, checkpoints: saver.byteRecords }` and
 `recovery: saver.recovery` from the same app/principal-scoped
 [`IndexedDBSaver`](../storage-indexeddb/README.md#python-byte-checkpoints). The Worker
@@ -104,7 +107,8 @@ Raw graph streams can contain working state and bypass routed-model output check
 hosts must select the checked message projection before rendering text. The RAG
 application renders checked answer-node messages and its final result as React
 text. Default sessions remain in memory; opt-in passage review uses a registered
-interaction and scoped durable checkpoints on either executor.
+interaction and scoped durable checkpoints on either LangGraph executor. The
+pydantic-ai example uses the separate approval flow described below.
 
 Python code is trusted under [ADR-0018](../../docs/adr/0018-python-agents-through-pyodide.md).
 It can import `js` and use the Worker's APIs. A dedicated Worker does not isolate
@@ -157,7 +161,7 @@ agent deferrals do not propagate to the parent, and pydantic-graph 2.60 has no
 persistence module matching nested interrupt and stream semantics.
 
 Include `DeferredToolRequests` in the agent's output types to pause on
-`requires_approval` or `CallDeferred`. Wrap the agent in `Executor(agent,
+`requires_approval`, `ApprovalRequired` or `CallDeferred`. Wrap the agent in `Executor(agent,
 interaction=..., resume=...)`. The author's synchronous `interaction(requests)`
 returns one `{ surfaceId, viewRevision, component, props }` request for all deferred
 calls in that response. Invalid requests fail with fixed `unsupported` errors.
@@ -185,11 +189,13 @@ chain, so a model that repeats an ID such as `call_0` within one chain fails
 `invalid`; a fresh start may reuse it.
 
 The [pydantic-ai matrix](../../tests/conformance/compatibility-matrix-pydantic-ai.json)
-records the native CPython, Node Pyodide and real headless Chromium cases. The
-deterministic mock still cannot script prompted-output retries whose
-`RetryPromptPart` has no tool name; deferred-tool resume does not need that path.
+records the native CPython, Node Pyodide and real headless Chromium cases. For
+scripted prompted-output retries whose `RetryPromptPart` has no tool name, create
+`MockChatModel(script, { sequence: 'assistant-turns' })`. That opt-in mode chooses
+the last scripted human prompt and advances from assistant turns in retained history,
+including after a fresh model is constructed; default tool-call sequencing stays unchanged.
 
-The maintained RAG transcript matches across native CPython 3.14, Pyodide on Node
+The maintained LangGraph RAG transcript matches across native CPython 3.14, Pyodide on Node
 and Chromium, and the JavaScript graph on Node and Chromium. A separate Chromium
 boot test installs the locked wheel set and imports LangGraph under the unchanged
 strict page and Worker CSP, with zero policy violations. Node and browser bridge
@@ -221,15 +227,22 @@ tests cover all twelve cases, RAG and effect fixtures; exceptions decode as `rep
 strings and tuples as msgpack arrays, with strict equality otherwise.
 No real model or device measurements were added.
 
-The RAG example also offers opt-in passage review on both executors: retrieval runs
-in a subgraph, a registered interaction selects passage IDs, and the answer streams
-through JavaScript output checks. Shared Node and real Chromium transcripts compare
-capability inputs, ID/title-only props and the kept-passage answer. Separate bounded
-Chromium page tests restore pending reviews from reopened IndexedDB, resume them,
-delete their sessions and return to the default in-memory flow. Review instances use
-the saver's recovery store and fenced Web Lock ownership. See the [mock command and
-review steps](../../examples/rag-browser/README.md#passage-review-with-mock-models).
-The hands-on Chrome review remains with the reviewer; no real-model result is claimed.
+The RAG example offers all three executors in its built mock mode. The two
+LangGraph agents retain their shared review transcript and retrieval-subgraph paths.
+The pydantic-ai agent uses a capability-backed `search_docs` tool, then optionally
+raises `ApprovalRequired` from `review_passages` with trusted retrieved passages in
+persisted metadata. Its registered interaction exposes IDs/titles only; the author
+validates kept IDs before approval, and citations come from trusted tool history.
+The final cited answer is text output so checked deltas can stream.
+
+Bounded Chromium page tests cover lazy selection, retrieval/citations, selected
+wheel-set byte totals, review reload through reopened IndexedDB, resume, Start over
+deletion, executor switching and an injected-passage output block. Review instances
+use scoped byte records, the saver's recovery store and fenced Web Lock ownership.
+The pydantic-ai choice requires an answer-role provider declaring `tool-calling`;
+the bundled WebLLM and Built-in AI descriptors lack it, so only mock mode currently
+offers that choice. See the [mock command and review steps](../../examples/rag-browser/README.md#passage-review-with-mock-models).
+A mock-only hands-on Chrome check of the RAG example (2026-10-31) covered review, reload restore, resume and Start over; real models remain unmeasured. No real-model result is claimed.
 
 `linear` and `branching` also match the native Python stream events, mode order and
 paths on Node Pyodide and real Chromium. Both lanes prove checked deltas and final

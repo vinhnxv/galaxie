@@ -4,9 +4,9 @@
 import type { EventId, RunEvent, RunId } from '@galaxie/core';
 import { AIMessageChunk } from '@langchain/core/messages';
 import { expect, test } from 'vitest';
-import { answerDelta } from '../src/host/stream.js';
+import { answerDelta, startsModelTurn } from '../src/host/stream.js';
 
-function stream(data: unknown, mode = 'messages'): RunEvent {
+function stream(data: unknown, mode = 'messages'): Extract<RunEvent, { type: 'stream' }> {
   return {
     type: 'stream',
     executor: 'fixture',
@@ -41,4 +41,29 @@ test('keeps graph state, other nodes and tool-call messages out of answer displa
     stream([{ type: 'human', content: 'Private question.' }, { langgraph_node: 'generateAnswer' }]),
   ])
     expect(answerDelta(event)).toBe('');
+});
+
+test('pydantic-ai displays only its checked text projection', () => {
+  const event: RunEvent = {
+    ...stream([{ type: 'ai', content: 'Answer [1]' }, {}]),
+    executor: 'pydantic-ai-python',
+  };
+  expect(answerDelta(event)).toBe('Answer [1]');
+  expect(answerDelta({ ...event, mode: 'updates' })).toBe('');
+  expect(
+    answerDelta({ ...event, data: [{ type: 'ai', content: 'private', tool_calls: [{}] }, {}] }),
+  ).toBe('');
+});
+
+test('marks each pydantic-ai model request as a new answer turn', () => {
+  const request = {
+    ...stream({ kind: 'model-request', index: 1 }, 'updates'),
+    executor: 'pydantic-ai-python',
+  };
+  expect(startsModelTurn(request)).toBe(true);
+  expect(
+    startsModelTurn({ ...request, data: { kind: 'tool-call', name: 'search_docs', index: 0 } }),
+  ).toBe(false);
+  expect(startsModelTurn({ ...request, executor: 'langgraph-python' })).toBe(false);
+  expect(startsModelTurn(stream({ kind: 'model-request', index: 1 }))).toBe(false);
 });
