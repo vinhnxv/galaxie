@@ -41,6 +41,7 @@ def test_program_owns_retrieval_arguments_and_citation_projection():
         "effectScope": "dspy/rag/1/0",
     }
     assert "tools" not in seen[-1]["payload"]["options"]
+    assert "with its [n] marker, for example [1]." in json.dumps(seen[-1]["payload"]["messages"])
 
 
 def paused_review():
