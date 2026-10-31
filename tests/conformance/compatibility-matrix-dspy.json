@@ -1,0 +1,43 @@
+{
+  "reference": "Native CPython 3.14 with DSPy 3.4.1 custom engines",
+  "requestReference": "dspy.clients.lm15_boundary.request_kwargs(request, \"chat\") from pinned DSPy 3.4.1; the galaxie mapper is independent",
+  "lanes": ["Node Pyodide", "real headless Chromium Pyodide"],
+  "features": {
+    "streaming": false,
+    "interrupts": false,
+    "resume": false,
+    "checkpoints": false,
+    "subgraphs": false
+  },
+  "cases": [
+    "predict",
+    "chain-of-thought",
+    "json-adapter",
+    "react-one-tool",
+    "react-two-tools",
+    "react-v2",
+    "native-tool-calling",
+    "parse-failure",
+    "capability-denial",
+    "outcome-unknown",
+    "reply-block",
+    "argument-block",
+    "refused-lm",
+    "abort"
+  ],
+  "differences": [],
+  "normalizations": [
+    "Assistant tool-only content null maps to the bridge empty string.",
+    "Tool-call argument JSON strings compare as parsed JSON; call IDs, names, values and all message text remain compared.",
+    "Replies project text and tool calls without provider-generated message IDs or timestamps.",
+    "Native cancellation and the runtime cancelled event share the fixed cancelled code and message."
+  ],
+  "limits": [
+    "All replies are deterministic scripts; no real model or model download is exercised.",
+    "Native records use DSPy directly with an independent engine and tool, not galaxie.dspy. Refused plain LMs and JavaScript safety failures have fixed native stand-ins.",
+    "Node and Chromium use verified local wheels, block external requests and enforce output checks in JavaScript before Python receives text or tool arguments.",
+    "The outcome-unknown case uses a write capability and proves that no model call follows the terminal tool failure.",
+    "Streaming, interrupts, resume, checkpoints and subgraphs remain false. No replay journal, persistence or RAG executor selection ships in this stage.",
+    "Trusted Python author code can still import js; provider omission and linting do not create a sandbox."
+  ]
+}

@@ -29,7 +29,7 @@ const passages = [
 ];
 
 test.skipIf(!pythonWheelsAvailable)(
-  'both Python frameworks run in one runtime and reject an invalid pydantic entry',
+  'three Python frameworks run in one runtime and reject an invalid pydantic entry',
   async () => {
     const fixture = await createPythonFixture({
       module: 'agents',
@@ -60,13 +60,26 @@ def create_tool_agent():
     return Executor(Agent(GalaxieModel('rag.answer'), tools=[tool]), prompt=lambda value: value['question'])
 def invalid_agent():
     return object()
+def create_dspy_agent():
+    import dspy
+    from galaxie.dspy import GalaxieLM
+    class Program(dspy.Module):
+        async def aforward(self, question, **kwargs):
+            if question == 'slow':
+                await GalaxieLM('rag.answer').acall('slow')
+            return dspy.Prediction(answer='DSPy', citations=[])
+    return Program()
 `,
       },
     });
     const pydantic = createPyodideAdapter({ ...fixture.options, framework: 'pydantic-ai' });
     const runtime = createRuntime({
       appId: 'both-python-frameworks',
-      executors: [createPyodideAdapter(fixture.options), pydantic],
+      executors: [
+        createPyodideAdapter(fixture.options),
+        pydantic,
+        createPyodideAdapter({ ...fixture.options, framework: 'dspy' }),
+      ],
       outputSafety: () => 'allow',
     });
     const latch = createMockLatch();
@@ -106,6 +119,7 @@ def invalid_agent():
       for (const [executor, entry, answer] of [
         ['langgraph-python', 'create_agent', 'LangGraph'],
         ['pydantic-ai-python', 'create_pydantic_agent', 'Pydantic'],
+        ['dspy-python', 'create_dspy_agent', 'DSPy'],
       ]) {
         const instance = await runtime.create(
           { ...pythonRagDefinition, executor: executor as string },
@@ -122,7 +136,7 @@ def invalid_agent():
         expect(
           (await events(instance.events(run.runId))).find((event) => event.type === 'output'),
         ).toMatchObject({ output: { answer, citations: [] } });
-        if (executor === 'pydantic-ai-python') {
+        if (executor === 'pydantic-ai-python' || executor === 'dspy-python') {
           const slow = await instance.start({ question: 'slow', mode: 'hybrid' });
           const cancelled = events(instance.events(slow.runId));
           await latch.entered;
@@ -131,7 +145,7 @@ def invalid_agent():
           const next = await instance.start({ question: 'hello', mode: 'hybrid' });
           expect(
             (await events(instance.events(next.runId))).find((event) => event.type === 'output'),
-          ).toMatchObject({ output: { answer: 'Pydantic', citations: [] } });
+          ).toMatchObject({ output: { answer, citations: [] } });
         }
       }
       const noTools = await runtime.create(

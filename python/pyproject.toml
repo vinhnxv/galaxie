@@ -3,7 +3,7 @@ name = "galaxie-python-tests"
 version = "0.0.0"
 license = "AGPL-3.0-only"
 requires-python = ">=3.14,<3.15"
-dependencies = ["galaxie[pydantic-ai]", "ormsgpack==1.13.0", "langgraph>=1,<2"]
+dependencies = ["galaxie[pydantic-ai,dspy]", "ormsgpack==1.13.0", "langgraph>=1,<2"]
 
 [dependency-groups]
 dev = ["pytest==8.4.2", "setuptools==80.9.0", "wheel==0.45.1", "openai==3.37.0"]
@@ -14,14 +14,16 @@ exclude-newer = "2026-10-23T17:00:00Z"
 constraint-dependencies = [
   "msgpack==1.1.2", "orjson==3.11.8", "pydantic==2.12.5",
   "pydantic-core==2.41.5", "xxhash==3.6.0", "zstandard==0.25.0",
+  "regex==2026.3.32", "rpds-py==0.30.0", "pyyaml==6.0.3",
 ]
 
 [tool.uv.workspace]
-members = ["galaxie", "standins/ormsgpack"]
+members = ["galaxie", "standins/ormsgpack", "standins/litellm"]
 
 [tool.uv.sources]
 galaxie = { workspace = true }
 ormsgpack = { workspace = true }
+litellm = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["galaxie/tests", "../examples/rag-browser/agent_py/tests", "../tests/conformance/cases-python", "../tests/conformance/cases-pydantic-ai"]
+testpaths = ["galaxie/tests", "../examples/rag-browser/agent_py/tests", "../tests/conformance/cases-python", "../tests/conformance/cases-pydantic-ai", "../tests/conformance/cases-dspy"]

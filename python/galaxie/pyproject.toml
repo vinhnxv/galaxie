@@ -11,6 +11,7 @@ requires-python = ">=3.14"
 dependencies = ["langchain-core>=1,<2", "langgraph>=1,<2"]
 
 [project.optional-dependencies]
+dspy = ["dspy==3.4.1"]
 pydantic-ai = ["pydantic-ai-slim==2.60.0", "pydantic-graph==2.60.0"]
 
 [tool.setuptools.packages.find]

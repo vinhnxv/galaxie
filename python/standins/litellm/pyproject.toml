@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "litellm"
+version = "1.106.2"
+description = "Metadata-only dependency stand-in for the galaxie DSPy custom engine."
+license = "AGPL-3.0-only"
+requires-python = ">=3.14"
+
+[tool.setuptools]
+packages = []

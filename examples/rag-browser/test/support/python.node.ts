@@ -40,7 +40,7 @@ export interface PythonFixture {
   cleanup(): Promise<void>;
 }
 export interface PythonFixtureInput {
-  readonly framework?: 'langgraph' | 'pydantic-ai';
+  readonly framework?: 'langgraph' | 'pydantic-ai' | 'dspy';
   readonly sources?: Readonly<Record<string, string>>;
   readonly module?: string;
   readonly entry?: string;
