@@ -37,6 +37,23 @@
           "title": "A",
           "text": "one"
         }
+      ],
+      "sources": [
+        {
+          "passageId": "a",
+          "title": "A",
+          "text": "one"
+        },
+        {
+          "passageId": "b",
+          "title": "B",
+          "text": "two"
+        },
+        {
+          "passageId": "c",
+          "title": "C",
+          "text": "three"
+        }
       ]
     }
   },
@@ -65,7 +82,24 @@
     "reply": "No markers.",
     "expected": {
       "answer": "No markers.",
-      "citations": []
+      "citations": [],
+      "sources": [
+        {
+          "passageId": "a",
+          "title": "A",
+          "text": "one"
+        },
+        {
+          "passageId": "b",
+          "title": "B",
+          "text": "two"
+        },
+        {
+          "passageId": "c",
+          "title": "C",
+          "text": "three"
+        }
+      ]
     }
   },
   {
@@ -74,7 +108,8 @@
     "reply": "Unknown [0] [9].",
     "expected": {
       "answer": "Unknown  .",
-      "citations": []
+      "citations": [],
+      "sources": []
     }
   },
   {
@@ -133,6 +168,43 @@
           "title": "7",
           "text": "7"
         }
+      ],
+      "sources": [
+        {
+          "passageId": "1",
+          "title": "1",
+          "text": "1"
+        },
+        {
+          "passageId": "2",
+          "title": "2",
+          "text": "2"
+        },
+        {
+          "passageId": "3",
+          "title": "3",
+          "text": "3"
+        },
+        {
+          "passageId": "4",
+          "title": "4",
+          "text": "4"
+        },
+        {
+          "passageId": "5",
+          "title": "5",
+          "text": "5"
+        },
+        {
+          "passageId": "6",
+          "title": "6",
+          "text": "6"
+        },
+        {
+          "passageId": "7",
+          "title": "7",
+          "text": "7"
+        }
       ]
     }
   },
@@ -161,7 +233,24 @@
     "reply": "[9007199254740992]",
     "expected": {
       "answer": "",
-      "citations": []
+      "citations": [],
+      "sources": [
+        {
+          "passageId": "a",
+          "title": "A",
+          "text": "one"
+        },
+        {
+          "passageId": "b",
+          "title": "B",
+          "text": "two"
+        },
+        {
+          "passageId": "c",
+          "title": "C",
+          "text": "three"
+        }
+      ]
     }
   }
 ]

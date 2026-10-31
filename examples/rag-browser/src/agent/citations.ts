@@ -16,5 +16,6 @@ export function citeAnswer(reply: string, passages: SearchResult['passages']): R
     }
     return token;
   });
-  return { answer, citations };
+  const sources = passages.map(({ id, title, text }) => ({ passageId: id, title, text }));
+  return { answer, citations, sources };
 }

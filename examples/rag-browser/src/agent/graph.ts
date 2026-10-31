@@ -11,6 +11,7 @@ import {
   ReviewSubmissionSchema,
   type SearchMode,
   type SearchResult,
+  type Source,
 } from './schemas.js';
 
 const input = Annotation.Root({
@@ -18,7 +19,11 @@ const input = Annotation.Root({
   mode: Annotation<SearchMode>,
   review: Annotation<boolean | undefined>,
 });
-const output = Annotation.Root({ answer: Annotation<string>, citations: Annotation<Citation[]> });
+const output = Annotation.Root({
+  answer: Annotation<string>,
+  citations: Annotation<Citation[]>,
+  sources: Annotation<Source[]>,
+});
 const state = Annotation.Root({
   ...input.spec,
   ...output.spec,
@@ -74,6 +79,6 @@ export function createRagAgent(): LangGraphAgent {
       .addEdge('retrieve', 'generateAnswer')
       .addEdge('generateAnswer', END)
       .compile({ checkpointer: host.langchain.checkpointer() });
-    return graph.withConfig({ outputKeys: ['answer', 'citations'] });
+    return graph.withConfig({ outputKeys: ['answer', 'citations', 'sources'] });
   };
 }

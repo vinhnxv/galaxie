@@ -49,7 +49,7 @@ def test_review_pauses_after_retrieval_and_answers_with_only_kept_passages(monke
         }}), config)
         assert result == {"answer": "Kept [1].", "citations": [{
             "marker": 1, "passageId": "keep", "title": "Kept", "text": "Kept private passage.",
-        }]}
+        }], "sources": [{"passageId": "keep", "title": "Kept", "text": "Kept private passage."}]}
         assert requests[-1]["payload"]["messages"][-1]["content"] == user_prompt("Which passage?", passages[1:])
 
     asyncio.run(run())
