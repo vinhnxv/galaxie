@@ -5,7 +5,7 @@ export const dspyDriver: string = `
 import sys, os, json, asyncio, importlib, uuid
 os.environ['LITELLM_LOCAL_MODEL_COST_MAP'] = 'true'
 import dspy
-from galaxie._bridge import install_transport, GalaxieError, receive_model_chunk
+from galaxie._bridge import install_transport, GalaxieError, receive_model_chunk, notify_stream_data
 from galaxie.dspy import prepare_executor, error_code
 from _galaxie_transport import request as _transport, notify as _notify
 sys.path.insert(0, '/agent')
@@ -33,7 +33,10 @@ async def _galaxie_execute():
         session = payload['threadId']
         if session not in _galaxie_conversations:
             _galaxie_conversations[session] = str(uuid.uuid4())
-        output = await _galaxie_executor.run(payload['input'], _galaxie_conversations[session], payload['steps'])
+        output = await _galaxie_executor.run(
+            payload['input'], _galaxie_conversations[session], payload['steps'],
+            on_stream=lambda mode, data: notify_stream_data([], mode, data),
+        )
         return json.dumps({'ok': True, 'output': output}, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
     except BaseException as error:
         return json.dumps({'ok': False, 'code': error_code(error)})

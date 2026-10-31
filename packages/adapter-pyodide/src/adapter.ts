@@ -296,7 +296,7 @@ export function createPyodideAdapter(
       interrupts: framework !== 'dspy',
       resume: framework !== 'dspy',
       checkpoints: framework !== 'dspy',
-      streaming: framework !== 'dspy',
+      streaming: true,
       subgraphs: langgraph,
     },
     async prepare(agent, services, preparation) {

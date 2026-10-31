@@ -134,14 +134,17 @@ def test_stream_projection_is_closed_and_limits_metadata():
     assert json.loads(notifications[-1])['payload'][2] == {
         '__interrupt__': [{'id': 'one', 'value': {'question': 'Continue?'}}],
     }
+    _bridge.notify_stream_data((), 'messages', {'field': 'answer', 'text': 'checked'})
+    assert json.loads(notifications[-1])['payload'] == [[], 'messages', {'field': 'answer', 'text': 'checked'}]
 
 
 @pytest.mark.parametrize('data', [b'PRIVATE', {1: 'PRIVATE'}, float('nan'), object(), 'é' * 524289])
-def test_unsupported_stream_data_never_leaves_python(data):
+@pytest.mark.parametrize('notify', [_bridge.notify_stream, _bridge.notify_stream_data])
+def test_unsupported_stream_data_never_leaves_python(data, notify):
     notifications = []
     _bridge.install_transport(unused_transport, notifications.append)
     with pytest.raises(GalaxieError, match='^This operation is unsupported\\.$'):
-        _bridge.notify_stream((), 'custom', data)
+        notify((), 'custom', data)
     assert notifications == []
 
 

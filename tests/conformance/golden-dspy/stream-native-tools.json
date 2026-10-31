@@ -1,0 +1,200 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (Union[str, NoneType]): \n2. `history` (History):\nYour output fields are:\n1. `next_thought` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## history ## ]]\n{history}\n\n[[ ## next_thought ## ]]\n{next_thought}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.\n        You are an Agent. Use the supplied tools to produce `answer` from `question`.\n        Call tools when more information is needed.\n        When the final answer is ready, call `submit` with `answer`.\n        The available tools are: `lookup`, `submit`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\nRespond with the corresponding output fields, starting with the field `[[ ## next_thought ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup",
+            "description": "Look up the fact.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": ["query"]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit",
+            "description": "Submit the final outputs for the task.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "answer": {
+                  "type": "string"
+                }
+              },
+              "required": ["answer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (Union[str, NoneType]): \n2. `history` (History):\nYour output fields are:\n1. `next_thought` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## history ## ]]\n{history}\n\n[[ ## next_thought ## ]]\n{next_thought}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.\n        You are an Agent. Use the supplied tools to produce `answer` from `question`.\n        Call tools when more information is needed.\n        When the final answer is ready, call `submit` with `answer`.\n        The available tools are: `lookup`, `submit`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\nRespond with the corresponding output fields, starting with the field `[[ ## next_thought ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        },
+        {
+          "role": "assistant",
+          "content": "[[ ## next_thought ## ]]\nUse the supplied tools.\n\n[[ ## completed ## ]]\n",
+          "tool_calls": [
+            {
+              "id": "lookup-1",
+              "type": "function",
+              "function": {
+                "name": "lookup",
+                "arguments": {
+                  "query": "France"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "lookup-1",
+          "content": "Paris"
+        },
+        {
+          "role": "user",
+          "content": "Respond with the corresponding output fields, starting with the field `[[ ## next_thought ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup",
+            "description": "Look up the fact.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": ["query"]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit",
+            "description": "Submit the final outputs for the task.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "answer": {
+                  "type": "string"
+                }
+              },
+              "required": ["answer"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "[[ ## next_thought ## ]]\nUse the supplied tools.\n[[ ## completed ## ]]",
+      "toolCalls": [
+        {
+          "name": "lookup",
+          "id": "lookup-1",
+          "args": {
+            "query": "France"
+          },
+          "type": "tool_call"
+        }
+      ]
+    },
+    {
+      "content": "[[ ## next_thought ## ]]\nUse the supplied tools.\n[[ ## completed ## ]]",
+      "toolCalls": [
+        {
+          "name": "submit",
+          "id": "submit-1",
+          "args": {
+            "answer": "Paris"
+          },
+          "type": "tool_call"
+        }
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "France"
+      }
+    }
+  ],
+  "interactions": [],
+  "output": {
+    "answer": "Paris"
+  },
+  "error": null,
+  "events": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model",
+        "index": 0
+      }
+    },
+    {
+      "mode": "messages",
+      "data": {
+        "field": "next_thought",
+        "text": "Use the supplied tools."
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "tool",
+        "name": "lookup",
+        "index": 0
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model",
+        "index": 1
+      }
+    },
+    {
+      "mode": "messages",
+      "data": {
+        "field": "next_thought",
+        "text": "Use the supplied tools."
+      }
+    }
+  ]
+}
