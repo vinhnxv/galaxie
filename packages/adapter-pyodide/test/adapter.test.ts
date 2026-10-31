@@ -194,7 +194,7 @@ test('framework selection declares only the implemented features and selects the
     streaming: true,
     interrupts: true,
     resume: true,
-    checkpoints: false,
+    checkpoints: true,
     subgraphs: false,
   });
   expect(adapter.id).toBe('pydantic-ai-python');

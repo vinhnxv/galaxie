@@ -493,6 +493,61 @@ def test_two_pauses_replay_models_direct_capabilities_and_writes_without_dispatc
 INTERACTION = {'surfaceId': 'main', 'viewRevision': 'review', 'component': 'test.Review/v1', 'props': {}}
 
 
+def test_session_snapshot_rederives_pending_and_replays_in_a_fresh_executor():
+    from galaxie.dspy import request_interaction
+    from galaxie import capabilities
+    class Program(dspy.Module):
+        async def aforward(self, question):
+            receipt = await capabilities.call('write@1', {'query': question})
+            answer = request_interaction(INTERACTION)
+            return dspy.Prediction(answer=answer['payload'], receipt=receipt)
+    seen = []
+    transport_for(['private receipt'], seen)
+    original = Executor(Program())
+    asyncio.run(original.run({'question': 'private input'}, 'conversation', 5))
+    pending = original.pending('conversation')
+    assert pending is not None
+    checkpoint, metadata = original._snapshot('conversation', 'session')
+    restored = Executor(Program())
+    assert restored._restore(checkpoint, metadata, 'session') == 'conversation'
+    assert restored.pending('conversation') == pending
+    assert asyncio.run(restored.run(None, 'conversation', 5, resume={
+        'interactionId': pending['id'], 'action': 'continue', 'payload': 'done',
+    })) == {'answer': 'done', 'receipt': 'private receipt'}
+    assert len(seen) == 1
+    assert seen[0]['payload']['effectScope'] == 'dspy/conversation/1/0'
+    completed = Executor(Program())
+    completed._restore(*restored._snapshot('conversation', 'session'), 'session')
+    assert completed.pending('conversation') is None
+    transport_for(['new receipt'], seen)
+    asyncio.run(completed.run({'question': 'new run'}, 'conversation', 5))
+    assert seen[-1]['payload']['effectScope'] == 'dspy/conversation/2/0'
+
+
+@pytest.mark.parametrize('mutation', ['session', 'version', 'format', 'adapter', 'digest', 'pending', 'counter', 'bytes'])
+def test_corrupt_or_incompatible_snapshots_do_not_replace_a_valid_session(mutation):
+    from galaxie.dspy import request_interaction
+    class Program(dspy.Module):
+        async def aforward(self):
+            return dspy.Prediction(answer=request_interaction(INTERACTION))
+    executor = Executor(Program())
+    asyncio.run(executor.run({}, 'c', 5))
+    checkpoint, metadata = executor._snapshot('c', 'session')
+    raw, meta = json.loads(checkpoint), json.loads(metadata)
+    if mutation == 'session': meta['session'] = 'other'
+    if mutation == 'version': meta['dspy'] = '0.0.0'
+    if mutation == 'format': meta['v'] = 2
+    if mutation == 'adapter': meta['adapter'] = 'JSONAdapter'
+    if mutation == 'digest': raw['journal'][-1]['digest'] = '0' * 64
+    if mutation == 'pending': raw['journal'][-1]['request']['props'] = {'changed': True}
+    if mutation == 'counter': raw['pauses'] = 0
+    before = executor.pending('c')
+    with pytest.raises(GalaxieError) as error:
+        executor._restore(b'corrupt' if mutation == 'bytes' else json.dumps(raw).encode(), json.dumps(meta).encode(), 'session')
+    assert error.value.code == 'unrecoverable'
+    assert executor.pending('c') == before
+
+
 @pytest.mark.parametrize('change', ['model', 'write', 'return', 'interaction'])
 def test_divergence_is_terminal_before_any_live_call_or_output(change):
     from galaxie.dspy import request_interaction

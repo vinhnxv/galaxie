@@ -134,3 +134,20 @@ export function checkpointBytes(value: unknown, direction: 'encode' | 'decode'):
     Object.entries(value).map(([key, item]) => [key, checkpointBytes(item, direction)]),
   );
 }
+
+/** Register stored input and replayed values before returning a journal to the Worker. */
+export function dspyCheckpointValues(value: unknown): unknown {
+  if (!object(value) || !object(value['checkpoint'])) return undefined;
+  const checkpoint = value['checkpoint'];
+  if (checkpoint['type'] !== 'dspy.journal/v1') return undefined;
+  const record: unknown = JSON.parse(
+    new TextDecoder('utf-8', { fatal: true }).decode(checkpoint['bytes'] as Uint8Array),
+  );
+  // Only a paused journal is replayed; compact completion markers carry no data.
+  if (!object(record) || record['status'] !== 'paused' || !Array.isArray(record['journal']))
+    return undefined;
+  return [
+    record['input'],
+    ...record['journal'].map((entry: unknown) => (object(entry) ? entry['result'] : undefined)),
+  ];
+}

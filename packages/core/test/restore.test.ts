@@ -125,7 +125,10 @@ test('restore publishes once, replays the interaction, and dispatch resumes with
     }),
   ).resolves.toMatchObject({ status: 'accepted' });
   await collect(instance.events(runId));
-  expect(pending.mock.calls).toEqual([[sessionId], [sessionId]]);
+  expect(pending.mock.calls).toEqual([
+    [sessionId, { registerRestoredData: expect.any(Function) }],
+    [sessionId, { registerRestoredData: expect.any(Function) }],
+  ]);
   expect(executor.requests[0]).toMatchObject({
     sessionId,
     command: {
@@ -307,4 +310,27 @@ test('restore validates grants and enforces private-user policy on free-text cap
   await collect(instance.events(restored.runId));
   expect(failure).toMatchObject({ code: 'denied' });
   expect(invoke).not.toHaveBeenCalled();
+});
+
+test('restored data adds the private label only when it carries strings and goes stale after the run', async () => {
+  const executor = new FakeExecutor();
+  let register: ((value: unknown) => void) | undefined;
+  const labels: string[][] = [];
+  executor.scripts.push(async function* (request) {
+    register = request.registerRestoredData;
+    request.registerRestoredData?.([null, 1, true]);
+    labels.push([...runtimeLabels()]);
+    request.registerRestoredData?.({ passage: 'restored private passage' });
+    labels.push([...runtimeLabels()]);
+    yield { type: 'output', output: 'done' };
+  });
+  const runtime = createRuntime({ appId: 'restore-tests', executors: [executor] });
+  runtimes.push(runtime);
+  const instance = await runtime.create(definition, { principalScope: 'user', agent: {} });
+  const runtimeLabels = (): readonly string[] => instance.getSnapshot().run?.labels ?? [];
+  await instance.prepare();
+  const { runId } = await instance.start('input');
+  await collect(instance.events(runId));
+  expect(labels).toEqual([['app'], ['app', 'private-user']]);
+  expect(() => register?.({ passage: 'late private passage' })).toThrow(GalaxieError);
 });

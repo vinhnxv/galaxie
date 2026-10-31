@@ -19,7 +19,7 @@ from dspy.lm15 import FunctionTool, Message, Request, Response, StreamDeltaEvent
 from dspy.streaming import StatusMessageProvider, StreamListener, StreamResponse
 
 from . import capabilities
-from ._bridge import ERROR_MESSAGES, GalaxieError, request
+from ._bridge import ERROR_MESSAGES, MAX_BYTES, GalaxieError, _model_reply, request
 
 
 class _LMError(dspy.LMError):
@@ -51,7 +51,8 @@ class _Session:
 
     def bounded(self) -> None:
         encoded = json.dumps(vars(self), ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')
-        if len(encoded) > 1024 * 1024:
+        # Byte envelopes cross the same bounded bridge as every other message.
+        if ((len(encoded) + 2) // 3) * 4 + 4096 > MAX_BYTES:
             raise _Termination('unsupported')
 
 
@@ -118,7 +119,7 @@ class _Run:
             self.cursor += 1
             return entry, True
         self.frontier()
-        entry = {'kind': kind, 'digest': digest}
+        entry = {'kind': kind, 'digest': digest, **({'request': _json(payload)} if kind == 'interaction' else {})}
         self.session.journal.append(entry)
         self.cursor += 1
         return entry, False
@@ -665,6 +666,75 @@ class Executor:
             raise GalaxieError('unrecoverable')
         return _json(state.pending) if state is not None and state.pending else None
 
+    def _snapshot(self, conversation: str, session: str, *, compact: bool = False) -> tuple[bytes, bytes]:
+        state = self._sessions[conversation]
+        if compact and state.pending is not None:
+            raise GalaxieError('unsupported')
+        checkpoint = {
+            'conversation_id': conversation, 'ordinal': state.ordinal, 'pauses': state.pauses,
+            'input': None if compact else state.value, 'journal': [] if compact else state.journal,
+            'status': 'unrecoverable' if state.unrecoverable else 'paused' if state.pending else 'completed',
+        }
+        metadata = {'v': 1, 'dspy': dspy.__version__, 'adapter': type(self.adapter).__name__, 'session': session}
+        def encode(value: Any) -> bytes:
+            return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')
+        return encode(checkpoint), encode(metadata)
+
+    def _restore(self, checkpoint: bytes, metadata: bytes, session: str) -> str:
+        """Validate a session-bound journal and derive its pending request from the frontier."""
+        try:
+            raw, meta = json.loads(checkpoint), json.loads(metadata)
+            if (type(meta) is not dict or set(meta) != {'v', 'dspy', 'adapter', 'session'}
+                or type(meta['v']) is not int or meta['v'] != 1
+                or meta['dspy'] != dspy.__version__ or meta['adapter'] != type(self.adapter).__name__
+                or meta['session'] != session
+                or type(raw) is not dict or set(raw) != {'conversation_id', 'ordinal', 'pauses', 'input', 'journal', 'status'}
+                or type(raw['conversation_id']) is not str or not raw['conversation_id']
+                or type(raw['ordinal']) is not int or raw['ordinal'] < 1
+                or type(raw['pauses']) is not int or raw['pauses'] < 0
+                or type(raw['journal']) is not list or raw['status'] not in {'paused', 'completed', 'unrecoverable'}):
+                raise ValueError()
+            identifier = raw['conversation_id']
+            state = _Session(ordinal=raw['ordinal'], pauses=raw['pauses'], value=raw['input'], journal=raw['journal'], unrecoverable=raw['status'] == 'unrecoverable')
+            interactions = 0
+            for index, entry in enumerate(state.journal):
+                if type(entry) is not dict or entry.get('kind') not in {'model', 'capability', 'interaction'}:
+                    raise ValueError()
+                pending = raw['status'] == 'paused' and index == len(state.journal) - 1
+                expected = {'kind', 'digest'} | ({'request'} if entry['kind'] == 'interaction' else set()) | (set() if pending else {'result'})
+                if set(entry) != expected or type(entry['digest']) is not str or re.fullmatch('[0-9a-f]{64}', entry['digest']) is None:
+                    raise ValueError()
+                if entry['kind'] == 'interaction':
+                    interactions += 1
+                    value = _interaction(entry['request'])
+                    if _digest(value) != entry['digest']:
+                        raise ValueError()
+                    if pending:
+                        state.pending = {'id': _digest([identifier, state.pauses - 1]), 'value': value}
+                    elif (type(entry['result']) is not dict or set(entry['result']) != {'action', 'payload'}
+                        or type(entry['result']['action']) is not str or not entry['result']['action']):
+                        raise ValueError()
+                elif pending:
+                    raise ValueError()
+                elif entry['kind'] == 'model':
+                    # Shape-only check; replay compares the live request digest before use.
+                    if not _model_reply(entry['result']):
+                        raise ValueError()
+            if (interactions > state.pauses or (raw['status'] == 'paused' and state.pending is None)
+                or (state.unrecoverable and (state.journal or state.value is not None))):
+                raise ValueError()
+            state.bounded()
+            _json(raw)
+            if raw['status'] == 'completed':
+                state.journal = []
+                state.value = None
+            self._sessions[identifier] = state
+            return identifier
+        except Exception:
+            raise GalaxieError('unrecoverable') from None
+        except _Termination:
+            raise GalaxieError('unrecoverable') from None
+
     async def _stream_prediction(self, inputs: dict[str, Any], run: _Run) -> Any:
         if type(self.adapter) is not dspy.ChatAdapter:
             raise GalaxieError('unsupported')
@@ -736,8 +806,6 @@ class Executor:
                 signature = getattr(self.module, 'signature', None)
                 output = _json({key: result[key] for key in signature.output_fields} if signature is not None else dict(result.items()))
             run.check()
-            state.journal = []
-            state.value = None
             return output
         except BaseException as error:
             try:

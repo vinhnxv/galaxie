@@ -590,6 +590,15 @@ export function createAgentInstance(
           limits: { steps: instrumentation.limits.steps },
           capabilities: broker.port(ports),
           models: router.port(ports),
+          registerRestoredData(value: unknown): void {
+            if (!active(run, segment))
+              throw new GalaxieError('stale', 'The run is no longer active.');
+            const strings = [...payloadStrings(value)];
+            if (strings.length === 0) return;
+            run.labels.add('private-user');
+            registerPrivate(strings, run.privateValues);
+            ports.labelsChanged();
+          },
         })
         [Symbol.asyncIterator]();
       // Never use for-await here: its early exit calls return() and can hide live engine work.
@@ -834,9 +843,14 @@ export function createAgentInstance(
               throw error;
             }
           }
+          const privateValues = new Set<string>();
           let pending: PendingInteraction | undefined;
           try {
-            pending = await executor?.pending(sessionId);
+            pending = await executor?.pending(sessionId, {
+              registerRestoredData(value: unknown): void {
+                registerPrivate(payloadStrings(value), privateValues);
+              },
+            });
           } catch (error) {
             report({ kind: 'restore_failed', error });
             const code = failureCode(error, 'executor_error');
@@ -866,7 +880,6 @@ export function createAgentInstance(
           }
           assertUsable();
           if (pending === undefined) return undefined;
-          const privateValues = new Set<string>();
           for (const submission of inbox.values())
             registerPrivate(payloadStrings(submission.payload), privateValues);
           const error = interactionError(pending, privateValues);
@@ -971,7 +984,11 @@ export function createAgentInstance(
       run.dispatching = interactionId;
       const checking = (async (): Promise<DispatchReceipt> => {
         try {
-          const committed = await executor?.pending(sessionId);
+          const committed = await executor?.pending(sessionId, {
+            registerRestoredData(value: unknown): void {
+              registerPrivate(payloadStrings(value), run.privateValues);
+            },
+          });
           if (
             disposing ||
             current !== run ||
