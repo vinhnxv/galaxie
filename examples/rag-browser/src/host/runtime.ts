@@ -21,6 +21,7 @@ import { loadWebLLMEngine, WebLLMChatModel } from '@galaxie/models/webllm';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import { z } from 'zod';
 import { ragDefinition } from '../agent/definition.js';
+import { dspyRagDefinition } from '../agent/definition-dspy.js';
 import { pydanticAiRagDefinition } from '../agent/definition-pydantic-ai.js';
 import { pythonRagDefinition } from '../agent/definition-python.js';
 import { createRagAgent } from '../agent/graph.js';
@@ -31,11 +32,11 @@ import { createPyodideWorker, createWebLLMWorker } from './trusted-types.js';
 
 const reviewKey = 'galaxie.rag-browser.review';
 const savedReviewSchema = z.strictObject({
-  executor: z.enum(['javascript', 'python', 'pydantic-ai']),
+  executor: z.enum(['javascript', 'python', 'pydantic-ai', 'dspy']),
   sessionId: z.string().min(1).max(128),
 });
 type SavedReview = z.infer<typeof savedReviewSchema>;
-export type RagExecutor = 'javascript' | 'python' | 'pydantic-ai';
+export type RagExecutor = 'javascript' | 'python' | 'pydantic-ai' | 'dspy';
 
 export interface RagModels {
   chatModels: LangGraphServices['chatModels'];
@@ -47,6 +48,7 @@ export interface RagHost {
   instance: AgentInstance<RagInput, unknown>;
   readonly executor: RagExecutor;
   readonly pydanticAiAvailable: boolean;
+  readonly dspyAvailable: boolean;
   readonly pythonPhase: 'idle' | 'booting' | 'ready' | 'failed';
   readonly pythonColdStartMs: number | undefined;
   readonly reviewing: boolean;
@@ -80,6 +82,10 @@ export async function createRagHost(
     models.routing.roles['rag.answer']?.providers.some((provider) =>
       models.routing.providers[provider]?.features.includes('tool-calling'),
     ) ?? false;
+  const dspyAvailable =
+    models.routing.roles['rag.answer']?.providers.some((provider) =>
+      models.routing.providers[provider]?.features.includes('streaming'),
+    ) ?? false;
   let pythonPhase: RagHost['pythonPhase'] = 'idle';
   let pythonColdStartMs: number | undefined;
   let generation = 0;
@@ -105,7 +111,7 @@ export async function createRagHost(
     await previous?.dispose();
   };
   const pythonAdapter = (
-    framework: 'langgraph' | 'pydantic-ai',
+    framework: 'langgraph' | 'pydantic-ai' | 'dspy',
   ): ReturnType<typeof createPyodideAdapter> =>
     createPyodideAdapter({
       framework,
@@ -114,7 +120,7 @@ export async function createRagHost(
       wheelsUrl: new URL('/python/wheels/', location.href).href,
       localWheels: pythonBuild.localWheels,
       onBoot(event) {
-        if (disposed || executor !== (framework === 'langgraph' ? 'python' : 'pydantic-ai')) return;
+        if (disposed || executor !== (framework === 'langgraph' ? 'python' : framework)) return;
         pythonPhase = event.phase;
         if (event.coldStartMs !== undefined) pythonColdStartMs = event.coldStartMs;
         if (event.phase === 'failed' && active !== review) void leavePython().catch(() => {});
@@ -123,7 +129,12 @@ export async function createRagHost(
     });
   const runtime = createRuntime({
     appId: 'rag-browser',
-    executors: [createLangGraphAdapter(), pythonAdapter('langgraph'), pythonAdapter('pydantic-ai')],
+    executors: [
+      createLangGraphAdapter(),
+      pythonAdapter('langgraph'),
+      pythonAdapter('pydantic-ai'),
+      pythonAdapter('dspy'),
+    ],
     outputSafety: ({ text }) => (text.includes('GALAXIE_BLOCK_DEMO') ? 'block' : 'allow'),
     ...(import.meta.env.DEV
       ? { developmentWarnings: (warning) => console.warn('[galaxie]', warning.code) }
@@ -153,13 +164,27 @@ export async function createRagHost(
     ],
     module: 'rag_pydantic_ai.agent',
   };
+  const dspyAgent = {
+    ...pythonAgent,
+    files: [
+      'rag_agent/__init__.py',
+      'rag_agent/citations.py',
+      'rag_agent/prompt.py',
+      'rag_agent/prompt.json',
+      'rag_dspy/__init__.py',
+      'rag_dspy/agent.py',
+    ],
+    module: 'rag_dspy.agent',
+  };
   const selectedPython = (): {
     definition: typeof pythonRagDefinition;
     agent: typeof pythonAgent;
   } =>
-    executor === 'pydantic-ai'
-      ? { definition: pydanticAiRagDefinition, agent: pydanticAiAgent }
-      : { definition: pythonRagDefinition, agent: pythonAgent };
+    executor === 'dspy'
+      ? { definition: dspyRagDefinition, agent: dspyAgent }
+      : executor === 'pydantic-ai'
+        ? { definition: pydanticAiRagDefinition, agent: pydanticAiAgent }
+        : { definition: pythonRagDefinition, agent: pythonAgent };
   const ui = reviewRegistry.bindings({ surfaces: ['rag-review'] });
   const readSavedReview = (): SavedReview | undefined => {
     const value = localStorage.getItem(reviewKey);
@@ -297,6 +322,7 @@ export async function createRagHost(
         return executor;
       },
       pydanticAiAvailable,
+      dspyAvailable,
       get pythonPhase() {
         return pythonPhase;
       },
@@ -346,7 +372,9 @@ export async function createRagHost(
         if (!saved) return;
         if (
           saved.executor !== 'javascript' &&
-          (!pythonBuild.available || (saved.executor === 'pydantic-ai' && !pydanticAiAvailable))
+          (!pythonBuild.available ||
+            (saved.executor === 'pydantic-ai' && !pydanticAiAvailable) ||
+            (saved.executor === 'dspy' && !dspyAvailable))
         ) {
           if (!(await openReviewStore(takeover))) return;
           failedReviewReference = saved;
@@ -398,6 +426,7 @@ export async function createRagHost(
         if (
           !pythonBuild.available ||
           (selected === 'pydantic-ai' && !pydanticAiAvailable) ||
+          (selected === 'dspy' && !dspyAvailable) ||
           pythonPhase === 'booting'
         )
           return;

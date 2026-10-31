@@ -1,13 +1,13 @@
 # @galaxie/adapter-pyodide
 
-An experimental executor adapter for trusted LangGraph Python graphs and pydantic-ai
-agents running in a dedicated Pyodide 314.0.7 module Worker. Agents use the Python `galaxie` proxies;
+An experimental executor adapter for trusted LangGraph Python graphs, pydantic-ai
+agents and DSPy programs running in a dedicated Pyodide 314.0.7 module Worker. Agents use the Python `galaxie` proxies;
 the existing JavaScript router and broker own routing, consent, labels, budgets,
 credentials, output checks and capability authorization.
 
 The host supplies `createPyodideAdapter({ createWorker, runtimeUrl, wheelsUrl,
 localWheels, onBoot?, framework? })`. The default framework is `langgraph`;
-`framework: 'pydantic-ai'` selects the separate pydantic-ai executor. `createWorker` returns a port with `postMessage(string)`,
+`framework: 'pydantic-ai'` or `framework: 'dspy'` selects its separate executor. `createWorker` returns a port with `postMessage(string)`,
 message and error listeners, and `terminate()`. A browser `Worker` satisfies that
 shape. Node hosts wrap `worker_threads.Worker`. Constructing the adapter fetches
 nothing and starts no Worker; `prepare` loads the source files and boots the interpreter.
@@ -15,7 +15,7 @@ nothing and starts no Worker; `prepare` loads the source files and boots the int
 The agent descriptor is `{ baseUrl, files, module, entry }`. Source paths are relative
 Python or JSON files, the module is a dotted Python import name, and the entry is a
 zero-argument function returning a LangGraph graph, or an `Agent`/`Executor` for
-the pydantic-ai framework. Sources and wheels are same-origin in
+the pydantic-ai framework, or a `dspy.Module`/`galaxie.dspy.Executor` for DSPy. Sources and wheels are same-origin in
 the browser and fetched with credentials omitted. On Node, the runtime directory may
 be local because native ESM cannot import an HTTP module; agent files and wheels may
 still be served from loopback. The host serves runtime assets together and supplies
@@ -227,7 +227,7 @@ tests cover all twelve cases, RAG and effect fixtures; exceptions decode as `rep
 strings and tuples as msgpack arrays, with strict equality otherwise.
 No real model or device measurements were added.
 
-The RAG example offers all three executors in its built mock mode. The two
+The RAG example offers all four executors in its built mock mode. The two
 LangGraph agents retain their shared review transcript and retrieval-subgraph paths.
 The pydantic-ai agent uses a capability-backed `search_docs` tool, then optionally
 raises `ApprovalRequired` from `review_passages` with trusted retrieved passages in
@@ -242,7 +242,82 @@ use scoped byte records, the saver's recovery store and fenced Web Lock ownershi
 The pydantic-ai choice requires an answer-role provider declaring `tool-calling`;
 the bundled WebLLM and Built-in AI descriptors lack it, so only mock mode currently
 offers that choice. See the [mock command and review steps](../../examples/rag-browser/README.md#passage-review-with-mock-models).
-A mock-only hands-on Chrome check of the RAG example (2026-10-31) covered review, reload restore, resume and Start over; real models remain unmeasured. No real-model result is claimed.
+A mock-only hands-on Chrome check of pydantic-ai in the RAG example (2026-10-31) covered review, reload restore, resume and Start over. A mock-only hands-on Chrome check of DSPy (2026-10-31) covered a cited answer, review with two kept passages, reload restore of the executor and pending review, resume and Start over. Real models remain unmeasured.
+
+## DSPy programs
+
+Select `framework: 'dspy'` and executor `dspy-python`, pinned to DSPy 3.4.1.
+The entry returns an async `dspy.Module` or `galaxie.dspy.Executor(module,
+input=..., output=..., adapter=..., stream_fields=...)`. By default, JSON input
+is passed as keyword arguments to `module.acall`, and prediction fields become
+JSON output. Bind predictors to `GalaxieLM(role)` and call capabilities through
+`galaxie.capabilities.call` or `galaxie.dspy.capability_tool`. The custom-engine
+LM uses the existing bridge v2 text/tool-call fields; JavaScript checks raw text
+and arguments before ChatAdapter, JSONAdapter or ReAct parses them.
+
+`streaming`, `interrupts`, `resume` and `checkpoints` are true; `subgraphs` is
+false. Nested modules have no checkpoint namespaces, interrupt propagation or
+nested stream paths: a pause unwinds the whole program. Sync entry points,
+`dspy.Parallel`, threaded `Evaluate`,
+optimizers, multimodal inputs, embeddings, service retrievers and provider-string
+LMs are unsupported. Offline-optimized program-state loading is untested.
+JSONAdapter works without streaming; provider `response_format`/native schema
+output is unsupported. The default ChatAdapter disables JSON fallback, since a
+fallback would change the replay call sequence. Parse failures end the run.
+
+An `Executor` with `stream_fields` always streams in the Worker, even if the host
+does not subscribe; its provider must declare `streaming`. Each declared field
+must identify exactly one predictor output annotated as plain `str`. Only checked
+text for those fields reaches `messages` as `{ field, text }`; markers, reasoning
+outside declared fields and tool data are omitted. Content-free `updates` mark
+each model call (`{ kind: 'model', index }`), tool call, pause and replay. Reset
+displayed answer text at each new model marker. Streaming ReActV2 requires
+`next_thought` annotated as `str`; its default annotation does not qualify. A
+field header indented on its line is not streamed, though final output still
+uses ChatAdapter's parsed value. JSONAdapter streaming fails `unsupported`:
+its `jiter` parser is absent from the Worker set.
+
+`request_interaction(request)` pauses from module or tool code. Resume reruns the
+program against a journal of completed model calls, capability results and
+interaction answers. It requires deterministic author code apart from those
+calls, including stable inputs and call order. Matching entries replay silently
+without routed calls or budget charges; divergence fails `unrecoverable` before
+later live calls. Use the same scoped byte-record port and recovery store as
+above for fresh-Worker restore, accepted-answer reconciliation and write-receipt
+replay. Without them, state is Worker-local. Journals must fit the 1 MiB bridge
+limit, including base64 envelopes, before a pause can publish. Completion stores
+a compact counter marker without input or journal. Work after the last committed
+pause can run again after Worker loss; broker writes need recovery and stable
+call positions. Other effects have no replay guarantee. Wrong executor, DSPy
+version, journal format or session identity is refused.
+
+Core's framework-neutral `registerRestoredData` callback on `RunRequest` and
+`ExecutorAgent.pending` re-registers restored JSON strings as private. The DSPy
+adapter passes stored input and journal results before restored interaction URL
+validation or any live outbound call; hosts constructing those contracts directly
+must supply the hook when restoring such data or restore fails closed. Core
+contains no framework-specific restore logic. This does not retrofit other
+executors' stored histories.
+
+DSPy ReAct turns ordinary exceptions from author tool code into observations
+containing a five-frame traceback, including file paths and source lines. The
+next routed model call carries that observation. Keep sensitive details out of
+author exceptions. Galaxie failures retain their fixed codes and end the run
+before another model call; they never travel as traceback observations. Disk and
+memory caches, history, traces and callbacks are disabled; non-galaxie predictor
+LMs and instance callbacks are refused.
+
+The Worker installs an explicit hash-pinned closure without dependency resolution.
+It omits `litellm`, `openai`, `gepa`, `tenacity`, `diskcache` and `cachetools`.
+CPython resolves a metadata-only workspace `litellm==1.106.2` stand-in with no
+importable module; accidental provider use fails closed. The existing cutoff and
+pins, other frameworks' third-party wheel sets, goldens and matrices stay unchanged.
+The [DSPy matrix](../../tests/conformance/compatibility-matrix-dspy.json) records
+native CPython, Node Pyodide and headless Chromium evidence. The RAG DSPy program
+chooses retrieval arguments from run input; with opt-in review it pauses before its
+first model request, then streams a `ChainOfThought` answer with the shared citation projection.
+It needs no model tool calling. Real-model format reliability, hands-on browser
+verification and device performance remain unmeasured.
 
 `linear` and `branching` also match the native Python stream events, mode order and
 paths on Node Pyodide and real Chromium. Both lanes prove checked deltas and final

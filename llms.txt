@@ -26,7 +26,7 @@
 
 - [Core README](packages/core/README.md): framework-neutral contracts and host runtime setup.
 - [LangGraph adapter README](packages/adapter-langgraph/README.md): a minimal graph and explicit config.
-- [Python adapter README](packages/adapter-pyodide/README.md): trusted LangGraph Python/pydantic-ai Workers, checked JSON bridge, durable interactions and JavaScript policy.
+- [Python adapter README](packages/adapter-pyodide/README.md): trusted LangGraph Python/pydantic-ai/DSPy Workers, checked bridge, durable interactions, deterministic DSPy replay and JavaScript policy.
 - [Models README](packages/models/README.md): provider subpaths and the deterministic mock.
 - [React README](packages/react/README.md): surfaces and separate host confirmations.
 - [IndexedDB README](packages/storage-indexeddb/README.md): scoped checkpoints, recovery and storage lifecycle.
@@ -44,7 +44,7 @@
 - [MCP tools AGENTS](packages/tools-mcp/AGENTS.md): metadata pins, broker dispatch and sanitized errors.
 - [ESLint plugin AGENTS](packages/eslint-plugin/AGENTS.md): scope analysis without runtime enforcement.
 
-- [Browser-built RAG example](examples/rag-browser/README.md): LangGraph.js, LangGraph Python and mock-only pydantic-ai, cited text and durable passage review, verified files, Orama Worker and unmeasured real-device paths.
+- [Browser-built RAG example](examples/rag-browser/README.md): four executors (LangGraph.js, LangGraph Python, mock-only pydantic-ai and DSPy), cited streams, durable passage review, verified files and Orama; DSPy real-model paths unverified.
 
 ## Verification
 

@@ -20,8 +20,14 @@ export interface AppProps {
   prepareModels(): Promise<RagHost>;
   disposeModels(): void;
 }
-function pythonBytes(framework: 'langgraph' | 'pydantic-ai'): string {
-  const meta = framework === 'langgraph' ? 'galaxie-python-bytes' : 'galaxie-pydantic-ai-bytes';
+const executorNames: Readonly<Record<RagExecutor, string>> = {
+  javascript: 'LangGraph.js',
+  python: 'LangGraph Python',
+  'pydantic-ai': 'pydantic-ai Python',
+  dspy: 'DSPy Python',
+};
+function pythonBytes(framework: 'langgraph' | 'pydantic-ai' | 'dspy'): string {
+  const meta = framework === 'langgraph' ? 'galaxie-python-bytes' : `galaxie-${framework}-bytes`;
   return Number(
     document.querySelector<HTMLMetaElement>(`meta[name="${meta}"]`)?.content ??
       pythonBuild.bytes[framework],
@@ -39,12 +45,6 @@ export function App({
   const [active, setActive] = useState<RagHost['instance']>();
   const [executor, setExecutor] = useState<RagExecutor>('javascript');
   const [answerExecutor, setAnswerExecutor] = useState<RagExecutor>('javascript');
-  const executorName = (choice: RagExecutor): string =>
-    choice === 'javascript'
-      ? 'LangGraph.js'
-      : choice === 'python'
-        ? 'LangGraph Python'
-        : 'pydantic-ai Python';
   const [pythonPhase, setPythonPhase] = useState<RagHost['pythonPhase']>('idle');
   const [bootSeconds, setBootSeconds] = useState(0);
   const javascriptOption = useRef<HTMLInputElement>(null);
@@ -261,7 +261,7 @@ export function App({
       <h1>Ask your documents</h1>
       <p>
         Build an index and answer questions in this browser.{' '}
-        {executor === 'javascript' ? 'JavaScript' : 'Python'} · {executorName(executor)}
+        {executor === 'javascript' ? 'JavaScript' : 'Python'} · {executorNames[executor]}
       </p>
       <section aria-labelledby="index-heading">
         <h2 id="index-heading">Index and models</h2>
@@ -339,6 +339,12 @@ export function App({
                 depends on this device.
               </p>
             )}
+            {host?.dspyAvailable && (
+              <p>
+                DSPy Python adds {pythonBytes('dspy')} bytes of download. Cold start depends on this
+                device.
+              </p>
+            )}
             {(!host || index.status !== 'ready') && (
               <p id="executor-reason">Prepare chat models first.</p>
             )}
@@ -392,12 +398,28 @@ export function App({
                   pydantic-ai Python
                 </label>
               )}
+              {host?.dspyAvailable && (
+                <label>
+                  <input
+                    type="radio"
+                    name="executor"
+                    value="dspy"
+                    checked={executor === 'dspy'}
+                    onChange={() => {
+                      requestedRun.current = undefined;
+                      setAnswer(undefined);
+                      void host.selectExecutor('dspy');
+                    }}
+                  />
+                  DSPy Python
+                </label>
+              )}
             </fieldset>
             <p role="status">
               {pythonPhase === 'booting'
-                ? `Preparing ${executorName(executor)}…`
+                ? `Preparing ${executorNames[executor]}…`
                 : pythonPhase === 'ready'
-                  ? `${executorName(executor)} ready`
+                  ? `${executorNames[executor]} ready`
                   : ''}
             </p>
             {pythonPhase === 'booting' && (
@@ -545,7 +567,7 @@ export function App({
         {answer && (
           <article>
             <h3 ref={answerHeading} tabIndex={-1}>
-              Answer · {executorName(answerExecutor)}
+              Answer · {executorNames[answerExecutor]}
             </h3>
             <p className="answer">{answer.answer}</p>
             {answer.citations.length === 0 && <p>No retrieved passage is cited for this answer.</p>}

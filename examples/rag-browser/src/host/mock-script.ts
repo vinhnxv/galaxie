@@ -53,15 +53,23 @@ function script(messages: BaseMessage[], tools: BindToolsInput[]): MockChatModel
   }
   const data = human.split('BEGIN_REFERENCE_DATA\n')[1]?.split('\nEND_REFERENCE_DATA')[0] ?? '[]';
   const passages = JSON.parse(data) as { text: string }[];
-  const text = human.startsWith('Question: Show an answer without citations.')
+  const dspy = human.startsWith('[[ ## question ## ]]');
+  const selected = dspy ? passages : passages.slice(0, 1);
+  const text = (
+    dspy
+      ? human.includes('Question: Show an answer without citations.')
+      : human.startsWith('Question: Show an answer without citations.')
+  )
     ? 'This mock answer has no citation.'
-    : passages[0]
-      ? `${passages[0].text} [1]`
+    : selected.length
+      ? selected.map((passage, index) => `${passage.text} [${index + 1}]`).join(' ')
       : 'No passages support an answer.';
   return new MockChatModel({
     [human]: {
       id: 'rag-mock-answer',
-      text,
+      text: dspy
+        ? `[[ ## reasoning ## ]]\nUse only the supplied references.\n[[ ## answer ## ]]\n${text}\n[[ ## completed ## ]]`
+        : text,
       usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
     },
   });
