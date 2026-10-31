@@ -1,0 +1,141 @@
+{
+  "predict": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "chain-of-thought": {
+    "replies": [
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "json-adapter": {
+    "replies": [
+      {
+        "text": "{\"answer\":\"Paris\"}"
+      }
+    ]
+  },
+  "react-one-tool": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "react-two-tools": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"Europe\"}\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "react-v2": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nUse the tool.\n[[ ## tool_calls ## ]]\n[{\"name\":\"lookup\",\"args\":{\"query\":\"France\"}}]\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## next_thought ## ]]\nUse the tool.\n[[ ## tool_calls ## ]]\n[{\"name\":\"submit\",\"args\":{\"answer\":\"Paris\"}}]\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "native-tool-calling": {
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "name": "lookup",
+            "id": "lookup-1",
+            "args": {
+              "query": "France"
+            },
+            "type": "tool_call"
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "name": "submit",
+            "id": "submit-1",
+            "args": {
+              "answer": "Paris"
+            },
+            "type": "tool_call"
+          }
+        ]
+      }
+    ]
+  },
+  "parse-failure": {
+    "replies": [
+      {
+        "text": "malformed reply"
+      }
+    ]
+  },
+  "capability-denial": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "outcome-unknown": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "reply-block": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nBLOCKED_TEXT\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "argument-block": {
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "name": "lookup",
+            "id": "lookup-1",
+            "args": {
+              "query": "BLOCKED_ARGUMENT"
+            },
+            "type": "tool_call"
+          }
+        ]
+      }
+    ]
+  },
+  "refused-lm": {
+    "replies": []
+  },
+  "abort": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nlate\n[[ ## completed ## ]]"
+      }
+    ]
+  }
+}

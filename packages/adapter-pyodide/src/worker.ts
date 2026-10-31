@@ -12,6 +12,7 @@ import {
   type RunPayload,
   success,
 } from './bridge.js';
+import { dspyDriver } from './dspy-driver.js';
 import { adapterFailure, failureCode } from './errors.js';
 import { pydanticAiDriver } from './pydantic-ai-driver.js';
 import { lockedWheels } from './runtime-files.js';
@@ -110,9 +111,11 @@ async function boot(input: BootPayload): Promise<number> {
     if (cache !== undefined) fs?.rmSync(cache, { recursive: true, force: true });
   }
   await py.runPythonAsync(
-    framework === 'pydantic-ai'
-      ? 'import pydantic_ai\nimport galaxie'
-      : 'import langgraph.graph\nimport langchain_core.messages\nimport galaxie\nimport ormsgpack',
+    framework === 'dspy'
+      ? 'import dspy\nimport galaxie'
+      : framework === 'pydantic-ai'
+        ? 'import pydantic_ai\nimport galaxie'
+        : 'import langgraph.graph\nimport langchain_core.messages\nimport galaxie\nimport ormsgpack',
   );
   py.FS.mkdirTree('/agent');
   for (const source of input.sources) {
@@ -155,9 +158,11 @@ async function boot(input: BootPayload): Promise<number> {
   py.globals['set']('_galaxie_entry', input.entry);
   py.globals['set']('_galaxie_durable', input.checkpoints === true);
   await py.runPythonAsync(
-    framework === 'pydantic-ai'
-      ? pydanticAiDriver
-      : `
+    framework === 'dspy'
+      ? dspyDriver
+      : framework === 'pydantic-ai'
+        ? pydanticAiDriver
+        : `
 import sys, json, asyncio, importlib
 from galaxie._bridge import install_transport, GalaxieError, notify_stream, receive_model_chunk
 from _galaxie_transport import request as _transport, notify as _notify

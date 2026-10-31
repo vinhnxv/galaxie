@@ -6,7 +6,8 @@
     "examples/rag-browser/agent_py",
     "tests/conformance/cases-python",
     "scripts",
-    "tests/conformance/cases-pydantic-ai"
+    "tests/conformance/cases-pydantic-ai",
+    "tests/conformance/cases-dspy"
   ],
   "venvPath": "python",
   "venv": ".venv",
@@ -19,6 +20,14 @@
   ],
   "exclude": ["**/build", "**/node_modules", "**/__pycache__", "**/.*"],
   "executionEnvironments": [
+    {
+      "root": "tests/conformance/cases-dspy",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
+    },
+    {
+      "root": "scripts/record-dspy-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
+    },
     {
       "root": "tests/conformance/cases-pydantic-ai",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai"]

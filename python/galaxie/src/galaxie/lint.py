@@ -14,6 +14,8 @@ _MODULES = (
     "google.genai", "google.generativeai", "ollama", "litellm", "langchain_openai",
     "langchain_anthropic", "langchain_google_genai", "langchain_ollama",
     "pydantic_ai.providers",
+    "dspy.clients.openai", "dspy.clients.databricks", "dspy.clients.lm_local",
+    "dspy.lm15.providers", "dspy.lm15.transports",
     *("pydantic_ai.models." + module for module in (
         "anthropic", "bedrock", "bedrock_mantle", "cerebras", "cohere", "crusoe",
         "function", "github_copilot", "google", "groq", "huggingface", "mcp_sampling",
@@ -41,6 +43,13 @@ def lint_source(source: str) -> None:
         tree = ast.parse(source)
     except SyntaxError:
         raise ValueError(_MESSAGE) from None
+    dspy_modules = {"dspy"}
+    dspy_constructors: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            dspy_modules.update(alias.asname or alias.name for alias in node.names if alias.name == "dspy")
+        if isinstance(node, ast.ImportFrom) and node.module == "dspy":
+            dspy_constructors.update(alias.asname or alias.name for alias in node.names if alias.name in {"LM", "Embedder"})
     for node in ast.walk(tree):
         if isinstance(node, ast.Import) and any(_forbidden(alias.name) for alias in node.names):
             raise ValueError(_MESSAGE)
@@ -50,6 +59,16 @@ def lint_source(source: str) -> None:
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and _PROVIDER.match(node.value):
             raise ValueError(_MESSAGE)
         if isinstance(node, ast.Call):
+            dspy_constructor = (
+                isinstance(node.func, ast.Name) and node.func.id in dspy_constructors
+            ) or (
+                isinstance(node.func, ast.Attribute) and node.func.attr in {"LM", "Embedder"}
+                and isinstance(node.func.value, ast.Name) and node.func.value.id in dspy_modules
+            )
+            if dspy_constructor:
+                model = next((keyword.value for keyword in node.keywords if keyword.arg == "model"), node.args[0] if node.args else None)
+                if isinstance(model, ast.Constant) and isinstance(model.value, str):
+                    raise ValueError(_MESSAGE)
             if (
                 isinstance(node.func, ast.Name) and node.func.id == "infer_model"
             ) or (

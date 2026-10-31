@@ -169,6 +169,7 @@ interface ActiveRun {
   readonly leases: Set<LeasedCall>;
   readonly checkpoints: Set<Promise<void>>;
   readonly streams: ExecutorEvent[];
+  modelCalls: number;
   wake(): void;
   cancelled: boolean;
   cancellation?: Promise<void>;
@@ -281,16 +282,21 @@ export function createPyodideAdapter(
   options: PyodideAdapterOptions,
 ): ExecutorAdapter<PyodideAgent, PyodideServices> {
   const framework = options?.framework ?? 'langgraph';
-  const executorId = framework === 'pydantic-ai' ? 'pydantic-ai-python' : 'langgraph-python';
+  const executorId =
+    framework === 'dspy'
+      ? 'dspy-python'
+      : framework === 'pydantic-ai'
+        ? 'pydantic-ai-python'
+        : 'langgraph-python';
   const langgraph = framework === 'langgraph';
   return {
     id: executorId,
     version: '0.0.0',
     features: {
-      interrupts: true,
-      resume: true,
-      checkpoints: true,
-      streaming: true,
+      interrupts: framework !== 'dspy',
+      resume: framework !== 'dspy',
+      checkpoints: framework !== 'dspy',
+      streaming: framework !== 'dspy',
       subgraphs: langgraph,
     },
     async prepare(agent, services, preparation) {
@@ -301,7 +307,7 @@ export function createPyodideAdapter(
         typeof options?.createWorker !== 'function' ||
         typeof options.runtimeUrl !== 'string' ||
         !Array.isArray(options.localWheels) ||
-        !['langgraph', 'pydantic-ai'].includes(framework)
+        !['langgraph', 'pydantic-ai', 'dspy'].includes(framework)
       )
         throw adapterFailure('invalid');
       const base = sourceBase(agent, options);
@@ -413,6 +419,8 @@ export function createPyodideAdapter(
                 ...(input.effectScope === undefined ? {} : { effectScope: input.effectScope }),
               });
             } else {
+              if (framework === 'dspy' && run.modelCalls++ >= run.request.limits.steps)
+                throw adapterFailure('budget_exceeded');
               const input = message.payload as ModelPayload;
               const offered = (input.options.tools?.length ?? 0) > 0;
               const requires = [
@@ -689,6 +697,7 @@ export function createPyodideAdapter(
                   leases: new Set(),
                   checkpoints: new Set(),
                   streams: [],
+                  modelCalls: 0,
                   wake: () => wake(),
                   cancelled: false,
                 };

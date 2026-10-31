@@ -1,0 +1,72 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (Union[str, NoneType]): \n2. `history` (History):\nYour output fields are:\n1. `next_thought` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## history ## ]]\n{history}\n\n[[ ## next_thought ## ]]\n{next_thought}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.\n        You are an Agent. Use the supplied tools to produce `answer` from `question`.\n        Call tools when more information is needed.\n        When the final answer is ready, call `submit` with `answer`.\n        The available tools are: `lookup`, `submit`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\nRespond with the corresponding output fields, starting with the field `[[ ## next_thought ## ]]` (must be formatted as a valid Python str), and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup",
+            "description": "Look up the fact.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": ["query"]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "submit",
+            "description": "Submit the final outputs for the task.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "answer": {
+                  "type": "string"
+                }
+              },
+              "required": ["answer"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "name": "lookup",
+          "id": "lookup-1",
+          "args": {
+            "query": "BLOCKED_ARGUMENT"
+          },
+          "type": "tool_call"
+        }
+      ]
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "denied",
+    "message": "Policy denied the request."
+  }
+}

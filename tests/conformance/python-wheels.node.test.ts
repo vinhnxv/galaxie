@@ -64,7 +64,9 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     expect(wheel.frameworks, wheel.name).toBeDefined();
     expect(wheel.frameworks?.length, wheel.name).toBeGreaterThan(0);
     expect(
-      wheel.frameworks?.every((framework) => ['langgraph', 'pydantic-ai'].includes(framework)),
+      wheel.frameworks?.every((framework) =>
+        ['langgraph', 'pydantic-ai', 'dspy'].includes(framework),
+      ),
     ).toBe(true);
   }
   const langgraph = inventory.filter((wheel) => wheel.frameworks?.includes('langgraph'));
@@ -79,13 +81,36 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     'af0f855f9a3ad22e27237d198f94a690d7e05ca54ebeb9ae6b8b2de165582cd1',
   );
   const pydantic = inventory.filter((wheel) => wheel.frameworks?.includes('pydantic-ai'));
+  expect(pydantic.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(5_208_632);
+  expect(
+    createHash('sha256')
+      .update(
+        pydantic
+          .map(
+            (wheel) =>
+              `${wheel.name} ${wheel.version} ${wheel.file} ${wheel.bytes} ${wheel.sha256} ${wheel.url}`,
+          )
+          .join('\n'),
+      )
+      .digest('hex'),
+  ).toBe('e576cc156d67f2e33e275c6eb8c750cc32c8449264f7a11a07602adae3b0ef16');
+  const dspy = inventory.filter((wheel) => wheel.frameworks?.includes('dspy'));
+  expect(dspy.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(4_431_463);
+  expect(dspy.find((wheel) => wheel.name === 'dspy')?.version).toBe('3.4.1');
+  expect(
+    dspy.some((wheel) =>
+      ['openai', 'litellm', 'gepa', 'tenacity', 'diskcache', 'cachetools', 'jiter'].includes(
+        wheel.name,
+      ),
+    ),
+  ).toBe(false);
   expect(pydantic.find((wheel) => wheel.name === 'pydantic-ai-slim')?.version).toBe('2.60.0');
   expect(pydantic.find((wheel) => wheel.name === 'pydantic-graph')?.version).toBe('2.60.0');
   expect(inventory.some((wheel) => ['openai', 'jiter', 'pydantic-ai'].includes(wheel.name))).toBe(
     false,
   );
   const native = await readFile(new URL('../../python/uv.lock', import.meta.url), 'utf8');
-  for (const wheel of pydantic) {
+  for (const wheel of [...pydantic, ...dspy]) {
     const block = native
       .split('[[package]]')
       .find((item) => item.startsWith(`\nname = "${wheel.name}"\n`));

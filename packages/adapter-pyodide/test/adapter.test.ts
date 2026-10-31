@@ -73,7 +73,7 @@ const preparation = {
 };
 function setup(
   workers: FixtureWorker[],
-  framework?: 'pydantic-ai',
+  framework?: 'pydantic-ai' | 'dspy',
 ): ReturnType<typeof createPyodideAdapter> {
   return createPyodideAdapter({
     ...(framework === undefined ? {} : { framework }),
@@ -188,6 +188,15 @@ test('framework selection declares only the implemented features and selects the
   vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
   const workers: FixtureWorker[] = [];
   const adapter = setup(workers, 'pydantic-ai');
+  const dspy = setup([], 'dspy');
+  expect(dspy.id).toBe('dspy-python');
+  expect(dspy.features).toEqual({
+    streaming: false,
+    interrupts: false,
+    resume: false,
+    checkpoints: false,
+    subgraphs: false,
+  });
   expect(adapter.id).toBe('pydantic-ai-python');
   expect(adapter.features).toEqual({
     streaming: true,
@@ -209,6 +218,48 @@ test('framework selection declares only the implemented features and selects the
     preparation,
   );
   expect(workers[0]?.sent[0]).toMatchObject({ op: 'boot', payload: { framework: 'pydantic-ai' } });
+  await executor.dispose();
+});
+
+test('DSPy model steps stop in JavaScript before another lease or provider call', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const provider = model();
+  const executor = await setup(workers, 'dspy').prepare(
+    descriptor,
+    { chatModels: { model: provider } },
+    preparation,
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('The fixture Worker is missing.');
+  let running: BridgeMessage | undefined;
+  let ordinal = 0;
+  const dispatch = (): void => {
+    if (!running) throw new Error('The fixture run is missing.');
+    worker.emit({
+      v: BRIDGE_VERSION,
+      kind: 'request',
+      op: 'model',
+      id: `${running.id}/${++ordinal}`,
+      payload: { role: 'answer', messages: [{ role: 'user', content: 'question' }], options: {} },
+    });
+  };
+  worker.handle = (message) => {
+    if (message.kind === 'request' && message.op === 'run') {
+      running = message;
+      dispatch();
+    } else if (message.kind === 'response' && message.op === 'model' && running) {
+      if (!message.ok) worker.emit(failure(running, message.error.code, 'result'));
+      else if (ordinal === 1) dispatch();
+      else worker.emit(success(running, { output: 'unexpected second call' }, 'result'));
+    }
+  };
+  const run = request();
+  expect(await collect(executor.run({ ...run.request, limits: { steps: 1 } }))).toMatchObject([
+    { type: 'error', error: { code: 'budget_exceeded' } },
+  ]);
+  expect(run.request.models.begin).toHaveBeenCalledTimes(1);
+  expect(provider.invoke).toHaveBeenCalledTimes(1);
   await executor.dispose();
 });
 

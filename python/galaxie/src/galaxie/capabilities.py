@@ -1,10 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 # SPDX-License-Identifier: AGPL-3.0-only
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 from typing import Any
 
 from ._bridge import GalaxieError, request
+
+# A framework face may observe failed calls so author code cannot swallow a terminal code.
+failures: ContextVar[Callable[[str], None] | None] = ContextVar('galaxie_capability_failures', default=None)
 
 
 async def call(
@@ -29,4 +33,10 @@ async def call(
             if not isinstance(scope, str):
                 raise GalaxieError("invalid")
             payload["effectScope"] = scope
-    return await request("capability", payload)
+    try:
+        return await request("capability", payload)
+    except GalaxieError as error:
+        observer = failures.get()
+        if observer is not None:
+            observer(error.code)
+        raise

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export type PythonFramework = 'langgraph' | 'pydantic-ai';
+export type PythonFramework = 'langgraph' | 'pydantic-ai' | 'dspy';
 
 export interface LockedWheel {
   readonly name: string;
@@ -22,7 +22,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'annotated_types-0.8.0-py3-none-any.whl',
     bytes: 13427,
     sha256: 'f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0',
-    frameworks: ['langgraph', 'pydantic-ai'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
   },
   {
     name: 'anyio',
@@ -31,7 +31,16 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'anyio-4.15.1-py3-none-any.whl',
     bytes: 132079,
     sha256: '6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101',
-    frameworks: ['langgraph', 'pydantic-ai'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+  },
+  {
+    name: 'attrs',
+    version: '26.1.0',
+    url: 'https://files.pythonhosted.org/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl',
+    file: 'attrs-26.1.0-py3-none-any.whl',
+    bytes: 67548,
+    sha256: 'c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309',
+    frameworks: ['dspy'],
   },
   {
     name: 'certifi',
@@ -40,7 +49,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'certifi-2026.10.23-py3-none-any.whl',
     bytes: 135082,
     sha256: 'e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'dspy'],
   },
   {
     name: 'cffi',
@@ -58,7 +67,16 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'charset_normalizer-3.5.2-py3-none-any.whl',
     bytes: 68872,
     sha256: 'b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'dspy'],
+  },
+  {
+    name: 'cloudpickle',
+    version: '3.1.2',
+    url: 'https://files.pythonhosted.org/packages/88/39/799be3f2f0f38cc727ee3b4f1445fe6d5e4133064ec2e4115069418a5bb6/cloudpickle-3.1.2-py3-none-any.whl',
+    file: 'cloudpickle-3.1.2-py3-none-any.whl',
+    bytes: 22228,
+    sha256: '9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a',
+    frameworks: ['dspy'],
   },
   {
     name: 'distro',
@@ -68,6 +86,15 @@ export const lockedWheels: readonly LockedWheel[] = [
     bytes: 20277,
     sha256: 'b18cf6e1488fabd5e83f00b77549a5f4d5dde566dbe88fc2da212747ff99f920',
     frameworks: ['langgraph'],
+  },
+  {
+    name: 'dspy',
+    version: '3.4.1',
+    url: 'https://files.pythonhosted.org/packages/ad/2f/656f16206c9ba4e359b639e2605cf196a4e5c678c6d9aed0fae537701ec2/dspy-3.4.1-py3-none-any.whl',
+    file: 'dspy-3.4.1-py3-none-any.whl',
+    bytes: 1027332,
+    sha256: 'afda9e7f8b3d46be0829af19ac1153a6feaa6db5923f2b1011eef547fb15ce2d',
+    frameworks: ['dspy'],
   },
   {
     name: 'genai-prices',
@@ -121,7 +148,16 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'idna-3.20-py3-none-any.whl',
     bytes: 69583,
     sha256: 'ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c',
-    frameworks: ['langgraph', 'pydantic-ai'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+  },
+  {
+    name: 'json-repair',
+    version: '0.64.2',
+    url: 'https://files.pythonhosted.org/packages/9a/79/91b83df91d03b9647ee759f286900957f0d113f49a606e28c8a43d39365b/json_repair-0.64.2-py3-none-any.whl',
+    file: 'json_repair-0.64.2-py3-none-any.whl',
+    bytes: 52688,
+    sha256: '1dec7868c05abff0c52e91dc896e01f28fda6ba1c9f2a9ede18ab520dde637e1',
+    frameworks: ['dspy'],
   },
   {
     name: 'jsonpatch',
@@ -140,6 +176,24 @@ export const lockedWheels: readonly LockedWheel[] = [
     bytes: 9047,
     sha256: '136e2e3273fd82a1502274f56ec172f331b6a1703d86a1824d503af4d9a96142',
     frameworks: ['langgraph'],
+  },
+  {
+    name: 'jsonschema',
+    version: '4.26.0',
+    url: 'https://files.pythonhosted.org/packages/69/90/f63fb5873511e014207a475e2bb4e8b2e570d655b00ac19a9a0ca0a385ee/jsonschema-4.26.0-py3-none-any.whl',
+    file: 'jsonschema-4.26.0-py3-none-any.whl',
+    bytes: 90630,
+    sha256: 'd489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce',
+    frameworks: ['dspy'],
+  },
+  {
+    name: 'jsonschema-specifications',
+    version: '2025.9.1',
+    url: 'https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl',
+    file: 'jsonschema_specifications-2025.9.1-py3-none-any.whl',
+    bytes: 18437,
+    sha256: '98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe',
+    frameworks: ['dspy'],
   },
   {
     name: 'langchain-core',
@@ -238,7 +292,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'orjson-3.11.8-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
     bytes: 151833,
     sha256: '1dfad46c65f40626eee81b31e1808fa5c48bed1a604f9babe81688381b40fc43',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'dspy'],
   },
   {
     name: 'packaging',
@@ -265,7 +319,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'pydantic-2.12.5-py3-none-any.whl',
     bytes: 463578,
     sha256: '04854875001e07a8a74d87b7c80296cba168773d8c9804e232d695f82484d7d7',
-    frameworks: ['langgraph', 'pydantic-ai'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
   },
   {
     name: 'pydantic-ai-slim',
@@ -283,7 +337,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'pydantic_core-2.41.5-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
     bytes: 1310164,
     sha256: '54703fa42a0d4d574283cfb8f08050ba7820c9a42b0a21bc1286407d9a9e54da',
-    frameworks: ['langgraph', 'pydantic-ai'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
   },
   {
     name: 'pydantic-graph',
@@ -301,7 +355,25 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'pyyaml-6.0.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
     bytes: 112901,
     sha256: 'a05d2a48c13ed72a8c60c73b30b753a25c3a591bb66c15428b7e95e69a9e806f',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'dspy'],
+  },
+  {
+    name: 'referencing',
+    version: '0.37.0',
+    url: 'https://files.pythonhosted.org/packages/2c/58/ca301544e1fa93ed4f80d724bf5b194f6e4b945841c5bfd555878eea9fcb/referencing-0.37.0-py3-none-any.whl',
+    file: 'referencing-0.37.0-py3-none-any.whl',
+    bytes: 26766,
+    sha256: '381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231',
+    frameworks: ['dspy'],
+  },
+  {
+    name: 'regex',
+    version: '2026.3.32',
+    url: 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/regex-2026.3.32-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
+    file: 'regex-2026.3.32-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
+    bytes: 203281,
+    sha256: '872e5bbab799991b2c0570c30e20f30404d7b0fd979dadd4f161f91645a0c1ac',
+    frameworks: ['dspy'],
   },
   {
     name: 'requests',
@@ -310,7 +382,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'requests-2.34.2-py3-none-any.whl',
     bytes: 73075,
     sha256: '2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'dspy'],
   },
   {
     name: 'requests-toolbelt',
@@ -320,6 +392,15 @@ export const lockedWheels: readonly LockedWheel[] = [
     bytes: 54481,
     sha256: 'cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06',
     frameworks: ['langgraph'],
+  },
+  {
+    name: 'rpds-py',
+    version: '0.30.0',
+    url: 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/rpds_py-0.30.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
+    file: 'rpds_py-0.30.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
+    bytes: 115722,
+    sha256: '9997dcfaee4465d4e877397c0f95fb9ec1dddb0e9da6dac94e96ff9621cdcd05',
+    frameworks: ['dspy'],
   },
   {
     name: 'sniffio',
@@ -340,13 +421,22 @@ export const lockedWheels: readonly LockedWheel[] = [
     frameworks: ['langgraph'],
   },
   {
+    name: 'tqdm',
+    version: '4.70.1',
+    url: 'https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl',
+    file: 'tqdm-4.70.1-py3-none-any.whl',
+    bytes: 80199,
+    sha256: 'c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73',
+    frameworks: ['dspy'],
+  },
+  {
     name: 'typing-extensions',
     version: '4.16.0',
     url: 'https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl',
     file: 'typing_extensions-4.16.0-py3-none-any.whl',
     bytes: 45571,
     sha256: '481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8',
-    frameworks: ['langgraph', 'pydantic-ai'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
   },
   {
     name: 'typing-inspection',
@@ -355,7 +445,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'typing_inspection-0.4.4-py3-none-any.whl',
     bytes: 14750,
     sha256: '65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147',
-    frameworks: ['langgraph', 'pydantic-ai'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
   },
   {
     name: 'urllib3',
@@ -364,7 +454,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'urllib3-2.8.0-py3-none-any.whl',
     bytes: 135717,
     sha256: '0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'dspy'],
   },
   {
     name: 'uuid-utils',
