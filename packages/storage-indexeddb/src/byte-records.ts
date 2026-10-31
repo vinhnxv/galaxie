@@ -17,7 +17,13 @@ export interface ByteWrite {
   readonly interruptIds: readonly string[];
 }
 type Location = { readonly sessionId: string; readonly namespace: string };
-export type ByteCheckpointRequest =
+export type ByteExecutor = 'langgraph-python' | 'pydantic-ai-python';
+
+export function isByteExecutor(value: unknown): value is ByteExecutor {
+  return value === 'langgraph-python' || value === 'pydantic-ai-python';
+}
+
+export type ByteCheckpointRequest = { readonly executor: ByteExecutor } & (
   | { readonly op: 'delete'; readonly sessionId: string }
   | (Location & { readonly op: 'get'; readonly id?: string })
   | {
@@ -42,7 +48,8 @@ export type ByteCheckpointRequest =
       readonly taskId: string;
       readonly taskPath: string;
       readonly writes: readonly ByteWrite[];
-    });
+    })
+);
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -69,14 +76,19 @@ function bytes(value: unknown): Envelope {
     throw new StorageError('invalid');
   return { v: 1, type: value['type'], bytes: value['bytes'].slice() };
 }
-export function parseByteRequest(value: unknown): ByteCheckpointRequest {
-  if (!object(value)) throw new StorageError('invalid');
+export function parseByteRequest(request: unknown): ByteCheckpointRequest {
+  if (!object(request)) throw new StorageError('invalid');
+  // Untagged requests retain the original LangGraph Python port contract.
+  const executor = 'executor' in request ? request['executor'] : 'langgraph-python';
+  if (!isByteExecutor(executor)) throw new StorageError('invalid');
+  const value = { ...request };
+  delete value['executor'];
   const op = value['op'];
   const sessionId = value['sessionId'];
   validateKey(sessionId);
   if (op === 'delete') {
     fields(value, ['op', 'sessionId']);
-    return { op, sessionId };
+    return { op, sessionId, executor };
   }
   const namespace = value['namespace'];
   if (op === 'list') {
@@ -93,6 +105,7 @@ export function parseByteRequest(value: unknown): ByteCheckpointRequest {
       throw new StorageError('invalid');
     return {
       op,
+      executor,
       sessionId,
       ...(namespace === undefined ? {} : { namespace }),
       ...(value['id'] === undefined ? {} : { id: value['id'] as string }),
@@ -101,7 +114,7 @@ export function parseByteRequest(value: unknown): ByteCheckpointRequest {
     };
   }
   validateKey(namespace, true);
-  const location = { sessionId, namespace };
+  const location = { sessionId, namespace, executor };
   if (op === 'get') {
     fields(value, ['op', 'sessionId', 'namespace'], ['id']);
     if (value['id'] !== undefined) validateKey(value['id']);

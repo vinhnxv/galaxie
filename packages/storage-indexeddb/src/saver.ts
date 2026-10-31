@@ -21,7 +21,12 @@ import {
   WRITES_IDX_MAP,
   writesSortKey,
 } from '@langchain/langgraph-checkpoint';
-import { type ByteCheckpointPort, parseByteRequest } from './byte-records.js';
+import {
+  type ByteCheckpointPort,
+  type ByteExecutor,
+  isByteExecutor,
+  parseByteRequest,
+} from './byte-records.js';
 import { decode, type Envelope, encode } from './envelope.js';
 import { StorageError, type StorageErrorCode } from './errors.js';
 import { Fencing, generation } from './fencing.js';
@@ -69,7 +74,7 @@ export interface IndexedDBSaverOptions {
 }
 
 interface CheckpointRecord {
-  readonly executor?: 'langgraph-python';
+  readonly executor?: ByteExecutor;
   readonly timestamp?: string;
   readonly v: 1;
   readonly key: CheckpointKey;
@@ -84,7 +89,7 @@ interface CheckpointRecord {
 }
 
 interface WriteRecord {
-  readonly executor?: 'langgraph-python';
+  readonly executor?: ByteExecutor;
   readonly interruptIds?: readonly string[];
   readonly v: 1;
   readonly key: [...CheckpointKey, string, number];
@@ -128,7 +133,7 @@ function readCheckpoint(value: unknown): CheckpointRecord {
     !positive(value['threadOrder']) ||
     !positive(value['namespaceOrder']) ||
     ('executor' in value &&
-      (value['executor'] !== 'langgraph-python' || exportTimestamp(value['timestamp']) === null))
+      (!isByteExecutor(value['executor']) || exportTimestamp(value['timestamp']) === null))
   )
     throw new StorageError('corrupt');
   return value as unknown as CheckpointRecord;
@@ -149,7 +154,7 @@ function readWrite(value: unknown): WriteRecord {
     !positive(value['order']) ||
     !('value' in value) ||
     ('executor' in value &&
-      (value['executor'] !== 'langgraph-python' ||
+      (!isByteExecutor(value['executor']) ||
         !Array.isArray(value['interruptIds']) ||
         !value['interruptIds'].every((id: unknown) => typeof id === 'string' && id.length > 0)))
   )
@@ -430,6 +435,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     checkpoint: Envelope,
     metadata: Envelope,
     timestamp?: string,
+    executor: ByteExecutor = 'langgraph-python',
   ): Promise<void> {
     const key = this.#key(thread, namespace, id);
     await this.#fencing.write(['checkpoints', 'meta'], async (tx) => {
@@ -470,7 +476,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         parentId,
         threadOrder,
         namespaceOrder,
-        ...(timestamp === undefined ? {} : { executor: 'langgraph-python' as const, timestamp }),
+        ...(timestamp === undefined ? {} : { executor, timestamp }),
       };
       await requestResult(tx.objectStore('checkpoints').put(row));
     });
@@ -514,7 +520,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
     }[],
     taskId: string,
     taskPath: string,
-    python = false,
+    executor?: ByteExecutor,
   ): Promise<void> {
     const checkpoint = this.#key(thread, namespace, id);
     await this.#fencing.write(['writes', 'meta'], async (tx) => {
@@ -537,9 +543,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           value: write.value,
           taskPath,
           order: previous?.order ?? ++order,
-          ...(python
-            ? { executor: 'langgraph-python' as const, interruptIds: write.interruptIds ?? [] }
-            : {}),
+          ...(executor !== undefined ? { executor, interruptIds: write.interruptIds ?? [] } : {}),
         };
         await requestResult(store.put(row));
       }
@@ -562,6 +566,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           input.checkpoint,
           input.metadata,
           input.timestamp,
+          input.executor,
         );
         return null;
       }
@@ -573,7 +578,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           input.writes,
           input.taskId,
           input.taskPath,
-          true,
+          input.executor,
         );
         return null;
       }
@@ -594,7 +599,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           else {
             const request = checkpoints.openCursor(range, 'prev');
             let cursor = await requestResult(request);
-            while (cursor && readCheckpoint(cursor.value).executor !== 'langgraph-python') {
+            while (cursor && readCheckpoint(cursor.value).executor !== input.executor) {
               cursor.continue();
               cursor = await requestResult(request);
             }
@@ -624,7 +629,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         const pending = (rows: unknown[]): unknown[] =>
           rows
             .map(readWrite)
-            .filter((row) => row.executor === 'langgraph-python')
+            .filter((row) => row.executor === input.executor)
             .sort(compareWrites)
             .map((row) => ({
               taskId: row.key[5],
@@ -637,7 +642,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           .map(readCheckpoint)
           .filter(
             (row) =>
-              row.executor === 'langgraph-python' &&
+              row.executor === input.executor &&
               (input.id === undefined || row.key[4] === input.id) &&
               (input.op !== 'list' || input.before === undefined || row.key[4] < input.before),
           )
@@ -716,7 +721,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
         let timestamp: string | null = null;
         let channelValues = exportValue(unavailableValue);
         try {
-          if (row.executor === 'langgraph-python') {
+          if (isByteExecutor(row.executor)) {
             timestamp = exportTimestamp(row.timestamp);
             if (personalContent)
               channelValues = exportValue({
@@ -742,16 +747,15 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
           if (!personalContent && write.channel !== INTERRUPT) continue;
           let value: unknown;
           try {
-            value =
-              write.executor === 'langgraph-python'
-                ? { type: write.value.type, bytes: write.value.bytes }
-                : await decode(this.serde, write.value);
+            value = isByteExecutor(write.executor)
+              ? { type: write.value.type, bytes: write.value.bytes }
+              : await decode(this.serde, write.value);
           } catch {
             unrecoverable = true;
             value = unavailableValue;
           }
           if (write.channel === INTERRUPT && latest.get(row.key[3]) === row.key[4]) {
-            if (write.executor === 'langgraph-python')
+            if (isByteExecutor(write.executor))
               for (const id of write.interruptIds ?? []) pending.add(id);
             else
               for (const interrupt of Array.isArray(value) ? value : [value])
@@ -768,6 +772,7 @@ export class IndexedDBSaver extends BaseCheckpointSaver {
               parentId: row.parentId,
               namespace: row.key[3],
               timestamp,
+              ...(row.executor === undefined ? {} : { executor: row.executor }),
               channelValues,
               pendingWrites: Object.freeze(pendingWrites),
             }),

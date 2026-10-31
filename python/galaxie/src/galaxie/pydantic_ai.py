@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import re
+from copy import deepcopy
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -15,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, RunContext, Tool, capture_run_messages
+from pydantic_ai import Agent, AgentRunResult, Conversation, ConversationTypeAdapter, DeferredToolRequests, DeferredToolResults, RunContext, Tool, capture_run_messages
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (
@@ -369,6 +370,7 @@ class _Conversation:
     position: int = 0
     pauses: int = 0
     pending: _Pause | None = None
+    conversation: Conversation | None = None
 
 
 class Executor:
@@ -392,9 +394,80 @@ class Executor:
         agent.instrument = False
 
     def pending(self, conversation_id: str) -> dict[str, Any] | None:
-        """Read the one pending interaction while this executor remains in memory."""
+        """Read the one pending interaction, including a restored conversation."""
         state = self._conversations.get(conversation_id)
         return _json(state.pending.interaction) if state and state.pending else None
+
+    def _snapshot(self, conversation_id: str, session: str | None = None) -> tuple[bytes, bytes]:
+        state = self._conversations[conversation_id]
+        if state.conversation is None:
+            raise GalaxieError('unrecoverable')
+        pause = state.pending
+        try:
+            return ConversationTypeAdapter.dump_json(state.conversation), json.dumps({
+                'v': 1, 'position': state.position, 'pauses': state.pauses,
+                'pending': {'position': pause.position, 'interaction': pause.interaction} if pause else None,
+                **({'session': session} if session is not None else {}),
+            }, allow_nan=False, ensure_ascii=False).encode()
+        except Exception:
+            raise GalaxieError('unsupported') from None
+
+    def _restore(self, checkpoint: bytes, metadata: bytes, session: str | None = None) -> str:
+        """Restore untrusted snapshot bytes; a bound session must match the stored one."""
+        try:
+            raw = json.loads(checkpoint)
+            if type(raw) is not dict or set(raw) != {'messages', 'usage', 'conversation_id', 'deferred_tool_requests'}:
+                raise ValueError()
+            conversation = ConversationTypeAdapter.validate_json(checkpoint)
+            identifier = conversation.conversation_id
+            meta = json.loads(metadata)
+            if (
+                not isinstance(identifier, str) or not identifier
+                or type(meta) is not dict
+                or set(meta) != {'v', 'position', 'pauses', 'pending', *(('session',) if session is not None else ())}
+                or (session is not None and meta['session'] != session)
+                or type(meta['v']) is not int or meta['v'] != 1
+                or any(type(meta[key]) is not int or meta[key] < 0 for key in ('position', 'pauses'))
+            ):
+                raise ValueError()
+            state = _Conversation(position=meta['position'], pauses=meta['pauses'], conversation=conversation)
+            pause = meta['pending']
+            requests = conversation.deferred_tool_requests
+            if pause is None:
+                if requests is not None:
+                    raise ValueError()
+            else:
+                if (
+                    type(pause) is not dict or set(pause) != {'position', 'interaction'}
+                    or type(pause['position']) is not int or pause['position'] < 0
+                    or pause['position'] + len(conversation.messages) != state.position
+                    or state.pauses < 1 or requests is None or not (requests.calls or requests.approvals)
+                    or type(pause['interaction']) is not dict or set(pause['interaction']) != {'id', 'value'}
+                    or pause['interaction']['id'] != hashlib.sha256(json.dumps([identifier, state.pauses - 1]).encode()).hexdigest()
+                ):
+                    raise ValueError()
+                value = _interaction(pause['interaction']['value'])
+                # Stored props must be what this agent's interaction factory derives from the requests.
+                if self.interaction is None or _interaction(self.interaction(requests)) != value:
+                    raise ValueError()
+                calls = requests.calls + requests.approvals
+                ids = [call.tool_call_id for call in calls]
+                if (
+                    len(set(ids)) != len(ids) or any(not 0 < len(call_id) <= 128 for call_id in ids)
+                    or not set(requests.metadata) <= set(ids)
+                ):
+                    raise ValueError()
+                responses = [message for message in conversation.messages if isinstance(message, ModelResponse)]
+                if not responses:
+                    raise ValueError()
+                parts = [part for part in responses[-1].parts if isinstance(part, ToolCallPart)]
+                if any(call not in parts for call in calls):
+                    raise ValueError()
+                state.pending = _Pause(pause['position'], conversation.messages, requests, pause['interaction'])
+            self._conversations[identifier] = state
+            return identifier
+        except Exception:
+            raise GalaxieError('unrecoverable') from None
 
     def _results(self, requests: DeferredToolRequests, action: str, payload: Any) -> DeferredToolResults:
         approvals = {call.tool_call_id for call in requests.approvals}
@@ -472,6 +545,9 @@ class Executor:
                 raise GalaxieError('invalid')
             options['deferred_tool_results'] = self._results(pause.requests, resume['action'], resume['payload'])
             options['message_history'] = pause.messages
+            if state.conversation is not None:
+                options['usage'] = deepcopy(state.conversation.usage)
+                options['usage_limits'] = UsageLimits(request_limit=state.conversation.usage.requests + steps)
             position = pause.position
             prompt = None
         elif self.prompt is None:
@@ -497,6 +573,7 @@ class Executor:
             finally:
                 state.position = position + len(messages)
                 _positions.reset(token)
+        state.conversation = result.conversation
         if isinstance(result.output, DeferredToolRequests):
             try:
                 if self.interaction is None:

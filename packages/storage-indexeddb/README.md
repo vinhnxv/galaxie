@@ -57,10 +57,14 @@ The saver implements `BaseCheckpointSaver`: `getTuple`, `list`, `put`, `putWrite
 ## Python byte checkpoints
 
 For the Python adapter, pass `services: { chatModels, checkpoints: saver.byteRecords }`
-and `recovery: saver.recovery`. Compile the Python graph with
-`galaxie.langgraph.checkpointer()`. The Worker serializes checkpoints and pending
+and `recovery: saver.recovery`. Compile a LangGraph Python graph with
+`galaxie.langgraph.checkpointer()`; the pydantic-ai driver instead snapshots its
+conversation at pauses and completion. The Worker serializes checkpoints and pending
 writes; JavaScript stores their opaque bytes in the existing version-1 envelopes
-and key layout, marked `executor: 'langgraph-python'`. The JavaScript saver's
+and key layout, marked with the closed set `langgraph-python | pydantic-ai-python`.
+The adapter supplies its executor ID on port requests; an omitted ID retains the
+original `langgraph-python` contract. Reads select the requested executor's rows,
+and existing LangGraph bytes remain readable without a rewrite. The JavaScript saver's
 `getTuple` and `list` skip these marked records. No storage schema or version changes.
 
 `byteRecords.request(value)` accepts the closed operations `get`, `list`, `put`,
@@ -77,7 +81,8 @@ records. Base64 appears only on the Worker bridge.
 The port uses the same fenced write helpers, app/principal scope, retention,
 explicit deletion and principal wipe as the JavaScript saver. Export reads marker
 timestamps and interrupt IDs without invoking the JavaScript serializer. An explicit
-personal-content export represents serialized values as their type tag and marked
+personal-content export copies each checkpoint's stored executor tag and represents
+serialized values as their type tag and marked
 base64 bytes; it does not deserialize Python objects. A tuple or list must fit the
 bridge's 1 MiB limit after base64 encoding, or the operation fails `unsupported`.
 Hosts still compose ownership and dispose the runtime before closing the saver.

@@ -22,3 +22,9 @@ spec.loader.exec_module(native)
 def test_native_pydantic_transcript(name):
     expected = json.loads((directory.parent / 'golden-pydantic-ai' / f'{name}.json').read_text())
     assert asyncio.run(native.run_case(name)) == expected
+
+
+@pytest.mark.parametrize('name', native.RELOAD_CASES)
+def test_native_reload_preserves_transcript_conversation_and_usage(name):
+    expected = json.loads((directory.parent / 'golden-pydantic-ai' / f'{name}.json').read_text())
+    assert asyncio.run(native.run_reload_case(name)) == expected

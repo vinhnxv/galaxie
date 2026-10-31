@@ -133,10 +133,28 @@ without provider SDKs. Use `GalaxieModel(role)` for routed model calls and
 tool-call arguments, IDs and names on every growing chunk and at completion.
 Only checked reply text reaches `messages`; tool arguments and results do not.
 
-This executor declares `streaming`, `interrupts` and `resume` true; `checkpoints`
-and `subgraphs` remain false. Pending conversations live in Worker memory only.
-Cancellation or Worker loss discards pending state; subsequent pending/resume
-fails `unavailable`. Reload restore and a durable checkpoint service are unsupported.
+This executor declares `streaming`, `interrupts`, `resume` and `checkpoints` true.
+Supply `services.checkpoints: saver.byteRecords` and `recovery: saver.recovery`
+from the same scoped `IndexedDBSaver` to restore after reload. Without the recovery
+store, core cannot compare session identity, so opening a session that another
+executor created starts a new conversation beside its rows instead of failing.
+Snapshots are bound to their session. Each pause and
+completion stores a pinned `ConversationTypeAdapter` snapshot containing message
+history, usage, conversation identity and deferred requests. Pending interactions
+retain their IDs after a fresh Worker and reopened IndexedDB. Accepted answers
+reconcile through recovery, and succeeded write receipts replay without invoking
+the binding again. An unreadable snapshot fails `unrecoverable`; another executor's
+session is refused before checkpoint reads. Exports copy each byte row's executor
+tag and omit personal content unless explicitly requested.
+
+Without the byte-record port, pending conversations live in Worker memory only;
+cancellation or Worker loss discards them, and subsequent pending/resume fails
+`unavailable`. Snapshots cover pause and completion boundaries, not arbitrary
+mid-run replay. Write deduplication requires recovery and deterministic call order;
+a replay with changed arguments fails `unrecoverable`. Keep the existing app/principal
+scope, logout fencing and ownership composition. `subgraphs` stays false: child
+agent deferrals do not propagate to the parent, and pydantic-graph 2.60 has no
+persistence module matching nested interrupt and stream semantics.
 
 Include `DeferredToolRequests` in the agent's output types to pause on
 `requires_approval` or `CallDeferred`. Wrap the agent in `Executor(agent,

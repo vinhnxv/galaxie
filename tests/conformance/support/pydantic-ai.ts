@@ -79,7 +79,7 @@ function normalizeMessages(messages: BaseMessage[]): unknown[] {
     return result;
   });
 }
-class RecordingModel extends BaseChatModel {
+export class RecordingModel extends BaseChatModel {
   readonly mock: MockChatModel;
   readonly transcript: PydanticTranscript;
   readonly script: MockScript;

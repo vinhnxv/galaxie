@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { ByteExecutor } from './byte-records.js';
 import type { StoredSession } from './recovery.js';
 
 export type SessionExportValue =
@@ -37,6 +38,7 @@ export interface SessionExport {
     readonly unrecoverable?: true;
   };
   readonly checkpoints?: readonly {
+    readonly executor?: ByteExecutor;
     readonly id: string;
     readonly parentId: string | null;
     readonly namespace: string;

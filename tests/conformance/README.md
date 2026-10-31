@@ -138,6 +138,40 @@ The Node lane checks checkpoint settlement writes after cancellation. Native
 serializer tests check the actual twelve cases, RAG values and parent-effect fixture;
 only documented exception-string and tuple-array decoding is allowed to differ.
 
+## pydantic-ai conversations
+
+The separate [pydantic-ai matrix](compatibility-matrix-pydantic-ai.json) lists 31
+native-reference cases for model calls, tools, output validation, checked streaming
+and deferred interactions. Native CPython, Node Pyodide and real headless Chromium
+compare the same OpenAI-format requests, responses, capabilities, interactions and
+stream projections. The CPython-only recorder uses the pinned OpenAI mapper;
+provider SDKs do not enter the Worker wheel sets.
+
+Eight reload variants reuse those goldens: `approval-approve`, `approval-deny`,
+`approval-mixed`, `call-deferred`, `approval-consecutive`, `stream-approval-approve`,
+`approval-invalid-action` and `approval-incomplete`. Native runs serialize pinned
+`ConversationTypeAdapter` bytes between fresh agents; Node reconstructs each
+runtime and Worker; Chromium reloads the page and reopens IndexedDB. Restored
+pending IDs are compared before normalization. Snapshots preserve messages, usage,
+conversation identity, deferred requests, pause ordinals and effect positions.
+
+Node and Chromium also exercise accepted-answer reconciliation, approved and
+unapproved write receipt replay after Worker loss, changed-input refusal, corrupt
+snapshot isolation and executor identity checks. Storage tests cover both closed-set
+byte tags, exports, principal isolation, retention, logout and app-epoch fencing.
+Fault probes preserve the committed pause after a failed checkpoint put and replace
+orphan interrupt markers before completion. Snapshots cover pauses and completion;
+there is no arbitrary mid-run replay or pydantic-ai subgraph support. Without the
+byte-record port, pending state remains in Worker memory only.
+
+Run the focused Node lane with
+`pnpm exec vitest run --project node tests/conformance/pydantic-ai.node.test.ts tests/conformance/pydantic-ai-restore.node.test.ts`.
+The built Chromium lane is
+`pnpm exec vitest run --project node examples/rag-browser/test/pydantic-ai-conformance.node.test.ts`.
+`pnpm test:python` checks native transcripts and snapshot validation;
+`uv run --locked --offline python -I ../scripts/record-pydantic-ai-conformance.py --check`
+from `python/` reproduces the existing pydantic-ai goldens without writing them.
+
 ## Running the suite
 
 - `pnpm check` runs the repository's license, lint, both TypeScript compilers, Node/Chromium tests, build and dependency checks.

@@ -13,7 +13,7 @@ import socket
 import sys
 from unittest.mock import patch
 
-from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
+from pydantic_ai import Agent, ConversationTypeAdapter, DeferredToolRequests, DeferredToolResults
 from pydantic_ai.messages import (
     ModelResponse, ModelResponseStreamEvent, PartDeltaEvent, PartStartEvent,
     TextPart, TextPartDelta, ToolCallPart,
@@ -33,6 +33,11 @@ if suite_spec is None or suite_spec.loader is None:
 suite = importlib.util.module_from_spec(suite_spec)
 sys.modules[suite_spec.name] = suite
 suite_spec.loader.exec_module(suite)
+
+RELOAD_CASES = (
+    'approval-approve', 'approval-deny', 'approval-mixed', 'call-deferred',
+    'approval-consecutive', 'stream-approval-approve', 'approval-invalid-action', 'approval-incomplete',
+)
 
 
 def normalized(value):
@@ -117,13 +122,36 @@ async def run_agent(agent, prompt, options, streams=None):
         return run.result
 
 
-async def run_deferred(executor, spec, name, transcript):
+def roundtrip_conversation(result):
+    original = result.conversation
+    saved = ConversationTypeAdapter.dump_json(original)
+    conversation = ConversationTypeAdapter.validate_json(saved)
+    assert conversation.conversation_id == 'conformance'
+    assert to_jsonable_python(conversation.usage) == to_jsonable_python(original.usage)
+    assert conversation.usage.requests > 0
+    assert to_jsonable_python(conversation) == to_jsonable_python(original)
+    return conversation
+
+
+async def run_deferred(executor, spec, name, transcript, reload_factory=None):
     pause = 0
+    previous_requests = 0
     for _ in range(2 if name == 'approval-repeated-ids' else 1):
         result = await run_agent(executor.agent, spec['prompt'], {'conversation_id': 'conformance'}, transcript.get('streams'))
         answer_index = 0
         while isinstance(result.output, DeferredToolRequests):
             requests = result.output
+            conversation = None
+            if reload_factory is not None:
+                conversation = roundtrip_conversation(result)
+                assert conversation.usage.requests > previous_requests
+                previous_requests = conversation.usage.requests
+                previous = executor
+                executor = reload_factory()
+                assert executor is not previous and executor.agent is not previous.agent
+                requests = conversation.deferred_tool_requests
+                assert requests is not None
+                assert executor.interaction(requests) == previous.interaction(result.output)
             if name == 'approval-invalid-interaction':
                 raise GalaxieError('unsupported')
             if 'streams' in transcript:
@@ -144,12 +172,17 @@ async def run_deferred(executor, spec, name, transcript):
                     raise GalaxieError('invalid')
                 results = DeferredToolResults(approvals={identifier: answer['action'] == 'approve' for identifier in ids})
             result = await run_agent(executor.agent, None, {
-                'conversation_id': 'conformance', 'message_history': result.all_messages(), 'deferred_tool_results': results,
+                **({'conversation': conversation} if conversation is not None else {
+                    'conversation_id': 'conformance', 'message_history': result.all_messages(),
+                }),
+                'deferred_tool_results': results,
             }, transcript.get('streams'))
         transcript['output'] = to_jsonable_python(result.output)
+        if reload_factory is not None:
+            assert roundtrip_conversation(result).deferred_tool_requests is None
 
 
-async def _run_case(name):
+async def _run_case(name, *, reload=False):
     spec = json.loads(Path(__file__).with_name('fixtures.json').read_text())[name]
     transcript = {'requests': [], 'responses': [], 'capabilities': [], 'interactions': [], 'output': None, 'error': None}
     streaming = name.startswith('stream-')
@@ -223,7 +256,10 @@ async def _run_case(name):
     try:
         agent = suite.factory(name, ScriptedModel())
         if isinstance(agent, Executor):
-            await run_deferred(agent, spec, name, transcript)
+            await run_deferred(
+                agent, spec, name, transcript,
+                reload_factory=(lambda: suite.factory(name, ScriptedModel())) if reload else None,
+            )
         else:
             result = await run_agent(agent, spec['prompt'], {'conversation_id': 'conformance'}, transcript.get('streams'))
             transcript['output'] = to_jsonable_python(result.output)
@@ -248,3 +284,15 @@ async def run_case(name):
         patch.object(socket, 'getaddrinfo', _blocked_network),
     ):
         return await _run_case(name)
+
+
+async def run_reload_case(name):
+    """Native persistence reference, independent of galaxie's byte-record driver."""
+    if name not in RELOAD_CASES:
+        raise ValueError('The native reload case is unknown.')
+    with (
+        patch.object(socket.socket, 'connect', _blocked_network),
+        patch.object(socket.socket, 'connect_ex', _blocked_network),
+        patch.object(socket, 'getaddrinfo', _blocked_network),
+    ):
+        return await _run_case(name, reload=True)

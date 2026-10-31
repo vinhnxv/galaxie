@@ -49,6 +49,7 @@ export class MemoryByteCheckpoints {
     const rows = [...this.rows.values()]
       .filter(
         (row) =>
+          row.executor === input.executor &&
           row.sessionId === input.sessionId &&
           (input.namespace === undefined || row.namespace === input.namespace) &&
           (!input.id || row.id === input.id) &&
