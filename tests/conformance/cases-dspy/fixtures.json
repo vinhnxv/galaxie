@@ -349,5 +349,156 @@
         "chunks": ["[[ ## answer ## ]]", "\nfinal answer\n", "[[ ## completed ## ]]"]
       }
     ]
+  },
+  "pause-module": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "France"
+      }
+    ]
+  },
+  "pause-react-tool": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "Paris"
+      }
+    ]
+  },
+  "pause-react-v2-tool": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nUse the tool.\n[[ ## tool_calls ## ]]\n[{\"name\":\"lookup\",\"args\":{\"query\":\"France\"}}]\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## next_thought ## ]]\nUse the tool.\n[[ ## tool_calls ## ]]\n[{\"name\":\"submit\",\"args\":{\"answer\":\"Paris\"}}]\n[[ ## completed ## ]]"
+      }
+    ],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "Paris"
+      }
+    ]
+  },
+  "pause-two": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## answer ## ]]\nReview draft\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## answer ## ]]\nReviewed Paris\n[[ ## completed ## ]]"
+      }
+    ],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "one"
+      },
+      {
+        "action": "continue",
+        "payload": "two"
+      }
+    ]
+  },
+  "stream-pause-two": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+        "chunks": ["[[ ## answer ## ]]", "\nParis\n", "[[ ## completed ## ]]"]
+      },
+      {
+        "text": "[[ ## answer ## ]]\nReview draft\n[[ ## completed ## ]]",
+        "chunks": ["[[ ## answer ## ]]", "\nReview draft\n", "[[ ## completed ## ]]"]
+      },
+      {
+        "text": "[[ ## answer ## ]]\nReviewed Paris\n[[ ## completed ## ]]",
+        "chunks": ["[[ ## answer ## ]]", "\nReviewed Paris\n", "[[ ## completed ## ]]"]
+      }
+    ],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "one"
+      },
+      {
+        "action": "continue",
+        "payload": "two"
+      }
+    ]
+  },
+  "pause-diverged-model": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "Paris"
+      }
+    ]
+  },
+  "pause-early-return": {
+    "replies": [],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "Paris"
+      }
+    ]
+  },
+  "pause-changed-write": {
+    "replies": [],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "Paris"
+      }
+    ]
+  },
+  "pause-concurrent": {
+    "replies": []
+  },
+  "pause-oversize": {
+    "replies": [],
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "Paris"
+      }
+    ]
+  },
+  "pause-new-run": {
+    "replies": [],
+    "runs": 2,
+    "resumes": [
+      {
+        "action": "continue",
+        "payload": "first run"
+      },
+      {
+        "action": "continue",
+        "payload": "second run"
+      }
+    ]
   }
 }

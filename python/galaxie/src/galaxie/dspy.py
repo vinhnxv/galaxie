@@ -4,12 +4,14 @@
 """Async DSPy engines and tools over the JavaScript-owned runtime boundary."""
 
 import asyncio
+import hashlib
 import json
+import math
 import re
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import aclosing
 from contextvars import ContextVar
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from typing import Any
 
 import dspy
@@ -33,10 +35,40 @@ class _Termination(BaseException):
         super().__init__(ERROR_MESSAGES[self.code])
 
 
+class _Pause(BaseException):
+    def __init__(self, interaction: dict[str, Any]) -> None:
+        self.interaction = interaction
+
+
+@dataclass
+class _Session:
+    ordinal: int = 0
+    pauses: int = 0
+    value: Any = None
+    journal: list[dict[str, Any]] = field(default_factory=list)
+    pending: dict[str, Any] | None = None
+    unrecoverable: bool = False
+
+    def bounded(self) -> None:
+        encoded = json.dumps(vars(self), ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')
+        if len(encoded) > 1024 * 1024:
+            raise _Termination('unsupported')
+
+
+def _digest(value: Any) -> str:
+    return hashlib.sha256(json.dumps(_json(value), sort_keys=True, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')).hexdigest()
+
+
 @dataclass
 class _Run:
     conversation: str
     ordinal: int
+    session: _Session
+    replay: int = 0
+    cursor: int = 0
+    replay_notified: bool = False
+    pausing: bool = False
+    streaming: bool = False
     calls: int = 0
     failure: str | None = None
     models: int = 0
@@ -53,9 +85,62 @@ class _Run:
 
     def model(self) -> None:
         self.check()
-        self.emit('updates', {'kind': 'model', 'index': self.models})
+        if self.streaming:
+            self.emit('updates', {'kind': 'model', 'index': self.models})
         self.check()
         self.models += 1
+
+    @property
+    def replaying(self) -> bool:
+        return self.cursor < self.replay
+
+    def frontier(self) -> None:
+        self.check()
+        if self.replaying:
+            self.record('unrecoverable')
+            self.check()
+        if self.replay and not self.replay_notified:
+            self.replay_notified = True
+            self.emit('updates', {'kind': 'replayed', 'count': self.replay})
+            self.check()
+
+    def begin(self, kind: str, payload: Any) -> tuple[dict[str, Any], bool]:
+        self.check()
+        if self.pausing:
+            self.record('unsupported')
+            self.check()
+        digest = _digest(payload)
+        if self.replaying:
+            entry = self.session.journal[self.cursor]
+            if entry['kind'] != kind or entry['digest'] != digest or 'result' not in entry:
+                self.record('unrecoverable')
+                self.check()
+            self.cursor += 1
+            return entry, True
+        self.frontier()
+        entry = {'kind': kind, 'digest': digest}
+        self.session.journal.append(entry)
+        self.cursor += 1
+        return entry, False
+
+    async def capability(self, payload: dict[str, Any]) -> Any:
+        ordinal = self.calls
+        self.calls += 1
+        entry, replayed = self.begin('capability', {'name': payload['name'], 'input': payload['input']})
+        if replayed:
+            return _json(entry['result'])
+        tool_name = _tool_name.get()
+        if self.streaming and tool_name is not None:
+            self.emit('updates', {'kind': 'tool', 'name': tool_name, 'index': ordinal})
+        self.check()
+        try:
+            result = await request('capability', {**payload, 'effectScope': f'dspy/{self.conversation}/{self.ordinal}/{ordinal}'})
+            self.check()
+            entry['result'] = _json(result)
+            return result
+        except GalaxieError as error:
+            self.record(error.code)
+            raise _Termination(self.failure or error.code) from None
 
     def emit(self, mode: str, data: Any) -> None:
         if self.on_stream is not None:
@@ -69,6 +154,7 @@ class _Run:
 
 
 _run: ContextVar[_Run | None] = ContextVar('galaxie_dspy_run', default=None)
+_tool_name: ContextVar[str | None] = ContextVar('galaxie_dspy_tool_name', default=None)
 
 
 def _json(value: Any) -> Any:
@@ -76,6 +162,53 @@ def _json(value: Any) -> Any:
         return json.loads(json.dumps(value, ensure_ascii=False, allow_nan=False))
     except (TypeError, ValueError, OverflowError, UnicodeError):
         raise GalaxieError('unsupported') from None
+
+
+def _interaction(value: Any) -> dict[str, Any]:
+    def valid(item: Any, ancestors: set[int]) -> bool:
+        if item is None or type(item) in (str, bool, int):
+            return True
+        if type(item) is float:
+            return math.isfinite(item)
+        if type(item) not in (list, dict) or id(item) in ancestors:
+            return False
+        ancestors = ancestors | {id(item)}
+        return all(valid(child, ancestors) for child in item) if type(item) is list else all(
+            type(key) is str and valid(child, ancestors) for key, child in item.items()
+        )
+    if (type(value) is not dict or set(value) != {'surfaceId', 'viewRevision', 'component', 'props'}
+        or any(type(value[key]) is not str or not value[key] for key in ('surfaceId', 'viewRevision', 'component'))
+        or re.fullmatch(r'[A-Za-z][\w-]*\.[A-Za-z][\w-]*/v\d+', value['component'], re.ASCII) is None
+        or type(value['props']) is not dict or not valid(value, set())):
+        raise GalaxieError('unsupported')
+    return _json(value)
+
+
+def request_interaction(request: dict[str, Any]) -> dict[str, Any]:
+    """Pause the whole program, or return the recorded answer during re-execution."""
+    run = _run.get()
+    if run is None:
+        raise GalaxieError('unsupported')
+    run.check()
+    try:
+        value = _interaction(request)
+    except GalaxieError as error:
+        # Author tool code must not turn a malformed request into an observation.
+        run.record(error.code)
+        run.check()
+        raise
+    entry, replayed = run.begin('interaction', value)
+    if replayed:
+        return _json(entry['result'])
+    unfinished = [previous for previous in run.session.journal[:-1] if 'result' not in previous]
+    if unfinished:
+        # A dispatched sibling write may still commit; report it as such.
+        run.record('outcome_unknown' if any(previous['kind'] == 'capability' for previous in unfinished) else 'unsupported')
+        run.check()
+    run.pausing = True
+    identifier = _digest([run.conversation, run.session.pauses])
+    run.session.pauses += 1
+    raise _Pause({'id': identifier, 'value': value})
 
 
 def _text(parts: Any) -> str:
@@ -232,12 +365,22 @@ class _AsyncEngine:
 
     async def complete(self, value: Request) -> Response:
         run = _run.get()
-        if run is not None:
-            run.model()
         try:
             options = _options(value, self.native)
-            reply = await request('model', {'role': self.role, 'messages': _messages(value), 'options': options})
-            return _reply(reply, value, self.native, self.role)
+            payload = {'role': self.role, 'messages': _messages(value), 'options': options}
+            entry, replayed = run.begin('model', payload) if run is not None else ({}, False)
+            if replayed:
+                if run is not None:
+                    run.models += 1
+                return _reply(_json(entry['result']), value, self.native, self.role)
+            if run is not None:
+                run.model()
+            reply = await request('model', payload)
+            result = _reply(reply, value, self.native, self.role)
+            if run is not None:
+                run.check()
+                entry['result'] = _json(reply)
+            return result
         except GalaxieError as error:
             if run is not None:
                 run.record(error.code)
@@ -245,13 +388,17 @@ class _AsyncEngine:
 
     async def stream(self, value: Request) -> AsyncIterator[Any]:
         run = _run.get()
-        if run is not None:
-            run.model()
         task = None
         try:
-            options = {**_options(value, self.native), 'stream': True}
-            chunks: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+            options = _options(value, self.native)
             payload = {'role': self.role, 'messages': _messages(value), 'options': options}
+            entry, replayed = run.begin('model', payload) if run is not None else ({}, False)
+            if replayed:
+                raise GalaxieError('unsupported')
+            if run is not None:
+                run.model()
+            chunks: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+            payload = {**payload, 'options': {**options, 'stream': True}}
             async def receive() -> Any:
                 try:
                     return await request('model', payload, on_model_chunk=chunks.put_nowait)
@@ -295,6 +442,9 @@ class _AsyncEngine:
                 if arguments != _argument_json(json.dumps(part.input)):
                     raise GalaxieError('invalid')
                 yield StreamDeltaEvent(ToolCallDelta(input=streamed['arguments'], part_index=index, id=part.id, name=part.name))
+            if run is not None:
+                run.check()
+                entry['result'] = _json(final)
             yield StreamEndEvent(finish_reason=reply.finish_reason, usage=reply.usage)
         except GalaxieError as error:
             if run is not None:
@@ -336,12 +486,24 @@ class GalaxieLM(dspy.LM):
         return {'stop', 'tool_choice'} if self.native_tools else {'stop'}
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        run = _run.get()
+        if run is not None:
+            run.check()
+            run.record('unsupported')
         raise _LMError('unsupported')
 
     async def acall(self, prompt: Any = None, *, messages: Any = None, **kwargs: Any) -> Any:
+        run = _run.get()
+        if run is not None:
+            run.check()
         if kwargs.get('n', self.kwargs.get('n', 1)) != 1:
+            if run is not None:
+                run.record('unsupported')
             raise _LMError('unsupported')
-        with dspy.context(disable_history=True, trace=None, callbacks=[]):
+        # Reuse the complete path for cached responses: no deltas enter DSPy's
+        # asynchronous listener queue, even when the original call streamed.
+        replay = {'send_stream': None} if run is not None and run.replaying else {}
+        with dspy.context(disable_history=True, trace=None, callbacks=[], **replay):
             return await super().acall(prompt, messages=messages, **kwargs)
 
 
@@ -355,15 +517,14 @@ def capability_tool(name: str, description: str, args_schema: dict[str, Any], *,
         if run is None:
             raise _Termination('unsupported')
         run.check()
-        ordinal = run.calls
-        run.calls += 1
-        run.emit('updates', {'kind': 'tool', 'name': tool_name or name, 'index': ordinal})
-        run.check()
+        token = _tool_name.set(tool_name or name)
         try:
-            return await capabilities.call(name, arguments, effect_scope=f'dspy/{run.conversation}/{run.ordinal}/{ordinal}')
+            return await capabilities.call(name, arguments)
         except GalaxieError as error:
             # Every capability failure ends the run: `invalid` may follow a dispatched write.
             raise _Termination(error.code) from None
+        finally:
+            _tool_name.reset(token)
 
     return dspy.Tool(invoke, name=tool_name or name, desc=description, args=_json(args_schema.get('properties', {})), arg_types={})
 
@@ -383,17 +544,16 @@ def _validate(module: dspy.Module, adapter: Any, default_lm: Any) -> None:
             raise GalaxieError('unsupported')
 
 
+def _exception_leaves(error: BaseException) -> list[BaseException]:
+    if isinstance(error, BaseExceptionGroup):
+        return [leaf for child in error.exceptions for leaf in _exception_leaves(child)]
+    return [error]
+
+
 def error_code(error: BaseException) -> str:
     """Flatten task-group failures without exposing author exception text."""
     if isinstance(error, BaseExceptionGroup):
-        leaves = []
-        def flatten(group: BaseException) -> None:
-            if isinstance(group, BaseExceptionGroup):
-                for child in group.exceptions:
-                    flatten(child)
-            else:
-                leaves.append(group)
-        flatten(error)
+        leaves = _exception_leaves(error)
         for child in leaves:
             if isinstance(child, (GalaxieError, _LMError, _Termination)):
                 return GalaxieError(child.code).code
@@ -401,6 +561,19 @@ def error_code(error: BaseException) -> str:
     if isinstance(error, (GalaxieError, _LMError, _Termination)):
         return GalaxieError(error.code).code
     return 'cancelled' if isinstance(error, asyncio.CancelledError) else 'executor_error'
+
+
+def _pause(error: BaseException) -> _Pause | None:
+    leaves = _exception_leaves(error)
+    failures = [item for item in leaves if isinstance(item, (GalaxieError, _LMError, _Termination))]
+    if failures:
+        raise GalaxieError(failures[0].code)
+    pauses = [item for item in leaves if isinstance(item, _Pause)]
+    if len(pauses) > 1:
+        raise GalaxieError('unsupported')
+    if len(pauses) == 1 and all(isinstance(item, (_Pause, asyncio.CancelledError)) for item in leaves):
+        return pauses[0]
+    return None
 
 
 class _SilentStatus(StatusMessageProvider):
@@ -480,11 +653,17 @@ class Executor:
         self.module, self.input, self.output = module, input, output
         self.adapter = adapter if adapter is not None else dspy.ChatAdapter(use_json_adapter_fallback=False)
         self.lm = dspy.settings.lm if isinstance(dspy.settings.lm, GalaxieLM) else None
-        self._ordinals: dict[str, int] = {}
+        self._sessions: dict[str, _Session] = {}
         if isinstance(stream_fields, str) or any(not isinstance(field, str) or not field for field in stream_fields) or len(set(stream_fields)) != len(stream_fields):
             raise GalaxieError('unsupported')
         self.stream_fields = tuple(stream_fields)
         _validate(module, self.adapter, self.lm)
+
+    def pending(self, conversation: str) -> dict[str, Any] | None:
+        state = self._sessions.get(conversation)
+        if state is not None and state.unrecoverable:
+            raise GalaxieError('unrecoverable')
+        return _json(state.pending) if state is not None and state.pending else None
 
     async def _stream_prediction(self, inputs: dict[str, Any], run: _Run) -> Any:
         if type(self.adapter) is not dspy.ChatAdapter:
@@ -511,16 +690,35 @@ class Executor:
             raise GalaxieError('executor_error')
         return result
 
-    async def run(self, value: Any, conversation: str, steps: int, *, on_stream: Callable[[str, Any], None] | None = None) -> Any:
+    async def run(self, value: Any, conversation: str, steps: int, *, on_stream: Callable[[str, Any], None] | None = None, resume: dict[str, Any] | None = None) -> Any:
         dspy.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
         _validate(self.module, self.adapter, self.lm)
-        ordinal = self._ordinals.get(conversation, 0) + 1
-        self._ordinals[conversation] = ordinal
+        state = self._sessions.setdefault(conversation, _Session())
+        if state.unrecoverable:
+            raise GalaxieError('unrecoverable')
+        if resume is not None:
+            if state.pending is None or resume.get('interactionId') != state.pending['id']:
+                raise GalaxieError('stale')
+            if set(resume) != {'interactionId', 'action', 'payload'} or not isinstance(resume['action'], str) or not resume['action']:
+                raise GalaxieError('invalid')
+            state.journal[-1]['result'] = _json({'action': resume['action'], 'payload': resume['payload']})
+            replay = len(state.journal)
+        else:
+            # Core decides whether a fresh start may replace a pending pause
+            # (for example after it rejected the published request).
+            state.ordinal += 1
+            state.value = _json(value)
+            state.journal = []
+            replay = 0
+        state.pending = None
         streaming = on_stream is not None and bool(self.stream_fields)
-        run = _Run(conversation, ordinal, on_stream=on_stream if streaming else None)
+        run = _Run(conversation, state.ordinal, state, replay=replay, streaming=streaming, on_stream=on_stream)
         token = _run.set(run)
         observer = capabilities.failures.set(run.record)
+        dispatcher = capabilities.dispatch.set(run.capability)
         try:
+            state.bounded()
+            value = _json(state.value)
             inputs = self.input(value) if self.input else value
             if not isinstance(inputs, dict):
                 raise GalaxieError('unsupported')
@@ -529,14 +727,41 @@ class Executor:
                     result = await self._stream_prediction(inputs, run)
                 else:
                     result = await self.module.acall(**inputs)
-            run.check()
+            run.frontier()
+            if run.pausing:
+                raise GalaxieError('unsupported')
             if self.output:
-                return _json(self.output(result))
-            signature = getattr(self.module, 'signature', None)
-            return _json({key: result[key] for key in signature.output_fields} if signature is not None else dict(result.items()))
+                output = _json(self.output(result))
+            else:
+                signature = getattr(self.module, 'signature', None)
+                output = _json({key: result[key] for key in signature.output_fields} if signature is not None else dict(result.items()))
+            run.check()
+            state.journal = []
+            state.value = None
+            return output
         except BaseException as error:
-            raise GalaxieError(run.failure or error_code(error)) from None
+            try:
+                run.check()
+                pause = _pause(error)
+                if pause is not None:
+                    run.frontier()
+                    state.pending = pause.interaction
+                    state.bounded()
+                    run.emit('updates', {'kind': 'pause'})
+                    run.check()
+                    return None
+                code = error_code(error)
+            except BaseException as terminal:
+                code = run.failure or error_code(terminal)
+            state.pending = None
+            state.journal = []
+            state.value = None
+            if code == 'unrecoverable':
+                state.unrecoverable = True
+                run.emit('updates', {'kind': 'unrecoverable'})
+            raise GalaxieError(code) from None
         finally:
+            capabilities.dispatch.reset(dispatcher)
             capabilities.failures.reset(observer)
             _run.reset(token)
 

@@ -293,8 +293,8 @@ export function createPyodideAdapter(
     id: executorId,
     version: '0.0.0',
     features: {
-      interrupts: framework !== 'dspy',
-      resume: framework !== 'dspy',
+      interrupts: true,
+      resume: true,
       checkpoints: framework !== 'dspy',
       streaming: true,
       subgraphs: langgraph,

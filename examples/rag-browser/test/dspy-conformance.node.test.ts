@@ -97,9 +97,13 @@ afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-test.each(dspyCases)(
-  'real Chromium DSPy matches native requests, tools and output under strict CSP: %s',
-  async (name) => {
+test.each([
+  ...dspyCases.map((name) => ({ name, steps: undefined as number | undefined })),
+  { name: 'pause-two', steps: 1 },
+  { name: 'pause-two', steps: 2 },
+])(
+  'real Chromium DSPy matches native requests, tools and output under strict CSP: $name (steps=$steps)',
+  async ({ name, steps }) => {
     if (!browser) throw new Error('The conformance browser is missing.');
     const context = await browser.newContext({ serviceWorkers: 'block' });
     const external: string[] = [];
@@ -114,7 +118,7 @@ test.each(dspyCases)(
         headers.push(response.headers()['content-security-policy'] ?? ''),
       );
       const page = await context.newPage();
-      await page.goto(`${origin}/?case=${name}`);
+      await page.goto(`${origin}/?case=${name}${steps === undefined ? '' : `&steps=${steps}`}`);
       await page.waitForFunction(
         () => Reflect.get(globalThis, 'dspyConformance')?.done,
         undefined,
@@ -123,14 +127,24 @@ test.each(dspyCases)(
       const result = await page.evaluate(() => Reflect.get(globalThis, 'dspyConformance'));
       expect(result.error).toBeUndefined();
       expect(result.violations).toEqual([]);
-      expect(result.transcript).toEqual(
-        JSON.parse(
-          await readFile(
-            new URL(`../../../tests/conformance/golden-dspy/${name}.json`, import.meta.url),
-            'utf8',
+      if (steps === 1) {
+        expect(result.transcript.error).toEqual({
+          code: 'budget_exceeded',
+          message: 'The budget limit was reached.',
+        });
+        expect(result.transcript.requests).toHaveLength(2);
+        expect(result.transcript.capabilities).toHaveLength(1);
+        expect(result.transcript.interactions).toHaveLength(2);
+        expect(result.transcript.output).toBeNull();
+      } else
+        expect(result.transcript).toEqual(
+          JSON.parse(
+            await readFile(
+              new URL(`../../../tests/conformance/golden-dspy/${name}.json`, import.meta.url),
+              'utf8',
+            ),
           ),
-        ),
-      );
+        );
       expect(external).toEqual([]);
       expect(headers.length).toBeGreaterThan(0);
       expect(headers.every((value) => value === header)).toBe(true);

@@ -23,6 +23,9 @@ import fixtures from '../cases-dspy/fixtures.json' with { type: 'json' };
 export const dspyCases: readonly string[] = Object.keys(fixtures);
 interface Spec {
   readonly fragmented?: boolean;
+  readonly resumes?: readonly { readonly action: string; readonly payload: unknown }[];
+  readonly runs?: number;
+  readonly steps?: number;
   readonly replies: readonly {
     readonly text: string;
     readonly toolCalls?: readonly ToolCall[];
@@ -162,6 +165,7 @@ export async function executeDspyCase(
   options: PyodideAdapterOptions,
   agent: PyodideAgent,
   name: string,
+  steps?: number,
 ): Promise<DspyTranscript> {
   if (!dspyCases.includes(name)) throw new Error('The conformance case is unknown.');
   const transcript: DspyTranscript = {
@@ -173,7 +177,9 @@ export async function executeDspyCase(
     error: null,
   };
   const streaming = name.startsWith('stream-');
-  if (streaming) transcript.events = [];
+  const pauses = name.includes('pause-');
+  const spec = (fixtures as Record<string, Spec>)[name];
+  if (streaming || pauses) transcript.events = [];
   let sawText: (() => void) | undefined;
   const streamed = new Promise<void>((resolve) => {
     sawText = resolve;
@@ -183,17 +189,21 @@ export async function executeDspyCase(
   const runtime = createRuntime({
     appId: 'dspy-conformance',
     executors: [createPyodideAdapter({ ...options, framework: 'dspy' })],
-    budgets: { steps: 25, toolCalls: 10, tokens: 2000 },
+    budgets: { steps: steps ?? spec?.steps ?? 25, toolCalls: 10, tokens: 2000 },
     outputSafety: ({ text }) => (text.includes('BLOCKED_') ? 'block' : 'allow'),
   });
-  const kind = name.endsWith('outcome-unknown') ? 'write' : 'read';
+  const kind = name.endsWith('outcome-unknown') || pauses ? 'write' : 'read';
   try {
     const instance = await runtime.create(
       defineAgentDefinition({
         id: 'conformance/dspy',
         version: '1.0.0',
         executor: 'dspy-python',
-        input: z.object({ question: z.string() }),
+        input: z.object({
+          question: pauses
+            ? z.string().meta({ 'x-galaxie': { label: 'private-user' } })
+            : z.string(),
+        }),
         models: { answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
         capabilities: {
           required: {
@@ -205,6 +215,12 @@ export async function executeDspyCase(
         principalScope: 'fixture',
         agent,
         services: { chatModels: { mock: model } },
+        ui: {
+          surfaces: ['main'],
+          components: {
+            'test.Review/v1': { actions: { continue: { payload: z.string() } } },
+          },
+        },
         bindings: {
           'docs.lookup@1': {
             kind,
@@ -239,56 +255,107 @@ export async function executeDspyCase(
       },
     );
     await instance.prepare();
-    const { runId } = await instance.start({ question: 'What is the capital of France?' });
-    const events = (async (): Promise<void> => {
-      for await (const event of instance.events(runId)) {
-        if (event.type === 'output') transcript.output = event.output;
-        if (event.type === 'error') transcript.error = event.error;
-        if (event.type === 'cancelled')
-          transcript.error = { code: 'cancelled', message: 'The run was cancelled.' };
-        if (event.type === 'interaction')
-          throw new Error('DSPy emitted an unsupported interaction.');
-        if (event.type === 'stream') {
-          if (!streaming || !transcript.events || event.path.length)
-            throw new Error('DSPy emitted an unexpected stream.');
-          const data = event.data as Record<string, unknown>;
-          if (event.mode === 'messages') {
+    const ids = new Set<string>();
+    let answerIndex = 0;
+    for (let round = 0; round < (spec?.runs ?? 1); round++) {
+      const { runId } = await instance.start({ question: 'What is the capital of France?' });
+      const events = (async (): Promise<void> => {
+        for await (const event of instance.events(runId)) {
+          if (event.type === 'output') transcript.output = event.output;
+          if (event.type === 'error') transcript.error = event.error;
+          if (event.type === 'cancelled')
+            transcript.error = { code: 'cancelled', message: 'The run was cancelled.' };
+          if (event.type === 'interaction') {
+            const pending = instance.getSnapshot().run?.pending;
+            if (!pauses || !pending || ids.has(pending.interactionId))
+              throw new Error('DSPy emitted a missing or repeated interaction.');
+            ids.add(pending.interactionId);
+            const { interactionId: _, ...request } = pending;
+            transcript.interactions.push(request);
+            const beforeStale = [transcript.requests.length, transcript.capabilities.length];
+            const stale = await instance.dispatch({
+              instanceId: instance.instanceId,
+              runId,
+              ...pending,
+              interactionId: 'wrong' as typeof pending.interactionId,
+              action: 'continue',
+              payload: 'stale answer',
+            });
             if (
-              Object.keys(data).sort().join(',') !== 'field,text' ||
-              typeof data['field'] !== 'string' ||
-              typeof data['text'] !== 'string' ||
-              data['text'].includes('BLOCKED_') ||
-              !['answer', 'next_thought'].includes(data['field'])
+              stale.status !== 'rejected' ||
+              stale.error.code !== 'stale' ||
+              beforeStale[0] !== transcript.requests.length ||
+              beforeStale[1] !== transcript.capabilities.length
             )
-              throw new Error('DSPy emitted an invalid field projection.');
-            sawText?.();
-          } else if (
-            event.mode !== 'updates' ||
-            !Number.isInteger(data['index']) ||
-            (data['kind'] === 'model'
-              ? Object.keys(data).sort().join(',') !== 'index,kind'
-              : data['kind'] !== 'tool' ||
-                data['name'] !== 'lookup' ||
-                Object.keys(data).sort().join(',') !== 'index,kind,name')
-          )
-            throw new Error('DSPy emitted an invalid progress projection.');
-          const previous = transcript.events.at(-1);
-          if (
-            event.mode === 'messages' &&
-            previous?.mode === 'messages' &&
-            previous.data['field'] === data['field']
-          ) {
-            previous.data['text'] = String(previous.data['text']) + data['text'];
-          } else transcript.events.push({ mode: event.mode, data: { ...data } });
+              throw new Error('The stale answer dispatched work.');
+            const answer = spec?.resumes?.[answerIndex++];
+            if (!answer) throw new Error('The interaction answer is missing.');
+            const submission = { instanceId: instance.instanceId, runId, ...pending, ...answer };
+            const [first, duplicate] = await Promise.all([
+              instance.dispatch(submission),
+              instance.dispatch(submission),
+            ]);
+            if (
+              first?.status !== 'accepted' ||
+              duplicate?.status !== 'rejected' ||
+              duplicate.error.code !== 'duplicate'
+            )
+              throw new Error('The submission inbox did not accept exactly one answer.');
+          }
+          if (event.type === 'stream') {
+            if ((!streaming && !pauses) || !transcript.events || event.path.length)
+              throw new Error('DSPy emitted an unexpected stream.');
+            const data = event.data as Record<string, unknown>;
+            if (event.mode === 'messages') {
+              if (
+                Object.keys(data).sort().join(',') !== 'field,text' ||
+                typeof data['field'] !== 'string' ||
+                typeof data['text'] !== 'string' ||
+                data['text'].includes('BLOCKED_') ||
+                !['answer', 'next_thought'].includes(data['field'])
+              )
+                throw new Error('DSPy emitted an invalid field projection.');
+              sawText?.();
+            } else if (
+              event.mode !== 'updates' ||
+              !(
+                (data['kind'] === 'model' &&
+                  Number.isInteger(data['index']) &&
+                  Object.keys(data).sort().join(',') === 'index,kind') ||
+                (data['kind'] === 'tool' &&
+                  Number.isInteger(data['index']) &&
+                  typeof data['name'] === 'string' &&
+                  Object.keys(data).sort().join(',') === 'index,kind,name') ||
+                (pauses &&
+                  ['pause', 'unrecoverable'].includes(String(data['kind'])) &&
+                  Object.keys(data).join(',') === 'kind') ||
+                (pauses &&
+                  data['kind'] === 'replayed' &&
+                  Number.isInteger(data['count']) &&
+                  Object.keys(data).sort().join(',') === 'count,kind')
+              )
+            )
+              throw new Error('DSPy emitted an invalid progress projection.');
+            if (pauses && !instance.getSnapshot().run?.labels.includes('private-user'))
+              throw new Error('A DSPy replay lost its private label.');
+            const previous = transcript.events.at(-1);
+            if (
+              event.mode === 'messages' &&
+              previous?.mode === 'messages' &&
+              previous.data['field'] === data['field']
+            ) {
+              previous.data['text'] = String(previous.data['text']) + data['text'];
+            } else transcript.events.push({ mode: event.mode, data: { ...data } });
+          }
         }
+      })();
+      if (name === 'abort' || name === 'stream-abort') {
+        await latch.entered;
+        if (name === 'stream-abort') await streamed;
+        await instance.cancel(runId);
       }
-    })();
-    if (name === 'abort' || name === 'stream-abort') {
-      await latch.entered;
-      if (name === 'stream-abort') await streamed;
-      await instance.cancel(runId);
+      await events;
     }
-    await events;
   } catch (error) {
     transcript.error = toErrorInfo(error instanceof GalaxieError ? error.code : 'executor_error');
   } finally {

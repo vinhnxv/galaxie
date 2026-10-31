@@ -4,8 +4,8 @@
   "lanes": ["Node Pyodide", "real headless Chromium Pyodide"],
   "features": {
     "streaming": true,
-    "interrupts": false,
-    "resume": false,
+    "interrupts": true,
+    "resume": true,
     "checkpoints": false,
     "subgraphs": false
   },
@@ -36,7 +36,18 @@
     "stream-argument-block",
     "stream-literal-brackets",
     "stream-literal-fragmented",
-    "stream-repeat"
+    "stream-repeat",
+    "pause-module",
+    "pause-react-tool",
+    "pause-react-v2-tool",
+    "pause-two",
+    "stream-pause-two",
+    "pause-diverged-model",
+    "pause-early-return",
+    "pause-changed-write",
+    "pause-concurrent",
+    "pause-oversize",
+    "pause-new-run"
   ],
   "differences": [],
   "normalizations": [
@@ -59,6 +70,9 @@
     "Streaming ReActV2 requires next_thought annotated as str; an unmodified ReActV2 program cannot stream that field.",
     "A field header indented on its line is not streamed; the final output carries ChatAdapter.parse's value.",
     "An Executor with stream_fields always streams and needs a provider that declares streaming.",
-    "Interrupts, resume, checkpoints and subgraphs remain false. No replay journal, persistence or RAG executor selection ships in this stage."
+    "Pauses and resume use an in-memory journal and require deterministic author code apart from model, capability and interaction calls. Checkpoints and subgraphs remain false; no persistence or RAG executor selection ships in this stage.",
+    "Native pause cases use an independent in-memory replay controller with full canonical request equality; DSPy supplies no native pause primitive.",
+    "Journals are limited to 1 MiB before a pause is published. A pause while earlier concurrent calls are unfinished fails unsupported.",
+    "Replay emits no model field text or per-call progress and reports one content-free replay count. Replayed capability values are not re-registered as private strings."
   ]
 }

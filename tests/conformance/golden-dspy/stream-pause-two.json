@@ -1,0 +1,164 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\ntwo\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nReview draft\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+      "toolCalls": []
+    },
+    {
+      "content": "[[ ## answer ## ]]\nReview draft\n[[ ## completed ## ]]",
+      "toolCalls": []
+    },
+    {
+      "content": "[[ ## answer ## ]]\nReviewed Paris\n[[ ## completed ## ]]",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "Paris"
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "surfaceId": "main",
+      "viewRevision": "first",
+      "component": "test.Review/v1",
+      "props": {
+        "answer": "Paris"
+      }
+    },
+    {
+      "surfaceId": "main",
+      "viewRevision": "second",
+      "component": "test.Review/v1",
+      "props": {
+        "first": "one"
+      }
+    }
+  ],
+  "output": {
+    "answer": "Reviewed Paris",
+    "first": "one",
+    "second": "two"
+  },
+  "error": null,
+  "events": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model",
+        "index": 0
+      }
+    },
+    {
+      "mode": "messages",
+      "data": {
+        "field": "answer",
+        "text": "Paris"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "tool",
+        "name": "lookup",
+        "index": 0
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "pause"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "replayed",
+        "count": 3
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "pause"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "replayed",
+        "count": 4
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model",
+        "index": 1
+      }
+    },
+    {
+      "mode": "messages",
+      "data": {
+        "field": "answer",
+        "text": "Review draft"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model",
+        "index": 2
+      }
+    },
+    {
+      "mode": "messages",
+      "data": {
+        "field": "answer",
+        "text": "Reviewed Paris"
+      }
+    }
+  ]
+}

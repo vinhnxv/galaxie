@@ -457,3 +457,286 @@ def test_stream_fields_must_name_unique_text_outputs_before_dispatch(declaration
         asyncio.run(Executor(Program(), stream_fields=['absent' if declaration == 'missing' else 'answer']).run({'question': 'q'}, 'c', 5, on_stream=lambda *_: None))
     assert error.value.code == 'unsupported'
     assert seen == []
+
+
+def test_two_pauses_replay_models_direct_capabilities_and_writes_without_dispatch():
+    from galaxie.dspy import request_interaction
+    from galaxie import capabilities
+    seen = []
+    transport_for([{'content': fields(answer='Paris')}, 'receipt', {'content': fields(answer='Done')}], seen)
+    interaction = {'surfaceId': 'main', 'viewRevision': 'review', 'component': 'test.Review/v1', 'props': {}}
+    class Program(dspy.Module):
+        def __init__(self):
+            self.predict = dspy.Predict(Question)
+            self.predict.set_lm(GalaxieLM('answer'))
+        async def aforward(self, question):
+            prediction = await self.predict.acall(question=question)
+            await capabilities.call('write@1', {'query': prediction.answer})
+            first = request_interaction(interaction)
+            second = request_interaction({**interaction, 'viewRevision': 'second'})
+            final = await self.predict.acall(question=second['payload'])
+            return dspy.Prediction(answer=final.answer, first=first, second=second)
+    executor = Executor(Program())
+    assert asyncio.run(executor.run({'question': 'France?'}, 'c', 5)) is None
+    first = executor.pending('c')
+    assert first is not None and first['value'] == interaction
+    assert asyncio.run(executor.run(None, 'c', 5, resume={'interactionId': first['id'], 'action': 'keep', 'payload': 'one'})) is None
+    second = executor.pending('c')
+    assert second is not None and second['id'] != first['id']
+    result = asyncio.run(executor.run(None, 'c', 5, resume={'interactionId': second['id'], 'action': 'keep', 'payload': 'two'}))
+    assert result == {'answer': 'Done', 'first': {'action': 'keep', 'payload': 'one'}, 'second': {'action': 'keep', 'payload': 'two'}}
+    assert [message['op'] for message in seen] == ['model', 'capability', 'model']
+    assert seen[1]['payload']['effectScope'] == 'dspy/c/1/0'
+    assert executor.pending('c') is None
+
+
+INTERACTION = {'surfaceId': 'main', 'viewRevision': 'review', 'component': 'test.Review/v1', 'props': {}}
+
+
+@pytest.mark.parametrize('change', ['model', 'write', 'return', 'interaction'])
+def test_divergence_is_terminal_before_any_live_call_or_output(change):
+    from galaxie.dspy import request_interaction
+    from galaxie import capabilities
+    changed = False
+    seen, events = [], []
+    transport_for([{'content': fields(answer='Paris')}, 'receipt'], seen)
+    class Program(dspy.Module):
+        def __init__(self):
+            self.predict = dspy.Predict(Question)
+            self.predict.set_lm(GalaxieLM('answer'))
+        async def aforward(self):
+            if changed and change == 'return':
+                return dspy.Prediction(answer='early')
+            await self.predict.acall(question='different' if changed and change == 'model' else 'same')
+            await capabilities.call('write@1', {'query': 'different' if changed and change == 'write' else 'same'})
+            request_interaction({**INTERACTION, 'viewRevision': 'different'} if changed and change == 'interaction' else INTERACTION)
+            return dspy.Prediction(answer='done')
+    executor = Executor(Program())
+    asyncio.run(executor.run({}, 'c', 5))
+    pending = executor.pending('c')
+    assert pending is not None
+    changed = True
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run(None, 'c', 5, resume={'interactionId': pending['id'], 'action': 'keep', 'payload': {}}, on_stream=lambda *item: events.append(item)))
+    assert error.value.code == 'unrecoverable'
+    assert len(seen) == 2
+    assert events == [('updates', {'kind': 'unrecoverable'})]
+    with pytest.raises(GalaxieError) as error:
+        executor.pending('c')
+    assert error.value.code == 'unrecoverable'
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run({}, 'c', 5))
+    assert error.value.code == 'unrecoverable'
+
+
+def test_stale_resume_leaves_the_pending_answer_and_journal_intact():
+    from galaxie.dspy import request_interaction
+    entries = []
+    class Program(dspy.Module):
+        async def aforward(self):
+            entries.append('run')
+            return dspy.Prediction(answer=request_interaction(INTERACTION))
+    executor = Executor(Program())
+    asyncio.run(executor.run({}, 'c', 5))
+    pending = executor.pending('c')
+    assert pending is not None
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run(None, 'c', 5, resume={'interactionId': 'wrong', 'action': 'keep', 'payload': {}}))
+    assert error.value.code == 'stale'
+    assert entries == ['run']
+    assert executor.pending('c') == pending
+    result = asyncio.run(executor.run(None, 'c', 5, resume={'interactionId': pending['id'], 'action': 'keep', 'payload': 'answer'}))
+    assert result == {'answer': {'action': 'keep', 'payload': 'answer'}}
+
+
+@pytest.mark.parametrize('streaming', [False, True])
+def test_replay_is_silent_and_returns_mutation_isolated_receipts(streaming):
+    from galaxie.dspy import request_interaction
+    from galaxie import capabilities
+    seen, events = [], []
+    async def transport(raw):
+        message = json.loads(raw)
+        seen.append(message)
+        payload = {'content': fields(answer='private reply')} if message['op'] == 'model' else {'receipt': ['original']}
+        if message['op'] == 'model' and streaming:
+            _bridge.receive_model_chunk(json.dumps({**{key: message[key] for key in ('v', 'id')}, 'kind': 'notify', 'op': 'model-chunk', 'payload': payload}))
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': payload})
+    _bridge.install_transport(transport)
+    class Program(dspy.Module):
+        def __init__(self):
+            self.predict = dspy.Predict(Question)
+            self.predict.set_lm(GalaxieLM('answer'))
+        async def aforward(self):
+            await self.predict.acall(question='same')
+            receipt = await capabilities.call('write@1', {})
+            receipt['receipt'].append('author mutation')
+            answer = request_interaction(INTERACTION)
+            return dspy.Prediction(receipt=receipt, answer=answer)
+    executor = Executor(Program(), stream_fields=['answer'] if streaming else [])
+    asyncio.run(executor.run({}, 'c', 5, on_stream=lambda *item: events.append(item)))
+    pending = executor.pending('c')
+    assert pending is not None
+    events.clear()
+    result = asyncio.run(executor.run(None, 'c', 5, resume={'interactionId': pending['id'], 'action': 'keep', 'payload': {}}, on_stream=lambda *item: events.append(item)))
+    assert result['receipt'] == {'receipt': ['original', 'author mutation']}
+    assert [message['op'] for message in seen] == ['model', 'capability']
+    assert events == [('updates', {'kind': 'replayed', 'count': 3})]
+
+
+def test_pause_groups_allow_one_pause_with_cancellation_but_reject_two_or_other_errors():
+    from galaxie.dspy import _Pause
+    for children, expected in [
+        ([_Pause({'id': 'one', 'value': INTERACTION}), asyncio.CancelledError()], None),
+        ([_Pause({}), _Pause({})], 'unsupported'),
+        ([_Pause({}), ValueError('private text')], 'executor_error'),
+        ([_Pause({}), GalaxieError('denied'), GalaxieError('unavailable')], 'denied'),
+    ]:
+        class Program(dspy.Module):
+            async def aforward(self):
+                raise BaseExceptionGroup('private group', children)
+        executor = Executor(Program(), output=lambda _: {})
+        if expected is None:
+            assert asyncio.run(executor.run({}, 'c', 5)) is None
+            assert executor.pending('c') == {'id': 'one', 'value': INTERACTION}
+        else:
+            with pytest.raises(GalaxieError) as error:
+                asyncio.run(executor.run({}, 'c', 5))
+            assert error.value.code == expected
+
+
+@pytest.mark.parametrize('value', [
+    {}, {**INTERACTION, 'extra': True}, {**INTERACTION, 'component': 'wrong'},
+    {**INTERACTION, 'props': {'bad': float('nan')}}, {**INTERACTION, 'props': {'bad': (1, 2)}},
+])
+def test_pause_requests_obey_the_json_display_contract(value):
+    from galaxie.dspy import request_interaction
+    class Program(dspy.Module):
+        async def aforward(self):
+            request_interaction(value)
+    executor = Executor(Program())
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run({}, 'c', 5))
+    assert error.value.code == 'unsupported'
+    assert executor.pending('c') is None
+
+
+def test_concurrent_replayed_capabilities_keep_call_start_order():
+    from galaxie.dspy import request_interaction
+    from galaxie import capabilities
+    seen = []
+    async def transport(raw):
+        message = json.loads(raw)
+        seen.append(message)
+        if message['payload']['input']['query'] == 'first':
+            await asyncio.sleep(0)
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': message['payload']['input']['query']})
+    _bridge.install_transport(transport)
+    class Program(dspy.Module):
+        async def aforward(self):
+            results = await asyncio.gather(capabilities.call('write@1', {'query': 'first'}), capabilities.call('write@1', {'query': 'second'}))
+            request_interaction(INTERACTION)
+            return dspy.Prediction(results=results)
+    executor = Executor(Program())
+    asyncio.run(executor.run({}, 'c', 5))
+    pending = executor.pending('c')
+    assert pending is not None
+    assert asyncio.run(executor.run(None, 'c', 5, resume={'interactionId': pending['id'], 'action': 'keep', 'payload': {}})) == {'results': ['first', 'second']}
+    assert [message['payload']['effectScope'] for message in seen] == ['dspy/c/1/0', 'dspy/c/1/1']
+
+
+@pytest.mark.parametrize('kwargs', [{'name': '', 'input': {}}, {'name': 'write@1', 'input': {}, 'effect_scope': ''}])
+def test_caught_capability_validation_failure_still_ends_the_run_before_a_model(kwargs):
+    from galaxie import capabilities
+    seen = []
+    transport_for([], seen)
+    class Program(dspy.Module):
+        def __init__(self):
+            self.predict = dspy.Predict(Question)
+            self.predict.set_lm(GalaxieLM('answer'))
+        async def aforward(self):
+            try:
+                await capabilities.call(**kwargs)
+            except GalaxieError:
+                pass
+            return await self.predict.acall(question='must not dispatch')
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(Program()).run({}, 'c', 5))
+    assert error.value.code == 'invalid'
+    assert seen == []
+
+
+def test_direct_capability_names_are_not_projected_as_offered_tool_names():
+    from galaxie import capabilities
+    events = []
+    transport_for([], code='denied')
+    class Program(dspy.Module):
+        def __init__(self):
+            self.predict = dspy.Predict(Question)
+            self.predict.set_lm(GalaxieLM('answer'))
+        async def aforward(self):
+            await capabilities.call('private-dynamic-name@1', {'query': 'private argument'})
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(Program(), stream_fields=['answer']).run({}, 'c', 5, on_stream=lambda *item: events.append(item)))
+    assert error.value.code == 'denied'
+    assert events == []
+
+
+def test_a_fresh_start_replaces_a_pending_pause_that_core_discarded():
+    from galaxie.dspy import request_interaction
+    class Program(dspy.Module):
+        async def aforward(self, ask):
+            return dspy.Prediction(answer=request_interaction(INTERACTION)['payload'] if ask else 'fresh')
+    executor = Executor(Program())
+    asyncio.run(executor.run({'ask': True}, 'c', 5))
+    assert executor.pending('c') is not None
+    assert asyncio.run(executor.run({'ask': False}, 'c', 5)) == {'answer': 'fresh'}
+    assert executor.pending('c') is None
+
+
+def test_a_large_run_without_a_pause_still_returns_its_output():
+    async def transport(raw):
+        message = json.loads(raw)
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': 'x' * 400_000})
+    _bridge.install_transport(transport)
+    tool = capability_tool('lookup@1', 'Look up', SCHEMA)
+    class Program(dspy.Module):
+        async def aforward(self):
+            results = [await tool.acall(query=str(index)) for index in range(3)]
+            return dspy.Prediction(answer=sum(map(len, results)))
+    assert asyncio.run(Executor(Program()).run({}, 'c', 5)) == {'answer': 1_200_000}
+
+
+def test_a_malformed_interaction_inside_a_tool_ends_the_run_unsupported():
+    from galaxie.dspy import request_interaction
+    def review(query: str) -> str:
+        return request_interaction({**INTERACTION, 'component': 'not a component'})['payload']
+    transport_for([LOOKUP, FINISH])
+    module = dspy.ReAct(Question, tools=[dspy.Tool(review, name='lookup')], max_iters=2)
+    module.set_lm(GalaxieLM('answer'))
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(module).run({'question': 'q'}, 'c', 5))
+    assert error.value.code == 'unsupported'
+
+
+def test_a_pause_beside_an_unfinished_write_reports_outcome_unknown():
+    from galaxie.dspy import request_interaction
+    release = asyncio.Event()
+    async def transport(raw):
+        message = json.loads(raw)
+        await release.wait()
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': 'ok'})
+    _bridge.install_transport(transport)
+    tool = capability_tool('write@1', 'Write', SCHEMA)
+    class Program(dspy.Module):
+        async def aforward(self):
+            async def ask():
+                await asyncio.sleep(0)
+                try:
+                    return request_interaction(INTERACTION)
+                finally:
+                    release.set()
+            await asyncio.gather(tool.acall(query='write'), ask())
+            return dspy.Prediction(answer='done')
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(Program()).run({}, 'c', 5))
+    assert error.value.code == 'outcome_unknown'

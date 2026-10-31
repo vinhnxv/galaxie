@@ -3,6 +3,8 @@
 
 """The same DSPy programs run natively and through the Worker adapter."""
 
+import asyncio
+
 import dspy
 from typing import Any
 
@@ -15,7 +17,7 @@ class Question(dspy.Signature):
 SCHEMA = {'type': 'object', 'properties': {'query': {'type': 'string'}}, 'required': ['query'], 'additionalProperties': False}
 
 
-def base_name(name):
+def base_name(name: str) -> str:
     return {
         'stream-text': 'chain-of-thought', 'stream-fragmented': 'chain-of-thought',
         'stream-tools': 'react-one-tool', 'stream-native-tools': 'native-tool-calling',
@@ -27,12 +29,68 @@ def base_name(name):
     }.get(name, name)
 
 
-def program(name, lm=None, tool=None):
+def pause_program(name, lm, tool, interaction):
+    if interaction is None:
+        from galaxie.dspy import request_interaction
+        interaction = request_interaction
+    if tool is None:
+        from galaxie.dspy import capability_tool
+        tool = capability_tool('docs.lookup@1', 'Look up the fact.', SCHEMA, tool_name='lookup')
+    def review(revision, props=None):
+        return interaction({'surfaceId': 'main', 'viewRevision': revision, 'component': 'test.Review/v1', 'props': props or {}})
+    if name in {'pause-react-tool', 'pause-react-v2-tool'}:
+        async def lookup(query: str) -> str:
+            await tool.acall(query=query)
+            return review('tool', {'query': query})['payload']
+        reviewed = dspy.Tool(lookup, name='lookup', desc='Review the fact.', args=SCHEMA['properties'], arg_types={})
+        module = (dspy.ReAct if name == 'pause-react-tool' else dspy.ReActV2)(Question, tools=[reviewed], max_iters=1 if name == 'pause-react-tool' else 2)
+    else:
+        class Pausing(dspy.Module):
+            def __init__(self):
+                self.predict = dspy.Predict(Question)
+                self.executions = 0
+            async def aforward(self, question):
+                self.executions += 1
+                if name == 'pause-early-return' and self.executions > 1:
+                    return dspy.Prediction(answer='Too early.')
+                if name == 'pause-concurrent':
+                    async def ask(revision):
+                        return review(revision)
+                    results = await asyncio.gather(ask('first'), ask('second'), return_exceptions=True)
+                    raise BaseExceptionGroup('Concurrent interactions.', [result for result in results if isinstance(result, BaseException)])
+                if name == 'pause-changed-write':
+                    await tool.acall(query='France' if self.executions == 1 else 'changed')
+                if name == 'pause-new-run':
+                    await tool.acall(query='France')
+                if name in {'pause-two', 'stream-pause-two'}:
+                    prediction = await self.predict.acall(question=question)
+                    await tool.acall(query=prediction.answer)
+                    first = review('first', {'answer': prediction.answer})
+                    second = review('second', {'first': first['payload']})
+                    draft = await self.predict.acall(question=second['payload'])
+                    final = await self.predict.acall(question=draft.answer)
+                    return dspy.Prediction(answer=final.answer, first=first['payload'], second=second['payload'])
+                if name == 'pause-diverged-model':
+                    await self.predict.acall(question=question if self.executions == 1 else 'changed')
+                first = review('first')
+                if name == 'pause-oversize':
+                    review('second', {'large': 'x' * 1_100_000})
+                if name in {'pause-early-return', 'pause-changed-write', 'pause-new-run', 'pause-diverged-model'}:
+                    return dspy.Prediction(answer=first['payload'])
+                return await self.predict.acall(question=first['payload'])
+        module = Pausing()
+    module.set_lm(lm)
+    return module
+
+
+def program(name, lm=None, tool=None, interaction=None):
     streaming = name.startswith('stream-')
     name = base_name(name)
     if lm is None:
         from galaxie.dspy import GalaxieLM
         lm = GalaxieLM('answer', native_tools=name in {'native-tool-calling', 'argument-block'})
+    if 'pause-' in name:
+        return pause_program(name, lm, tool, interaction)
     if name in {'react-one-tool', 'react-two-tools', 'react-v2', 'native-tool-calling', 'argument-block', 'capability-denial', 'outcome-unknown'}:
         if tool is None:
             from galaxie.dspy import capability_tool

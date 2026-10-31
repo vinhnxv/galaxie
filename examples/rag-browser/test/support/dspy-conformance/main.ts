@@ -51,6 +51,9 @@ try {
       entry: 'create_agent',
     },
     name,
+    new URLSearchParams(location.search).has('steps')
+      ? Number(new URLSearchParams(location.search).get('steps'))
+      : undefined,
   );
 } catch (error) {
   result.error = String(error);
