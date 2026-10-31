@@ -5,13 +5,16 @@
 
 import asyncio
 import json
-from collections.abc import Callable
+import re
+from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import aclosing
 from contextvars import ContextVar
 from dataclasses import dataclass, fields
 from typing import Any
 
 import dspy
-from dspy.lm15 import FunctionTool, Message, Request, Response, TextPart, ToolCallPart, ToolResultPart, Usage
+from dspy.lm15 import FunctionTool, Message, Request, Response, StreamDeltaEvent, StreamEndEvent, StreamStartEvent, TextDelta, TextPart, ToolCallDelta, ToolCallPart, ToolResultPart, Usage
+from dspy.streaming import StatusMessageProvider, StreamListener, StreamResponse
 
 from . import capabilities
 from ._bridge import ERROR_MESSAGES, GalaxieError, request
@@ -36,6 +39,8 @@ class _Run:
     ordinal: int
     calls: int = 0
     failure: str | None = None
+    models: int = 0
+    on_stream: Callable[[str, Any], None] | None = None
 
     def record(self, code: str) -> None:
         if self.failure is None:
@@ -45,6 +50,22 @@ class _Run:
         # A failure that DSPy turned into an observation still ends the run with its code.
         if self.failure is not None:
             raise _Termination(self.failure)
+
+    def model(self) -> None:
+        self.check()
+        self.emit('updates', {'kind': 'model', 'index': self.models})
+        self.check()
+        self.models += 1
+
+    def emit(self, mode: str, data: Any) -> None:
+        if self.on_stream is not None:
+            try:
+                self.on_stream(mode, data)
+            except BaseException as error:
+                # Drain streamify in its owning task before surfacing a notification
+                # failure; abandoning its generator strands an anyio cancel scope.
+                self.record(error_code(error))
+                self.on_stream = None
 
 
 _run: ContextVar[_Run | None] = ContextVar('galaxie_dspy_run', default=None)
@@ -122,6 +143,11 @@ def _invalid_json(_: str) -> None:
     raise GalaxieError('invalid')
 
 
+def _argument_json(value: str) -> str:
+    # Match provider JSON normalization without equating booleans and numbers.
+    return json.dumps(json.loads(value, parse_int=float, parse_float=float, parse_constant=_invalid_json), sort_keys=True, allow_nan=False)
+
+
 def _reply(value: Any, original: Request, native: bool, role: str) -> Response:
     calls = value.get('toolCalls', [])
     if calls and not native:
@@ -144,6 +170,57 @@ def _reply(value: Any, original: Request, native: bool, role: str) -> Response:
     return Response(id=None, model=role, message=Message(role='assistant', parts=tuple(parts)), finish_reason='tool_call' if calls else 'stop', usage=Usage(**usage) if usage else Usage())
 
 
+class _TextFramer:
+    # DSPy's listener retains only ten fragments of a delimiter. Frame a delimiter
+    # as one fragment, without changing checked text or parsing field values here.
+    def __init__(self) -> None:
+        self._pending: list[str] = []
+        self._suffix = 0
+
+    def feed(self, text: str) -> list[str]:
+        prefix, suffix = '[[ ## ', ' ## ]]'
+        output, plain = [], []
+        for character in text:
+            if self._pending:
+                if len(self._pending) < len(prefix):
+                    valid = character == prefix[len(self._pending)]
+                elif self._suffix:
+                    valid = character == suffix[self._suffix]
+                    if valid:
+                        self._suffix += 1
+                else:
+                    valid = re.fullmatch(r'\w', character) is not None
+                    if character == ' ' and len(self._pending) > len(prefix):
+                        valid = True
+                        self._suffix = 1
+                if valid:
+                    self._pending.append(character)
+                    if self._suffix == len(suffix):
+                        output.append(''.join(self._pending))
+                        self._pending.clear()
+                        self._suffix = 0
+                    continue
+                plain.extend(self._pending)
+                self._pending.clear()
+                self._suffix = 0
+            if character == '[':
+                if plain:
+                    output.append(''.join(plain))
+                    plain.clear()
+                self._pending.append(character)
+            else:
+                plain.append(character)
+        if plain:
+            output.append(''.join(plain))
+        return output
+
+    def finish(self) -> str:
+        text = ''.join(self._pending)
+        self._pending.clear()
+        self._suffix = 0
+        return text
+
+
 class _SyncEngine:
     def complete(self, value: Request) -> Response:
         raise _LMError('unsupported')
@@ -156,7 +233,7 @@ class _AsyncEngine:
     async def complete(self, value: Request) -> Response:
         run = _run.get()
         if run is not None:
-            run.check()
+            run.model()
         try:
             options = _options(value, self.native)
             reply = await request('model', {'role': self.role, 'messages': _messages(value), 'options': options})
@@ -165,6 +242,69 @@ class _AsyncEngine:
             if run is not None:
                 run.record(error.code)
             raise _LMError(error.code) from None
+
+    async def stream(self, value: Request) -> AsyncIterator[Any]:
+        run = _run.get()
+        if run is not None:
+            run.model()
+        task = None
+        try:
+            options = {**_options(value, self.native), 'stream': True}
+            chunks: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+            payload = {'role': self.role, 'messages': _messages(value), 'options': options}
+            async def receive() -> Any:
+                try:
+                    return await request('model', payload, on_model_chunk=chunks.put_nowait)
+                except GalaxieError as error:
+                    if run is not None:
+                        run.record(error.code)
+                    raise
+            task = asyncio.create_task(receive())
+            task.add_done_callback(lambda _: chunks.put_nowait(None))
+            yield StreamStartEvent(model=self.role)
+            content: list[str] = []
+            calls: dict[int, dict[str, list[str]]] = {}
+            framer = _TextFramer()
+            while (chunk := await chunks.get()) is not None:
+                content.append(chunk['content'])
+                for fragment in framer.feed(chunk['content']):
+                    yield StreamDeltaEvent(TextDelta(fragment))
+                for fragment in chunk.get('toolCalls', []):
+                    call = calls.setdefault(fragment['index'], {'id': [], 'name': [], 'arguments': []})
+                    call['id'].append(fragment.get('id', ''))
+                    for key in ('name', 'arguments'):
+                        call[key].append(fragment['function'].get(key, ''))
+            final = await task
+            reply = _reply(final, value, self.native, self.role)
+            joined = [{key: ''.join(pieces) for key, pieces in call.items()} for call in calls.values()]
+            by_id = {call['id']: call for call in joined}
+            if ''.join(content) != final['content'] or len(joined) != len(final.get('toolCalls', [])) or len(by_id) != len(joined):
+                raise GalaxieError('invalid')
+            if tail := framer.finish():
+                yield StreamDeltaEvent(TextDelta(tail))
+            for index, part in enumerate(reply.message.parts):
+                if not isinstance(part, ToolCallPart):
+                    continue
+                streamed = by_id.get(part.id)
+                if streamed is None or streamed['name'] != part.name:
+                    raise GalaxieError('invalid')
+                try:
+                    arguments = _argument_json(streamed['arguments'])
+                except (ValueError, TypeError):
+                    raise GalaxieError('invalid') from None
+                if arguments != _argument_json(json.dumps(part.input)):
+                    raise GalaxieError('invalid')
+                yield StreamDeltaEvent(ToolCallDelta(input=streamed['arguments'], part_index=index, id=part.id, name=part.name))
+            yield StreamEndEvent(finish_reason=reply.finish_reason, usage=reply.usage)
+        except GalaxieError as error:
+            if run is not None:
+                run.record(error.code)
+            raise _LMError(error.code) from None
+        finally:
+            if task is not None:
+                if not task.done():
+                    task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
 
     async def aclose(self) -> None:
         pass
@@ -217,6 +357,8 @@ def capability_tool(name: str, description: str, args_schema: dict[str, Any], *,
         run.check()
         ordinal = run.calls
         run.calls += 1
+        run.emit('updates', {'kind': 'tool', 'name': tool_name or name, 'index': ordinal})
+        run.check()
         try:
             return await capabilities.call(name, arguments, effect_scope=f'dspy/{run.conversation}/{run.ordinal}/{ordinal}')
         except GalaxieError as error:
@@ -261,24 +403,121 @@ def error_code(error: BaseException) -> str:
     return 'cancelled' if isinstance(error, asyncio.CancelledError) else 'executor_error'
 
 
+class _SilentStatus(StatusMessageProvider):
+    def tool_start_status_message(self, instance: Any, inputs: Any) -> Any:
+        pass
+
+    def tool_end_status_message(self, outputs: Any) -> Any:
+        pass
+
+
+class _ChatListener(StreamListener):
+    _LINE_BREAKS = '\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029'
+
+    def __init__(self, field: str, **kwargs: Any) -> None:
+        super().__init__(field, **kwargs)
+        self._line_start = True
+        self._indented = False
+        self._header = False
+        self._carriage_return = False
+
+    def receive(self, chunk: Any) -> Any:
+        choice = chunk.choices[0]
+        text = choice.delta.content
+        if text is None:
+            if choice.finish_reason is not None:
+                # Reuse is per model call; repeated field headers within a call
+                # still keep the first value, as ChatAdapter.parse does.
+                self.__init__(self.signature_field_name, predict=self.predict, predict_name=self.predict_name)
+            return None
+        if self.stream_end:
+            return None
+        self._header = self._line_start and re.fullmatch(r'\[\[ ## \w+ ## \]\]', text) is not None
+        if self._header and self._indented and not self.stream_start and text == f'[[ ## {self.signature_field_name} ## ]]':
+            # ChatAdapter.parse slices an indented header's value differently;
+            # leave that field to the final output rather than stream other text.
+            self.stream_end = True
+            return None
+        consume = self.stream_start or bool(self.field_start_queue) or (
+            self._header and text == f'[[ ## {self.signature_field_name} ## ]]'
+        )
+        for character in text:
+            if character in self._LINE_BREAKS:
+                self._line_start, self._indented = True, False
+            elif not character.isspace():
+                self._line_start = False
+            elif self._line_start:
+                self._indented = True
+        return super().receive(chunk) if consume else None
+
+    def _could_form_end_identifier(self, concat_message: str, adapter_name: str) -> bool:
+        return self._header
+
+    def flush(self) -> str:
+        # DSPy's default flush truncates literal '[['; only framed line headers
+        # delimit ChatAdapter fields. The engine frames those before streamify.
+        text = ''.join(self.field_end_queue.get_nowait() for _ in range(self.field_end_queue.qsize()))
+        if self._header:
+            text = text.split('[[ ##', 1)[0]
+        normalized = []
+        for character in text:
+            if character == '\n' and self._carriage_return:
+                self._carriage_return = False
+                continue
+            self._carriage_return = character == '\r'
+            normalized.append('\n' if character in self._LINE_BREAKS else character)
+        if self._header:
+            self._carriage_return = False
+        return ''.join(normalized)
+
+
 class Executor:
     """Map one JSON input to an async DSPy module and project its output fields."""
 
-    def __init__(self, module: dspy.Module, *, input: Callable[[Any], dict[str, Any]] | None = None, output: Callable[[Any], Any] | None = None, adapter: Any = None) -> None:
+    def __init__(self, module: dspy.Module, *, input: Callable[[Any], dict[str, Any]] | None = None, output: Callable[[Any], Any] | None = None, adapter: Any = None, stream_fields: Sequence[str] = ()) -> None:
         if not isinstance(module, dspy.Module):
             raise GalaxieError('unsupported')
         self.module, self.input, self.output = module, input, output
         self.adapter = adapter if adapter is not None else dspy.ChatAdapter(use_json_adapter_fallback=False)
         self.lm = dspy.settings.lm if isinstance(dspy.settings.lm, GalaxieLM) else None
         self._ordinals: dict[str, int] = {}
+        if isinstance(stream_fields, str) or any(not isinstance(field, str) or not field for field in stream_fields) or len(set(stream_fields)) != len(stream_fields):
+            raise GalaxieError('unsupported')
+        self.stream_fields = tuple(stream_fields)
         _validate(module, self.adapter, self.lm)
 
-    async def run(self, value: Any, conversation: str, steps: int) -> Any:
+    async def _stream_prediction(self, inputs: dict[str, Any], run: _Run) -> Any:
+        if type(self.adapter) is not dspy.ChatAdapter:
+            raise GalaxieError('unsupported')
+        listeners = []
+        for field in self.stream_fields:
+            predictors = [predictor for _, predictor in self.module.named_predictors() if field in getattr(predictor.signature, 'output_fields', {})]
+            if len(predictors) != 1 or getattr(predictors[0].signature, 'output_fields')[field].annotation is not str:
+                raise GalaxieError('unsupported')
+            listeners.append(_ChatListener(field))
+        stream: Any = dspy.streamify(self.module, is_async_program=True, async_streaming=True,
+            stream_listeners=listeners, status_message_provider=_SilentStatus())
+        result = None
+        async with aclosing(stream(**inputs)) as events:
+            async for item in events:
+                if isinstance(item, StreamResponse) and item.signature_field_name in self.stream_fields:
+                    if not isinstance(item.chunk, str):
+                        raise GalaxieError('unsupported')
+                    if item.chunk:
+                        run.emit('messages', {'field': item.signature_field_name, 'text': item.chunk})
+                elif isinstance(item, dspy.Prediction):
+                    result = item
+        if result is None:
+            raise GalaxieError('executor_error')
+        return result
+
+    async def run(self, value: Any, conversation: str, steps: int, *, on_stream: Callable[[str, Any], None] | None = None) -> Any:
         dspy.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
         _validate(self.module, self.adapter, self.lm)
         ordinal = self._ordinals.get(conversation, 0) + 1
         self._ordinals[conversation] = ordinal
-        run = _Run(conversation, ordinal)
+        streaming = on_stream is not None and bool(self.stream_fields)
+        run = _Run(conversation, ordinal, on_stream=on_stream if streaming else None)
         token = _run.set(run)
         observer = capabilities.failures.set(run.record)
         try:
@@ -286,14 +525,17 @@ class Executor:
             if not isinstance(inputs, dict):
                 raise GalaxieError('unsupported')
             with dspy.context(lm=self.lm, adapter=self.adapter, disable_history=True, trace=None, callbacks=[]):
-                result = await self.module.acall(**inputs)
+                if streaming:
+                    result = await self._stream_prediction(inputs, run)
+                else:
+                    result = await self.module.acall(**inputs)
             run.check()
             if self.output:
                 return _json(self.output(result))
             signature = getattr(self.module, 'signature', None)
             return _json({key: result[key] for key in signature.output_fields} if signature is not None else dict(result.items()))
         except BaseException as error:
-            raise GalaxieError(error_code(error)) from None
+            raise GalaxieError(run.failure or error_code(error)) from None
         finally:
             capabilities.failures.reset(observer)
             _run.reset(token)

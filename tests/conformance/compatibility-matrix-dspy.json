@@ -3,7 +3,7 @@
   "requestReference": "dspy.clients.lm15_boundary.request_kwargs(request, \"chat\") from pinned DSPy 3.4.1; the galaxie mapper is independent",
   "lanes": ["Node Pyodide", "real headless Chromium Pyodide"],
   "features": {
-    "streaming": false,
+    "streaming": true,
     "interrupts": false,
     "resume": false,
     "checkpoints": false,
@@ -23,21 +23,42 @@
     "reply-block",
     "argument-block",
     "refused-lm",
-    "abort"
+    "abort",
+    "stream-text",
+    "stream-fragmented",
+    "stream-tools",
+    "stream-native-tools",
+    "stream-mid-block",
+    "stream-final-mismatch",
+    "stream-abort",
+    "stream-json-adapter",
+    "stream-outcome-unknown",
+    "stream-argument-block",
+    "stream-literal-brackets",
+    "stream-literal-fragmented",
+    "stream-repeat"
   ],
   "differences": [],
   "normalizations": [
     "Assistant tool-only content null maps to the bridge empty string.",
     "Tool-call argument JSON strings compare as parsed JSON; call IDs, names, values and all message text remain compared.",
     "Replies project text and tool calls without provider-generated message IDs or timestamps.",
-    "Native cancellation and the runtime cancelled event share the fixed cancelled code and message."
+    "Native cancellation and the runtime cancelled event share the fixed cancelled code and message.",
+    "Adjacent messages deltas for the same field are joined on both sides before comparison; chunk boundaries are not compared, but the joined text and the per-call model markers are.",
+    "Fragmented cases split replies into single characters on the galaxie lanes and use the fixture's chunks natively; the native reference streams each growing prefix through DSPy's own ChatAdapter.parse."
   ],
   "limits": [
     "All replies are deterministic scripts; no real model or model download is exercised.",
     "Native records use DSPy directly with an independent engine and tool, not galaxie.dspy. Refused plain LMs and JavaScript safety failures have fixed native stand-ins.",
     "Node and Chromium use verified local wheels, block external requests and enforce output checks in JavaScript before Python receives text or tool arguments.",
     "The outcome-unknown case uses a write capability and proves that no model call follows the terminal tool failure.",
-    "Streaming, interrupts, resume, checkpoints and subgraphs remain false. No replay journal, persistence or RAG executor selection ships in this stage.",
-    "Trusted Python author code can still import js; provider omission and linting do not create a sandbox."
+    "Trusted Python author code can still import js; provider omission and linting do not create a sandbox.",
+    "Streaming covers ChatAdapter fields declared in stream_fields with a plain str annotation; JSONAdapter streaming fails unsupported because jiter is not in the Worker set.",
+    "Native updates markers are scripted to match galaxie's content-free projection; they are not native DSPy events.",
+    "stream-final-mismatch and stream-abort use fixed native stand-ins (invalid and cancelled); the final-reply equality check and cancellation run only on the galaxie lanes.",
+    "Streaming ReActV2 requires next_thought annotated as str; an unmodified ReActV2 program cannot stream that field.",
+    "A field header indented on its line is not streamed; the final output carries ChatAdapter.parse's value.",
+    "An Executor with stream_fields always streams and needs a provider that declares streaming.",
+    "Interrupts, resume, checkpoints and subgraphs remain false. No replay journal, persistence or RAG executor selection ships in this stage."
   ]
 }

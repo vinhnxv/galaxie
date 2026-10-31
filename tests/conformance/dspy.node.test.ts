@@ -4,6 +4,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 import { createPythonFixture } from '../../examples/rag-browser/test/support/python.node.js';
+import { createPyodideAdapter } from '../../packages/adapter-pyodide/src/adapter.js';
 import { dspyCases, executeDspyCase } from './support/dspy.js';
 import { dspySources } from './support/dspy-sources.node.js';
 
@@ -21,8 +22,9 @@ test.each(dspyCases)(
         JSON.parse(await readFile(new URL(`./golden-dspy/${name}.json`, import.meta.url), 'utf8')),
       );
       expect(fixture.workerErrors).toEqual([]);
-      if (name === 'reply-block') expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED_TEXT');
-      if (name === 'argument-block')
+      if (name === 'reply-block' || name === 'stream-mid-block')
+        expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED_TEXT');
+      if (name === 'argument-block' || name === 'stream-argument-block')
         expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED_ARGUMENT');
     } finally {
       await fixture.cleanup();
@@ -30,3 +32,21 @@ test.each(dspyCases)(
   },
   60000,
 );
+
+test('the DSPy compatibility matrix lists every case and the adapter features', async () => {
+  const matrix = JSON.parse(
+    await readFile(new URL('./compatibility-matrix-dspy.json', import.meta.url), 'utf8'),
+  );
+  expect([...matrix.cases].sort()).toEqual([...dspyCases].sort());
+  expect(matrix.features).toEqual(
+    createPyodideAdapter({
+      framework: 'dspy',
+      runtimeUrl: '',
+      wheelsUrl: '',
+      localWheels: [],
+      createWorker: () => {
+        throw new Error('The matrix check starts no Worker.');
+      },
+    }).features,
+  );
+});

@@ -137,5 +137,217 @@
         "text": "[[ ## answer ## ]]\nlate\n[[ ## completed ## ]]"
       }
     ]
+  },
+  "stream-text": {
+    "replies": [
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+        "chunks": [
+          "[[ ## reasoning ## ]]",
+          "\nUse the supplied fact.\n",
+          "[[ ## answer ## ]]",
+          "\nParis\n",
+          "[[ ## completed ## ]]"
+        ]
+      }
+    ]
+  },
+  "stream-fragmented": {
+    "replies": [
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+        "chunks": [
+          "[[ ## reasoning ## ]]",
+          "\nUse the supplied fact.\n",
+          "[[ ## answer ## ]]",
+          "\nParis\n",
+          "[[ ## completed ## ]]"
+        ]
+      }
+    ],
+    "fragmented": true
+  },
+  "stream-tools": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]",
+        "chunks": [
+          "[[ ## next_thought ## ]]",
+          "\nLook up the fact.\n",
+          "[[ ## next_tool_name ## ]]",
+          "\nlookup\n",
+          "[[ ## next_tool_args ## ]]",
+          "\n{\"query\":\"France\"}\n",
+          "[[ ## completed ## ]]"
+        ]
+      },
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+        "chunks": [
+          "[[ ## reasoning ## ]]",
+          "\nUse the supplied fact.\n",
+          "[[ ## answer ## ]]",
+          "\nParis\n",
+          "[[ ## completed ## ]]"
+        ]
+      }
+    ]
+  },
+  "stream-native-tools": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nUse the supplied tools.\n[[ ## completed ## ]]",
+        "toolCalls": [
+          {
+            "name": "lookup",
+            "id": "lookup-1",
+            "args": {
+              "query": "France"
+            },
+            "type": "tool_call"
+          }
+        ],
+        "chunks": [
+          "[[ ## next_thought ## ]]",
+          "\nUse the supplied tools.\n",
+          "[[ ## completed ## ]]"
+        ]
+      },
+      {
+        "text": "[[ ## next_thought ## ]]\nUse the supplied tools.\n[[ ## completed ## ]]",
+        "toolCalls": [
+          {
+            "name": "submit",
+            "id": "submit-1",
+            "args": {
+              "answer": "Paris"
+            },
+            "type": "tool_call"
+          }
+        ],
+        "chunks": [
+          "[[ ## next_thought ## ]]",
+          "\nUse the supplied tools.\n",
+          "[[ ## completed ## ]]"
+        ]
+      }
+    ]
+  },
+  "stream-mid-block": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nsafe prefix BLOCKED_TEXT\n[[ ## completed ## ]]",
+        "chunks": [
+          "[[ ## answer ## ]]",
+          "\nsafe prefix",
+          " ",
+          "BLOCKED_TEXT",
+          "\n[[ ## completed ## ]]"
+        ]
+      }
+    ]
+  },
+  "stream-final-mismatch": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+        "chunks": ["[[ ## answer ## ]]", "\nParis\n", "[[ ## completed ## ]]"]
+      }
+    ]
+  },
+  "stream-abort": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+        "chunks": ["[[ ## answer ## ]]", "\nParis", "\n[[ ## completed ## ]]"]
+      }
+    ]
+  },
+  "stream-json-adapter": {
+    "replies": [
+      {
+        "text": "{\"answer\":\"Paris\"}",
+        "chunks": ["{\"answer\":\"Paris\"}"]
+      }
+    ]
+  },
+  "stream-outcome-unknown": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]",
+        "chunks": [
+          "[[ ## next_thought ## ]]",
+          "\nLook up the fact.\n",
+          "[[ ## next_tool_name ## ]]",
+          "\nlookup\n",
+          "[[ ## next_tool_args ## ]]",
+          "\n{\"query\":\"France\"}\n",
+          "[[ ## completed ## ]]"
+        ]
+      }
+    ]
+  },
+  "stream-argument-block": {
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nUse the supplied tools.\n[[ ## completed ## ]]",
+        "toolCalls": [
+          {
+            "name": "lookup",
+            "id": "lookup-1",
+            "args": {
+              "query": "BLOCKED_ARGUMENT"
+            },
+            "type": "tool_call"
+          }
+        ],
+        "chunks": [
+          "[[ ## next_thought ## ]]",
+          "\nUse the supplied tools.\n",
+          "[[ ## completed ## ]]"
+        ]
+      }
+    ]
+  },
+  "stream-literal-brackets": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nUse [[Paris]]\r\nand [[1,2]]; hello [[ ## fake ## ]] world.\n[[ ## completed ## ]]",
+        "chunks": [
+          "[[ ## answer ## ]]",
+          "\nUse [[Paris]]\r\nand [[1,2]]; hello ",
+          "[[ ## fake ## ]]",
+          " world.\n",
+          "[[ ## completed ## ]]"
+        ]
+      }
+    ]
+  },
+  "stream-literal-fragmented": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nUse [[Paris]]\r\nand [[1,2]]; hello [[ ## fake ## ]] world.\n[[ ## completed ## ]]",
+        "chunks": [
+          "[[ ## answer ## ]]",
+          "\nUse [[Paris]]\r\nand [[1,2]]; hello ",
+          "[[ ## fake ## ]]",
+          " world.\n",
+          "[[ ## completed ## ]]"
+        ]
+      }
+    ],
+    "fragmented": true
+  },
+  "stream-repeat": {
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nfirst draft\n[[ ## completed ## ]]",
+        "chunks": ["[[ ## answer ## ]]", "\nfirst draft\n", "[[ ## completed ## ]]"]
+      },
+      {
+        "text": "[[ ## answer ## ]]\nfinal answer\n[[ ## completed ## ]]",
+        "chunks": ["[[ ## answer ## ]]", "\nfinal answer\n", "[[ ## completed ## ]]"]
+      }
+    ]
   }
 }

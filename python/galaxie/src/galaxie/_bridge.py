@@ -272,15 +272,27 @@ def notify_stream(path, mode, data) -> None:
     if _notify is None:
         raise GalaxieError('unavailable')
     try:
-        if not isinstance(path, (list, tuple)) or any(not isinstance(item, str) for item in path):
-            raise GalaxieError('unsupported')
-        if mode not in ('values', 'updates', 'messages', 'custom'):
-            raise GalaxieError('unsupported')
         if mode == 'messages':
             message, metadata = data
             data = [message, {key: metadata[key] for key in (
                 'langgraph_node', 'langgraph_checkpoint_ns',
             ) if key in metadata}]
+        notify_stream_data(path, mode, data)
+    except GalaxieError:
+        raise
+    except Exception:
+        raise GalaxieError('unsupported') from None
+
+
+def notify_stream_data(path, mode, data) -> None:
+    """Send a bounded JSON event whose executor already owns its projection."""
+    if _notify is None:
+        raise GalaxieError('unavailable')
+    try:
+        if not isinstance(path, (list, tuple)) or any(not isinstance(item, str) for item in path):
+            raise GalaxieError('unsupported')
+        if mode not in ('values', 'updates', 'messages', 'custom'):
+            raise GalaxieError('unsupported')
         raw = json.dumps({
             'v': VERSION, 'kind': 'notify', 'id': str(next(_ids)), 'op': 'stream',
             'payload': [list(path), mode, _project_stream(data)],

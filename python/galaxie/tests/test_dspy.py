@@ -236,19 +236,21 @@ LOOKUP = {'content': fields(next_thought='look up', next_tool_name='lookup', nex
 FINISH = {'content': fields(reasoning='Done.', answer='Paris')}
 
 
-def test_invalid_capability_failure_ends_the_run_because_a_write_may_have_run():
+@pytest.mark.parametrize('streaming', [False, True])
+def test_invalid_capability_failure_ends_the_run_because_a_write_may_have_run(streaming):
     seen = []
     react_transport(seen, [LOOKUP, FINISH], capability_code='invalid')
     tool = capability_tool('lookup@1', 'Look up', SCHEMA, tool_name='lookup')
     module = dspy.ReAct(Question, tools=[tool], max_iters=2)
     module.set_lm(GalaxieLM('answer'))
     with pytest.raises(GalaxieError) as error:
-        asyncio.run(Executor(module).run({'question': 'q'}, 'c', 5))
+        asyncio.run(Executor(module, stream_fields=['answer'] if streaming else []).run({'question': 'q'}, 'c', 5, on_stream=lambda *_: None))
     assert error.value.code == 'invalid'
     assert [message['op'] for message in seen] == ['model', 'capability']
 
 
-def test_failures_inside_author_tools_still_end_the_run_with_their_code():
+@pytest.mark.parametrize('streaming', [False, True])
+def test_failures_inside_author_tools_still_end_the_run_with_their_code(streaming):
     from galaxie import capabilities
     inner = dspy.Predict('question -> answer')
     inner.set_lm(GalaxieLM('answer'))
@@ -262,7 +264,7 @@ def test_failures_inside_author_tools_still_end_the_run_with_their_code():
         module = dspy.ReAct(Question, tools=[dspy.Tool(tool, name='lookup')], max_iters=2)
         module.set_lm(GalaxieLM('answer'))
         with pytest.raises(GalaxieError) as error:
-            asyncio.run(Executor(module).run({'question': 'q'}, 'c', 5))
+            asyncio.run(Executor(module, stream_fields=['answer'] if streaming else []).run({'question': 'q'}, 'c', 5, on_stream=lambda *_: None))
         assert error.value.code == code
         assert [message['op'] for message in seen] == ['model', 'model' if tool is nested else 'capability']
 
@@ -273,3 +275,185 @@ def test_grouped_failures_keep_first_galaxie_code_and_omit_exception_text():
     assert error_code(ExceptionGroup('private group', [_LMError('budget_exceeded'), GalaxieError('unavailable')])) == 'budget_exceeded'
     assert error_code(BaseExceptionGroup('private group', [asyncio.CancelledError()])) == 'cancelled'
     assert error_code(ExceptionGroup('private group', [RuntimeError('private exception')])) == 'executor_error'
+
+
+def stream_transport(chunks, *, final=None, code=None, seen=None):
+    async def transport(raw):
+        message = json.loads(raw)
+        if seen is not None:
+            seen.append(message)
+        for text in chunks:
+            _bridge.receive_model_chunk(json.dumps({
+                **{key: message[key] for key in ('v', 'id')}, 'kind': 'notify',
+                'op': 'model-chunk', 'payload': {'content': text} if isinstance(text, str) else text,
+            }))
+            await asyncio.sleep(0)
+        response = {key: message[key] for key in ('v', 'id', 'op')}
+        return json.dumps({**response, 'kind': 'response', **(
+            {'ok': False, 'error': {'code': code}} if code else
+            {'ok': True, 'payload': final if isinstance(final, dict) else {'content': ''.join(chunks) if final is None else final}}
+        )})
+    _bridge.install_transport(transport)
+
+
+@pytest.mark.parametrize('fragmented', [False, True])
+def test_streamify_emits_only_declared_checked_field_text_in_order(monkeypatch, fragmented):
+    import dspy.streaming.messages as status
+    monkeypatch.setattr(status, 'sync_send_to_stream', lambda *_: pytest.fail('Streaming used the threaded status sender.'))
+    seen, events = [], []
+    chunks = ['[[ ## reasoning ## ]]\nHidden rationale.\n', '[[ ## answer ## ]]\n', 'Pa', 'ris', '\n[[ ## completed ## ]]']
+    stream_transport(list(''.join(chunks)) if fragmented else chunks, seen=seen)
+    module = dspy.ChainOfThought(Question)
+    module.set_lm(GalaxieLM('answer'))
+    executor = Executor(module, stream_fields=['answer'])
+    result = asyncio.run(executor.run({'question': 'France?'}, 'c', 5, on_stream=lambda mode, data: events.append((mode, data))))
+    assert result == {'reasoning': 'Hidden rationale.', 'answer': 'Paris'}
+    assert seen[0]['payload']['options'] == {'stream': True}
+    texts = [data for mode, data in events if mode == 'messages']
+    assert texts
+    assert all(set(data) == {'field', 'text'} and data['field'] == 'answer' for data in texts)
+    assert ''.join(data['text'] for data in texts) == 'Paris'
+    assert [data for mode, data in events if mode == 'updates'] == [{'kind': 'model', 'index': 0}]
+
+
+@pytest.mark.parametrize('final,code,expected', [('different final reply', None, 'invalid'), (None, 'denied', 'denied')])
+def test_stream_failure_keeps_fixed_code_and_previously_emitted_text(final, code, expected):
+    stream_transport(['[[ ## answer ## ]]\n', 'safe prefix', ' still safe'], final=final, code=code)
+    module = dspy.Predict(Question)
+    module.set_lm(GalaxieLM('answer'))
+    events = []
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(module, stream_fields=['answer']).run({'question': 'q'}, 'c', 5, on_stream=lambda mode, data: events.append((mode, data))))
+    assert error.value.code == expected
+    assert 'safe prefix' not in str(error.value)
+    assert any(mode == 'messages' for mode, _ in events)
+
+
+def test_json_adapter_streaming_is_refused_before_any_model_call():
+    seen = []
+    transport_for([], seen)
+    module = dspy.Predict(Question)
+    module.set_lm(GalaxieLM('answer'))
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(module, adapter=dspy.JSONAdapter(), stream_fields=['answer']).run({'question': 'q'}, 'c', 5, on_stream=lambda *_: None))
+    assert error.value.code == 'unsupported'
+    assert seen == []
+
+
+@pytest.mark.parametrize('streamed', [
+    {'id': 'one', 'function': {'name': 'lookup', 'arguments': '{"query":"Fran'}},
+    {'id': 'other', 'function': {'name': 'lookup', 'arguments': '{"query":"France"}'}},
+    {'id': 'one', 'function': {'name': 'other', 'arguments': '{"query":"France"}'}},
+    {'id': 'one', 'function': {'name': 'lookup', 'arguments': '{"query":"Germany"}'}},
+])
+def test_streamed_tool_calls_must_match_the_checked_final_reply(streamed):
+    stream_transport([{'content': '', 'toolCalls': [{'index': 0, **streamed}]}], final={'content': '', 'toolCalls': [tool_call()]})
+    class Sink:
+        async def send(self, chunk):
+            pass
+    async def run():
+        with dspy.context(send_stream=Sink()):
+            return await GalaxieLM('answer', native_tools=True).acall(native_request())
+    with pytest.raises(dspy.LMError) as error:
+        asyncio.run(run())
+    assert error.value.code == 'invalid'
+
+
+def test_streamed_tool_calls_accept_fragmented_escaped_arguments_and_settle_usage():
+    chunks = [
+        {'content': '', 'toolCalls': [{'index': 0, 'id': 'one', 'function': {'name': 'look', 'arguments': '{"query":"Fr'}}]},
+        {'content': '', 'toolCalls': [{'index': 0, 'function': {'name': 'up', 'arguments': 'an\\u0063e"}'}}]},
+    ]
+    stream_transport(chunks, final={'content': '', 'toolCalls': [tool_call()], 'usage': {'input_tokens': 2, 'output_tokens': 3, 'total_tokens': 5}})
+    class Sink:
+        async def send(self, chunk):
+            pass
+    async def run():
+        with dspy.context(send_stream=Sink()):
+            return await GalaxieLM('answer', native_tools=True).acall(native_request())
+    result = asyncio.run(run())
+    assert result.message.parts == (ToolCallPart(id='one', name='lookup', input={'query': 'France'}),)
+    assert result.usage.total_tokens == 5
+
+
+def test_stream_notification_failure_drains_streamify_in_its_own_task(caplog):
+    stream_transport(['[[ ## answer ## ]]\n', 'Paris', '\n[[ ## completed ## ]]'])
+    module = dspy.Predict(Question)
+    module.set_lm(GalaxieLM('answer'))
+    def notify(mode, data):
+        if mode == 'messages':
+            raise GalaxieError('unsupported')
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(module, stream_fields=['answer']).run({'question': 'q'}, 'c', 5, on_stream=notify))
+    assert error.value.code == 'unsupported'
+    assert 'unhandled exception' not in caplog.text
+
+
+@pytest.mark.parametrize('answer', ['Use [[Paris]] today', 'hello [[ ## fake ## ]] world', 'An array [[1,2]] is nested.', 'first\r\nsecond', 'first\rsecond', 'first\u2028second'])
+@pytest.mark.parametrize('fragmented', [False, True])
+def test_streamify_preserves_literal_brackets_and_inline_headers(answer, fragmented):
+    text = fields(answer=answer)
+    stream_transport(list(text) if fragmented else [text])
+    module = dspy.Predict(Question)
+    module.set_lm(GalaxieLM('answer'))
+    events = []
+    result = asyncio.run(Executor(module, stream_fields=['answer']).run({'question': 'q'}, 'c', 5, on_stream=lambda mode, data: events.append((mode, data))))
+    expected = '\n'.join(answer.splitlines())
+    assert result['answer'] == expected
+    assert ''.join(data['text'] for mode, data in events if mode == 'messages') == expected
+
+
+@pytest.mark.parametrize('fragmented', [False, True])
+def test_indented_field_header_is_left_to_the_final_output(fragmented):
+    text = '  [[ ## answer ## ]]\nParis\n[[ ## completed ## ]]'
+    stream_transport(list(text) if fragmented else ['  ', '[[ ## answer ## ]]', '\nParis\n', '[[ ## completed ## ]]'])
+    module = dspy.Predict(Question)
+    module.set_lm(GalaxieLM('answer'))
+    events = []
+    result = asyncio.run(Executor(module, stream_fields=['answer']).run({'question': 'q'}, 'c', 5, on_stream=lambda mode, data: events.append((mode, data))))
+    assert result == dspy.ChatAdapter().parse(Question, text)
+    assert [data for mode, data in events if mode == 'messages'] == []
+
+
+def test_streamify_reuses_listener_on_later_model_calls():
+    replies = iter(['first draft', 'final answer'])
+    async def transport(raw):
+        message = json.loads(raw)
+        text = fields(answer=next(replies))
+        for content in [text]:
+            _bridge.receive_model_chunk(json.dumps({
+                **{key: message[key] for key in ('v', 'id')}, 'kind': 'notify',
+                'op': 'model-chunk', 'payload': {'content': content},
+            }))
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': {'content': text}})
+    _bridge.install_transport(transport)
+    class Refine(dspy.Module):
+        def __init__(self):
+            self.predict = dspy.Predict(Question)
+            self.predict.set_lm(GalaxieLM('answer'))
+        async def aforward(self, question):
+            await self.predict.acall(question=question)
+            return await self.predict.acall(question=question)
+    events = []
+    result = asyncio.run(Executor(Refine(), stream_fields=['answer']).run({'question': 'q'}, 'c', 5, on_stream=lambda mode, data: events.append((mode, data))))
+    assert result == {'answer': 'final answer'}
+    assert [data['text'] for mode, data in events if mode == 'messages'] == ['first draft', 'final answer']
+
+
+@pytest.mark.parametrize('declaration', ['missing', 'non-text', 'ambiguous'])
+def test_stream_fields_must_name_unique_text_outputs_before_dispatch(declaration):
+    seen = []
+    transport_for([], seen)
+    class Program(dspy.Module):
+        def __init__(self):
+            self.first = dspy.Predict('question -> answer: int' if declaration == 'non-text' else Question)
+            self.first.set_lm(GalaxieLM('answer'))
+            if declaration == 'ambiguous':
+                self.second = dspy.Predict(Question)
+                self.second.set_lm(GalaxieLM('answer'))
+        async def aforward(self, question):
+            raise AssertionError('An invalid stream declaration reached author code.')
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(Program(), stream_fields=['absent' if declaration == 'missing' else 'answer']).run({'question': 'q'}, 'c', 5, on_stream=lambda *_: None))
+    assert error.value.code == 'unsupported'
+    assert seen == []

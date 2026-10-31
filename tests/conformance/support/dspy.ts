@@ -5,11 +5,12 @@ import { createRuntime, defineAgentDefinition, GalaxieError, toErrorInfo } from 
 import { BaseChatModel, type BindToolsInput } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
+  AIMessageChunk,
   type BaseMessage,
   type StandardMessageStructure,
 } from '@langchain/core/messages';
 import type { ToolCall } from '@langchain/core/messages/tool';
-import type { ChatResult } from '@langchain/core/outputs';
+import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import { z } from 'zod';
 import {
   createPyodideAdapter,
@@ -21,7 +22,12 @@ import fixtures from '../cases-dspy/fixtures.json' with { type: 'json' };
 
 export const dspyCases: readonly string[] = Object.keys(fixtures);
 interface Spec {
-  readonly replies: readonly { readonly text: string; readonly toolCalls?: readonly ToolCall[] }[];
+  readonly fragmented?: boolean;
+  readonly replies: readonly {
+    readonly text: string;
+    readonly toolCalls?: readonly ToolCall[];
+    readonly chunks?: readonly string[];
+  }[];
 }
 export interface DspyTranscript {
   readonly requests: unknown[];
@@ -30,6 +36,7 @@ export interface DspyTranscript {
   readonly interactions: unknown[];
   output: unknown;
   error: unknown;
+  events?: { mode: string; data: Record<string, unknown> }[];
 }
 
 function messages(input: BaseMessage[]): unknown[] {
@@ -117,6 +124,38 @@ class ScriptedModel extends BaseChatModel {
       ],
     };
   }
+  override async *_streamResponseChunks(
+    input: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): AsyncGenerator<ChatGenerationChunk> {
+    const spec = (fixtures as Record<string, Spec>)[this.caseName];
+    const reply = spec?.replies[this.state.index];
+    await this._generate(input, options);
+    if (!reply) throw new Error('The conformance reply is missing.');
+    const chunks = spec?.fragmented ? [...reply.text] : (reply.chunks ?? []);
+    for (const [index, text] of chunks.entries()) {
+      yield new ChatGenerationChunk({ text, message: new AIMessageChunk({ content: text }) });
+      if (this.caseName === 'stream-abort' && index === 1) await this.latch.wait(options.signal);
+    }
+    yield new ChatGenerationChunk({
+      text: '',
+      message: new AIMessageChunk<StandardMessageStructure>({
+        content: '',
+        ...(reply.toolCalls?.length
+          ? {
+              tool_call_chunks: reply.toolCalls.map((call, index) => ({
+                index,
+                ...(call.id === undefined ? {} : { id: call.id }),
+                name: call.name,
+                args: JSON.stringify(call.args),
+                type: 'tool_call_chunk' as const,
+              })),
+            }
+          : {}),
+        usage_metadata: { input_tokens: 2, output_tokens: 2, total_tokens: 4 },
+      }),
+    });
+  }
 }
 
 export async function executeDspyCase(
@@ -133,6 +172,12 @@ export async function executeDspyCase(
     output: null,
     error: null,
   };
+  const streaming = name.startsWith('stream-');
+  if (streaming) transcript.events = [];
+  let sawText: (() => void) | undefined;
+  const streamed = new Promise<void>((resolve) => {
+    sawText = resolve;
+  });
   const latch = createMockLatch();
   const model = new ScriptedModel(name, transcript, latch);
   const runtime = createRuntime({
@@ -141,7 +186,7 @@ export async function executeDspyCase(
     budgets: { steps: 25, toolCalls: 10, tokens: 2000 },
     outputSafety: ({ text }) => (text.includes('BLOCKED_') ? 'block' : 'allow'),
   });
-  const kind = name === 'outcome-unknown' ? 'write' : 'read';
+  const kind = name.endsWith('outcome-unknown') ? 'write' : 'read';
   try {
     const instance = await runtime.create(
       defineAgentDefinition({
@@ -173,7 +218,7 @@ export async function executeDspyCase(
               transcript.capabilities.push({ name: 'docs.lookup@1', input });
               if (name === 'capability-denial')
                 throw new GalaxieError('denied', 'Policy denied the request.');
-              if (name === 'outcome-unknown')
+              if (name.endsWith('outcome-unknown'))
                 throw new GalaxieError('outcome_unknown', 'The write outcome is unknown.');
               return 'Paris';
             },
@@ -185,7 +230,7 @@ export async function executeDspyCase(
               destination: 'in-browser',
               modality: 'text',
               languages: ['en'],
-              features: ['tool-calling'],
+              features: ['tool-calling', 'streaming'],
               pricing: { inputPerToken: 0, outputPerToken: 0 },
             },
           },
@@ -201,12 +246,46 @@ export async function executeDspyCase(
         if (event.type === 'error') transcript.error = event.error;
         if (event.type === 'cancelled')
           transcript.error = { code: 'cancelled', message: 'The run was cancelled.' };
-        if (event.type === 'stream' || event.type === 'interaction')
-          throw new Error('D1 emitted an unsupported event.');
+        if (event.type === 'interaction')
+          throw new Error('DSPy emitted an unsupported interaction.');
+        if (event.type === 'stream') {
+          if (!streaming || !transcript.events || event.path.length)
+            throw new Error('DSPy emitted an unexpected stream.');
+          const data = event.data as Record<string, unknown>;
+          if (event.mode === 'messages') {
+            if (
+              Object.keys(data).sort().join(',') !== 'field,text' ||
+              typeof data['field'] !== 'string' ||
+              typeof data['text'] !== 'string' ||
+              data['text'].includes('BLOCKED_') ||
+              !['answer', 'next_thought'].includes(data['field'])
+            )
+              throw new Error('DSPy emitted an invalid field projection.');
+            sawText?.();
+          } else if (
+            event.mode !== 'updates' ||
+            !Number.isInteger(data['index']) ||
+            (data['kind'] === 'model'
+              ? Object.keys(data).sort().join(',') !== 'index,kind'
+              : data['kind'] !== 'tool' ||
+                data['name'] !== 'lookup' ||
+                Object.keys(data).sort().join(',') !== 'index,kind,name')
+          )
+            throw new Error('DSPy emitted an invalid progress projection.');
+          const previous = transcript.events.at(-1);
+          if (
+            event.mode === 'messages' &&
+            previous?.mode === 'messages' &&
+            previous.data['field'] === data['field']
+          ) {
+            previous.data['text'] = String(previous.data['text']) + data['text'];
+          } else transcript.events.push({ mode: event.mode, data: { ...data } });
+        }
       }
     })();
-    if (name === 'abort') {
+    if (name === 'abort' || name === 'stream-abort') {
       await latch.entered;
+      if (name === 'stream-abort') await streamed;
       await instance.cancel(runId);
     }
     await events;

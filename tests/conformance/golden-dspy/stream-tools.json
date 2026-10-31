@@ -1,0 +1,82 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str): \n2. `trajectory` (str):\nYour output fields are:\n1. `next_thought` (str): \n2. `next_tool_name` (Literal['lookup', 'finish']): \n3. `next_tool_args` (dict[str, Any]):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## trajectory ## ]]\n{trajectory}\n\n[[ ## next_thought ## ]]\n{next_thought}\n\n[[ ## next_tool_name ## ]]\n{next_tool_name}        # note: the value you produce must exactly match (no extra characters) one of: lookup; finish\n\n[[ ## next_tool_args ## ]]\n{next_tool_args}        # note: the value you produce must adhere to the JSON schema: {\"type\": \"object\", \"additionalProperties\": true}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.\n        \n        You are an Agent. In each episode, you will be given the fields `question` as input. And you can see your past trajectory so far.\n        Your goal is to use one or more of the supplied tools to collect any necessary information for producing `answer`.\n        \n        To do this, you will interleave next_thought, next_tool_name, and next_tool_args in each turn, and also when finishing the task.\n        After each tool call, you receive a resulting observation, which gets appended to your trajectory.\n        \n        When writing next_thought, you may reason about the current situation and plan for future steps.\n        When selecting the next_tool_name and its next_tool_args, the tool must be one of:\n        \n        (1) lookup, whose description is <desc>Look up the fact.</desc>. It takes arguments {'query': {'type': 'string'}}.\n        (2) finish, whose description is <desc>Marks the task as complete. That is, signals that all information for producing the outputs, i.e. `answer`, are now available to be extracted.</desc>. It takes arguments {}.\n        When providing `next_tool_args`, the value inside the field must be in JSON format"
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\n[[ ## trajectory ## ]]\n\n\nRespond with the corresponding output fields, starting with the field `[[ ## next_thought ## ]]`, then `[[ ## next_tool_name ## ]]` (must be formatted as a valid Python Literal['lookup', 'finish']), then `[[ ## next_tool_args ## ]]` (must be formatted as a valid Python dict[str, Any]), and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str): \n2. `trajectory` (str):\nYour output fields are:\n1. `reasoning` (str): \n2. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## trajectory ## ]]\n{trajectory}\n\n[[ ## reasoning ## ]]\n{reasoning}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\n[[ ## trajectory ## ]]\n[[ ## thought_0 ## ]]\nLook up the fact.\n\n[[ ## tool_name_0 ## ]]\nlookup\n\n[[ ## tool_args_0 ## ]]\n{\"query\": \"France\"}\n\n[[ ## observation_0 ## ]]\nParis\n\nRespond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]",
+      "toolCalls": []
+    },
+    {
+      "content": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "France"
+      }
+    }
+  ],
+  "interactions": [],
+  "output": {
+    "answer": "Paris"
+  },
+  "error": null,
+  "events": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model",
+        "index": 0
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "tool",
+        "name": "lookup",
+        "index": 0
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model",
+        "index": 1
+      }
+    },
+    {
+      "mode": "messages",
+      "data": {
+        "field": "answer",
+        "text": "Paris"
+      }
+    }
+  ]
+}
