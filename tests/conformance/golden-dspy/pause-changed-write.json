@@ -1,0 +1,39 @@
+{
+  "requests": [],
+  "responses": [],
+  "capabilities": [
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "France"
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "surfaceId": "main",
+      "viewRevision": "first",
+      "component": "test.Review/v1",
+      "props": {}
+    }
+  ],
+  "output": null,
+  "error": {
+    "code": "unrecoverable",
+    "message": "Stored state cannot be recovered."
+  },
+  "events": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "pause"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "unrecoverable"
+      }
+    }
+  ]
+}

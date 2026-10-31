@@ -192,8 +192,8 @@ test('framework selection declares only the implemented features and selects the
   expect(dspy.id).toBe('dspy-python');
   expect(dspy.features).toEqual({
     streaming: true,
-    interrupts: false,
-    resume: false,
+    interrupts: true,
+    resume: true,
     checkpoints: false,
     subgraphs: false,
   });

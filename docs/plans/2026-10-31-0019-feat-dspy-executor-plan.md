@@ -387,6 +387,8 @@ flowchart LR
 - **Files:** `packages/adapter-pyodide/src/dspy-driver.ts`, `packages/adapter-pyodide/src/checkpoints.ts`, `packages/adapter-pyodide/src/adapter.ts`, `packages/storage-indexeddb/src/byte-records.ts`, `packages/storage-indexeddb/src/saver.ts`, `packages/storage-indexeddb/test/`, `tests/conformance/support/memory-byte-checkpoints.ts`, `tests/conformance/cases-dspy/`, `tests/conformance/dspy-restore.node.test.ts` (new)
 - **Approach:** Store and restore per KTD11; set `checkpoints: true`.
 - **Test scenarios:**
+  - After restore, replayed capability results and the stored run input re-register their private strings with core before any live model call, as accepted payloads do today.
+  - A completion whose journal exceeds the record limit keeps its output; only the stored record is dropped, with a fixed diagnostic, so committed writes are never retried as new effects.
   - Pause, dispose the Worker, restore in a fresh runtime with the same store: the same pending interaction is published and resuming completes.
   - In Chromium with reopened IndexedDB, the same reload case passes.
   - An approved write executed before a crash replays its receipt after restore instead of repeating, with the KTD8 effect ID.

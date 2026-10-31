@@ -1,0 +1,12 @@
+{
+  "requests": [],
+  "responses": [],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "unsupported",
+    "message": "This operation is unsupported."
+  },
+  "events": []
+}

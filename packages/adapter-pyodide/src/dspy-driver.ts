@@ -22,21 +22,27 @@ try:
 except BaseException as error:
     _galaxie_ready = {'ok': False, 'code': error_code(error)}
 async def _galaxie_pending():
-    return json.dumps({'ok': True, 'interrupts': []})
+    try:
+        conversation = _galaxie_conversations.get(_galaxie_thread)
+        pending = _galaxie_executor.pending(conversation) if conversation else None
+        return json.dumps({'ok': True, 'interrupts': [pending] if pending else []})
+    except BaseException as error:
+        return json.dumps({'ok': False, 'code': error_code(error)})
 async def _galaxie_execute():
     global _galaxie_task
     _galaxie_task = asyncio.current_task()
     try:
         payload = json.loads(_galaxie_input)
-        if 'resume' in payload:
-            raise GalaxieError('unsupported')
         session = payload['threadId']
         if session not in _galaxie_conversations:
             _galaxie_conversations[session] = str(uuid.uuid4())
         output = await _galaxie_executor.run(
-            payload['input'], _galaxie_conversations[session], payload['steps'],
+            payload.get('input'), _galaxie_conversations[session], payload['steps'],
             on_stream=lambda mode, data: notify_stream_data([], mode, data),
+            resume=payload.get('resume'),
         )
+        if _galaxie_executor.pending(_galaxie_conversations[session]) is not None:
+            return json.dumps({'ok': True, 'interrupted': True})
         return json.dumps({'ok': True, 'output': output}, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
     except BaseException as error:
         return json.dumps({'ok': False, 'code': error_code(error)})

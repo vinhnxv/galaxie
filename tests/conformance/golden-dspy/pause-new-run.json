@@ -1,0 +1,64 @@
+{
+  "requests": [],
+  "responses": [],
+  "capabilities": [
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "France"
+      }
+    },
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "France"
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "surfaceId": "main",
+      "viewRevision": "first",
+      "component": "test.Review/v1",
+      "props": {}
+    },
+    {
+      "surfaceId": "main",
+      "viewRevision": "first",
+      "component": "test.Review/v1",
+      "props": {}
+    }
+  ],
+  "output": {
+    "answer": "second run"
+  },
+  "error": null,
+  "events": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "pause"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "replayed",
+        "count": 2
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "pause"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "replayed",
+        "count": 2
+      }
+    }
+  ]
+}

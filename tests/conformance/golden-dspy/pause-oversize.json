@@ -1,0 +1,33 @@
+{
+  "requests": [],
+  "responses": [],
+  "capabilities": [],
+  "interactions": [
+    {
+      "surfaceId": "main",
+      "viewRevision": "first",
+      "component": "test.Review/v1",
+      "props": {}
+    }
+  ],
+  "output": null,
+  "error": {
+    "code": "unsupported",
+    "message": "This operation is unsupported."
+  },
+  "events": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "pause"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "replayed",
+        "count": 1
+      }
+    }
+  ]
+}

@@ -8,19 +8,36 @@ import { createPyodideAdapter } from '../../packages/adapter-pyodide/src/adapter
 import { dspyCases, executeDspyCase } from './support/dspy.js';
 import { dspySources } from './support/dspy-sources.node.js';
 
-test.each(dspyCases)(
-  'Node Pyodide matches native DSPy requests, tools and output: %s',
-  async (name) => {
+test.each([
+  ...dspyCases.map((name) => ({ name, steps: undefined as number | undefined })),
+  { name: 'pause-two', steps: 1 },
+  { name: 'pause-two', steps: 2 },
+])(
+  'Node Pyodide matches native DSPy requests, tools and output: $name (steps=$steps)',
+  async ({ name, steps }) => {
     const fixture = await createPythonFixture({
       framework: 'dspy',
       module: 'selected',
       sources: await dspySources(name),
     });
     try {
-      const actual = await executeDspyCase(fixture.options, fixture.agent, name);
-      expect(actual).toEqual(
-        JSON.parse(await readFile(new URL(`./golden-dspy/${name}.json`, import.meta.url), 'utf8')),
-      );
+      const actual = await executeDspyCase(fixture.options, fixture.agent, name, steps);
+      if (steps === 1) {
+        expect(actual.error).toEqual({
+          code: 'budget_exceeded',
+          message: 'The budget limit was reached.',
+        });
+        expect(actual.requests).toHaveLength(2);
+        expect(actual.capabilities).toHaveLength(1);
+        expect(actual.interactions).toHaveLength(2);
+        expect(actual.output).toBeNull();
+      } else {
+        expect(actual).toEqual(
+          JSON.parse(
+            await readFile(new URL(`./golden-dspy/${name}.json`, import.meta.url), 'utf8'),
+          ),
+        );
+      }
       expect(fixture.workerErrors).toEqual([]);
       if (name === 'reply-block' || name === 'stream-mid-block')
         expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED_TEXT');
