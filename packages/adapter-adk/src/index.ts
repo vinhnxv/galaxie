@@ -1,4 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+export { createAdkAdapter } from './adapter.js';
+export type { AdkAgent, AdkHost, AdkServices, CapabilityToolSpec } from './host.js';
+export type { AdkChatModel } from './llm.js';
+export { ensureAdkRuntimeEnv } from './runtime-shim.js';
 export const ADK_EXECUTOR_ID: 'adk-js' = 'adk-js';
