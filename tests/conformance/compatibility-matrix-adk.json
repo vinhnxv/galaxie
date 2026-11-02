@@ -1,0 +1,35 @@
+{
+  "reference": "Native @google/adk 2.3.0 browser bundle (dist/web/index_web.js) driven by its own Runner, run on Node",
+  "lanes": ["Node galaxie adk-js adapter", "headless Chromium galaxie adk-js adapter"],
+  "features": {
+    "streaming": false,
+    "interrupts": false,
+    "resume": false,
+    "checkpoints": false,
+    "subgraphs": false
+  },
+  "cases": [
+    "plain-text",
+    "capability",
+    "sequential-tools",
+    "output-schema",
+    "capability-denial",
+    "argument-block",
+    "step-budget",
+    "abort"
+  ],
+  "differences": [],
+  "normalizations": [
+    "Function-call and function-response IDs are runtime-generated on each side (ADK uses adk-<uuid>, galaxie uses galaxie-<n>), so transcripts compare names and payloads only.",
+    "Requests are recorded at the ADK model boundary on both sides: the scripted BaseLlm on the native side and a wrapper around host.adk.llm(role) on the galaxie side. The galaxie scripted replies come from the deterministic mock chat model behind the router.",
+    "Run errors compare by code. ADK reports a failed run as an error event whose code is UNKNOWN_ERROR or INVOCATION_ABORTED; the native harness maps its call-limit message to budget_exceeded, an aborted invocation to cancelled, and its own host-check emulation to denied.",
+    "The native lane emulates the host output-safety hook with the same BLOCKED_ pattern the galaxie run uses; the native lane has no router, so this stands in for the host hook only to keep the case comparable.",
+    "A request that galaxie's step budget refuses before dispatch is dropped from the galaxie transcript, because ADK's call limit refuses before it asks the model."
+  ],
+  "limits": [
+    "Stage A2 is non-streaming, with no interrupts, resume, checkpoints or subgraphs. The adapter reports every optional feature as false.",
+    "The run input is { prompt: string }. Only the closed set of LlmAgent, SequentialAgent, ParallelAgent and LoopAgent is accepted, and tools and models must come from the host.",
+    "All model replies are deterministic scripts; no real model, network request or download takes part.",
+    "The Chromium lane runs under the vitest browser project, not a page with the strict mock CSP; the strict-CSP bundle probe in packages/adapter-adk covers the bundle alone."
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "requests": [
+    {
+      "system": "You are an agent. Your internal name is \"agent\".\n\nUse the supplied tools and answer briefly.",
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "one tool"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "name": "math_double_1",
+          "description": "Double an integer.",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "value": {
+                "type": "INTEGER",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "type": "STRING"
+              }
+            },
+            "required": [
+              "value"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "system": "You are an agent. Your internal name is \"agent\".\n\nUse the supplied tools and answer briefly.",
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "one tool"
+            }
+          ]
+        },
+        {
+          "role": "model",
+          "parts": [
+            {
+              "functionCall": {
+                "name": "math_double_1",
+                "args": {
+                  "value": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "parts": [
+            {
+              "functionResponse": {
+                "name": "math_double_1",
+                "response": {
+                  "value": 6
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "name": "math_double_1",
+          "description": "Double an integer.",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "value": {
+                "type": "INTEGER",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "type": "STRING"
+              }
+            },
+            "required": [
+              "value"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "math_double_1",
+            "args": {
+              "value": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The result is 6."
+        }
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 3
+      }
+    }
+  ],
+  "output": "The result is 6.",
+  "error": null
+}

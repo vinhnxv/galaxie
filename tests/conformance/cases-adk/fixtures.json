@@ -1,0 +1,157 @@
+{
+  "plain-text": {
+    "prompt": "plain text",
+    "replies": [
+      {
+        "text": "A plain answer."
+      }
+    ]
+  },
+  "capability": {
+    "prompt": "one tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The result is 6."
+      }
+    ]
+  },
+  "sequential-tools": {
+    "prompt": "two tools",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 2
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_2",
+            "name": "math_double_1",
+            "args": {
+              "value": 5
+            }
+          }
+        ]
+      },
+      {
+        "text": "Both results are in."
+      }
+    ]
+  },
+  "output-schema": {
+    "prompt": "structured",
+    "replies": [
+      {
+        "text": "{\"answer\":\"42\"}"
+      }
+    ]
+  },
+  "capability-denial": {
+    "prompt": "denied tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The tool was denied."
+      }
+    ]
+  },
+  "argument-block": {
+    "prompt": "blocked argument",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 1,
+              "note": "BLOCKED_ARGUMENT"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "step-budget": {
+    "prompt": "loop forever",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 1
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_2",
+            "name": "math_double_1",
+            "args": {
+              "value": 2
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_3",
+            "name": "math_double_1",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "abort": {
+    "prompt": "abort me",
+    "replies": [
+      {
+        "text": "never delivered"
+      }
+    ]
+  }
+}
