@@ -1,0 +1,35 @@
+{
+  "name": "@galaxie/adapter-adk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Google ADK (JavaScript) executor adapter for galaxie.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@galaxie/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@google/adk": "2.3.0",
+    "@langchain/core": "~1.2.20",
+    "zod": "^4.6.0"
+  },
+  "devDependencies": {
+    "@google/adk": "2.3.0",
+    "@langchain/core": "1.2.20",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/sdk-trace": "3.0.0",
+    "es-module-lexer": "2.3.2",
+    "vite": "8.3.4",
+    "zod": "4.6.7"
+  }
+}

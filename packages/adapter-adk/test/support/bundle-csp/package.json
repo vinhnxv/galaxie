@@ -1,0 +1,6 @@
+{
+  "name": "@galaxie/adapter-adk-bundle-csp-page",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module"
+}

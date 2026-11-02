@@ -11,6 +11,13 @@ import {
 } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
+  // Both lanes load the file the package `browser` export condition selects (ADR-0020).
+  '@google/adk': fileURLToPath(
+    new URL(
+      './packages/adapter-adk/node_modules/@google/adk/dist/web/index_web.js',
+      import.meta.url,
+    ),
+  ),
   '@galaxie/adapter-pyodide': fileURLToPath(
     new URL('./packages/adapter-pyodide/src/index.ts', import.meta.url),
   ),
@@ -139,6 +146,7 @@ const config: ViteUserConfig = defineConfig({
             '**/*.test.tsx',
             '../../packages/react/test/**/*.test.tsx',
             '../../packages/adapter-pyodide/test/**/*.test.ts',
+            '../../packages/adapter-adk/test/**/*.test.ts',
             '../../packages/storage-indexeddb/test/**/*.test.ts',
             '../../examples/*/test/**/*.test.ts',
           ],
@@ -146,6 +154,7 @@ const config: ViteUserConfig = defineConfig({
             ...configDefaults.exclude,
             '**/*.node.test.ts',
             '../../packages/adapter-pyodide/test/**/*.node.test.ts',
+            '../../packages/adapter-adk/test/**/*.node.test.ts',
             '../../examples/*/test/**/*.node.test.ts',
           ],
           browser: {

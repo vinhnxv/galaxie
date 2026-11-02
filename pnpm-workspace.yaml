@@ -10,3 +10,6 @@ allowBuilds:
   onnxruntime-node: false
   sharp: false
   protobufjs: false
+  '@google/genai': false
+  cpu-features: false
+  ssh2: false
