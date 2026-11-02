@@ -195,6 +195,8 @@ export class GalaxieLlm extends BaseLlm {
     stream: boolean,
     abortSignal: AbortSignal | undefined,
   ): Promise<LlmResponse> {
+    // After a fatal error nothing more may reach a provider or the model.
+    if (run.failure !== undefined) throw run.failure;
     if (stream) throw failure('unsupported');
     for (const [name, tool] of Object.entries(request.toolsDict))
       if (!this.#trusted(tool) && !INTERNAL_TOOLS.has(name)) throw failure('unsupported');
