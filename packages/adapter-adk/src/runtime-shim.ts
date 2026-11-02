@@ -12,7 +12,8 @@ const CAPTURE_FLAG = 'ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS';
  * arguments and results. Without a `process` global that read throws, and ADK turns the throw
  * into an ordinary error event. This creates a frozen `{ env }` holding only the flag. Where a
  * `process` already exists, it sets only the flag, and only when the key is unset. No real
- * environment data is read or exposed.
+ * environment data is read or exposed. If the flag cannot be set (a frozen env), it throws
+ * rather than leave prompts and results in spans.
  *
  * It cannot reach a bundle whose bundler already replaced `process.env` with `{}` (Vite
  * production builds do): those hosts set the flag with a build-time define instead.
@@ -29,6 +30,9 @@ export function ensureAdkRuntimeEnv(scope: object = globalThis): void {
     return;
   }
   const env: unknown = Reflect.get(existing, 'env');
-  if (typeof env === 'object' && env !== null && Reflect.get(env, CAPTURE_FLAG) === undefined)
+  if (typeof env === 'object' && env !== null && Reflect.get(env, CAPTURE_FLAG) === undefined) {
     Reflect.set(env, CAPTURE_FLAG, 'false');
+    if (Reflect.get(env, CAPTURE_FLAG) !== 'false')
+      throw new Error('ADK span content capture could not be turned off.');
+  }
 }

@@ -27,6 +27,11 @@ test('sets only the flag, and only when unset, on an existing process', () => {
   expect(chosen.process.env[FLAG]).toBe('true');
 });
 
+test('fails closed when the flag cannot be set on a frozen env', () => {
+  const scope = { process: { env: Object.freeze({}) } };
+  expect(() => ensureAdkRuntimeEnv(scope)).toThrow('could not be turned off');
+});
+
 test('leaves a process without an env object alone', () => {
   const scope = { process: { version: 'v0' } };
   ensureAdkRuntimeEnv(scope);

@@ -12,6 +12,8 @@ import {
 export interface RecordedSpan {
   readonly name: string;
   readonly attributes: Readonly<Record<string, unknown>>;
+  readonly events: readonly { name: string; attributes: Readonly<Record<string, unknown>> }[];
+  readonly status: { code: number; message?: string };
 }
 
 export interface SpanRecorder {
@@ -68,6 +70,11 @@ export function recordSpans(): SpanRecorder {
       exporter.getFinishedSpans().map((span) => ({
         name: span.name,
         attributes: { ...span.attributes },
+        events: span.events.map((event) => ({
+          name: event.name,
+          attributes: { ...event.attributes },
+        })),
+        status: { ...span.status },
       })),
     dispose: async () => {
       trace.disable();

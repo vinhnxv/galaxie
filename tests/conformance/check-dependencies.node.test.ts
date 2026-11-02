@@ -110,6 +110,24 @@ test('a runtime import of @google/genai fails and a type-only import passes', ()
   expect(run({ 'packages/adapter-adk/src/a.ts': adk('@google/genai', 'type') }).status).toBe(0);
 });
 
+test.each([
+  ["import { type X } from '@google/genai';\nexport type { X };\n"],
+  ["export { type X } from '@google/genai';\n"],
+])('an inline type specifier of @google/genai still loads the module and fails', (source) => {
+  const result = run({ 'packages/adapter-adk/src/a.ts': source });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('@google/genai may be imported as a type only');
+});
+
+test.each(['../../adapter-langgraph/src/index.js', '../node_modules/@google/adk/dist/index.js'])(
+  'a relative import of %s fails',
+  (specifier) => {
+    const result = run({ 'packages/adapter-adk/src/a.ts': adk(specifier) });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('reaches into a dependency or another adapter');
+  },
+);
+
 test.each(['@galaxie/adapter-langgraph', '@galaxie/adapter-pyodide', '@langchain/langgraph/web'])(
   'the ADK adapter importing %s fails',
   (specifier) => {
@@ -141,6 +159,8 @@ test.each([
   ['packages/core/src/a.ts', adk('@google/adk')],
   ['packages/models/src/a.ts', adk('@google/adk')],
   ['packages/react/src/a.ts', adk('@google/adk')],
+  ['packages/core/test/a.test.ts', adk('@google/adk/a2a')],
+  ['packages/models/vite.config.ts', adk('@google/adk')],
   ['examples/host-local/src/a.ts', adk('@google/adk')],
   ['examples/rag-browser/src/a.ts', adk('@google/adk/a2a')],
   ['tests/conformance/a.test.ts', adk('@google/adk/a2a')],
