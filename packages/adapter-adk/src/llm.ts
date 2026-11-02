@@ -249,16 +249,11 @@ export class GalaxieLlm extends BaseLlm {
           : { outputSafetyOutcome: lease.outputSafetyOutcome }),
         route,
       });
-      // Provider call IDs are discarded; positions in the history make the assigned ones replay.
-      const base = request.contents.reduce(
-        (count, content) =>
-          count + (content.parts ?? []).filter((part) => part.functionCall !== undefined).length,
-        0,
-      );
+      // Provider call IDs are discarded; the run assigns IDs after those already in the session.
       const parts: Part[] = [
         ...(reply.content.length > 0 ? [{ text: reply.content }] : []),
-        ...calls.map((call, position) => ({
-          functionCall: { id: `galaxie-${base + position}`, name: call.name, args: call.args },
+        ...calls.map((call) => ({
+          functionCall: { id: run.takeCallId(), name: call.name, args: call.args },
         })),
       ];
       return {

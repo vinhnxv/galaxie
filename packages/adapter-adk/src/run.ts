@@ -36,6 +36,7 @@ export class RunState {
   readonly span: TraceHandle;
   #failure: GalaxieError | undefined;
   #modelCalls = 0;
+  #calls = 0;
 
   constructor(services: RunServices, span: TraceHandle) {
     this.capabilities = services.capabilities;
@@ -48,6 +49,16 @@ export class RunState {
 
   get failure(): GalaxieError | undefined {
     return this.#failure;
+  }
+
+  /** Starts call IDs after the calls already stored in the session, so IDs stay unique across runs. */
+  seedCallIds(existing: number): void {
+    this.#calls = existing;
+  }
+
+  /** The next function-call ID, unique within the session across agents and runs. */
+  takeCallId(): string {
+    return `galaxie-${this.#calls++}`;
   }
 
   /** Counts one model call against `limits.steps`; the call that would exceed it fails. */

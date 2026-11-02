@@ -128,11 +128,20 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
           let last: FinalResponse | undefined;
           let thrown: unknown;
           try {
-            await sessions.getOrCreateSession({
+            const session = await sessions.getOrCreateSession({
               appName: APP_NAME,
               userId: USER_ID,
               sessionId: request.sessionId,
             });
+            run.seedCallIds(
+              session.events.reduce(
+                (count, event) =>
+                  count +
+                  (event.content?.parts ?? []).filter((part) => part.functionCall !== undefined)
+                    .length,
+                0,
+              ),
+            );
             for await (const event of current.runAsync({
               userId: USER_ID,
               sessionId: request.sessionId,
@@ -146,6 +155,14 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               abortSignal: run.signal,
             })) {
               if (event.errorCode !== undefined && run.failure === undefined) run.fail(undefined);
+              // A tool that pauses the run needs interrupts, which this stage does not offer.
+              if (
+                (event.longRunningToolIds?.length ?? 0) > 0 ||
+                Object.keys(event.actions?.requestedToolConfirmations ?? {}).length > 0
+              ) {
+                run.fail(failure('unsupported'));
+                break;
+              }
               if (event.partial === true || !isFinalResponse(event)) continue;
               const text = (event.content?.parts ?? [])
                 .filter((part) => part.thought !== true)

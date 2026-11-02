@@ -25,6 +25,25 @@ function object(value: unknown): value is Record<string, unknown> {
  * (KTD5). A string or foreign model, a built-in or author-built tool, a remote or custom agent,
  * a toolset, a planner and a code executor fail `unsupported`.
  */
+type ProcessorField = 'contextCompactors' | 'requestProcessors' | 'responseProcessors';
+
+/** The prototypes of the processors ADK itself puts on every LlmAgent. */
+const BASELINE = new LlmAgent({ name: 'baseline', model: 'baseline' });
+
+function defaultsOnly(agent: LlmAgent, field: ProcessorField): boolean {
+  const value: unknown = Reflect.get(agent, field);
+  if (value === undefined) return true;
+  if (!Array.isArray(value)) return false;
+  const allowed = new Set<unknown>(
+    ((Reflect.get(BASELINE, field) as unknown[] | undefined) ?? []).map((entry) =>
+      Object.getPrototypeOf(entry),
+    ),
+  );
+  return value.every(
+    (entry: unknown) => object(entry) && allowed.has(Object.getPrototypeOf(entry)),
+  );
+}
+
 export function validateAgentTree(root: unknown, registry: HostRegistry): void {
   let visited = 0;
   const walk = (
@@ -46,6 +65,11 @@ export function validateAgentTree(root: unknown, registry: HostRegistry): void {
       if (!modelKnown) throw failure('unsupported');
       if (agent.codeExecutor !== undefined || agent.planner !== undefined)
         throw failure('unsupported');
+      // Compactors and added processors can hold their own models or run author code on each
+      // request; only the processors a bare LlmAgent already carries are ADK's own.
+      if (!defaultsOnly(agent, 'contextCompactors') || !defaultsOnly(agent, 'requestProcessors'))
+        throw failure('unsupported');
+      if (!defaultsOnly(agent, 'responseProcessors')) throw failure('unsupported');
       if (!Array.isArray(agent.tools)) throw failure('invalid');
       for (const tool of agent.tools)
         if (!object(tool) || !registry.tools.has(tool)) throw failure('unsupported');

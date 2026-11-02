@@ -313,6 +313,66 @@ test('an output key returns the session state value, parsed as the schema', asyn
   await runtime.dispose();
 });
 
+test('a tool that needs a confirmation fails unsupported instead of succeeding with no output', async () => {
+  const { runtime, run, invocations } = await execute({
+    reply: toolThenText('unused'),
+    agent: (host) =>
+      new LlmAgent({
+        name: 'agent',
+        model: host.adk.llm('agent'),
+        instruction: 'x',
+        tools: [
+          host.adk.capabilityTool('docs.search@1', {
+            description: 'Search the documents.',
+            parameters: z.object({ q: z.string() }),
+            requireConfirmation: true,
+          }),
+        ],
+      }),
+  });
+  const { events } = await run('go');
+  expect(last(events)).toMatchObject({ type: 'error', error: { code: 'unsupported' } });
+  expect(events.some((event) => event.type === 'output')).toBe(false);
+  expect(invocations).toHaveLength(0);
+  await runtime.dispose();
+});
+
+test('function-call IDs stay unique across agents and across runs of one session', async () => {
+  const ids: string[] = [];
+  const { runtime, run } = await execute({
+    reply: (seen) =>
+      seen.messages.at(-1)?.type === 'tool'
+        ? new AIMessage({ content: 'done' })
+        : new AIMessage({ content: '', tool_calls: [call('docs_search_1', { q: 'x' })] }),
+    agent: (host) => {
+      const tool = host.adk.capabilityTool('docs.search@1', {
+        description: 'Search the documents.',
+        parameters: z.object({ q: z.string() }),
+      });
+      const llm = host.adk.llm('agent');
+      const generate = llm.generateContentAsync.bind(llm);
+      llm.generateContentAsync = async function* (request, stream, signal) {
+        for await (const response of generate(request, stream, signal)) {
+          for (const part of response.content?.parts ?? [])
+            if (part.functionCall?.id !== undefined) ids.push(part.functionCall.id);
+          yield response;
+        }
+      };
+      return new SequentialAgent({
+        name: 'flow',
+        subAgents: ['first', 'second'].map(
+          (name) => new LlmAgent({ name, model: llm, instruction: name, tools: [tool] }),
+        ),
+      });
+    },
+  });
+  await run('one');
+  await run('two');
+  expect(ids.length).toBeGreaterThanOrEqual(4);
+  expect(new Set(ids).size).toBe(ids.length);
+  await runtime.dispose();
+});
+
 test('prepare rejects an invalid factory, invalid services and a foreign tree', async () => {
   const adapter = createAdkAdapter();
   const options = { signal: new AbortController().signal };

@@ -167,3 +167,11 @@ test('a model or tool from another host is not trusted', () => {
     expect.objectContaining({ code: 'unsupported' }),
   );
 });
+
+test('context compactors and request or response processors fail unsupported', () => {
+  const { registry, agent } = setup();
+  for (const field of ['contextCompactors', 'requestProcessors', 'responseProcessors'])
+    expect(() => validates(agent('a', { [field]: [{}] }), registry), field).toThrowError(
+      expect.objectContaining({ code: 'unsupported' }),
+    );
+});
