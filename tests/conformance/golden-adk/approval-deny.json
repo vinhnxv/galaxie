@@ -1,0 +1,130 @@
+{
+  "requests": [
+    {
+      "system": "You are an agent. Your internal name is \"agent\".\n\nUse the supplied tools and answer briefly.",
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "approval deny"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "name": "math_double_1",
+          "description": "Double an integer.",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "value": {
+                "type": "INTEGER",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "type": "STRING"
+              }
+            },
+            "required": ["value"]
+          }
+        }
+      ]
+    },
+    {
+      "system": "You are an agent. Your internal name is \"agent\".\n\nUse the supplied tools and answer briefly.",
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "approval deny"
+            }
+          ]
+        },
+        {
+          "role": "model",
+          "parts": [
+            {
+              "functionCall": {
+                "name": "math_double_1",
+                "args": {
+                  "value": 5
+                }
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "parts": [
+            {
+              "functionResponse": {
+                "name": "math_double_1",
+                "response": {
+                  "error": "This tool call is rejected."
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "name": "math_double_1",
+          "description": "Double an integer.",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "value": {
+                "type": "INTEGER",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "type": "STRING"
+              }
+            },
+            "required": ["value"]
+          }
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "math_double_1",
+            "args": {
+              "value": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The doubling was declined."
+        }
+      ]
+    }
+  ],
+  "capabilities": [],
+  "pauses": [
+    {
+      "tool": "math_double_1",
+      "args": {
+        "value": 5
+      }
+    }
+  ],
+  "output": "The doubling was declined.",
+  "error": null
+}

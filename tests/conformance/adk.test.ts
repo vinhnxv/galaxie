@@ -5,6 +5,8 @@ import { expect, test } from 'vitest';
 import { createAdkAdapter } from '../../packages/adapter-adk/src/index.js';
 import matrix from './compatibility-matrix-adk.json' with { type: 'json' };
 import abort from './golden-adk/abort.json' with { type: 'json' };
+import approvalApprove from './golden-adk/approval-approve.json' with { type: 'json' };
+import approvalDeny from './golden-adk/approval-deny.json' with { type: 'json' };
 import argumentBlock from './golden-adk/argument-block.json' with { type: 'json' };
 import capability from './golden-adk/capability.json' with { type: 'json' };
 import capabilityDenial from './golden-adk/capability-denial.json' with { type: 'json' };
@@ -27,6 +29,8 @@ const goldens: Record<AdkCase, unknown> = {
   abort,
   'streaming-text': streamingText,
   'streaming-tool': streamingTool,
+  'approval-approve': approvalApprove,
+  'approval-deny': approvalDeny,
 };
 
 test.each(adkCases)('galaxie matches the native ADK golden: %s', async (name) => {

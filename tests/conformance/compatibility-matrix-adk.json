@@ -3,8 +3,8 @@
   "lanes": ["Node galaxie adk-js adapter", "headless Chromium galaxie adk-js adapter"],
   "features": {
     "streaming": true,
-    "interrupts": false,
-    "resume": false,
+    "interrupts": true,
+    "resume": true,
     "checkpoints": false,
     "subgraphs": false
   },
@@ -18,7 +18,9 @@
     "step-budget",
     "abort",
     "streaming-text",
-    "streaming-tool"
+    "streaming-tool",
+    "approval-approve",
+    "approval-deny"
   ],
   "differences": [],
   "normalizations": [
@@ -27,12 +29,14 @@
     "Run errors compare by code. ADK reports a failed run as an error event whose code is UNKNOWN_ERROR or INVOCATION_ABORTED; the native harness maps its call-limit message to budget_exceeded, an aborted invocation to cancelled, and its own host-check emulation to denied.",
     "The native lane emulates the host output-safety hook with the same BLOCKED_ pattern the galaxie run uses; the native lane has no router, so this stands in for the host hook only to keep the case comparable.",
     "A request that galaxie's step budget refuses before dispatch is dropped from the galaxie transcript, because ADK's call limit refuses before it asks the model.",
-    "Streaming cases run the native Runner in SSE mode with a scripted model that yields one partial response per word before the final response; the galaxie lane runs SSE through the router with the mock chat model's word chunks. Both sides record the partial text deltas in order and the content-free tool step markers (step kind, offered tool name, position). The other cases compare complete responses only: the galaxie wrapper drops partial responses, which exist only because the adapter always runs ADK in SSE mode."
+    "Streaming cases run the native Runner in SSE mode with a scripted model that yields one partial response per word before the final response; the galaxie lane runs SSE through the router with the mock chat model's word chunks. Both sides record the partial text deltas in order and the content-free tool step markers (step kind, offered tool name, position). The other cases compare complete responses only: the galaxie wrapper drops partial responses, which exist only because the adapter always runs ADK in SSE mode.",
+    "Approval cases register the same tool with confirmation required on both sides. The native lane runs a second invocation whose user message carries the confirmation function response; the galaxie lane answers the interaction with the default resume (action approve or deny, payload { indexes: [0] }). Both record the tool calls the run paused on (name and arguments, never a call ID), the model requests including the tool result or the denial text the model sees, the capability calls and the final output."
   ],
   "limits": [
-    "Stage A3 streams text deltas and content-free tool step markers but has no interrupts, resume, checkpoints or subgraphs. The adapter reports streaming as true and every other optional feature as false.",
+    "Stage A4 adds confirmations and long-running tools as interactions: a run pauses, ends, and resumes as a new run through core's accepted submission inbox. It streams text deltas and content-free step markers, and has no checkpoints or subgraphs, so a pause does not survive a reload. The adapter reports streaming, interrupts and resume as true and checkpoints and subgraphs as false.",
     "The run input is { prompt: string }. Only the closed set of LlmAgent, SequentialAgent, ParallelAgent and LoopAgent is accepted, and tools and models must come from the host.",
     "All model replies are deterministic scripts; no real model, network request or download takes part.",
-    "The Chromium lane runs under the vitest browser project, not a page with the strict mock CSP; the strict-CSP bundle probe in packages/adapter-adk covers the bundle alone."
+    "The Chromium lane runs under the vitest browser project, not a page with the strict mock CSP; the strict-CSP bundle probe in packages/adapter-adk covers the bundle alone.",
+    "ADK drops the function responses of sibling calls that ran beside a confirmation-gated call in the same model turn, so the adapter fails such a turn as unsupported, as it does a confirmation beside a long-running call, a pause inside a ParallelAgent and a long-running call whose result never arrives. ADK also hides adk_request_input calls and answers from an LlmAgent, so a pause on that tool fails as unsupported."
   ]
 }

@@ -137,14 +137,14 @@ const toolThenText =
       ? new AIMessage({ content: final })
       : new AIMessage({ content: '', tool_calls: [call('docs_search_1', { q: 'x' })] });
 
-test('the adapter reports adk-js and the stage A3 features, and runs a text agent', async () => {
+test('the adapter reports adk-js and the stage A4 features, and runs a text agent', async () => {
   const { adapter, runtime, run } = await execute({
     reply: () => new AIMessage({ content: 'hello' }),
   });
   expect(adapter.id).toBe('adk-js');
   expect(adapter.features).toEqual({
-    interrupts: false,
-    resume: false,
+    interrupts: true,
+    resume: true,
     checkpoints: false,
     streaming: true,
     subgraphs: false,
@@ -315,7 +315,7 @@ test('an output key returns the session state value, parsed as the schema', asyn
   await runtime.dispose();
 });
 
-test('a tool that needs a confirmation fails unsupported instead of succeeding with no output', async () => {
+test('a tool that needs a confirmation fails unsupported when the entry has no interaction hook', async () => {
   const { runtime, run, invocations } = await execute({
     reply: toolThenText('unused'),
     agent: (host) =>

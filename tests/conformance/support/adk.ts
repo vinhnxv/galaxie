@@ -22,7 +22,11 @@ import {
 } from '@google/adk';
 import type { ToolCall } from '@langchain/core/messages';
 import { z } from 'zod';
-import { type AdkAgent, createAdkAdapter } from '../../../packages/adapter-adk/src/index.js';
+import {
+  type AdkAgent,
+  createAdkAdapter,
+  defineAdkEntry,
+} from '../../../packages/adapter-adk/src/index.js';
 import specs from '../cases-adk/fixtures.json' with { type: 'json' };
 
 export const adkCases = [
@@ -36,11 +40,15 @@ export const adkCases = [
   'abort',
   'streaming-text',
   'streaming-tool',
+  'approval-approve',
+  'approval-deny',
 ] as const;
 export type AdkCase = (typeof adkCases)[number];
 
 const STEP_LIMIT = 2;
 const isStreaming = (name: AdkCase): boolean => name.startsWith('streaming-');
+const isApproval = (name: AdkCase): boolean => name.startsWith('approval-');
+const approves = (name: AdkCase): boolean => name === 'approval-approve';
 const BLOCKED = /BLOCKED_(ARGUMENT|TEXT)/;
 const TOOL = 'math_double_1';
 const TOOL_DESCRIPTION = 'Double an integer.';
@@ -68,6 +76,8 @@ export interface AdkTranscript {
   /** Streaming cases only: the text deltas in order and the content-free tool step markers. */
   streamed?: string[];
   steps?: { step: string; tool: string; index: number }[];
+  /** Approval cases only: the tool calls the run paused on, in order. */
+  pauses?: { tool: string; args: unknown }[];
   output: unknown;
   error: { code: string } | null;
 }
@@ -125,6 +135,7 @@ function newTranscript(name: AdkCase): AdkTranscript {
     responses: [],
     capabilities: [],
     ...(isStreaming(name) ? { streamed: [], steps: [] } : {}),
+    ...(isApproval(name) ? { pauses: [] } : {}),
     output: null,
     error: null,
   };
@@ -214,6 +225,7 @@ export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
     name: TOOL,
     description: TOOL_DESCRIPTION,
     parameters,
+    ...(isApproval(name) ? { requireConfirmation: true } : {}),
     execute: async (input: z.infer<typeof parameters>) => {
       transcript.capabilities.push({ name: 'math.double@1', input });
       if (name === 'capability-denial') return modelVisible('denied');
@@ -230,49 +242,81 @@ export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
   const controller = new AbortController();
   let text = '';
   let delta: unknown;
-  try {
-    const events = (async () => {
-      for await (const event of runner.runAsync({
-        userId: 'fixture',
-        sessionId: session.id,
-        newMessage: { role: 'user', parts: [{ text: spec.prompt }] },
-        runConfig: {
-          maxLlmCalls: name === 'step-budget' ? STEP_LIMIT : 500,
-          streamingMode: isStreaming(name) ? StreamingMode.SSE : StreamingMode.NONE,
-        },
-        abortSignal: controller.signal,
-      })) {
-        if (event.errorCode !== undefined) {
-          // ADK reports a failed run as an error event rather than throwing.
-          transcript.error = {
-            code: codeOf(event.errorCode, event.errorMessage ?? '', model.denied),
-          };
-          break;
+  /** Runs one invocation; returns the confirmation call a gated tool is waiting on, if any. */
+  const drive = async (message: {
+    role: string;
+    parts: Record<string, unknown>[];
+  }): Promise<string | undefined> => {
+    let waiting: string | undefined;
+    for await (const event of runner.runAsync({
+      userId: 'fixture',
+      sessionId: session.id,
+      newMessage: message,
+      runConfig: {
+        maxLlmCalls: name === 'step-budget' ? STEP_LIMIT : 500,
+        streamingMode: isStreaming(name) ? StreamingMode.SSE : StreamingMode.NONE,
+      },
+      abortSignal: controller.signal,
+    })) {
+      if (event.errorCode !== undefined) {
+        // ADK reports a failed run as an error event rather than throwing.
+        transcript.error = {
+          code: codeOf(event.errorCode, event.errorMessage ?? '', model.denied),
+        };
+        break;
+      }
+      if (Object.keys(event.actions?.requestedToolConfirmations ?? {}).length > 0) {
+        for (const part of event.content?.parts ?? []) {
+          const call = part.functionCall;
+          if (call?.name !== 'adk_request_confirmation') continue;
+          const pinned = call.args?.['originalFunctionCall'] as { name: string; args: unknown };
+          transcript.pauses?.push({ tool: pinned.name, args: pinned.args });
+          waiting = call.id;
         }
-        if (event.partial === true) {
-          for (const part of event.content?.parts ?? [])
-            if (typeof part.text === 'string') transcript.streamed?.push(part.text);
-        } else {
-          for (const part of event.content?.parts ?? []) {
-            const call = part.functionCall ?? part.functionResponse;
-            if (call?.name !== undefined)
-              transcript.steps?.push({
-                step: part.functionCall === undefined ? 'tool_result' : 'tool_call',
-                tool: call.name,
-                index: transcript.steps?.length ?? 0,
-              });
-          }
-        }
-        if (event.partial !== true && event.author === 'agent' && event.content?.role === 'model') {
-          const answer = (event.content.parts ?? [])
-            .flatMap((part) => (typeof part.text === 'string' ? [part.text] : []))
-            .join('');
-          if ((event.content.parts ?? []).every((part) => part.functionCall === undefined)) {
-            text = answer;
-            delta = event.actions?.stateDelta;
-          }
+        continue;
+      }
+      if (event.partial === true) {
+        for (const part of event.content?.parts ?? [])
+          if (typeof part.text === 'string') transcript.streamed?.push(part.text);
+      } else {
+        for (const part of event.content?.parts ?? []) {
+          const call = part.functionCall ?? part.functionResponse;
+          if (call?.name !== undefined)
+            transcript.steps?.push({
+              step: part.functionCall === undefined ? 'tool_result' : 'tool_call',
+              tool: call.name,
+              index: transcript.steps?.length ?? 0,
+            });
         }
       }
+      if (event.partial !== true && event.author === 'agent' && event.content?.role === 'model') {
+        const answer = (event.content.parts ?? [])
+          .flatMap((part) => (typeof part.text === 'string' ? [part.text] : []))
+          .join('');
+        if ((event.content.parts ?? []).every((part) => part.functionCall === undefined)) {
+          text = answer;
+          delta = event.actions?.stateDelta;
+        }
+      }
+    }
+    return waiting;
+  };
+  try {
+    const events = (async () => {
+      const waiting = await drive({ role: 'user', parts: [{ text: spec.prompt }] });
+      if (waiting !== undefined)
+        await drive({
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: waiting,
+                name: 'adk_request_confirmation',
+                response: { confirmed: approves(name) },
+              },
+            },
+          ],
+        });
     })();
     if (latch !== undefined) {
       await latch.entered;
@@ -330,15 +374,32 @@ export async function runAdkGalaxie(name: AdkCase): Promise<AdkTranscript> {
         throw error;
       }
     };
-    return agentFor(
+    const root = agentFor(
       name,
       llm,
       host.adk.capabilityTool('math.double@1', {
         toolName: TOOL,
         description: TOOL_DESCRIPTION,
         parameters,
+        ...(isApproval(name) ? { requireConfirmation: true } : {}),
       }),
     );
+    return isApproval(name)
+      ? defineAdkEntry({
+          agent: root,
+          interaction: (requests) => {
+            for (const pending of requests)
+              if (pending.kind === 'confirmation')
+                transcript.pauses?.push({ tool: pending.tool, args: pending.args });
+            return {
+              surfaceId: 'main',
+              viewRevision: 'r1',
+              component: 'conformance.Approval/v1',
+              props: { count: requests.length },
+            };
+          },
+        })
+      : root;
   };
   try {
     const instance = await runtime.create(
@@ -397,7 +458,19 @@ export async function runAdkGalaxie(name: AdkCase): Promise<AdkTranscript> {
     const { runId } = await instance.start({ prompt: spec.prompt });
     const events = (async (): Promise<RunEvent[]> => {
       const recorded: RunEvent[] = [];
-      for await (const event of instance.events(runId)) recorded.push(event);
+      for await (const event of instance.events(runId)) {
+        recorded.push(event);
+        if (event.type === 'interaction') {
+          const receipt = await instance.dispatch({
+            instanceId: instance.instanceId,
+            runId,
+            ...event.interaction,
+            action: approves(name) ? 'approve' : 'deny',
+            payload: { indexes: [0] },
+          });
+          if (receipt.status !== 'accepted') throw new Error('The approval was not accepted.');
+        }
+      }
       return recorded;
     })();
     if (name === 'abort') {

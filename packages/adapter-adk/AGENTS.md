@@ -3,7 +3,7 @@
 ## Purpose
 
 Host Google ADK (JavaScript) agents as a galaxie executor, with routing, labels, consent,
-budgets and persistence kept in galaxie. Stage A3 adds checked streaming. See the
+budgets and persistence kept in galaxie. Stage A4 adds pauses for confirmations and long-running tools as interactions. See the
 [README](README.md) and [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md).
 
 ## Entry points
@@ -33,8 +33,9 @@ Do not import an `@google/adk/...` subpath, another executor adapter or LangGrap
 
 ## Limits
 
-The adapter streams checked text deltas and content-free tool markers, but has no interrupts,
-resume, checkpoints or subgraphs, and sessions live in memory. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle, so
+The adapter streams checked text deltas and content-free tool markers and pauses on confirmations
+and long-running tools (interrupts and resume), but has no checkpoints or subgraphs, and sessions
+and pauses live in memory. Author code sees positional requests only; never expose ADK call IDs. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle, so
 hosts must apply the build define.
 
 ## Tests

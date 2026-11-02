@@ -16,6 +16,17 @@ export const MAX_DELTA_LENGTH = 4096;
 export class StreamProjector {
   #position = 0;
 
+  /** The marker for a run that stops to wait for the user; it holds no call or content. */
+  paused(): ExecutorEvent {
+    return {
+      type: 'stream',
+      executor: EXECUTOR_ID,
+      path: [],
+      mode: 'updates',
+      data: { step: 'paused', index: this.#position++ },
+    };
+  }
+
   project(event: Event): ExecutorEvent[] {
     const parts = event.content?.parts ?? [];
     if (event.partial === true) {

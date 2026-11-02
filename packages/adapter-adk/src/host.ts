@@ -12,6 +12,7 @@ import {
 } from '@google/adk';
 import type { ZodObject, ZodRawShape } from 'zod';
 import { failure } from './errors.js';
+import type { AdkEntry } from './interaction.js';
 import { type AdkChatModel, GalaxieLlm } from './llm.js';
 import type { RunState } from './run.js';
 import { toGalaxieError } from './run.js';
@@ -50,7 +51,7 @@ export interface AdkHost {
   };
 }
 
-export type AdkAgent = (host: AdkHost) => BaseAgent;
+export type AdkAgent = (host: AdkHost) => BaseAgent | AdkEntry;
 
 /** Models and tools this host created; membership, not ADK's forgeable brand, is the trust check. */
 export interface HostRegistry {

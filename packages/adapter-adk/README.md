@@ -2,13 +2,14 @@
 
 The Google ADK (JavaScript) executor adapter (executor id `adk-js`). It pins ADK, runs its
 browser bundle under galaxie's strict CSP and Trusted Types, and hosts agents through galaxie's
-router, broker and budgets, with checked streaming. See
+router, broker and budgets, with checked streaming and pauses for confirmations and long-running
+tools. See
 [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md) (Proposed).
 
-## Adapter (stage A3)
+## Adapter (stage A4)
 
-`createAdkAdapter()` registers `adk-js` with `streaming` set to `true` and `interrupts`, `resume`,
-`checkpoints` and `subgraphs` set to `false`. The run input is `{ prompt: string }`.
+`createAdkAdapter()` registers `adk-js` with `streaming`, `interrupts` and `resume` set to `true`
+and `checkpoints` and `subgraphs` set to `false`. The run input is `{ prompt: string }`.
 The agent factory receives a host and returns an ADK agent:
 
 ```ts
@@ -49,7 +50,48 @@ Stream data is delivered live and is not journaled. A provider without native st
 whole reply as one chunk. The final response ADK records carries the whole reply, so the run output
 does not depend on the deltas. Abort or an early stop settles the model call once, as failed.
 
-Long-running tools, confirmations, durable sessions and the example host are later stages.
+## Pauses and resume
+
+A tool created with `requireConfirmation: true`, or with `longRunning: true`, can stop the run to
+wait for the user. The factory may return `defineAdkEntry({ agent, interaction, resume })` instead of
+a bare agent:
+
+```ts
+const agent: AdkAgent = (host) =>
+  defineAdkEntry({
+    agent: new LlmAgent({ /* ... */ tools: [host.adk.capabilityTool('files.delete@1', spec)] }),
+    interaction: (requests) => ({
+      surfaceId: 'main',
+      viewRevision: 'r1',
+      component: 'app.Approval/v1',
+      props: { tools: requests.map((request) => request.tool) },
+    }),
+  });
+```
+
+- A pause ends the run with one `interaction` event and the run resumes as a new run when the user
+  submits. Without an `interaction` hook, or when it returns anything but the four-field request
+  core accepts, the run fails `unsupported` with a fixed message.
+- `interaction(requests)` and `resume(requests, action, payload)` see positional requests
+  (`confirmation` with the tool and its arguments, or `long-running` with the tool and arguments).
+  ADK call IDs never reach author code, props or the user interface. All requests from one model
+  response form one interaction. The interaction ID is a digest of the conversation ID and the pause
+  number, so later pauses get new IDs.
+- The default `resume` handles confirmations only: action `approve` or `deny` with payload
+  `{ indexes: [0, ...] }` covering every pending request exactly once. Anything else fails `invalid`
+  and runs nothing. A pause that includes a long-running call needs an author `resume`, which returns
+  `{ confirmed }` for a confirmation and `{ response }` (a plain JSON object) for a long-running call.
+- A resume whose interaction ID is not the pending one fails `stale` before any tool runs. ADK's
+  confirmation processor and the tool-call integrity plugin stay enabled, so an altered stored
+  request fails the resume.
+- ADK limits: when one model turn calls a confirmation-gated tool beside other tools (including a
+  long-running one), ADK drops the other tools' results or splits the answer across events, so the
+  adapter fails that turn `unsupported`. A pause inside a tree that holds a `ParallelAgent`, and a
+  long-running call whose result never arrives, fail `unsupported` too. A pause abandoned without a
+  valid answer is answered with a denial before the next `start`, so history stays well-formed. ADK also hides
+  `adk_request_input` calls and answers from an `LlmAgent`, so `host.adk.requestInput()` fails the
+  run `unsupported`; use a long-running tool to ask the user a question.
+- Pauses live in memory: checkpoints, reload restore and the example host are later stages.
 
 ## Install
 
