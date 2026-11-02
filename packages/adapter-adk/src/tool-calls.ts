@@ -81,10 +81,7 @@ export function outputText(message: BaseMessage): string {
  * name, because ADK acts on those strings too.
  */
 export function checkedText(message: BaseMessage): string {
-  return [
-    outputText(message),
-    ...replyCalls(message).flatMap((call) => [call.id, call.name]),
-  ]
+  return [outputText(message), ...replyCalls(message).flatMap((call) => [call.id, call.name])]
     .filter((value): value is string => value !== undefined)
     .join('\n');
 }

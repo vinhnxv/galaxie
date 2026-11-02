@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import '../../packages/adapter-adk/test/support/adk-env.js';
 import {
   createLangGraphAdapter,
   type LangGraphAgent,
@@ -16,6 +17,8 @@ import {
   type ExecutorAgent,
   type SessionId,
 } from '@galaxie/core';
+import { MockChatModel } from '@galaxie/models/mock';
+import { LlmAgent } from '@google/adk';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage } from '@langchain/core/messages';
@@ -38,6 +41,7 @@ import {
 } from '@opentelemetry/sdk-trace';
 import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
+import { type AdkAgent, createAdkAdapter } from '../../packages/adapter-adk/src/index.js';
 import adapterMetadata from '../../packages/adapter-langgraph/package.json' with { type: 'json' };
 import { collect, deferred, flush } from '../../packages/core/test/fake-executor.js';
 import { assertSpanTree, serializeSpans } from '../../packages/core/test/span-tree.js';
@@ -744,4 +748,60 @@ test('prepare rejects a graph without checkpoint state inspection', async () => 
       { signal: new AbortController().signal },
     ),
   ).rejects.toMatchObject({ code: 'unsupported' });
+});
+
+test('runs the LangGraph and ADK adapters side by side in one runtime', async () => {
+  const usage = { input_tokens: 2, output_tokens: 2, total_tokens: 4 };
+  const runtime = createRuntime({
+    appId: 'tests',
+    executors: [createLangGraphAdapter(), createAdkAdapter()],
+  });
+  const state = Annotation.Root({ value: Annotation<number> });
+  const graphAgent: LangGraphAgent = (host) =>
+    new StateGraph(state)
+      .addNode('a', ({ value }) => ({ value: value + 1 }))
+      .addEdge(START, 'a')
+      .addEdge('a', END)
+      .compile({ checkpointer: host.langchain.checkpointer() });
+  const adkAgent: AdkAgent = (host) =>
+    new LlmAgent({ name: 'agent', model: host.adk.llm('assistant'), instruction: 'Answer.' });
+  const graph = await runtime.create(definition, {
+    principalScope: 'user',
+    services: { chatModels: {} },
+    agent: graphAgent,
+  });
+  const adk = await runtime.create(
+    defineAgentDefinition({
+      id: 'tests/adk',
+      version: '1.0.0',
+      executor: 'adk-js',
+      input: z.object({ prompt: z.string() }),
+      models: assistantRoles,
+    }),
+    {
+      principalScope: 'user',
+      services: {
+        chatModels: {
+          assistant: new MockChatModel({
+            question: [{ id: 'r0', text: 'adk answer', usage }],
+          }),
+        },
+      },
+      models: assistantRouting(),
+      agent: adkAgent,
+    },
+  );
+  await Promise.all([graph.prepare(), adk.prepare()]);
+  const [first, second] = await Promise.all([
+    graph.start({ value: 1 }),
+    adk.start({ prompt: 'question' }),
+  ]);
+  const [graphEvents, adkEvents] = await Promise.all([
+    collect(graph.events(first.runId)),
+    collect(adk.events(second.runId)),
+  ]);
+  expect(graphEvents.at(-1)).toMatchObject({ type: 'output', output: { value: 2 } });
+  expect(adkEvents.at(-1)).toMatchObject({ type: 'output', output: 'adk answer' });
+  expect(adkEvents.some((event) => event.type === 'stream')).toBe(false);
+  await runtime.dispose();
 });
