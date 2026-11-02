@@ -1,9 +1,40 @@
 # @galaxie/adapter-adk
 
-Foundation for the Google ADK (JavaScript) executor adapter (executor id `adk-js`). Stage A1
-ships no adapter yet: it pins ADK, proves that its browser bundle loads and runs under galaxie's
-strict CSP and Trusted Types, and enforces the import rules. See
+The Google ADK (JavaScript) executor adapter (executor id `adk-js`). It pins ADK, runs its
+browser bundle under galaxie's strict CSP and Trusted Types, and hosts non-streaming agents
+through galaxie's router, broker and budgets. See
 [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md) (Proposed).
+
+## Adapter (stage A2)
+
+`createAdkAdapter()` registers `adk-js` with every optional feature (`streaming`, `interrupts`,
+`resume`, `checkpoints`, `subgraphs`) set to `false`. The run input is `{ prompt: string }`.
+The agent factory receives a host and returns an ADK agent:
+
+```ts
+const agent: AdkAgent = (host) =>
+  new LlmAgent({
+    name: 'agent',
+    model: host.adk.llm('answer'),
+    instruction: 'Answer briefly.',
+    tools: [host.adk.capabilityTool('docs.search@1', { description: '...', parameters })],
+  });
+```
+
+- `host.adk.llm(role)` is the only model source. It leases the router for each call, so routing,
+  labels, consent, output safety and budgets apply. ADK model classes are rejected at prepare and
+  flagged by `galaxie/no-direct-model`.
+- `host.adk.capabilityTool(name, spec)` calls a bound capability through the broker. A `denied` or
+  `invalid` result returns a fixed message to the model; every other failure ends the run.
+- Prepare accepts only `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent`, with models
+  and tools created by the host. Anything else fails closed.
+- The adapter creates the `Runner`, an in-memory event log and one tool-call integrity plugin, and
+  sets `maxLlmCalls` from the step budget. A run that reaches that limit fails `budget_exceeded`.
+- The run output is the final response text, or the session-state value at the final agent's
+  `outputKey`.
+
+Streaming, long-running tools, confirmations, durable sessions and the example host are later
+stages.
 
 ## Install
 

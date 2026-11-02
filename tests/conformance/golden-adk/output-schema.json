@@ -1,0 +1,33 @@
+{
+  "requests": [
+    {
+      "system": "Use the supplied tools and answer briefly.",
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "structured"
+            }
+          ]
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "{\"answer\":\"42\"}"
+        }
+      ]
+    }
+  ],
+  "capabilities": [],
+  "output": {
+    "answer": "42"
+  },
+  "error": null
+}

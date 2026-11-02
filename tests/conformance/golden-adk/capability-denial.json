@@ -1,0 +1,129 @@
+{
+  "requests": [
+    {
+      "system": "You are an agent. Your internal name is \"agent\".\n\nUse the supplied tools and answer briefly.",
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "denied tool"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "name": "math_double_1",
+          "description": "Double an integer.",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "value": {
+                "type": "INTEGER",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "type": "STRING"
+              }
+            },
+            "required": ["value"]
+          }
+        }
+      ]
+    },
+    {
+      "system": "You are an agent. Your internal name is \"agent\".\n\nUse the supplied tools and answer briefly.",
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "denied tool"
+            }
+          ]
+        },
+        {
+          "role": "model",
+          "parts": [
+            {
+              "functionCall": {
+                "name": "math_double_1",
+                "args": {
+                  "value": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "parts": [
+            {
+              "functionResponse": {
+                "name": "math_double_1",
+                "response": {
+                  "error": "Policy denied the request."
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "name": "math_double_1",
+          "description": "Double an integer.",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "value": {
+                "type": "INTEGER",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "type": "STRING"
+              }
+            },
+            "required": ["value"]
+          }
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "role": "model",
+      "parts": [
+        {
+          "functionCall": {
+            "name": "math_double_1",
+            "args": {
+              "value": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The tool was denied."
+        }
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 4
+      }
+    }
+  ],
+  "output": "The tool was denied.",
+  "error": null
+}

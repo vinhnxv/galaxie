@@ -238,6 +238,22 @@ the [page loop](../../examples/rag-browser/test/loop.node.test.ts) and add
 [Node Pyodide](../../examples/rag-browser/test/dspy-agent.node.test.ts) checks;
 real-model format reliability, hands-on review and device performance are unmeasured.
 
+## Google ADK conversations
+
+The separate [ADK matrix](compatibility-matrix-adk.json) lists eight cases for the `adk-js`
+adapter: plain text, one and two sequential capability tool calls, an output schema with an output
+key, a capability denial, an output-safety block on a function-call argument, the step budget and
+abort. The reference is the pinned ADK 2.3.0 web bundle driven by its own `Runner` with a scripted
+`BaseLlm` ([native lane](adk-native.node.test.ts), which writes the `golden-adk` files). The
+[galaxie lane](adk.test.ts) runs the same agent through the adapter, router and broker on Node and
+in headless Chromium and compares ADK-side requests, responses, capability calls, output and error
+code. Call IDs are runtime-generated and are not compared. The lane is non-streaming; later
+stages add streaming and pauses. It runs under the vitest browser project, not a page with the
+strict mock CSP; the bundle-level strict-CSP probe lives in `packages/adapter-adk`. No other
+executor's goldens or matrix change.
+
+Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformance/adk-native.node.test.ts`. To rewrite the goldens on purpose, set `ADK_UPDATE_GOLDEN=1` for the native test, run `pnpm format` and review the diff.
+
 ## Running the suite
 
 - `pnpm check` runs the repository's license, lint, both TypeScript compilers, Node/Chromium tests, build and dependency checks.

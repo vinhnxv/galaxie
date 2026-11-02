@@ -242,10 +242,12 @@ const modelSources = [
   '@langchain/groq',
   '@langchain/community',
   '@mlc-ai/web-llm',
+  '@google/genai',
   'openai',
   '@anthropic-ai/sdk',
   '@galaxie/models',
 ];
+const adkModels = ['Gemini', 'ApigeeLlm', 'ChromeBuiltInLlm', 'LLMRegistry', 'RoutedLlm'];
 tester.run('no-direct-model', rule('no-direct-model'), {
   valid: [
     'import { x } from "@langchain/core/messages";',
@@ -255,6 +257,12 @@ tester.run('no-direct-model', rule('no-direct-model'), {
     'import { LanguageModel } from "allowed"; LanguageModel.create();',
     'function run(globalThis) { globalThis.LanguageModel.create(); }',
     'const obj = {}; obj.LanguageModel.create();',
+    'import { LlmAgent, FunctionTool } from "@google/adk"; new LlmAgent({ model: host.adk.llm("agent") });',
+    'import * as adk from "@google/adk"; new adk.LlmAgent({});',
+    'import { Gemini } from "other"; new Gemini();',
+    'const Gemini = class {}; new Gemini();',
+    'import * as adk from "other"; new adk.Gemini();',
+    'import * as adk from "@google/adk"; const adk2 = {}; adk2.Gemini; adk["dynamic" + 1];',
     { code: 'import "openai/subpath";', options: [{ allow: ['openai'] }] },
     { code: 'import "openai/allowed";', options: [{ allow: ['openai/allowed'] }] },
     { code: 'import "vendor/model";', options: [{ extraSources: ['vendor/model-other'] }] },
@@ -270,6 +278,15 @@ tester.run('no-direct-model', rule('no-direct-model'), {
       invalid(`export { Model } from '${source}';`, 'directModel', source),
       invalid(`export * from '${source}/subpath';`, 'directModel', source),
       invalid(`import('${source}');`, 'directModel', source),
+    ]),
+    ...adkModels.flatMap((name) => [
+      invalid(`import { ${name} } from '@google/adk'; new ${name}();`, 'directAdkModel', name),
+      invalid(`import { ${name} as Alias } from '@google/adk';`, 'directAdkModel', name),
+      invalid(`import { "${name}" as Alias } from '@google/adk';`, 'directAdkModel', name),
+      invalid(`export { ${name} } from '@google/adk';`, 'directAdkModel', name),
+      invalid(`import * as adk from '@google/adk'; new adk.${name}();`, 'directAdkModel', name),
+      invalid(`import * as adk from '@google/adk'; adk['${name}'];`, 'directAdkModel', name),
+      invalid(`import { ${name} } from '@google/adk/sub';`, 'directAdkModel', name),
     ]),
     invalid('LanguageModel.create();', 'directModel', 'LanguageModel'),
     invalid('const model = LanguageModel;', 'directModel', 'LanguageModel'),

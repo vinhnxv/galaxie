@@ -1,0 +1,43 @@
+{
+  "requests": [
+    {
+      "system": "You are an agent. Your internal name is \"agent\".\n\nUse the supplied tools and answer briefly.",
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "blocked argument"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "name": "math_double_1",
+          "description": "Double an integer.",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "value": {
+                "type": "INTEGER",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "type": "STRING"
+              }
+            },
+            "required": ["value"]
+          }
+        }
+      ]
+    }
+  ],
+  "responses": [],
+  "capabilities": [],
+  "output": null,
+  "error": {
+    "code": "denied"
+  }
+}

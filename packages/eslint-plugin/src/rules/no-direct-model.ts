@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { Rule } from 'eslint';
-import { globalPath } from '../globals.js';
+import { globalPath, staticPropertyName } from '../globals.js';
 
 const sources = [
   '@langchain/openai',
@@ -13,10 +13,15 @@ const sources = [
   '@langchain/groq',
   '@langchain/community',
   '@mlc-ai/web-llm',
+  '@google/genai',
   'openai',
   '@anthropic-ai/sdk',
   '@galaxie/models',
 ];
+
+/** ADK exports that build a model outside the host router; the rest of `@google/adk` is allowed. */
+const adkSource = '@google/adk';
+const adkModels = new Set(['Gemini', 'ApigeeLlm', 'ChromeBuiltInLlm', 'LLMRegistry', 'RoutedLlm']);
 
 const sourceList = {
   type: 'array',
@@ -30,6 +35,10 @@ const sourceList = {
 
 function matches(source: string, prefix: string): boolean {
   return source === prefix || source.startsWith(`${prefix}/`);
+}
+
+function isAdk(source: unknown): boolean {
+  return typeof source === 'string' && matches(source, adkSource);
 }
 
 const rule: Rule.RuleModule = {
@@ -46,6 +55,8 @@ const rule: Rule.RuleModule = {
     messages: {
       directModel:
         'Call host.langchain.chatModel(role) instead of {{name}} so routing, labels, consent and budgets apply.',
+      directAdkModel:
+        'Call host.adk.llm(role) instead of {{name}} so routing, labels, consent and budgets apply.',
     },
   },
   create(context) {
@@ -61,12 +72,34 @@ const rule: Rule.RuleModule = {
       if (globalPath(context, node)?.join('.') === 'LanguageModel')
         context.report({ node, messageId: 'directModel', data: { name: 'LanguageModel' } });
     };
+    const adkNamespaces = new Set<string>();
+    const importedName = (node: { type: string; name?: string; value?: unknown }): unknown =>
+      node.type === 'Identifier' ? node.name : node.value;
+    const checkAdkName = (node: Rule.Node, name: unknown): void => {
+      if (typeof name === 'string' && adkModels.has(name))
+        context.report({ node, messageId: 'directAdkModel', data: { name } });
+    };
+    const checkAdkMember = (node: Rule.Node & { type: 'MemberExpression' }): void => {
+      if (node.object.type !== 'Identifier' || !adkNamespaces.has(node.object.name)) return;
+      const name = staticPropertyName(node);
+      if (name !== undefined) checkAdkName(node, name);
+    };
     return {
       ImportDeclaration(node) {
         checkSource(node, node.source.value);
+        if (!isAdk(node.source.value)) return;
+        for (const specifier of node.specifiers) {
+          if (specifier.type === 'ImportSpecifier')
+            checkAdkName(node, importedName(specifier.imported));
+          else if (specifier.type === 'ImportNamespaceSpecifier')
+            adkNamespaces.add(specifier.local.name);
+        }
       },
       ExportNamedDeclaration(node) {
         checkSource(node, node.source?.value);
+        if (isAdk(node.source?.value))
+          for (const specifier of node.specifiers)
+            checkAdkName(node, importedName(specifier.local));
       },
       ExportAllDeclaration(node) {
         checkSource(node, node.source.value);
@@ -75,7 +108,10 @@ const rule: Rule.RuleModule = {
         if (node.source.type === 'Literal') checkSource(node, node.source.value);
       },
       Identifier: checkGlobal,
-      MemberExpression: checkGlobal,
+      MemberExpression(node) {
+        checkGlobal(node);
+        checkAdkMember(node);
+      },
     };
   },
 };

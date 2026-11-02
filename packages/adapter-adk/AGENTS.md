@@ -3,12 +3,17 @@
 ## Purpose
 
 Host Google ADK (JavaScript) agents as a galaxie executor, with routing, labels, consent,
-budgets and persistence kept in galaxie. Stage A1 is the foundation only. See the
+budgets and persistence kept in galaxie. Stage A2 runs non-streaming agents. See the
 [README](README.md) and [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md).
 
 ## Entry points
 
-- [src/index.ts](src/index.ts) exports the executor id.
+- [src/index.ts](src/index.ts) exports `createAdkAdapter`, the host types and the executor id.
+- [src/adapter.ts](src/adapter.ts) is the `adk-js` adapter and its Runner-owning run loop.
+- [src/llm.ts](src/llm.ts) is the router-backed `GalaxieLlm`; [src/host.ts](src/host.ts) builds the
+  host, capability tools and trust registry; [src/validate.ts](src/validate.ts) checks the agent tree.
+- [src/session.ts](src/session.ts) is the in-memory session service; [src/run.ts](src/run.ts) holds
+  the per-run failure slot.
 - [src/runtime-shim.ts](src/runtime-shim.ts) makes the bundle's unguarded `process.env` read safe.
 - [test/bundle-probe.ts](test/bundle-probe.ts) is the probe every lane runs.
 - [test/support/bundle-csp](test/support/bundle-csp) holds the pages the strict-CSP test builds.
@@ -28,10 +33,12 @@ Do not import an `@google/adk/...` subpath, another executor adapter or LangGrap
 
 ## Limits
 
-Only the foundation exists: no `ExecutorAdapter` is registered, so no ADK agent runs through galaxie
-yet. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle.
+The adapter is non-streaming: no interrupts, resume, checkpoints or subgraphs, and sessions live in
+memory. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle, so
+hosts must apply the build define.
 
 ## Tests
 
-Run `pnpm exec vitest run packages/adapter-adk`. The bundle-file test fails on any ADK or bundle
-change. Run `pnpm check` before reporting the integrated change as finished.
+Run `pnpm exec vitest run packages/adapter-adk tests/conformance/adk.test.ts
+tests/conformance/adk-native.node.test.ts`. The bundle-file test fails on any ADK or bundle change.
+Run `pnpm check` before reporting the integrated change as finished.
