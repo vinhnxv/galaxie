@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import ts from '@typescript/typescript6';
 
 interface ImportReference {
@@ -10,6 +10,8 @@ interface ImportReference {
   readonly typeOnly: boolean;
   readonly hasTypes: boolean;
   readonly dynamic: boolean;
+  /** Type stripping erases the whole declaration, so the module is never evaluated. */
+  readonly erased: boolean;
 }
 
 const problems: string[] = [];
@@ -28,9 +30,15 @@ function imports(file: string): ImportReference[] {
     true,
   );
   const references: ImportReference[] = [];
-  const add = (node: ts.Node, typeOnly: boolean, hasTypes = typeOnly, dynamic = false): void => {
+  const add = (
+    node: ts.Node,
+    typeOnly: boolean,
+    hasTypes = typeOnly,
+    dynamic = false,
+    erased = false,
+  ): void => {
     if (ts.isStringLiteralLike(node))
-      references.push({ specifier: node.text, typeOnly, hasTypes, dynamic });
+      references.push({ specifier: node.text, typeOnly, hasTypes, dynamic, erased });
     else problems.push(`${file}: import specifiers must be string literals`);
   };
   const visit = (node: ts.Node): void => {
@@ -51,6 +59,8 @@ function imports(file: string): ImportReference[] {
           (named !== undefined &&
             ts.isNamedImports(named) &&
             named.elements.some((element) => element.isTypeOnly)),
+        false,
+        clause?.isTypeOnly === true,
       );
     } else if (ts.isExportDeclaration(node) && node.moduleSpecifier !== undefined) {
       const typeOnly =
@@ -66,9 +76,11 @@ function imports(file: string): ImportReference[] {
           (node.exportClause !== undefined &&
             ts.isNamedExports(node.exportClause) &&
             node.exportClause.elements.some((element) => element.isTypeOnly)),
+        false,
+        node.isTypeOnly,
       );
     } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
-      add(node.argument.literal, true);
+      add(node.argument.literal, true, true, false, true);
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const argument = node.arguments[0];
       if (argument === undefined) problems.push(`${file}: dynamic imports require a specifier`);
@@ -151,6 +163,93 @@ for (const area of ['src', 'dist', 'test']) {
       )
         continue;
       problems.push(`${file}: forbidden Python adapter import ${specifier}`);
+    }
+  }
+}
+
+const ADK_TEST_ONLY = new Set([
+  'vitest',
+  'vite',
+  'playwright',
+  'zod',
+  'es-module-lexer',
+  '@opentelemetry/api',
+  '@opentelemetry/sdk-trace',
+]);
+for (const area of ['src', 'dist', 'test']) {
+  const directory = join('packages/adapter-adk', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier, erased } of imports(file)) {
+      if (specifier.startsWith('@google/adk/')) {
+        problems.push(
+          `${file}: ADK subpath imports are not allowed (Node-only or networked code), received ${specifier}`,
+        );
+        continue;
+      }
+      if (specifier === '@google/genai' || specifier.startsWith('@google/genai/')) {
+        if (!erased)
+          problems.push(
+            `${file}: @google/genai may be imported as a type only, with a declaration-level \`import type\` (the bundle inlines its own copy)`,
+          );
+        continue;
+      }
+      if (specifier.startsWith('@langchain/langgraph') || specifier.startsWith('@galaxie/adapter-'))
+        problems.push(`${file}: the ADK adapter must not depend on another executor adapter`);
+      if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        const target = resolve(dirname(file), specifier);
+        const [package_] = relative(resolve('packages'), target).split(/[\\/]/);
+        if (
+          target.split(/[\\/]/).includes('node_modules') ||
+          (package_?.startsWith('adapter-') === true && package_ !== 'adapter-adk')
+        )
+          problems.push(
+            `${file}: relative import ${specifier} reaches into a dependency or another adapter`,
+          );
+        continue;
+      }
+      if (
+        specifier === '@google/adk' ||
+        specifier === '@galaxie/core' ||
+        specifier.startsWith('@langchain/core/') ||
+        (area !== 'dist' && specifier === 'zod') ||
+        (area === 'test' &&
+          (specifier.startsWith('node:') ||
+            ADK_TEST_ONLY.has(specifier) ||
+            specifier === '@galaxie/models/mock'))
+      )
+        continue;
+      problems.push(`${file}: forbidden ADK adapter import ${specifier}`);
+    }
+  }
+}
+
+const EXEMPT_FROM_ADK_SCAN = new Set([
+  'scripts/check-dependencies.ts',
+  'tests/conformance/check-dependencies.node.test.ts',
+]);
+const isNativeReferenceRun = (file: string, specifier: string | undefined): boolean =>
+  specifier === '@google/adk' && file.startsWith('tests/conformance/');
+
+function sourceFilesOutsideDependencies(directory: string, includeDist: boolean): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || (entry.name === 'dist' && !includeDist)) return [];
+      return sourceFilesOutsideDependencies(path, includeDist);
+    }
+    return entry.isFile() && /\.[cm]?[jt]sx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
+for (const root of ['examples', 'tests', 'scripts', 'packages']) {
+  for (const file of sourceFilesOutsideDependencies(root, root === 'packages')) {
+    if (EXEMPT_FROM_ADK_SCAN.has(file) || file.startsWith('packages/adapter-adk/')) continue;
+    for (const match of readFileSync(file, 'utf8').matchAll(
+      /['"`](@google\/adk(?:\/[^'"`]*)?)['"`]/g,
+    )) {
+      if (isNativeReferenceRun(file, match[1])) continue;
+      problems.push(`${file}: ADK imports belong only in packages/adapter-adk (${match[1]})`);
     }
   }
 }
@@ -464,6 +563,7 @@ for (const directory of [
   'packages/core/dist',
   'packages/adapter-langgraph/dist',
   'packages/adapter-pyodide/dist',
+  'packages/adapter-adk/dist',
   'packages/models/dist',
   'packages/react/dist',
   'packages/storage-indexeddb/dist',
