@@ -212,7 +212,7 @@ for (const area of ['src', 'dist', 'test']) {
         specifier === '@google/adk' ||
         specifier === '@galaxie/core' ||
         specifier.startsWith('@langchain/core/') ||
-        (area !== 'dist' && specifier === 'zod') ||
+        ((area !== 'dist' || file.endsWith('.d.ts')) && specifier === 'zod') ||
         (area === 'test' &&
           (specifier.startsWith('node:') ||
             ADK_TEST_ONLY.has(specifier) ||
@@ -226,6 +226,10 @@ for (const area of ['src', 'dist', 'test']) {
 
 const EXEMPT_FROM_ADK_SCAN = new Set([
   'scripts/check-dependencies.ts',
+  // The lint rule names the ADK model classes it flags; it imports nothing from ADK.
+  'packages/eslint-plugin/src/rules/no-direct-model.ts',
+  'packages/eslint-plugin/dist/rules/no-direct-model.js',
+  'packages/eslint-plugin/test/rules.test.ts',
   'tests/conformance/check-dependencies.node.test.ts',
 ]);
 const isNativeReferenceRun = (file: string, specifier: string | undefined): boolean =>
