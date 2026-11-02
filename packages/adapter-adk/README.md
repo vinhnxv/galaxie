@@ -1,14 +1,14 @@
 # @galaxie/adapter-adk
 
 The Google ADK (JavaScript) executor adapter (executor id `adk-js`). It pins ADK, runs its
-browser bundle under galaxie's strict CSP and Trusted Types, and hosts non-streaming agents
-through galaxie's router, broker and budgets. See
+browser bundle under galaxie's strict CSP and Trusted Types, and hosts agents through galaxie's
+router, broker and budgets, with checked streaming. See
 [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md) (Proposed).
 
-## Adapter (stage A2)
+## Adapter (stage A3)
 
-`createAdkAdapter()` registers `adk-js` with every optional feature (`streaming`, `interrupts`,
-`resume`, `checkpoints`, `subgraphs`) set to `false`. The run input is `{ prompt: string }`.
+`createAdkAdapter()` registers `adk-js` with `streaming` set to `true` and `interrupts`, `resume`,
+`checkpoints` and `subgraphs` set to `false`. The run input is `{ prompt: string }`.
 The agent factory receives a host and returns an ADK agent:
 
 ```ts
@@ -33,8 +33,23 @@ const agent: AdkAgent = (host) =>
 - The run output is the final response text, or the session-state value at the final agent's
   `outputKey`.
 
-Streaming, long-running tools, confirmations, durable sessions and the example host are later
-stages.
+## Streaming
+
+The adapter always runs ADK in SSE mode, so a run emits `stream` events with `executor: 'adk-js'` and
+an empty `path`:
+
+- `messages` carries `{ author, text }`, one event per provider text chunk (split at 4096
+  characters). The reply so far, including call arguments, passes the host's output-safety hook
+  before the chunk reaches ADK, so a blocked chunk is never delivered and earlier chunks are not
+  retracted. A block fails the run `denied`.
+- `updates` carries `{ step, tool, index }` with `step` `tool_call` or `tool_result`, the offered tool
+  name and a run-wide position. It never carries a call ID, an argument or a result.
+
+Stream data is delivered live and is not journaled. A provider without native streaming yields its
+whole reply as one chunk. The final response ADK records carries the whole reply, so the run output
+does not depend on the deltas. Abort or an early stop settles the model call once, as failed.
+
+Long-running tools, confirmations, durable sessions and the example host are later stages.
 
 ## Install
 

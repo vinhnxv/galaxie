@@ -12,6 +12,8 @@ import outputSchema from './golden-adk/output-schema.json' with { type: 'json' }
 import plainText from './golden-adk/plain-text.json' with { type: 'json' };
 import sequentialTools from './golden-adk/sequential-tools.json' with { type: 'json' };
 import stepBudget from './golden-adk/step-budget.json' with { type: 'json' };
+import streamingText from './golden-adk/streaming-text.json' with { type: 'json' };
+import streamingTool from './golden-adk/streaming-tool.json' with { type: 'json' };
 import { type AdkCase, adkCases, runAdkGalaxie } from './support/adk.js';
 
 const goldens: Record<AdkCase, unknown> = {
@@ -23,6 +25,8 @@ const goldens: Record<AdkCase, unknown> = {
   'argument-block': argumentBlock,
   'step-budget': stepBudget,
   abort,
+  'streaming-text': streamingText,
+  'streaming-tool': streamingTool,
 };
 
 test.each(adkCases)('galaxie matches the native ADK golden: %s', async (name) => {

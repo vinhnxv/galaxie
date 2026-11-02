@@ -17,8 +17,8 @@ import {
   type BindToolsInput,
   type LangSmithParams,
 } from '@langchain/core/language_models/chat_models';
-import type { AIMessage, BaseMessage } from '@langchain/core/messages';
-import type { ChatResult } from '@langchain/core/outputs';
+import { type AIMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages';
+import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
 import { RunState } from '../../src/run.js';
 
@@ -31,17 +31,57 @@ export interface SeenCall {
 
 export type Reply = (call: SeenCall, index: number) => AIMessage | Promise<AIMessage>;
 
+/** Splits a scripted reply into word chunks, then two argument fragments per tool call. */
+export function wordChunks(message: AIMessage): AIMessageChunk[] {
+  const chunks = (message.text.match(/\S+\s*/g) ?? []).map(
+    (word) => new AIMessageChunk({ content: word }),
+  );
+  for (const [index, call] of (message.tool_calls ?? []).entries()) {
+    const args = JSON.stringify(call.args);
+    const split = Math.ceil(args.length / 2);
+    chunks.push(
+      new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [
+          {
+            index,
+            name: call.name,
+            ...(call.id === undefined ? {} : { id: call.id }),
+            args: args.slice(0, split),
+            type: 'tool_call_chunk',
+          },
+        ],
+      }),
+      new AIMessageChunk({
+        content: '',
+        tool_call_chunks: [{ index, args: args.slice(split), type: 'tool_call_chunk' }],
+      }),
+    );
+  }
+  if (chunks.length === 0) chunks.push(new AIMessageChunk({ content: '' }));
+  return chunks;
+}
+
 /** A scripted chat model that records what the adapter sent it. */
 export class FakeChatModel extends BaseChatModel {
   readonly seen: SeenCall[] = [];
   readonly #reply: Reply;
+  readonly #split: ((message: AIMessage) => AIMessageChunk[]) | undefined;
   #tools: readonly Record<string, unknown>[] = [];
   #shared: SeenCall[];
 
-  constructor(reply: Reply, shared?: SeenCall[]) {
+  /** With `split`, the model streams the scripted reply as those chunks. */
+  constructor(reply: Reply, shared?: SeenCall[], split?: (message: AIMessage) => AIMessageChunk[]) {
     super({});
     this.#reply = reply;
     this.#shared = shared ?? this.seen;
+    this.#split = split;
+    if (split !== undefined)
+      this._streamResponseChunks = async function* (this: FakeChatModel, messages, options) {
+        const message = await this.#respond(messages, options);
+        for (const chunk of split(message))
+          yield new ChatGenerationChunk({ text: chunk.text, message: chunk });
+      };
   }
 
   override _llmType(): string {
@@ -53,7 +93,7 @@ export class FakeChatModel extends BaseChatModel {
   }
 
   override bindTools(tools: BindToolsInput[]): FakeChatModel {
-    const bound = new FakeChatModel(this.#reply, this.#shared);
+    const bound = new FakeChatModel(this.#reply, this.#shared, this.#split);
     bound.#tools = tools.map((tool) => ({ ...convertToOpenAITool(tool).function }));
     return bound;
   }
@@ -62,6 +102,11 @@ export class FakeChatModel extends BaseChatModel {
     messages: BaseMessage[],
     options: this['ParsedCallOptions'],
   ): Promise<ChatResult> {
+    const message = await this.#respond(messages, options);
+    return { generations: [{ text: message.text, message }] };
+  }
+
+  async #respond(messages: BaseMessage[], options: this['ParsedCallOptions']): Promise<AIMessage> {
     const call: SeenCall = {
       messages,
       options: { ...options } as Record<string | symbol, unknown>,
@@ -69,8 +114,7 @@ export class FakeChatModel extends BaseChatModel {
       toolSchemas: this.#tools,
     };
     this.#shared.push(call);
-    const message = await this.#reply(call, this.#shared.length - 1);
-    return { generations: [{ text: message.text, message }] };
+    return this.#reply(call, this.#shared.length - 1);
   }
 }
 

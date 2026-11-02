@@ -802,6 +802,10 @@ test('runs the LangGraph and ADK adapters side by side in one runtime', async ()
   ]);
   expect(graphEvents.at(-1)).toMatchObject({ type: 'output', output: { value: 2 } });
   expect(adkEvents.at(-1)).toMatchObject({ type: 'output', output: 'adk answer' });
-  expect(adkEvents.some((event) => event.type === 'stream')).toBe(false);
+  expect(
+    adkEvents
+      .filter((event) => event.type === 'stream')
+      .every((event) => event.executor === 'adk-js'),
+  ).toBe(true);
   await runtime.dispose();
 });
