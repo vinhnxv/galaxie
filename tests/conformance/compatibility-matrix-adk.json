@@ -2,7 +2,7 @@
   "reference": "Native @google/adk 2.3.0 browser bundle (dist/web/index_web.js) driven by its own Runner, run on Node",
   "lanes": ["Node galaxie adk-js adapter", "headless Chromium galaxie adk-js adapter"],
   "features": {
-    "streaming": false,
+    "streaming": true,
     "interrupts": false,
     "resume": false,
     "checkpoints": false,
@@ -16,7 +16,9 @@
     "capability-denial",
     "argument-block",
     "step-budget",
-    "abort"
+    "abort",
+    "streaming-text",
+    "streaming-tool"
   ],
   "differences": [],
   "normalizations": [
@@ -24,10 +26,11 @@
     "Requests are recorded at the ADK model boundary on both sides: the scripted BaseLlm on the native side and a wrapper around host.adk.llm(role) on the galaxie side. The galaxie scripted replies come from the deterministic mock chat model behind the router.",
     "Run errors compare by code. ADK reports a failed run as an error event whose code is UNKNOWN_ERROR or INVOCATION_ABORTED; the native harness maps its call-limit message to budget_exceeded, an aborted invocation to cancelled, and its own host-check emulation to denied.",
     "The native lane emulates the host output-safety hook with the same BLOCKED_ pattern the galaxie run uses; the native lane has no router, so this stands in for the host hook only to keep the case comparable.",
-    "A request that galaxie's step budget refuses before dispatch is dropped from the galaxie transcript, because ADK's call limit refuses before it asks the model."
+    "A request that galaxie's step budget refuses before dispatch is dropped from the galaxie transcript, because ADK's call limit refuses before it asks the model.",
+    "Streaming cases run the native Runner in SSE mode with a scripted model that yields one partial response per word before the final response; the galaxie lane runs SSE through the router with the mock chat model's word chunks. Both sides record the partial text deltas in order and the content-free tool step markers (step kind, offered tool name, position). The other cases compare complete responses only: the galaxie wrapper drops partial responses, which exist only because the adapter always runs ADK in SSE mode."
   ],
   "limits": [
-    "Stage A2 is non-streaming, with no interrupts, resume, checkpoints or subgraphs. The adapter reports every optional feature as false.",
+    "Stage A3 streams text deltas and content-free tool step markers but has no interrupts, resume, checkpoints or subgraphs. The adapter reports streaming as true and every other optional feature as false.",
     "The run input is { prompt: string }. Only the closed set of LlmAgent, SequentialAgent, ParallelAgent and LoopAgent is accepted, and tools and models must come from the host.",
     "All model replies are deterministic scripts; no real model, network request or download takes part.",
     "The Chromium lane runs under the vitest browser project, not a page with the strict mock CSP; the strict-CSP bundle probe in packages/adapter-adk covers the bundle alone."

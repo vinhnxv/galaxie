@@ -34,10 +34,13 @@ export const adkCases = [
   'argument-block',
   'step-budget',
   'abort',
+  'streaming-text',
+  'streaming-tool',
 ] as const;
 export type AdkCase = (typeof adkCases)[number];
 
 const STEP_LIMIT = 2;
+const isStreaming = (name: AdkCase): boolean => name.startsWith('streaming-');
 const BLOCKED = /BLOCKED_(ARGUMENT|TEXT)/;
 const TOOL = 'math_double_1';
 const TOOL_DESCRIPTION = 'Double an integer.';
@@ -62,6 +65,9 @@ export interface AdkTranscript {
   readonly requests: { system: unknown; contents: Content[]; tools: unknown[] }[];
   readonly responses: Content[];
   readonly capabilities: { name: string; input: unknown }[];
+  /** Streaming cases only: the text deltas in order and the content-free tool step markers. */
+  streamed?: string[];
+  steps?: { step: string; tool: string; index: number }[];
   output: unknown;
   error: { code: string } | null;
 }
@@ -113,8 +119,15 @@ function responseContent(response: LlmResponse): Content {
   return normalizeContent(response.content ?? { role: 'model', parts: [] });
 }
 
-function newTranscript(): AdkTranscript {
-  return { requests: [], responses: [], capabilities: [], output: null, error: null };
+function newTranscript(name: AdkCase): AdkTranscript {
+  return {
+    requests: [],
+    responses: [],
+    capabilities: [],
+    ...(isStreaming(name) ? { streamed: [], steps: [] } : {}),
+    output: null,
+    error: null,
+  };
 }
 
 const instruction = 'Use the supplied tools and answer briefly.';
@@ -158,7 +171,7 @@ class ScriptedLlm extends BaseLlm {
 
   override async *generateContentAsync(
     request: LlmRequest,
-    _stream?: boolean,
+    stream?: boolean,
     abortSignal?: AbortSignal,
   ): AsyncGenerator<LlmResponse, void> {
     record(this.#transcript, request);
@@ -174,6 +187,9 @@ class ScriptedLlm extends BaseLlm {
     }
     const parts = [...(reply.text === '' ? [] : [{ text: reply.text }]), ...calls];
     const response: LlmResponse = { content: { role: 'model', parts }, turnComplete: true };
+    if (stream === true)
+      for (const word of reply.text.match(/\S+\s*/g) ?? [])
+        yield { content: { role: 'model', parts: [{ text: word }] }, partial: true };
     this.#transcript.responses.push(responseContent(response));
     yield response;
   }
@@ -192,7 +208,7 @@ function codeOf(errorCode: string, message: string, denied: boolean): string {
 
 export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
   const spec = specOf(name);
-  const transcript = newTranscript();
+  const transcript = newTranscript(name);
   const latch = name === 'abort' ? createMockLatch() : undefined;
   const tool = new FunctionTool({
     name: TOOL,
@@ -222,7 +238,7 @@ export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
         newMessage: { role: 'user', parts: [{ text: spec.prompt }] },
         runConfig: {
           maxLlmCalls: name === 'step-budget' ? STEP_LIMIT : 500,
-          streamingMode: StreamingMode.NONE,
+          streamingMode: isStreaming(name) ? StreamingMode.SSE : StreamingMode.NONE,
         },
         abortSignal: controller.signal,
       })) {
@@ -232,6 +248,20 @@ export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
             code: codeOf(event.errorCode, event.errorMessage ?? '', model.denied),
           };
           break;
+        }
+        if (event.partial === true) {
+          for (const part of event.content?.parts ?? [])
+            if (typeof part.text === 'string') transcript.streamed?.push(part.text);
+        } else {
+          for (const part of event.content?.parts ?? []) {
+            const call = part.functionCall ?? part.functionResponse;
+            if (call?.name !== undefined)
+              transcript.steps?.push({
+                step: part.functionCall === undefined ? 'tool_result' : 'tool_call',
+                tool: call.name,
+                index: transcript.steps?.length ?? 0,
+              });
+          }
         }
         if (event.partial !== true && event.author === 'agent' && event.content?.role === 'model') {
           const answer = (event.content.parts ?? [])
@@ -263,7 +293,7 @@ export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
 /** The same agent through galaxie: the adapter, router, broker and output-safety hook. */
 export async function runAdkGalaxie(name: AdkCase): Promise<AdkTranscript> {
   const spec = specOf(name);
-  const transcript = newTranscript();
+  const transcript = newTranscript(name);
   const latch = createMockLatch();
   const script: MockScript = {
     [spec.prompt]: spec.replies.map((reply, index) => ({
@@ -288,7 +318,8 @@ export async function runAdkGalaxie(name: AdkCase): Promise<AdkTranscript> {
       const recorded = transcript.requests.length;
       try {
         for await (const response of generate(request, stream, signal)) {
-          transcript.responses.push(responseContent(response));
+          // Partial responses are the stream; the transcript compares complete responses.
+          if (response.partial !== true) transcript.responses.push(responseContent(response));
           yield response;
         }
       } catch (error) {
@@ -374,7 +405,17 @@ export async function runAdkGalaxie(name: AdkCase): Promise<AdkTranscript> {
       await instance.cancel(runId);
     }
     for (const event of await events) {
-      if (event.type === 'output') transcript.output = event.output;
+      if (event.type === 'stream' && event.executor === 'adk-js') {
+        const data = event.data as { text?: string; step?: string; tool?: string; index?: number };
+        if (event.mode === 'messages' && typeof data.text === 'string')
+          transcript.streamed?.push(data.text);
+        else if (event.mode === 'updates')
+          transcript.steps?.push({
+            step: data.step ?? '',
+            tool: data.tool ?? '',
+            index: data.index ?? -1,
+          });
+      } else if (event.type === 'output') transcript.output = event.output;
       else if (event.type === 'error') transcript.error = { code: event.error.code };
       else if (event.type === 'cancelled') transcript.error = { code: 'cancelled' };
     }

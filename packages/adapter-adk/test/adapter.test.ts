@@ -137,7 +137,7 @@ const toolThenText =
       ? new AIMessage({ content: final })
       : new AIMessage({ content: '', tool_calls: [call('docs_search_1', { q: 'x' })] });
 
-test('the adapter reports adk-js and the stage A2 features, and runs a text agent', async () => {
+test('the adapter reports adk-js and the stage A3 features, and runs a text agent', async () => {
   const { adapter, runtime, run } = await execute({
     reply: () => new AIMessage({ content: 'hello' }),
   });
@@ -146,12 +146,14 @@ test('the adapter reports adk-js and the stage A2 features, and runs a text agen
     interrupts: false,
     resume: false,
     checkpoints: false,
-    streaming: false,
+    streaming: true,
     subgraphs: false,
   });
   const { events } = await run('hi');
   expect(last(events)).toMatchObject({ type: 'output', output: 'hello' });
-  expect(events.some((event) => event.type === 'stream')).toBe(false);
+  expect(events.filter((event) => event.type === 'stream')).toMatchObject([
+    { executor: 'adk-js', path: [], mode: 'messages', data: { text: 'hello' } },
+  ]);
   await runtime.dispose();
 });
 
@@ -412,7 +414,7 @@ test('the run configuration comes only from the adapter', async () => {
     },
   });
   await run('hi');
-  expect(seen).toEqual([{ stream: false }]);
+  expect(seen).toEqual([{ stream: true }]);
   expect(hostKeys.sort()).toEqual(['adk', 'capabilities', 'capabilityTool', 'llm', 'requestInput']);
   await runtime.dispose();
 });

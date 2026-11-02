@@ -322,7 +322,7 @@ test('an inlineData part in the request fails unsupported', async () => {
   expect(model.seen).toEqual([]);
 });
 
-test('call IDs and names are checked as separate strings, and streaming and live are unsupported', async () => {
+test('call IDs and names are checked as separate strings, and a live connection is unsupported', async () => {
   const { llm, leases } = setup(
     () =>
       new AIMessage({
@@ -333,8 +333,5 @@ test('call IDs and names are checked as separate strings, and streaming and live
   await generate(llm, request([user('go')], { tools: declare('lookup') }));
   expect(leases[0]?.checked).toEqual(['x\n{"a":1}\ncall-id\nlookup']);
   const second = setup(() => new AIMessage({ content: 'x' }));
-  await expect(async () => {
-    for await (const _ of second.llm.generateContentAsync(request([user('go')]), true)) void _;
-  }).rejects.toMatchObject({ code: 'unsupported' });
   await expect(second.llm.connect()).rejects.toMatchObject({ code: 'unsupported' });
 });

@@ -6,15 +6,18 @@ import { BaseLlm, type LlmRequest, type LlmResponse } from '@google/adk';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
+  type AIMessageChunk,
   type BaseMessage,
   HumanMessage,
+  isAIMessageChunk,
   SystemMessage,
   ToolMessage,
 } from '@langchain/core/messages';
+import { concat } from '@langchain/core/utils/stream';
 import { failure } from './errors.js';
 import type { RunState } from './run.js';
 import { declarationParameters, responseJsonSchema } from './schema.js';
-import { checkedText } from './tool-calls.js';
+import { checkedText, outputText } from './tool-calls.js';
 
 /** Credential providers are constructed per call; credentials never enter call options (ADR-0006). */
 export type AdkChatModel =
@@ -138,7 +141,16 @@ export function openAiTools(request: LlmRequest): OpenAiTool[] {
   return tools;
 }
 
-function usageOf(reply: AIMessage): { input: number; output: number } | undefined {
+/** Whether `text` is complete JSON that equals `value`. */
+function sameJson(text: string, value: unknown): boolean {
+  try {
+    return JSON.stringify(JSON.parse(text)) === JSON.stringify(value);
+  } catch {
+    return false;
+  }
+}
+
+function usageOf(reply: AIMessage | AIMessageChunk): { input: number; output: number } | undefined {
   const reported: unknown = Reflect.get(reply, 'usage_metadata');
   if (reported === undefined) return undefined;
   if (!object(reported)) throw failure('invalid');
@@ -150,7 +162,8 @@ function usageOf(reply: AIMessage): { input: number; output: number } | undefine
 
 /**
  * The router-backed ADK model (KTD3). Every call is leased through the run's `ModelPort`, so
- * routing, labels, consent, budgets and output checks stay in galaxie. Non-streaming only.
+ * routing, labels, consent, budgets and output checks stay in galaxie. With `stream` set, each text
+ * delta is checked before ADK receives it and the final response carries the whole reply (KTD10).
  */
 export class GalaxieLlm extends BaseLlm {
   readonly #role: string;
@@ -179,7 +192,7 @@ export class GalaxieLlm extends BaseLlm {
     const run = this.#active();
     if (run === undefined) throw failure('invalid');
     try {
-      yield await this.#generate(run, request, stream === true, abortSignal);
+      yield* this.#generate(run, request, stream === true, abortSignal);
     } catch (error) {
       throw run.fail(error);
     }
@@ -189,15 +202,14 @@ export class GalaxieLlm extends BaseLlm {
     throw failure('unsupported');
   }
 
-  async #generate(
+  async *#generate(
     run: RunState,
     request: LlmRequest,
     stream: boolean,
     abortSignal: AbortSignal | undefined,
-  ): Promise<LlmResponse> {
+  ): AsyncGenerator<LlmResponse, void> {
     // After a fatal error nothing more may reach a provider or the model.
     if (run.failure !== undefined) throw run.failure;
-    if (stream) throw failure('unsupported');
     for (const [name, tool] of Object.entries(request.toolsDict))
       if (!this.#trusted(tool) && !INTERNAL_TOOLS.has(name)) throw failure('unsupported');
     run.countModelCall();
@@ -220,7 +232,9 @@ export class GalaxieLlm extends BaseLlm {
     const span = run.trace.start({ kind: 'model', route }, run.span);
     let settled = false;
     try {
-      const reply = await this.#invoke(lease, signal, messages, tools, jsonSchema, request);
+      const reply: AIMessage | AIMessageChunk = stream
+        ? yield* this.#stream(lease, signal, messages, tools, jsonSchema, request)
+        : await this.#invoke(lease, signal, messages, tools, jsonSchema, request);
       const calls = reply.tool_calls ?? [];
       if (
         typeof reply.content !== 'string' ||
@@ -256,7 +270,7 @@ export class GalaxieLlm extends BaseLlm {
           functionCall: { id: run.takeCallId(), name: call.name, args: call.args },
         })),
       ];
-      return {
+      yield {
         content: { role: 'model', parts: parts.length > 0 ? parts : [{ text: '' }] },
         turnComplete: true,
         ...(usage === undefined
@@ -269,7 +283,8 @@ export class GalaxieLlm extends BaseLlm {
               },
             }),
       };
-    } catch (error) {
+    } finally {
+      // Also reached when ADK stops consuming mid-stream; a lease is settled exactly once.
       if (!settled) {
         lease.fail();
         settled = true;
@@ -282,18 +297,16 @@ export class GalaxieLlm extends BaseLlm {
           route,
         });
       }
-      throw error;
     }
   }
 
-  async #invoke(
+  #bind(
     lease: ModelCall,
     signal: AbortSignal,
-    messages: BaseMessage[],
     tools: readonly OpenAiTool[],
     jsonSchema: Record<string, unknown> | undefined,
     request: LlmRequest,
-  ): Promise<AIMessage> {
+  ) {
     const implementation = Object.hasOwn(this.#providers, lease.providerId)
       ? this.#providers[lease.providerId]
       : undefined;
@@ -314,6 +327,83 @@ export class GalaxieLlm extends BaseLlm {
       ...(jsonSchema === undefined ? {} : { jsonSchema }),
       [DESTINATION]: lease.destination,
     };
+    return { bound, options };
+  }
+
+  async #invoke(
+    lease: ModelCall,
+    signal: AbortSignal,
+    messages: BaseMessage[],
+    tools: readonly OpenAiTool[],
+    jsonSchema: Record<string, unknown> | undefined,
+    request: LlmRequest,
+  ): Promise<AIMessage> {
+    const { bound, options } = this.#bind(lease, signal, tools, jsonSchema, request);
     return bound.invoke(messages, options);
+  }
+
+  /**
+   * Yields one partial response per provider chunk that carries text, after the growing reply
+   * (text and call arguments) passed the output check, and returns the joined reply. A provider
+   * without native streaming yields its whole reply as one chunk.
+   */
+  async *#stream(
+    lease: ModelCall,
+    signal: AbortSignal,
+    messages: BaseMessage[],
+    tools: readonly OpenAiTool[],
+    jsonSchema: Record<string, unknown> | undefined,
+    request: LlmRequest,
+  ): AsyncGenerator<LlmResponse, AIMessage | AIMessageChunk> {
+    const { bound, options } = this.#bind(lease, signal, tools, jsonSchema, request);
+    let joined: AIMessage | AIMessageChunk | undefined;
+    let checked = '';
+    const fragments = new Map<string, number>();
+    const raw: string[] = [];
+    let complete = 0;
+    for await (const chunk of await bound.stream(messages, options)) {
+      // Native concat repairs cut-off argument JSON and can drop complete calls beside fragments,
+      // so the raw fragments are tracked here and the joined calls are verified against them.
+      const pieces = isAIMessageChunk(chunk) ? (chunk.tool_call_chunks ?? []) : [];
+      // A fragment alone is rarely valid JSON, so only a provider-reported invalid call counts here.
+      if (pieces.length === 0 && (chunk.invalid_tool_calls?.length ?? 0) > 0)
+        throw failure('invalid');
+      if (pieces.length === 0 && (chunk.tool_calls?.length ?? 0) > 0) complete += 1;
+      for (const [position, piece] of pieces.entries()) {
+        const key = JSON.stringify(
+          piece.index !== undefined
+            ? ['index', piece.index]
+            : piece.id !== undefined
+              ? ['id', piece.id]
+              : ['position', position],
+        );
+        let slot = fragments.get(key);
+        if (slot === undefined) {
+          slot = raw.length;
+          fragments.set(key, slot);
+          raw.push('');
+        }
+        raw[slot] = (raw[slot] ?? '') + (piece.args ?? '');
+      }
+      joined = joined === undefined ? chunk : concat(joined, chunk);
+      const next = outputText(joined);
+      if (next !== checked) {
+        await lease.checkOutput(next, { final: false });
+        checked = next;
+      }
+      if (signal.aborted) throw failure('cancelled');
+      const delta = chunk.text;
+      if (delta.length > 0)
+        yield { content: { role: 'model', parts: [{ text: delta }] }, partial: true };
+    }
+    if (joined === undefined) throw failure('unavailable');
+    if (complete > 0 && (raw.length > 0 || complete > 1)) throw failure('unsupported');
+    if (raw.length > 0) {
+      const calls = joined.tool_calls ?? [];
+      if (calls.length !== raw.length) throw failure('invalid');
+      for (const [slot, text] of raw.entries())
+        if (!sameJson(text === '' ? '{}' : text, calls[slot]?.args)) throw failure('invalid');
+    }
+    return joined;
   }
 }

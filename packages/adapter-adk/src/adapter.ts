@@ -16,6 +16,7 @@ import { type AdkAgent, type AdkServices, createHost, validServices } from './ho
 import { RunState, toGalaxieError } from './run.js';
 import { ensureAdkRuntimeEnv } from './runtime-shim.js';
 import { GalaxieSessionService } from './session.js';
+import { StreamProjector } from './stream.js';
 import { validateAgentTree } from './validate.js';
 
 const APP_NAME = 'galaxie';
@@ -68,7 +69,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
       interrupts: false,
       resume: false,
       checkpoints: false,
-      streaming: false,
+      streaming: true,
       subgraphs: false,
     },
     async prepare(agent, services, options) {
@@ -126,6 +127,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
           active = run;
           conversation = request.sessionId;
           let last: FinalResponse | undefined;
+          const projector = new StreamProjector();
           let thrown: unknown;
           try {
             const session = await sessions.getOrCreateSession({
@@ -149,7 +151,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               runConfig: {
                 // A backstop only: the model call count in RunState enforces `limits.steps`.
                 maxLlmCalls: request.limits.steps + 1,
-                streamingMode: StreamingMode.NONE,
+                streamingMode: StreamingMode.SSE,
                 pauseOnToolCalls: false,
               },
               abortSignal: run.signal,
@@ -163,6 +165,8 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
                 run.fail(failure('unsupported'));
                 break;
               }
+              if (run.failure === undefined && !request.signal.aborted)
+                yield* projector.project(event);
               if (event.partial === true || !isFinalResponse(event)) continue;
               const text = (event.content?.parts ?? [])
                 .filter((part) => part.thought !== true)

@@ -153,5 +153,33 @@
         "text": "never delivered"
       }
     ]
+  },
+  "streaming-text": {
+    "prompt": "stream text",
+    "replies": [
+      {
+        "text": "Streaming works word by word."
+      }
+    ]
+  },
+  "streaming-tool": {
+    "prompt": "stream tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "Done streaming now."
+      }
+    ]
   }
 }
