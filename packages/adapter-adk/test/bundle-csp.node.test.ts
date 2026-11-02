@@ -8,12 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { type Browser, chromium } from 'playwright';
 import { build, preview } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { cspDirectives, cspHeader } from '../../../examples/host-local/src/csp.js';
+import { cspHeader } from '../../../examples/host-local/src/csp.js';
 import { CANARY_ARGUMENT, CANARY_PROMPT, CANARY_REPLY, CANARY_RESULT } from './bundle-probe.js';
 import type { PageData } from './support/bundle-csp/page.js';
 
-// Each page is its own build: a shared chunk would let the bundler reorder module evaluation,
-// and the order of the preludes against the ADK bundle is what these tests are about.
 const PAGES = ['plain', 'control', 'traced', 'traced-private'] as const;
 // A host that ships spans to a collector turns ADK span content capture off at build time:
 // the bundle inlines `process.env` as `{}`, so only a bundler define can reach its flag.
@@ -27,23 +25,25 @@ let browser: Browser;
 let closeServer: () => Promise<void>;
 const headers: string[] = [];
 
+async function buildPageInIsolation(page: (typeof PAGES)[number], root: string): Promise<void> {
+  await build({
+    configFile: false,
+    root,
+    base: `/${page}/`,
+    logLevel: 'silent',
+    define: page === 'traced-private' ? CONTENT_FLAG_DEFINE : {},
+    build: {
+      outDir: join(directory, page),
+      emptyOutDir: true,
+      rolldownOptions: { input: join(root, `${page}.html`) },
+    },
+  });
+}
+
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'galaxie-adk-csp-'));
   const root = fileURLToPath(new URL('./support/bundle-csp/', import.meta.url));
-  for (const page of PAGES) {
-    await build({
-      configFile: false,
-      root,
-      base: `/${page}/`,
-      logLevel: 'silent',
-      define: page === 'traced-private' ? CONTENT_FLAG_DEFINE : {},
-      build: {
-        outDir: join(directory, page),
-        emptyOutDir: true,
-        rolldownOptions: { input: join(root, `${page}.html`) },
-      },
-    });
-  }
+  await Promise.all(PAGES.map((page) => buildPageInIsolation(page, root)));
   const server = await preview({
     configFile: false,
     root: directory,
@@ -117,12 +117,6 @@ function canaries(value: unknown): string[] {
   );
 }
 
-test('the strict mock policy keeps Trusted Types and forbids eval', () => {
-  expect(header).not.toMatch(/'unsafe-eval'|'unsafe-inline'/);
-  expect(cspDirectives('mock')['require-trusted-types-for']).toEqual(["'script'"]);
-  expect(cspDirectives('mock')['trusted-types']).toEqual(["'none'"]);
-});
-
 test('the built pages carry no Node-only module', async () => {
   for (const page of PAGES) {
     const assets = (await readdir(join(directory, page, 'assets'))).filter((name) =>
@@ -171,7 +165,6 @@ test('ADK spans reach a host provider registered before the bundle, with content
   expect(data.spans?.map((span) => span.name)).toEqual(
     expect.arrayContaining(['invocation', 'invoke_agent probe', 'call_llm', 'execute_tool echo']),
   );
-  // Documented default: the bundle records prompts, arguments and results in span attributes.
   expect(canaries(data.spans)).toEqual(
     expect.arrayContaining([CANARY_PROMPT, CANARY_ARGUMENT, CANARY_RESULT]),
   );

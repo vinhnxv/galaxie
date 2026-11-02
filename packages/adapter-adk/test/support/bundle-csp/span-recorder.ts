@@ -1,16 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import {
-  type Context,
-  type ContextManager,
-  context,
-  ROOT_CONTEXT,
-  trace,
-} from '@opentelemetry/api';
+import { type Context, context, ROOT_CONTEXT, trace } from '@opentelemetry/api';
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
+  StackContextManager,
   TracerProvider,
 } from '@opentelemetry/sdk-trace';
 
@@ -25,59 +20,34 @@ export interface SpanRecorder {
 }
 
 /**
- * A minimal context manager for a single sequential flow, without AsyncLocalStorage (absent in a
- * page). The context stays active until the callback, or the promise it returns, settles. ADK binds
- * the active context around every step of its async generators, and writes span attributes after
- * awaits, so a plain stack would already be empty by then. This is test support, not a model for
- * concurrent flows.
+ * Keeps the context active until a returned promise settles. There is no AsyncLocalStorage in a
+ * page, and ADK writes span attributes after awaits. Suitable for one sequential flow only.
  */
-class SequentialContextManager implements ContextManager {
-  private current: Context = ROOT_CONTEXT;
-
-  active(): Context {
-    return this.current;
-  }
-
-  with<A extends unknown[], F extends (...args: A) => ReturnType<F>>(
-    activeContext: Context,
+class SequentialContextManager extends StackContextManager {
+  override with<A extends unknown[], F extends (...args: A) => ReturnType<F>>(
+    activeContext: Context | null,
     fn: F,
     thisArg?: ThisParameterType<F>,
     ...args: A
   ): ReturnType<F> {
-    const previous = this.current;
-    this.current = activeContext;
+    const previous = this._currentContext;
+    this._currentContext = activeContext ?? ROOT_CONTEXT;
     let result: ReturnType<F>;
     try {
       result = fn.call(thisArg, ...args);
     } catch (error) {
-      this.current = previous;
+      this._currentContext = previous;
       throw error;
     }
     if (typeof (result as { then?: unknown } | null)?.then === 'function') {
       const restore = (): void => {
-        this.current = previous;
+        this._currentContext = previous;
       };
       (result as unknown as Promise<unknown>).then(restore, restore);
     } else {
-      this.current = previous;
+      this._currentContext = previous;
     }
     return result;
-  }
-
-  bind<T>(activeContext: Context, target: T): T {
-    if (typeof target !== 'function') return target;
-    const bound = (...args: unknown[]): unknown =>
-      this.with(activeContext, target as (...args: unknown[]) => unknown, undefined, ...args);
-    return bound as T;
-  }
-
-  enable(): this {
-    return this;
-  }
-
-  disable(): this {
-    this.current = ROOT_CONTEXT;
-    return this;
   }
 }
 
@@ -92,7 +62,7 @@ export function recordSpans(): SpanRecorder {
   const exporter = new InMemorySpanExporter();
   const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
   trace.setGlobalTracerProvider(provider);
-  context.setGlobalContextManager(new SequentialContextManager());
+  context.setGlobalContextManager(new SequentialContextManager().enable());
   return {
     spans: () =>
       exporter.getFinishedSpans().map((span) => ({

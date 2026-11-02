@@ -10,9 +10,7 @@ import { expect, onTestFinished, test } from 'vitest';
 
 const script = fileURLToPath(new URL('../../scripts/check-dependencies.ts', import.meta.url));
 
-// Directories the script reads unconditionally. A new unconditional read makes these tests fail
-// with ENOENT: add the directory here.
-const EMPTY_DIRECTORIES = [
+const UNCONDITIONALLY_READ_DIRECTORIES = [
   'packages/core/src',
   'packages/adapter-langgraph/src',
   'packages/models/src',
@@ -57,7 +55,8 @@ const FILES: Record<string, string> = {
 function run(extra: Record<string, string>): { status: number | null; output: string } {
   const root = mkdtempSync(join(tmpdir(), 'galaxie-deps-'));
   onTestFinished(() => rmSync(root, { recursive: true, force: true }));
-  for (const directory of EMPTY_DIRECTORIES) mkdirSync(join(root, directory), { recursive: true });
+  for (const directory of UNCONDITIONALLY_READ_DIRECTORIES)
+    mkdirSync(join(root, directory), { recursive: true });
   for (const [path, content] of Object.entries({ ...FILES, ...extra })) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
@@ -148,7 +147,7 @@ test.each([
 ])('%s importing ADK fails', (path, source) => {
   const result = run({ [path]: source });
   expect(result.status).toBe(1);
-  expect(result.output).toContain(path);
+  expect(result.output).toContain(`${path}: ADK imports belong only in packages/adapter-adk`);
 });
 
 test('the conformance lane may import the root specifier for native reference runs', () => {

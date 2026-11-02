@@ -21,7 +21,7 @@ runProbe()
   .then((result) => new Promise<ProbeResult>((resolve) => setTimeout(() => resolve(result), 50)))
   .then((result) => {
     data.result = { ...result, violations: [...violations] };
-    if (recorder !== undefined) data.spans = recorder.spans();
+    data.spans = recorder?.spans() ?? [];
   })
   .catch((error: unknown) => {
     data.failure = error instanceof Error ? `${error.name}: ${error.message}` : String(error);

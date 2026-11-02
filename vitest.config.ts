@@ -11,7 +11,6 @@ import {
 } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
-  // Both lanes load the file the package `browser` export condition selects (ADR-0020).
   '@google/adk': fileURLToPath(
     new URL(
       './packages/adapter-adk/node_modules/@google/adk/dist/web/index_web.js',

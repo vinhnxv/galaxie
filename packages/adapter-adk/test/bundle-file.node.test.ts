@@ -8,17 +8,13 @@ import { dirname, join } from 'node:path';
 import { init, parse } from 'es-module-lexer';
 import { expect, test } from 'vitest';
 
-// Pinned with the ADK release. A version bump is separate work (ADR-0020 decision 2): update
-// the pin, then re-run the bundle probe, the symbol checks and the conformance lane.
 const ADK_VERSION = '2.3.0';
 const BUNDLE_SHA256 = 'e5090e3c76b35fbeba9d07403e0e534732f12ae586bed9f5558c09d4170ea199';
 
 const require = createRequire(import.meta.url);
 const packageDirectory = dirname(require.resolve('@google/adk/package.json'));
 
-async function bundle(): Promise<string> {
-  return readFile(join(packageDirectory, 'dist/web/index_web.js'), 'utf8');
-}
+const bundleSource = readFile(join(packageDirectory, 'dist/web/index_web.js'), 'utf8');
 
 test('the installed release is the pinned one', async () => {
   const manifest = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8')) as {
@@ -26,29 +22,26 @@ test('the installed release is the pinned one', async () => {
     exports: Record<string, Record<string, string>>;
   };
   expect(manifest.version).toBe(ADK_VERSION);
-  // The browser condition selects the self-contained web bundle.
   expect(manifest.exports['.']?.['browser']).toBe('./dist/web/index_web.js');
 });
 
 test('the web bundle file is byte-identical to the reviewed one', async () => {
   expect(
     createHash('sha256')
-      .update(await bundle())
+      .update(await bundleSource)
       .digest('hex'),
   ).toBe(BUNDLE_SHA256);
 });
 
 test('the web bundle imports nothing from outside itself', async () => {
   await init;
-  // The lexer reports static imports, dynamic import() and re-exports, not text in strings.
-  const [imports] = parse(await bundle());
+  const [imports] = parse(await bundleSource);
   expect(imports.map((entry) => entry.n)).toEqual([]);
 });
 
 test('the web bundle exports the symbols the adapter depends on', async () => {
-  const source = await bundle();
   await init;
-  const [, exports] = parse(source);
+  const [, exports] = parse(await bundleSource);
   const names = new Set(exports.map((entry) => entry.n));
   for (const name of [
     'BaseLlm',

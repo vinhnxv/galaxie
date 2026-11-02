@@ -155,7 +155,6 @@ for (const area of ['src', 'dist', 'test']) {
   }
 }
 
-// ADR-0020: the ADK adapter imports the browser bundle through the root specifier only.
 const ADK_TEST_ONLY = new Set([
   'vitest',
   'vite',
@@ -177,8 +176,10 @@ for (const area of ['src', 'dist', 'test']) {
         continue;
       }
       if (specifier === '@google/genai' || specifier.startsWith('@google/genai/')) {
-        // The bundle inlines its own copy; a runtime import would load a second one.
-        if (!typeOnly) problems.push(`${file}: @google/genai may be imported as a type only`);
+        if (!typeOnly)
+          problems.push(
+            `${file}: @google/genai may be imported as a type only (the bundle inlines its own copy)`,
+          );
         continue;
       }
       if (specifier.startsWith('@langchain/langgraph') || specifier.startsWith('@galaxie/adapter-'))
@@ -201,21 +202,20 @@ for (const area of ['src', 'dist', 'test']) {
   }
 }
 
-// ADK stays inside its adapter. The native reference runs of the conformance lane import the
-// root specifier without galaxie (plan KTD13); nothing else outside the adapter may name ADK.
 const EXEMPT_FROM_ADK_SCAN = new Set([
   'scripts/check-dependencies.ts',
   'tests/conformance/check-dependencies.node.test.ts',
 ]);
+const isNativeReferenceRun = (file: string, specifier: string | undefined): boolean =>
+  specifier === '@google/adk' && file.startsWith('tests/conformance/');
 for (const root of ['examples', 'tests', 'scripts']) {
   for (const file of files(root, /\.[cm]?[jt]sx?$/)) {
     if (file.split('/').some((part) => part === 'node_modules' || part === 'dist')) continue;
-    // This script and its fixture test spell the specifiers they check.
     if (EXEMPT_FROM_ADK_SCAN.has(file)) continue;
     for (const match of readFileSync(file, 'utf8').matchAll(
       /['"`](@google\/adk(?:\/[^'"`]*)?)['"`]/g,
     )) {
-      if (match[1] === '@google/adk' && file.startsWith('tests/conformance/')) continue;
+      if (isNativeReferenceRun(file, match[1])) continue;
       problems.push(`${file}: ADK imports belong only in packages/adapter-adk (${match[1]})`);
     }
   }

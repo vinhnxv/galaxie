@@ -1,9 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// Shared probe for the ADK web bundle. The Node and Chromium test lanes and the strict-CSP page
-// all run this module, so every lane exercises the same behavior. Spike code: it is test support,
-// not package code, and it uses the bundle exactly as an agent author would.
 import {
   BaseLlm,
   FunctionTool,
@@ -20,27 +17,19 @@ export const CANARY_ARGUMENT = 'canary-argument-52de';
 export const CANARY_RESULT = 'canary-result-ad04';
 
 export interface ProbeResult {
-  /** Final text of the run. */
   readonly text: string;
-  /** Event authors in order. */
   readonly authors: readonly string[];
-  /** Names of function calls seen in events. */
   readonly calls: readonly string[];
-  /** The argument the tool received. */
   readonly toolInput: unknown;
-  /** Outbound network attempts through fetch, XMLHttpRequest, WebSocket or sendBeacon. */
   readonly network: readonly string[];
-  /** Calls to the global `Function` constructor made while the probe ran. */
   readonly functionConstructions: number;
-  /** Whether a `process` global existed when the probe started. */
   readonly hadProcess: boolean;
-  /** CSP violations reported to the page. */
+  /** Empty from `runProbe`; the strict-CSP page fills it from `securitypolicyviolation` events. */
   readonly violations: readonly string[];
 }
 
 type Model = Pick<LlmRequest, 'contents'>;
 
-/** A scripted model: first it calls the tool, then it answers with the canary reply. */
 export class ProbeLlm extends BaseLlm {
   readonly seen: Model[] = [];
 
@@ -113,10 +102,7 @@ function countFunctionConstructions(counter: { count: number }): () => void {
   };
 }
 
-/** Runs one tool-calling agent through the bundle with the network blocked. */
-export async function runProbe(options?: {
-  readonly violations?: readonly string[];
-}): Promise<ProbeResult> {
+export async function runProbe(): Promise<ProbeResult> {
   const network: string[] = [];
   const functionCounter = { count: 0 };
   const hadProcess = typeof Reflect.get(globalThis, 'process') !== 'undefined';
@@ -161,7 +147,7 @@ export async function runProbe(options?: {
       network,
       functionConstructions: functionCounter.count,
       hadProcess,
-      violations: options?.violations ?? [],
+      violations: [],
     };
   } finally {
     restoreFunction();
