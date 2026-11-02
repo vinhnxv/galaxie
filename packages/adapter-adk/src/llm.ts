@@ -9,6 +9,7 @@ import {
   type AIMessageChunk,
   type BaseMessage,
   HumanMessage,
+  isAIMessageChunk,
   SystemMessage,
   ToolMessage,
 } from '@langchain/core/messages';
@@ -138,6 +139,15 @@ export function openAiTools(request: LlmRequest): OpenAiTool[] {
     }
   }
   return tools;
+}
+
+/** Whether `text` is complete JSON that equals `value`. */
+function sameJson(text: string, value: unknown): boolean {
+  try {
+    return JSON.stringify(JSON.parse(text)) === JSON.stringify(value);
+  } catch {
+    return false;
+  }
 }
 
 function usageOf(reply: AIMessage | AIMessageChunk): { input: number; output: number } | undefined {
@@ -348,7 +358,33 @@ export class GalaxieLlm extends BaseLlm {
     const { bound, options } = this.#bind(lease, signal, tools, jsonSchema, request);
     let joined: AIMessage | AIMessageChunk | undefined;
     let checked = '';
+    const fragments = new Map<string, number>();
+    const raw: string[] = [];
+    let complete = 0;
     for await (const chunk of await bound.stream(messages, options)) {
+      // Native concat repairs cut-off argument JSON and can drop complete calls beside fragments,
+      // so the raw fragments are tracked here and the joined calls are verified against them.
+      const pieces = isAIMessageChunk(chunk) ? (chunk.tool_call_chunks ?? []) : [];
+      // A fragment alone is rarely valid JSON, so only a provider-reported invalid call counts here.
+      if (pieces.length === 0 && (chunk.invalid_tool_calls?.length ?? 0) > 0)
+        throw failure('invalid');
+      if (pieces.length === 0 && (chunk.tool_calls?.length ?? 0) > 0) complete += 1;
+      for (const [position, piece] of pieces.entries()) {
+        const key = JSON.stringify(
+          piece.index !== undefined
+            ? ['index', piece.index]
+            : piece.id !== undefined
+              ? ['id', piece.id]
+              : ['position', position],
+        );
+        let slot = fragments.get(key);
+        if (slot === undefined) {
+          slot = raw.length;
+          fragments.set(key, slot);
+          raw.push('');
+        }
+        raw[slot] = (raw[slot] ?? '') + (piece.args ?? '');
+      }
       joined = joined === undefined ? chunk : concat(joined, chunk);
       const next = outputText(joined);
       if (next !== checked) {
@@ -361,6 +397,13 @@ export class GalaxieLlm extends BaseLlm {
         yield { content: { role: 'model', parts: [{ text: delta }] }, partial: true };
     }
     if (joined === undefined) throw failure('unavailable');
+    if (complete > 0 && (raw.length > 0 || complete > 1)) throw failure('unsupported');
+    if (raw.length > 0) {
+      const calls = joined.tool_calls ?? [];
+      if (calls.length !== raw.length) throw failure('invalid');
+      for (const [slot, text] of raw.entries())
+        if (!sameJson(text === '' ? '{}' : text, calls[slot]?.args)) throw failure('invalid');
+    }
     return joined;
   }
 }

@@ -10,7 +10,7 @@ import {
   type RunEvent,
 } from '@galaxie/core';
 import { LlmAgent, type LlmRequest, type LlmResponse } from '@google/adk';
-import { AIMessage } from '@langchain/core/messages';
+import { AIMessage, AIMessageChunk } from '@langchain/core/messages';
 import { expect, test } from 'vitest';
 import { z } from 'zod';
 import { createAdkAdapter } from '../src/adapter.js';
@@ -39,6 +39,33 @@ function llmFor(reply: Reply, options: FakeModelsOptions = {}) {
     trusted: () => false,
   });
   return { llm, leases };
+}
+
+function chunked(chunks: AIMessageChunk[], options: FakeModelsOptions = {}) {
+  const model = new FakeChatModel(
+    () => new AIMessage({ content: '' }),
+    undefined,
+    () => chunks,
+  );
+  const { port, leases } = fakeModels(options);
+  const { run } = fakeRun(port);
+  const llm = new GalaxieLlm({
+    role: 'agent',
+    providers: { mock: model },
+    active: () => run,
+    trusted: () => false,
+  });
+  return { llm, leases };
+}
+
+const fragment = (args: string, extra: Record<string, unknown> = {}): AIMessageChunk =>
+  new AIMessageChunk({
+    content: '',
+    tool_call_chunks: [{ index: 0, args, type: 'tool_call_chunk', ...extra }],
+  });
+
+async function drain(llm: GalaxieLlm): Promise<void> {
+  for await (const _ of llm.generateContentAsync(ask(), true)) void _;
 }
 
 const ask = (): LlmRequest => ({
@@ -313,5 +340,84 @@ test('an abort mid-stream stops further deltas and settles the run as cancelled'
   });
   expect(events.at(-1)?.type).toBe('cancelled');
   expect(streams(events, 'messages').map((data) => data['text'])).toEqual(['alpha ']);
+  await runtime.dispose();
+});
+
+test('a stream cut off inside tool-call arguments fails invalid instead of running repaired arguments', async () => {
+  const { llm, leases } = chunked([fragment('{"q":"ab', { name: 'lookup', id: 'c1' })]);
+  await expect(drain(llm)).rejects.toMatchObject({ code: 'invalid' });
+  expect(leases[0]?.failed).toBe(1);
+});
+
+test('argument fragments that join to complete JSON become one call', async () => {
+  const { llm } = chunked([fragment('{"q":', { name: 'lookup', id: 'c1' }), fragment('"abc"}')]);
+  const responses: LlmResponse[] = [];
+  for await (const response of llm.generateContentAsync(ask(), true)) responses.push(response);
+  expect(responses.at(-1)?.content?.parts).toEqual([
+    { functionCall: { id: 'galaxie-0', name: 'lookup', args: { q: 'abc' } } },
+  ]);
+});
+
+test('a complete call beside argument fragments, and an invalid call chunk, are refused', async () => {
+  const whole = new AIMessageChunk({
+    content: '',
+    tool_calls: [{ id: 'a', name: 'lookup', args: { q: 'x' } }],
+  });
+  const mixed = chunked([whole, fragment('{"q":"y"}', { name: 'lookup', id: 'c1' })]);
+  await expect(drain(mixed.llm)).rejects.toMatchObject({ code: 'unsupported' });
+  // A provider without native streaming yields its whole reply, which may report an invalid call.
+  const { port } = fakeModels();
+  const { run } = fakeRun(port);
+  const invalid = new GalaxieLlm({
+    role: 'agent',
+    providers: {
+      mock: new FakeChatModel(
+        () =>
+          new AIMessage({
+            content: '',
+            invalid_tool_calls: [
+              { name: 'lookup', args: '{', error: 'bad', type: 'invalid_tool_call' },
+            ],
+          }),
+      ),
+    },
+    active: () => run,
+    trusted: () => false,
+  });
+  await expect(drain(invalid)).rejects.toMatchObject({ code: 'invalid' });
+});
+
+test('a blocked call ID or argument fails denied at the check and no partial carries it', async () => {
+  const byId = llmFor(
+    () =>
+      new AIMessage({
+        content: 'ok ',
+        tool_calls: [{ id: CANARY_CALL_ID, name: 'lookup', args: { q: 'x' } }],
+      }),
+    { block: CANARY_CALL_ID },
+  );
+  const seen: LlmResponse[] = [];
+  await expect(async () => {
+    for await (const response of byId.llm.generateContentAsync(ask(), true)) seen.push(response);
+  }).rejects.toMatchObject({ code: 'denied' });
+  expect(JSON.stringify(seen)).not.toContain(CANARY_CALL_ID);
+  const byArgument = llmFor(
+    () =>
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'c1', name: 'lookup', args: { q: 'BLOCKED_ARG' } }],
+      }),
+    { block: 'BLOCKED_ARG' },
+  );
+  await expect(drain(byArgument.llm)).rejects.toMatchObject({ code: 'denied' });
+});
+
+test('a text delta split never separates a surrogate pair', async () => {
+  const text = `${'x'.repeat(MAX_DELTA_LENGTH - 1)}\u{1F600}tail`;
+  const { runtime, run } = await execute(() => new AIMessage({ content: text }));
+  const texts = streams(await run('hi'), 'messages').map((data) => String(data['text']));
+  expect(texts.length).toBeGreaterThan(1);
+  expect(texts.join('')).toBe(text);
+  for (const value of texts) expect(value.isWellFormed()).toBe(true);
   await runtime.dispose();
 });

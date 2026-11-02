@@ -24,14 +24,20 @@ export class StreamProjector {
         .map((part) => part.text ?? '')
         .join('');
       const events: ExecutorEvent[] = [];
-      for (let start = 0; start < text.length; start += MAX_DELTA_LENGTH)
+      for (let start = 0; start < text.length; ) {
+        let end = Math.min(start + MAX_DELTA_LENGTH, text.length);
+        // Never split a surrogate pair across two events.
+        const last = text.charCodeAt(end - 1);
+        if (end < text.length && last >= 0xd800 && last <= 0xdbff) end -= 1;
         events.push({
           type: 'stream',
           executor: EXECUTOR_ID,
           path: [],
           mode: 'messages',
-          data: { author: event.author, text: text.slice(start, start + MAX_DELTA_LENGTH) },
+          data: { author: event.author, text: text.slice(start, end) },
         });
+        start = end;
+      }
       return events;
     }
     const events: ExecutorEvent[] = [];
