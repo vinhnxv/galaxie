@@ -28,9 +28,7 @@
                 "type": "STRING"
               }
             },
-            "required": [
-              "value"
-            ]
+            "required": ["value"]
           }
         }
       ]
@@ -89,9 +87,7 @@
                 "type": "STRING"
               }
             },
-            "required": [
-              "value"
-            ]
+            "required": ["value"]
           }
         }
       ]
@@ -176,9 +172,7 @@
                 "type": "STRING"
               }
             },
-            "required": [
-              "value"
-            ]
+            "required": ["value"]
           }
         }
       ]

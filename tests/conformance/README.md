@@ -252,7 +252,7 @@ stages add streaming and pauses. It runs under the vitest browser project, not a
 strict mock CSP; the bundle-level strict-CSP probe lives in `packages/adapter-adk`. No other
 executor's goldens or matrix change.
 
-Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformance/adk-native.node.test.ts`.
+Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformance/adk-native.node.test.ts`. To rewrite the goldens on purpose, set `ADK_UPDATE_GOLDEN=1` for the native test, run `pnpm format` and review the diff.
 
 ## Running the suite
 

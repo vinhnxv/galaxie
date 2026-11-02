@@ -28,9 +28,7 @@
                 "type": "STRING"
               }
             },
-            "required": [
-              "value"
-            ]
+            "required": ["value"]
           }
         }
       ]
