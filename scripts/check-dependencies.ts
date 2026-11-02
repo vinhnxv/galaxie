@@ -155,6 +155,72 @@ for (const area of ['src', 'dist', 'test']) {
   }
 }
 
+// ADR-0020: the ADK adapter imports the browser bundle through the root specifier only.
+const ADK_TEST_ONLY = new Set([
+  'vitest',
+  'vite',
+  'playwright',
+  'zod',
+  'es-module-lexer',
+  '@opentelemetry/api',
+  '@opentelemetry/sdk-trace',
+]);
+for (const area of ['src', 'dist', 'test']) {
+  const directory = join('packages/adapter-adk', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier, typeOnly } of imports(file)) {
+      if (specifier.startsWith('@google/adk/')) {
+        problems.push(
+          `${file}: ADK subpath imports are not allowed (Node-only or networked code), received ${specifier}`,
+        );
+        continue;
+      }
+      if (specifier === '@google/genai' || specifier.startsWith('@google/genai/')) {
+        // The bundle inlines its own copy; a runtime import would load a second one.
+        if (!typeOnly) problems.push(`${file}: @google/genai may be imported as a type only`);
+        continue;
+      }
+      if (specifier.startsWith('@langchain/langgraph') || specifier.startsWith('@galaxie/adapter-'))
+        problems.push(`${file}: the ADK adapter must not depend on another executor adapter`);
+      if (
+        specifier.startsWith('./') ||
+        specifier.startsWith('../') ||
+        specifier === '@google/adk' ||
+        specifier === '@galaxie/core' ||
+        specifier.startsWith('@langchain/core/') ||
+        (area !== 'dist' && specifier === 'zod') ||
+        (area === 'test' &&
+          (specifier.startsWith('node:') ||
+            ADK_TEST_ONLY.has(specifier) ||
+            specifier === '@galaxie/models/mock'))
+      )
+        continue;
+      problems.push(`${file}: forbidden ADK adapter import ${specifier}`);
+    }
+  }
+}
+
+// ADK stays inside its adapter. The native reference runs of the conformance lane import the
+// root specifier without galaxie (plan KTD13); nothing else outside the adapter may name ADK.
+const EXEMPT_FROM_ADK_SCAN = new Set([
+  'scripts/check-dependencies.ts',
+  'tests/conformance/check-dependencies.node.test.ts',
+]);
+for (const root of ['examples', 'tests', 'scripts']) {
+  for (const file of files(root, /\.[cm]?[jt]sx?$/)) {
+    if (file.split('/').some((part) => part === 'node_modules' || part === 'dist')) continue;
+    // This script and its fixture test spell the specifiers they check.
+    if (EXEMPT_FROM_ADK_SCAN.has(file)) continue;
+    for (const match of readFileSync(file, 'utf8').matchAll(
+      /['"`](@google\/adk(?:\/[^'"`]*)?)['"`]/g,
+    )) {
+      if (match[1] === '@google/adk' && file.startsWith('tests/conformance/')) continue;
+      problems.push(`${file}: ADK imports belong only in packages/adapter-adk (${match[1]})`);
+    }
+  }
+}
+
 const models = JSON.parse(readFileSync('packages/models/package.json', 'utf8')) as {
   peerDependencies?: Record<string, unknown>;
   peerDependenciesMeta?: Record<string, { optional?: boolean }>;
@@ -261,6 +327,11 @@ for (const entry of readdirSync('packages', { withFileTypes: true })) {
           )
         )
           problems.push(`${file}: OpenAI imports belong only in the models openai provider`);
+        if (
+          (specifier === '@google/adk' || specifier.startsWith('@google/adk/')) &&
+          entry.name !== 'adapter-adk'
+        )
+          problems.push(`${file}: ADK imports belong only in packages/adapter-adk`);
         if (
           area !== 'test' &&
           (specifier.startsWith('@galaxie/example-') ||
@@ -464,6 +535,7 @@ for (const directory of [
   'packages/core/dist',
   'packages/adapter-langgraph/dist',
   'packages/adapter-pyodide/dist',
+  'packages/adapter-adk/dist',
   'packages/models/dist',
   'packages/react/dist',
   'packages/storage-indexeddb/dist',
