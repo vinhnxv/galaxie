@@ -498,4 +498,64 @@ test('a confirmation raised inside the first sub-agent survives a reload and res
   expect(second.writes).toEqual([{ q: 'note' }]);
   const systems = second.model.seen.map((call) => JSON.stringify(call.messages[0]?.content));
   expect(systems.at(-1)).toContain('role=second;');
+  // The paused first child asked the model once more to finish; nothing earlier ran again.
+  expect(systems.filter((system) => system.includes('role=first;'))).toHaveLength(1);
+});
+
+test('a confirmation raised by a sub-agent reached by transfer survives a reload and resumes in place', async () => {
+  const source = shared('adk-restore-transfer');
+  const transfer: AdkAgent = (host) =>
+    defineAdkEntry({
+      agent: new LlmAgent({
+        name: 'parent',
+        model: host.adk.llm('agent'),
+        instruction: 'role=parent;',
+        subAgents: [
+          new LlmAgent({
+            name: 'child',
+            model: host.adk.llm('agent'),
+            instruction: 'role=child;',
+            tools: [host.adk.capabilityTool('docs.save@1', save)],
+          }),
+        ],
+      }),
+      interaction: (requests) => ({
+        surfaceId: 'main',
+        viewRevision: 'r1',
+        component: 'conformance.Approval/v1',
+        props: { count: requests.length },
+      }),
+    });
+  const script: Reply = (seen) => {
+    const system = JSON.stringify(seen.messages[0]?.content ?? '');
+    if (system.includes('role=parent;'))
+      return seen.messages.some((message) => message.type === 'tool')
+        ? new AIMessage({ content: 'handed over' })
+        : new AIMessage({
+            content: '',
+            tool_calls: [
+              { id: 'call_t', name: 'transfer_to_agent', args: { agent_name: 'child' } },
+            ],
+          });
+    return saving(seen, 0);
+  };
+  const first = await life(await source.open(), script, { factory: transfer });
+  await first.instance.start({ prompt: 'go' });
+  const submitted = await approval(first);
+  await first.runtime.dispose();
+  expect(first.writes).toHaveLength(0);
+
+  const second = await life(await source.open(), script, {
+    sessionId: first.sessionId,
+    factory: transfer,
+  });
+  expect(await second.instance.restore()).toBeDefined();
+  const restored = await approval(second);
+  expect(restored.interactionId).toBe(submitted.interactionId);
+  await second.instance.dispatch(restored);
+  await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
+  expect(second.writes).toEqual([{ q: 'note' }]);
+  // The parent did not decide again: only the paused child asked the model after the resume.
+  const systems = second.model.seen.map((call) => JSON.stringify(call.messages[0]?.content));
+  expect(systems.some((system) => system.includes('role=parent;'))).toBe(false);
 });
