@@ -5,7 +5,7 @@
     "streaming": true,
     "interrupts": true,
     "resume": true,
-    "checkpoints": false,
+    "checkpoints": true,
     "subgraphs": false
   },
   "cases": [
@@ -33,7 +33,7 @@
     "Approval cases register the same tool with confirmation required on both sides. The native lane runs a second invocation whose user message carries the confirmation function response; the galaxie lane answers the interaction with the default resume (action approve or deny, payload { indexes: [0] }). Both record the tool calls the run paused on (name and arguments, never a call ID), the model requests including the tool result or the denial text the model sees, the capability calls and the final output."
   ],
   "limits": [
-    "Stage A4 adds confirmations and long-running tools as interactions: a run pauses, ends, and resumes as a new run through core's accepted submission inbox. It streams text deltas and content-free step markers, and has no checkpoints or subgraphs, so a pause does not survive a reload. The adapter reports streaming, interrupts and resume as true and checkpoints and subgraphs as false.",
+    "Stage A5 adds durable sessions: with a byte-record checkpoint port in the host services, a pause and each completed conversation are stored as an adk.session/v1 record, and a reload restores the pause through core's restore. Failed and cancelled runs write nothing, partial events and binary parts are never stored, and a stored record is validated against a closed schema before ADK sees it. The adapter reports streaming, interrupts, resume and checkpoints as true and subgraphs as false. The restore lanes are in adk-restore.test.ts, not the golden cases, because they need a second runtime lifetime.",
     "The run input is { prompt: string }. Only the closed set of LlmAgent, SequentialAgent, ParallelAgent and LoopAgent is accepted, and tools and models must come from the host.",
     "All model replies are deterministic scripts; no real model, network request or download takes part.",
     "The Chromium lane runs under the vitest browser project, not a page with the strict mock CSP; the strict-CSP bundle probe in packages/adapter-adk covers the bundle alone.",

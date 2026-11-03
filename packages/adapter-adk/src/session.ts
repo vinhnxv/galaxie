@@ -79,6 +79,38 @@ export class GalaxieSessionService extends BaseSessionService {
     return event;
   }
 
+  /** The stored events of one conversation, as copies. */
+  eventsOf(appName: string, userId: string, sessionId: string): Event[] {
+    return structuredClone(this.#sessions.get(keyOf(appName, userId, sessionId))?.events ?? []);
+  }
+
+  /** Replaces a conversation with restored events, rebuilding its state from their deltas. */
+  async load(
+    appName: string,
+    userId: string,
+    sessionId: string,
+    events: readonly Event[],
+  ): Promise<void> {
+    await this.deleteSession({ appName, userId, sessionId });
+    const session = await this.createSession({ appName, userId, sessionId });
+    for (const event of events) await this.appendEvent({ session, event });
+  }
+
+  /**
+   * Drops the events a failed run added, so a later save never stores them, and rebuilds the state
+   * from the kept events so no state value of the dropped run survives.
+   */
+  async truncate(
+    appName: string,
+    userId: string,
+    sessionId: string,
+    length: number,
+  ): Promise<void> {
+    const stored = this.#sessions.get(keyOf(appName, userId, sessionId));
+    if (stored === undefined || stored.events.length <= length) return;
+    await this.load(appName, userId, sessionId, stored.events.slice(0, length));
+  }
+
   /** Forgets every conversation; used when the prepared agent is disposed. */
   clear(): void {
     this.#sessions.clear();

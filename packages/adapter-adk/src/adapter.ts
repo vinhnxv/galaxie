@@ -31,6 +31,17 @@ import {
   type PausedCall,
   PauseTracker,
 } from './interaction.js';
+import {
+  decodeRecord,
+  EXECUTOR,
+  encodeRecord,
+  restoredContent,
+  revisionId,
+  SESSION_TYPE,
+  type SessionRecord,
+  STATE_TYPE,
+  type StoredSession,
+} from './persist.js';
 import { RunState, toGalaxieError } from './run.js';
 import { ensureAdkRuntimeEnv } from './runtime-shim.js';
 import { GalaxieSessionService } from './session.js';
@@ -104,7 +115,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
     features: {
       interrupts: true,
       resume: true,
-      checkpoints: false,
+      checkpoints: true,
       streaming: true,
       subgraphs: false,
     },
@@ -126,19 +137,166 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
       const root: unknown = entry === undefined ? built : entry.agent;
       validateAgentTree(root, registry);
       const sessions = new GalaxieSessionService();
+      const store = services.checkpoints;
       const pauses = new Map<string, StoredPause>();
       /** Confirmations whose pause was consumed without an answer; their gated calls need a reply. */
       const abandoned = new Map<string, readonly PausedCall[]>();
       const parallel = hasParallel(root as BaseAgent);
       const ordinals = new Map<string, number>();
-      let runner: Runner | undefined = new Runner({
-        appName: APP_NAME,
-        agent: root as BaseAgent,
-        plugins: [
-          new ToolCallIntegrityPlugin({ secretKey: crypto.getRandomValues(new Uint8Array(32)) }),
-        ],
-        sessionService: sessions,
-      });
+      /** Per conversation: the integrity key, its runner, the stored revision and the load state. */
+      const keys = new Map<string, Uint8Array>();
+      const runners = new Map<string, Runner>();
+      const revisions = new Map<string, number>();
+      const known = new Set<string>();
+      const loading = new Map<string, Promise<void>>();
+      let disposed = false;
+      const runnerFor = (sessionId: SessionId): Runner => {
+        let runner = runners.get(sessionId);
+        if (runner === undefined) {
+          let key = keys.get(sessionId);
+          if (key === undefined) {
+            key = crypto.getRandomValues(new Uint8Array(32));
+            keys.set(sessionId, key);
+          }
+          runner = new Runner({
+            appName: APP_NAME,
+            agent: root as BaseAgent,
+            plugins: [new ToolCallIntegrityPlugin({ secretKey: key })],
+            sessionService: sessions,
+          });
+          runners.set(sessionId, runner);
+        }
+        return runner;
+      };
+      /** Reads the stored conversation once, registering its content as private before replay. */
+      const load = async (
+        sessionId: SessionId,
+        register: ((value: unknown) => void) | undefined,
+      ): Promise<void> => {
+        if (store !== undefined) {
+          let reply: unknown;
+          try {
+            reply = await store.request({
+              op: 'get',
+              executor: EXECUTOR,
+              sessionId,
+              namespace: '',
+            });
+          } catch (error) {
+            throw toGalaxieError(error, 'unavailable');
+          }
+          if (reply !== null) {
+            const stored = await storedOf(sessionId, reply);
+            if (register === undefined) throw failure('unsupported');
+            try {
+              register(restoredContent(stored));
+            } catch (error) {
+              const code = toGalaxieError(error, 'unrecoverable').code;
+              throw failure(code === 'stale' || code === 'cancelled' ? code : 'unrecoverable');
+            }
+            if (disposed) return;
+            await sessions.load(APP_NAME, USER_ID, sessionId, stored.events);
+            if (disposed) return;
+            keys.set(sessionId, stored.key);
+            ordinals.set(sessionId, stored.ordinal);
+            revisions.set(sessionId, stored.revision);
+            if (stored.pause !== undefined)
+              pauses.set(sessionId, {
+                interaction: stored.pause.interaction,
+                calls: stored.pause.calls,
+              });
+          }
+        }
+        known.add(sessionId);
+      };
+      const storedOf = (sessionId: SessionId, reply: unknown): Promise<StoredSession> => {
+        const value = reply as Record<string, unknown> | null;
+        if (
+          typeof value !== 'object' ||
+          value === null ||
+          value['sessionId'] !== sessionId ||
+          value['namespace'] !== '' ||
+          typeof value['checkpoint'] !== 'object' ||
+          value['checkpoint'] === null ||
+          typeof value['metadata'] !== 'object' ||
+          value['metadata'] === null
+        )
+          return Promise.reject(failure('unrecoverable'));
+        return decodeRecord(sessionId, digestOf, {
+          id: value['id'],
+          checkpoint: value['checkpoint'] as { type: unknown; bytes: unknown },
+          metadata: value['metadata'] as { type: unknown; bytes: unknown },
+        });
+      };
+      const hydrate = (
+        sessionId: SessionId,
+        register: ((value: unknown) => void) | undefined,
+      ): Promise<void> => {
+        if (disposed || known.has(sessionId)) return Promise.resolve();
+        let reading = loading.get(sessionId);
+        if (reading === undefined) {
+          reading = load(sessionId, register).finally(() => loading.delete(sessionId));
+          loading.set(sessionId, reading);
+        }
+        return reading;
+      };
+      /** Writes the conversation after a pause or completion: the marker first, then the commit. */
+      const persist = async (
+        sessionId: SessionId,
+        pause: StoredPause | undefined,
+      ): Promise<void> => {
+        if (store === undefined) return;
+        const key = keys.get(sessionId);
+        if (key === undefined) throw failure('invalid');
+        const record = {
+          events: sessions.eventsOf(APP_NAME, USER_ID, sessionId),
+          ordinal: ordinals.get(sessionId) ?? 0,
+          ...(pause === undefined ? {} : { pause }),
+        };
+        const { checkpoint, metadata } = encodeRecord(sessionId, record, key);
+        const previous = revisions.get(sessionId) ?? 0;
+        const location = {
+          executor: EXECUTOR,
+          sessionId,
+          namespace: '',
+          id: revisionId(previous + 1),
+        };
+        try {
+          // The checkpoint is the commit marker; an orphan marker from a failed save is replaced.
+          await store.request({
+            op: 'put-writes',
+            ...location,
+            taskId: 'conversation',
+            taskPath: '',
+            writes: [
+              {
+                channel: '__interrupt__',
+                index: -3,
+                interruptIds: pause === undefined ? [] : [pause.interaction.interactionId],
+                value: {
+                  type: 'json',
+                  bytes: new TextEncoder().encode(
+                    JSON.stringify(
+                      pause === undefined ? null : { id: pause.interaction.interactionId },
+                    ),
+                  ),
+                },
+              },
+            ],
+          });
+          await store.request({
+            op: 'put',
+            ...location,
+            parentId: previous > 0 ? revisionId(previous) : null,
+            checkpoint: { type: SESSION_TYPE, bytes: checkpoint },
+            metadata: { type: STATE_TYPE, bytes: metadata },
+            timestamp: new Date().toISOString(),
+          });
+        } catch (error) {
+          throw toGalaxieError(error, 'unavailable');
+        }
+        revisions.set(sessionId, previous + 1);
+      };
       /** Builds the interaction for a pause; the author's request must be the four-field JSON form. */
       const pauseOf = async (
         sessionId: SessionId,
@@ -166,8 +324,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
       };
       return {
         async *run(request): AsyncGenerator<ExecutorEvent> {
-          const current = runner;
-          if (current === undefined) {
+          if (disposed) {
             if (!request.signal.aborted) yield { type: 'error', error: adapterError('invalid') };
             return;
           }
@@ -178,7 +335,36 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
             yield* refuse('invalid');
             return;
           }
+          try {
+            await hydrate(sessionId, request.registerRestoredData);
+          } catch (error) {
+            const fatal = toGalaxieError(error, 'unavailable', request.signal);
+            if (!request.signal.aborted)
+              yield { type: 'error', error: adapterError(fatal.code, fatal) };
+            return;
+          }
+          if (disposed) return;
+          if (store !== undefined && request.registerRestoredData !== undefined) {
+            // Core clears its private values at every run end, so the stored history is
+            // registered again for each run that can replay it (KTD8).
+            const waiting = pauses.get(sessionId);
+            const record: SessionRecord = {
+              events: sessions.eventsOf(APP_NAME, USER_ID, sessionId),
+              ordinal: 0,
+              ...(waiting === undefined ? {} : { pause: waiting }),
+            };
+            try {
+              request.registerRestoredData(restoredContent(record));
+            } catch (error) {
+              const fatal = toGalaxieError(error, 'unrecoverable', request.signal);
+              if (!request.signal.aborted)
+                yield { type: 'error', error: adapterError(fatal.code, fatal) };
+              return;
+            }
+          }
           let message: { role: 'user'; parts: { text: string }[] } | ReturnType<typeof answerOf>;
+          /** The pause this run resumes; its calls need a reply if the run does not complete. */
+          let consumed: readonly PausedCall[] | undefined;
           if (command.type === 'start') {
             const prompt = promptOf(command.input);
             if (prompt === undefined) {
@@ -214,6 +400,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               yield* refuse('invalid');
               return;
             }
+            consumed = stored.calls;
           }
           const span = request.trace.start({ kind: 'node', name: 'adk.run' });
           const run = new RunState(
@@ -232,6 +419,8 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
           const projector = new StreamProjector();
           const tracker = new PauseTracker();
           let thrown: unknown;
+          /** How many events the conversation held before this run, to undo a run that fails. */
+          let before = 0;
           try {
             const session = await sessions.getOrCreateSession({
               appName: APP_NAME,
@@ -265,6 +454,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
                   }),
                 });
             }
+            before = session.events.length;
             run.seedCallIds(
               session.events.reduce(
                 (count, event) =>
@@ -274,7 +464,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
                 0,
               ),
             );
-            for await (const event of current.runAsync({
+            for await (const event of runnerFor(sessionId).runAsync({
               userId: USER_ID,
               sessionId,
               newMessage: message,
@@ -310,6 +500,11 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
           } finally {
             active = undefined;
           }
+          /** A run that does not complete writes nothing and leaves the conversation as it was. */
+          const undo = async (): Promise<void> => {
+            await sessions.truncate(APP_NAME, USER_ID, sessionId, before);
+            if (consumed !== undefined) abandon(sessionId, consumed);
+          };
           const waiting = tracker.calls;
           if (tracker.unanswered && run.failure === undefined && thrown === undefined)
             run.fail(failure('unsupported'));
@@ -319,13 +514,15 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               ? undefined
               : toGalaxieError(thrown, 'unavailable', run.signal));
           if (fatal !== undefined) {
+            await undo();
             span.end({ status: 'error', errorType: 'GalaxieError' });
             if (!request.signal.aborted)
               yield { type: 'error', error: adapterError(fatal.code, fatal) };
             return;
           }
           if (waiting !== undefined) {
-            if (request.signal.aborted || runner === undefined) {
+            if (request.signal.aborted || disposed) {
+              await undo();
               abandon(sessionId, waiting);
               span.end({ status: 'error', errorType: 'GalaxieError' });
               return;
@@ -333,15 +530,17 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
             let stored: StoredPause;
             try {
               stored = await pauseOf(sessionId, waiting);
+              if (!request.signal.aborted && !disposed) await persist(sessionId, stored);
             } catch (error) {
-              abandon(sessionId, waiting);
+              await undo();
               span.end({ status: 'error', errorType: 'GalaxieError' });
               const code = isGalaxieError(error) ? error.code : 'unavailable';
               if (!request.signal.aborted)
                 yield { type: 'error', error: adapterError(code, error) };
               return;
             }
-            if (request.signal.aborted || runner === undefined) {
+            if (request.signal.aborted || disposed) {
+              await undo();
               abandon(sessionId, waiting);
               span.end({ status: 'error', errorType: 'GalaxieError' });
               return;
@@ -352,17 +551,44 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
             yield { type: 'interaction', interaction: stored.interaction };
             return;
           }
+          if (!request.signal.aborted && !disposed && last !== undefined) {
+            try {
+              await persist(sessionId, undefined);
+            } catch (error) {
+              await undo();
+              span.end({ status: 'error', errorType: 'GalaxieError' });
+              const fatal = toGalaxieError(error, 'unavailable', request.signal);
+              if (!request.signal.aborted)
+                yield { type: 'error', error: adapterError(fatal.code, fatal) };
+              return;
+            }
+          }
+          if (request.signal.aborted || disposed) {
+            await undo();
+            span.end({ status: 'error', errorType: 'GalaxieError' });
+            return;
+          }
           span.end({ status: 'ok' });
-          if (!request.signal.aborted && last !== undefined)
+          if (last !== undefined)
             yield { type: 'output', output: outputOf(root as BaseAgent, last) };
         },
-        async pending(sessionId: SessionId): Promise<PendingInteraction | undefined> {
+        async pending(
+          sessionId: SessionId,
+          options?: { registerRestoredData?: (value: unknown) => void },
+        ): Promise<PendingInteraction | undefined> {
+          await hydrate(sessionId, options?.registerRestoredData);
           return pauses.get(sessionId)?.interaction;
         },
         async dispose(): Promise<void> {
-          runner = undefined;
+          disposed = true;
+          runners.clear();
+          keys.clear();
           pauses.clear();
           abandoned.clear();
+          ordinals.clear();
+          revisions.clear();
+          loading.clear();
+          known.clear();
           sessions.clear();
         },
       };
