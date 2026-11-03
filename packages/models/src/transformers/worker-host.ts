@@ -110,7 +110,8 @@ export function createWorkerHost(options: WorkerHostOptions): WorkerHost {
       fail(undefined, id);
       return;
     }
-    if (request.jsonSchema !== undefined) {
+    // A schema constrains the whole reply, so it cannot share a request with tool markup.
+    if (request.jsonSchema !== undefined && request.tools !== undefined) {
       post({ type: 'failed', id, code: 'unsupported' });
       return;
     }

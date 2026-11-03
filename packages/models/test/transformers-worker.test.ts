@@ -265,17 +265,26 @@ describe('request failures', () => {
     await handle.dispose();
   });
 
-  it('answers a JSON schema request as unsupported', async () => {
-    const { model, worker } = await setup();
+  it('passes a JSON schema request to the runtime and refuses one that also offers tools', async () => {
+    const { model, worker, runtime } = await setup();
     const handle = await createTransformersEngine(
       { worker, model: model.record, allowDownload: true },
       { gpu: undefined },
     );
+    const events = [];
+    for await (const event of handle.stream({
+      ...request,
+      jsonSchema: { type: 'object' },
+    } as GenerateRequest))
+      events.push(event.type);
+    expect(events.at(-1)).toBe('done');
+    expect(runtime.generations[0]?.request.jsonSchema).toEqual({ type: 'object' });
     await expect(
       (async () => {
         for await (const _ of handle.stream({
           ...request,
           jsonSchema: { type: 'object' },
+          tools: [{ type: 'function', function: { name: 'a' } }],
         } as GenerateRequest));
       })(),
     ).rejects.toMatchObject({ code: 'unsupported' });

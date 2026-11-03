@@ -105,6 +105,43 @@ async function probe(): Promise<WorkerReport> {
   } catch (error) {
     report.failures['tokenizer'] = message(error);
   }
+
+  try {
+    // The constraint package is loaded the way the runtime loads it, then driven over a byte-level
+    // vocabulary: the logits favor `z` at every step, so only the mask can produce valid output.
+    const { StructuredOutputProcessor } = await import(
+      '@huggingface/transformers-structured-output'
+    );
+    const tokens = Array.from({ length: 256 }, (_, byte) => Uint8Array.of(byte));
+    tokens.push(new Uint8Array(0));
+    const processor = new StructuredOutputProcessor(
+      { tokens, eosTokenId: 256 },
+      {
+        type: 'json_schema',
+        json_schema: {
+          type: 'object',
+          properties: { a: { type: 'integer' } },
+          required: ['a'],
+          additionalProperties: false,
+        },
+      },
+    );
+    const input: bigint[] = [];
+    let text = '';
+    for (let step = 0; step < 64; step++) {
+      const data = new Float32Array(257);
+      data[0x7a] = 10;
+      processor._call([input], { dims: [1, 257], data } as never);
+      let best = 0;
+      for (let id = 1; id < data.length; id++) if ((data[id] ?? 0) > (data[best] ?? 0)) best = id;
+      if (best === 256) break;
+      input.push(BigInt(best));
+      text += String.fromCharCode(best);
+    }
+    report.constrained = text;
+  } catch (error) {
+    report.failures['constrained'] = message(error);
+  }
   return report;
 }
 
@@ -113,6 +150,7 @@ probe()
     (error: unknown): WorkerReport => ({
       identity: undefined,
       tokenizer: undefined,
+      constrained: undefined,
       failures: { load: message(error) },
       violations: [],
       functionConstructions: 0,

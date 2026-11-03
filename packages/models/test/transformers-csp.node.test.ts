@@ -121,6 +121,9 @@ test('the ONNX runtime, tokenizer and chat template run under the strict CSP and
   expect(report?.tokenizer?.rendered).toContain('# Tools');
   expect(report?.tokenizer?.rendered).toContain('"name": "get_weather"');
   expect(report?.tokenizer?.rendered).toContain('<|im_start|>assistant');
+  // The mask alone forced a valid object although the logits favored `z` at every step.
+  expect(JSON.parse(report?.constrained ?? 'null')).toBeTypeOf('object');
+  expect(JSON.parse(report?.constrained ?? 'null')).toHaveProperty('a');
   expect(report?.violations).toEqual([]);
   expect(data.pageViolations).toEqual([]);
   expect(report?.functionConstructions).toBe(0);

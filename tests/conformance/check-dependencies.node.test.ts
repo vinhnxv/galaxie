@@ -42,12 +42,14 @@ const FILES: Record<string, string> = {
   'packages/models/package.json': JSON.stringify({
     peerDependencies: {
       '@huggingface/transformers': '4.3.1',
+      '@huggingface/transformers-structured-output': '4.3.1',
       '@langchain/core': '1',
       '@langchain/openai': '1.6.3',
       '@mlc-ai/web-llm': '0.2.86',
     },
     peerDependenciesMeta: {
       '@huggingface/transformers': { optional: true },
+      '@huggingface/transformers-structured-output': { optional: true },
       '@langchain/openai': { optional: true },
       '@mlc-ai/web-llm': { optional: true },
     },
@@ -232,6 +234,31 @@ test.each([
   expect(result.output).toContain(`${TRANSFORMERS}/${file}: forbidden models import`);
 });
 
+test('the runtime file may import the structured-output package dynamically and without types', () => {
+  const result = run({
+    [`${TRANSFORMERS}/runtime.ts`]:
+      "export const load = (): Promise<unknown> => import('@huggingface/transformers-structured-output');\n",
+  });
+  expect(result).toMatchObject({ status: 0, output: '' });
+});
+
+test.each([
+  [
+    'a static import in runtime.ts',
+    'runtime.ts',
+    "import { StructuredOutputProcessor } from '@huggingface/transformers-structured-output';\nexport { StructuredOutputProcessor };\n",
+  ],
+  [
+    'a dynamic import in chat-model.ts',
+    'chat-model.ts',
+    "export const load = (): Promise<unknown> => import('@huggingface/transformers-structured-output');\n",
+  ],
+])('the structured-output package: %s fails', (_label, file, source) => {
+  const result = run({ [`${TRANSFORMERS}/${file}`]: source });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${TRANSFORMERS}/${file}: forbidden models import`);
+});
+
 test('the Transformers.js files may import relative files and LangChain core', () => {
   const result = run({
     [`${TRANSFORMERS}/chat-model.ts`]: [adk('./engine.js'), adk('@langchain/core/messages')].join(
@@ -253,6 +280,39 @@ test.each([
       '@mlc-ai/web-llm',
       '@huggingface/transformers',
     ]),
+  ],
+  [
+    'the structured-output peer is missing',
+    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '4.3.1' }, [
+      '@mlc-ai/web-llm',
+      '@huggingface/transformers',
+    ]),
+  ],
+  [
+    'the structured-output peer is not optional',
+    modelsPackage(
+      {
+        ...WEBLLM,
+        '@huggingface/transformers': '4.3.1',
+        '@huggingface/transformers-structured-output': '4.3.1',
+      },
+      ['@mlc-ai/web-llm', '@huggingface/transformers'],
+    ),
+  ],
+  [
+    'the structured-output peer is not exactly 4.3.1',
+    modelsPackage(
+      {
+        ...WEBLLM,
+        '@huggingface/transformers': '4.3.1',
+        '@huggingface/transformers-structured-output': '^4.3.1',
+      },
+      [
+        '@mlc-ai/web-llm',
+        '@huggingface/transformers',
+        '@huggingface/transformers-structured-output',
+      ],
+    ),
   ],
 ])('the models peer rule fails when %s', (_label, manifest) => {
   const result = run({ 'packages/models/package.json': manifest });

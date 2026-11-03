@@ -4,6 +4,8 @@
 export interface WorkerReport {
   identity: { input: number[]; output: number[] } | undefined;
   tokenizer: { ids: number[]; rendered: string } | undefined;
+  /** The reply a schema-constrained greedy decode produced when the logits favored `z`. */
+  constrained: string | undefined;
   failures: Record<string, string>;
   violations: string[];
   functionConstructions: number;
@@ -15,6 +17,7 @@ export function emptyReport(): WorkerReport {
   return {
     identity: undefined,
     tokenizer: undefined,
+    constrained: undefined,
     failures: {},
     violations: [],
     functionConstructions: 0,

@@ -41,12 +41,16 @@
   ],
   "peerDependencies": {
     "@huggingface/transformers": "4.3.1",
+    "@huggingface/transformers-structured-output": "4.3.1",
     "@langchain/core": "~1.2.20",
     "@langchain/openai": "1.6.3",
     "@mlc-ai/web-llm": "0.2.86"
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
+      "optional": true
+    },
+    "@huggingface/transformers-structured-output": {
       "optional": true
     },
     "@langchain/openai": {
@@ -59,6 +63,7 @@
   "devDependencies": {
     "@huggingface/jinja": "0.5.10",
     "@huggingface/transformers": "4.3.1",
+    "@huggingface/transformers-structured-output": "4.3.1",
     "@langchain/core": "1.2.20",
     "@langchain/openai": "1.6.3",
     "@mlc-ai/web-llm": "0.2.86",

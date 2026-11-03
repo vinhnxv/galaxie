@@ -294,6 +294,9 @@ importers:
       '@huggingface/transformers':
         specifier: 4.3.1
         version: 4.3.1(@types/node@24.19.2)
+      '@huggingface/transformers-structured-output':
+        specifier: 4.3.1
+        version: 4.3.1(@huggingface/transformers@4.3.1(@types/node@24.19.2))
       '@langchain/core':
         specifier: 1.2.20
         version: 1.2.20(@opentelemetry/api@1.10.0)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(openai@7.42.0(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
@@ -631,6 +634,11 @@ packages:
 
   '@huggingface/tokenizers@0.2.0':
     resolution: {integrity: sha512-LidMHe1FpcSYH4vcSjXooda34pC0M8m1gmDOv7SQi6Iv+ib1zX7J3sHBCC9/3FPCkn2k1b55FneVqMRxrr99pg==}
+
+  '@huggingface/transformers-structured-output@4.3.1':
+    resolution: {integrity: sha512-ZE1gOgDOSHVYxrO1o0c7EAZb26GXP7injcUf/9JUb/0VZnLZOKYSq82/Q79c9ZxMb3jNzAYcatQxw8B7SbVqwA==}
+    peerDependencies:
+      '@huggingface/transformers': ^4.3.1
 
   '@huggingface/transformers@4.3.1':
     resolution: {integrity: sha512-5+voSeUCFK6PCKlY15dPhNOKq3/zOTxDN7oC+Wy9dFb1QZ0TSQomZRRy7URRK8YRuUoE9fGMQTTPC5d/pWBJhA==}
@@ -3025,6 +3033,10 @@ snapshots:
   '@huggingface/jinja@0.5.10': {}
 
   '@huggingface/tokenizers@0.2.0': {}
+
+  '@huggingface/transformers-structured-output@4.3.1(@huggingface/transformers@4.3.1(@types/node@24.19.2))':
+    dependencies:
+      '@huggingface/transformers': 4.3.1(@types/node@24.19.2)
 
   '@huggingface/transformers@4.3.1(@types/node@24.19.2)':
     dependencies:

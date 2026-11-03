@@ -74,6 +74,13 @@ interface LibraryModule {
   readonly InterruptableStoppingCriteria: new () => StoppingCriteria;
 }
 
+interface StructuredOutputModule {
+  readonly StructuredOutputProcessor: new (
+    tokenizer: object,
+    format: { readonly type: 'json_schema'; readonly json_schema: Record<string, unknown> },
+  ) => object;
+}
+
 interface GPUAdapterLike {
   readonly info?: { readonly vendor?: string; readonly architecture?: string };
 }
@@ -96,6 +103,33 @@ async function deviceReport(record: TransformersModelRecord): Promise<DeviceRepo
     vendor: label(adapter.info?.vendor),
     architecture: label(adapter.info?.architecture),
   };
+}
+
+/**
+ * A logits processor that lets only tokens that keep the reply valid against `schema`
+ * (ADR-0021 decision 12). The optional package is loaded only when a call carries a schema; a
+ * schema it cannot enforce, such as one with `pattern` or `format`, fails `invalid`.
+ */
+export async function constraintFor(
+  tokenizer: object,
+  schema: Record<string, unknown>,
+): Promise<object> {
+  let module: StructuredOutputModule;
+  try {
+    module = (await import(
+      '@huggingface/transformers-structured-output'
+    )) as unknown as StructuredOutputModule;
+  } catch {
+    throw new ModelError('unsupported');
+  }
+  try {
+    return new module.StructuredOutputProcessor(tokenizer, {
+      type: 'json_schema',
+      json_schema: schema,
+    });
+  } catch {
+    throw new ModelError('invalid');
+  }
 }
 
 /**
@@ -192,6 +226,10 @@ export const transformersRuntime: TransformersRuntime = {
         );
         const promptTokens = inputs.input_ids.dims[1] ?? 0;
         if (promptTokens + request.maxTokens > contextWindow) throw new ModelError('invalid');
+        const constraint =
+          request.jsonSchema === undefined
+            ? undefined
+            : await constraintFor(tokenizer, request.jsonSchema);
         const stopping = new library.InterruptableStoppingCriteria();
         let completionTokens = 0;
         // The streamer reports the end-of-sequence token too, so special tokens are not counted.
@@ -216,6 +254,7 @@ export const transformersRuntime: TransformersRuntime = {
             max_new_tokens: request.maxTokens,
             do_sample: request.temperature > 0,
             ...(request.temperature > 0 ? { temperature: request.temperature } : {}),
+            ...(constraint === undefined ? {} : { logits_processor: constraint }),
             streamer,
             stopping_criteria: [stopping],
           });
