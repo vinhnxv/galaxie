@@ -201,8 +201,8 @@ test('framework selection declares only the implemented features and selects the
   expect(adk.id).toBe('adk-python');
   expect(adk.features).toEqual({
     streaming: true,
-    interrupts: false,
-    resume: false,
+    interrupts: true,
+    resume: true,
     checkpoints: false,
     subgraphs: false,
   });

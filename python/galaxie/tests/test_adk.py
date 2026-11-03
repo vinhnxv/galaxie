@@ -3,7 +3,7 @@
 
 import asyncio
 import json
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from google.adk.agents import LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
@@ -556,3 +556,389 @@ def test_parallel_agents_keep_their_own_half_pair():
         data['text'].encode('utf-8')
         texts[data['author']] = texts.get(data['author'], '') + data['text']
     assert sorted(texts.values()) == ['x\U0001f600', 'yz']
+
+
+def interact(requests):
+    return {
+        'surfaceId': 'main', 'viewRevision': 'r1', 'component': 'app.Approval/v1',
+        'props': {'requests': requests},
+    }
+
+
+def gated(**options):
+    return capability_tool('math.double@1', 'math.double@1', PARAMETERS, 'Double an integer.', require_confirmation=True, **options)
+
+
+def pausing(tools, **hooks):
+    hooks.setdefault('interaction', interact)
+    return Executor(agent(tools), **hooks)
+
+
+def answer(executor, interaction, action='approve', payload=None, steps=5, session='s1'):
+    resume = {'interactionId': interaction['id'], 'action': action, 'payload': {'indexes': [0]} if payload is None else payload}
+    return asyncio.run(executor.run(None, session, steps, resume=resume))
+
+
+def test_a_confirmation_pauses_with_one_interaction_and_runs_no_tool():
+    seen = []
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}', 'CANARY_CALL_ID')]}], seen)
+    executor = pausing([gated()])
+    assert run(executor) is None
+    assert [op for op, _ in seen] == ['model']
+    pending = executor.pending('s1')
+    assert pending is not None and set(pending) == {'id', 'value'}
+    assert pending['value']['props'] == {'requests': [{'kind': 'confirmation', 'tool': 'math_double_1', 'args': {'value': 21}}]}
+    assert 'CANARY' not in json.dumps(pending) and 'adk-' not in json.dumps(pending)
+    assert executor.pending('other') is None
+
+
+def test_approve_runs_the_tool_once_and_completes():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]},
+        {'value': 42}, {'content': 'done'},
+    ], seen)
+    executor = pausing([gated()])
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert answer(executor, pending) == 'done'
+    assert [op for op, _ in seen] == ['model', 'capability', 'model']
+    assert seen[1][1]['input'] == {'value': 21}
+    assert seen[2][1]['messages'][-1] == {'role': 'tool', 'tool_call_id': 'galaxie-1', 'content': '{"value":42}'}
+    assert executor.pending('s1') is None
+
+
+def test_deny_reports_the_denial_to_the_model_and_completes():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}, {'content': 'declined'},
+    ], seen)
+    executor = pausing([gated()])
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert answer(executor, pending, 'deny') == 'declined'
+    assert [op for op, _ in seen] == ['model', 'model']
+    assert json.loads(seen[1][1]['messages'][-1]['content']) == {'error': 'This tool call is rejected.'}
+
+
+def two_calls():
+    return {'content': '', 'toolCalls': [
+        tool_call('math_double_1', '{"value":1}', 'call_a'), tool_call('math_double_1', '{"value":2}', 'call_b'),
+    ]}
+
+
+def test_two_confirmations_in_one_response_form_one_interaction_the_default_resume_covers_both():
+    seen = []
+    transport_for([two_calls(), {'value': 2}, {'value': 4}, {'content': 'both'}], seen)
+    executor = pausing([gated()])
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert [item['args'] for item in pending['value']['props']['requests']] == [{'value': 1}, {'value': 2}]
+    assert answer(executor, pending, payload={'indexes': [1, 0]}) == 'both'
+    assert [op for op, _ in seen] == ['model', 'capability', 'capability', 'model']
+
+
+@pytest.mark.parametrize('action,payload', [
+    ('approve', {'indexes': [0]}), ('approve', {'indexes': [0, 0]}), ('approve', {'indexes': [0, 2]}),
+    ('approve', {'indexes': [0, True]}), ('approve', {'indexes': [0, 1], 'extra': 1}), ('approve', {}),
+    ('approve', None), ('maybe', {'indexes': [0, 1]}),
+])
+def test_a_default_resume_that_does_not_cover_every_request_once_fails_invalid_and_runs_nothing(action, payload):
+    seen = []
+    transport_for([two_calls(), {'value': 2}, {'value': 4}, {'content': 'both'}], seen)
+    executor = pausing([gated()])
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert code_of(lambda: answer(executor, pending, action, payload)) == 'invalid'
+    assert [op for op, _ in seen] == ['model']
+    assert executor.pending('s1') == pending
+    assert answer(executor, pending, payload={'indexes': [0, 1]}) == 'both'
+
+
+def test_a_long_running_tool_pauses_after_its_pending_result_and_the_payload_supplies_the_answer():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":5}')]},
+        {'status': 'started'}, {'content': 'finished'},
+    ], seen)
+
+    def resume(requests, action, payload):
+        assert [request['kind'] for request in requests] == ['long-running'] and action == 'submit'
+        return [{'response': payload}]
+
+    long = capability_tool('math.double@1', 'math.double@1', PARAMETERS, 'Start a job.', long_running=True)
+    executor = pausing([long], resume=resume)
+    assert run(executor) is None
+    assert [op for op, _ in seen] == ['model', 'capability']
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert pending['value']['props']['requests'] == [{'kind': 'long-running', 'tool': 'math_double_1', 'args': {'value': 5}}]
+    assert answer(executor, pending, 'submit', {'result': 'external'}) == 'finished'
+    assert [op for op, _ in seen] == ['model', 'capability', 'model']
+    tool_messages = [message for message in seen[2][1]['messages'] if message['role'] == 'tool']
+    assert [json.loads(message['content']) for message in tool_messages] == [{'result': 'external'}]
+
+
+def test_the_default_resume_does_not_answer_a_long_running_call():
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":5}')]}, {'status': 'started'}])
+    long = capability_tool('math.double@1', 'math.double@1', PARAMETERS, 'Start a job.', long_running=True)
+    executor = pausing([long])
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert code_of(lambda: answer(executor, pending)) == 'invalid'
+    assert executor.pending('s1') == pending
+
+
+def test_a_wrong_interaction_id_fails_stale_before_any_tool_runs_and_the_pause_stays_answerable():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}, {'value': 42}, {'content': 'done'},
+    ], seen)
+    executor = pausing([gated()])
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert code_of(lambda: answer(executor, {'id': 'f' * 64})) == 'stale'
+    assert code_of(lambda: answer(executor, pending, session='other')) == 'stale'
+    assert [op for op, _ in seen] == ['model']
+    assert answer(executor, pending) == 'done'
+    assert code_of(lambda: answer(executor, pending)) == 'stale'
+
+
+def test_a_malformed_resume_fails_invalid_before_any_tool_runs():
+    seen = []
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}], seen)
+    executor = pausing([gated()])
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    for resume in (
+        {'interactionId': pending['id'], 'action': 'approve'},
+        {'interactionId': pending['id'], 'action': 3, 'payload': {'indexes': [0]}},
+        {'interactionId': pending['id'], 'action': 'approve', 'payload': {'indexes': [0]}, 'extra': 1},
+    ):
+        assert code_of(lambda: asyncio.run(executor.run(None, 's1', 5, resume=resume))) == 'invalid'
+    assert [op for op, _ in seen] == ['model']
+
+
+@pytest.mark.parametrize('decisions', [
+    [], [{'confirmed': True}, {'confirmed': True}], [{'confirmed': 'yes'}], [{'response': {}}],
+    [{'confirmed': True, 'extra': 1}], 'approve', [None],
+])
+def test_an_author_resume_whose_answer_does_not_match_the_requests_fails_invalid_before_any_tool_runs(decisions):
+    seen = []
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}], seen)
+    executor = pausing([gated()], resume=lambda requests, action, payload: decisions)
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert code_of(lambda: answer(executor, pending)) == 'invalid'
+    assert [op for op, _ in seen] == ['model']
+
+
+def test_an_author_resume_that_raises_fails_invalid():
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}])
+
+    def resume(requests, action, payload):
+        raise RuntimeError('secret detail')
+
+    executor = pausing([gated()], resume=resume)
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert code_of(lambda: answer(executor, pending)) == 'invalid'
+
+
+def test_scripted_calls_reusing_one_id_get_distinct_interaction_ids_per_pause():
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":1}', 'same')]}, {'value': 2},
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":2}', 'same')]}, {'value': 4},
+        {'content': 'done'},
+    ])
+    executor = pausing([gated()])
+    run(executor)
+    first = executor.pending('s1')
+    assert first is not None
+    assert answer(executor, first) is None
+    second = executor.pending('s1')
+    assert second is not None and second['id'] != first['id']
+    assert code_of(lambda: answer(executor, first)) == 'stale'
+    assert answer(executor, second) == 'done'
+
+
+def test_a_pausing_tool_without_an_interaction_hook_is_refused_before_any_run():
+    assert code_of(lambda: Executor(agent([gated()]))) == 'unsupported'
+    assert code_of(lambda: prepare_executor(agent([gated()]))) == 'unsupported'
+    Executor(agent([double()]))
+
+
+def test_an_interaction_hook_that_fails_or_returns_a_bad_request_fails_unsupported_and_rolls_back():
+    def divide(requests: list[dict[str, Any]]) -> dict[str, Any]:
+        return {'surfaceId': 1 / 0}
+
+    for hook in (lambda requests: {'surfaceId': 'main'}, divide):
+        transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}])
+        executor = Executor(agent([gated()]), interaction=hook)
+        assert code_of(lambda: run(executor)) == 'unsupported'
+        assert executor.pending('s1') is None
+        assert executor._sessions.sessions['galaxie']['galaxie']['s1'].events == []
+
+
+def test_a_new_prompt_while_a_pause_is_pending_fails_invalid():
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}])
+    executor = pausing([gated()])
+    run(executor)
+    pending = executor.pending('s1')
+    assert code_of(lambda: run(executor, prompt='again')) == 'invalid'
+    assert executor.pending('s1') == pending
+
+
+def test_a_failed_resume_keeps_the_pause_and_a_retry_completes():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}, {'value': 42}, 'unavailable',
+        {'value': 42}, {'content': 'done'},
+    ], seen)
+    executor = pausing([gated()])
+    run(executor)
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert code_of(lambda: answer(executor, pending)) == 'unavailable'
+    assert executor.pending('s1') == pending
+    assert answer(executor, pending) == 'done'
+
+
+def test_a_confirmation_beside_an_ordinary_call_runs_the_ordinary_call_once_before_the_pause():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [
+            tool_call('math_double_1', '{"value":1}', 'call_a'), tool_call('math_double_2', '{"value":2}', 'call_b'),
+        ]},
+        {'value': 4}, {'value': 2}, {'content': 'both'},
+    ], seen)
+    plain = capability_tool('math.double@2', 'math.double@2', PARAMETERS, 'Plain.')
+    executor = pausing([gated(), plain])
+    run(executor)
+    assert [op for op, _ in seen] == ['model', 'capability']
+    assert seen[1][1]['name'] == 'math.double@2'
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert [item['tool'] for item in pending['value']['props']['requests']] == ['math_double_1']
+    assert answer(executor, pending) == 'both'
+    assert [payload['name'] for op, payload in seen if op == 'capability'] == ['math.double@2', 'math.double@1']
+    assert sorted(message['tool_call_id'] for message in seen[-1][1]['messages'] if message['role'] == 'tool') == ['galaxie-1', 'galaxie-2']
+
+
+def test_a_confirmation_beside_a_long_running_call_fails_unsupported_before_any_capability_runs():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [
+            tool_call('math_double_1', '{"value":1}', 'call_a'), tool_call('math_double_2', '{"value":2}', 'call_b'),
+        ]},
+    ], seen)
+    long = capability_tool('math.double@2', 'math.double@2', PARAMETERS, 'Start a job.', long_running=True)
+    executor = pausing([gated(), long])
+    assert code_of(lambda: run(executor)) == 'unsupported'
+    assert [op for op, _ in seen] == ['model']
+    assert executor.pending('s1') is None
+    assert executor._sessions.sessions['galaxie']['galaxie']['s1'].events == []
+
+
+def test_a_failing_paused_marker_rolls_the_run_back_and_publishes_no_pause():
+    streaming_transport([
+        ([{'content': '', 'toolCalls': [{'index': 0, 'id': 'x', 'function': {'name': 'math_double_1', 'arguments': '{"value":1}'}}]}],
+         {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":1}', 'x')]}),
+    ])
+    executor = pausing([gated()])
+
+    def fail_on_pause(mode, data):
+        if data.get('step') == 'paused':
+            raise GalaxieError('unavailable')
+
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run({'prompt': 'q'}, 's1', 5, on_stream=fail_on_pause))
+    assert error.value.code == 'unavailable'
+    assert executor.pending('s1') is None
+    assert executor._sessions.sessions['galaxie']['galaxie']['s1'].events == []
+
+
+def test_a_resume_that_is_not_an_object_fails_invalid():
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}])
+    executor = pausing([gated()])
+    run(executor)
+    for resume in ('approve', 3, ['x']):
+        assert code_of(lambda: asyncio.run(executor.run(None, 's1', 5, resume=cast(Any, resume)))) == 'invalid'
+    assert executor.pending('s1') is not None
+
+
+def test_the_stream_marks_a_pause_without_the_confirmation_call_or_any_content():
+    streaming_transport([
+        ([{'content': '', 'toolCalls': [{'index': 0, 'id': 'CANARY_CALL_ID', 'function': {'name': 'math_double_1', 'arguments': '{"value":777}'}}]}],
+         {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":777}', 'CANARY_CALL_ID')]}),
+    ])
+    output, events = streamed(pausing([gated()]))
+    assert output is None
+    assert events == [
+        ('updates', {'step': 'tool_call', 'tool': 'math_double_1', 'index': 0}),
+        ('updates', {'step': 'tool_result', 'tool': 'math_double_1', 'index': 1}),
+        ('updates', {'step': 'paused', 'tool': 'math_double_1', 'index': 2}),
+    ]
+    assert 'CANARY' not in json.dumps(events) and '777' not in json.dumps(events)
+
+
+def test_an_option_that_is_not_a_boolean_or_asks_for_both_pauses_fails_invalid():
+    cases: list[dict[str, Any]] = [
+        {'require_confirmation': 'yes'}, {'long_running': 1}, {'require_confirmation': True, 'long_running': True},
+    ]
+    for options in cases:
+        assert code_of(lambda: capability_tool('t', 'math.double@1', PARAMETERS, 'd', **options)) == 'invalid'
+
+
+def named(name, tool):
+    return LlmAgent(name=name, model=llm('answer'), instruction='x', tools=[tool])
+
+
+def quiet_child(name='quiet'):
+    return LlmAgent(name=name, model=llm('answer'), instruction='x')
+
+
+@pytest.mark.parametrize('build', [
+    lambda: SequentialAgent(name='root', sub_agents=[named('a', gated()), quiet_child()]),
+    lambda: ParallelAgent(name='root', sub_agents=[named('a', gated()), quiet_child()]),
+    lambda: LoopAgent(name='root', sub_agents=[named('a', gated())], max_iterations=2),
+    lambda: LlmAgent(name='root', model=llm('answer'), instruction='x', tools=[gated()], sub_agents=[quiet_child()]),
+    lambda: LlmAgent(name='root', model=llm('answer'), instruction='x', sub_agents=[named('a', gated())]),
+    lambda: SequentialAgent(name='root', sub_agents=[
+        SequentialAgent(name='inner', sub_agents=[named('a', gated()), quiet_child('b')]), quiet_child('c'),
+    ]),
+    lambda: SequentialAgent(name='root', sub_agents=[quiet_child('a'), named('a', gated())]),
+])
+def test_a_pausing_agent_that_is_not_the_last_to_run_or_has_a_duplicate_name_fails_unsupported(build):
+    assert code_of(lambda: Executor(build())) == 'unsupported'
+
+
+def test_a_pausing_agent_in_the_last_position_is_accepted_and_others_are_unaffected():
+    Executor(SequentialAgent(name='root', sub_agents=[
+        quiet_child(), SequentialAgent(name='inner', sub_agents=[quiet_child('b'), named('last', gated())]),
+    ]), interaction=interact)
+    Executor(ParallelAgent(name='root', sub_agents=[named('a', double()), quiet_child()]))
+
+
+def test_a_pause_in_the_last_child_of_a_sequence_resumes_that_child():
+    seen = []
+    transport_for([
+        {'content': 'first done'},
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}, {'value': 42}, {'content': 'last done'},
+    ], seen)
+    first = LlmAgent(name='first', model=llm('answer'), instruction='x')
+    executor = Executor(SequentialAgent(name='root', sub_agents=[first, named('last', gated())]), interaction=interact)
+    assert run(executor) is None
+    pending = executor.pending('s1')
+    assert pending is not None
+    assert answer(executor, pending) == 'last done'
+    assert [op for op, _ in seen] == ['model', 'model', 'capability', 'model']

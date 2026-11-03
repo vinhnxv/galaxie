@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import asyncio
+import contextlib
 import importlib.util
 import json
 from pathlib import Path
@@ -28,6 +29,7 @@ sys.modules[suite_spec.name] = suite
 suite_spec.loader.exec_module(suite)
 
 STEP_LIMIT = 2
+CONFIRMATION = 'adk_request_confirmation'
 DENIED = 'Policy denied the request.'
 
 
@@ -139,9 +141,12 @@ class NativeDouble(BaseTool):
     """Independent native tool: same declaration, runs the fixture's arithmetic directly."""
 
     def __init__(self, case, transcript):
-        super().__init__(name='double', description='Double an integer.')
+        super().__init__(name='double', description='Double an integer.', is_long_running=case == 'long-running')
         self.case = case
         self.transcript = transcript
+
+    async def check_require_confirmation(self, args, tool_context):
+        return self.case in suite.CONFIRMATION_CASES
 
     def _get_declaration(self):
         return types.FunctionDeclaration(
@@ -155,21 +160,92 @@ class NativeDouble(BaseTool):
         return {'value': args['value'] * 2}
 
 
-def project(event, streams):
-    """The streamed view of an ADK event, written independently of galaxie's projection."""
+def project(event, streams, base):
+    """The streamed view of an ADK event, written independently of galaxie's projection.
+
+    Tool markers are numbered from `base`, the first marker of the current run; returns the next number.
+    """
     parts = event.content.parts if event.content else []
     if event.partial:
         text = ''.join(part.text or '' for part in parts)
         if text:
             streams.append({'mode': 'messages', 'data': {'author': event.author, 'text': text}})
-        return
+        return base
     for part in parts:
         call, response = part.function_call, part.function_response
-        if call or response:
+        # ADK's own confirmation request is not an offered tool; the pause has its own marker.
+        if (call or response) and (call or response).name != CONFIRMATION:
             streams.append({'mode': 'updates', 'data': {
-                'step': 'tool_call' if call else 'tool_result', 'tool': (call or response).name, 'index': sum(
-                    1 for item in streams if item['mode'] == 'updates'),
+                'step': 'tool_call' if call else 'tool_result', 'tool': (call or response).name, 'index': base,
             }})
+            base += 1
+    return base
+
+
+async def converse(runner, session, spec, name, transcript):
+    """Run the case natively: a pause ends a run and the answer is a new run, as ADK documents it."""
+    streaming = 'streams' in transcript
+    message = types.Content(role='user', parts=[types.Part(text=spec['prompt'])])
+    answers = iter(spec.get('answers', []))
+    pauses = 0
+    last = None
+    while True:
+        asks = []
+        flagged = []
+        position = 0
+        stream = runner.run_async(
+            user_id='user', session_id=session.id, new_message=message,
+            run_config=RunConfig(streaming_mode=StreamingMode.SSE if streaming else StreamingMode.NONE),
+        )
+        async with contextlib.aclosing(stream):
+            async for event in stream:
+                if streaming:
+                    position = project(event, transcript['streams'], position)
+                if event.partial:
+                    continue
+                parts = event.content.parts if event.content else []
+                calls = [part.function_call for part in parts if part.function_call]
+                for call in calls:
+                    if call.name == CONFIRMATION:
+                        original = call.args['originalFunctionCall']
+                        asks.append(('confirmation', call.id, CONFIRMATION, original['name'], original.get('args') or {}))
+                    elif call.id in (event.long_running_tool_ids or ()):
+                        flagged.append(('long-running', call.id, call.name, call.name, call.args or {}))
+                if calls:
+                    continue
+                if flagged and not asks:
+                    # A long-running call's pending result has arrived: the run waits for the real one.
+                    break
+                if event.is_final_response() and event.content:
+                    last = ''.join(part.text or '' for part in event.content.parts or [])
+        asks = asks or flagged
+        if not asks:
+            return last
+        requests = [{'kind': kind, 'tool': tool, 'args': args} for kind, _, _, tool, args in asks]
+        transcript['interactions'].append({'interactionId': f'pause-{pauses}', **suite.hooks(name)['interaction'](requests)})
+        pauses += 1
+        if streaming:
+            for index, (_, _, _, tool, _) in enumerate(asks):
+                transcript['streams'].append({'mode': 'updates', 'data': {'step': 'paused', 'tool': tool, 'index': position + index}})
+        if name == 'confirm-stale':
+            raise GalaxieError('stale')
+        answer = next(answers)
+        if name == 'confirm-double-submit':
+            transcript['dispatches'] = ['accepted', 'rejected:duplicate']
+        parts = []
+        if name == 'long-running':
+            parts.append(types.Part(function_response=types.FunctionResponse(
+                id=asks[0][1], name=asks[0][2], response=answer['payload'],
+            )))
+        else:
+            indexes = answer['payload'].get('indexes')
+            if answer['action'] not in ('approve', 'deny') or sorted(indexes) != list(range(len(asks))):
+                raise GalaxieError('invalid')
+            for _, identifier, gate, _, _ in asks:
+                parts.append(types.Part(function_response=types.FunctionResponse(
+                    id=identifier, name=gate, response={'confirmed': answer['action'] == 'approve'},
+                )))
+        message = types.Content(role='user', parts=parts)
 
 
 async def _run_case(name):
@@ -185,17 +261,7 @@ async def _run_case(name):
     session = await runner.session_service.create_session(app_name='conformance', user_id='user', session_id='conformance')
     last = None
     try:
-        async for event in runner.run_async(
-            user_id='user', session_id=session.id,
-            new_message=types.Content(role='user', parts=[types.Part(text=spec['prompt'])]),
-            run_config=RunConfig(streaming_mode=StreamingMode.SSE if streaming else StreamingMode.NONE),
-        ):
-            if streaming:
-                project(event, transcript['streams'])
-            if event.partial:
-                continue
-            if event.is_final_response() and event.content:
-                last = ''.join(part.text or '' for part in event.content.parts or [])
+        last = await converse(runner, session, spec, name, transcript)
         stored = await runner.session_service.get_session(app_name='conformance', user_id='user', session_id=session.id)
         transcript['output'] = stored.state['result'] if name == 'output-schema' and stored else last
     except asyncio.CancelledError:

@@ -18,8 +18,9 @@ import opentelemetry.semconv
 /**
  * The ADK Python run loop. It builds the executor from the agent's entry factory and runs one
  * conversation per call, streaming checked text deltas and content-free step markers; the model,
- * the tools and the budget all go through the bridge. Interactions and durable sessions stay off
- * until their stages ship (ADR-0022).
+ * the tools and the budget all go through the bridge. A pause (a confirmation or a long-running
+ * tool) ends the run with the interaction pending in the executor, and the answer resumes it as a
+ * new run. Durable sessions stay off until their stage ships (ADR-0022).
  */
 export const adkDriver: string = `
 import sys, json, asyncio, importlib
@@ -39,18 +40,25 @@ except GalaxieError as error:
 except Exception:
     _galaxie_ready = {'ok': False, 'code': 'unavailable'}
 async def _galaxie_pending():
-    return json.dumps({'ok': True, 'interrupts': []})
+    try:
+        pending = _galaxie_executor.pending(_galaxie_thread)
+        return json.dumps({'ok': True, 'interrupts': [pending] if pending else []})
+    except GalaxieError as error:
+        return json.dumps({'ok': False, 'code': error.code})
+    except Exception:
+        return json.dumps({'ok': False, 'code': 'executor_error'})
 async def _galaxie_execute():
     global _galaxie_task
     _galaxie_task = asyncio.current_task()
     try:
         payload = json.loads(_galaxie_input)
-        if payload.get('resume') is not None:
-            raise GalaxieError('unsupported')
         output = await _galaxie_executor.run(
             payload.get('input'), payload['threadId'], payload['steps'],
             on_stream=lambda mode, data: notify_stream_data([], mode, data),
+            resume=payload.get('resume'),
         )
+        if _galaxie_executor.pending(payload['threadId']) is not None:
+            return json.dumps({'ok': True, 'interrupted': True})
         return json.dumps({'ok': True, 'output': output}, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
     except GalaxieError as error:
         return json.dumps({'ok': False, 'code': error.code})

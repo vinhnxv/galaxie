@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { createRuntime, defineAgentDefinition, GalaxieError } from '@galaxie/core';
+import { createRuntime, defineAgentDefinition, GalaxieError, type RunEvent } from '@galaxie/core';
 import { createMockLatch, MockChatModel, type MockScript } from '@galaxie/models/mock';
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { BaseChatModel, type BindToolsInput } from '@langchain/core/language_models/chat_models';
@@ -28,6 +28,15 @@ export const adkPythonCases = [
   'stream-tools',
   'stream-mid-block',
   'stream-abort',
+  'confirm-approve',
+  'confirm-deny',
+  'confirm-two',
+  'long-running',
+  'confirm-stale',
+  'confirm-incomplete',
+  'confirm-double-submit',
+  'confirm-consecutive',
+  'stream-confirm-approve',
 ] as const;
 /** The Chromium lane repeats these; the Node lane runs all of them. */
 export const adkPythonBrowserCases = [
@@ -36,11 +45,13 @@ export const adkPythonBrowserCases = [
   'abort',
   'stream-text',
   'stream-abort',
+  'confirm-approve',
 ] as const;
 const stepLimit = 2;
 interface Spec {
   readonly prompt: string;
   readonly replies: readonly { readonly text: string; readonly toolCalls?: readonly ToolCall[] }[];
+  readonly answers?: readonly { readonly action: string; readonly payload: unknown }[];
 }
 export interface AdkPythonTranscript {
   readonly requests: unknown[];
@@ -48,6 +59,7 @@ export interface AdkPythonTranscript {
   readonly capabilities: unknown[];
   readonly interactions: unknown[];
   readonly streams?: unknown[];
+  dispatches?: string[];
   output: unknown;
   error: unknown;
 }
@@ -225,6 +237,16 @@ export async function executeAdkPythonCase(
         principalScope: 'fixture',
         agent,
         services: { chatModels: { mock: model } },
+        ui: {
+          surfaces: ['main'],
+          components: {
+            'tests.Approval/v1': {
+              actions: Object.fromEntries(
+                ['approve', 'deny', 'submit'].map((action) => [action, { payload: z.unknown() }]),
+              ),
+            },
+          },
+        },
         bindings: {
           'math.double@1': {
             kind: 'read',
@@ -258,12 +280,47 @@ export async function executeAdkPythonCase(
     );
     await instance.prepare();
     const { runId } = await instance.start({ prompt: spec.prompt });
-    const events = (async () => {
-      const recorded = [];
+    const ids = new Set<string>();
+    let answerIndex = 0;
+    const events = (async (): Promise<RunEvent[]> => {
+      const recorded: RunEvent[] = [];
       for await (const event of instance.events(runId)) {
         recorded.push(event);
         if (name === 'stream-abort' && event.type === 'stream' && event.mode === 'messages')
           await instance.cancel(runId);
+        if (event.type === 'interaction') {
+          const pending = instance.getSnapshot().run?.pending;
+          if (!pending || ids.has(pending.interactionId))
+            throw new Error('The pending interaction is missing or reused.');
+          ids.add(pending.interactionId);
+          const answer = spec.answers?.[answerIndex++];
+          if (!answer) throw new Error('The interaction answer is missing.');
+          const submission = {
+            instanceId: instance.instanceId,
+            runId,
+            ...pending,
+            ...answer,
+            ...(name === 'confirm-stale'
+              ? { interactionId: 'wrong' as typeof pending.interactionId }
+              : {}),
+          };
+          const receipts = await Promise.all([
+            instance.dispatch(submission),
+            ...(name === 'confirm-double-submit' ? [instance.dispatch(submission)] : []),
+          ]);
+          if (name === 'confirm-double-submit')
+            transcript.dispatches = receipts.map((receipt) =>
+              receipt.status === 'accepted' ? 'accepted' : `rejected:${receipt.error.code}`,
+            );
+          if (name === 'confirm-stale') {
+            const receipt = receipts[0];
+            if (receipt?.status !== 'rejected') throw new Error('The stale answer was accepted.');
+            transcript.error = receipt.error;
+            break;
+          }
+          if (receipts[0]?.status !== 'accepted')
+            throw new Error('The interaction answer was rejected.');
+        }
       }
       return recorded;
     })();
@@ -276,7 +333,12 @@ export async function executeAdkPythonCase(
       else if (event.type === 'error') transcript.error = event.error;
       else if (event.type === 'cancelled')
         transcript.error = { code: 'cancelled', message: 'The run was cancelled.' };
-      else if (event.type === 'stream') {
+      else if (event.type === 'interaction') {
+        transcript.interactions.push({
+          ...event.interaction,
+          interactionId: `pause-${transcript.interactions.length}`,
+        });
+      } else if (event.type === 'stream') {
         if (event.executor !== 'adk-python' || event.path.length !== 0)
           throw new Error('The stream has an unexpected executor or path.');
         transcript.streams?.push({ mode: event.mode, data: event.data });
