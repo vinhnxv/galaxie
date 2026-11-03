@@ -3,9 +3,10 @@
 
 import { createRuntime, defineAgentDefinition, GalaxieError } from '@galaxie/core';
 import { createMockLatch, MockChatModel, type MockScript } from '@galaxie/models/mock';
+import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { BaseChatModel, type BindToolsInput } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage, ToolCall } from '@langchain/core/messages';
-import type { ChatResult } from '@langchain/core/outputs';
+import type { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';
 import { z } from 'zod';
 import {
   createPyodideAdapter,
@@ -23,9 +24,19 @@ export const adkPythonCases = [
   'argument-block',
   'step-budget',
   'abort',
+  'stream-text',
+  'stream-tools',
+  'stream-mid-block',
+  'stream-abort',
 ] as const;
 /** The Chromium lane repeats these; the Node lane runs all of them. */
-export const adkPythonBrowserCases = ['plain-text', 'capability', 'abort'] as const;
+export const adkPythonBrowserCases = [
+  'plain-text',
+  'capability',
+  'abort',
+  'stream-text',
+  'stream-abort',
+] as const;
 const stepLimit = 2;
 interface Spec {
   readonly prompt: string;
@@ -36,6 +47,7 @@ export interface AdkPythonTranscript {
   readonly responses: unknown[];
   readonly capabilities: unknown[];
   readonly interactions: unknown[];
+  readonly streams?: unknown[];
   output: unknown;
   error: unknown;
 }
@@ -62,17 +74,20 @@ export class RecordingModel extends BaseChatModel {
   readonly script: MockScript;
   readonly tools: BindToolsInput[];
   readonly choice: unknown;
+  readonly streamLatch: ReturnType<typeof createMockLatch> | undefined;
   constructor(
     script: MockScript,
     transcript: AdkPythonTranscript,
     tools: BindToolsInput[] = [],
     choice?: unknown,
+    streamLatch?: ReturnType<typeof createMockLatch>,
   ) {
     super({});
     this.script = script;
     this.transcript = transcript;
     this.tools = tools;
     this.choice = choice;
+    this.streamLatch = streamLatch;
     this.mock = tools.length
       ? new MockChatModel(script).bindTools(tools)
       : new MockChatModel(script);
@@ -84,7 +99,13 @@ export class RecordingModel extends BaseChatModel {
     tools: BindToolsInput[],
     kwargs?: Partial<this['ParsedCallOptions']>,
   ): RecordingModel {
-    return new RecordingModel(this.script, this.transcript, tools, kwargs?.tool_choice);
+    return new RecordingModel(
+      this.script,
+      this.transcript,
+      tools,
+      kwargs?.tool_choice,
+      this.streamLatch,
+    );
   }
   override async _generate(
     messages: BaseMessage[],
@@ -105,6 +126,21 @@ export class RecordingModel extends BaseChatModel {
       toolCalls: 'tool_calls' in message ? message.tool_calls : [],
     });
     return result;
+  }
+
+  override async *_streamResponseChunks(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+    runManager?: CallbackManagerForLLMRun,
+  ): AsyncGenerator<ChatGenerationChunk> {
+    // Record the provider's complete scripted reply, including replies blocked during delivery.
+    await this._generate(messages, options);
+    let first = true;
+    for await (const chunk of this.mock._streamResponseChunks(messages, options, runManager)) {
+      yield chunk;
+      if (first) await this.streamLatch?.wait(options.signal);
+      first = false;
+    }
   }
 }
 
@@ -141,6 +177,7 @@ export async function executeAdkPythonCase(
     responses: [],
     capabilities: [],
     interactions: [],
+    ...(name.startsWith('stream-') ? { streams: [] } : {}),
     output: null,
     error: null,
   };
@@ -153,12 +190,18 @@ export async function executeAdkPythonCase(
       ...(name === 'abort' ? { wait: latch } : {}),
     })),
   };
-  const model = new RecordingModel(script, transcript);
+  const model = new RecordingModel(
+    script,
+    transcript,
+    [],
+    undefined,
+    name === 'stream-abort' ? latch : undefined,
+  );
   const runtime = createRuntime({
     appId: 'adk-python-conformance',
     executors: [createPyodideAdapter({ ...options, framework: 'adk' })],
     budgets: { steps: name === 'step-budget' ? stepLimit : 25, toolCalls: 10, tokens: 2000 },
-    outputSafety: ({ text }) => (/BLOCKED_ARGUMENT/.test(text) ? 'block' : 'allow'),
+    outputSafety: ({ text }) => (/BLOCKED_(ARGUMENT|TEXT)/.test(text) ? 'block' : 'allow'),
   });
   try {
     const instance = await runtime.create(
@@ -205,7 +248,7 @@ export async function executeAdkPythonCase(
               destination: 'in-browser',
               modality: 'text',
               languages: ['en'],
-              features: ['tool-calling', 'structured-output'],
+              features: ['tool-calling', 'structured-output', 'streaming'],
               pricing: { inputPerToken: 0, outputPerToken: 0 },
             },
           },
@@ -217,7 +260,11 @@ export async function executeAdkPythonCase(
     const { runId } = await instance.start({ prompt: spec.prompt });
     const events = (async () => {
       const recorded = [];
-      for await (const event of instance.events(runId)) recorded.push(event);
+      for await (const event of instance.events(runId)) {
+        recorded.push(event);
+        if (name === 'stream-abort' && event.type === 'stream' && event.mode === 'messages')
+          await instance.cancel(runId);
+      }
       return recorded;
     })();
     if (name === 'abort') {
@@ -229,6 +276,11 @@ export async function executeAdkPythonCase(
       else if (event.type === 'error') transcript.error = event.error;
       else if (event.type === 'cancelled')
         transcript.error = { code: 'cancelled', message: 'The run was cancelled.' };
+      else if (event.type === 'stream') {
+        if (event.executor !== 'adk-python' || event.path.length !== 0)
+          throw new Error('The stream has an unexpected executor or path.');
+        transcript.streams?.push({ mode: event.mode, data: event.data });
+      }
     }
     const actual = JSON.parse(JSON.stringify(transcript)) as AdkPythonTranscript;
     renumber(actual.requests);

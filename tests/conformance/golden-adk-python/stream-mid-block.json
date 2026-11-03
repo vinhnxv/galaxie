@@ -1,0 +1,39 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "stream mid block"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [
+    {
+      "content": "Allowed BLOCKED_TEXT hidden.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "denied",
+    "message": "Policy denied the request."
+  },
+  "streams": [
+    {
+      "mode": "messages",
+      "data": {
+        "author": "conformance",
+        "text": "Allowed "
+      }
+    }
+  ]
+}

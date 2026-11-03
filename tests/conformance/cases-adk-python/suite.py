@@ -7,12 +7,15 @@ from pydantic import BaseModel
 CASES = (
     'plain-text', 'capability', 'sequential-tools', 'output-schema',
     'capability-denial', 'argument-block', 'step-budget', 'abort',
+    'stream-text', 'stream-tools', 'stream-mid-block', 'stream-abort',
 )
 PARAMETERS = {
     'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'],
     'additionalProperties': False,
 }
-TOOL_CASES = ('capability', 'sequential-tools', 'capability-denial', 'argument-block', 'step-budget')
+TOOL_CASES = (
+    'capability', 'sequential-tools', 'capability-denial', 'argument-block', 'step-budget', 'stream-tools',
+)
 
 
 class Answer(BaseModel):

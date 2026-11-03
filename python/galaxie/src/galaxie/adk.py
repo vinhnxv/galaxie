@@ -12,12 +12,12 @@ import re
 import secrets
 import warnings
 import weakref
-from collections.abc import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator, Callable, Iterator
 from contextvars import ContextVar
 from typing import Any
 
 from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
-from google.adk.agents.run_config import RunConfig
+from google.adk.agents.run_config import RunConfig, StreamingMode  # pyright: ignore[reportPrivateImportUsage]
 from google.adk.apps import App
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_request import LlmRequest
@@ -39,6 +39,8 @@ APP_NAME = 'galaxie'
 USER_ID = 'galaxie'
 MAX_DEPTH = 16
 MAX_AGENTS = 256
+# The longest text one `messages` event carries; a longer delta is split.
+MAX_DELTA = 4096
 _TOOL_NAME = re.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
 # A capability error that tells the model about its own mistake rather than ending the run.
 _MODEL_VISIBLE = frozenset({'denied', 'invalid'})
@@ -306,8 +308,6 @@ class _GalaxieLlm(BaseLlm):
         if run is None:
             raise GalaxieError('invalid')
         try:
-            if stream:
-                raise GalaxieError('unsupported')
             # After a fatal error nothing more may reach a provider or the model.
             if run.failure is not None:
                 raise run.failure
@@ -325,10 +325,36 @@ class _GalaxieLlm(BaseLlm):
             stop = list(config.stop_sequences or []) if config is not None else []
             options: dict[str, Any] = {
                 **({'stop': stop} if stop else {}),
+                **({'stream': True} if stream else {}),
                 **({'tools': tools} if tools else {}),
                 **({'jsonSchema': schema} if schema is not None else {}),
             }
-            reply = await request('model', {'role': self.role, 'messages': messages, 'options': options})
+            payload = {'role': self.role, 'messages': messages, 'options': options}
+            if not stream:
+                reply = await request('model', payload)
+            else:
+                # The runtime checks every delta before it reaches this queue, so a blocked delta
+                # never gets here; the final reply is checked again before it is returned.
+                chunks: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+                pending = asyncio.ensure_future(request('model', payload, on_model_chunk=chunks.put_nowait))
+                pending.add_done_callback(lambda _: chunks.put_nowait(None))
+                try:
+                    while (chunk := await chunks.get()) is not None:
+                        if run.failure is not None:
+                            raise run.failure
+                        if chunk['content']:
+                            yield LlmResponse(
+                                content=types.Content(role='model', parts=[types.Part(text=chunk['content'])]),
+                                partial=True,
+                            )
+                    reply = await pending
+                finally:
+                    # Abandoning the stream cancels the bridge request and drains it.
+                    if not pending.done():
+                        pending.cancel()
+                    await asyncio.wait([pending])
+                    if not pending.cancelled():
+                        pending.exception()
             if run.failure is not None:
                 raise run.failure
             yield self._response(run, reply, offered)
@@ -551,6 +577,39 @@ def _mute_loggers() -> None:
 _mute_loggers()
 
 
+class _Deltas:
+    """Bounded text deltas from growing text; a surrogate pair is never split.
+
+    A provider can end one chunk on a high surrogate and start the next on its low half. The halves
+    are joined here, and a trailing high surrogate waits for the next chunk.
+    """
+
+    def __init__(self) -> None:
+        self._held = ''
+
+    def feed(self, text: str) -> list[str]:
+        text = (self._held + text).encode('utf-16-le', 'surrogatepass').decode('utf-16-le', 'surrogatepass')
+        self._held = ''
+        if text and '\ud800' <= text[-1] <= '\udbff':
+            self._held, text = text[-1], text[:-1]
+        return [text[start:start + MAX_DELTA] for start in range(0, len(text), MAX_DELTA)]
+
+    def reset(self) -> None:
+        self._held = ''
+
+
+def _markers(event: Any, position: int) -> list[dict[str, Any]]:
+    """Content-free step markers: the step, the offered tool's name and a run-wide position."""
+    markers: list[dict[str, Any]] = []
+    for part in event.content.parts or [] if event.content is not None else []:
+        call, response = part.function_call, part.function_response
+        step = 'tool_call' if call is not None else 'tool_result' if response is not None else ''
+        name = call.name if call is not None else response.name if response is not None else None
+        if step and isinstance(name, str):
+            markers.append({'step': step, 'tool': name, 'index': position + len(markers)})
+    return markers
+
+
 class Executor:
     """Run an ADK agent tree with explicit input and output projections."""
 
@@ -572,7 +631,9 @@ class Executor:
             self._runners[session] = runner
         return runner
 
-    async def run(self, input: Any, session: str, steps: int) -> Any:
+    async def run(
+        self, input: Any, session: str, steps: int, on_stream: Callable[[str, Any], None] | None = None,
+    ) -> Any:
         if not isinstance(session, str) or not session or type(steps) is not int or steps < 1:
             raise GalaxieError('invalid')
         if (
@@ -593,21 +654,43 @@ class Executor:
         thrown: BaseException | None = None
         cancelled = False
         last: tuple[str | None, str, Any] | None = None
+        deltas: dict[str, _Deltas] = {}
+        position = 0
         try:
             with quiet():
                 generator = self._runner(session).run_async(
                     user_id=USER_ID, session_id=session,
                     new_message=types.Content(role='user', parts=[types.Part(text=input['prompt'])]),
                     # A backstop only: the model call count in the run enforces the step budget.
-                    run_config=RunConfig(max_llm_calls=steps + 1),
+                    run_config=RunConfig(
+                        max_llm_calls=steps + 1,
+                        streaming_mode=StreamingMode.SSE if on_stream is not None else StreamingMode.NONE,
+                    ),
                 )
                 async for event in generator:
                     if event.error_code is not None and run.failure is None:
                         run.fail(None)
                     if run.failure is not None:
                         break
+                    if event.partial:
+                        # The text was checked in the runtime before this model saw it.
+                        if on_stream is not None and event.content is not None:
+                            text = ''.join(
+                                part.text or '' for part in event.content.parts or []
+                                if part.thought is not True and part.function_call is None
+                            )
+                            # Parallel agents interleave, so each author holds its own half-pair.
+                            for delta in deltas.setdefault(event.author, _Deltas()).feed(text):
+                                on_stream('messages', {'author': event.author, 'text': delta})
+                        continue
+                    if event.author in deltas:
+                        deltas[event.author].reset()
+                    if on_stream is not None:
+                        for marker in _markers(event, position):
+                            on_stream('updates', marker)
+                            position += 1
                     # A state-only final event (an after-agent callback) carries no answer.
-                    if event.partial or not event.is_final_response() or event.content is None:
+                    if not event.is_final_response() or event.content is None:
                         continue
                     text = ''.join(
                         part.text or '' for part in event.content.parts or [] if part.thought is not True

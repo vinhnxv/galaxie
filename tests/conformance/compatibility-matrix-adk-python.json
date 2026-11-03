@@ -1,9 +1,12 @@
 {
   "reference": "Native CPython 3.14 with google-adk 2.12.0 (its own Runner, a scripted BaseLlm and a native tool)",
   "requestReference": "The native lane maps ADK's LlmRequest to OpenAI-format messages and tools in tests/conformance/cases-adk-python/native.py; the galaxie mapper is independent",
-  "lanes": ["Node Pyodide", "real headless Chromium Pyodide (plain-text, capability, abort)"],
+  "lanes": [
+    "Node Pyodide",
+    "real headless Chromium Pyodide (plain-text, capability, abort, stream-text, stream-abort)"
+  ],
   "features": {
-    "streaming": false,
+    "streaming": true,
     "interrupts": false,
     "resume": false,
     "checkpoints": false,
@@ -17,14 +20,19 @@
     "capability-denial",
     "argument-block",
     "step-budget",
-    "abort"
+    "abort",
+    "stream-text",
+    "stream-tools",
+    "stream-mid-block",
+    "stream-abort"
   ],
   "differences": [],
   "normalizations": [
     "Provider call IDs are runtime-generated on each side (ADK uses adk-<uuid>, galaxie uses galaxie-<n>), so request messages number them by first appearance.",
-    "Transcripts compare the requests the model saw, the scripted replies it returned, the capability calls, the run output and the run error. ADK events are not part of a transcript: the adapter exposes none before streaming ships.",
+    "Transcripts compare the requests the model saw, the scripted replies it returned, the capability calls, the run output and the run error. ADK events are not part of a transcript except the stream events a streaming case records: checked text deltas as `messages` and content-free tool markers as `updates`.",
     "The native lane implements the capability tool itself with the same declaration, so the lanes compare the model mapping and the run loop, not the tool body. The denial case pins the fixed model-visible error a denied capability returns.",
     "The native lane emulates the router's step budget (budget_exceeded before the third dispatch with a limit of two), the host output-safety block (denied) and cancellation, because it has no router; the lanes compare the observable outcome.",
+    "The native lane streams with ADK's SSE mode and a scripted model that yields word-sized partial responses (the router's mock splits the same way); the stream-mid-block case stops at the first chunk whose growing text holds the blocked marker, as the router's output check does, and stream-abort cancels after the first chunk.",
     "ADK ends a cancelled root node quietly; the native fixture records the cancellation itself, and the galaxie run reports cancelled through the adapter."
   ]
 }
