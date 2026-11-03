@@ -1,7 +1,8 @@
 # @galaxie/models
 
 LangChain chat providers for galaxie hosts: deterministic mocks, WebLLM worker
-inference, Chrome Built-in AI and call-scoped OpenAI-compatible clients.
+inference, ONNX models through Transformers.js, Chrome Built-in AI and call-scoped
+OpenAI-compatible clients.
 There is no root export; select a [package subpath](package.json).
 
 ## Install
@@ -41,6 +42,66 @@ credentials. All automated model tests use fakes; the real device demonstrations
 are recorded in the [M2 exit record](../../docs/m2-exit-record.md).
 Shared-model lifetime has [fake-engine and fake Prompt API conformance evidence](../../tests/conformance/shared-model-lifetime.test.ts)
 on Node and headless Chromium only. Real prefill abort latency remains unmeasured.
+
+## Transformers (ONNX models)
+
+`/transformers` runs an ONNX chat model through Transformers.js inside a host-owned
+Worker ([ADR-0021](../../docs/adr/0021-in-browser-onnx-chat-provider.md), Proposed).
+The library and the optional constraint package are optional peers: hosts that do
+not use the provider install nothing. `onnxruntime-web` arrives with the library;
+a host that imports its `?url` assets in its own Worker entry should list it as its
+own dependency. The package ships no
+model record; a maintainer pins one with `scripts/pin-onnx-model.ts`, which prints
+the license it reads at that revision. Library licenses as read in the installed package manifests:
+`@huggingface/transformers` and `@huggingface/transformers-structured-output`
+Apache-2.0, `onnxruntime-web` MIT. Each model has its own license, which the
+record's maintainer must read and record; Gemma terms differ from Apache-2.0.
+
+```ts
+// worker.ts: bundled by the host as a module worker
+import ortMjs from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url';
+import ortWasm from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url';
+import { startTransformersWorker } from '@galaxie/models/transformers/worker';
+
+startTransformersWorker({ ort: { mjs: ortMjs, wasm: ortWasm } });
+
+// page.ts: `record` is a pinned TransformersModelRecord; `worker` comes from your
+// Trusted Types worker policy.
+import {
+  checkTransformersModel,
+  loadTransformersEngine,
+  TransformersChatModel,
+  type TransformersChatEngine,
+} from '@galaxie/models/transformers';
+
+// `??=` keeps the first result: a rejected load stays rejected for this handle, so recovery
+// needs a new handle, as for WebLLM.
+let loading: ReturnType<typeof loadTransformersEngine> | undefined;
+const load = (allowDownload: boolean) =>
+  (loading ??= loadTransformersEngine({ worker, model: record, allowDownload }));
+const engine: TransformersChatEngine = {
+  modelId: record.modelId,
+  toolFormat: record.toolFormat,
+  async *stream(request, signal) {
+    yield* (await load(false)).stream(request, signal);
+  },
+};
+// models: { availability: () => checkTransformersModel({ model: record }),
+//           download: async () => { await load(true); return true; } }
+// services: { chatModels: { local: new TransformersChatModel(engine) } }
+```
+
+Register the provider with destination `in-browser`, zero pricing and the features
+its tests support: `streaming` and `cancellation`, plus `tool-calling` when the
+record has `toolFormat: 'hermes'` (verified through the ADK adapter's routed model only; the routed LangGraph model has no `bindTools`) and `structured-output` when the constraint
+package is installed. `availability` and `download` arrange consent before any file
+is fetched; a refusal fetches nothing. Files are checked against the record's size
+and SHA-256 before they are stored. The record names one device (`webgpu` or
+`wasm`) and the provider never falls back between them. Only the Worker needs the
+model host in `connect-src` and `'wasm-unsafe-eval'`; galaxie adds no directive.
+All tests use a fake runtime; there is no real-device run, so output quality, speed
+and memory are unmeasured ([unsupported list](../../docs/unsupported.md#models-and-providers),
+[device matrix](../../docs/device-matrix.md#untested-or-unmeasured)).
 
 ## User endpoints
 

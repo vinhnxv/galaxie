@@ -30,6 +30,10 @@ Additional tests in this directory run on both Node and Chromium unless their fi
 
 The credential fixture uses native `nostream` and projects replies away so its events/state contain no model text; this is not SDK stream redaction. Host-only `DiagnosticEvent.error` may hold raw host exceptions on other paths and must never be forwarded to traces or public surfaces. The scan covers these fixtures and build exports, not arbitrary host code or session exports. Page code receives credentials; XSS or a malicious same-origin dependency can read them. None of these tests uses real inference, weights, the real WebLLM bundle or a real `LanguageModel` global. Goldens, cases and the compatibility matrix are unchanged.
 
+## ONNX provider through the router
+
+[`transformers-provider.test.ts`](transformers-provider.test.ts) runs the ONNX provider on Node and headless Chromium with a fake runtime behind the real Worker host and an in-memory model store, so no model is downloaded and any network call fails the test. It covers consent for an uncached model (refusal fetches nothing), stored files with the wrong hash, output safety on a growing chunk, token reservations settled from actual usage, Worker failure without fallback, tool calls through an ADK agent (parsed blocks, malformed blocks failing `invalid`, block verdicts failing `denied`, the shared tool-call case table) and routed structured output with `repairAttempts`. It is evidence for the router contract and says nothing about real-model quality.
+
 ## MCP server profile
 
 [`mcp.test.ts`](mcp.test.ts) exercises the broker and the loopback

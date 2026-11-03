@@ -65,6 +65,19 @@ where the host supports them. The worked example shares one policy, allowing
 in default mode. Those permissions also permit same-origin code to reach these
 hosts; do not broaden them for unrelated integrations.
 
+ONNX models through Transformers.js follow the same shape with a pinned record:
+host-bundle a module worker that imports the ONNX Runtime WASM files as same-origin
+asset URLs and calls `startTransformersWorker({ ort })` from
+`@galaxie/models/transformers/worker`, create it through your Trusted Types worker
+policy, and pass it with a `TransformersModelRecord` to `loadTransformersEngine`
+after consent. Wire `checkTransformersModel` as the `availability` hook and have the
+`download` hook load the engine with downloads allowed. Every file is checked
+against the record's size and SHA-256 before it is stored, so a record is a
+maintainer artifact: pin it with `scripts/pin-onnx-model.ts`, and treat real-model
+quality as unmeasured. Only that Worker needs the model host in `connect-src` and
+`'wasm-unsafe-eval'` in `script-src`; no galaxie-owned directive or policy changes.
+See the [models README](../../packages/models/README.md#transformers-onnx-models).
+
 Built-in AI runs on the page. Probe with `checkBuiltInAI`, and call
 `prepareBuiltInAI` from an intentional download click. Calls require `available`
 and never start a download themselves. The browser manages the model identity
