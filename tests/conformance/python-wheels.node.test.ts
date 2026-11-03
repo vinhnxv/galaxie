@@ -65,7 +65,7 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     expect(wheel.frameworks?.length, wheel.name).toBeGreaterThan(0);
     expect(
       wheel.frameworks?.every((framework) =>
-        ['langgraph', 'pydantic-ai', 'dspy'].includes(framework),
+        ['langgraph', 'pydantic-ai', 'dspy', 'adk'].includes(framework),
       ),
     ).toBe(true);
   }
@@ -110,7 +110,8 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     false,
   );
   const native = await readFile(new URL('../../python/uv.lock', import.meta.url), 'utf8');
-  for (const wheel of [...pydantic, ...dspy]) {
+  const adk = inventory.filter((wheel) => wheel.frameworks?.includes('adk'));
+  for (const wheel of [...pydantic, ...dspy, ...adk]) {
     const block = native
       .split('[[package]]')
       .find((item) => item.startsWith(`\nname = "${wheel.name}"\n`));
@@ -119,4 +120,94 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     for (const match of uploadTimes)
       expect(Date.parse(match[1] ?? '')).toBeLessThan(Date.parse('2026-10-23T17:00:00Z'));
   }
+});
+
+test('the ADK wheel set is the pinned closure, with servers, SDKs and cloud clients kept out', async () => {
+  const adk = lockedWheels.filter((wheel) => wheel.frameworks?.includes('adk'));
+  expect(adk).toHaveLength(29);
+  expect(adk.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(12_622_878);
+  expect(
+    createHash('sha256')
+      .update(
+        adk
+          .map(
+            (wheel) =>
+              `${wheel.name} ${wheel.version} ${wheel.file} ${wheel.bytes} ${wheel.sha256} ${wheel.url}`,
+          )
+          .join('\n'),
+      )
+      .digest('hex'),
+  ).toBe('afbf242ab7af557c7cf973b4a76caff2f3225d0acbf60f7457799345752c3b98');
+  const only = lockedWheels.filter(
+    (wheel) => wheel.frameworks?.length === 1 && wheel.frameworks[0] === 'adk',
+  );
+  expect(only.map((wheel) => `${wheel.name} ${wheel.version} ${wheel.bytes}`)).toEqual([
+    'annotated-doc 0.0.5 5302',
+    'authlib 1.9.1 266042',
+    'cryptography 47.0.0 2174338',
+    'fastapi 0.161.1 149049',
+    'google-adk 2.12.0 4998446',
+    'google-auth 2.62.0 267911',
+    'google-genai 2.33.0 1222487',
+    'joserfc 1.7.7 71758',
+    'opentelemetry-semantic-conventions 0.66b1 206279',
+    'starlette 1.9.0 80335',
+  ]);
+  const forbidden = (name: string): boolean =>
+    [
+      'watchdog',
+      'uvicorn',
+      'grpcio',
+      'opentelemetry-sdk',
+      'mcp',
+      'click',
+      'aiosqlite',
+      'graphviz',
+      'python-dotenv',
+      'python-multipart',
+    ].includes(name) ||
+    name.startsWith('pyasn1') ||
+    name.startsWith('google-cloud-');
+  expect(lockedWheels.filter((wheel) => forbidden(wheel.name))).toEqual([]);
+});
+
+test('adding the ADK extra moved no earlier pin in either lock', async () => {
+  const native = await readFile(new URL('../../python/uv.lock', import.meta.url), 'utf8');
+  const versions = new Map(
+    [...native.matchAll(/\[\[package\]\]\nname = "([^"]+)"\nversion = "([^"]+)"/g)].map((match) => [
+      match[1],
+      match[2],
+    ]),
+  );
+  const pinned: Record<string, string> = {
+    pydantic: '2.12.5',
+    'pydantic-core': '2.41.5',
+    'opentelemetry-api': '1.45.1',
+    'opentelemetry-semantic-conventions': '0.66b1',
+    tenacity: '9.2.1',
+    websockets: '17.3',
+    cryptography: '47.0.0',
+    cffi: '2.0.0',
+    pycparser: '3.0',
+    'google-adk': '2.12.0',
+    'google-genai': '2.33.0',
+    langgraph: '1.2.16',
+    'langchain-core': '1.7.0',
+    dspy: '3.4.1',
+    'pydantic-ai-slim': '2.60.0',
+  };
+  for (const [name, version] of Object.entries(pinned))
+    expect(versions.get(name), name).toBe(version);
+  // The overrides and constraints that hold those pins stay declared in the project file.
+  const project = await readFile(new URL('../../python/pyproject.toml', import.meta.url), 'utf8');
+  for (const pin of [
+    'opentelemetry-api==1.45.1',
+    'opentelemetry-semantic-conventions==0.66b1',
+    'tenacity==9.2.1',
+    'websockets==17.3',
+    'cryptography==47.0.0',
+    'cffi==2.0.0',
+    'pycparser==3.0',
+  ])
+    expect(project, pin).toContain(`"${pin}"`);
 });

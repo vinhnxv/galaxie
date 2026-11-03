@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export type PythonFramework = 'langgraph' | 'pydantic-ai' | 'dspy';
+export type PythonFramework = 'langgraph' | 'pydantic-ai' | 'dspy' | 'adk';
 
 export interface LockedWheel {
   readonly name: string;
@@ -16,13 +16,22 @@ export interface LockedWheel {
 // Build-bound package inventory; the consistency test compares it with python/requirements.lock.
 export const lockedWheels: readonly LockedWheel[] = [
   {
+    name: 'annotated-doc',
+    version: '0.0.5',
+    url: 'https://files.pythonhosted.org/packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl',
+    file: 'annotated_doc-0.0.5-py3-none-any.whl',
+    bytes: 5302,
+    sha256: '117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101',
+    frameworks: ['adk'],
+  },
+  {
     name: 'annotated-types',
     version: '0.8.0',
     url: 'https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl',
     file: 'annotated_types-0.8.0-py3-none-any.whl',
     bytes: 13427,
     sha256: 'f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0',
-    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy', 'adk'],
   },
   {
     name: 'anyio',
@@ -31,7 +40,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'anyio-4.15.1-py3-none-any.whl',
     bytes: 132079,
     sha256: '6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101',
-    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy', 'adk'],
   },
   {
     name: 'attrs',
@@ -43,13 +52,22 @@ export const lockedWheels: readonly LockedWheel[] = [
     frameworks: ['dspy'],
   },
   {
+    name: 'authlib',
+    version: '1.9.1',
+    url: 'https://files.pythonhosted.org/packages/39/44/a46089266de32a0d809023b6bf31b80a1f26a46954446a7ce695a565cbea/authlib-1.9.1-py2.py3-none-any.whl',
+    file: 'authlib-1.9.1-py2.py3-none-any.whl',
+    bytes: 266042,
+    sha256: '8b9be8b1e5174dcbf5520e984f1a22dc2edae5b6e40a61d4cedbf86b97e9e69b',
+    frameworks: ['adk'],
+  },
+  {
     name: 'certifi',
     version: '2026.10.23',
     url: 'https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl',
     file: 'certifi-2026.10.23-py3-none-any.whl',
     bytes: 135082,
     sha256: 'e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1',
-    frameworks: ['langgraph', 'dspy'],
+    frameworks: ['langgraph', 'dspy', 'adk'],
   },
   {
     name: 'cffi',
@@ -58,7 +76,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'cffi-2.0.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
     bytes: 148947,
     sha256: '9ae1a61096321cef7248e02293f42d000fa87b73a3e795705a2444290590459d',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'adk'],
   },
   {
     name: 'charset-normalizer',
@@ -67,7 +85,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'charset_normalizer-3.5.2-py3-none-any.whl',
     bytes: 68872,
     sha256: 'b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685',
-    frameworks: ['langgraph', 'dspy'],
+    frameworks: ['langgraph', 'dspy', 'adk'],
   },
   {
     name: 'cloudpickle',
@@ -77,6 +95,15 @@ export const lockedWheels: readonly LockedWheel[] = [
     bytes: 22228,
     sha256: '9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a',
     frameworks: ['dspy'],
+  },
+  {
+    name: 'cryptography',
+    version: '47.0.0',
+    url: 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/cryptography-47.0.0-cp314-abi3-pyemscripten_2026_0_wasm32.whl',
+    file: 'cryptography-47.0.0-cp314-abi3-pyemscripten_2026_0_wasm32.whl',
+    bytes: 2174338,
+    sha256: '0b41491ced2cf85046559cac2502e875492cbef6d332addafa680e41be27f0ad',
+    frameworks: ['adk'],
   },
   {
     name: 'distro',
@@ -97,6 +124,15 @@ export const lockedWheels: readonly LockedWheel[] = [
     frameworks: ['dspy'],
   },
   {
+    name: 'fastapi',
+    version: '0.161.1',
+    url: 'https://files.pythonhosted.org/packages/45/2a/101012d82931d9de3855384e1667e49c0e07a0048e3868f9fec1697293a9/fastapi-0.161.1-py3-none-any.whl',
+    file: 'fastapi-0.161.1-py3-none-any.whl',
+    bytes: 149049,
+    sha256: 'a1363080cf9aeedecd99f4e1a23669d7e77542227f6536f4d7bbd59f07ecaa94',
+    frameworks: ['adk'],
+  },
+  {
     name: 'genai-prices',
     version: '0.1.13',
     url: 'https://files.pythonhosted.org/packages/41/5a/b6b7d55148d367d07bcd3efdf24e3086ad199ea5109d0c335a872dfaac95/genai_prices-0.1.13-py3-none-any.whl',
@@ -104,6 +140,33 @@ export const lockedWheels: readonly LockedWheel[] = [
     bytes: 142541,
     sha256: '6d2b40760a2f7f5e207bac9b98de0af80e60c58ead497872a5331a7cee610477',
     frameworks: ['pydantic-ai'],
+  },
+  {
+    name: 'google-adk',
+    version: '2.12.0',
+    url: 'https://files.pythonhosted.org/packages/d3/65/3706e52bac2f8ac1328caa7da28dfff8a9086fce5004619960f91c7f7bb4/google_adk-2.12.0-py3-none-any.whl',
+    file: 'google_adk-2.12.0-py3-none-any.whl',
+    bytes: 4998446,
+    sha256: '79f89ea94ccd87e4ac8c893e81c44ed2ce5568d05406a95c1d10bcef0ce0ff5d',
+    frameworks: ['adk'],
+  },
+  {
+    name: 'google-auth',
+    version: '2.62.0',
+    url: 'https://files.pythonhosted.org/packages/eb/a3/87fe9b7203ec2e56ea6a57c75e6d632eaf9487c7f7978cdad1d801bee0af/google_auth-2.62.0-py3-none-any.whl',
+    file: 'google_auth-2.62.0-py3-none-any.whl',
+    bytes: 267911,
+    sha256: '4ff4319aeb4ad128409759d397a9fcafad126d0031d241cc0dd6b9a00b43e3f3',
+    frameworks: ['adk'],
+  },
+  {
+    name: 'google-genai',
+    version: '2.33.0',
+    url: 'https://files.pythonhosted.org/packages/ba/3b/9ae8e16c5b2177bfdec1c64769a93eea9093de684e0bbb95c10c77645fef/google_genai-2.33.0-py3-none-any.whl',
+    file: 'google_genai-2.33.0-py3-none-any.whl',
+    bytes: 1222487,
+    sha256: 'f3f8ab696b35caf95c222e05268740c1ccd6934257890506be73b126150d3b14',
+    frameworks: ['adk'],
   },
   {
     name: 'griffelib',
@@ -121,7 +184,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'httpx-0.28.1-py3-none-any.whl',
     bytes: 77457,
     sha256: '830cb1ec73bb4c46f2e38ebeb3dd50ffb45f62b804dd040519d34fe36f8fdfc7',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'adk'],
   },
   {
     name: 'httpx2',
@@ -148,7 +211,16 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'idna-3.20-py3-none-any.whl',
     bytes: 69583,
     sha256: 'ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c',
-    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy', 'adk'],
+  },
+  {
+    name: 'joserfc',
+    version: '1.7.7',
+    url: 'https://files.pythonhosted.org/packages/df/9f/934db284aa22f37af59708e382903860d4b81329c137b1b0ed2745daeb65/joserfc-1.7.7-py3-none-any.whl',
+    file: 'joserfc-1.7.7-py3-none-any.whl',
+    bytes: 71758,
+    sha256: '06979cfbab78bc802f14c0358f32969826cc26720e13cb38926ffdc86bc0cb2c',
+    frameworks: ['adk'],
   },
   {
     name: 'json-repair',
@@ -283,7 +355,16 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'opentelemetry_api-1.45.1-py3-none-any.whl',
     bytes: 60256,
     sha256: 'b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb',
-    frameworks: ['pydantic-ai'],
+    frameworks: ['pydantic-ai', 'adk'],
+  },
+  {
+    name: 'opentelemetry-semantic-conventions',
+    version: '0.66b1',
+    url: 'https://files.pythonhosted.org/packages/bc/14/67f8aa798857f8cf686f515bf93d9bb877ce952ddc8efae0fa25b45ce0d6/opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl',
+    file: 'opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl',
+    bytes: 206279,
+    sha256: 'd4cddeb4315490b35213f55e2bdc9ac54bb1e4d318927475bed62b35545e581b',
+    frameworks: ['adk'],
   },
   {
     name: 'orjson',
@@ -301,7 +382,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'packaging-26.3-py3-none-any.whl',
     bytes: 129956,
     sha256: 'd7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'adk'],
   },
   {
     name: 'pycparser',
@@ -310,7 +391,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'pycparser-3.0-py3-none-any.whl',
     bytes: 48172,
     sha256: '0b4cbc12c42e25df55343342fb0da45b189181e4f360602f9721db2016fc3a4b',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'adk'],
   },
   {
     name: 'pydantic',
@@ -319,7 +400,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'pydantic-2.12.5-py3-none-any.whl',
     bytes: 463578,
     sha256: '04854875001e07a8a74d87b7c80296cba168773d8c9804e232d695f82484d7d7',
-    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy', 'adk'],
   },
   {
     name: 'pydantic-ai-slim',
@@ -337,7 +418,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'pydantic_core-2.41.5-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
     bytes: 1310164,
     sha256: '54703fa42a0d4d574283cfb8f08050ba7820c9a42b0a21bc1286407d9a9e54da',
-    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy', 'adk'],
   },
   {
     name: 'pydantic-graph',
@@ -382,7 +463,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'requests-2.34.2-py3-none-any.whl',
     bytes: 73075,
     sha256: '2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0',
-    frameworks: ['langgraph', 'dspy'],
+    frameworks: ['langgraph', 'dspy', 'adk'],
   },
   {
     name: 'requests-toolbelt',
@@ -409,7 +490,16 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'sniffio-1.3.1-py3-none-any.whl',
     bytes: 9560,
     sha256: '1e0f350ca8eac5252c1af9a8d93a7edd70056c1eddf5661f6950688094d1f670',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'adk'],
+  },
+  {
+    name: 'starlette',
+    version: '1.9.0',
+    url: 'https://files.pythonhosted.org/packages/f3/93/181df62699d9b5aca1d87e5cfda131dac87e3cdaebf668662f7206ca3470/starlette-1.9.0-py3-none-any.whl',
+    file: 'starlette-1.9.0-py3-none-any.whl',
+    bytes: 80335,
+    sha256: 'fd3f159936e882d06c1108f84688f7cda2cf85fc6a592a50edbd175e882c2ddc',
+    frameworks: ['adk'],
   },
   {
     name: 'tenacity',
@@ -418,7 +508,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'tenacity-9.2.1-py3-none-any.whl',
     bytes: 32310,
     sha256: '9e56f17539296baab7beabb08b92f6ee3d7be92d8be72d763360677c2ad6580e',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'adk'],
   },
   {
     name: 'tqdm',
@@ -436,7 +526,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'typing_extensions-4.16.0-py3-none-any.whl',
     bytes: 45571,
     sha256: '481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8',
-    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy', 'adk'],
   },
   {
     name: 'typing-inspection',
@@ -445,7 +535,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'typing_inspection-0.4.4-py3-none-any.whl',
     bytes: 14750,
     sha256: '65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147',
-    frameworks: ['langgraph', 'pydantic-ai', 'dspy'],
+    frameworks: ['langgraph', 'pydantic-ai', 'dspy', 'adk'],
   },
   {
     name: 'urllib3',
@@ -454,7 +544,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'urllib3-2.8.0-py3-none-any.whl',
     bytes: 135717,
     sha256: '0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3',
-    frameworks: ['langgraph', 'dspy'],
+    frameworks: ['langgraph', 'dspy', 'adk'],
   },
   {
     name: 'uuid-utils',
@@ -472,7 +562,7 @@ export const lockedWheels: readonly LockedWheel[] = [
     file: 'websockets-17.3-py3-none-any.whl',
     bytes: 212375,
     sha256: 'dc2b495a92b3971966bf102e73589f950db3ec1ca6713265355ce7771d97b199',
-    frameworks: ['langgraph'],
+    frameworks: ['langgraph', 'adk'],
   },
   {
     name: 'xxhash',

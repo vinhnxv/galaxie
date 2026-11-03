@@ -290,20 +290,25 @@ export function createPyodideAdapter(
 ): ExecutorAdapter<PyodideAgent, PyodideServices> {
   const framework = options?.framework ?? 'langgraph';
   const executorId =
-    framework === 'dspy'
-      ? 'dspy-python'
-      : framework === 'pydantic-ai'
-        ? 'pydantic-ai-python'
-        : 'langgraph-python';
+    framework === 'adk'
+      ? 'adk-python'
+      : framework === 'dspy'
+        ? 'dspy-python'
+        : framework === 'pydantic-ai'
+          ? 'pydantic-ai-python'
+          : 'langgraph-python';
   const langgraph = framework === 'langgraph';
+  // The ADK executor is registered without behavior until its stages ship; every feature stays
+  // false and each flips only with its own evidence (ADR-0022).
+  const supported = framework !== 'adk';
   return {
     id: executorId,
     version: '0.0.0',
     features: {
-      interrupts: true,
-      resume: true,
-      checkpoints: true,
-      streaming: true,
+      interrupts: supported,
+      resume: supported,
+      checkpoints: supported,
+      streaming: supported,
       subgraphs: langgraph,
     },
     async prepare(agent, services, preparation) {
@@ -314,7 +319,7 @@ export function createPyodideAdapter(
         typeof options?.createWorker !== 'function' ||
         typeof options.runtimeUrl !== 'string' ||
         !Array.isArray(options.localWheels) ||
-        !['langgraph', 'pydantic-ai', 'dspy'].includes(framework)
+        !['langgraph', 'pydantic-ai', 'dspy', 'adk'].includes(framework)
       )
         throw adapterFailure('invalid');
       const base = sourceBase(agent, options);

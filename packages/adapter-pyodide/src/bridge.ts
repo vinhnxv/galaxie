@@ -180,7 +180,10 @@ function wheel(value: unknown): boolean {
         new Set(value['frameworks']).size === value['frameworks'].length &&
         value['frameworks'].every(
           (framework: unknown) =>
-            framework === 'langgraph' || framework === 'pydantic-ai' || framework === 'dspy',
+            framework === 'langgraph' ||
+            framework === 'pydantic-ai' ||
+            framework === 'dspy' ||
+            framework === 'adk',
         ))) &&
     text(value['name']) &&
     text(value['version']) &&
@@ -285,7 +288,8 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
         (value['framework'] === undefined ||
           value['framework'] === 'langgraph' ||
           value['framework'] === 'pydantic-ai' ||
-          value['framework'] === 'dspy') &&
+          value['framework'] === 'dspy' ||
+          value['framework'] === 'adk') &&
         (value['checkpoints'] === undefined || typeof value['checkpoints'] === 'boolean') &&
         text(value['runtimeUrl']) &&
         text(value['wheelsUrl']) &&

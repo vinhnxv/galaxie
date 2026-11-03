@@ -38,7 +38,7 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
         }
       ).packages
     : [];
-  const frameworks: readonly PythonFramework[] = ['langgraph', 'pydantic-ai', 'dspy'];
+  const frameworks: readonly PythonFramework[] = ['langgraph', 'pydantic-ai', 'dspy', 'adk'];
   const assets: { file: string; bytes: Uint8Array; frameworks: readonly PythonFramework[] }[] = [];
   const add = (file: string, path: string, selected = frameworks): void => {
     assets.push({ file, bytes: readFileSync(path), frameworks: selected });
@@ -96,7 +96,7 @@ export function pythonAssets(cacheDirectory: string = defaultCache): Plugin {
     },
     load(id) {
       return id === '\0rag-python'
-        ? `export const pythonBuild = ${JSON.stringify({ available: included, bytes: included ? bytes : { langgraph: 0, 'pydantic-ai': 0, dspy: 0 }, localWheels: included ? local : [] })};`
+        ? `export const pythonBuild = ${JSON.stringify({ available: included, bytes: included ? bytes : { langgraph: 0, 'pydantic-ai': 0, dspy: 0, adk: 0 }, localWheels: included ? local : [] })};`
         : undefined;
     },
     generateBundle() {

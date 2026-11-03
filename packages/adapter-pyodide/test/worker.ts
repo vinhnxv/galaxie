@@ -6,7 +6,11 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { loadPyodide } from 'pyodide';
 import type { LockedWheel } from '../src/runtime-files.js';
 
-const { source, wheels } = workerData as { source: string; wheels: readonly LockedWheel[] };
+const { source, wheels, absent } = workerData as {
+  source: string;
+  wheels: readonly LockedWheel[];
+  absent?: readonly string[];
+};
 let fetches = 0;
 globalThis.fetch = async (): Promise<Response> => {
   fetches++;
@@ -47,6 +51,6 @@ await py.loadPackage(
   { checkIntegrity: true, messageCallback: () => {}, errorCallback: () => {} },
 );
 const result = await py.runPythonAsync(
-  `import importlib.util\nassert importlib.util.find_spec('openai') is None\nassert importlib.util.find_spec('litellm') is None\n${source}\njson.dumps(await run_gate())`,
+  `import importlib.util\nfor _name in ${JSON.stringify(absent ?? ['openai', 'litellm'])}:\n    assert importlib.util.find_spec(_name) is None\n${source}\njson.dumps(await run_gate())`,
 );
 parentPort?.postMessage({ gate: JSON.parse(result as string), fetches });
