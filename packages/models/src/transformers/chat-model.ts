@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
-import type { StructuredOutputMethodOptions } from '@langchain/core/language_models/base';
+import type {
+  BaseLanguageModelInput,
+  StructuredOutputMethodOptions,
+} from '@langchain/core/language_models/base';
 import {
   BaseChatModel,
   type BaseChatModelCallOptions,
@@ -19,10 +22,11 @@ import {
   type UsageMetadata,
 } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
+import type { Runnable } from '@langchain/core/runnables';
 import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
 import { ModelError } from '../errors.js';
 import { mapMessages } from '../messages.js';
-import type { OutputSchema } from '../structured-output.js';
+import { type OutputSchema, structuredOutput } from '../structured-output.js';
 import type { TransformersStreamEvent } from './engine.js';
 import { mapToolMessages } from './messages.js';
 import type { GenerateRequest, JsonObject } from './protocol.js';
@@ -42,7 +46,7 @@ export interface TransformersChatEngine {
 export interface TransformersCallOptions extends BaseChatModelCallOptions {
   readonly maxTokens?: number;
   readonly temperature?: number;
-  /** Not supported yet: a call that sets it fails `unsupported`. */
+  /** Constrains the reply to this JSON Schema; set by `withStructuredOutput`. */
   readonly jsonSchema?: Readonly<Record<string, unknown>>;
 }
 
@@ -140,12 +144,15 @@ export class TransformersChatModel extends BaseChatModel<TransformersCallOptions
     options: this['ParsedCallOptions'],
   ): AsyncGenerator<ModelEvent> {
     // Only whitelisted options reach the Worker, so unrelated call options never cross.
-    if (options.jsonSchema !== undefined) throw new ModelError('unsupported');
     const tools = toolsEnabled(options.tool_choice) ? this.#tools : undefined;
+    // A schema constrains the whole reply, so it cannot share a request with tool markup.
+    if (options.jsonSchema !== undefined && tools !== undefined)
+      throw new ModelError('unsupported');
     const request: GenerateRequest = {
       messages:
         this.#handle.toolFormat === undefined ? mapMessages(messages) : mapToolMessages(messages),
       ...(tools === undefined ? {} : { tools }),
+      ...(options.jsonSchema === undefined ? {} : { jsonSchema: options.jsonSchema as JsonObject }),
       maxTokens: options.maxTokens ?? this.#maxTokens,
       temperature: options.temperature ?? this.#temperature,
     };
@@ -294,10 +301,26 @@ export class TransformersChatModel extends BaseChatModel<TransformersCallOptions
     });
   }
 
-  /** Structured output needs constrained decoding, which this provider does not offer yet. */
   override withStructuredOutput<
     RunOutput extends Record<string, unknown> = Record<string, unknown>,
-  >(_schema: OutputSchema<RunOutput>, _config?: StructuredOutputMethodOptions<boolean>): never {
-    throw new ModelError('unsupported');
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<false>,
+  ): Runnable<BaseLanguageModelInput, RunOutput>;
+  override withStructuredOutput<
+    RunOutput extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<true>,
+  ): Runnable<BaseLanguageModelInput, { raw: BaseMessage; parsed: RunOutput }>;
+  override withStructuredOutput<
+    RunOutput extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    schema: OutputSchema<RunOutput>,
+    config?: StructuredOutputMethodOptions<boolean>,
+  ):
+    | Runnable<BaseLanguageModelInput, RunOutput>
+    | Runnable<BaseLanguageModelInput, { raw: BaseMessage; parsed: RunOutput }> {
+    return structuredOutput(this, schema, config);
   }
 }

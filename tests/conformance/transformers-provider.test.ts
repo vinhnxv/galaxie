@@ -8,6 +8,7 @@ import {
   type DiagnosticEvent,
   defineAgentDefinition,
   type ExecutorAdapter,
+  type ModelFeature,
   type ModelRouting,
   type OutputSafetyHook,
   type RunEvent,
@@ -23,6 +24,7 @@ import {
 } from '@galaxie/models/transformers';
 import { LlmAgent } from '@google/adk';
 import { HumanMessage } from '@langchain/core/messages';
+import { toJsonSchema } from '@langchain/core/utils/json_schema';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { z } from 'zod';
@@ -686,4 +688,105 @@ test.each([
   } finally {
     await (await host.handle(false)).dispose();
   }
+});
+
+const structuredSchema = z.object({ answer: z.literal('yes') });
+
+async function runStructured(
+  host: Host,
+  options: { features?: readonly ModelFeature[]; repairAttempts?: number } = {},
+) {
+  const { runtime, provider, diagnostics } = createTestRuntime();
+  try {
+    const instance = await runtime.create(definition, {
+      principalScope: 'transformers-test',
+      services: { chatModels: { local: new TransformersChatModel(host.engine) } },
+      models: {
+        providers: {
+          local: {
+            destination: 'in-browser',
+            modality: 'text',
+            features: options.features ?? ['streaming', 'cancellation', 'structured-output'],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+          },
+        },
+        roles: {
+          assistant: {
+            providers: ['local'],
+            allow: ['in-browser'],
+            maxTokens: 100,
+            ...(options.repairAttempts === undefined
+              ? {}
+              : { repairAttempts: options.repairAttempts }),
+          },
+        },
+        ...host.routing,
+      },
+      agent: (graphHost) =>
+        new StateGraph(Annotation.Root({ answer: Annotation<string> }))
+          .addNode('respond', async (_state, config) => {
+            const parsed = await graphHost.langchain
+              .chatModel('assistant')
+              .withStructuredOutput(structuredSchema)
+              .invoke([new HumanMessage(promptCanary)], config);
+            return { answer: parsed.answer };
+          })
+          .addEdge(START, 'respond')
+          .addEdge('respond', END)
+          .compile(),
+    });
+    await instance.prepare();
+    const { runId } = await instance.start({});
+    const events = await collect(instance.events(runId));
+    await provider.forceFlush();
+    return { events, snapshot: instance.getSnapshot(), diagnostics };
+  } finally {
+    await runtime.dispose();
+    await provider.shutdown();
+  }
+}
+
+test('routed structured output sends the schema to the runtime and returns the parsed object', async () => {
+  const host = await createHost({ pieces: ['{"answer":', '"yes"}'] }, { cached: true });
+  const result = await runStructured(host);
+  expect(result.events.at(-1)).toMatchObject({ type: 'output', output: { answer: 'yes' } });
+  expect(host.parts.runtime.generations).toHaveLength(1);
+  expect(host.parts.runtime.generations[0]?.request.jsonSchema).toEqual(
+    toJsonSchema(structuredSchema),
+  );
+  expect(JSON.stringify(result.snapshot)).not.toContain(promptCanary);
+});
+
+test('a reply that breaks the schema fails invalid with the fixed message and no reply text', async () => {
+  const host = await createHost(
+    { pieces: ['{"answer":"private reply canary"}'] },
+    { cached: true },
+  );
+  const result = await runStructured(host);
+  expect(result.events.at(-1)).toMatchObject({ type: 'error', error: { code: 'invalid' } });
+  // Raw stream events carry the reply by design; the failure, snapshot and diagnostics do not.
+  expect(JSON.stringify([result.events.at(-1), result.snapshot, result.diagnostics])).not.toContain(
+    'private reply canary',
+  );
+  expect(host.parts.runtime.generations).toHaveLength(1);
+});
+
+test('with repairAttempts set a broken reply is repaired through an ordinary second call', async () => {
+  const host = await createHost(
+    { scripts: [['{"answer":"no"}'], ['{"answer":"yes"}']] },
+    { cached: true },
+  );
+  const result = await runStructured(host, { repairAttempts: 1 });
+  expect(result.events.at(-1)).toMatchObject({ type: 'output', output: { answer: 'yes' } });
+  expect(host.parts.runtime.generations).toHaveLength(2);
+  expect(host.parts.runtime.generations.every((g) => g.request.jsonSchema !== undefined)).toBe(
+    true,
+  );
+});
+
+test('a descriptor without structured-output is not selected: the call fails unavailable before dispatch', async () => {
+  const host = await createHost({ pieces: ['{"answer":"yes"}'] }, { cached: true });
+  const result = await runStructured(host, { features: ['streaming', 'cancellation'] });
+  expect(result.snapshot.run).toMatchObject({ status: 'failed', error: { code: 'unavailable' } });
+  expect(host.parts.runtime.generations).toEqual([]);
 });

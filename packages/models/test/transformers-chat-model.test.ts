@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+import { toJsonSchema } from '@langchain/core/utils/json_schema';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { ModelProviderError } from '../src/errors.js';
 import { TransformersChatModel } from '../src/transformers/chat-model.js';
 import { createTransformersEngine } from '../src/transformers/engine.js';
 import type { FakeRuntimeOptions } from './support/fake-transformers-runtime.js';
@@ -167,16 +169,57 @@ describe('Transformers chat model', () => {
     }
   });
 
-  it('fails unsupported for a JSON schema call option and for structured output', async () => {
+  it('sends a schema call option to the runtime and returns the parsed object', async () => {
+    const answer = z.object({ answer: z.string() });
+    const { runtime, handle, model } = await fixture({ pieces: ['{"answer":', '"yes"}'] });
+    try {
+      const parsed = await model.withStructuredOutput(answer).invoke('hello');
+      expect(parsed).toEqual({ answer: 'yes' });
+      expect(runtime.generations[0]?.request.jsonSchema).toEqual(toJsonSchema(answer));
+      const raw = await model.withStructuredOutput(answer, { includeRaw: true }).invoke('hello');
+      expect(raw.parsed).toEqual({ answer: 'yes' });
+      expect(raw.raw.content).toBe('{"answer":"yes"}');
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  it('fails with the fixed provider error, without the reply text, when the reply does not match', async () => {
+    const { handle, model } = await fixture({ pieces: ['{"answer":"private canary"'] });
+    try {
+      const failure: unknown = await model
+        .withStructuredOutput(z.object({ answer: z.string() }))
+        .invoke('hello')
+        .catch((error: unknown) => error);
+      // The router maps this fixed error to `invalid` (conformance); the model adds no reply text.
+      expect(failure).toBeInstanceOf(ModelProviderError);
+      expect(String((failure as Error).message)).not.toContain('canary');
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  it.each([
+    ['a non-object schema', 'text'],
+    ['an array schema', ['x']],
+  ])('fails invalid before any dispatch for %s', async (_label, schema) => {
     const { runtime, handle, model } = await fixture();
     try {
-      await expect(model.invoke('hello', { jsonSchema: { type: 'object' } })).rejects.toMatchObject(
-        { code: 'unsupported' },
-      );
-      expect(() => model.withStructuredOutput(z.object({ answer: z.string() }))).toThrow(
-        expect.objectContaining({ code: 'unsupported' }),
-      );
+      await expect(
+        model.invoke('hello', { jsonSchema: schema as unknown as Record<string, unknown> }),
+      ).rejects.toMatchObject({ code: 'invalid' });
       expect(runtime.generations).toEqual([]);
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  it('rejects another structured-output method as unsupported', async () => {
+    const { handle, model } = await fixture();
+    try {
+      expect(() =>
+        model.withStructuredOutput(z.object({ a: z.string() }), { method: 'functionCalling' }),
+      ).toThrow(expect.objectContaining({ code: 'unsupported' }));
     } finally {
       await handle.dispose();
     }

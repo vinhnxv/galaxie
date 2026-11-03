@@ -269,19 +269,22 @@ if (
   JSON.stringify(Object.keys(models.peerDependencies ?? {}).sort()) !==
     JSON.stringify([
       '@huggingface/transformers',
+      '@huggingface/transformers-structured-output',
       '@langchain/core',
       '@langchain/openai',
       '@mlc-ai/web-llm',
     ]) ||
   models.peerDependencies?.['@huggingface/transformers'] !== '4.3.1' ||
   models.peerDependenciesMeta?.['@huggingface/transformers']?.optional !== true ||
+  models.peerDependencies?.['@huggingface/transformers-structured-output'] !== '4.3.1' ||
+  models.peerDependenciesMeta?.['@huggingface/transformers-structured-output']?.optional !== true ||
   models.peerDependencies?.['@langchain/openai'] !== '1.6.3' ||
   models.peerDependenciesMeta?.['@langchain/openai']?.optional !== true ||
   models.peerDependencies?.['@mlc-ai/web-llm'] !== '0.2.86' ||
   models.peerDependenciesMeta?.['@mlc-ai/web-llm']?.optional !== true
 )
   problems.push(
-    'packages/models/package.json: models peers must be @langchain/core, optional @huggingface/transformers 4.3.1, optional @langchain/openai 1.6.3 and optional @mlc-ai/web-llm 0.2.86',
+    'packages/models/package.json: models peers must be @langchain/core, optional @huggingface/transformers 4.3.1, optional @huggingface/transformers-structured-output 4.3.1, optional @langchain/openai 1.6.3 and optional @mlc-ai/web-llm 0.2.86',
   );
 for (const field of [
   'dependencies',
@@ -300,7 +303,8 @@ for (const file of files('packages/models/src', /\.[cm]?tsx?$/)) {
       specifier.startsWith('../') ||
       specifier.startsWith('@langchain/core/') ||
       (specifier === '@langchain/openai' && file.startsWith('packages/models/src/openai/')) ||
-      (specifier === '@huggingface/transformers' &&
+      ((specifier === '@huggingface/transformers' ||
+        specifier === '@huggingface/transformers-structured-output') &&
         !hasTypes &&
         dynamic &&
         file === 'packages/models/src/transformers/runtime.ts') ||
