@@ -18,6 +18,7 @@ test('importing the Transformers.js entries loads no model library', async () =>
   const worker = await import('../src/transformers/worker.js');
   expect(Object.keys(page).sort()).toEqual([
     'ModelError',
+    'TransformersChatModel',
     'checkTransformersModel',
     'loadTransformersEngine',
   ]);

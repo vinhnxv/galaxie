@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { ModelError } from '../../src/errors.js';
 import type {
   LoadedRuntime,
   RuntimeGenerateOptions,
@@ -20,6 +21,8 @@ export interface FakeRuntimeOptions {
   /** The generation rejects with this error before emitting. */
   readonly generateError?: unknown;
   readonly backend?: 'webgpu' | 'wasm';
+  /** Prompt length the fake reports; with `maxTokens` it is checked against the context window. */
+  readonly promptTokens?: number;
 }
 
 export interface FakeRuntime extends TransformersRuntime {
@@ -56,6 +59,9 @@ export function createFakeRuntime(options: FakeRuntimeOptions = {}): FakeRuntime
         async generate(generation): Promise<RuntimeGenerateResult> {
           runtime.generations.push(generation);
           if (options.generateError !== undefined) throw options.generateError;
+          const promptTokens = options.promptTokens ?? 5;
+          if (promptTokens + generation.request.maxTokens > generation.contextWindow)
+            throw new ModelError('invalid');
           const first = runtime.generations.length === 1;
           let emitted = 0;
           for (const piece of pieces) {
@@ -72,7 +78,7 @@ export function createFakeRuntime(options: FakeRuntimeOptions = {}): FakeRuntime
             await Promise.resolve();
           }
           return {
-            promptTokens: 5,
+            promptTokens,
             completionTokens: emitted,
             finishReason: generation.signal.aborted ? 'abort' : 'stop',
           };
