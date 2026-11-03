@@ -33,3 +33,12 @@ Do not import another executor adapter, LangGraph, Pyodide or `@google/adk`. Do 
 
 Stage AG1 boots and verifies the Worker only. The stubs guard against accidental network use; Go code
 is trusted and can reach anything `syscall/js` reaches, so they are not an isolation boundary.
+
+## Tests
+
+Run `pnpm exec vitest run packages/adapter-go tests/conformance/check-dependencies.node.test.ts
+examples/rag-browser/test/go-gate.node.test.ts` and `pnpm run test:go`. `test/loader.node.test.ts`
+covers the verify-before-compile order, the egress stubs and the exit handshake;
+`test/adapter.node.test.ts` covers validation, Worker lifetime and the unsupported run. The gate test
+needs Go and builds the gate module itself. Run `pnpm check` before reporting the integrated change
+as finished.

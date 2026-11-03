@@ -25,11 +25,22 @@ export interface GoLoaderEnvironment {
   readonly scope: Record<string, unknown>;
 }
 
+/** How long each loading phase took, in milliseconds. */
+export interface GoLoadTimings {
+  /** Fetching the bytes and checking their length and digest. */
+  readonly fetchMs: number;
+  /** Compiling and instantiating the module. */
+  readonly compileMs: number;
+  /** Starting the Go runtime until the program reports ready. */
+  readonly startMs: number;
+}
+
 export interface LoadedGo {
   /** Resolves with the exit code when the Go program ends; the Worker is then dead. */
   readonly exited: Promise<number>;
   /** How many times Go code reached a blocked network surface. */
   readonly egressAttempts: () => number;
+  readonly timings: GoLoadTimings;
 }
 
 /** Names the loader replaces before Go code runs, so ordinary Go networking fails closed. */
@@ -84,6 +95,7 @@ export async function loadGoWasm(
   reference: GoWasmReference,
   environment: GoLoaderEnvironment,
 ): Promise<LoadedGo> {
+  const started = performance.now();
   let bytes: Uint8Array<ArrayBuffer>;
   try {
     const response = await environment.fetch(reference.url, {
@@ -97,6 +109,7 @@ export async function loadGoWasm(
   } catch {
     throw adapterFailure('unavailable');
   }
+  const fetched = performance.now();
   let attempts = 0;
   installEgressStubs(environment.scope, () => {
     attempts++;
@@ -112,6 +125,7 @@ export async function loadGoWasm(
     Reflect.set(environment.scope, 'galaxieReady', (): void => ready.resolve());
     const module = await environment.compile(bytes);
     const instance = await environment.instantiate(module, go.importObject);
+    const compiled = performance.now();
     const exited = go.run(instance).then(
       () => code,
       () => -1,
@@ -122,7 +136,16 @@ export async function loadGoWasm(
     });
     early.catch(() => undefined);
     await Promise.race([ready.promise, early]);
-    return { exited, egressAttempts: () => attempts };
+    const readyAt = performance.now();
+    return {
+      exited,
+      egressAttempts: () => attempts,
+      timings: {
+        fetchMs: Math.round(fetched - started),
+        compileMs: Math.round(compiled - fetched),
+        startMs: Math.round(readyAt - compiled),
+      },
+    };
   } catch {
     throw adapterFailure('unavailable');
   }

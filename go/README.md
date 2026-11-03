@@ -6,7 +6,7 @@ This directory holds the Go sources of galaxie's Google ADK (Go) executor ([ADR-
 | --- | --- |
 | `go.mod`, `go.sum` | The module graph: `google.golang.org/adk` v1.9.0, `google.golang.org/genai` v1.57.0, toolchain `go1.27.3`. |
 | `wasm.lock` | The supply-chain record: toolchain, build flags, every module in the wasm build with its license and checksum database record, the cutoff and the digest of `wasm_exec.js`. |
-| `gate/` | The first-run gate: a scripted ADK run that the native test, the Node test and the headless Chromium test all execute. It is a standalone program, not the galaxie package. |
+| `gate/` | The first-run gate: fourteen scripted ADK scenarios (`scenarios.go`) that the native test, the Node test and the headless Chromium test all execute, plus the wasm entry that bridges to JavaScript. `expected.json` is the native record (`go run ./gate`); the other lanes must reproduce it. It is a standalone program, not the galaxie package. |
 
 ## Commands
 
