@@ -5,6 +5,7 @@ import { ModelError } from '../errors.js';
 import {
   localModelKey,
   modelFileUrl,
+  parseModelRecord,
   type TransformersModelFile,
   type TransformersModelRecord,
   totalBytes,
@@ -114,15 +115,26 @@ async function readStored(
   file: TransformersModelFile,
   signal: AbortSignal | undefined,
 ): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  let stored: Response | undefined;
+  try {
+    stored = await store.match(url);
+  } catch (error) {
+    // A failing store is not evidence that the entry is bad, so it is left alone.
+    if (signal?.aborted === true) throw error;
+    throw new ModelError('unavailable', 'load_failed');
+  }
+  if (stored === undefined) return undefined;
+  if (stored.body === null || !isStoredFile(stored, file)) {
+    void stored.body?.cancel().catch(() => undefined);
+    return undefined;
+  }
   let bytes: Uint8Array<ArrayBuffer>;
   try {
-    const stored = await store.match(url);
-    if (stored === undefined || stored.body === null || !isStoredFile(stored, file))
-      return undefined;
     bytes = await readExactly(stored.body, file.bytes, () => undefined, signal);
   } catch (error) {
+    if (error instanceof SizeMismatch) return undefined;
     if (signal?.aborted === true || error instanceof ModelError) throw error;
-    return undefined;
+    throw new ModelError('unavailable', 'load_failed');
   }
   return (await sha256Hex(bytes)) === file.sha256 ? bytes : undefined;
 }
@@ -147,8 +159,10 @@ async function download(
       credentials: 'omit',
       signal: combined,
     });
-    if (!response.ok || response.body === null)
+    if (!response.ok || response.body === null) {
+      void response.body?.cancel().catch(() => undefined);
       throw new ModelError('unavailable', 'download_failed');
+    }
     return await readExactly(
       response.body,
       file.bytes,
@@ -198,7 +212,9 @@ export async function deniedFetch(): Promise<never> {
 export async function loadVerifiedModelFiles(
   options: LoadModelFilesOptions,
 ): Promise<VerifiedModelFiles> {
-  const { record, store, signal, onProgress } = options;
+  const { store, signal, onProgress } = options;
+  // The record may come from a message or a file, so it is checked again here.
+  const record = parseModelRecord(options.record);
   const total = totalBytes(record);
   const verified = new Map<string, Uint8Array<ArrayBuffer>>();
   let finished = 0;
@@ -229,6 +245,7 @@ export async function loadVerifiedModelFiles(
     finished += file.bytes;
     onProgress?.({ phase: 'verify', fraction: finished / total });
   }
+  signal?.throwIfAborted();
   return {
     cache: {
       async match(key) {

@@ -88,6 +88,8 @@ function validBaseUrl(value: unknown, revision: string): value is string {
       !url.hash &&
       // A normalized path that differs from the written one hides dot segments or backslashes.
       url.pathname === path &&
+      // An https base must already be in the form the runtime will build its keys from.
+      (value.startsWith('/') || url.href === value) &&
       path.endsWith(`/resolve/${revision}/`)
     );
   } catch {
@@ -104,16 +106,17 @@ function validPath(value: unknown): value is string {
 }
 
 function parseFile(value: unknown): TransformersModelFile | undefined {
+  if (!plain(value) || !only(value, ['path', 'bytes', 'sha256'])) return undefined;
+  // Read each field once, so a getter cannot answer differently for the check and the copy.
+  const { path, bytes, sha256 } = value;
   if (
-    !plain(value) ||
-    !only(value, ['path', 'bytes', 'sha256']) ||
-    !validPath(value['path']) ||
-    !sizeInRange(value['bytes'], maxFileBytes) ||
-    typeof value['sha256'] !== 'string' ||
-    !sha256Pattern.test(value['sha256'])
+    !validPath(path) ||
+    !sizeInRange(bytes, maxFileBytes) ||
+    typeof sha256 !== 'string' ||
+    !sha256Pattern.test(sha256)
   )
     return undefined;
-  return Object.freeze({ path: value['path'], bytes: value['bytes'], sha256: value['sha256'] });
+  return Object.freeze({ path, bytes, sha256 });
 }
 
 function parseFiles(value: unknown): readonly TransformersModelFile[] | undefined {
@@ -157,8 +160,9 @@ export function parseModelRecord(value: unknown): TransformersModelRecord {
   )
     throw new ModelError('invalid');
   const { modelId, baseUrl, revision, device, dtype, contextWindow, toolFormat } = value;
-  const files = parseFiles(value['files']);
-  const template = value['template'] === undefined ? undefined : parseTemplate(value['template']);
+  const { files: fileList, template: templateValue } = value;
+  const files = parseFiles(fileList);
+  const template = templateValue === undefined ? undefined : parseTemplate(templateValue);
   if (
     typeof modelId !== 'string' ||
     !modelIdPattern.test(modelId) ||

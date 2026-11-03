@@ -177,6 +177,36 @@ test('selects the plain model file for fp32 and honors the device and context wi
   expect(result.record).toMatchObject({ device: 'wasm', dtype: 'fp32', contextWindow: 2048 });
 });
 
+test('a template that declares tools but never renders the call or its result gets no tool format', async () => {
+  const declaresOnly = `{% if tools %}Tools: {{ tools | tojson }} use <tool_call>...</tool_call>{% endif %}{% for message in messages %}{% if message.role == 'user' or message.role == 'system' %}{{ message.content }}{% endif %}{% endfor %}`;
+  const result = await pinModel(request, { fetch: serve(repository(declaresOnly)).fetch });
+  expect(result.template).toMatchObject({ declarations: true, calls: false, hermes: false });
+  expect(result.record).not.toHaveProperty('toolFormat');
+});
+
+test('rejects a template problem before any weight file is downloaded', async () => {
+  const network = serve(repository('{% if %}'));
+  await expect(pinModel(request, { fetch: network.fetch })).rejects.toThrow(
+    'The chat template could not be rendered.',
+  );
+  expect(network.urls.some((url) => url.includes('/onnx/'))).toBe(false);
+});
+
+test('refuses a paginated file listing instead of pinning a partial one', async () => {
+  const network = serve(repository());
+  const paginated: typeof fetch = async (input, init) => {
+    const response = await network.fetch(input, init);
+    return String(input).includes('/tree/')
+      ? new Response(response.body, {
+          headers: { link: '<https://huggingface.co/next>; rel="next"' },
+        })
+      : response;
+  };
+  await expect(pinModel(request, { fetch: paginated })).rejects.toThrow(
+    'The model file list could not be read.',
+  );
+});
+
 test('a template without tool support leaves the tool format out of the record', async () => {
   const result = await pinModel(request, { fetch: serve(repository(plainTemplate)).fetch });
   expect(result.template).toMatchObject({ rendered: true, declarations: false, hermes: false });

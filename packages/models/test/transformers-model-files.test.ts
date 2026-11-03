@@ -77,11 +77,9 @@ describe('verified model files', () => {
       fetch: network.fetch,
     });
     expect(network.calls).toEqual([]);
-    const first = model.record.files[0];
     expect(await readBytes(await again.cache.match(model.urls[0] as string))).toEqual(
       model.served.get(model.urls[0] as string),
     );
-    expect(first?.path).toBe('config.json');
   });
 
   it('stops reading a body longer than the record and stores nothing for it', async () => {
@@ -288,17 +286,146 @@ describe('verified model files', () => {
       }) as typeof fetch,
       createFakeFetch(model.served, { stall: { url: first, afterChunks: 1 } }).fetch,
     ];
-    for (const fetch of cases) {
+    for (const [index, fetch] of cases.entries()) {
       const error: unknown = await loadVerifiedModelFiles({
         record: model.record,
         store: new MemoryStore(),
         allowDownload: true,
         fetch,
-        idleTimeoutMs: 30,
+        idleTimeoutMs: index === 2 ? 30 : 60_000,
       }).catch((caught: unknown) => caught);
       expect(error).toMatchObject(unavailable('download_failed'));
       expect(JSON.stringify(error)).not.toContain('private network text');
     }
+  });
+
+  it('checks the record itself before touching the store or the network', async () => {
+    const model = await createSyntheticModel();
+    const network = createFakeFetch(model.served);
+    const bad = {
+      ...model.record,
+      files: [{ path: '../escape', bytes: 1, sha256: '0'.repeat(64) }],
+    };
+    await expect(
+      loadVerifiedModelFiles({
+        record: bad as typeof model.record,
+        store: new MemoryStore(),
+        allowDownload: true,
+        fetch: network.fetch,
+      }),
+    ).rejects.toMatchObject({ code: 'invalid' });
+    expect(network.calls).toEqual([]);
+  });
+
+  it('keeps a stored file when the store fails to read it and reports a load failure', async () => {
+    const { model, store, files } = await loaded();
+    files.release();
+    const deleted: string[] = [];
+    const url = model.urls[0] as string;
+    const failing = {
+      async match(key: string): Promise<Response | undefined> {
+        if (key === url) throw new DOMException('private storage text', 'UnknownError');
+        return store.match(key);
+      },
+      put: store.put.bind(store),
+      async delete(key: string): Promise<boolean> {
+        deleted.push(key);
+        return store.delete(key);
+      },
+    };
+    const network = createFakeFetch(model.served);
+    const error: unknown = await loadVerifiedModelFiles({
+      record: model.record,
+      store: failing,
+      allowDownload: true,
+      fetch: network.fetch,
+    }).catch((caught: unknown) => caught);
+    expect(error).toMatchObject(unavailable('load_failed'));
+    expect(JSON.stringify(error)).not.toContain('private storage text');
+    expect(deleted).toEqual([]);
+    expect(network.calls).toEqual([]);
+    expect(store.entries.has(url)).toBe(true);
+  });
+
+  it('keeps a stored file whose body stream fails and reports a load failure', async () => {
+    const { model, store, files } = await loaded();
+    files.release();
+    const url = model.urls[0] as string;
+    const entry = store.entries.get(url);
+    if (entry === undefined) throw new Error('missing entry');
+    const broken = {
+      async match(key: string): Promise<Response | undefined> {
+        if (key !== url) return store.match(key);
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(new TypeError('stream failed'));
+          },
+        });
+        return new Response(body, { headers: entry.headers });
+      },
+      put: store.put.bind(store),
+      delete: store.delete.bind(store),
+    };
+    await expect(
+      loadVerifiedModelFiles({
+        record: model.record,
+        store: broken,
+        fetch: createFakeFetch(model.served).fetch,
+      }),
+    ).rejects.toMatchObject(unavailable('load_failed'));
+    expect(store.entries.has(url)).toBe(true);
+  });
+
+  it('reports a download error when the body stream fails mid-file', async () => {
+    const model = await createSyntheticModel();
+    const first = model.urls[0] as string;
+    const fetch = (async (input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url !== first) return new Response(model.served.get(url));
+      let sent = false;
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (sent) controller.error(new TypeError('private network text'));
+            else controller.enqueue(new Uint8Array(100));
+            sent = true;
+          },
+        }),
+      );
+    }) as typeof globalThis.fetch;
+    const store = new MemoryStore();
+    const error: unknown = await loadVerifiedModelFiles({
+      record: model.record,
+      store,
+      allowDownload: true,
+      fetch,
+    }).catch((caught: unknown) => caught);
+    expect(error).toMatchObject(unavailable('download_failed'));
+    expect(JSON.stringify(error)).not.toContain('private network text');
+    expect(store.entries.size).toBe(0);
+  });
+
+  it('honors an abort that arrives while the last file is being stored', async () => {
+    const model = await createSyntheticModel();
+    const store = new MemoryStore();
+    const controller = new AbortController();
+    const reason = new Error('late stop');
+    const put = store.put.bind(store);
+    let puts = 0;
+    store.put = async (key, response) => {
+      await put(key, response);
+      puts += 1;
+      if (puts === model.urls.length) controller.abort(reason);
+    };
+    await expect(
+      loadVerifiedModelFiles({
+        record: model.record,
+        store,
+        allowDownload: true,
+        fetch: createFakeFetch(model.served).fetch,
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(reason);
   });
 
   it('fails with a download error and leaves nothing behind when the store cannot save', async () => {

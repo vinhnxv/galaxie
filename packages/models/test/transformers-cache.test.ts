@@ -83,7 +83,7 @@ test('a model that was never stored is downloadable and its cache is not created
   expect(storage.stores.size).toBe(0);
 });
 
-test('a missing file, a size mismatch or a hash mismatch is downloadable with the summed size', async () => {
+test('a missing file, a size marker mismatch or a hash marker mismatch is downloadable with the summed size', async () => {
   const { record, store, model } = await storedModel();
   const [first, second, third] = model.urls as [string, string, string];
   const entry = store.entries.get(second);

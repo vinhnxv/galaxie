@@ -171,6 +171,23 @@ describe('Transformers.js model record', () => {
     expect(String(error)).not.toContain(canary);
   });
 
+  it('reads each field once, so an accessor cannot pass the check and then change', () => {
+    let reads = 0;
+    const file = {
+      get path(): string {
+        reads += 1;
+        return reads === 1 ? 'extra.bin' : '../../escape';
+      },
+      bytes: 10,
+      sha256: hash('e'),
+    };
+    const record = parseModelRecord({ ...valid, files: [...files, file] });
+    expect(record.files.map((entry) => entry.path)).toEqual([
+      ...files.map((f) => f.path),
+      'extra.bin',
+    ]);
+  });
+
   it('accepts exactly 64 files and a file of exactly 1 GiB', () => {
     const many = Array.from({ length: 60 }, (_, index) => ({
       path: `extra/${index}.bin`,

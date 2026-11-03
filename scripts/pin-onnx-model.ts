@@ -10,12 +10,13 @@ import { Template } from '@huggingface/jinja';
  * Maintainer-run: reads a Hugging Face model repository at one revision, downloads and hashes the
  * files an ONNX chat provider needs, and prints a `TransformersModelRecord` (ADR-0021 decision 9)
  * with the model card license and a chat-template probe. It is never part of CI and its tests
- * inject `fetch`. The record is validated by `parseModelRecord` in the package; this script
- * applies the same limits by construction.
+ * inject `fetch`. This script applies the record's size and file-count limits itself, and its
+ * tests check every printed record with the package's `parseModelRecord`.
  */
 
 const huggingFace = 'https://huggingface.co';
 const maxFileBytes = 1024 ** 3;
+const maxFiles = 64;
 const defaultContextWindow = 4096;
 
 /** The ONNX file suffix Transformers.js 4.3.1 uses for each dtype. */
@@ -149,10 +150,17 @@ interface TreeEntry {
   readonly size?: unknown;
 }
 
-async function getJson(fetcher: typeof fetch, url: string, failure: string): Promise<unknown> {
+async function getJson(
+  fetcher: typeof fetch,
+  url: string,
+  failure: string,
+  complete = false,
+): Promise<unknown> {
   try {
     const response = await fetcher(url, { credentials: 'omit' });
-    if (!response.ok) throw new Error();
+    // A paginated listing would silently omit files, so it is refused instead.
+    if (!response.ok || (complete && /rel="?next"?/.test(response.headers.get('link') ?? '')))
+      throw new Error();
     return await response.json();
   } catch {
     throw new PinError(failure);
@@ -168,6 +176,7 @@ async function listFiles(
     fetcher,
     `${huggingFace}/api/models/${request.modelId}/tree/${request.revision}?recursive=true`,
     'The model file list could not be read.',
+    true,
   );
   if (!Array.isArray(tree)) throw new PinError('The model file list could not be read.');
   const files = new Map<string, number | undefined>();
@@ -192,7 +201,8 @@ function selectPaths(
   const missing =
     !requiredFiles.every((path) => paths.includes(path)) ||
     !paths.includes(`onnx/model${dtypeSuffixes[request.dtype]}.onnx`);
-  if (missing) throw new PinError('The model repository lacks a file the provider needs.');
+  if (missing || paths.length > maxFiles)
+    throw new PinError('The model repository lacks a file the provider needs.');
   return paths.sort();
 }
 
@@ -314,12 +324,14 @@ export function probeTemplate(
     throw new PinError('The chat template could not be rendered.');
   }
   const declarations = output.includes('Look up the weather for one city.');
+  const calls = output.includes('Hanoi');
+  const results = output.includes('temperature');
   return {
     rendered: true,
     declarations,
-    calls: output.includes('Hanoi'),
-    results: output.includes('temperature'),
-    hermes: declarations && output.includes('<tool_call>'),
+    calls,
+    results,
+    hermes: declarations && calls && results && output.includes('<tool_call>'),
     mentionsEnableThinking: source.includes('enable_thinking'),
   };
 }
@@ -340,14 +352,18 @@ export async function pinModel(
   const fetcher = dependencies.fetch ?? fetch;
   const log = dependencies.log ?? (() => undefined);
   const listed = await listFiles(fetcher, request);
+  const paths = selectPaths(request, listed);
   const files: PinnedFile[] = [];
   const texts = new Map<string, string>();
-  for (const path of selectPaths(request, listed)) {
+  const hash = async (path: string): Promise<void> => {
     log(`Hashing ${path}`);
     const { file, text } = await hashFile(fetcher, request, path, listed.get(path));
     files.push(file);
     if (text !== undefined) texts.set(path, text);
-  }
+  };
+  // The small text files come first, so a model that fails the template or context checks is
+  // rejected before any weight shard is downloaded.
+  for (const path of paths.filter((entry) => textFiles.has(entry))) await hash(path);
   const tokenizerConfig = parseJsonObject(texts.get('tokenizer_config.json'));
   const template = probeTemplate(
     chatTemplate(tokenizerConfig, texts.get('chat_template.jinja')),
@@ -361,6 +377,8 @@ export async function pinModel(
       : undefined);
   if (contextWindow === undefined) throw new PinError('Pass --context-window for this model.');
   const license = await readLicense(fetcher, request);
+  for (const path of paths.filter((entry) => !textFiles.has(entry))) await hash(path);
+  files.sort((a, b) => (a.path < b.path ? -1 : 1));
   return {
     record: {
       modelId: request.modelId,
