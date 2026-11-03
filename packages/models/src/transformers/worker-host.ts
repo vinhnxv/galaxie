@@ -41,7 +41,13 @@ export function createWorkerHost(options: WorkerHostOptions): WorkerHost {
   const current = (): State => state;
   let loaded: LoadedRuntime | undefined;
   let record: TransformersModelRecord | undefined;
-  let active: { readonly id: number; readonly controller: AbortController } | undefined;
+  let active:
+    | {
+        readonly id: number;
+        readonly controller: AbortController;
+        readonly finished: Promise<void>;
+      }
+    | undefined;
 
   const fail = (error: unknown, id?: number): void => {
     const failure = classifyTransformersError(error);
@@ -104,8 +110,13 @@ export function createWorkerHost(options: WorkerHostOptions): WorkerHost {
       fail(undefined, id);
       return;
     }
+    if (request.jsonSchema !== undefined) {
+      post({ type: 'failed', id, code: 'unsupported' });
+      return;
+    }
     const controller = new AbortController();
-    active = { id, controller };
+    const finished = Promise.withResolvers<void>();
+    active = { id, controller, finished: finished.promise };
     try {
       const result = await loaded.generate({
         request,
@@ -136,12 +147,16 @@ export function createWorkerHost(options: WorkerHostOptions): WorkerHost {
       }
     } finally {
       active = undefined;
+      finished.resolve();
     }
   }
 
   async function dispose(): Promise<void> {
     state = 'disposed';
-    active?.controller.abort();
+    const running = active;
+    running?.controller.abort();
+    // The runtime must not be released while a generation is still using it.
+    await running?.finished;
     const engine = loaded;
     loaded = undefined;
     await engine?.dispose().catch(() => undefined);
@@ -150,7 +165,18 @@ export function createWorkerHost(options: WorkerHostOptions): WorkerHost {
   return {
     receive(data): void {
       const message = parseToWorker(data);
-      if (message === undefined) return;
+      if (message === undefined) {
+        // A well-formed id with a rejected request still gets an answer, so the page never waits.
+        const id = (data as { id?: unknown } | null)?.id;
+        if (
+          (data as { type?: unknown } | null)?.type === 'generate' &&
+          typeof id === 'number' &&
+          Number.isSafeInteger(id) &&
+          id > 0
+        )
+          post({ type: 'failed', id, code: 'invalid' });
+        return;
+      }
       switch (message.type) {
         case 'load':
           void load(message);

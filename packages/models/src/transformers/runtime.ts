@@ -176,14 +176,19 @@ export const transformersRuntime: TransformersRuntime = {
         if (promptTokens + request.maxTokens > contextWindow) throw new ModelError('invalid');
         const stopping = new library.InterruptableStoppingCriteria();
         let completionTokens = 0;
-        const streamer = new library.TextStreamer(tokenizer, {
-          skip_prompt: true,
-          skip_special_tokens: true,
-          callback_function: onText,
-          token_callback_function: (tokens: readonly bigint[]) => {
-            completionTokens += tokens.length;
+        // The streamer reports the end-of-sequence token too, so special tokens are not counted.
+        const streamer: { special_ids?: ReadonlySet<bigint> } = new library.TextStreamer(
+          tokenizer,
+          {
+            skip_prompt: true,
+            skip_special_tokens: true,
+            callback_function: onText,
+            token_callback_function: (tokens: readonly bigint[]) => {
+              for (const token of tokens)
+                if (!streamer.special_ids?.has(token)) completionTokens += 1;
+            },
           },
-        });
+        );
         const interrupt = (): void => stopping.interrupt();
         if (signal.aborted) interrupt();
         signal.addEventListener('abort', interrupt, { once: true });

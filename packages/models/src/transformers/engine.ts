@@ -11,6 +11,7 @@ import {
   type GenerateRequest,
   type LoadPhase,
   parseFromWorker,
+  parseToWorker,
 } from './protocol.js';
 
 /** The structural Worker seam: the page and tests both satisfy it without DOM types. */
@@ -213,9 +214,16 @@ export class TransformersEngineHandle {
       if (signal?.aborted) onAbort();
       await lifetime.race(Promise.race([previous, aborted.promise]));
       check();
+      // A request the Worker would drop must fail here, or no answer would ever arrive.
+      const message = { type: 'generate', id, request } as const;
+      if (parseToWorker(message) === undefined) throw new ModelError('invalid');
       channel.expect(id);
+      try {
+        this.#worker.postMessage(message);
+      } catch {
+        throw new ModelError('invalid');
+      }
       started = true;
-      this.#worker.postMessage({ type: 'generate', id, request });
       for (;;) {
         const message = await lifetime.race(Promise.race([channel.next(), aborted.promise]));
         check();

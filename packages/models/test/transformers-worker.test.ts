@@ -119,7 +119,7 @@ describe('worker host', () => {
     ]);
     expect(runtime.generations[0]?.contextWindow).toBe(2048);
     await handle.dispose();
-    expect(runtime.disposed).toBe(1);
+    await vi.waitFor(() => expect(runtime.disposed).toBe(1));
     expect(worker.terminated).toBe(1);
   });
 
@@ -215,10 +215,14 @@ describe('worker host', () => {
       openStore: async () => new MemoryStore(),
     });
     host.receive({ type: 'load', record: { ...model.record, device: 'cpu' }, allowDownload: true });
-    host.receive({ type: 'generate', id: 1 });
     host.receive('nonsense');
+    host.receive({ type: 'generate', id: -1 });
     await settle();
     expect(posted).toEqual([]);
+    // A generate with a usable id but a rejected request is answered, so the page never waits.
+    host.receive({ type: 'generate', id: 1 });
+    await settle();
+    expect(posted).toEqual([{ type: 'failed', id: 1, code: 'invalid' }]);
     expect(runtime.loads).toEqual([]);
   });
 
@@ -275,5 +279,113 @@ describe('worker entry', () => {
     listeners[0]?.({ data: { type: 'generate', id: 3, request } } as MessageEvent);
     await settle();
     expect(sent).toEqual([{ type: 'failed', id: 3, code: 'provider' }]);
+  });
+});
+
+describe('request failures', () => {
+  it('fails an oversize request on the page and keeps the handle usable', async () => {
+    const { model, worker } = await setup();
+    const handle = await createTransformersEngine(
+      { worker, model: model.record, allowDownload: true },
+      { gpu: undefined },
+    );
+    const tooLong = {
+      ...request,
+      messages: [{ role: 'user', content: 'x'.repeat(1_048_577) }],
+    } as GenerateRequest;
+    await expect(
+      (async () => {
+        for await (const _ of handle.stream(tooLong));
+      })(),
+    ).rejects.toMatchObject({ code: 'invalid' });
+    const events = [];
+    for await (const event of handle.stream(request as GenerateRequest)) events.push(event.type);
+    expect(events.at(-1)).toBe('done');
+    await handle.dispose();
+  });
+
+  it('fails an uncloneable request and releases the turn', async () => {
+    const { model, worker } = await setup();
+    const handle = await createTransformersEngine(
+      { worker, model: model.record, allowDownload: true },
+      { gpu: undefined },
+    );
+    const original = worker.postMessage.bind(worker);
+    let throwOnce = true;
+    worker.postMessage = (message: unknown): void => {
+      if (throwOnce && (message as { type?: string }).type === 'generate') {
+        throwOnce = false;
+        throw new DOMException('not cloneable', 'DataCloneError');
+      }
+      original(message);
+    };
+    await expect(
+      (async () => {
+        for await (const _ of handle.stream(request as GenerateRequest));
+      })(),
+    ).rejects.toMatchObject({ code: 'invalid' });
+    const events = [];
+    for await (const event of handle.stream(request as GenerateRequest)) events.push(event.type);
+    expect(events.at(-1)).toBe('done');
+    await handle.dispose();
+  });
+
+  it('answers a JSON schema request as unsupported', async () => {
+    const { model, worker } = await setup();
+    const handle = await createTransformersEngine(
+      { worker, model: model.record, allowDownload: true },
+      { gpu: undefined },
+    );
+    await expect(
+      (async () => {
+        for await (const _ of handle.stream({
+          ...request,
+          jsonSchema: { type: 'object' },
+        } as GenerateRequest));
+      })(),
+    ).rejects.toMatchObject({ code: 'unsupported' });
+    await handle.dispose();
+  });
+
+  it('waits for a running generation before releasing the runtime on dispose', async () => {
+    const model = await createSyntheticModel();
+    const runtime = createFakeRuntime({ holdAfter: 1 });
+    const posted: FromWorker[] = [];
+    let releasedWhileRunning = false;
+    const real = runtime.load.bind(runtime);
+    runtime.load = async (options) => {
+      const loaded = await real(options);
+      let running = false;
+      return {
+        ...loaded,
+        async generate(generation) {
+          running = true;
+          try {
+            return await loaded.generate(generation);
+          } finally {
+            await new Promise<void>((resolve) => setTimeout(resolve, 20));
+            running = false;
+          }
+        },
+        async dispose() {
+          releasedWhileRunning = running;
+          await loaded.dispose();
+        },
+      };
+    };
+    const host = createWorkerHost({
+      post: (message) => posted.push(message),
+      runtime,
+      assets,
+      openStore: async () => new MemoryStore(),
+      fetch: createFakeFetch(model.served).fetch,
+    });
+    host.receive({ type: 'load', record: model.record, allowDownload: true });
+    await vi.waitFor(() => expect(posted.at(-1)).toMatchObject({ type: 'ready' }));
+    host.receive({ type: 'generate', id: 1, request });
+    await vi.waitFor(() => expect(posted.some((message) => message.type === 'chunk')).toBe(true));
+    host.receive({ type: 'dispose' });
+    await vi.waitFor(() => expect(runtime.disposed).toBe(1));
+    expect(releasedWhileRunning).toBe(false);
   });
 });
