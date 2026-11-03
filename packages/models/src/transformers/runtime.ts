@@ -98,7 +98,8 @@ async function deviceReport(record: TransformersModelRecord): Promise<DeviceRepo
   };
 }
 
-function templateMessages(request: GenerateRequest): unknown[] {
+/** The messages as the chat template sees them; exported so tests render the same shape. */
+export function templateMessages(request: GenerateRequest): unknown[] {
   return request.messages.map((message) => ({
     role: message.role,
     content: message.content,
@@ -169,6 +170,10 @@ export const transformersRuntime: TransformersRuntime = {
       async generate({ request, contextWindow, onText, signal }): Promise<RuntimeGenerateResult> {
         const inputs = tokenizer.apply_chat_template(templateMessages(request), {
           ...(request.tools === undefined ? {} : { tools: request.tools }),
+          // Qwen3 reasons before it answers unless the record turns that off (ADR-0021 decision 11).
+          ...(record.template?.enableThinking === undefined
+            ? {}
+            : { enable_thinking: record.template.enableThinking }),
           add_generation_prompt: true,
           return_dict: true,
         });

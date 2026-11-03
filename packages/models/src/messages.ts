@@ -9,7 +9,7 @@ export interface TextMessage {
   readonly content: string;
 }
 
-function textContent(message: BaseMessage): string {
+export function textContent(message: BaseMessage): string {
   if (typeof message.content === 'string') return message.content;
   if (message.content.every((block) => block.type === 'text' && typeof block.text === 'string'))
     return message.content.map((block) => block.text).join('');
