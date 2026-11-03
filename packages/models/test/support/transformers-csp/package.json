@@ -1,0 +1,6 @@
+{
+  "name": "@galaxie/models-transformers-csp-page",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module"
+}
