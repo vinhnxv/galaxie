@@ -10,7 +10,6 @@ import {
   type SessionId,
 } from '@galaxie/core';
 import { createMockLatch, type MockScript } from '@galaxie/models/mock';
-import type { ToolCall } from '@langchain/core/messages';
 import { z } from 'zod';
 import {
   createPyodideAdapter,
@@ -18,7 +17,13 @@ import {
   type PyodideAgent,
 } from '../../../packages/adapter-pyodide/src/adapter.js';
 import specs from '../cases-adk-python/fixtures.json' with { type: 'json' };
-import { type AdkPythonTranscript, RecordingModel, renumber } from './adk-python.js';
+import {
+  type AdkPythonTranscript,
+  AgentScript,
+  RecordingModel,
+  renumber,
+  type Spec,
+} from './adk-python.js';
 
 /** Golden cases whose pause survives a reload; each is compared with its one-lifetime golden. */
 export const adkPythonReloadCases = [
@@ -28,6 +33,7 @@ export const adkPythonReloadCases = [
   'long-running',
   'confirm-consecutive',
   'stream-confirm-approve',
+  'agents-confirm-last',
 ] as const;
 /** Write cases that need a second lifetime, so they have no golden of their own. */
 export const adkPythonWriteCases = ['approved-write', 'resumed-write'] as const;
@@ -50,12 +56,6 @@ export interface AdkReloadResult {
   readonly consumed: boolean;
   readonly retriedOutput?: unknown;
 }
-interface Spec {
-  readonly prompt: string;
-  readonly replies: readonly { readonly text: string; readonly toolCalls?: readonly ToolCall[] }[];
-  readonly answers?: readonly { readonly action: string; readonly payload: unknown }[];
-}
-
 function writeSpec(step: AdkReloadStep): Spec {
   const approved = step.name === 'approved-write';
   return {
@@ -98,7 +98,7 @@ export async function executeAdkReloadStep(
   step: AdkReloadStep,
 ): Promise<AdkReloadResult> {
   const write = (adkPythonWriteCases as readonly string[]).includes(step.name);
-  const spec = write ? writeSpec(step) : (specs as Record<string, Spec>)[step.name];
+  const spec = write ? writeSpec(step) : (specs as unknown as Record<string, Spec>)[step.name];
   if (!spec) throw new Error('The reload case is unknown.');
   const transcript: AdkPythonTranscript = {
     requests: [],
@@ -111,11 +111,11 @@ export async function executeAdkReloadStep(
   };
   const latch = createMockLatch();
   const script: MockScript = {
-    [spec.prompt]: spec.replies.map((reply, index) => ({
+    [spec.prompt]: (spec.replies ?? []).map((reply, index, all) => ({
       ...reply,
       id: `reply-${index}`,
       usage: { input_tokens: 2, output_tokens: 2, total_tokens: 4 },
-      ...(step.crashAfterWrite && index === spec.replies.length - 1 ? { wait: latch } : {}),
+      ...(step.crashAfterWrite && index === all.length - 1 ? { wait: latch } : {}),
     })),
   };
   const runtime = createRuntime({
@@ -167,7 +167,16 @@ export async function executeAdkReloadStep(
         recovery: store.recovery,
         ...(step.sessionId === undefined ? {} : { sessionId: step.sessionId as SessionId }),
         services: {
-          chatModels: { mock: new RecordingModel(script, transcript) },
+          chatModels: {
+            mock: new RecordingModel(
+              script,
+              transcript,
+              [],
+              undefined,
+              undefined,
+              spec.agents ? new AgentScript(spec.agents) : undefined,
+            ),
+          },
           checkpoints: store.checkpoints,
         },
         ui: {

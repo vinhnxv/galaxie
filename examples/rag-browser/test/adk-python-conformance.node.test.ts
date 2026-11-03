@@ -234,7 +234,7 @@ describe.skipIf(!pythonWheelsAvailable)(
       }
     }
 
-    test.each(['confirm-approve', 'confirm-consecutive'] as const)(
+    test.each(['confirm-approve', 'confirm-consecutive', 'agents-confirm-last'] as const)(
       'Chromium reload with reopened IndexedDB matches native ADK Python: %s',
       async (name) => {
         await reloadScenario(name, async (first, reload) => {

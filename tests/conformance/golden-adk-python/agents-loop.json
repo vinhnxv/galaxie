@@ -1,0 +1,178 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Answer as worker.\n\nYou are an agent. Your internal name is \"worker\". The description about you is \"The worker agent.\"."
+        },
+        {
+          "role": "user",
+          "content": "refine twice"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "agent": "worker"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Answer as worker.\n\nYou are an agent. Your internal name is \"worker\". The description about you is \"The worker agent.\"."
+        },
+        {
+          "role": "user",
+          "content": "refine twice"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call-1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":3}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-1",
+          "content": "{\"value\":6}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "agent": "worker"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Answer as worker.\n\nYou are an agent. Your internal name is \"worker\". The description about you is \"The worker agent.\"."
+        },
+        {
+          "role": "user",
+          "content": "refine twice"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call-1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":3}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-1",
+          "content": "{\"value\":6}"
+        },
+        {
+          "role": "assistant",
+          "content": "Pass 1: 6"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "agent": "worker"
+    }
+  ],
+  "responses": [
+    {
+      "agent": "worker",
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "double_1",
+          "name": "double",
+          "args": {
+            "value": 3
+          }
+        }
+      ]
+    },
+    {
+      "agent": "worker",
+      "content": "Pass 1: 6",
+      "toolCalls": []
+    },
+    {
+      "agent": "worker",
+      "content": "Pass 2 ready.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 3
+      }
+    }
+  ],
+  "interactions": [],
+  "output": "Pass 2 ready.",
+  "error": null
+}

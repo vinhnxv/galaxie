@@ -5,7 +5,7 @@ import { createRuntime, defineAgentDefinition, GalaxieError, type RunEvent } fro
 import { createMockLatch, MockChatModel, type MockScript } from '@galaxie/models/mock';
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { BaseChatModel, type BindToolsInput } from '@langchain/core/language_models/chat_models';
-import type { BaseMessage, ToolCall } from '@langchain/core/messages';
+import { type BaseMessage, HumanMessage, type ToolCall } from '@langchain/core/messages';
 import type { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';
 import { z } from 'zod';
 import {
@@ -37,6 +37,12 @@ export const adkPythonCases = [
   'confirm-double-submit',
   'confirm-consecutive',
   'stream-confirm-approve',
+  'agents-sequential',
+  'agents-parallel',
+  'agents-loop',
+  'agents-transfer',
+  'stream-agents-sequential',
+  'agents-confirm-last',
 ] as const;
 /** The Chromium lane repeats these; the Node lane runs all of them. */
 export const adkPythonBrowserCases = [
@@ -46,11 +52,21 @@ export const adkPythonBrowserCases = [
   'stream-text',
   'stream-abort',
   'confirm-approve',
+  'agents-sequential',
+  'agents-confirm-last',
 ] as const;
 const stepLimit = 2;
-interface Spec {
+export interface AgentReply {
+  readonly text: string;
+  readonly toolCalls?: readonly ToolCall[];
+  /** The reply waits until this agent has delivered its final answer, which orders parallel branches. */
+  readonly after?: string;
+}
+export interface Spec {
   readonly prompt: string;
-  readonly replies: readonly { readonly text: string; readonly toolCalls?: readonly ToolCall[] }[];
+  readonly replies?: readonly { readonly text: string; readonly toolCalls?: readonly ToolCall[] }[];
+  readonly agents?: Readonly<Record<string, readonly AgentReply[]>>;
+  readonly unordered?: boolean;
   readonly answers?: readonly { readonly action: string; readonly payload: unknown }[];
 }
 export interface AdkPythonTranscript {
@@ -80,6 +96,29 @@ function normalizeMessages(messages: BaseMessage[]): unknown[] {
     return result;
   });
 }
+interface Picked {
+  readonly agent: string;
+  readonly entry: AgentReply;
+  readonly id: string;
+}
+
+/** The replies of a multi-agent case, shared by every bound copy of the model. */
+export class AgentScript {
+  readonly replies: Readonly<Record<string, readonly AgentReply[]>>;
+  readonly #done = new Map<string, PromiseWithResolvers<void>>();
+  constructor(replies: Readonly<Record<string, readonly AgentReply[]>>) {
+    this.replies = replies;
+  }
+  done(agent: string): PromiseWithResolvers<void> {
+    let value = this.#done.get(agent);
+    if (value === undefined) {
+      value = Promise.withResolvers<void>();
+      this.#done.set(agent, value);
+    }
+    return value;
+  }
+}
+
 export class RecordingModel extends BaseChatModel {
   readonly mock: MockChatModel;
   readonly transcript: AdkPythonTranscript;
@@ -87,14 +126,17 @@ export class RecordingModel extends BaseChatModel {
   readonly tools: BindToolsInput[];
   readonly choice: unknown;
   readonly streamLatch: ReturnType<typeof createMockLatch> | undefined;
+  readonly agents: AgentScript | undefined;
   constructor(
     script: MockScript,
     transcript: AdkPythonTranscript,
     tools: BindToolsInput[] = [],
     choice?: unknown,
     streamLatch?: ReturnType<typeof createMockLatch>,
+    agents?: AgentScript,
   ) {
     super({});
+    this.agents = agents;
     this.script = script;
     this.transcript = transcript;
     this.tools = tools;
@@ -117,26 +159,69 @@ export class RecordingModel extends BaseChatModel {
       tools,
       kwargs?.tool_choice,
       this.streamLatch,
+      this.agents,
     );
+  }
+
+  /** The agent a request is for and its next reply, which follows the agent's own earlier turns. */
+  #pick(messages: BaseMessage[]): Picked | undefined {
+    if (!this.agents) return undefined;
+    const system = messages.find((message) => message.type === 'system');
+    const content = typeof system?.content === 'string' ? system.content : '';
+    const agent = /Your internal name is "([^"]+)"/.exec(content)?.[1];
+    const turn = messages.filter((message) => message.type === 'ai').length;
+    const entry = agent === undefined ? undefined : this.agents.replies[agent]?.[turn];
+    if (agent === undefined || entry === undefined)
+      throw new Error('The agent script has no reply for this request.');
+    return { agent, entry, id: `reply-${agent}-${turn}` };
+  }
+
+  #scripted(picked: Picked): MockChatModel {
+    return new MockChatModel({
+      [picked.agent]: {
+        id: picked.id,
+        text: picked.entry.text,
+        ...(picked.entry.toolCalls === undefined ? {} : { toolCalls: picked.entry.toolCalls }),
+        usage: { input_tokens: 2, output_tokens: 2, total_tokens: 4 },
+      },
+    }).bindTools(this.tools);
   }
   override async _generate(
     messages: BaseMessage[],
     options: this['ParsedCallOptions'],
   ): Promise<ChatResult> {
+    return this.#respond(messages, options, this.#pick(messages));
+  }
+
+  async #respond(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+    picked: Picked | undefined,
+  ): Promise<ChatResult> {
     const jsonSchema = (options as { jsonSchema?: unknown }).jsonSchema;
     this.transcript.requests.push({
+      ...(picked ? { agent: picked.agent } : {}),
       messages: normalizeMessages(messages),
       tools: this.tools,
       ...(this.tools.length ? { toolChoice: this.choice } : {}),
       ...(jsonSchema === undefined ? {} : { jsonSchema }),
     });
-    const result = await this.mock._generate(messages, options);
+    if (picked?.entry.after !== undefined) await this.agents?.done(picked.entry.after).promise;
+    const result = picked
+      ? await this.#scripted(picked)._generate([new HumanMessage(picked.agent)], options)
+      : await this.mock._generate(messages, options);
     const message = result.generations[0]?.message;
     if (!message) throw new Error('The scripted reply is missing.');
     this.transcript.responses.push({
+      ...(picked ? { agent: picked.agent } : {}),
       content: message.content,
       toolCalls: 'tool_calls' in message ? message.tool_calls : [],
     });
+    // The gated branch starts after this answer has crossed the bridge; a heuristic margin, not a signal.
+    if (picked && !picked.entry.toolCalls?.length) {
+      const agents = this.agents;
+      setTimeout(() => agents?.done(picked.agent).resolve(), 100);
+    }
     return result;
   }
 
@@ -146,14 +231,46 @@ export class RecordingModel extends BaseChatModel {
     runManager?: CallbackManagerForLLMRun,
   ): AsyncGenerator<ChatGenerationChunk> {
     // Record the provider's complete scripted reply, including replies blocked during delivery.
-    await this._generate(messages, options);
+    const picked = this.#pick(messages);
+    await this.#respond(messages, options, picked);
+    const source = picked
+      ? this.#scripted(picked)._streamResponseChunks(
+          [new HumanMessage(picked.agent)],
+          options,
+          runManager,
+        )
+      : this.mock._streamResponseChunks(messages, options, runManager);
     let first = true;
-    for await (const chunk of this.mock._streamResponseChunks(messages, options, runManager)) {
+    for await (const chunk of source) {
       yield chunk;
       if (first) await this.streamLatch?.wait(options.signal);
       first = false;
     }
   }
+}
+
+/** Parallel branches finish in no fixed order: order what they produced by agent, then by turn. */
+export function settle(transcript: AdkPythonTranscript): void {
+  const turn = (request: unknown): number =>
+    (request as { messages: { role: string }[] }).messages.filter(
+      (message) => message.role === 'assistant',
+    ).length;
+  const agent = (value: unknown): string => (value as { agent: string }).agent;
+  const order = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+  transcript.requests.sort(
+    (left, right) => order(agent(left), agent(right)) || turn(left) - turn(right),
+  );
+  const seen = new Map<string, number>();
+  const turns = new Map<unknown, number>();
+  for (const response of transcript.responses) {
+    seen.set(agent(response), (seen.get(agent(response)) ?? 0) + 1);
+    turns.set(response, seen.get(agent(response)) ?? 0);
+  }
+  transcript.responses.sort(
+    (left, right) =>
+      order(agent(left), agent(right)) || (turns.get(left) ?? 0) - (turns.get(right) ?? 0),
+  );
+  transcript.capabilities.sort((left, right) => order(JSON.stringify(left), JSON.stringify(right)));
 }
 
 /** Provider call IDs differ per lane (ADK generates one, galaxie assigns one): number them by appearance. */
@@ -182,7 +299,7 @@ export async function executeAdkPythonCase(
 ): Promise<AdkPythonTranscript> {
   if (!(adkPythonCases as readonly string[]).includes(name))
     throw new Error('The conformance case is unknown.');
-  const spec = (specs as Record<string, Spec>)[name];
+  const spec = (specs as unknown as Record<string, Spec>)[name];
   if (!spec) throw new Error('The conformance script is missing.');
   const transcript: AdkPythonTranscript = {
     requests: [],
@@ -195,7 +312,7 @@ export async function executeAdkPythonCase(
   };
   const latch = createMockLatch();
   const script: MockScript = {
-    [spec.prompt]: spec.replies.map((reply, index) => ({
+    [spec.prompt]: (spec.replies ?? []).map((reply, index) => ({
       ...reply,
       id: `reply-${index}`,
       usage: { input_tokens: 2, output_tokens: 2, total_tokens: 4 },
@@ -208,6 +325,7 @@ export async function executeAdkPythonCase(
     [],
     undefined,
     name === 'stream-abort' ? latch : undefined,
+    spec.agents ? new AgentScript(spec.agents) : undefined,
   );
   const runtime = createRuntime({
     appId: 'adk-python-conformance',
@@ -345,7 +463,11 @@ export async function executeAdkPythonCase(
       }
     }
     const actual = JSON.parse(JSON.stringify(transcript)) as AdkPythonTranscript;
-    renumber(actual.requests);
+    if (spec.unordered) {
+      settle(actual);
+      // Branches share no call history, so each request numbers its own calls.
+      for (const request of actual.requests) renumber([request]);
+    } else renumber(actual.requests);
     return actual;
   } finally {
     latch.release();

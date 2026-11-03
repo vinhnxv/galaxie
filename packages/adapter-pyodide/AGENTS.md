@@ -50,6 +50,13 @@ library bytes share the page build's trust; the adapter does not bind their byte
 Third-party wheels are checked against hashes compiled into the Worker. Local wheels
 and agent sources are trusted build outputs. See ADR-0018 decisions 9 and 10.
 
+The `adk` framework (executor `adk-python`, ADR-0022) accepts only `LlmAgent`,
+`SequentialAgent`, `ParallelAgent` and `LoopAgent` trees built from `galaxie.adk` models
+and tools; a pause is allowed only in a leaf that is the last child under sequential
+ancestors. Keep `subgraphs` false and keep the parallel-write replay test
+(`tests/conformance/adk-python-agents.node.test.ts`) green when changing effect scopes.
+Rebuild the wheel (`node scripts/build-python-wheels.ts`) after changing `python/galaxie`.
+
 ## Tests
 
 Run the focused bridge and adapter tests with Vitest on Node and Chromium. Real

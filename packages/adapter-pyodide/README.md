@@ -340,3 +340,34 @@ deleted or reordered history). A record must fit one 1 MiB bridge frame (about 7
 run that would exceed it fails `unsupported` before the next model or tool dispatch. Without a
 recovery store, host writes still repeat after a restore. See the
 [unsupported list](../../docs/unsupported.md) for the supported agent shapes and limits.
+
+### Authoring surface and supported shapes
+
+The agent module exports an entry factory (`entry` in the `PyodideAgent` descriptor) that returns
+an ADK agent tree or `galaxie.adk.Executor(agent, interaction=..., resume=...)`. Authors import
+`llm(role)` for a router-backed model, `capability_tool(name, capability, parameters, description,
+require_confirmation=False, long_running=False)` for a tool that calls a bound capability, and
+`loop_exit()` for a `LoopAgent` without `max_iterations`. They never see the Runner, the session
+service or a credential; `interaction(requests)` turns a pause into one interaction and an optional
+`resume(requests, action, payload)` returns one decision per request.
+
+The conformance cases show these shapes with the same results as native ADK 2.12.0: a single
+`LlmAgent`, a `SequentialAgent`, a `ParallelAgent` (inside a sequence), a `LoopAgent`, and an
+`LlmAgent` with `sub_agents` that transfers with `transfer_to_agent`, each for run and stream, and a
+confirmation in the last child of a `SequentialAgent`, also across a reload. Two parallel branches
+that call write capabilities keep branch-local replay scopes. `Workflow`, `AgentTool` and every
+pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) names fail
+`unsupported` at prepare. `subgraphs` stays false.
+
+### Third-party licenses
+
+The 29-wheel `adk` set carries the licenses its wheels declare in their dist-info metadata:
+
+- Apache-2.0: `google-adk` (declared by classifier), `google-genai`, `google-auth`, `tenacity`, `opentelemetry-api`, `opentelemetry-semantic-conventions` and `requests` (which ships a `NOTICE` file).
+- `Apache-2.0 OR BSD-3-Clause`: Pyodide's `cryptography` 47.0.0, with `LICENSE`, `LICENSE.APACHE` and `LICENSE.BSD` in its `dist-info`. It ships no separate notice for its native extension, so a host that redistributes the wheel should check that extension's own notices.
+- `Apache-2.0 OR BSD-2-Clause`: `packaging`. `MIT OR Apache-2.0`: `sniffio`.
+- BSD-3-Clause: `authlib`, `joserfc`, `websockets`, `starlette`, `httpx`, `idna` and `pycparser`.
+- MIT: `fastapi`, `annotated-doc`, `annotated-types`, `anyio`, `cffi`, `charset-normalizer`, `pydantic`, `pydantic-core`, `typing-inspection` and `urllib3`.
+- MPL-2.0: `certifi`. PSF-2.0: `typing-extensions`.
+
+Hosts that serve the wheels keep each wheel's `dist-info` license and notice files with it.

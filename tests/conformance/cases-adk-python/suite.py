@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 # SPDX-License-Identifier: AGPL-3.0-only
 
-from google.adk.agents import LlmAgent
+from google.adk.agents import LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from pydantic import BaseModel
 
 CASES = (
@@ -10,6 +10,13 @@ CASES = (
     'stream-text', 'stream-tools', 'stream-mid-block', 'stream-abort',
     'confirm-approve', 'confirm-deny', 'confirm-two', 'long-running', 'confirm-stale',
     'confirm-incomplete', 'confirm-double-submit', 'confirm-consecutive', 'stream-confirm-approve',
+    'agents-sequential', 'agents-parallel', 'agents-loop', 'agents-transfer', 'stream-agents-sequential',
+    'agents-confirm-last',
+)
+# Cases whose agent tree has several agents; the scripted model answers by agent name.
+SHAPES = (
+    'agents-sequential', 'agents-parallel', 'agents-loop', 'agents-transfer', 'stream-agents-sequential',
+    'agents-confirm-last',
 )
 CONFIRMATION_CASES = tuple(name for name in CASES if 'confirm' in name)
 INTERACTION_CASES = (*CONFIRMATION_CASES, 'long-running')
@@ -42,6 +49,34 @@ def hooks(name):
     return {'interaction': interaction, **({'resume': external_answer} if name == 'long-running' else {})}
 
 
+def shape(name, model, tool):
+    """The supported multi-agent trees, each over the host's model and one capability tool."""
+
+    def leaf(agent, tools=(), **options):
+        return LlmAgent(
+            name=agent, model=model, description=f'The {agent} agent.', instruction=f'Answer as {agent}.',
+            tools=list(tools), **options,
+        )
+
+    kind = name.removeprefix('stream-')
+    if kind == 'agents-sequential':
+        return SequentialAgent(name='pipeline', sub_agents=[leaf('drafter', [tool]), leaf('reviewer')])
+    if kind == 'agents-parallel':
+        # The merger sees the last branch event, so the fixtures gate right's answer behind left's in both lanes.
+        fanout = ParallelAgent(name='fanout', sub_agents=[leaf('left', [tool]), leaf('right', [tool])])
+        return SequentialAgent(name='pipeline', sub_agents=[fanout, leaf('merger', include_contents='none')])
+    if kind == 'agents-loop':
+        return LoopAgent(name='refine', max_iterations=2, sub_agents=[leaf('worker', [tool])])
+    if kind == 'agents-transfer':
+        return LlmAgent(
+            name='router', model=model, description='The router agent.', instruction='Route the request.',
+            sub_agents=[leaf('specialist', [tool])],
+        )
+    if kind == 'agents-confirm-last':
+        return SequentialAgent(name='pipeline', sub_agents=[leaf('drafter'), leaf('approver', [tool])])
+    raise ValueError('The conformance case is unknown.')
+
+
 def factory(name, model=None, tool=None):
     """The case's agent; the native lane passes its own model and tool, the Worker lane the host helpers."""
     if name not in CASES:
@@ -55,7 +90,7 @@ def factory(name, model=None, tool=None):
             require_confirmation=name in CONFIRMATION_CASES, long_running=name == 'long-running',
         )
     options = {'output_schema': Answer, 'output_key': 'result'} if name == 'output-schema' else {}
-    agent = LlmAgent(
+    agent = shape(name, model, tool) if name in SHAPES else LlmAgent(
         name='conformance', model=model, instruction='Use the supplied tools and answer briefly.',
         tools=[tool] if name in TOOL_CASES and tool is not None else [], **options,
     )

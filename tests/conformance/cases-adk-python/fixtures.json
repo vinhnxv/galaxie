@@ -1,32 +1,90 @@
 {
   "plain-text": {
     "prompt": "plain text",
-    "replies": [{ "text": "A plain answer." }]
+    "replies": [
+      {
+        "text": "A plain answer."
+      }
+    ]
   },
   "capability": {
     "prompt": "one tool",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "The result is 6." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The result is 6."
+      }
     ]
   },
   "sequential-tools": {
     "prompt": "two tools",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 2 } }] },
-      { "text": "", "toolCalls": [{ "id": "double_2", "name": "double", "args": { "value": 4 } }] },
-      { "text": "The result is 8." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 2
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_2",
+            "name": "double",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The result is 8."
+      }
     ]
   },
   "output-schema": {
     "prompt": "structured answer",
-    "replies": [{ "text": "{\"value\": 6}" }]
+    "replies": [
+      {
+        "text": "{\"value\": 6}"
+      }
+    ]
   },
   "capability-denial": {
     "prompt": "denied tool",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "The tool was denied." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The tool was denied."
+      }
     ]
   },
   "argument-block": {
@@ -35,58 +93,160 @@
       {
         "text": "",
         "toolCalls": [
-          { "id": "double_1", "name": "double", "args": { "value": 1, "note": "BLOCKED_ARGUMENT" } }
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 1,
+              "note": "BLOCKED_ARGUMENT"
+            }
+          }
         ]
       },
-      { "text": "unreachable" }
+      {
+        "text": "unreachable"
+      }
     ]
   },
   "step-budget": {
     "prompt": "budget",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 1 } }] },
-      { "text": "", "toolCalls": [{ "id": "double_2", "name": "double", "args": { "value": 2 } }] },
-      { "text": "unreachable" }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 1
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_2",
+            "name": "double",
+            "args": {
+              "value": 2
+            }
+          }
+        ]
+      },
+      {
+        "text": "unreachable"
+      }
     ]
   },
   "abort": {
     "prompt": "slow reply",
-    "replies": [{ "text": "late" }]
+    "replies": [
+      {
+        "text": "late"
+      }
+    ]
   },
   "stream-text": {
     "prompt": "stream text",
-    "replies": [{ "text": "A streamed answer." }]
+    "replies": [
+      {
+        "text": "A streamed answer."
+      }
+    ]
   },
   "stream-tools": {
     "prompt": "stream tools",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "The result is 6." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The result is 6."
+      }
     ]
   },
   "stream-mid-block": {
     "prompt": "stream mid block",
-    "replies": [{ "text": "Allowed BLOCKED_TEXT hidden." }]
+    "replies": [
+      {
+        "text": "Allowed BLOCKED_TEXT hidden."
+      }
+    ]
   },
   "stream-abort": {
     "prompt": "stream abort",
-    "replies": [{ "text": "First never returned." }]
+    "replies": [
+      {
+        "text": "First never returned."
+      }
+    ]
   },
   "confirm-approve": {
     "prompt": "confirm approve",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "The confirmed result is ready." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The confirmed result is ready."
+      }
     ],
-    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }]
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
   },
   "confirm-deny": {
     "prompt": "confirm deny",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "The tool was declined." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The tool was declined."
+      }
     ],
-    "answers": [{ "action": "deny", "payload": { "indexes": [0] } }]
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
   },
   "confirm-two": {
     "prompt": "confirm two",
@@ -94,62 +254,409 @@
       {
         "text": "",
         "toolCalls": [
-          { "id": "double_1", "name": "double", "args": { "value": 3 } },
-          { "id": "double_2", "name": "double", "args": { "value": 4 } }
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          },
+          {
+            "id": "double_2",
+            "name": "double",
+            "args": {
+              "value": 4
+            }
+          }
         ]
       },
-      { "text": "The confirmed result is ready." }
+      {
+        "text": "The confirmed result is ready."
+      }
     ],
-    "answers": [{ "action": "approve", "payload": { "indexes": [1, 0] } }]
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [1, 0]
+        }
+      }
+    ]
   },
   "long-running": {
     "prompt": "long running",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "The external result arrived." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The external result arrived."
+      }
     ],
-    "answers": [{ "action": "submit", "payload": { "result": "external six" } }]
+    "answers": [
+      {
+        "action": "submit",
+        "payload": {
+          "result": "external six"
+        }
+      }
+    ]
   },
   "confirm-stale": {
     "prompt": "confirm stale",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
     ],
-    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }]
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
   },
   "confirm-incomplete": {
     "prompt": "confirm incomplete",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
     ],
-    "answers": [{ "action": "approve", "payload": { "indexes": [] } }]
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": []
+        }
+      }
+    ]
   },
   "confirm-double-submit": {
     "prompt": "confirm double submit",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "The confirmed result is ready." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The confirmed result is ready."
+      }
     ],
-    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }]
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
   },
   "confirm-consecutive": {
     "prompt": "confirm consecutive",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 4 } }] },
-      { "text": "The confirmed result is ready." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The confirmed result is ready."
+      }
     ],
     "answers": [
-      { "action": "approve", "payload": { "indexes": [0] } },
-      { "action": "approve", "payload": { "indexes": [0] } }
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      },
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
     ]
   },
   "stream-confirm-approve": {
     "prompt": "stream confirm approve",
     "replies": [
-      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
-      { "text": "The confirmed result is ready." }
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The confirmed result is ready."
+      }
     ],
-    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }]
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
+  },
+  "agents-sequential": {
+    "prompt": "pipeline run",
+    "agents": {
+      "drafter": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "Draft: 4"
+        }
+      ],
+      "reviewer": [
+        {
+          "text": "Reviewed: Draft: 4"
+        }
+      ]
+    }
+  },
+  "stream-agents-sequential": {
+    "prompt": "stream pipeline",
+    "agents": {
+      "drafter": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "Draft: 4"
+        }
+      ],
+      "reviewer": [
+        {
+          "text": "Reviewed: Draft: 4"
+        }
+      ]
+    }
+  },
+  "agents-parallel": {
+    "prompt": "fan out",
+    "unordered": true,
+    "agents": {
+      "left": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_l",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "Left: 4"
+        }
+      ],
+      "right": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_r",
+              "name": "double",
+              "args": {
+                "value": 5
+              }
+            }
+          ]
+        },
+        {
+          "text": "Right: 10",
+          "after": "left"
+        }
+      ],
+      "merger": [
+        {
+          "text": "Merged both branches."
+        }
+      ]
+    }
+  },
+  "agents-loop": {
+    "prompt": "refine twice",
+    "agents": {
+      "worker": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "Pass 1: 6"
+        },
+        {
+          "text": "Pass 2 ready."
+        }
+      ]
+    }
+  },
+  "agents-transfer": {
+    "prompt": "route me",
+    "agents": {
+      "router": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "transfer_1",
+              "name": "transfer_to_agent",
+              "args": {
+                "agent_name": "specialist"
+              }
+            }
+          ]
+        }
+      ],
+      "specialist": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 4
+              }
+            }
+          ]
+        },
+        {
+          "text": "The specialist says 8."
+        }
+      ]
+    }
+  },
+  "agents-confirm-last": {
+    "prompt": "approve at the end",
+    "agents": {
+      "drafter": [
+        {
+          "text": "Draft ready."
+        }
+      ],
+      "approver": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "Approved and doubled."
+        }
+      ]
+    },
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
   }
 }
