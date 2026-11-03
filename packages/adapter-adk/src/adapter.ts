@@ -17,6 +17,7 @@ import {
   LlmAgent,
   ParallelAgent,
   Runner,
+  SequentialAgent,
   StreamingMode,
   setLogger,
   ToolCallIntegrityPlugin,
@@ -86,9 +87,35 @@ function outputOf(root: BaseAgent, last: FinalResponse): unknown {
   return last.text;
 }
 
-/** Branches of a ParallelAgent interleave their events, so a pause there cannot be told apart. */
+/** Branches of a ParallelAgent interleave their events, so a pause in such a tree is refused. */
 function hasParallel(agent: BaseAgent): boolean {
   return agent instanceof ParallelAgent || agent.subAgents.some(hasParallel);
+}
+
+function agentsNamed(agent: BaseAgent, name: string): BaseAgent[] {
+  return [
+    ...(agent.name === name ? [agent] : []),
+    ...agent.subAgents.flatMap((child) => agentsNamed(child, name)),
+  ];
+}
+
+/**
+ * Whether resuming a pause raised by the agent called `name` would run earlier work again.
+ * ADK resumes directly at the paused agent only when it and all its ancestors are LlmAgents;
+ * otherwise it restarts from the root. That restart is safe only when every step down to the
+ * paused agent is the first child of a SequentialAgent. An unknown or ambiguous name fails closed.
+ */
+export function restartsSiblings(root: BaseAgent, name: string): boolean {
+  const found = agentsNamed(root, name);
+  const target = found[0];
+  if (found.length !== 1 || target === undefined) return true;
+  const chain: BaseAgent[] = [];
+  for (let up = target.parentAgent; up !== undefined; up = up.parentAgent) chain.unshift(up);
+  if (chain.every((agent) => agent instanceof LlmAgent)) return false;
+  const path = [...chain, target];
+  return chain.some((parent, index) => {
+    return !(parent instanceof SequentialAgent) || parent.subAgents[0] !== path[index + 1];
+  });
 }
 
 function findAgent(root: BaseAgent, name: string): BaseAgent | undefined {
@@ -480,7 +507,13 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               let paused = false;
               try {
                 paused = tracker.observe(event);
-                if (paused && parallel) throw failure('unsupported');
+                if (
+                  paused &&
+                  (parallel ||
+                    (event.author !== undefined &&
+                      restartsSiblings(root as BaseAgent, event.author)))
+                )
+                  throw failure('unsupported');
               } catch (error) {
                 run.fail(error);
                 break;

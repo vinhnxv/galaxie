@@ -27,7 +27,7 @@
 - [Core README](packages/core/README.md): framework-neutral contracts and host runtime setup.
 - [LangGraph adapter README](packages/adapter-langgraph/README.md): a minimal graph and explicit config.
 - [Python adapter README](packages/adapter-pyodide/README.md): trusted LangGraph Python/pydantic-ai/DSPy Workers, checked bridge, durable interactions, deterministic DSPy replay and JavaScript policy.
-- [ADK adapter README](packages/adapter-adk/README.md): ADK 2.3.0 browser-bundle foundation, host requirements measured under strict CSP (stage A1, no adapter yet).
+- [ADK adapter README](packages/adapter-adk/README.md): `adk-js` executor over the ADK 2.3.0 browser bundle: router-backed models, capability tools, checked streaming, confirmations and long-running tools as interactions, durable sessions and the supported agent shapes.
 - [Models README](packages/models/README.md): provider subpaths and the deterministic mock.
 - [React README](packages/react/README.md): surfaces and separate host confirmations.
 - [IndexedDB README](packages/storage-indexeddb/README.md): scoped checkpoints, recovery and storage lifecycle.
@@ -39,7 +39,7 @@
 - [Core AGENTS](packages/core/AGENTS.md): lifecycle, policy and content-free instrumentation rules.
 - [LangGraph adapter AGENTS](packages/adapter-langgraph/AGENTS.md): native semantics, config and unsupported interrupts.
 - [Python adapter AGENTS](packages/adapter-pyodide/AGENTS.md): Worker lifecycle, compiled wheel hashes, CSP and Python trust limits.
-- [ADK adapter AGENTS](packages/adapter-adk/AGENTS.md): import rules, bundle pin and host ordering for the ADK foundation.
+- [ADK adapter AGENTS](packages/adapter-adk/AGENTS.md): import rules, bundle pin, host ordering and limits of the ADK executor.
 - [Models AGENTS](packages/models/AGENTS.md): host registration and fake-only automated model tests.
 - [React AGENTS](packages/react/AGENTS.md): trusted registries, text rendering and host lifecycle.
 - [IndexedDB AGENTS](packages/storage-indexeddb/AGENTS.md): principal scope, fencing, recovery and deletion.

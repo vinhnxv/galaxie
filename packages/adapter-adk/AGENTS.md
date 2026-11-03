@@ -3,7 +3,7 @@
 ## Purpose
 
 Host Google ADK (JavaScript) agents as a galaxie executor, with routing, labels, consent,
-budgets and persistence kept in galaxie. Stage A5 adds durable sessions through the byte-record checkpoint port. See the
+budgets and persistence kept in galaxie. Durable sessions go through the byte-record checkpoint port. A pause is accepted only where ADK's resume does not rerun earlier siblings (`restartsSiblings` in `src/adapter.ts`, evidence in `test/agents.test.ts`); loosening that rule needs new native evidence. See the
 [README](README.md) and [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md).
 
 ## Entry points

@@ -2,11 +2,11 @@
 
 The Google ADK (JavaScript) executor adapter (executor id `adk-js`). It pins ADK, runs its
 browser bundle under galaxie's strict CSP and Trusted Types, and hosts agents through galaxie's
-router, broker and budgets, with checked streaming and pauses for confirmations and long-running
-tools. See
+router, broker and budgets, with checked streaming, pauses for confirmations and long-running
+tools, and durable sessions. See
 [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md) (Proposed).
 
-## Adapter (stage A5)
+## Adapter
 
 `createAdkAdapter()` registers `adk-js` with `streaming`, `interrupts`, `resume` and `checkpoints` set
 to `true` and `subgraphs` set to `false`. The run input is `{ prompt: string }`.
@@ -104,6 +104,37 @@ const agent: AdkAgent = (host) =>
   stay in memory, as before. The effect scope of a write is position-derived, so an approved write
   whose run crashed replays its receipt after the restore. One active owner per session applies, as for
   the other executors; the example host is a later stage.
+
+## Supported agent shapes
+
+Native ADK and the adapter run the same scripted model requests and return the same output for
+`SequentialAgent`, `LoopAgent`, `ParallelAgent` (request tags compared sorted, because branch arrival order
+varies) and an `LlmAgent` with `subAgents` that transfers ([agents.test.ts](test/agents.test.ts)).
+Two `ParallelAgent` branches that each call a write capability get their own position-derived
+scopes: after a failed run, the re-dispatch with reversed branch completion order replays each
+receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `false`.
+
+- ADK resumes directly at the paused agent only when that agent and all its ancestors are
+  `LlmAgent`s; otherwise it restarts from the root, and a `SequentialAgent` or `LoopAgent` runs
+  from its first child (the native test shows this for `SequentialAgent`). A pause would run
+  earlier siblings, and their writes, again in a `LoopAgent`, in a later child of a
+  `SequentialAgent`, or under an `LlmAgent` inside a workflow agent, so it fails `unsupported`.
+  The same holds in any tree that contains a `ParallelAgent`, and for an unknown or
+  duplicate-named pausing agent. A pause in the first child at every `SequentialAgent` step, or in
+  a chain of `LlmAgent`s linked by transfer, resumes in place and survives a reload.
+- `AgentTool` and `Workflow` fail `unsupported` at prepare. Re-admitting `AgentTool` needs an
+  adapter-owned wrapper with its own run config, integrity plugin and session keying.
+
+## Other facts for hosts
+
+- The adapter installs a no-op ADK logger, which is process-global, so it also silences ADK logging
+  for other code in the page.
+- The bundle needs `crypto.subtle` for the tool-call integrity plugin. It ships under Apache-2.0
+  with inlined lodash (MIT) and `@google/genai` (Apache-2.0).
+- The per-session integrity key guards in-flight forgery and corrupt history. It does not protect
+  against a writer of the store.
+- ADK still emits content-free spans of its own to a registered global OpenTelemetry provider.
+  Responses that an agent-level model callback replaces are not re-checked (ADR-0002).
 
 ## Install
 
