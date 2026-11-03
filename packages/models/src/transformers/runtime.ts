@@ -98,6 +98,24 @@ async function deviceReport(record: TransformersModelRecord): Promise<DeviceRepo
   };
 }
 
+/**
+ * The options handed to the chat template. Qwen3 reasons before it answers unless the record
+ * turns that off (ADR-0021 decision 11).
+ */
+export function templateOptions(
+  request: GenerateRequest,
+  record: TransformersModelRecord,
+): Record<string, unknown> {
+  return {
+    ...(request.tools === undefined ? {} : { tools: request.tools }),
+    ...(record.template?.enableThinking === undefined
+      ? {}
+      : { enable_thinking: record.template.enableThinking }),
+    add_generation_prompt: true,
+    return_dict: true,
+  };
+}
+
 /** The messages as the chat template sees them; exported so tests render the same shape. */
 export function templateMessages(request: GenerateRequest): unknown[] {
   return request.messages.map((message) => ({
@@ -168,15 +186,10 @@ export const transformersRuntime: TransformersRuntime = {
     return {
       device,
       async generate({ request, contextWindow, onText, signal }): Promise<RuntimeGenerateResult> {
-        const inputs = tokenizer.apply_chat_template(templateMessages(request), {
-          ...(request.tools === undefined ? {} : { tools: request.tools }),
-          // Qwen3 reasons before it answers unless the record turns that off (ADR-0021 decision 11).
-          ...(record.template?.enableThinking === undefined
-            ? {}
-            : { enable_thinking: record.template.enableThinking }),
-          add_generation_prompt: true,
-          return_dict: true,
-        });
+        const inputs = tokenizer.apply_chat_template(
+          templateMessages(request),
+          templateOptions(request, record),
+        );
         const promptTokens = inputs.input_ids.dims[1] ?? 0;
         if (promptTokens + request.maxTokens > contextWindow) throw new ModelError('invalid');
         const stopping = new library.InterruptableStoppingCriteria();

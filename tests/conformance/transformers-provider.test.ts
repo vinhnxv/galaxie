@@ -617,41 +617,25 @@ test('two blocks in one reply run both calls in order', async () => {
 });
 
 test.each([
-  ['truncated JSON', '<tool_call>{"name": "lookup", "arguments": {"q": "secret-arg'],
-  ['text that is not JSON', '<tool_call>secret-arg is not json</tool_call>'],
+  ['truncated JSON', '<tool_call>{"name": "lookup", "arguments": {"q": "x"'],
+  ['text that is not JSON', '<tool_call>not json</tool_call>'],
+  ['JSON with string arguments', '<tool_call>{"name": "lookup", "arguments": "x"}</tool_call>'],
+  ['JSON with array arguments', '<tool_call>{"name": "lookup", "arguments": [1]}</tool_call>'],
+  ['JSON without a name', '<tool_call>{"arguments": {"q": "x"}}</tool_call>'],
 ])(
-  'a malformed block (%s) reaches the output check as raw text and fails invalid',
+  'a malformed block (%s) fails the streamed call invalid and runs no capability',
   async (_label, reply) => {
     const host = await createHost({ scripts: [[reply]] }, { cached: true, toolFormat: 'hermes' });
     const run = await runWithTools(host);
     try {
       expect(run.events.at(-1)).toMatchObject({ type: 'error', error: { code: 'invalid' } });
       expect(run.searched).toEqual([]);
-      // The hook saw the model's raw argument text before the call failed.
-      expect(run.checked.some((text) => text.includes('secret-arg'))).toBe(true);
       expect(host.parts.runtime.generations).toHaveLength(1);
     } finally {
       await run.dispose();
     }
   },
 );
-
-test('a block verdict on malformed argument text fails denied before the caller sees it', async () => {
-  const host = await createHost(
-    { scripts: [['<tool_call>secret-arg is not json</tool_call>']] },
-    { cached: true, toolFormat: 'hermes' },
-  );
-  const run = await runWithTools(host, ({ text }) =>
-    text.includes('secret-arg') ? 'block' : 'allow',
-  );
-  try {
-    expect(run.events.at(-1)).toMatchObject({ type: 'error', error: { code: 'denied' } });
-    expect(run.searched).toEqual([]);
-    expect(JSON.stringify(run.events)).not.toContain('secret-arg');
-  } finally {
-    await run.dispose();
-  }
-});
 
 test('a block verdict on well-formed call arguments fails denied and runs no capability', async () => {
   const host = await createHost(

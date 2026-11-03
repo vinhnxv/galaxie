@@ -136,14 +136,53 @@ describe('Transformers tool calling', () => {
     }
   });
 
-  it('streams a malformed block as raw argument text without a name', async () => {
-    const { handle, model } = await fixture({ pieces: ['<tool_call>not json</tool_call>'] });
+  it.each([
+    ['text that is not JSON', 'not json', 'not json', undefined],
+    [
+      'JSON with the wrong argument type',
+      '{"name": "lookup", "arguments": [1]}',
+      '{"name": "lookup", "arguments": [1]}',
+      'lookup',
+    ],
+    [
+      'a truncated block',
+      '{"name": "lookup", "arguments": {"q": "x"',
+      '{"name": "lookup", "arguments": {"q": "x"',
+      undefined,
+    ],
+  ])(
+    'streams a malformed block (%s) as an invalid call, never as argument fragments',
+    async (_label, body, args, name) => {
+      const { handle, model } = await fixture({ pieces: [`<tool_call>${body}</tool_call>`] });
+      try {
+        const chunks: AIMessageChunk[] = [];
+        for await (const chunk of await model.bindTools([lookup]).stream('find'))
+          chunks.push(chunk);
+        // LangChain would repair argument fragments of a JSON-valid block into a valid call.
+        expect(chunks.flatMap((chunk) => chunk.tool_call_chunks ?? [])).toEqual([]);
+        expect(chunks.flatMap((chunk) => chunk.tool_calls ?? [])).toEqual([]);
+        expect(chunks.flatMap((chunk) => chunk.invalid_tool_calls ?? [])).toEqual([
+          expect.objectContaining({
+            id: 'call_0',
+            args,
+            ...(name === undefined ? {} : { name }),
+          }),
+        ]);
+      } finally {
+        await handle.dispose();
+      }
+    },
+  );
+
+  it('streams the seventeenth block as an invalid call after sixteen valid ones', async () => {
+    const { handle, model } = await fixture({
+      pieces: Array.from({ length: 17 }, (_, index) => call('lookup', { q: String(index) })),
+    });
     try {
       const chunks: AIMessageChunk[] = [];
       for await (const chunk of await model.bindTools([lookup]).stream('find')) chunks.push(chunk);
-      const [entry] = chunks.flatMap((chunk) => chunk.tool_call_chunks ?? []);
-      expect(entry).toMatchObject({ index: 0, id: 'call_0', args: 'not json' });
-      expect(entry?.name).toBeUndefined();
+      expect(chunks.flatMap((chunk) => chunk.tool_call_chunks ?? [])).toHaveLength(16);
+      expect(chunks.flatMap((chunk) => chunk.invalid_tool_calls ?? [])).toHaveLength(1);
     } finally {
       await handle.dispose();
     }

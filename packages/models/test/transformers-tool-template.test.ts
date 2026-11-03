@@ -5,7 +5,9 @@ import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/
 import { describe, expect, it } from 'vitest';
 import { ModelError } from '../src/errors.js';
 import { mapToolMessages } from '../src/transformers/messages.js';
+import type { TransformersModelRecord } from '../src/transformers/model-record.js';
 import { type GenerateRequest, parseToWorker } from '../src/transformers/protocol.js';
+import { templateOptions } from '../src/transformers/runtime.js';
 import { renderHermes } from './support/hermes-template.js';
 
 const lookup = {
@@ -60,6 +62,48 @@ describe('tool message mapping', () => {
     ]);
     expect(mapped.map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'tool']);
     expect(mapped[1]?.toolCalls?.map((call) => call.name)).toEqual(['one', 'two']);
+  });
+
+  it.each([
+    [
+      'a tool turn with no call before it',
+      () => [new HumanMessage('hi'), new ToolMessage({ content: 'x', tool_call_id: 'a' })],
+    ],
+    [
+      'more results than calls',
+      () => [
+        new HumanMessage('go'),
+        new AIMessage({ content: '', tool_calls: [{ id: 'a', name: 'one', args: {} }] }),
+        new ToolMessage({ content: 'first', tool_call_id: 'a' }),
+        new ToolMessage({ content: 'second', tool_call_id: 'b' }),
+      ],
+    ],
+    [
+      'a result after a human turn that followed the call',
+      () => [
+        new HumanMessage('go'),
+        new AIMessage({ content: '', tool_calls: [{ id: 'a', name: 'one', args: {} }] }),
+        new HumanMessage('wait'),
+        new ToolMessage({ content: 'late', tool_call_id: 'a' }),
+      ],
+    ],
+  ])('rejects %s as invalid', (_label, make) => {
+    expect(() => mapToolMessages(make())).toThrow(expect.objectContaining({ code: 'invalid' }));
+  });
+
+  it('accepts fewer results than calls, as when a result is still pending', () => {
+    const mapped = mapToolMessages([
+      new HumanMessage('go'),
+      new AIMessage({
+        content: '',
+        tool_calls: [
+          { id: 'a', name: 'one', args: {} },
+          { id: 'b', name: 'two', args: {} },
+        ],
+      }),
+      new ToolMessage({ content: 'first', tool_call_id: 'a' }),
+    ]);
+    expect(mapped.map((message) => message.role)).toEqual(['user', 'assistant', 'tool']);
   });
 
   it('accepts a conversation that ends with a human or a tool turn', () => {
@@ -194,5 +238,28 @@ describe('Hermes-style template rendering', () => {
       temperature: 0,
     });
     expect(rendered).toBe('<|im_start|>user\nhi<|im_end|>\n<|im_start|>assistant\n');
+  });
+});
+
+describe('template options', () => {
+  const record = { template: { enableThinking: false } } as TransformersModelRecord;
+  const plain = {} as TransformersModelRecord;
+  const base: GenerateRequest = {
+    messages: [{ role: 'user', content: 'hi' }],
+    maxTokens: 8,
+    temperature: 0,
+  };
+
+  it('turns thinking off only when the record says so and passes tools through', () => {
+    expect(templateOptions(base, record)).toEqual({
+      enable_thinking: false,
+      add_generation_prompt: true,
+      return_dict: true,
+    });
+    expect(templateOptions({ ...base, tools: [lookup] }, plain)).toEqual({
+      tools: [lookup],
+      add_generation_prompt: true,
+      return_dict: true,
+    });
   });
 });

@@ -26,12 +26,7 @@ import type { OutputSchema } from '../structured-output.js';
 import type { TransformersStreamEvent } from './engine.js';
 import { mapToolMessages } from './messages.js';
 import type { GenerateRequest, JsonObject } from './protocol.js';
-import {
-  type InvalidToolBlock,
-  type ParsedToolCall,
-  ToolBlockSplitter,
-  type ToolItem,
-} from './tool-parser.js';
+import { type InvalidToolBlock, ToolBlockSplitter, type ToolItem } from './tool-parser.js';
 
 /**
  * What the chat model needs from an engine. A loaded handle satisfies it; a host that loads
@@ -85,14 +80,13 @@ function toolsEnabled(choice: unknown): boolean {
   throw new ModelError('unsupported');
 }
 
-function chunkOf(item: ParsedToolCall | InvalidToolBlock) {
+function invalidCall(block: InvalidToolBlock): InvalidToolCall {
   return {
-    type: 'tool_call_chunk' as const,
-    index: item.index,
-    id: item.id,
-    ...(item.kind === 'call'
-      ? { name: item.name, args: JSON.stringify(item.args) }
-      : { ...(item.name === undefined ? {} : { name: item.name }), args: item.args }),
+    type: 'invalid_tool_call',
+    id: block.id,
+    ...(block.name === undefined ? {} : { name: block.name }),
+    args: block.args,
+    error: 'The tool call is malformed.',
   };
 }
 
@@ -188,7 +182,11 @@ export class TransformersChatModel extends BaseChatModel<TransformersCallOptions
     options.signal?.throwIfAborted();
   }
 
-  async #token(runManager: CallbackManagerForLLMRun | undefined, text: string): Promise<void> {
+  /** Reports one text delta to the run's callbacks and returns it as a chunk. */
+  async #text(
+    runManager: CallbackManagerForLLMRun | undefined,
+    text: string,
+  ): Promise<ChatGenerationChunk> {
     const chunk = new ChatGenerationChunk({
       text,
       message: new AIMessageChunk<StandardMessageStructure>({ content: text }),
@@ -196,6 +194,7 @@ export class TransformersChatModel extends BaseChatModel<TransformersCallOptions
     await runManager?.handleLLMNewToken(text, undefined, undefined, undefined, undefined, {
       chunk,
     });
+    return chunk;
   }
 
   override async _generate(
@@ -211,18 +210,12 @@ export class TransformersChatModel extends BaseChatModel<TransformersCallOptions
     for await (const event of this.#events(messages, options)) {
       if (event.kind === 'text') {
         text += event.text;
-        await this.#token(runManager, event.text);
+        await this.#text(runManager, event.text);
         options.signal?.throwIfAborted();
       } else if (event.kind === 'call') {
         calls.push({ type: 'tool_call', id: event.id, name: event.name, args: event.args });
       } else if (event.kind === 'invalid') {
-        invalid.push({
-          type: 'invalid_tool_call',
-          id: event.id,
-          ...(event.name === undefined ? {} : { name: event.name }),
-          args: event.args,
-          error: 'The tool call is malformed.',
-        });
+        invalid.push(invalidCall(event));
       } else {
         usage = event.usage;
         metadata = { finish_reason: event.finishReason };
@@ -256,32 +249,39 @@ export class TransformersChatModel extends BaseChatModel<TransformersCallOptions
         continue;
       }
       if (event.kind === 'text') {
-        const output = new ChatGenerationChunk({
-          text: event.text,
-          message: new AIMessageChunk<StandardMessageStructure>({ content: event.text }),
-        });
-        await runManager?.handleLLMNewToken(
-          event.text,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          { chunk: output },
-        );
+        const output = await this.#text(runManager, event.text);
         options.signal?.throwIfAborted();
         yield output;
         continue;
       }
-      // Each complete block arrives once, with its own index; a malformed one carries its raw
-      // text as the argument string, so a reader that rebuilds calls can compare the two.
       options.signal?.throwIfAborted();
-      yield new ChatGenerationChunk({
-        text: '',
-        message: new AIMessageChunk<StandardMessageStructure>({
-          content: '',
-          tool_call_chunks: [chunkOf(event)],
-        }),
-      });
+      // A valid block arrives once as a complete argument string with its own index. A malformed
+      // one is reported as an invalid call on its own chunk, never as argument fragments:
+      // LangChain would repair fragments of a JSON-valid but wrong block into a call that looks
+      // valid. The list is set after construction because the constructor recomputes it from
+      // fragments; a reader that concatenates chunks loses it, while the ADK adapter reads each
+      // chunk and fails the call `invalid`.
+      if (event.kind === 'call') {
+        yield new ChatGenerationChunk({
+          text: '',
+          message: new AIMessageChunk<StandardMessageStructure>({
+            content: '',
+            tool_call_chunks: [
+              {
+                type: 'tool_call_chunk',
+                index: event.index,
+                id: event.id,
+                name: event.name,
+                args: JSON.stringify(event.args),
+              },
+            ],
+          }),
+        });
+        continue;
+      }
+      const message = new AIMessageChunk<StandardMessageStructure>({ content: '' });
+      message.invalid_tool_calls = [invalidCall(event)];
+      yield new ChatGenerationChunk({ text: '', message });
     }
     options.signal?.throwIfAborted();
     yield new ChatGenerationChunk({

@@ -23,6 +23,8 @@ function toolCallsOf(message: BaseMessage): ProtocolToolCall[] {
 export function mapToolMessages(messages: BaseMessage[]): readonly ProtocolMessage[] {
   const last = messages.at(-1)?.type;
   if (last !== 'human' && last !== 'tool') throw new ModelError('invalid');
+  // Results pair with calls by position, so a result needs a call of the turn before it.
+  let pending = 0;
   return messages.map((message, index) => {
     if (message.type === 'system' && index !== 0) throw new ModelError('invalid');
     if (
@@ -36,13 +38,18 @@ export function mapToolMessages(messages: BaseMessage[]): readonly ProtocolMessa
     const content = textContent(message);
     switch (message.type) {
       case 'system':
+        pending = 0;
         return { role: 'system', content };
       case 'human':
+        pending = 0;
         return { role: 'user', content };
       case 'tool':
+        if (pending === 0) throw new ModelError('invalid');
+        pending -= 1;
         return { role: 'tool', content };
       case 'ai': {
         const toolCalls = toolCallsOf(message);
+        pending = toolCalls.length;
         return toolCalls.length === 0
           ? { role: 'assistant', content }
           : { role: 'assistant', content, toolCalls };
