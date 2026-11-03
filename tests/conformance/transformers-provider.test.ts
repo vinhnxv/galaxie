@@ -732,7 +732,6 @@ async function runStructured(
             return { answer: parsed.answer };
           })
           .addEdge(START, 'respond')
-          .addEdge(START, 'respond')
           .addEdge('respond', END)
           .compile(),
     });

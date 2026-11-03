@@ -75,10 +75,14 @@ interface LibraryModule {
 }
 
 interface StructuredOutputModule {
-  readonly StructuredOutputProcessor: new (
-    tokenizer: object,
-    format: { readonly type: 'json_schema'; readonly json_schema: Record<string, unknown> },
-  ) => object;
+  readonly StructuredOutputProcessor: {
+    new (
+      tokenizer: object,
+      format: { readonly type: 'json_schema'; readonly json_schema: Record<string, unknown> },
+    ): object;
+    /** Reads the tokenizer once, so a tokenizer it cannot read fails apart from a bad schema. */
+    warmup(tokenizer: object): void;
+  };
 }
 
 interface GPUAdapterLike {
@@ -121,6 +125,12 @@ export async function constraintFor(
     )) as unknown as StructuredOutputModule;
   } catch {
     throw new ModelError('unsupported');
+  }
+  // A tokenizer the package cannot read is an environment fault, not a caller's schema fault.
+  try {
+    module.StructuredOutputProcessor.warmup(tokenizer);
+  } catch {
+    throw new ModelError('unavailable', 'load_failed');
   }
   try {
     return new module.StructuredOutputProcessor(tokenizer, {

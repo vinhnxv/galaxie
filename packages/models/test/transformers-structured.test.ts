@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { TransformersChatModel } from '../src/transformers/chat-model.js';
@@ -61,6 +60,12 @@ describe('constrained decoding', () => {
     ).rejects.toMatchObject({ code: 'invalid' });
   });
 
+  it('fails unavailable, not invalid, for a tokenizer the package cannot read', async () => {
+    await expect(constraintFor({ tokens: bytes.tokens }, schema)).rejects.toMatchObject({
+      code: 'unavailable',
+    });
+  });
+
   it('fails unsupported when the optional package is not installed', async () => {
     vi.resetModules();
     vi.doMock('@huggingface/transformers-structured-output', () => {
@@ -96,8 +101,6 @@ describe('structured output with tools', () => {
           .invoke('hello'),
       ).rejects.toMatchObject({ code: 'unsupported' });
       expect(runtime.generations).toEqual([]);
-      // Unused imports keep the message helpers available to later cases.
-      expect([AIMessage, HumanMessage]).toHaveLength(2);
     } finally {
       await handle.dispose();
     }
