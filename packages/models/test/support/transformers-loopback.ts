@@ -6,10 +6,15 @@ import { storedBytesHeader, storedSha256Header } from '../../src/transformers/mo
 import { modelFileUrl } from '../../src/transformers/model-record.js';
 import type { FromWorker } from '../../src/transformers/protocol.js';
 import { createWorkerHost, type WorkerHost } from '../../src/transformers/worker-host.js';
-import { createFakeRuntime, type FakeRuntimeOptions } from './fake-transformers-runtime.js';
+import {
+  createFakeRuntime,
+  type FakeRuntime,
+  type FakeRuntimeOptions,
+} from './fake-transformers-runtime.js';
 import {
   createFakeFetch,
   createSyntheticModel,
+  type FakeFetch,
   MemoryStore,
   type SyntheticModel,
 } from './transformers-model.js';
@@ -46,6 +51,14 @@ export class LoopbackWorker implements TransformersWorker {
   }
 }
 
+export interface LoopbackParts {
+  readonly model: SyntheticModel;
+  readonly store: MemoryStore;
+  readonly runtime: FakeRuntime;
+  readonly fetcher: FakeFetch;
+  readonly worker: LoopbackWorker;
+}
+
 export async function setup(
   options: {
     model?: SyntheticModel;
@@ -53,7 +66,7 @@ export async function setup(
     store?: MemoryStore;
     served?: boolean;
   } = {},
-) {
+): Promise<LoopbackParts> {
   const model = options.model ?? (await createSyntheticModel());
   const store = options.store ?? new MemoryStore();
   const runtime = createFakeRuntime(options.runtime);

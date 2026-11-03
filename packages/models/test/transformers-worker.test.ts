@@ -7,7 +7,7 @@ import { createTransformersEngine } from '../src/transformers/engine.js';
 import { modelFileUrl } from '../src/transformers/model-record.js';
 import type { FromWorker, GenerateRequest } from '../src/transformers/protocol.js';
 import { startTransformersWorker } from '../src/transformers/worker.js';
-import { createWorkerHost, type WorkerHost } from '../src/transformers/worker-host.js';
+import { createWorkerHost } from '../src/transformers/worker-host.js';
 import { createFakeRuntime } from './support/fake-transformers-runtime.js';
 import { request, settle } from './support/fake-transformers-worker.js';
 import { assets, seed, setup } from './support/transformers-loopback.js';
@@ -15,7 +15,6 @@ import {
   createFakeFetch,
   createSyntheticModel,
   MemoryStore,
-  type SyntheticModel,
 } from './support/transformers-model.js';
 
 describe('worker host', () => {
