@@ -34,6 +34,7 @@ export async function createSyntheticModel(
     readonly baseUrl?: string;
     readonly sizes?: readonly number[];
     readonly modelId?: string;
+    readonly toolFormat?: 'hermes';
   } = {},
 ): Promise<SyntheticModel> {
   const modelId = options.modelId ?? `example-org/tiny-${crypto.randomUUID().slice(0, 8)}`;
@@ -54,6 +55,7 @@ export async function createSyntheticModel(
     device: 'wasm',
     dtype: 'q4',
     contextWindow: 2048,
+    ...(options.toolFormat === undefined ? {} : { toolFormat: options.toolFormat }),
     files,
   });
   const served = new Map<string, Uint8Array<ArrayBuffer>>();

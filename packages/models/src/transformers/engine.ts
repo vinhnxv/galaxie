@@ -132,6 +132,8 @@ class Channel {
 
 export class TransformersEngineHandle {
   readonly modelId: string;
+  /** The record's tool-call text format; a handle without one refuses tools. */
+  readonly toolFormat: 'hermes' | undefined;
   readonly device: DeviceReport;
   readonly #worker: TransformersWorker;
   readonly #channel: Channel;
@@ -147,11 +149,13 @@ export class TransformersEngineHandle {
     lifetime: EngineLifetime,
     modelId: string,
     device: DeviceReport,
+    toolFormat: 'hermes' | undefined,
   ) {
     this.#worker = worker;
     this.#channel = channel;
     this.#lifetime = lifetime;
     this.modelId = modelId;
+    this.toolFormat = toolFormat;
     this.device = Object.freeze({ ...device });
   }
 
@@ -324,6 +328,7 @@ export async function createTransformersEngine(
           lifetime,
           record.modelId,
           message.device,
+          record.toolFormat,
         );
       }
     }

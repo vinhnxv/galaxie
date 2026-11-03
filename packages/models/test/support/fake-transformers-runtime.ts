@@ -14,6 +14,8 @@ import { readBytes } from './transformers-model.js';
 export interface FakeRuntimeOptions {
   /** Text pieces each generation emits, one per step. */
   readonly pieces?: readonly string[];
+  /** Pieces per generation, in order; the last script repeats. Overrides `pieces` when set. */
+  readonly scripts?: readonly (readonly string[])[];
   /** After this many pieces the first generation waits for an abort; later ones run to the end. */
   readonly holdAfter?: number;
   /** The load rejects with this error. */
@@ -23,6 +25,8 @@ export interface FakeRuntimeOptions {
   readonly backend?: 'webgpu' | 'wasm';
   /** Prompt length the fake reports; with `maxTokens` it is checked against the context window. */
   readonly promptTokens?: number;
+  /** The finish reason a generation that ran to the end reports; `stop` by default. */
+  readonly finishReason?: 'stop' | 'length';
 }
 
 export interface FakeRuntime extends TransformersRuntime {
@@ -63,8 +67,10 @@ export function createFakeRuntime(options: FakeRuntimeOptions = {}): FakeRuntime
           if (promptTokens + generation.request.maxTokens > generation.contextWindow)
             throw new ModelError('invalid');
           const first = runtime.generations.length === 1;
+          const script =
+            options.scripts?.[runtime.generations.length - 1] ?? options.scripts?.at(-1);
           let emitted = 0;
-          for (const piece of pieces) {
+          for (const piece of script ?? pieces) {
             if (generation.signal.aborted) break;
             if (first && options.holdAfter !== undefined && emitted >= options.holdAfter) {
               await new Promise<void>((resolve) => {
@@ -80,7 +86,7 @@ export function createFakeRuntime(options: FakeRuntimeOptions = {}): FakeRuntime
           return {
             promptTokens,
             completionTokens: emitted,
-            finishReason: generation.signal.aborted ? 'abort' : 'stop',
+            finishReason: generation.signal.aborted ? 'abort' : (options.finishReason ?? 'stop'),
           };
         },
         async dispose(): Promise<void> {

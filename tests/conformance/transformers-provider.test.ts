@@ -1,13 +1,16 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import '../../packages/adapter-adk/test/support/adk-env.js';
 import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
 import {
   createRuntime,
   type DiagnosticEvent,
   defineAgentDefinition,
+  type ExecutorAdapter,
   type ModelRouting,
   type OutputSafetyHook,
+  type RunEvent,
   type Runtime,
 } from '@galaxie/core';
 import { MockChatModel } from '@galaxie/models/mock';
@@ -18,10 +21,13 @@ import {
   TransformersChatModel,
   type TransformersEngineHandle,
 } from '@galaxie/models/transformers';
+import { LlmAgent } from '@google/adk';
 import { HumanMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { z } from 'zod';
+import { type AdkHost, createAdkAdapter } from '../../packages/adapter-adk/src/index.js';
+import { outputText } from '../../packages/adapter-adk/src/tool-calls.js';
 import { RunBudget } from '../../packages/core/src/budgets.js';
 import { collect } from '../../packages/core/test/fake-executor.js';
 import { recordNetwork } from '../../packages/core/test/network-recorder.js';
@@ -33,6 +39,7 @@ import {
   MemoryCacheStorage,
   type MemoryStore,
 } from '../../packages/models/test/support/transformers-model.js';
+import { toolCallChecks } from './support/tool-call-checks.js';
 
 const promptCanary = 'private prompt canary';
 const state = Annotation.Root({ answer: Annotation<string> });
@@ -83,13 +90,16 @@ interface Host {
 /** A host that loads the engine lazily: after a consented download, or from stored files. */
 async function createHost(
   runtimeOptions: FakeRuntimeOptions,
-  options: { cached: boolean; accept?: boolean } = { cached: false },
+  options: { cached: boolean; accept?: boolean; toolFormat?: 'hermes' } = { cached: false },
 ): Promise<Host> {
   const storage = globalThis.caches as unknown as MemoryCacheStorage;
   const { createSyntheticModel } = await import(
     '../../packages/models/test/support/transformers-model.js'
   );
-  const model = await createSyntheticModel({ modelId: 'example-org/tiny-fixture' });
+  const model = await createSyntheticModel({
+    modelId: 'example-org/tiny-fixture',
+    ...(options.toolFormat === undefined ? {} : { toolFormat: options.toolFormat }),
+  });
   const store = (await storage.open(modelCacheName(model.record))) as MemoryStore;
   if (options.cached) await seed(store, model);
   const parts = await setup({ model, runtime: runtimeOptions, store });
@@ -108,6 +118,7 @@ async function createHost(
   const downloads: number[] = [];
   const engine: TransformersChatEngine = {
     modelId: model.record.modelId,
+    toolFormat: model.record.toolFormat,
     async *stream(request, signal) {
       yield* (await handle(false)).stream(request, signal);
     },
@@ -455,5 +466,224 @@ test('disposing a runtime mid-call cancels it and leaves the shared handle for a
     await second.runtime.dispose();
     await first.provider.shutdown();
     await second.provider.shutdown();
+  }
+});
+
+// Tool calling is routed through the ADK adapter's model: the LangGraph routed model has no
+// `bindTools`. The reply text and the call arguments pass the router's output check either way.
+
+const toolDefinition = defineAgentDefinition({
+  id: 'conformance/transformers-tools',
+  version: '1.0.0',
+  executor: 'adk-js',
+  input: z.object({ prompt: z.string() }),
+  models: { assistant: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
+  capabilities: {
+    required: {
+      'docs.search@1': {
+        kind: 'read',
+        input: z.object({ q: z.string() }),
+        output: z.object({ hit: z.string() }),
+      },
+    },
+  },
+});
+
+const block = (name: string, args: unknown): string =>
+  `<tool_call>${JSON.stringify({ name, arguments: args })}</tool_call>`;
+
+async function runWithTools(
+  host: Host,
+  outputSafety: OutputSafetyHook = () => 'allow',
+): Promise<{
+  events: RunEvent[];
+  searched: unknown[];
+  checked: string[];
+  dispose(): Promise<void>;
+}> {
+  const checked: string[] = [];
+  const runtime = createRuntime({
+    appId: 'transformers-tools-test',
+    executors: [createAdkAdapter() as ExecutorAdapter<unknown, unknown>],
+    budgets: { steps: 8, toolCalls: 10, tokens: 5000 },
+    outputSafety: (input) => {
+      checked.push(input.text);
+      return outputSafety(input);
+    },
+  });
+  const searched: unknown[] = [];
+  const instance = await runtime.create(toolDefinition, {
+    principalScope: 'transformers-test',
+    agent: (adkHost: AdkHost) =>
+      new LlmAgent({
+        name: 'agent',
+        model: adkHost.adk.llm('assistant'),
+        instruction: 'Answer briefly.',
+        tools: [
+          adkHost.adk.capabilityTool('docs.search@1', {
+            toolName: 'lookup',
+            description: 'Search the documents.',
+            parameters: z.object({ q: z.string() }),
+          }),
+        ],
+      }),
+    services: { chatModels: { local: new TransformersChatModel(host.engine) } },
+    bindings: {
+      'docs.search@1': {
+        kind: 'read',
+        destination: 'in-browser',
+        timeoutMs: 1000,
+        concurrency: 1,
+        grantScope: 'instance',
+        approval: 'none',
+        retry: 'none',
+        async invoke(input: { q: string }) {
+          searched.push(input);
+          return { hit: `found ${input.q}` };
+        },
+      },
+    },
+    models: {
+      providers: {
+        local: {
+          destination: 'in-browser',
+          modality: 'text',
+          languages: ['en'],
+          features: ['streaming', 'cancellation', 'tool-calling'],
+          pricing: { inputPerToken: 0, outputPerToken: 0 },
+        },
+      },
+      roles: { assistant: { providers: ['local'], allow: ['in-browser'], maxTokens: 100 } },
+      ...host.routing,
+    },
+  });
+  await instance.prepare();
+  const { runId } = await instance.start({ prompt: promptCanary });
+  const events = await collect(instance.events(runId));
+  return { events, searched, checked, dispose: () => runtime.dispose() };
+}
+
+test('a routed tool call runs the capability and the next request replays the call and result', async () => {
+  const host = await createHost(
+    {
+      scripts: [
+        ['Checking. ', block('lookup', { q: 'x' })],
+        ['It is ', 'found.'],
+      ],
+    },
+    { cached: true, toolFormat: 'hermes' },
+  );
+  const charges = reservationCharges();
+  const run = await runWithTools(host);
+  try {
+    expect(run.events.at(-1)).toMatchObject({ type: 'output' });
+    expect(run.searched).toEqual([{ q: 'x' }]);
+    const [first, second] = host.parts.runtime.generations;
+    expect(first?.request.tools).toMatchObject([
+      { type: 'function', function: { name: 'lookup', description: 'Search the documents.' } },
+    ]);
+    // The second request holds the assistant call and the capability result, in order.
+    const roles = second?.request.messages.map((message) => message.role);
+    expect(roles).toEqual(['system', 'user', 'assistant', 'tool']);
+    expect(second?.request.messages.at(2)).toMatchObject({
+      role: 'assistant',
+      toolCalls: [{ name: 'lookup', arguments: { q: 'x' } }],
+    });
+    expect(second?.request.messages.at(3)?.content).toContain('found x');
+    // Each call is charged its actual usage: 5 prompt tokens plus one token per piece.
+    expect(charges).toEqual([7, 7]);
+    expect(run.checked.some((text) => text.includes('"q":"x"'))).toBe(true);
+  } finally {
+    await run.dispose();
+  }
+});
+
+test('two blocks in one reply run both calls in order', async () => {
+  const host = await createHost(
+    {
+      scripts: [[block('lookup', { q: 'a' }), block('lookup', { q: 'b' })], ['done']],
+    },
+    { cached: true, toolFormat: 'hermes' },
+  );
+  const run = await runWithTools(host);
+  try {
+    expect(run.events.at(-1)).toMatchObject({ type: 'output', output: 'done' });
+    expect(run.searched).toEqual([{ q: 'a' }, { q: 'b' }]);
+    const toolTurn = host.parts.runtime.generations[1]?.request.messages.at(2);
+    expect(toolTurn?.toolCalls?.map((call) => call.arguments)).toEqual([{ q: 'a' }, { q: 'b' }]);
+  } finally {
+    await run.dispose();
+  }
+});
+
+test.each([
+  ['truncated JSON', '<tool_call>{"name": "lookup", "arguments": {"q": "x"'],
+  ['text that is not JSON', '<tool_call>not json</tool_call>'],
+  ['JSON with string arguments', '<tool_call>{"name": "lookup", "arguments": "x"}</tool_call>'],
+  ['JSON with array arguments', '<tool_call>{"name": "lookup", "arguments": [1]}</tool_call>'],
+  ['JSON without a name', '<tool_call>{"arguments": {"q": "x"}}</tool_call>'],
+])(
+  'a malformed block (%s) fails the streamed call invalid and runs no capability',
+  async (_label, reply) => {
+    const host = await createHost({ scripts: [[reply]] }, { cached: true, toolFormat: 'hermes' });
+    const run = await runWithTools(host);
+    try {
+      expect(run.events.at(-1)).toMatchObject({ type: 'error', error: { code: 'invalid' } });
+      expect(run.searched).toEqual([]);
+      expect(host.parts.runtime.generations).toHaveLength(1);
+    } finally {
+      await run.dispose();
+    }
+  },
+);
+
+test('a block verdict on well-formed call arguments fails denied and runs no capability', async () => {
+  const host = await createHost(
+    { scripts: [[block('lookup', { q: 'secret-arg' })]] },
+    { cached: true, toolFormat: 'hermes' },
+  );
+  const run = await runWithTools(host, ({ text }) =>
+    text.includes('secret-arg') ? 'block' : 'allow',
+  );
+  try {
+    expect(run.events.at(-1)).toMatchObject({ type: 'error', error: { code: 'denied' } });
+    expect(run.searched).toEqual([]);
+  } finally {
+    await run.dispose();
+  }
+});
+
+test('a record without a tool format fails the routed tool call unsupported before any request', async () => {
+  const host = await createHost({ scripts: [['unused']] }, { cached: true });
+  const run = await runWithTools(host);
+  try {
+    expect(run.events.at(-1)).toMatchObject({ type: 'error', error: { code: 'unsupported' } });
+    expect(host.parts.runtime.generations).toEqual([]);
+  } finally {
+    await run.dispose();
+  }
+});
+
+// The shared table covers replies that carry provider mirrors this provider never produces, so
+// only the cases a text-format reply can express are compared.
+test.each([
+  ['text', 'hello'],
+  ['two calls', `hello\n${block('lookup', { value: 2 })}\n${block('lookup', { value: 3 })}`],
+  ['invalid arguments', '<tool_call>{"value":</tool_call>'],
+])('the checked text for a %s reply matches the shared case table', async (name, reply) => {
+  const host = await createHost({ scripts: [[reply]] }, { cached: true, toolFormat: 'hermes' });
+  const model = new TransformersChatModel(host.engine).bindTools([
+    {
+      type: 'function',
+      function: { name: 'lookup', description: 'Look up.', parameters: { type: 'object' } },
+    },
+  ]);
+  try {
+    const message = await model.invoke('go');
+    const expected = toolCallChecks.find((check) => check.name === name)?.checked;
+    expect(expected).toBeDefined();
+    expect(outputText(message)).toBe(expected);
+  } finally {
+    await (await host.handle(false)).dispose();
   }
 });
