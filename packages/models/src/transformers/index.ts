@@ -7,9 +7,23 @@ export {
   checkTransformersModel,
   type TransformersModelAvailability,
 } from './cache.js';
+export {
+  type LoadTransformersEngineOptions,
+  loadTransformersEngine,
+  type TransformersEngineHandle,
+  type TransformersProgress,
+  type TransformersStreamEvent,
+  type TransformersWorker,
+} from './engine.js';
 export type {
   TransformersDevice,
   TransformersDtype,
   TransformersModelFile,
   TransformersModelRecord,
 } from './model-record.js';
+export type {
+  DeviceReport as TransformersDeviceReport,
+  FinishReason as TransformersFinishReason,
+  GenerateRequest as TransformersGenerateRequest,
+  LoadPhase as TransformersLoadPhase,
+} from './protocol.js';

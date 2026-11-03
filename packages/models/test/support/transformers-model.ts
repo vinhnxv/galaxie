@@ -30,9 +30,13 @@ export interface SyntheticModel {
 }
 
 export async function createSyntheticModel(
-  options: { readonly baseUrl?: string; readonly sizes?: readonly number[] } = {},
+  options: {
+    readonly baseUrl?: string;
+    readonly sizes?: readonly number[];
+    readonly modelId?: string;
+  } = {},
 ): Promise<SyntheticModel> {
-  const modelId = `example-org/tiny-${crypto.randomUUID().slice(0, 8)}`;
+  const modelId = options.modelId ?? `example-org/tiny-${crypto.randomUUID().slice(0, 8)}`;
   const baseUrl = options.baseUrl ?? `https://models.example.test/${modelId}/resolve/${revision}/`;
   const paths = ['config.json', 'tokenizer.json', 'tokenizer_config.json'];
   const sizes = options.sizes ?? [2500, 6000, 3500];
