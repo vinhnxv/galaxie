@@ -35,6 +35,11 @@ export class LoopbackWorker implements TransformersWorker {
     this.terminated += 1;
   }
 
+  /** A Worker script error, as the browser reports it. */
+  fail(): void {
+    this.onerror?.({ preventDefault() {} } as unknown as ErrorEvent);
+  }
+
   deliver(message: FromWorker): void {
     const copy = structuredClone(message);
     queueMicrotask(() => this.onmessage?.({ data: copy } as MessageEvent));

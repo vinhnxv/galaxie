@@ -9,6 +9,7 @@ export {
 } from './cache.js';
 export {
   type TransformersCallOptions,
+  type TransformersChatEngine,
   TransformersChatModel,
   type TransformersChatModelOptions,
 } from './chat-model.js';

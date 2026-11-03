@@ -19,8 +19,17 @@ import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import { ModelError } from '../errors.js';
 import { mapMessages } from '../messages.js';
 import type { OutputSchema } from '../structured-output.js';
-import type { TransformersEngineHandle } from './engine.js';
+import type { TransformersStreamEvent } from './engine.js';
 import type { GenerateRequest } from './protocol.js';
+
+/**
+ * What the chat model needs from an engine. A loaded handle satisfies it; a host that loads
+ * lazily, after a download decision, passes its own object with the same two members.
+ */
+export interface TransformersChatEngine {
+  readonly modelId: string;
+  stream(request: GenerateRequest, signal?: AbortSignal): AsyncGenerator<TransformersStreamEvent>;
+}
 
 export interface TransformersCallOptions extends BaseChatModelCallOptions {
   readonly maxTokens?: number;
@@ -36,11 +45,11 @@ export interface TransformersChatModelOptions {
 
 /** Stateless LangChain text chat over one runtime's serialized ONNX Worker engine. */
 export class TransformersChatModel extends BaseChatModel<TransformersCallOptions> {
-  readonly #handle: TransformersEngineHandle;
+  readonly #handle: TransformersChatEngine;
   readonly #maxTokens: number;
   readonly #temperature: number;
 
-  constructor(handle: TransformersEngineHandle, options: TransformersChatModelOptions = {}) {
+  constructor(handle: TransformersChatEngine, options: TransformersChatModelOptions = {}) {
     super({});
     this.#handle = handle;
     this.#maxTokens = options.maxTokens ?? 1024;
