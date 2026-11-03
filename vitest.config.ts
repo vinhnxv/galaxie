@@ -69,6 +69,12 @@ const alias = {
   '@galaxie/models/builtin-ai': fileURLToPath(
     new URL('./packages/models/src/builtin-ai/index.ts', import.meta.url),
   ),
+  '@galaxie/models/transformers/worker': fileURLToPath(
+    new URL('./packages/models/src/transformers/worker.ts', import.meta.url),
+  ),
+  '@galaxie/models/transformers': fileURLToPath(
+    new URL('./packages/models/src/transformers/index.ts', import.meta.url),
+  ),
   '@galaxie/models/webllm/worker': fileURLToPath(
     new URL('./packages/models/src/webllm/worker.ts', import.meta.url),
   ),

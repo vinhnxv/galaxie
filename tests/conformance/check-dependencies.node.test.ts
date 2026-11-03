@@ -41,11 +41,13 @@ const FILES: Record<string, string> = {
   }),
   'packages/models/package.json': JSON.stringify({
     peerDependencies: {
+      '@huggingface/transformers': '4.3.1',
       '@langchain/core': '1',
       '@langchain/openai': '1.6.3',
       '@mlc-ai/web-llm': '0.2.86',
     },
     peerDependenciesMeta: {
+      '@huggingface/transformers': { optional: true },
       '@langchain/openai': { optional: true },
       '@mlc-ai/web-llm': { optional: true },
     },
@@ -172,4 +174,88 @@ test.each([
 
 test('the conformance lane may import the root specifier for native reference runs', () => {
   expect(run({ 'tests/conformance/a.test.ts': adk('@google/adk') }).status).toBe(0);
+});
+
+const TRANSFORMERS = 'packages/models/src/transformers';
+const modelsPackage = (peers: Record<string, string>, optional: readonly string[]): string =>
+  JSON.stringify({
+    peerDependencies: { '@langchain/core': '1', '@langchain/openai': '1.6.3', ...peers },
+    peerDependenciesMeta: {
+      '@langchain/openai': { optional: true },
+      ...Object.fromEntries(optional.map((name) => [name, { optional: true }])),
+    },
+  });
+const WEBLLM = { '@mlc-ai/web-llm': '0.2.86' };
+
+test('the Transformers.js runtime file may import the library dynamically and without types', () => {
+  const result = run({
+    [`${TRANSFORMERS}/runtime.ts`]:
+      "export const load = (): Promise<unknown> => import('@huggingface/transformers');\n",
+  });
+  expect(result).toMatchObject({ status: 0, output: '' });
+});
+
+test.each([
+  [
+    'a static import in runtime.ts',
+    'runtime.ts',
+    "import { env } from '@huggingface/transformers';\nexport { env };\n",
+  ],
+  [
+    'a types import in runtime.ts',
+    'runtime.ts',
+    "import type { PreTrainedTokenizer } from '@huggingface/transformers';\nexport type { PreTrainedTokenizer };\n",
+  ],
+  [
+    'a dynamic import in chat-model.ts',
+    'chat-model.ts',
+    "export const load = (): Promise<unknown> => import('@huggingface/transformers');\n",
+  ],
+  [
+    'a static import in chat-model.ts',
+    'chat-model.ts',
+    "import { env } from '@huggingface/transformers';\nexport { env };\n",
+  ],
+  [
+    'a library subpath in runtime.ts',
+    'runtime.ts',
+    "export const load = (): Promise<unknown> => import('@huggingface/transformers/dist/x.js');\n",
+  ],
+  [
+    'a runtime path in the library',
+    'runtime.ts',
+    "export const load = (): Promise<unknown> => import('onnxruntime-web');\n",
+  ],
+])('%s fails', (_label, file, source) => {
+  const result = run({ [`${TRANSFORMERS}/${file}`]: source });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${TRANSFORMERS}/${file}: forbidden models import`);
+});
+
+test('the Transformers.js files may import relative files and LangChain core', () => {
+  const result = run({
+    [`${TRANSFORMERS}/chat-model.ts`]: [adk('./engine.js'), adk('@langchain/core/messages')].join(
+      '',
+    ),
+  });
+  expect(result).toMatchObject({ status: 0, output: '' });
+});
+
+test.each([
+  ['the peer is missing', modelsPackage(WEBLLM, ['@mlc-ai/web-llm'])],
+  [
+    'the peer is not optional',
+    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '4.3.1' }, ['@mlc-ai/web-llm']),
+  ],
+  [
+    'the peer is not exactly 4.3.1',
+    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '^4.3.1' }, [
+      '@mlc-ai/web-llm',
+      '@huggingface/transformers',
+    ]),
+  ],
+])('the models peer rule fails when %s', (_label, manifest) => {
+  const result = run({ 'packages/models/package.json': manifest });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('models peers must be @langchain/core');
 });

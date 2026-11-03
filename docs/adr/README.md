@@ -41,6 +41,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0018](0018-python-agents-through-pyodide.md) | Python agents through Pyodide in a worker, with policy kept in JavaScript | Proposed |
 | [0019](0019-in-browser-retrieval.md) | Browser-built retrieval in a maintained example | Proposed |
 | [0020](0020-google-adk-through-an-adapter.md) | Google ADK (JavaScript) through an executor adapter that owns the Runner | Proposed |
+| [0021](0021-in-browser-onnx-chat-provider.md) | In-browser ONNX chat models through a Transformers.js provider with a Worker-side runtime seam | Proposed |
 
 ## Template
 
