@@ -43,6 +43,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0020](0020-google-adk-through-an-adapter.md) | Google ADK (JavaScript) through an executor adapter that owns the Runner | Proposed |
 | [0021](0021-in-browser-onnx-chat-provider.md) | In-browser ONNX chat models through a Transformers.js provider with a Worker-side runtime seam | Proposed |
 | [0022](0022-google-adk-python-through-the-pyodide-adapter.md) | Google ADK (Python) through the Pyodide adapter, with an explicit wheel list | Proposed |
+| [0023](0023-google-adk-go-through-a-wasm-worker.md) | Google ADK (Go) through a WebAssembly Worker, with policy kept in JavaScript | Proposed |
 
 ## Template
 
