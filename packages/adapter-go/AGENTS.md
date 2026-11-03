@@ -1,0 +1,35 @@
+# @galaxie/adapter-go: coding guidance
+
+## Purpose
+
+Host Google ADK (Go) agents compiled to WebAssembly as a galaxie executor (`adk-go`). Go runs in a
+dedicated Worker; routing, labels, consent, budgets, credentials, output checks and authorization
+stay in JavaScript. See the [README](README.md), the [Go module](../../go/README.md) and
+[ADR-0023](../../docs/adr/0023-google-adk-go-through-a-wasm-worker.md) (Proposed).
+
+## Entry points
+
+- [src/index.ts](src/index.ts) exports `createGoAdapter`, the host types and the executor id.
+- [src/adapter.ts](src/adapter.ts) is the adapter: it validates the agent, boots one Worker per prepare
+  and fails a run `unsupported` until the model and tool bridge exist.
+- [src/loader.ts](src/loader.ts) runs inside the Worker: fetch, length and SHA-256 check, egress stubs,
+  compile, instantiate and the ready handshake. [src/worker.ts](src/worker.ts) is its entry.
+- [src/protocol.ts](src/protocol.ts) holds the boot and status messages shared by both sides.
+
+## Do
+
+- Check the module's length and SHA-256 before `WebAssembly.compile`; every failure is the same
+  fixed `unavailable` error.
+- Install the egress stubs before the first Go instruction and discard Go standard output.
+- Keep `syscall/js` out of this package's Go counterparts except `go/galaxie/bridge` and `go/gate`.
+
+## Never
+
+Do not import another executor adapter, LangGraph, Pyodide or `@google/adk`. Do not name Go or ADK in
+`packages/core`. Do not relax CSP or Trusted Types, add `unsafe-eval`, or let a run reach the network.
+`scripts/check-dependencies.ts` enforces the import rules.
+
+## Limits
+
+Stage AG1 boots and verifies the Worker only. The stubs guard against accidental network use; Go code
+is trusted and can reach anything `syscall/js` reaches, so they are not an isolation boundary.

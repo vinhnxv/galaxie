@@ -147,9 +147,10 @@ for (const area of ['src', 'dist', 'test']) {
     for (const { specifier } of imports(file)) {
       if (
         specifier.startsWith('@langchain/langgraph') ||
-        specifier.startsWith('@galaxie/adapter-langgraph')
+        specifier.startsWith('@galaxie/adapter-langgraph') ||
+        specifier.startsWith('@galaxie/adapter-go')
       )
-        problems.push(`${file}: the Python adapter must not depend on the JavaScript executor`);
+        problems.push(`${file}: the Python adapter must not depend on another executor`);
       const worker = file === `${directory}/worker.${area === 'dist' ? 'js' : 'ts'}`;
       if (
         specifier.startsWith('./') ||
@@ -164,6 +165,55 @@ for (const area of ['src', 'dist', 'test']) {
         continue;
       problems.push(`${file}: forbidden Python adapter import ${specifier}`);
     }
+  }
+}
+
+for (const area of ['src', 'dist', 'test']) {
+  const directory = join('packages/adapter-go', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (
+        specifier.startsWith('@langchain/langgraph') ||
+        specifier.startsWith('@galaxie/adapter-') ||
+        specifier === 'pyodide' ||
+        specifier === '@google/adk' ||
+        specifier.startsWith('@google/adk/')
+      )
+        problems.push(`${file}: the Go adapter must not depend on another executor or framework`);
+      else if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        const target = resolve(dirname(file), specifier);
+        const [package_] = relative(resolve('packages'), target).split(/[\\/]/);
+        if (
+          target.split(/[\\/]/).includes('node_modules') ||
+          (package_?.startsWith('adapter-') === true && package_ !== 'adapter-go')
+        )
+          problems.push(
+            `${file}: relative import ${specifier} reaches into a dependency or another adapter`,
+          );
+      } else if (
+        specifier === '@galaxie/core' ||
+        specifier.startsWith('@langchain/core/') ||
+        (area === 'test' &&
+          (specifier.startsWith('node:') ||
+            ['vitest', 'zod', '@galaxie/models/mock'].includes(specifier)))
+      )
+        continue;
+      else problems.push(`${file}: forbidden Go adapter import ${specifier}`);
+    }
+  }
+}
+
+// Only the bridge package and the first-run gate may call into JavaScript.
+const SYSCALL_JS_DIRECTORIES = ['go/galaxie/bridge', 'go/gate'];
+if (existsSync('go')) {
+  for (const entry of readdirSync('go', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.go')) continue;
+    const file = join(entry.parentPath, entry.name);
+    if (!/^\s*(?:import\s+)?(?:[\w.]+\s+)?"syscall\/js"/m.test(readFileSync(file, 'utf8')))
+      continue;
+    if (!SYSCALL_JS_DIRECTORIES.some((allowed) => dirname(file) === allowed))
+      problems.push(`${file}: syscall/js belongs only in go/galaxie/bridge and go/gate`);
   }
 }
 
@@ -583,6 +633,7 @@ for (const directory of [
   'packages/adapter-langgraph/dist',
   'packages/adapter-pyodide/dist',
   'packages/adapter-adk/dist',
+  'packages/adapter-go/dist',
   'packages/models/dist',
   'packages/react/dist',
   'packages/storage-indexeddb/dist',
