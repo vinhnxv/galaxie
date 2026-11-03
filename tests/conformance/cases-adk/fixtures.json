@@ -181,5 +181,45 @@
         "text": "Done streaming now."
       }
     ]
+  },
+  "approval-approve": {
+    "prompt": "approval approve",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 5
+            }
+          }
+        ]
+      },
+      {
+        "text": "Approved and doubled."
+      }
+    ]
+  },
+  "approval-deny": {
+    "prompt": "approval deny",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 5
+            }
+          }
+        ]
+      },
+      {
+        "text": "The doubling was declined."
+      }
+    ]
   }
 }

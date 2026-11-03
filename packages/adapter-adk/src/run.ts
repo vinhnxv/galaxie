@@ -87,5 +87,11 @@ export function toGalaxieError(
     if ('fenced' in error && error.fenced === true) return failure('fenced');
     if ('unrecoverable' in error && error.unrecoverable === true) return failure('unrecoverable');
   }
+  // ADK refuses forged or altered history and mismatched confirmations by name; neither is retryable.
+  for (let cause: unknown = error, depth = 0; cause instanceof Error && depth < 4; depth++) {
+    if (cause.name === 'IntentMismatchError' || cause.name === 'ToolCallIntegrityError')
+      return failure('invalid');
+    cause = cause.cause;
+  }
   return failure(signal?.aborted ? 'cancelled' : fallback);
 }

@@ -240,16 +240,19 @@ real-model format reliability, hands-on review and device performance are unmeas
 
 ## Google ADK conversations
 
-The separate [ADK matrix](compatibility-matrix-adk.json) lists ten cases for the `adk-js`
+The separate [ADK matrix](compatibility-matrix-adk.json) lists twelve cases for the `adk-js`
 adapter: plain text, one and two sequential capability tool calls, an output schema with an output
 key, a capability denial, an output-safety block on a function-call argument, the step budget,
-abort and two streaming cases (text only, and a tool turn). The reference is the pinned ADK 2.3.0 web bundle driven by its own `Runner` with a scripted
+abort, two streaming cases (text only, and a tool turn) and two approval cases (a confirmation
+that is approved, and one that is denied). The reference is the pinned ADK 2.3.0 web bundle driven by its own `Runner` with a scripted
 `BaseLlm` ([native lane](adk-native.node.test.ts), which writes the `golden-adk` files). The
 [galaxie lane](adk.test.ts) runs the same agent through the adapter, router and broker on Node and
 in headless Chromium and compares ADK-side requests, responses, capability calls, output and error
 code. Call IDs are runtime-generated and are not compared. The streaming cases also compare the
 text deltas and the content-free tool step markers; the other cases compare complete responses
-only. Later stages add pauses. It runs under the vitest browser project, not a page with the
+only. The approval cases pause the native run, resume it with a second invocation carrying the
+confirmation function response, and compare the paused tool calls, the model requests after the
+resume and the output with the galaxie run answered through core's dispatch. It runs under the vitest browser project, not a page with the
 strict mock CSP; the bundle-level strict-CSP probe lives in `packages/adapter-adk`. No other
 executor's goldens or matrix change.
 
