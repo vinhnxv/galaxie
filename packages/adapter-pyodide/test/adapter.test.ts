@@ -272,6 +272,67 @@ test('DSPy model steps stop in JavaScript before another lease or provider call'
   await executor.dispose();
 });
 
+test.each(['allowed', 'route-refused'] as const)(
+  'a JSON Schema option requires structured output and reaches the provider: %s',
+  async (outcome) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const provider = model('{"answer":"42"}');
+    const executor = await setup(workers, 'adk').prepare(
+      descriptor,
+      { chatModels: { model: provider } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('The fixture Worker is missing.');
+    const jsonSchema = { type: 'object', properties: { answer: { type: 'string' } } };
+    modelRoundTrip(worker, false, { jsonSchema });
+    const run = request();
+    if (outcome === 'route-refused')
+      vi.mocked(run.request.models.begin).mockRejectedValue(
+        new GalaxieError('unsupported', 'This operation is unsupported.'),
+      );
+    const result = await collect(executor.run(run.request));
+    expect(run.request.models.begin).toHaveBeenCalledWith(
+      'answer',
+      expect.objectContaining({ requires: ['structured-output'] }),
+    );
+    if (outcome === 'allowed') {
+      expect(provider.invoke).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ jsonSchema }),
+      );
+      expect(result).toMatchObject([{ type: 'output', output: { content: '{"answer":"42"}' } }]);
+    } else {
+      expect(provider.invoke).not.toHaveBeenCalled();
+      expect(result).toMatchObject([{ type: 'error', error: { code: 'unsupported' } }]);
+    }
+    await executor.dispose();
+  },
+);
+
+test('a model request without a JSON Schema leaves the lease and provider options unchanged', async () => {
+  vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+  const workers: FixtureWorker[] = [];
+  const provider = model();
+  const executor = await setup(workers, 'pydantic-ai').prepare(
+    descriptor,
+    { chatModels: { model: provider } },
+    preparation,
+  );
+  const worker = workers[0];
+  if (!worker) throw new Error('The fixture Worker is missing.');
+  modelRoundTrip(worker, false, { stop: ['END'] });
+  const run = request();
+  await collect(executor.run(run.request));
+  expect(run.request.models.begin).toHaveBeenCalledWith('answer', {
+    signal: run.request.signal,
+  });
+  const options = vi.mocked(provider.invoke).mock.calls[0]?.[1] as Record<string | symbol, unknown>;
+  expect(Object.keys(options)).toEqual(['signal', 'stop']);
+  await executor.dispose();
+});
+
 test.each(['allow', 'block', 'hook-error', 'no-bind'] as const)(
   'tool calls bind the leased provider and stay behind final output checks: %s',
   async (outcome) => {

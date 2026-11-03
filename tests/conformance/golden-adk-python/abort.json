@@ -1,0 +1,25 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "slow reply"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "cancelled",
+    "message": "The run was cancelled."
+  }
+}

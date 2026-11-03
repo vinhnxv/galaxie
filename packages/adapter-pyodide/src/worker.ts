@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { ErrorCode } from '@galaxie/core';
-import { adkDriver, adkImportProbe } from './adk-driver.js';
+import { adkDriver, adkImportProbe } from './adk-python-driver.js';
 import {
   type BootPayload,
   BRIDGE_VERSION,

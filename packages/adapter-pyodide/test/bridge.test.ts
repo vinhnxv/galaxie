@@ -219,6 +219,22 @@ test('v2 resume, pending and notifications have closed payloads', () => {
     );
 });
 
+test('a model request may carry a JSON Schema object and nothing else in its place', () => {
+  const base = { role: 'answer', messages: [{ role: 'user', content: 'x' }] };
+  const frame = (options: unknown): string =>
+    JSON.stringify({
+      v: version,
+      id: 'one',
+      kind: 'request',
+      op: 'model',
+      payload: { ...base, options },
+    });
+  const raw = frame({ jsonSchema: { type: 'object', properties: { a: { type: 'string' } } } });
+  expect(encodeBridge(parseBridge(raw))).toBe(raw);
+  for (const jsonSchema of ['text', 1, null, ['a']])
+    expect(() => parseBridge(frame({ jsonSchema }))).toThrow('The request is invalid.');
+});
+
 test('tool definitions, calls, results and argument deltas have closed JSON shapes', () => {
   const messages = [
     { role: 'user', content: 'double two' },

@@ -1,0 +1,40 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "structured answer"
+        }
+      ],
+      "tools": [],
+      "jsonSchema": {
+        "properties": {
+          "value": {
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": ["value"],
+        "title": "Answer",
+        "type": "object"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "content": "{\"value\": 6}",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "value": 6
+  },
+  "error": null
+}

@@ -470,6 +470,7 @@ export function createPyodideAdapter(
               const requires = [
                 ...(input.options.stream ? ['streaming' as const] : []),
                 ...(offered ? ['tool-calling' as const] : []),
+                ...(input.options.jsonSchema === undefined ? [] : ['structured-output' as const]),
               ];
               const lease = await run.request.models.begin(input.role, {
                 signal: run.request.signal,
@@ -523,6 +524,9 @@ export function createPyodideAdapter(
               const modelOptions = {
                 signal: run.request.signal,
                 ...(input.options.stop === undefined ? {} : { stop: [...input.options.stop] }),
+                ...(input.options.jsonSchema === undefined
+                  ? {}
+                  : { jsonSchema: input.options.jsonSchema }),
                 [Symbol.for('galaxie.model.destination')]: lease.destination,
               };
               const validateReply = (reply: AIMessage | AIMessageChunk): void => {

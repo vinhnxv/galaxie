@@ -14,6 +14,12 @@ _MODULES = (
     "google.genai", "google.generativeai", "ollama", "litellm", "langchain_openai",
     "langchain_anthropic", "langchain_google_genai", "langchain_ollama",
     "pydantic_ai.providers",
+    "google.adk.models.google_llm", "google.adk.models.gemma_llm", "google.adk.models.anthropic_llm",
+    "google.adk.models.apigee_llm", "google.adk.models.lite_llm", "google.adk.models.registry",
+    "google.adk.integrations",
+    *("google.adk.models." + name for name in (
+        "Gemini", "Gemma", "Gemma3Ollama", "Claude", "LiteLlm", "ApigeeLlm", "LLMRegistry", "FallbackModel",
+    )),
     "dspy.clients.openai", "dspy.clients.databricks", "dspy.clients.lm_local",
     "dspy.lm15.providers", "dspy.lm15.transports",
     *("pydantic_ai.models." + module for module in (

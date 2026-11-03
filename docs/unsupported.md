@@ -25,6 +25,13 @@ evidence, with the maintainer's decision pending.
 - Durable sessions need the scoped byte-record port; without it conversations live in memory and a reload starts over. Each record is limited to 4 MiB and 10,000 events, and a longer conversation fails `unsupported` when it is stored. The per-session integrity key guards in-flight forgery and corrupt history, not a writer of the store. Unknown-outcome writes have no reconciliation API, as for the other executors.
 - ADK still emits content-free spans of its own to a registered global OpenTelemetry provider, and the adapter does not re-check a response that an agent-level model callback replaces (ADR-0002). Span content capture must be disabled by a build define. Worker-hosted runs, real model providers and the example host are unmeasured ([ADR-0020](adr/0020-google-adk-through-an-adapter.md), [adapter README](../packages/adapter-adk/README.md)).
 
+## Google ADK (Python)
+
+- The `adk-python` executor ([ADR-0022](adr/0022-google-adk-python-through-the-pyodide-adapter.md), `google-adk` 2.12.0 in the Pyodide Worker) runs `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent` trees whose models and tools come from `galaxie.adk`. Other agent types, string or `Gemini` models, toolsets, code executors, planners, plugins, `App` objects and the retry, timeout, schema and parallel-worker fields fail `unsupported` at prepare. Author callbacks run, but a callback that swallows a tool failure cannot keep the run going.
+- Every executor feature (`streaming`, `interrupts`, `resume`, `checkpoints`, `subgraphs`) is false: a run returns its final output, a pause is not supported and a reload starts over. Later stages add them one by one.
+- Input is `{ prompt: string }`. Replies and tool results with non-text parts fail `unsupported`. The lint aid rejects every `google.genai` import, so author code cannot import `google.genai.types` yet.
+- Python is trusted and can import `js`; the tree validation and lint aid reduce accidents and are not a boundary. Evidence is scripted models on Node and headless Chromium only: no real model, credential scan or device measurement exists.
+
 ## Models and providers
 
 - Router token reservations do not set per-call provider output caps, which remain deferred even though WebLLM and OpenAI-compatible providers have their own output-limit options ([model contract](system-design.md#84-a-model-call)).
