@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0012, ADR-0017, ADR-0018, ADR-0020
-- **Revisions:** 2026-11-03: created with stage AP1 (pin, closure, lock strategy, first-run gate); features and per-stage evidence arrive with stages AP2 to AP6.
+- **Revisions:** 2026-11-03: created with stage AP1 (pin, closure, lock strategy, first-run gate); stage AP2 adds the model, tool and run evidence (features stay false); the remaining per-stage evidence arrives with stages AP3 to AP6.
 
 ## Context
 
@@ -23,7 +23,7 @@ Agent authors ask for Google's Agent Development Kit in Python. ADR-0018 gives P
 5. **Fail-closed tree validation by registry membership** (applies from stage AP2). Host helpers record every model and tool they create in a module-private registry. At prepare the driver accepts exact classes `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent`, only registry models and tools (resolving inherited and omitted models the way ADK does), and refuses `Workflow`, `AgentTool`, toolsets, code executors, planners, plugins, `App`, string model names and `Gemini` with fixed `unsupported` errors. Authors never see the Runner.
 6. **The adapter owns the Runner and every service** (stage AP2). It builds the `App` with one plugin, ADK's `ToolCallIntegrityPlugin`, a galaxie session service and a `RunConfig`, and drives only `run_async`. Fatal errors propagate out of `run_async` in 2.12.0; a per-run failure slot covers author callbacks that swallow them. `limits.steps` is enforced once, in the model's call count.
 7. **Pauses end the run; resume is a new `run_async`** (stage AP4), as in ADR-0020. Sessions persist as an event log through the existing byte-record port with a per-session integrity key kept in record metadata (stage AP5); the record must fit the 1 MiB bridge frame.
-8. **Executor features stay false in this stage.** The adapter registers `adk-python` with `streaming`, `interrupts`, `resume`, `checkpoints` and `subgraphs` all false, and its driver reports the fixed `unsupported` error after the boot probe. Each flag turns on only with the evidence listed under Verification. `subgraphs` stays false for the reasons ADR-0020 and ADR-0018 give.
+8. **Executor features stay false until their evidence exists.** The adapter registers `adk-python` with `streaming`, `interrupts`, `resume`, `checkpoints` and `subgraphs` all false. Stage AP2 runs text and tool-calling agents end to end with those flags still false. Each flag turns on only with the evidence listed under Verification. `subgraphs` stays false for the reasons ADR-0020 and ADR-0018 give.
 9. **Python is trusted.** A Worker can `import js`; the tree validation and the lint aid reduce accidents and are not an isolation boundary (ADR-0018). Only third-party wheels have independent hash checks. No CSP, Trusted Types or ADR-0012 guarantee changes.
 
 ## Alternatives considered
@@ -51,6 +51,13 @@ Observed in stage AP1 (scripted models only, no real model download):
 - Headless Chromium: the same gate passes under the unchanged strict CSP and Trusted Types with no violation, no external request and no network attempt (`examples/rag-browser/test/adk-gate.node.test.ts`).
 - Lock: no pin moved and the three existing wheel sets and fingerprints are unchanged (`tests/conformance/python-wheels.node.test.ts`).
 - Adapter: the boot import probe resolves every hidden module in the Worker, and a withheld wheel fails the boot with `unavailable` at prepare (`packages/adapter-pyodide/test/adapter.node.test.ts`).
+
+Observed in stage AP2 (scripted models only, no real model download):
+
+- Model, tools and run: `galaxie.adk` supplies a router-backed `BaseLlm`, capability tools and the loop-exit helper, and `Executor` drives `run_async` (`python/galaxie/tests/test_adk.py`, `test_adk_lint.py`). Schema output reaches the router through an additive optional `jsonSchema` model option that requires the `structured-output` feature; payloads of the other executors are unchanged.
+- Fixed failures: a raising model or capability ends the run with its code, an author callback that swallows a tool error cannot keep the run going, sibling tools are not dispatched after a fatal failure, a failed run leaves the session at its last stored point, and an abort settles within a bound and leaves the adapter usable (`tests/conformance/adk-python-run.node.test.ts`). A directly built `Gemini` agent fails in the Worker because its `fetch` stub rejects external origins; the test shows the failure, not an absence of attempts.
+- Conformance lane: eight native CPython transcripts (`tests/conformance/golden-adk-python`) reproduce on Pyodide in Node, and three of them in real headless Chromium under the unchanged strict CSP (`tests/conformance/adk-python.node.test.ts`, `examples/rag-browser/test/adk-python-conformance.node.test.ts`). Requests are mapped to OpenAI format independently on each side.
+- Limits: the lint aid still rejects every `google.genai` import, so author code cannot import `google.genai.types` yet; no Worker credential scan, real-model run or device measurement exists.
 
 Required before each feature flag turns on, and before this ADR is Accepted:
 

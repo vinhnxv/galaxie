@@ -1,0 +1,56 @@
+{
+  "plain-text": {
+    "prompt": "plain text",
+    "replies": [{ "text": "A plain answer." }]
+  },
+  "capability": {
+    "prompt": "one tool",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
+      { "text": "The result is 6." }
+    ]
+  },
+  "sequential-tools": {
+    "prompt": "two tools",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 2 } }] },
+      { "text": "", "toolCalls": [{ "id": "double_2", "name": "double", "args": { "value": 4 } }] },
+      { "text": "The result is 8." }
+    ]
+  },
+  "output-schema": {
+    "prompt": "structured answer",
+    "replies": [{ "text": "{\"value\": 6}" }]
+  },
+  "capability-denial": {
+    "prompt": "denied tool",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
+      { "text": "The tool was denied." }
+    ]
+  },
+  "argument-block": {
+    "prompt": "blocked argument",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          { "id": "double_1", "name": "double", "args": { "value": 1, "note": "BLOCKED_ARGUMENT" } }
+        ]
+      },
+      { "text": "unreachable" }
+    ]
+  },
+  "step-budget": {
+    "prompt": "budget",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 1 } }] },
+      { "text": "", "toolCalls": [{ "id": "double_2", "name": "double", "args": { "value": 2 } }] },
+      { "text": "unreachable" }
+    ]
+  },
+  "abort": {
+    "prompt": "slow reply",
+    "replies": [{ "text": "late" }]
+  }
+}

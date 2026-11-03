@@ -7,7 +7,8 @@
     "tests/conformance/cases-python",
     "scripts",
     "tests/conformance/cases-pydantic-ai",
-    "tests/conformance/cases-dspy"
+    "tests/conformance/cases-dspy",
+    "tests/conformance/cases-adk-python"
   ],
   "venvPath": "python",
   "venv": ".venv",
@@ -35,6 +36,14 @@
     {
       "root": "scripts/record-pydantic-ai-conformance.py",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai"]
+    },
+    {
+      "root": "tests/conformance/cases-adk-python",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-adk-python"]
+    },
+    {
+      "root": "scripts/record-adk-python-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-adk-python"]
     }
   ]
 }

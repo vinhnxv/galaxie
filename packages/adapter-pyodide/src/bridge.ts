@@ -68,6 +68,8 @@ export interface ModelPayload {
   readonly options: {
     readonly stop?: readonly string[];
     readonly stream?: boolean;
+    /** A JSON Schema object the reply must follow; routing requires `structured-output`. */
+    readonly jsonSchema?: Readonly<Record<string, unknown>>;
     readonly tools?: readonly ToolDefinition[];
     readonly toolChoice?:
       | 'auto'
@@ -334,12 +336,14 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
         Array.isArray(value['messages']) &&
         value['messages'].every(modelMessage) &&
         object(value['options']) &&
-        keys(value['options'], [], ['stop', 'stream', 'tools', 'toolChoice']) &&
+        keys(value['options'], [], ['stop', 'stream', 'tools', 'toolChoice', 'jsonSchema']) &&
         (value['options']['tools'] === undefined ||
           (Array.isArray(value['options']['tools']) &&
             value['options']['tools'].every(toolDefinition))) &&
         (value['options']['toolChoice'] === undefined ||
           toolChoice(value['options']['toolChoice'])) &&
+        (value['options']['jsonSchema'] === undefined ||
+          (object(value['options']['jsonSchema']) && json(value['options']['jsonSchema']))) &&
         (value['options']['stream'] === undefined ||
           typeof value['options']['stream'] === 'boolean') &&
         (value['options']['stop'] === undefined ||
