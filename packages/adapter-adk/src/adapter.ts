@@ -15,7 +15,6 @@ import {
   createEvent,
   isFinalResponse,
   LlmAgent,
-  LoopAgent,
   ParallelAgent,
   Runner,
   SequentialAgent,
@@ -88,25 +87,35 @@ function outputOf(root: BaseAgent, last: FinalResponse): unknown {
   return last.text;
 }
 
-/** Branches of a ParallelAgent interleave their events, so a pause there cannot be told apart. */
+/** Branches of a ParallelAgent interleave their events, so a pause in such a tree is refused. */
 function hasParallel(agent: BaseAgent): boolean {
   return agent instanceof ParallelAgent || agent.subAgents.some(hasParallel);
 }
 
+function agentsNamed(agent: BaseAgent, name: string): BaseAgent[] {
+  return [
+    ...(agent.name === name ? [agent] : []),
+    ...agent.subAgents.flatMap((child) => agentsNamed(child, name)),
+  ];
+}
+
 /**
- * ADK restarts a SequentialAgent or LoopAgent from its first child when a paused run resumes, so
- * earlier siblings, and their writes, would run again. A pause under one is unsupported unless
- * the paused agent is first at every sequential step and no loop is on the path.
+ * Whether resuming a pause raised by the agent called `name` would run earlier work again.
+ * ADK resumes directly at the paused agent only when it and all its ancestors are LlmAgents;
+ * otherwise it restarts from the root. That restart is safe only when every step down to the
+ * paused agent is the first child of a SequentialAgent. An unknown or ambiguous name fails closed.
  */
-function restartsSiblings(agent: BaseAgent, name: string): boolean {
-  if (agent.name === name) return false;
-  for (const [index, child] of agent.subAgents.entries()) {
-    if (child.name !== name && child.findSubAgent(name) === undefined) continue;
-    if (agent instanceof LoopAgent) return true;
-    if (agent instanceof SequentialAgent && index > 0) return true;
-    return restartsSiblings(child, name);
-  }
-  return false;
+export function restartsSiblings(root: BaseAgent, name: string): boolean {
+  const found = agentsNamed(root, name);
+  const target = found[0];
+  if (found.length !== 1 || target === undefined) return true;
+  const chain: BaseAgent[] = [];
+  for (let up = target.parentAgent; up !== undefined; up = up.parentAgent) chain.unshift(up);
+  if (chain.every((agent) => agent instanceof LlmAgent)) return false;
+  const path = [...chain, target];
+  return chain.some((parent, index) => {
+    return !(parent instanceof SequentialAgent) || parent.subAgents[0] !== path[index + 1];
+  });
 }
 
 function findAgent(root: BaseAgent, name: string): BaseAgent | undefined {

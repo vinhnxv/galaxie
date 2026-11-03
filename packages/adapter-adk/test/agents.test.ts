@@ -27,7 +27,7 @@ import { AIMessage } from '@langchain/core/messages';
 import { afterAll, expect, test } from 'vitest';
 import { z } from 'zod';
 import { MemoryRecoveryStore } from '../../core/test/support/memory-recovery-store.js';
-import { createAdkAdapter } from '../src/adapter.js';
+import { createAdkAdapter, restartsSiblings } from '../src/adapter.js';
 import type { AdkAgent, AdkHost } from '../src/host.js';
 import { ADK_EXECUTOR_ID } from '../src/index.js';
 import { defineAdkEntry } from '../src/interaction.js';
@@ -320,11 +320,6 @@ test('a SequentialAgent child reaches a capability tool through the broker', asy
   expect(galaxie.searches).toEqual([{ q: 'x' }]);
 });
 
-test('a streaming run over a SequentialAgent completes with the last answer', async () => {
-  const galaxie = await runGalaxie(shapes[0] as Shape);
-  expect(galaxie.output).toBe('two');
-});
-
 test('parallel branches that write get their own scopes, so a re-dispatch replays each receipt', async () => {
   const writes: { q: string }[] = [];
   let crash = true;
@@ -340,7 +335,7 @@ test('parallel branches that write get their own scopes, so a re-dispatch replay
     if (used) return new AIMessage({ content: `${tag} done` });
     // On the re-dispatch the right branch finishes first, so arrival order is reversed.
     if (!crash && tag === 'left') await wait.promise;
-    if (!crash && tag === 'right') queueMicrotask(() => setTimeout(() => wait.resolve(), 20));
+    if (!crash && tag === 'right') setTimeout(() => wait.resolve(), 20);
     return new AIMessage({
       content: '',
       tool_calls: [{ id: 'call_0', name: 'docs_save_1', args: { q: tag === 'left' ? 'L' : 'R' } }],
@@ -447,7 +442,7 @@ test('natively ADK reruns the earlier siblings when a paused sub-agent resumes',
   }))
     for (const part of event.content?.parts ?? [])
       if (part.functionCall?.name === 'adk_request_confirmation') waiting = part.functionCall.id;
-  expect(waiting).toBeDefined();
+  if (waiting === undefined) throw new Error('The native run did not pause for a confirmation.');
   const before = model.requests.length;
   for await (const _event of runner.runAsync({
     userId: 'u',
@@ -560,6 +555,31 @@ test('a pause inside a later sibling of a SequentialAgent or inside a LoopAgent 
     const failed = events.at(-1);
     expect(failed?.type).toBe('error');
     expect(failed?.type === 'error' ? failed.error.code : undefined).toBe('unsupported');
+    expect(events.some((event) => event.type === 'interaction')).toBe(false);
     await runtime.dispose();
   }
+});
+
+test('the resume rule follows ADK: only a restart through first children is safe', () => {
+  const llm = (name: string, subAgents: LlmAgent[] = []): LlmAgent =>
+    new LlmAgent({ name, instruction: name, subAgents });
+  const flow = (name: string, ...subAgents: BaseAgent[]): SequentialAgent =>
+    new SequentialAgent({ name, subAgents });
+  // A lone agent, and a chain of LlmAgents, resume directly at the paused agent.
+  expect(restartsSiblings(llm('solo'), 'solo')).toBe(false);
+  expect(restartsSiblings(llm('p', [llm('c')]), 'c')).toBe(false);
+  // The first child of a SequentialAgent, nested or not, restarts nothing that already ran.
+  expect(restartsSiblings(flow('s', llm('a'), llm('b')), 'a')).toBe(false);
+  expect(restartsSiblings(flow('s1', flow('s2', llm('a'), llm('b')), llm('c')), 'a')).toBe(false);
+  // A later sibling, or a sibling inside a later child, would run earlier work again.
+  expect(restartsSiblings(flow('s', llm('a'), llm('b')), 'b')).toBe(true);
+  expect(restartsSiblings(flow('s1', llm('a'), flow('s2', llm('b'), llm('c'))), 'b')).toBe(true);
+  // A sub-agent under an LlmAgent that sits inside a workflow cannot be resumed directly.
+  expect(restartsSiblings(flow('s', llm('p', [llm('c')]), llm('x')), 'c')).toBe(true);
+  expect(restartsSiblings(llm('root', []), 'nobody')).toBe(true);
+  // A loop always restarts from its first child; duplicate names cannot be told apart.
+  expect(
+    restartsSiblings(new LoopAgent({ name: 'loop', maxIterations: 2, subAgents: [llm('a')] }), 'a'),
+  ).toBe(true);
+  expect(restartsSiblings(flow('s', llm('x'), flow('t', llm('y'), llm('x'))), 'x')).toBe(true);
 });

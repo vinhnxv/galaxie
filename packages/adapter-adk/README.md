@@ -108,17 +108,20 @@ const agent: AdkAgent = (host) =>
 ## Supported agent shapes
 
 Native ADK and the adapter run the same scripted model requests and return the same output for
-`SequentialAgent`, `LoopAgent`, `ParallelAgent` (compared as a set, because branch arrival order
+`SequentialAgent`, `LoopAgent`, `ParallelAgent` (request tags compared sorted, because branch arrival order
 varies) and an `LlmAgent` with `subAgents` that transfers ([agents.test.ts](test/agents.test.ts)).
 Two `ParallelAgent` branches that each call a write capability get their own position-derived
 scopes: after a failed run, the re-dispatch with reversed branch completion order replays each
 receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `false`.
 
-- ADK restarts a `SequentialAgent` or `LoopAgent` from its first child when a paused run resumes
-  (the test shows native ADK doing so). A pause inside a `LoopAgent`, a `ParallelAgent` or a later
-  child of a `SequentialAgent` would run earlier siblings, and their writes, again, so it fails
-  `unsupported`. A pause in the first child, or in an agent reached by transfer, resumes in place
-  and survives a reload.
+- ADK resumes directly at the paused agent only when that agent and all its ancestors are
+  `LlmAgent`s; otherwise it restarts from the root, and a `SequentialAgent` or `LoopAgent` runs
+  from its first child (the native test shows this for `SequentialAgent`). A pause would run
+  earlier siblings, and their writes, again in a `LoopAgent`, in a later child of a
+  `SequentialAgent`, or under an `LlmAgent` inside a workflow agent, so it fails `unsupported`.
+  The same holds in any tree that contains a `ParallelAgent`, and for an unknown or
+  duplicate-named pausing agent. A pause in the first child at every `SequentialAgent` step, or in
+  a chain of `LlmAgent`s linked by transfer, resumes in place and survives a reload.
 - `AgentTool` and `Workflow` fail `unsupported` at prepare. Re-admitting `AgentTool` needs an
   adapter-owned wrapper with its own run config, integrity plugin and session keying.
 
