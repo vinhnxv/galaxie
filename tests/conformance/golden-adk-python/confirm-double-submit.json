@@ -1,0 +1,133 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "confirm double submit"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "confirm double submit"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call-1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":3}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-1",
+          "content": "{\"value\":6}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "double_1",
+          "name": "double",
+          "args": {
+            "value": 3
+          }
+        }
+      ]
+    },
+    {
+      "content": "The confirmed result is ready.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 3
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "interactionId": "pause-0",
+      "surfaceId": "main",
+      "viewRevision": "confirm-1",
+      "component": "tests.Approval/v1",
+      "props": {
+        "requests": [
+          {
+            "kind": "confirmation",
+            "tool": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "output": "The confirmed result is ready.",
+  "error": null,
+  "dispatches": ["accepted", "rejected:duplicate"]
+}

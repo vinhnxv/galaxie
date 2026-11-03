@@ -106,7 +106,10 @@ class Direct(Executor):
     def __init__(self):
         pass
 
-    async def run(self, input, session, steps, on_stream=None):
+    def pending(self, session):
+        return None
+
+    async def run(self, input, session, steps, on_stream=None, resume=None):
         os.environ['GOOGLE_API_KEY'] = 'fixture-not-a-key'
         from google.adk.agents import LlmAgent as Agent
         from google.adk.runners import InMemoryRunner
@@ -133,7 +136,7 @@ class Quiet(Executor):
     def __init__(self):
         super().__init__(tools())
 
-    async def run(self, input, session, steps, on_stream=None):
+    async def run(self, input, session, steps, on_stream=None, resume=None):
         import io, logging, sys, warnings
         captured = io.StringIO()
         handler = logging.StreamHandler(captured)
@@ -144,7 +147,7 @@ class Quiet(Executor):
         try:
             with warnings.catch_warnings(record=True) as recorded:
                 warnings.simplefilter('always')
-                output = await super().run(input, session, steps, on_stream)
+                output = await super().run(input, session, steps, on_stream, resume)
         finally:
             sys.stdout, sys.stderr = previous
             logging.getLogger().removeHandler(handler)

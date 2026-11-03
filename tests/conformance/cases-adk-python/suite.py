@@ -8,13 +8,18 @@ CASES = (
     'plain-text', 'capability', 'sequential-tools', 'output-schema',
     'capability-denial', 'argument-block', 'step-budget', 'abort',
     'stream-text', 'stream-tools', 'stream-mid-block', 'stream-abort',
+    'confirm-approve', 'confirm-deny', 'confirm-two', 'long-running', 'confirm-stale',
+    'confirm-incomplete', 'confirm-double-submit', 'confirm-consecutive', 'stream-confirm-approve',
 )
+CONFIRMATION_CASES = tuple(name for name in CASES if 'confirm' in name)
+INTERACTION_CASES = (*CONFIRMATION_CASES, 'long-running')
 PARAMETERS = {
     'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'],
     'additionalProperties': False,
 }
 TOOL_CASES = (
     'capability', 'sequential-tools', 'capability-denial', 'argument-block', 'step-budget', 'stream-tools',
+    *INTERACTION_CASES,
 )
 
 
@@ -22,16 +27,39 @@ class Answer(BaseModel):
     value: int
 
 
+def interaction(requests):
+    """What the host shows for the paused calls; both lanes use this projection."""
+    return {'surfaceId': 'main', 'viewRevision': 'confirm-1', 'component': 'tests.Approval/v1', 'props': {'requests': requests}}
+
+
+def external_answer(requests, action, payload):
+    """The author's resume for a long-running call: the submitted payload is the call's result."""
+    return [{'response': payload} for _ in requests]
+
+
+def hooks(name):
+    """The author hooks of an interaction case; the native lane applies them itself."""
+    return {'interaction': interaction, **({'resume': external_answer} if name == 'long-running' else {})}
+
+
 def factory(name, model=None, tool=None):
     """The case's agent; the native lane passes its own model and tool, the Worker lane the host helpers."""
     if name not in CASES:
         raise ValueError('The conformance case is unknown.')
-    if model is None:
+    worker = model is None
+    if worker:
         from galaxie.adk import capability_tool, llm
         model = llm('answer')
-        tool = capability_tool('double', 'math.double@1', PARAMETERS, 'Double an integer.')
+        tool = capability_tool(
+            'double', 'math.double@1', PARAMETERS, 'Double an integer.',
+            require_confirmation=name in CONFIRMATION_CASES, long_running=name == 'long-running',
+        )
     options = {'output_schema': Answer, 'output_key': 'result'} if name == 'output-schema' else {}
-    return LlmAgent(
+    agent = LlmAgent(
         name='conformance', model=model, instruction='Use the supplied tools and answer briefly.',
         tools=[tool] if name in TOOL_CASES and tool is not None else [], **options,
     )
+    if worker and name in INTERACTION_CASES:
+        from galaxie.adk import Executor
+        return Executor(agent, **hooks(name))
+    return agent

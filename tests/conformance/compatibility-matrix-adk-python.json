@@ -3,12 +3,12 @@
   "requestReference": "The native lane maps ADK's LlmRequest to OpenAI-format messages and tools in tests/conformance/cases-adk-python/native.py; the galaxie mapper is independent",
   "lanes": [
     "Node Pyodide",
-    "real headless Chromium Pyodide (plain-text, capability, abort, stream-text, stream-abort)"
+    "real headless Chromium Pyodide (plain-text, capability, abort, stream-text, stream-abort, confirm-approve)"
   ],
   "features": {
     "streaming": true,
-    "interrupts": false,
-    "resume": false,
+    "interrupts": true,
+    "resume": true,
     "checkpoints": false,
     "subgraphs": false
   },
@@ -24,7 +24,16 @@
     "stream-text",
     "stream-tools",
     "stream-mid-block",
-    "stream-abort"
+    "stream-abort",
+    "confirm-approve",
+    "confirm-deny",
+    "confirm-two",
+    "long-running",
+    "confirm-stale",
+    "confirm-incomplete",
+    "confirm-double-submit",
+    "confirm-consecutive",
+    "stream-confirm-approve"
   ],
   "differences": [],
   "normalizations": [
@@ -33,6 +42,8 @@
     "The native lane implements the capability tool itself with the same declaration, so the lanes compare the model mapping and the run loop, not the tool body. The denial case pins the fixed model-visible error a denied capability returns.",
     "The native lane emulates the router's step budget (budget_exceeded before the third dispatch with a limit of two), the host output-safety block (denied) and cancellation, because it has no router; the lanes compare the observable outcome.",
     "The native lane streams with ADK's SSE mode and a scripted model that yields word-sized partial responses (the router's mock splits the same way); the stream-mid-block case stops at the first chunk whose growing text holds the blocked marker, as the router's output check does, and stream-abort cancels after the first chunk.",
-    "ADK ends a cancelled root node quietly; the native fixture records the cancellation itself, and the galaxie run reports cancelled through the adapter."
+    "ADK ends a cancelled root node quietly; the native fixture records the cancellation itself, and the galaxie run reports cancelled through the adapter.",
+    "The native lane drives pauses itself the way ADK documents them: a confirmation run ends after ADK's own `adk_request_confirmation` request and the answer is a new run with a `FunctionResponse` for that request; a long-running run is left after the call's pending result and the answer is a new run with a `FunctionResponse` for the call. Interactions carry the author hook's projection with positional requests `{kind, tool, args}`; ADK call IDs never appear. The interaction IDs are the fixture's `pause-<n>` names.",
+    "The native lane validates the default resume itself (approve or deny, every request covered once) and raises the fixed `invalid` and `stale` errors where the galaxie lane rejects the answer before any tool runs; the native `confirm-stale` and `confirm-double-submit` results are fixed expectations, and only the Worker lane produces the core's rejection codes. Pause markers (`paused`, one per request, tool name and position only) are content-free and restart their numbering with each run."
   ]
 }

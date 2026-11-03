@@ -6,15 +6,18 @@
 import asyncio
 import contextlib
 import copy
+import hashlib
 import json
 import logging
+import math
 import re
 import secrets
 import warnings
 import weakref
 from collections.abc import AsyncGenerator, Callable, Iterator
 from contextvars import ContextVar
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, cast
 
 from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode  # pyright: ignore[reportPrivateImportUsage]
@@ -57,6 +60,8 @@ _NUMERIC_LIMITS = (
 )
 _COPIED = ('description', 'title', 'format', 'pattern', 'enum', 'default')
 _DEPTH_LIMIT = 32
+# The call ADK issues to ask the user about a confirmation-gated tool call.
+_CONFIRMATION = 'adk_request_confirmation'
 
 
 class _Run:
@@ -357,16 +362,24 @@ class _GalaxieLlm(BaseLlm):
                         pending.exception()
             if run.failure is not None:
                 raise run.failure
-            yield self._response(run, reply, offered)
+            kinds = {
+                name: 'confirmation' if getattr(tool, '_confirm', False) else 'long-running' if tool.is_long_running else ''
+                for name, tool in llm_request.tools_dict.items()
+            }
+            yield self._response(run, reply, offered, kinds)
         except Exception as error:
             # Any other failure is fatal too, so an author callback cannot swallow it.
             run.fail(error)
             raise
 
     @staticmethod
-    def _response(run: _Run, reply: dict[str, Any], offered: set[str]) -> LlmResponse:
+    def _response(run: _Run, reply: dict[str, Any], offered: set[str], kinds: dict[str, str]) -> LlmResponse:
         calls = reply.get('toolCalls') or []
         if calls and not offered:
+            raise GalaxieError('unsupported')
+        # ADK cannot resume a confirmation beside a long-running call, and the long-running capability
+        # would already have run by the time the tracker saw the turn, so the turn is refused first.
+        if {kinds.get(call['function']['name'], '') for call in calls} >= {'confirmation', 'long-running'}:
             raise GalaxieError('unsupported')
         parts: list[types.Part] = [types.Part(text=reply['content'])] if reply['content'] else []
         for call in calls:
@@ -437,10 +450,22 @@ def _parameter_schema(parameters: Any) -> dict[str, Any]:
 class _CapabilityTool(BaseTool):
     """A tool that calls a bound capability through the broker."""
 
-    def __init__(self, name: str, capability: str, parameters: dict[str, Any], description: str) -> None:
-        super().__init__(name=name, description=description)
+    def __init__(
+        self, name: str, capability: str, parameters: dict[str, Any], description: str,
+        confirm: bool = False, long_running: bool = False,
+    ) -> None:
+        super().__init__(name=name, description=description, is_long_running=long_running)
         self._capability = capability
         self._parameters = parameters
+        self._confirm = confirm
+
+    @property
+    def pauses(self) -> bool:
+        """True when a call can end the run to wait for the user."""
+        return self._confirm or self.is_long_running
+
+    async def check_require_confirmation(self, args: dict[str, Any], tool_context: ToolContext) -> bool:
+        return self._confirm
 
     def _get_declaration(self) -> types.FunctionDeclaration:
         return types.FunctionDeclaration(
@@ -468,17 +493,28 @@ class _CapabilityTool(BaseTool):
         return _json(result)
 
 
-def capability_tool(name: str, capability: str, parameters: Any, description: str) -> BaseTool:
-    """A tool that calls the bound capability `capability` with JSON Schema or pydantic `parameters`."""
+def capability_tool(
+    name: str, capability: str, parameters: Any, description: str, *,
+    require_confirmation: bool = False, long_running: bool = False,
+) -> BaseTool:
+    """A tool that calls the bound capability `capability` with JSON Schema or pydantic `parameters`.
+
+    `require_confirmation` asks the user before each call; `long_running` makes the call's result
+    the pending answer and ends the run until the user supplies the real one (ADR-0022).
+    """
     tool_name = re.sub(r'[^A-Za-z0-9_]', '_', name) if isinstance(name, str) else ''
     if tool_name[:1].isdigit():
         tool_name = '_' + tool_name
     if (
         not _TOOL_NAME.match(tool_name[:64]) or not isinstance(capability, str) or not capability
-        or not isinstance(description, str)
+        or not isinstance(description, str) or type(require_confirmation) is not bool
+        or type(long_running) is not bool or (require_confirmation and long_running)
     ):
         raise GalaxieError('invalid')
-    tool = _CapabilityTool(tool_name[:64], capability, _parameter_schema(parameters), description)
+    tool = _CapabilityTool(
+        tool_name[:64], capability, _parameter_schema(parameters), description,
+        require_confirmation, long_running,
+    )
     _tools.add(tool)
     return tool
 
@@ -494,11 +530,18 @@ def _is_exit(tool: Any) -> bool:
     return type(tool) is FunctionTool and tool.func is exit_loop and tool in _tools
 
 
-def _validate(root: Any) -> None:
-    """Fail closed unless every agent, model and tool in the tree is one galaxie can govern."""
-    visited = 0
+def _validate(root: Any) -> frozenset[str]:
+    """Fail closed unless every agent, model and tool in the tree is one galaxie can govern.
 
-    def walk(agent: Any, inherited: bool, depth: int, path: set[int]) -> bool:
+    Returns the names of the agents that can pause. ADK resumes only the agent that paused, so a
+    pausing agent must be the last one to run: native ADK 2.12.0 never runs the siblings after it,
+    and a pause inside a loop or parallel agent resumes without the surrounding iteration (ADR-0022).
+    """
+    visited = 0
+    names: dict[str, int] = {}
+    pausing: set[str] = set()
+
+    def walk(agent: Any, inherited: bool, depth: int, path: set[int], lineage: tuple[tuple[Any, int], ...]) -> bool:
         nonlocal visited
         visited += 1
         if depth > MAX_DEPTH or visited > MAX_AGENTS or id(agent) in path:
@@ -508,8 +551,10 @@ def _validate(root: Any) -> None:
         fields = type(agent).model_fields
         if any(getattr(agent, name) != fields[name].default for name in _REFUSED_FIELDS if name in fields):
             raise GalaxieError('unsupported')
+        names[agent.name] = names.get(agent.name, 0) + 1
         known = inherited
         exits = False
+        pauses = False
         if isinstance(agent, LlmAgent):
             if agent.model != '':
                 if type(agent.model) is not _GalaxieLlm or agent.model not in _models:
@@ -527,6 +572,7 @@ def _validate(root: Any) -> None:
                 raise GalaxieError('invalid')
             for tool in agent.tools:
                 if type(tool) is _CapabilityTool and tool in _tools:
+                    pauses = pauses or cast(_CapabilityTool, tool).pauses
                     continue
                 if _is_exit(tool):
                     exits = True
@@ -534,15 +580,26 @@ def _validate(root: Any) -> None:
                 raise GalaxieError('unsupported')
         if not isinstance(agent.sub_agents, list):
             raise GalaxieError('invalid')
+        if pauses:
+            if agent.sub_agents or any(
+                type(parent) is not SequentialAgent or index != len(parent.sub_agents) - 1
+                for parent, index in lineage
+            ):
+                raise GalaxieError('unsupported')
+            pausing.add(agent.name)
         path.add(id(agent))
-        for child in agent.sub_agents:
-            exits = walk(child, known, depth + 1, path) or exits
+        for index, child in enumerate(agent.sub_agents):
+            exits = walk(child, known, depth + 1, path, (*lineage, (agent, index))) or exits
         path.discard(id(agent))
         if isinstance(agent, LoopAgent) and agent.max_iterations is None and not exits:
             raise GalaxieError('unsupported')
         return exits
 
-    walk(root, False, 0, set())
+    walk(root, False, 0, set(), ())
+    # The agent named on a pausing event must identify one agent.
+    if any(names[name] != 1 for name in pausing):
+        raise GalaxieError('unsupported')
+    return frozenset(pausing)
 
 
 class GalaxieSessionService(InMemorySessionService):
@@ -605,20 +662,181 @@ def _markers(event: Any, position: int) -> list[dict[str, Any]]:
         call, response = part.function_call, part.function_response
         step = 'tool_call' if call is not None else 'tool_result' if response is not None else ''
         name = call.name if call is not None else response.name if response is not None else None
-        if step and isinstance(name, str):
+        # ADK's own confirmation call is not an offered tool; the pause has its own marker.
+        if step and isinstance(name, str) and name != _CONFIRMATION:
             markers.append({'step': step, 'tool': name, 'index': position + len(markers)})
     return markers
+
+
+def _interaction(value: Any) -> dict[str, Any]:
+    """Mirror the four-field JSON display contract without importing a framework."""
+    def json_value(item: Any, ancestors: set[int]) -> bool:
+        if item is None or type(item) in (str, bool, int):
+            return True
+        if type(item) is float:
+            return math.isfinite(item)
+        if type(item) not in (list, dict) or id(item) in ancestors:
+            return False
+        ancestors = ancestors | {id(item)}
+        return all(json_value(child, ancestors) for child in item) if type(item) is list else all(
+            type(key) is str and json_value(child, ancestors) for key, child in item.items()
+        )
+
+    if (
+        type(value) is not dict or set(value) != {'surfaceId', 'viewRevision', 'component', 'props'}
+        or any(type(value[key]) is not str or not value[key] for key in ('surfaceId', 'viewRevision', 'component'))
+        or re.fullmatch(r'[A-Za-z][\w-]*\.[A-Za-z][\w-]*/v\d+', value['component'], re.ASCII) is None
+        or type(value['props']) is not dict or not json_value(value, set())
+    ):
+        raise GalaxieError('unsupported')
+    return _json(value)
+
+
+@dataclass(frozen=True)
+class _Ask:
+    """One call the run waits on: where the answer goes and what the author's hooks may see."""
+
+    kind: str
+    call: str
+    name: str
+    tool: str
+    args: dict[str, Any]
+
+    def request(self) -> dict[str, Any]:
+        return {'kind': self.kind, 'tool': self.tool, 'args': copy.deepcopy(self.args)}
+
+
+@dataclass
+class _Pending:
+    asks: list[_Ask]
+    interaction: dict[str, Any]
+
+
+def _confirmation(call: types.FunctionCall) -> _Ask:
+    original = (call.args or {}).get('originalFunctionCall')
+    if (
+        not isinstance(call.id, str) or not call.id or not isinstance(original, dict)
+        or not isinstance(original.get('name'), str) or not isinstance(original.get('args') or {}, dict)
+    ):
+        raise GalaxieError('unsupported')
+    return _Ask('confirmation', call.id, _CONFIRMATION, original['name'], _json(original.get('args') or {}))
+
+
+class _Tracker:
+    """Watches the events of one run for the point where ADK needs the user (KTD10).
+
+    A confirmation request ends the invocation by itself. A long-running tool pauses it only after
+    the tool has returned its pending result, before ADK asks the model about it.
+    """
+
+    def __init__(self, pausing: frozenset[str]) -> None:
+        self.asks: list[_Ask] | None = None
+        self._pausing = pausing
+        self._flagged: list[_Ask] = []
+
+    def observe(self, event: Any) -> bool:
+        """True when this event is the one the run stops on.
+
+        Raises `unsupported` for a turn ADK cannot resume faithfully: a confirmation beside a
+        long-running call (ADK drops the long-running answer), or a pause from an agent that is not
+        a validated pausing agent.
+        """
+        parts = event.content.parts or [] if event.content is not None else []
+        calls = [part.function_call for part in parts if part.function_call is not None]
+        gates = [call for call in calls if call.name == _CONFIRMATION]
+        if gates:
+            if self._flagged or self.asks is not None or event.author not in self._pausing:
+                raise GalaxieError('unsupported')
+            self.asks = [_confirmation(call) for call in gates]
+            return False
+        if calls:
+            flagged = set(event.long_running_tool_ids or ())
+            self._flagged = [
+                _Ask('long-running', call.id, call.name, call.name, _json(call.args or {}))
+                for call in calls if isinstance(call.id, str) and call.id in flagged
+            ]
+            return False
+        if self.asks is not None or not self._flagged:
+            return False
+        # The next event carries the turn's (possibly empty) tool results; ADK would call the model
+        # about them next, so the run stops here instead.
+        if event.actions.requested_tool_confirmations or event.author not in self._pausing:
+            raise GalaxieError('unsupported')
+        self.asks = self._flagged
+        return True
+
+    def ended(self) -> None:
+        """The run ended by itself: long-running calls with no result event are the pause."""
+        if self.asks is None and self._flagged:
+            self.asks = self._flagged
+
+
+def _default_resume(requests: list[dict[str, Any]], action: str, payload: Any) -> list[dict[str, Any]]:
+    """Approve or deny every confirmation, nothing else."""
+    indexes = payload.get('indexes') if type(payload) is dict else None
+    if (
+        action not in ('approve', 'deny') or any(request['kind'] != 'confirmation' for request in requests)
+        or type(payload) is not dict or set(payload) != {'indexes'} or type(indexes) is not list
+        or any(type(index) is not int for index in indexes)
+        or sorted(indexes) != list(range(len(requests)))
+    ):
+        raise GalaxieError('invalid')
+    return [{'confirmed': action == 'approve'} for _ in requests]
+
+
+def _answer(asks: list[_Ask], decisions: Any) -> types.Content:
+    """The user message that answers every ask, from checked decisions."""
+    if type(decisions) is not list or len(decisions) != len(asks):
+        raise GalaxieError('invalid')
+    parts: list[types.Part] = []
+    for ask, decision in zip(asks, decisions):
+        if type(decision) is not dict or len(decision) != 1:
+            raise GalaxieError('invalid')
+        if ask.kind == 'confirmation':
+            if type(decision.get('confirmed')) is not bool:
+                raise GalaxieError('invalid')
+            response = {'confirmed': decision['confirmed']}
+        else:
+            if type(decision.get('response')) is not dict:
+                raise GalaxieError('invalid')
+            response = _json(decision['response'])
+        parts.append(types.Part(function_response=types.FunctionResponse(id=ask.call, name=ask.name, response=response)))
+    return types.Content(role='user', parts=parts)
 
 
 class Executor:
     """Run an ADK agent tree with explicit input and output projections."""
 
-    def __init__(self, agent: BaseAgent) -> None:
+    def __init__(
+        self, agent: BaseAgent, *,
+        interaction: Callable[[list[dict[str, Any]]], dict[str, Any]] | None = None,
+        resume: Callable[[list[dict[str, Any]], str, Any], list[dict[str, Any]]] | None = None,
+    ) -> None:
         with quiet():
-            _validate(agent)
+            self._pausing = _validate(agent)
+        # A pause with nowhere to show it would run its capability and then fail, so refuse it first.
+        if self._pausing and interaction is None:
+            raise GalaxieError('unsupported')
         self.agent = agent
+        self.interaction = interaction
+        self.resume = resume
         self._sessions = GalaxieSessionService()
         self._runners: dict[str, Runner] = {}
+        self._pauses: dict[str, int] = {}
+        self._pending: dict[str, _Pending] = {}
+
+    def pending(self, session: str) -> dict[str, Any] | None:
+        """The one pending interaction of a session."""
+        pause = self._pending.get(session)
+        return copy.deepcopy(pause.interaction) if pause is not None else None
+
+    def _answers(self, pause: _Pending, action: str, payload: Any) -> types.Content:
+        requests = [ask.request() for ask in pause.asks]
+        try:
+            decisions = self.resume(requests, action, payload) if self.resume is not None else _default_resume(requests, action, payload)
+            return _answer(pause.asks, decisions)
+        except Exception:
+            raise GalaxieError('invalid') from None
 
     def _runner(self, session: str) -> Runner:
         runner = self._runners.get(session)
@@ -633,14 +851,30 @@ class Executor:
 
     async def run(
         self, input: Any, session: str, steps: int, on_stream: Callable[[str, Any], None] | None = None,
+        resume: dict[str, Any] | None = None,
     ) -> Any:
         if not isinstance(session, str) or not session or type(steps) is not int or steps < 1:
             raise GalaxieError('invalid')
-        if (
-            not isinstance(input, dict) or set(input) != {'prompt'}
-            or not isinstance(input['prompt'], str) or not input['prompt']
-        ):
-            raise GalaxieError('invalid')
+        pause = self._pending.get(session)
+        if resume is not None:
+            # Every check precedes the run, so a stale or unmatched answer runs no tool.
+            if type(resume) is not dict:
+                raise GalaxieError('invalid')
+            if pause is None or resume.get('interactionId') != pause.interaction['id']:
+                raise GalaxieError('stale')
+            if set(resume) != {'interactionId', 'action', 'payload'} or not isinstance(resume['action'], str):
+                raise GalaxieError('invalid')
+            message = self._answers(pause, resume['action'], resume['payload'])
+        else:
+            if (
+                not isinstance(input, dict) or set(input) != {'prompt'}
+                or not isinstance(input['prompt'], str) or not input['prompt']
+            ):
+                raise GalaxieError('invalid')
+            # A new prompt would leave the paused calls unanswered in the history.
+            if pause is not None:
+                raise GalaxieError('invalid')
+            message = types.Content(role='user', parts=[types.Part(text=input['prompt'])])
         if session not in self._sessions.sessions.get(APP_NAME, {}).get(USER_ID, {}):
             await self._sessions.create_session(app_name=APP_NAME, user_id=USER_ID, session_id=session)
         stored = self._sessions.sessions[APP_NAME][USER_ID][session]
@@ -656,11 +890,12 @@ class Executor:
         last: tuple[str | None, str, Any] | None = None
         deltas: dict[str, _Deltas] = {}
         position = 0
+        tracker = _Tracker(self._pausing)
         try:
             with quiet():
                 generator = self._runner(session).run_async(
                     user_id=USER_ID, session_id=session,
-                    new_message=types.Content(role='user', parts=[types.Part(text=input['prompt'])]),
+                    new_message=message,
                     # A backstop only: the model call count in the run enforces the step budget.
                     run_config=RunConfig(
                         max_llm_calls=steps + 1,
@@ -689,6 +924,8 @@ class Executor:
                         for marker in _markers(event, position):
                             on_stream('updates', marker)
                             position += 1
+                    if tracker.observe(event):
+                        break
                     # A state-only final event (an after-agent callback) carries no answer.
                     if not event.is_final_response() or event.content is None:
                         continue
@@ -717,11 +954,36 @@ class Executor:
         fatal = run.failure or _galaxie_error(thrown)
         if fatal is None and thrown is not None:
             fatal = GalaxieError('executor_error')
-        if fatal is None and last is None:
+        tracker.ended()
+        value: dict[str, Any] | None = None
+        if fatal is None and tracker.asks is not None:
+            try:
+                if self.interaction is None:
+                    raise GalaxieError('unsupported')
+                value = _interaction(self.interaction([ask.request() for ask in tracker.asks]))
+            except Exception:
+                fatal = GalaxieError('unsupported')
+        if fatal is None and last is None and tracker.asks is None:
             fatal = GalaxieError('executor_error')
         if fatal is not None:
             self._sessions.rollback(session, mark)
             raise fatal
+        if tracker.asks is not None and value is not None:
+            if on_stream is not None:
+                try:
+                    for index, ask in enumerate(tracker.asks):
+                        on_stream('updates', {'step': 'paused', 'tool': ask.tool, 'index': position + index})
+                except Exception as error:
+                    # Nothing was published, so the session returns to where this run found it.
+                    self._sessions.rollback(session, mark)
+                    raise (_galaxie_error(error) or GalaxieError('executor_error')) from None
+            self._pending.pop(session, None)
+            ordinal = self._pauses.get(session, 0)
+            self._pauses[session] = ordinal + 1
+            identifier = hashlib.sha256(json.dumps([session, ordinal]).encode()).hexdigest()
+            self._pending[session] = _Pending(tracker.asks, {'id': identifier, 'value': value})
+            return None
+        self._pending.pop(session, None)
         assert last is not None
         return _json(self._output(last))
 

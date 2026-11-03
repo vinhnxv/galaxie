@@ -71,5 +71,85 @@
   "stream-abort": {
     "prompt": "stream abort",
     "replies": [{ "text": "First never returned." }]
+  },
+  "confirm-approve": {
+    "prompt": "confirm approve",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
+      { "text": "The confirmed result is ready." }
+    ],
+    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }]
+  },
+  "confirm-deny": {
+    "prompt": "confirm deny",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
+      { "text": "The tool was declined." }
+    ],
+    "answers": [{ "action": "deny", "payload": { "indexes": [0] } }]
+  },
+  "confirm-two": {
+    "prompt": "confirm two",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          { "id": "double_1", "name": "double", "args": { "value": 3 } },
+          { "id": "double_2", "name": "double", "args": { "value": 4 } }
+        ]
+      },
+      { "text": "The confirmed result is ready." }
+    ],
+    "answers": [{ "action": "approve", "payload": { "indexes": [1, 0] } }]
+  },
+  "long-running": {
+    "prompt": "long running",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
+      { "text": "The external result arrived." }
+    ],
+    "answers": [{ "action": "submit", "payload": { "result": "external six" } }]
+  },
+  "confirm-stale": {
+    "prompt": "confirm stale",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] }
+    ],
+    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }]
+  },
+  "confirm-incomplete": {
+    "prompt": "confirm incomplete",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] }
+    ],
+    "answers": [{ "action": "approve", "payload": { "indexes": [] } }]
+  },
+  "confirm-double-submit": {
+    "prompt": "confirm double submit",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
+      { "text": "The confirmed result is ready." }
+    ],
+    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }]
+  },
+  "confirm-consecutive": {
+    "prompt": "confirm consecutive",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 4 } }] },
+      { "text": "The confirmed result is ready." }
+    ],
+    "answers": [
+      { "action": "approve", "payload": { "indexes": [0] } },
+      { "action": "approve", "payload": { "indexes": [0] } }
+    ]
+  },
+  "stream-confirm-approve": {
+    "prompt": "stream confirm approve",
+    "replies": [
+      { "text": "", "toolCalls": [{ "id": "double_1", "name": "double", "args": { "value": 3 } }] },
+      { "text": "The confirmed result is ready." }
+    ],
+    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }]
   }
 }

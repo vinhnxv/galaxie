@@ -299,15 +299,15 @@ export function createPyodideAdapter(
           : 'langgraph-python';
   const langgraph = framework === 'langgraph';
   // The ADK executor turns each feature on only with its own stage's evidence (ADR-0022): it
-  // streams, and its interactions, resume and checkpoints stay off until their stages ship.
-  const supported = framework !== 'adk';
+  // streams and pauses for interactions, and its checkpoints stay off until their stage ships.
+  const durable = framework !== 'adk';
   return {
     id: executorId,
     version: '0.0.0',
     features: {
-      interrupts: supported,
-      resume: supported,
-      checkpoints: supported,
+      interrupts: true,
+      resume: true,
+      checkpoints: durable,
       streaming: true,
       subgraphs: langgraph,
     },
