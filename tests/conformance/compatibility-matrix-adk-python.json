@@ -9,7 +9,7 @@
     "streaming": true,
     "interrupts": true,
     "resume": true,
-    "checkpoints": false,
+    "checkpoints": true,
     "subgraphs": false
   },
   "cases": [
@@ -44,6 +44,7 @@
     "The native lane streams with ADK's SSE mode and a scripted model that yields word-sized partial responses (the router's mock splits the same way); the stream-mid-block case stops at the first chunk whose growing text holds the blocked marker, as the router's output check does, and stream-abort cancels after the first chunk.",
     "ADK ends a cancelled root node quietly; the native fixture records the cancellation itself, and the galaxie run reports cancelled through the adapter.",
     "The native lane drives pauses itself the way ADK documents them: a confirmation run ends after ADK's own `adk_request_confirmation` request and the answer is a new run with a `FunctionResponse` for that request; a long-running run is left after the call's pending result and the answer is a new run with a `FunctionResponse` for the call. Interactions carry the author hook's projection with positional requests `{kind, tool, args}`; ADK call IDs never appear. The interaction IDs are the fixture's `pause-<n>` names.",
-    "The native lane validates the default resume itself (approve or deny, every request covered once) and raises the fixed `invalid` and `stale` errors where the galaxie lane rejects the answer before any tool runs; the native `confirm-stale` and `confirm-double-submit` results are fixed expectations, and only the Worker lane produces the core's rejection codes. Pause markers (`paused`, one per request, tool name and position only) are content-free and restart their numbering with each run."
+    "The native lane validates the default resume itself (approve or deny, every request covered once) and raises the fixed `invalid` and `stale` errors where the galaxie lane rejects the answer before any tool runs; the native `confirm-stale` and `confirm-double-submit` results are fixed expectations, and only the Worker lane produces the core's rejection codes. Pause markers (`paused`, one per request, tool name and position only) are content-free and restart their numbering with each run.",
+    "Stage AP5 stores a conversation as an adk-python.session/v1 record: the event log in the checkpoint and the per-session integrity key, pause counter and pending request in the metadata. One record travels in one 1 MiB bridge frame, so the executor projects the record size at every appended event and fails unsupported before the next model or tool dispatch; a start inside the margin is refused. Failed and cancelled runs write nothing, and partial events and binary parts are never stored. Restore is covered by tests/conformance/adk-python-restore.node.test.ts, not the golden cases, because it needs a second runtime lifetime."
   ]
 }

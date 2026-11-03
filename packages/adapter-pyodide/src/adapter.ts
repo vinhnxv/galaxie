@@ -40,7 +40,7 @@ import {
   validPythonModule,
   validSourcePath,
 } from './bridge.js';
-import { checkpointBytes, dspyCheckpointValues } from './checkpoints.js';
+import { adkCheckpointValues, checkpointBytes, dspyCheckpointValues } from './checkpoints.js';
 import { adapterFailure, failureCode } from './errors.js';
 import type { LockedWheel, PythonFramework } from './runtime-files.js';
 import { GrowingOutput, outputText, toolCalls } from './tool-calls.js';
@@ -298,16 +298,13 @@ export function createPyodideAdapter(
           ? 'pydantic-ai-python'
           : 'langgraph-python';
   const langgraph = framework === 'langgraph';
-  // The ADK executor turns each feature on only with its own stage's evidence (ADR-0022): it
-  // streams and pauses for interactions, and its checkpoints stay off until their stage ships.
-  const durable = framework !== 'adk';
   return {
     id: executorId,
     version: '0.0.0',
     features: {
       interrupts: true,
       resume: true,
-      checkpoints: durable,
+      checkpoints: true,
       streaming: true,
       subgraphs: langgraph,
     },
@@ -401,10 +398,15 @@ export function createPyodideAdapter(
               const value = await services.checkpoints?.request(
                 checkpointBytes({ ...(message.payload as object), executor: executorId }, 'decode'),
               );
-              if (framework === 'dspy' && input.op === 'get' && value !== null) {
+              if (
+                (framework === 'dspy' || framework === 'adk') &&
+                input.op === 'get' &&
+                value !== null
+              ) {
                 let restored: unknown;
                 try {
-                  restored = dspyCheckpointValues(value);
+                  restored =
+                    framework === 'adk' ? adkCheckpointValues(value) : dspyCheckpointValues(value);
                 } catch {
                   throw adapterFailure('unrecoverable');
                 }

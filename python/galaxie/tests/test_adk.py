@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 import asyncio
+import base64
 import json
 from typing import Any, cast
 
@@ -942,3 +943,302 @@ def test_a_pause_in_the_last_child_of_a_sequence_resumes_that_child():
     assert pending is not None
     assert answer(executor, pending) == 'last done'
     assert [op for op, _ in seen] == ['model', 'model', 'capability', 'model']
+
+
+def durable(executor):
+    executor.durable = True
+    return executor
+
+
+def stored(executor, session='s1', binding='bound'):
+    return executor._snapshot(session, binding)
+
+
+def restored(checkpoint, metadata, binding='bound', **hooks):
+    executor = durable(pausing([gated()], **hooks))
+    return executor, asyncio.run(executor._restore(checkpoint, metadata, binding))
+
+
+def edit(raw, change):
+    value = json.loads(raw)
+    change(value)
+    return json.dumps(value, separators=(',', ':')).encode()
+
+
+def paused_record(**hooks):
+    seen = []
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}], seen)
+    executor = durable(pausing([gated()], **hooks))
+    assert run(executor) is None
+    return executor, stored(executor)
+
+
+def test_a_completed_session_restores_into_a_new_executor_and_keeps_its_history():
+    seen = []
+    transport_for([{'content': 'first'}, {'content': 'second'}], seen)
+    original = durable(Executor(agent()))
+    assert run(original, prompt='one') == 'first'
+    checkpoint, metadata = stored(original)
+    other = durable(Executor(agent()))
+    conversation = asyncio.run(other._restore(checkpoint, metadata, 'bound'))
+    assert conversation == 's1'
+    assert other.pending(conversation) is None
+    assert run(other, prompt='two') == 'second'
+    roles = [(message['role'], message['content']) for message in seen[-1][1]['messages'] if message['role'] != 'system']
+    assert roles == [('user', 'one'), ('assistant', 'first'), ('user', 'two')]
+
+
+def test_a_pause_restores_with_the_same_interaction_and_never_asks_the_author_hook_again():
+    original, (checkpoint, metadata) = paused_record()
+    asked = []
+
+    def hook(requests):
+        asked.append(requests)
+        return interact(requests)
+
+    other, conversation = restored(checkpoint, metadata, interaction=hook)
+    assert asked == []
+    assert other.pending(conversation) == original.pending('s1')
+    transport_for([{'value': 42}, {'content': 'done'}])
+    assert answer(other, other.pending(conversation)) == 'done'
+    assert other.pending(conversation) is None
+
+
+def test_a_restored_pause_stays_answerable_after_a_second_snapshot_and_restore():
+    _, (checkpoint, metadata) = paused_record()
+    middle, conversation = restored(checkpoint, metadata)
+    again, _ = restored(*stored(middle))
+    transport_for([{'value': 42}, {'content': 'done'}])
+    assert answer(again, again.pending(conversation)) == 'done'
+
+
+def test_the_interaction_id_covers_the_request_content():
+    first, _ = paused_record()
+    second, _ = paused_record(interaction=lambda requests: {**interact(requests), 'viewRevision': 'r2'})
+    other_args = durable(pausing([gated()]))
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":22}')]}])
+    assert run(other_args) is None
+    ids = {(executor.pending('s1') or {})['id'] for executor in (first, second, other_args)}
+    assert len(ids) == 3
+
+
+def test_the_record_never_holds_the_key_in_the_checkpoint_and_the_key_is_per_session():
+    _, (checkpoint, metadata) = paused_record()
+    key = json.loads(metadata)['key']
+    assert key not in checkpoint.decode()
+    _, (checkpoint2, metadata2) = paused_record()
+    assert json.loads(metadata2)['key'] != key
+
+
+@pytest.mark.parametrize('change', [
+    lambda value: value['events'][1]['content']['parts'][0]['functionCall']['args'].update(value=22),
+    lambda value: value['events'][2]['content']['parts'][0]['functionCall']['args']['originalFunctionCall']['args'].update(value=22),
+    lambda value: value['events'][2]['content']['parts'][0]['functionCall'].update(name='adk_request_input'),
+    lambda value: value['events'][1]['customMetadata'].clear(),
+    lambda value: value['events'].pop(2),
+    lambda value: value['events'][3]['content']['parts'][0]['functionResponse'].update(id=value['events'][2]['content']['parts'][0]['functionCall']['id']),
+    lambda value: value['events'].append(value['events'][0]),
+    lambda value: value['events'][0].update(partial=True),
+    lambda value: value.update(extra=1),
+    lambda value: value.update(v=2),
+    lambda value: value.update(conversation_id=''),
+    lambda value: value.update(events={}),
+])
+def test_a_changed_event_log_is_unrecoverable(change):
+    _, (checkpoint, metadata) = paused_record()
+    assert code_of(lambda: restored(edit(checkpoint, change), metadata)) == 'unrecoverable'
+
+
+@pytest.mark.parametrize('change', [
+    lambda value: value.update(key='AAAA'),
+    lambda value: value.update(key=value['key'][:-2] + 'AA'),
+    lambda value: value.update(session='other'),
+    lambda value: value.update(pauses=0),
+    lambda value: value.update(pauses=-1),
+    lambda value: value.update(extra=1),
+    lambda value: value.pop('pending') and None,
+    lambda value: value['pending'].update(extra=1),
+    lambda value: value['pending']['asks'][0].update(args={'value': 22}),
+    lambda value: value['pending']['asks'][0].update(call='unknown'),
+    lambda value: value['pending']['interaction'].update(id='forged'),
+    lambda value: value['pending']['interaction']['value']['props']['requests'][0].update(tool='other'),
+])
+def test_changed_metadata_is_unrecoverable(change):
+    _, (checkpoint, metadata) = paused_record()
+    assert code_of(lambda: restored(checkpoint, edit(metadata, change))) == 'unrecoverable'
+
+
+def test_non_json_and_non_utf8_records_are_unrecoverable():
+    _, (checkpoint, metadata) = paused_record()
+    for bad in (b'not json', b'\xff\xfe', b'[]', b'null'):
+        assert code_of(lambda: restored(bad, metadata)) == 'unrecoverable'
+        assert code_of(lambda: restored(checkpoint, bad)) == 'unrecoverable'
+
+
+def test_a_forged_tool_call_with_a_copied_stamp_is_refused_by_the_session_key():
+    _, (checkpoint, metadata) = paused_record()
+    other, (checkpoint_two, metadata_two) = paused_record()
+    # Events from another session carry stamps made with another key.
+    assert code_of(lambda: restored(checkpoint_two, metadata)) == 'unrecoverable'
+
+
+def test_a_restore_that_fails_leaves_the_executor_unchanged():
+    original, (checkpoint, metadata) = paused_record()
+    before = original.pending('s1')
+    assert code_of(lambda: asyncio.run(original._restore(checkpoint, edit(metadata, lambda v: v.update(key='AAAA')), 'bound'))) == 'unrecoverable'
+    assert original.pending('s1') == before
+
+
+def test_a_failed_run_writes_nothing_and_a_snapshot_of_a_rolled_back_run_is_the_earlier_one():
+    transport_for([{'content': 'first'}, 'unavailable'])
+    executor = durable(Executor(agent()))
+    assert run(executor, prompt='one') == 'first'
+    before = stored(executor)
+    assert code_of(lambda: run(executor, prompt='two')) == 'unavailable'
+    assert stored(executor) == before
+
+
+def test_a_session_that_was_never_run_cannot_be_snapshotted():
+    assert code_of(lambda: durable(Executor(agent()))._snapshot('none')) == 'unrecoverable'
+
+
+def test_snapshot_without_a_binding_omits_it_and_restore_without_a_binding_accepts_that():
+    transport_for([{'content': 'ok'}])
+    executor = durable(Executor(agent()))
+    run(executor)
+    checkpoint, metadata = executor._snapshot('s1')
+    assert 'session' not in json.loads(metadata)
+    other = durable(Executor(agent()))
+    assert asyncio.run(other._restore(checkpoint, metadata)) == 's1'
+
+
+def test_a_non_durable_executor_has_no_frame_limit():
+    transport_for([{'content': 'x' * 900000}])
+    executor = Executor(agent())
+    assert run(executor) == 'x' * 900000
+
+
+def test_a_reply_that_crosses_the_frame_limit_fails_unsupported_and_rolls_back():
+    transport_for([{'content': 'ok'}, {'content': 'x' * (face.RECORD_LIMIT + 1)}, {'content': 'again'}])
+    executor = durable(Executor(agent()))
+    assert run(executor, prompt='one') == 'ok'
+    before = stored(executor)
+    assert code_of(lambda: run(executor, prompt='two')) == 'unsupported'
+    assert stored(executor) == before
+    assert run(executor, prompt='three') == 'again'
+
+
+def test_a_tool_result_that_crosses_the_limit_fails_before_the_next_model_dispatch():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":1}')]},
+        {'value': 'x' * face.RECORD_LIMIT},
+        {'content': 'never'},
+    ], seen)
+    executor = durable(Executor(agent([double()])))
+    assert code_of(lambda: run(executor)) == 'unsupported'
+    assert [op for op, _ in seen] == ['model', 'capability']
+
+
+def test_the_final_answer_keeps_its_reserve_and_a_run_that_starts_inside_the_margin_is_refused():
+    fits = face.RECORD_LIMIT - 8000
+    transport_for([{'content': 'x' * fits}])
+    executor = durable(Executor(agent()))
+    assert run(executor, prompt='a') == 'x' * fits
+    checkpoint, metadata = stored(executor)
+    assert len(checkpoint) <= face.RECORD_LIMIT
+    other = durable(Executor(agent()))
+    asyncio.run(other._restore(checkpoint, metadata, 'bound'))
+    transport_for([{'content': 'more'}])
+    assert code_of(lambda: run(other, prompt='b')) == 'unsupported'
+
+
+def test_the_largest_permitted_record_fits_one_bridge_frame_and_round_trips():
+    fits = face.RECORD_LIMIT - 3000
+    transport_for([{'content': 'x' * fits}])
+    executor = durable(Executor(agent()))
+    run(executor)
+    checkpoint, metadata = stored(executor)
+    frame = json.dumps({'checkpoint': base64.b64encode(checkpoint).decode(), 'metadata': base64.b64encode(metadata).decode()})
+    assert len(frame.encode()) < _bridge.MAX_BYTES
+    other = durable(Executor(agent()))
+    assert asyncio.run(other._restore(checkpoint, metadata, 'bound')) == 's1'
+
+
+def test_binary_parts_are_refused_when_stored():
+    event = face.Event(author='root', content=types.Content(role='model', parts=[types.Part(inline_data=types.Blob(data=b'x', mime_type='image/png'))]))
+    assert face._binary(event)
+    assert not face._binary(face.Event(author='root', content=types.Content(role='model', parts=[types.Part(text='a')])))
+
+
+def test_a_long_running_pause_restores_and_the_author_resume_still_answers_it():
+    hooks = {'interaction': interact, 'resume': lambda requests, action, payload: [{'response': payload} for _ in requests]}
+
+    def build():
+        tool = capability_tool('math.double@1', 'math.double@1', PARAMETERS, 'Double an integer.', long_running=True)
+        return durable(Executor(agent([tool]), **hooks))
+
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":3}')]}, {'value': 6}])
+    original = build()
+    assert run(original) is None
+    checkpoint, metadata = stored(original)
+    other = build()
+    conversation = asyncio.run(other._restore(checkpoint, metadata, 'bound'))
+    assert other.pending(conversation) == original.pending('s1')
+    transport_for([{'content': 'done'}])
+    resume = {'interactionId': (other.pending(conversation) or {})['id'], 'action': 'submit', 'payload': {'result': 'six'}}
+    assert asyncio.run(other.run(None, conversation, 5, resume=resume)) == 'done'
+
+
+def test_a_restored_session_continues_the_call_numbering_without_colliding():
+    seen = []
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":1}')]}, {'value': 2}, {'content': 'one'},
+        {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":2}')]}, {'value': 4}, {'content': 'two'},
+    ], seen)
+    original = durable(Executor(agent([double()])))
+    assert run(original, prompt='first') == 'one'
+    other = durable(Executor(agent([double()])))
+    asyncio.run(other._restore(*stored(original), 'bound'))
+    assert run(other, prompt='second') == 'two'
+    scopes = [payload['effectScope'] for op, payload in seen if op == 'capability']
+    assert scopes == ['adk-python/s1/root/0/0', 'adk-python/s1/root/1/0']
+    assert 'galaxie-2' in json.dumps(seen[-1][1])
+
+
+def test_an_event_marked_restored_cannot_hide_a_changed_call():
+    executor, (checkpoint, metadata) = paused_record()
+
+    def mark(value):
+        for event in value['events']:
+            event['customMetadata'] = {**(event.get('customMetadata') or {}), '__adk_internal_restored_event': True}
+            for part in (event.get('content') or {}).get('parts') or []:
+                if part.get('functionCall', {}).get('name') == 'double':
+                    part['functionCall']['args']['value'] = 99
+
+    assert code_of(lambda: restored(edit(checkpoint, mark), metadata)) == 'unrecoverable'
+
+
+def test_a_restore_refuses_a_conversation_another_session_holds_before_installing_anything():
+    executor, (checkpoint, metadata) = paused_record()
+    other = durable(pausing([gated()]))
+    conversation = json.loads(checkpoint)['conversation_id']
+    assert code_of(lambda: asyncio.run(other._restore(checkpoint, metadata, 'bound', [conversation]))) == 'unrecoverable'
+    assert other.pending(conversation) is None
+    assert conversation not in other._sessions.sessions.get('galaxie', {}).get('galaxie', {})
+
+
+def test_a_pause_with_a_request_too_large_to_echo_is_refused_before_it_is_published():
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}])
+    executor = durable(pausing([gated()], interaction=lambda requests: {**interact(requests), 'props': {'note': 'x' * 20000}}))
+    with pytest.raises(GalaxieError) as error:
+        run(executor)
+    assert error.value.code == 'unsupported'
+    assert executor.pending('s1') is None
+
+
+def test_a_session_id_that_cannot_fit_the_frame_is_refused_at_snapshot():
+    transport_for([{'content': 'hello'}])
+    executor = durable(Executor(agent()))
+    assert run(executor, session='s' * 400000) == 'hello'
+    assert code_of(lambda: executor._snapshot('s' * 400000, 'q' * 200000)) == 'unsupported'
