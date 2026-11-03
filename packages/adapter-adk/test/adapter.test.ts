@@ -137,7 +137,7 @@ const toolThenText =
       ? new AIMessage({ content: final })
       : new AIMessage({ content: '', tool_calls: [call('docs_search_1', { q: 'x' })] });
 
-test('the adapter reports adk-js and the stage A4 features, and runs a text agent', async () => {
+test('the adapter reports adk-js and the stage A5 features, and runs a text agent', async () => {
   const { adapter, runtime, run } = await execute({
     reply: () => new AIMessage({ content: 'hello' }),
   });
@@ -145,7 +145,7 @@ test('the adapter reports adk-js and the stage A4 features, and runs a text agen
   expect(adapter.features).toEqual({
     interrupts: true,
     resume: true,
-    checkpoints: false,
+    checkpoints: true,
     streaming: true,
     subgraphs: false,
   });

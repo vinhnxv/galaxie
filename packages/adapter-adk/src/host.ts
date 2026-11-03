@@ -20,6 +20,12 @@ import { toGalaxieError } from './run.js';
 export interface AdkServices {
   /** Provider IDs, rather than role names (ADR-0006). */
   readonly chatModels: Readonly<Record<string, AdkChatModel>>;
+  /**
+   * The byte-record checkpoint port of `@galaxie/storage-indexeddb`. With it, a pause and each
+   * completed conversation are stored so that a reload restores them; without it, sessions live in
+   * memory only.
+   */
+  readonly checkpoints?: { request(value: unknown): Promise<unknown> };
 }
 
 export interface CapabilityToolSpec {
@@ -67,6 +73,11 @@ export function validServices(value: unknown): value is AdkServices {
   if (typeof value !== 'object' || value === null || !('chatModels' in value)) return false;
   const models = value.chatModels;
   if (typeof models !== 'object' || models === null || Array.isArray(models)) return false;
+  if ('checkpoints' in value && value.checkpoints !== undefined) {
+    const port: unknown = value.checkpoints;
+    if (typeof port !== 'object' || port === null || !('request' in port)) return false;
+    if (typeof port.request !== 'function') return false;
+  }
   return Object.values(models).every(
     (model: unknown) =>
       typeof model === 'function' ||

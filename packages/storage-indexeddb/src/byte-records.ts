@@ -17,10 +17,15 @@ export interface ByteWrite {
   readonly interruptIds: readonly string[];
 }
 type Location = { readonly sessionId: string; readonly namespace: string };
-export type ByteExecutor = 'langgraph-python' | 'pydantic-ai-python' | 'dspy-python';
+export type ByteExecutor = 'langgraph-python' | 'pydantic-ai-python' | 'dspy-python' | 'adk-js';
 
 export function isByteExecutor(value: unknown): value is ByteExecutor {
-  return value === 'langgraph-python' || value === 'pydantic-ai-python' || value === 'dspy-python';
+  return (
+    value === 'langgraph-python' ||
+    value === 'pydantic-ai-python' ||
+    value === 'dspy-python' ||
+    value === 'adk-js'
+  );
 }
 
 export type ByteCheckpointRequest = { readonly executor: ByteExecutor } & (

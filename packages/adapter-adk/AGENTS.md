@@ -3,7 +3,7 @@
 ## Purpose
 
 Host Google ADK (JavaScript) agents as a galaxie executor, with routing, labels, consent,
-budgets and persistence kept in galaxie. Stage A4 adds pauses for confirmations and long-running tools as interactions. See the
+budgets and persistence kept in galaxie. Stage A5 adds durable sessions through the byte-record checkpoint port. See the
 [README](README.md) and [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md).
 
 ## Entry points
@@ -34,12 +34,13 @@ Do not import an `@google/adk/...` subpath, another executor adapter or LangGrap
 ## Limits
 
 The adapter streams checked text deltas and content-free tool markers and pauses on confirmations
-and long-running tools (interrupts and resume), but has no checkpoints or subgraphs, and sessions
-and pauses live in memory. Author code sees positional requests only; never expose ADK call IDs. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle, so
+and long-running tools (interrupts and resume), and stores sessions through `services.checkpoints`
+when the host supplies it (otherwise in memory). It has no subgraphs. The integrity key lives in
+record metadata and must never be logged, put in a span or error, or exported. Author code sees positional requests only; never expose ADK call IDs. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle, so
 hosts must apply the build define.
 
 ## Tests
 
 Run `pnpm exec vitest run packages/adapter-adk tests/conformance/adk.test.ts
-tests/conformance/adk-native.node.test.ts`. The bundle-file test fails on any ADK or bundle change.
+tests/conformance/adk-native.node.test.ts tests/conformance/adk-restore.test.ts`. `test/persist.test.ts` covers the record codec; `adk-restore.test.ts` covers reload, replay, rollback and tampering. The bundle-file test fails on any ADK or bundle change.
 Run `pnpm check` before reporting the integrated change as finished.

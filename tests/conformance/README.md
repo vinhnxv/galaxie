@@ -256,6 +256,13 @@ resume and the output with the galaxie run answered through core's dispatch. It 
 strict mock CSP; the bundle-level strict-CSP probe lives in `packages/adapter-adk`. No other
 executor's goldens or matrix change.
 
+[adk-restore.test.ts](adk-restore.test.ts) covers durable sessions across two runtime lifetimes: a
+pause that survives a reload and resumes to completion with the model seeing the restored history, a
+write approved before a crash that replays its receipt after the restore, a failed run that stores
+nothing, a record from another executor, and (Node) a tampered stored call, a record spliced from
+another session and a corrupt record. Node keeps the byte records in memory; the Chromium lane uses
+a real `IndexedDBSaver` and also checks that an export never contains the integrity key.
+
 Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformance/adk-native.node.test.ts`. To rewrite the goldens on purpose, set `ADK_UPDATE_GOLDEN=1` for the native test, run `pnpm format` and review the diff.
 
 ## Running the suite

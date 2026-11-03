@@ -6,10 +6,10 @@ router, broker and budgets, with checked streaming and pauses for confirmations 
 tools. See
 [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md) (Proposed).
 
-## Adapter (stage A4)
+## Adapter (stage A5)
 
-`createAdkAdapter()` registers `adk-js` with `streaming`, `interrupts` and `resume` set to `true`
-and `checkpoints` and `subgraphs` set to `false`. The run input is `{ prompt: string }`.
+`createAdkAdapter()` registers `adk-js` with `streaming`, `interrupts`, `resume` and `checkpoints` set
+to `true` and `subgraphs` set to `false`. The run input is `{ prompt: string }`.
 The agent factory receives a host and returns an ADK agent:
 
 ```ts
@@ -91,7 +91,19 @@ const agent: AdkAgent = (host) =>
   valid answer is answered with a denial before the next `start`, so history stays well-formed. ADK also hides
   `adk_request_input` calls and answers from an `LlmAgent`, so `host.adk.requestInput()` fails the
   run `unsupported`; use a long-running tool to ask the user a question.
-- Pauses live in memory: checkpoints, reload restore and the example host are later stages.
+- Durable sessions: pass `services.checkpoints` (the `byteRecords` port of `IndexedDBSaver`). After a
+  run pauses or completes, the adapter writes one `adk.session/v1` record holding the conversation
+  events, the pause ordinal and the pending interaction. The per-session integrity key for ADK's
+  tool-call stamps is stored beside it in the record metadata, so it is never part of a personal-content
+  export. Restore (`instance.restore()`) validates the record against a closed schema, registers its
+  text as private data before ADK can reach a model, and rebuilds the plugin from the stored key, so
+  a stored pause must match the stamped calls in the events (name and arguments) or the record is `unrecoverable`, and an altered stamped call fails `invalid` when the run resumes. Core's private data is cleared at each run end, so every run of a store-backed session registers the stored history again before ADK can replay it. A corrupt, spliced or oversize record fails
+  `unrecoverable`. Failed and cancelled runs write nothing and are undone in memory (events and state), so a restore
+  returns to the last stored state. A record is limited to 4 MiB; a longer conversation fails
+  `unsupported` and cannot continue. Partial events and binary parts are never stored. Without `services.checkpoints` sessions
+  stay in memory, as before. The effect scope of a write is position-derived, so an approved write
+  whose run crashed replays its receipt after the restore. One active owner per session applies, as for
+  the other executors; the example host is a later stage.
 
 ## Install
 
