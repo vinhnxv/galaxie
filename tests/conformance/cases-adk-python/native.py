@@ -5,11 +5,13 @@ import asyncio
 import importlib.util
 import json
 from pathlib import Path
+import re
 import socket
 import sys
 from typing import Any
 from unittest.mock import patch
 
+from google.adk.agents.run_config import RunConfig, StreamingMode  # pyright: ignore[reportPrivateImportUsage]
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import InMemoryRunner
@@ -115,6 +117,17 @@ class ScriptedLlm(BaseLlm):
         transcript['responses'].append({'content': entry['text'], 'toolCalls': entry.get('toolCalls', [])})
         if self.case == 'argument-block':
             raise GalaxieError('denied')
+        if stream and self.case.startswith('stream-'):
+            # The router checks growing text before the model sees it; the fixture emulates that check.
+            shown = ''
+            for chunk in re.findall(r'\S+\s*', entry['text']):
+                if 'BLOCKED_TEXT' in shown + chunk:
+                    raise GalaxieError('denied')
+                shown += chunk
+                yield LlmResponse(content=types.Content(role='model', parts=[types.Part(text=chunk)]), partial=True)
+                if self.case == 'stream-abort':
+                    transcript['error'] = {'code': 'cancelled', 'message': 'The run was cancelled.'}
+                    raise asyncio.CancelledError()
         parts = ([types.Part(text=entry['text'])] if entry['text'] else []) + [
             types.Part(function_call=types.FunctionCall(name=call['name'], args=call['args']))
             for call in entry.get('toolCalls', [])
@@ -142,9 +155,30 @@ class NativeDouble(BaseTool):
         return {'value': args['value'] * 2}
 
 
+def project(event, streams):
+    """The streamed view of an ADK event, written independently of galaxie's projection."""
+    parts = event.content.parts if event.content else []
+    if event.partial:
+        text = ''.join(part.text or '' for part in parts)
+        if text:
+            streams.append({'mode': 'messages', 'data': {'author': event.author, 'text': text}})
+        return
+    for part in parts:
+        call, response = part.function_call, part.function_response
+        if call or response:
+            streams.append({'mode': 'updates', 'data': {
+                'step': 'tool_call' if call else 'tool_result', 'tool': (call or response).name, 'index': sum(
+                    1 for item in streams if item['mode'] == 'updates'),
+            }})
+
+
 async def _run_case(name):
     spec = json.loads(Path(__file__).with_name('fixtures.json').read_text())[name]
-    transcript = {'requests': [], 'responses': [], 'capabilities': [], 'interactions': [], 'output': None, 'error': None}
+    streaming = name.startswith('stream-')
+    transcript = {
+        'requests': [], 'responses': [], 'capabilities': [], 'interactions': [], 'output': None, 'error': None,
+        **({'streams': []} if streaming else {}),
+    }
     model = ScriptedLlm(model='answer', case=name, spec=spec, transcript=transcript)
     agent = suite.factory(name, model, NativeDouble(name, transcript))
     runner = InMemoryRunner(agent=agent, app_name='conformance')
@@ -154,7 +188,12 @@ async def _run_case(name):
         async for event in runner.run_async(
             user_id='user', session_id=session.id,
             new_message=types.Content(role='user', parts=[types.Part(text=spec['prompt'])]),
+            run_config=RunConfig(streaming_mode=StreamingMode.SSE if streaming else StreamingMode.NONE),
         ):
+            if streaming:
+                project(event, transcript['streams'])
+            if event.partial:
+                continue
             if event.is_final_response() and event.content:
                 last = ''.join(part.text or '' for part in event.content.parts or [])
         stored = await runner.session_service.get_session(app_name='conformance', user_id='user', session_id=session.id)

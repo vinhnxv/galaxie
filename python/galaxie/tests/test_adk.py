@@ -407,3 +407,152 @@ def test_a_non_galaxie_failure_in_the_model_path_cannot_be_swallowed_by_a_callba
     monkeypatch.setattr(face, '_messages', broken)
     transport_for([{'content': 'never'}])
     assert code_of(lambda: run(Executor(agent(on_model_error_callback=swallow)))) == 'executor_error'
+
+
+def streaming_transport(rounds, seen=None):
+    """Answer each model request with its chunks and then its final reply; a string final is an error code."""
+    rounds = iter(rounds)
+
+    async def transport(raw):
+        message = json.loads(raw)
+        if seen is not None:
+            seen.append((message['op'], message['payload']))
+        if message['op'] != 'model':
+            return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': {'value': 42}})
+        chunks, final = next(rounds)
+        for chunk in chunks:
+            _bridge.receive_model_chunk(json.dumps({**message, 'kind': 'notify', 'op': 'model-chunk', 'payload': chunk}))
+            await asyncio.sleep(0)
+        if isinstance(final, str):
+            return json.dumps({
+                'v': message['v'], 'kind': 'response', 'id': message['id'], 'op': 'model',
+                'ok': False, 'error': {'code': final},
+            })
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': final})
+
+    _bridge.install_transport(transport)
+
+
+def streamed(executor, steps=5, prompt='question', session='s1'):
+    events = []
+    output = asyncio.run(executor.run(
+        {'prompt': prompt}, session, steps, on_stream=lambda mode, data: events.append((mode, data)),
+    ))
+    return output, events
+
+
+def test_streamed_text_arrives_in_order_and_joins_to_the_final_output():
+    seen = []
+    streaming_transport([([{'content': 'A '}, {'content': 'streamed '}, {'content': 'answer.'}], {'content': 'A streamed answer.'})], seen)
+    output, events = streamed(Executor(agent()))
+    assert output == 'A streamed answer.'
+    assert events == [('messages', {'author': 'root', 'text': text}) for text in ('A ', 'streamed ', 'answer.')]
+    assert seen[0][1]['options'] == {'stream': True}
+
+
+def test_a_run_without_a_stream_callback_does_not_ask_the_provider_to_stream():
+    seen = []
+    transport_for([{'content': 'plain'}], seen)
+    assert run(Executor(agent())) == 'plain'
+    assert 'stream' not in seen[0][1]['options']
+
+
+def test_a_tool_turn_emits_content_free_markers_and_no_call_id_or_argument():
+    secret = tool_call('math_double_1', '{"value":777}', 'CANARY_CALL_ID')
+    streaming_transport([
+        ([{'content': '', 'toolCalls': [{'index': 0, 'id': 'CANARY_CALL_ID', 'function': {'name': 'math_double_1', 'arguments': '{"value":777}'}}]}],
+         {'content': '', 'toolCalls': [secret]}),
+        ([{'content': 'done'}], {'content': 'done'}),
+    ])
+    output, events = streamed(Executor(agent([double()])))
+    assert output == 'done'
+    assert events == [
+        ('updates', {'step': 'tool_call', 'tool': 'math_double_1', 'index': 0}),
+        ('updates', {'step': 'tool_result', 'tool': 'math_double_1', 'index': 1}),
+        ('messages', {'author': 'root', 'text': 'done'}),
+    ]
+    assert 'CANARY' not in json.dumps(events) and '777' not in json.dumps(events)
+
+
+def test_a_mid_stream_block_fails_denied_and_earlier_deltas_stay_delivered():
+    streaming_transport([([{'content': 'Allowed '}], 'denied')])
+    executor = Executor(agent())
+    events = []
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run({'prompt': 'q'}, 's1', 5, on_stream=lambda mode, data: events.append((mode, data))))
+    assert error.value.code == 'denied'
+    assert events == [('messages', {'author': 'root', 'text': 'Allowed '})]
+    assert not _bridge._streams
+
+
+def test_a_long_delta_is_split_without_splitting_a_surrogate_pair():
+    # The emoji straddles the boundary; it is one code point, so it moves whole to a slice.
+    text = 'a' * (face.MAX_DELTA - 1) + '\U0001f600' + 'b' * 10
+    streaming_transport([([{'content': text}], {'content': text})])
+    output, events = streamed(Executor(agent()))
+    deltas = [data['text'] for _, data in events]
+    assert output == text and ''.join(deltas) == text
+    assert [len(delta) for delta in deltas] == [face.MAX_DELTA, 10]
+    for delta in deltas:
+        delta.encode('utf-8')
+
+
+def test_a_pair_split_across_two_provider_chunks_is_joined_before_it_is_delivered():
+    streaming_transport([([{'content': 'x\ud83d'}, {'content': '\ude00y'}], {'content': 'x\U0001f600y'})])
+    output, events = streamed(Executor(agent()))
+    assert output == 'x\U0001f600y'
+    assert [data['text'] for _, data in events] == ['x', '\U0001f600y']
+    for _, data in events:
+        data['text'].encode('utf-8')
+
+
+def test_cancelling_mid_stream_stops_events_drains_the_bridge_and_rolls_back():
+    async def transport(raw: str) -> str:
+        message = json.loads(raw)
+        _bridge.receive_model_chunk(json.dumps({**message, 'kind': 'notify', 'op': 'model-chunk', 'payload': {'content': 'first'}}))
+        return await asyncio.Future()
+
+    _bridge.install_transport(transport)
+    executor = Executor(agent())
+    events = []
+
+    async def go():
+        def on_stream(mode, data):
+            events.append(data)
+            task.cancel()
+
+        task = asyncio.ensure_future(executor.run({'prompt': 'q'}, 's1', 5, on_stream=on_stream))
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await asyncio.sleep(0)
+
+    asyncio.run(go())
+    assert events == [{'author': 'root', 'text': 'first'}]
+    assert not _bridge._streams
+    assert executor._sessions.sessions['galaxie']['galaxie']['s1'].events == []
+
+
+def test_a_stream_callback_failure_ends_the_run_with_its_code():
+    streaming_transport([([{'content': 'text'}], {'content': 'text'})])
+
+    def fail(mode, data):
+        raise GalaxieError('unsupported')
+
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(agent()).run({'prompt': 'q'}, 's1', 5, on_stream=fail))
+    assert error.value.code == 'unsupported'
+
+
+def test_parallel_agents_keep_their_own_half_pair():
+    streaming_transport([
+        ([{'content': 'x\ud83d'}, {'content': '\ude00'}], {'content': 'x\U0001f600'}),
+        ([{'content': 'y'}, {'content': 'z'}], {'content': 'yz'}),
+    ])
+    first = LlmAgent(name='first', model=llm('answer'), instruction='a')
+    second = LlmAgent(name='second', model=llm('answer'), instruction='b')
+    _, events = streamed(Executor(ParallelAgent(name='root', sub_agents=[first, second])))
+    texts = {}
+    for _, data in events:
+        data['text'].encode('utf-8')
+        texts[data['author']] = texts.get(data['author'], '') + data['text']
+    assert sorted(texts.values()) == ['x\U0001f600', 'yz']

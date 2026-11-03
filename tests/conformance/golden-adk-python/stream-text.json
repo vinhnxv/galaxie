@@ -1,0 +1,50 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "stream text"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [
+    {
+      "content": "A streamed answer.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": "A streamed answer.",
+  "error": null,
+  "streams": [
+    {
+      "mode": "messages",
+      "data": {
+        "author": "conformance",
+        "text": "A "
+      }
+    },
+    {
+      "mode": "messages",
+      "data": {
+        "author": "conformance",
+        "text": "streamed "
+      }
+    },
+    {
+      "mode": "messages",
+      "data": {
+        "author": "conformance",
+        "text": "answer."
+      }
+    }
+  ]
+}

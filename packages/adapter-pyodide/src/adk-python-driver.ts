@@ -17,12 +17,13 @@ import opentelemetry.semconv
 
 /**
  * The ADK Python run loop. It builds the executor from the agent's entry factory and runs one
- * non-streaming conversation per call; the model, the tools and the budget all go through the
- * bridge. Features other than a plain run stay off until their stages ship (ADR-0022).
+ * conversation per call, streaming checked text deltas and content-free step markers; the model,
+ * the tools and the budget all go through the bridge. Interactions and durable sessions stay off
+ * until their stages ship (ADR-0022).
  */
 export const adkDriver: string = `
 import sys, json, asyncio, importlib
-from galaxie._bridge import install_transport, GalaxieError
+from galaxie._bridge import install_transport, GalaxieError, receive_model_chunk, notify_stream_data
 from _galaxie_transport import request as _transport, notify as _notify
 from galaxie.adk import prepare_executor, quiet
 sys.path.insert(0, '/agent')
@@ -46,7 +47,10 @@ async def _galaxie_execute():
         payload = json.loads(_galaxie_input)
         if payload.get('resume') is not None:
             raise GalaxieError('unsupported')
-        output = await _galaxie_executor.run(payload.get('input'), payload['threadId'], payload['steps'])
+        output = await _galaxie_executor.run(
+            payload.get('input'), payload['threadId'], payload['steps'],
+            on_stream=lambda mode, data: notify_stream_data([], mode, data),
+        )
         return json.dumps({'ok': True, 'output': output}, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
     except GalaxieError as error:
         return json.dumps({'ok': False, 'code': error.code})

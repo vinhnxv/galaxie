@@ -1,0 +1,39 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "stream abort"
+        }
+      ],
+      "tools": []
+    }
+  ],
+  "responses": [
+    {
+      "content": "First never returned.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "cancelled",
+    "message": "The run was cancelled."
+  },
+  "streams": [
+    {
+      "mode": "messages",
+      "data": {
+        "author": "conformance",
+        "text": "First "
+      }
+    }
+  ]
+}

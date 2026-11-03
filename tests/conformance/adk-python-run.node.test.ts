@@ -106,7 +106,7 @@ class Direct(Executor):
     def __init__(self):
         pass
 
-    async def run(self, input, session, steps):
+    async def run(self, input, session, steps, on_stream=None):
         os.environ['GOOGLE_API_KEY'] = 'fixture-not-a-key'
         from google.adk.agents import LlmAgent as Agent
         from google.adk.runners import InMemoryRunner
@@ -133,7 +133,7 @@ class Quiet(Executor):
     def __init__(self):
         super().__init__(tools())
 
-    async def run(self, input, session, steps):
+    async def run(self, input, session, steps, on_stream=None):
         import io, logging, sys, warnings
         captured = io.StringIO()
         handler = logging.StreamHandler(captured)
@@ -144,7 +144,7 @@ class Quiet(Executor):
         try:
             with warnings.catch_warnings(record=True) as recorded:
                 warnings.simplefilter('always')
-                output = await super().run(input, session, steps)
+                output = await super().run(input, session, steps, on_stream)
         finally:
             sys.stdout, sys.stderr = previous
             logging.getLogger().removeHandler(handler)
@@ -224,7 +224,7 @@ test.skipIf(!pythonWheelsAvailable)(
               destination: 'in-browser',
               modality: 'text',
               languages: ['en'],
-              features: ['tool-calling', 'structured-output'],
+              features: ['tool-calling', 'structured-output', 'streaming'],
               pricing: { inputPerToken: 0, outputPerToken: 0 },
             },
           },

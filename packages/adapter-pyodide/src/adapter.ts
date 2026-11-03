@@ -298,8 +298,8 @@ export function createPyodideAdapter(
           ? 'pydantic-ai-python'
           : 'langgraph-python';
   const langgraph = framework === 'langgraph';
-  // The ADK executor is registered without behavior until its stages ship; every feature stays
-  // false and each flips only with its own evidence (ADR-0022).
+  // The ADK executor turns each feature on only with its own stage's evidence (ADR-0022): it
+  // streams, and its interactions, resume and checkpoints stay off until their stages ship.
   const supported = framework !== 'adk';
   return {
     id: executorId,
@@ -308,7 +308,7 @@ export function createPyodideAdapter(
       interrupts: supported,
       resume: supported,
       checkpoints: supported,
-      streaming: supported,
+      streaming: true,
       subgraphs: langgraph,
     },
     async prepare(agent, services, preparation) {

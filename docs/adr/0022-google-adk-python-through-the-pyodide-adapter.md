@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0012, ADR-0017, ADR-0018, ADR-0020
-- **Revisions:** 2026-11-03: created with stage AP1 (pin, closure, lock strategy, first-run gate); stage AP2 adds the model, tool and run evidence (features stay false); the remaining per-stage evidence arrives with stages AP3 to AP6.
+- **Revisions:** 2026-11-03: created with stage AP1 (pin, closure, lock strategy, first-run gate); stage AP2 adds the model, tool and run evidence (features stay false); stage AP3 adds streaming and turns `streaming` on; the remaining per-stage evidence arrives with stages AP4 to AP6.
 
 ## Context
 
@@ -23,8 +23,9 @@ Agent authors ask for Google's Agent Development Kit in Python. ADR-0018 gives P
 5. **Fail-closed tree validation by registry membership** (applies from stage AP2). Host helpers record every model and tool they create in a module-private registry. At prepare the driver accepts exact classes `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent`, only registry models and tools (resolving inherited and omitted models the way ADK does), and refuses `Workflow`, `AgentTool`, toolsets, code executors, planners, plugins, `App`, string model names and `Gemini` with fixed `unsupported` errors. Authors never see the Runner.
 6. **The adapter owns the Runner and every service** (stage AP2). It builds the `App` with one plugin, ADK's `ToolCallIntegrityPlugin`, a galaxie session service and a `RunConfig`, and drives only `run_async`. Fatal errors propagate out of `run_async` in 2.12.0; a per-run failure slot covers author callbacks that swallow them. `limits.steps` is enforced once, in the model's call count.
 7. **Pauses end the run; resume is a new `run_async`** (stage AP4), as in ADR-0020. Sessions persist as an event log through the existing byte-record port with a per-session integrity key kept in record metadata (stage AP5); the record must fit the 1 MiB bridge frame.
-8. **Executor features stay false until their evidence exists.** The adapter registers `adk-python` with `streaming`, `interrupts`, `resume`, `checkpoints` and `subgraphs` all false. Stage AP2 runs text and tool-calling agents end to end with those flags still false. Each flag turns on only with the evidence listed under Verification. `subgraphs` stays false for the reasons ADR-0020 and ADR-0018 give.
+8. **Executor features turn on only with their evidence.** The adapter first registered `adk-python` with `streaming`, `interrupts`, `resume`, `checkpoints` and `subgraphs` all false. Stage AP2 runs text and tool-calling agents end to end with those flags still false; stage AP3 turns `streaming` on. Each flag turns on only with the evidence listed under Verification. `subgraphs` stays false for the reasons ADR-0020 and ADR-0018 give.
 9. **Python is trusted.** A Worker can `import js`; the tree validation and the lint aid reduce accidents and are not an isolation boundary (ADR-0018). Only third-party wheels have independent hash checks. No CSP, Trusted Types or ADR-0012 guarantee changes.
+10. **Streaming projects ADK's SSE events onto the existing stream modes** (stage AP3). A run always asks ADK for SSE, so every model call is a streamed bridge request and the routed provider must declare `streaming`. The runtime checks each growing chunk and the final reply before Python receives them; the router-backed model turns the checked chunks into partial responses and the final reply into the complete response. `messages` events carry `{ author, text }` deltas of at most 4096 code points: a surrogate pair split across two provider chunks is joined first and never split, and thought parts and tool-call fragments are excluded. `updates` events carry only `{ step, tool, index }` markers (the offered tool's name and a run-wide position), never a call ID, an argument or a result. A mid-stream block fails `denied` without forwarding the blocked delta; earlier deltas are not retracted. The stream is not journaled.
 
 ## Alternatives considered
 
@@ -52,6 +53,10 @@ Observed in stage AP1 (scripted models only, no real model download):
 - Lock: no pin moved and the three existing wheel sets and fingerprints are unchanged (`tests/conformance/python-wheels.node.test.ts`).
 - Adapter: the boot import probe resolves every hidden module in the Worker, and a withheld wheel fails the boot with `unavailable` at prepare (`packages/adapter-pyodide/test/adapter.node.test.ts`).
 
+Observed in stage AP3 (scripted models only, no real model download):
+
+- Streaming: checked deltas arrive in order and join to the final output, a tool turn emits content-free markers only, a mid-stream block fails `denied` without forwarding the blocked delta, surrogate pairs are never split (including across provider chunks) and abort stops events and settles `cancelled` (`python/galaxie/tests/test_adk.py`). Four streaming transcripts from native CPython with ADK's SSE mode (`stream-text`, `stream-tools`, `stream-mid-block`, `stream-abort`) reproduce on Pyodide in Node, and `stream-text` and `stream-abort` in real headless Chromium under the unchanged strict CSP (`tests/conformance/adk-python.node.test.ts`, `examples/rag-browser/test/adk-python-conformance.node.test.ts`). The native lane emulates the router's output check; the matrix records this. The `streaming` flag turns on and the matrix flag matches the adapter.
+
 Observed in stage AP2 (scripted models only, no real model download):
 
 - Model, tools and run: `galaxie.adk` supplies a router-backed `BaseLlm`, capability tools and the loop-exit helper, and `Executor` drives `run_async` (`python/galaxie/tests/test_adk.py`, `test_adk_lint.py`). Schema output reaches the router through an additive optional `jsonSchema` model option that requires the `structured-output` feature; payloads of the other executors are unchanged.
@@ -61,7 +66,7 @@ Observed in stage AP2 (scripted models only, no real model download):
 
 Required before each feature flag turns on, and before this ADR is Accepted:
 
-- `streaming`: checked text deltas in order and a mid-stream block that forwards nothing (stage AP3).
+- `streaming`: checked text deltas in order and a mid-stream block that forwards nothing (stage AP3, observed above).
 - `interrupts` and `resume`: confirmation and long-running pauses that resume by interaction ID, with stale and mismatched IDs failing before any tool runs (stage AP4).
 - `checkpoints`: reload restore of a pending interaction, integrity-key tamper refusal and the frame-size guard, with the recovery guarantees of the other durable executors (stage AP5).
 - A conformance lane of native CPython goldens reproduced on Node and Chromium, a credential and content scan over logs, warnings, events, errors, spans and stored records, and the real-device or real-model checks every other executor still lists as open (stage AP6).
