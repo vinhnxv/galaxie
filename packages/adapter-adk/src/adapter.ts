@@ -15,8 +15,10 @@ import {
   createEvent,
   isFinalResponse,
   LlmAgent,
+  LoopAgent,
   ParallelAgent,
   Runner,
+  SequentialAgent,
   StreamingMode,
   setLogger,
   ToolCallIntegrityPlugin,
@@ -89,6 +91,22 @@ function outputOf(root: BaseAgent, last: FinalResponse): unknown {
 /** Branches of a ParallelAgent interleave their events, so a pause there cannot be told apart. */
 function hasParallel(agent: BaseAgent): boolean {
   return agent instanceof ParallelAgent || agent.subAgents.some(hasParallel);
+}
+
+/**
+ * ADK restarts a SequentialAgent or LoopAgent from its first child when a paused run resumes, so
+ * earlier siblings, and their writes, would run again. A pause under one is unsupported unless
+ * the paused agent is first at every sequential step and no loop is on the path.
+ */
+function restartsSiblings(agent: BaseAgent, name: string): boolean {
+  if (agent.name === name) return false;
+  for (const [index, child] of agent.subAgents.entries()) {
+    if (child.name !== name && child.findSubAgent(name) === undefined) continue;
+    if (agent instanceof LoopAgent) return true;
+    if (agent instanceof SequentialAgent && index > 0) return true;
+    return restartsSiblings(child, name);
+  }
+  return false;
 }
 
 function findAgent(root: BaseAgent, name: string): BaseAgent | undefined {
@@ -480,7 +498,13 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               let paused = false;
               try {
                 paused = tracker.observe(event);
-                if (paused && parallel) throw failure('unsupported');
+                if (
+                  paused &&
+                  (parallel ||
+                    (event.author !== undefined &&
+                      restartsSiblings(root as BaseAgent, event.author)))
+                )
+                  throw failure('unsupported');
               } catch (error) {
                 run.fail(error);
                 break;

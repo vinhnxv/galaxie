@@ -13,7 +13,7 @@ import {
   type UserInteractionEvent,
 } from '@galaxie/core';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
-import { LlmAgent } from '@google/adk';
+import { LlmAgent, SequentialAgent } from '@google/adk';
 import { AIMessage } from '@langchain/core/messages';
 import { afterEach, expect, test, vi } from 'vitest';
 import { z } from 'zod';
@@ -448,3 +448,54 @@ test.skipIf(durable)(
     await expect(second.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
   },
 );
+
+test('a confirmation raised inside the first sub-agent survives a reload and resumes in place', async () => {
+  const source = shared('adk-restore-child');
+  const nested: AdkAgent = (host) =>
+    defineAdkEntry({
+      agent: new SequentialAgent({
+        name: 'flow',
+        subAgents: [
+          new LlmAgent({
+            name: 'first',
+            model: host.adk.llm('agent'),
+            instruction: 'role=first;',
+            tools: [host.adk.capabilityTool('docs.save@1', save)],
+          }),
+          new LlmAgent({
+            name: 'second',
+            model: host.adk.llm('agent'),
+            instruction: 'role=second;',
+          }),
+        ],
+      }),
+      interaction: (requests) => ({
+        surfaceId: 'main',
+        viewRevision: 'r1',
+        component: 'conformance.Approval/v1',
+        props: { count: requests.length },
+      }),
+    });
+  const script: Reply = (seen) => {
+    const system = JSON.stringify(seen.messages[0]?.content ?? '');
+    return system.includes('role=second;') ? new AIMessage({ content: 'two' }) : saving(seen, 0);
+  };
+  const first = await life(await source.open(), script, { factory: nested });
+  await first.instance.start({ prompt: 'go' });
+  const submitted = await approval(first);
+  await first.runtime.dispose();
+  expect(first.writes).toHaveLength(0);
+
+  const second = await life(await source.open(), script, {
+    sessionId: first.sessionId,
+    factory: nested,
+  });
+  expect(await second.instance.restore()).toBeDefined();
+  const restored = await approval(second);
+  expect(restored.interactionId).toBe(submitted.interactionId);
+  await second.instance.dispatch(restored);
+  await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
+  expect(second.writes).toEqual([{ q: 'note' }]);
+  const systems = second.model.seen.map((call) => JSON.stringify(call.messages[0]?.content));
+  expect(systems.at(-1)).toContain('role=second;');
+});

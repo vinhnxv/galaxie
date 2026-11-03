@@ -214,6 +214,16 @@ are sanitized before reaching it; output-safety failures discard hook errors.
 See [runtime contracts](../system-design.md#6-core-runtime-and-contracts) and
 the [tracing guide](tracing.md).
 
+## Google ADK agents
+
+An app that offers `adk-js` agents owns three things in its entry code, because the adapter package cannot (a bundler drops side-effect-only imports from a package marked side-effect free):
+
+- Put zod in jitless mode (`config({ jitless: true })` from `zod`) before the ADK bundle module is evaluated. Without it the bundle's own zod probes `new Function` and trips Trusted Types.
+- Define `process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS` as `"false"` in the build, so ADK's own spans never carry prompts, replies, arguments or results. In dev servers and test browsers that do not replace `process.env`, call `ensureAdkRuntimeEnv()` from `@galaxie/adapter-adk` first.
+- To keep a conversation across reloads, pass `services.checkpoints` (the `byteRecords` port of `IndexedDBSaver`) with a recovery store, and compose ownership as for the other executors. The record holds the conversation and a per-session integrity key; session export never includes the key.
+
+The bundle needs `crypto.subtle`, and ships under Apache-2.0 with inlined lodash (MIT) and `@google/genai` (Apache-2.0). See the [adapter README](../../packages/adapter-adk/README.md) and [unsupported list](../unsupported.md#google-adk-javascript).
+
 ## Remote models through a host proxy
 
 Use the call-scoped factory exported by `@galaxie/models/openai`:

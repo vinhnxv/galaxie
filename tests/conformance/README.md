@@ -263,6 +263,8 @@ nothing, a record from another executor, and (Node) a tampered stored call, a re
 another session and a corrupt record. Node keeps the byte records in memory; the Chromium lane uses
 a real `IndexedDBSaver` and also checks that an export never contains the integrity key.
 
+Agent shapes (`SequentialAgent`, `LoopAgent`, `ParallelAgent`, transfer) are compared with native ADK in [agents.test.ts](../../packages/adapter-adk/test/agents.test.ts), which also covers parallel write branches re-dispatched with reversed arrival and the refused pauses; the first-child pause reload is in `adk-restore.test.ts`.
+
 Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformance/adk-native.node.test.ts`. To rewrite the goldens on purpose, set `ADK_UPDATE_GOLDEN=1` for the native test, run `pnpm format` and review the diff.
 
 ## Running the suite
