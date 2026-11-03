@@ -157,7 +157,7 @@ export class RecordingModel extends BaseChatModel {
 }
 
 /** Provider call IDs differ per lane (ADK generates one, galaxie assigns one): number them by appearance. */
-function renumber(requests: unknown[]): void {
+export function renumber(requests: unknown[]): void {
   const known = new Map<string, string>();
   const number = (id: string): string => {
     const existing = known.get(id);

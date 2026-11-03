@@ -325,3 +325,18 @@ usage, cancellation after a checked delta, early public stream close followed by
 terminal model settlement and another run, a mid-stream block with only the allowed prefix observed in Python, fixed
 failures for non-JSON/oversized chunks, and stream-free event replay. Chromium keeps
 the existing CSP and Trusted Types policy and blocks external requests.
+
+## Google ADK (Python) agents
+
+Select `framework: 'adk'` and executor `adk-python`, pinned to `google-adk` 2.12.0
+([ADR-0022](../../docs/adr/0022-google-adk-python-through-the-pyodide-adapter.md)). The executor declares
+`streaming`, `interrupts`, `resume` and `checkpoints` true and `subgraphs` false. Supply
+`services.checkpoints: saver.byteRecords` and `recovery: saver.recovery` from the same scoped
+`IndexedDBSaver` to restore a pending confirmation or long-running interaction after a reload.
+The stored record is the ADK event log plus a per-session integrity key kept beside it; a changed
+pending call, a spliced log or an unreadable record fails `unrecoverable`, and the key gives no
+protection against a writer who can change both (ADK's check covers function-call arguments, not
+deleted or reordered history). A record must fit one 1 MiB bridge frame (about 719 KB raw): a
+run that would exceed it fails `unsupported` before the next model or tool dispatch. Without a
+recovery store, host writes still repeat after a restore. See the
+[unsupported list](../../docs/unsupported.md) for the supported agent shapes and limits.

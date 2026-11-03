@@ -4,6 +4,7 @@
 """Google ADK agents, models and capability tools backed by the JavaScript runtime."""
 
 import asyncio
+import base64
 import contextlib
 import copy
 import hashlib
@@ -14,17 +15,20 @@ import re
 import secrets
 import warnings
 import weakref
-from collections.abc import AsyncGenerator, Callable, Iterator
+from collections.abc import AsyncGenerator, Callable, Collection, Iterator
 from contextvars import ContextVar
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, cast
 
 from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode  # pyright: ignore[reportPrivateImportUsage]
 from google.adk.apps import App
+from google.adk.events import Event
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
+from google.adk.events._internal_metadata import RESTORED_EVENT_KEY
 from google.adk.plugins import ToolCallIntegrityPlugin
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -36,7 +40,7 @@ from pydantic import BaseModel, TypeAdapter
 from pydantic_core import to_jsonable_python
 
 from . import capabilities
-from ._bridge import ERROR_MESSAGES, GalaxieError, request
+from ._bridge import ERROR_MESSAGES, MAX_BYTES, GalaxieError, request
 
 APP_NAME = 'galaxie'
 USER_ID = 'galaxie'
@@ -62,6 +66,21 @@ _COPIED = ('description', 'title', 'format', 'pattern', 'enum', 'default')
 _DEPTH_LIMIT = 32
 # The call ADK issues to ask the user about a confirmation-gated tool call.
 _CONFIRMATION = 'adk_request_confirmation'
+# The checkpoint and state types of a stored conversation (ADR-0022 decision 13).
+CHECKPOINT_TYPE = 'adk-python.session/v1'
+STATE_TYPE = 'galaxie.adk-python-state/v1'
+# One stored record travels in one bridge frame. These bound its parts so that a run fails before
+# the next dispatch rather than at the write: the frame fields around the two byte arrays, the raw
+# bytes kept for the pending request, the key and the counters, and the raw bytes kept for the
+# final response.
+_ENVELOPE = 2048
+_METADATA_RESERVE = 65536
+_FINAL_RESERVE = 16384
+# The pending record is stored in the metadata and echoed in two interrupt writes, so a restore
+# reply holds it up to three times; this bound keeps those copies inside the metadata reserve.
+_PENDING_LIMIT = 16384
+RECORD_LIMIT = ((MAX_BYTES - _ENVELOPE - (_METADATA_RESERVE + 2) // 3 * 4) * 3) // 4
+_RECORD_BASE = 256
 
 
 class _Run:
@@ -602,8 +621,35 @@ def _validate(root: Any) -> frozenset[str]:
     return frozenset(pausing)
 
 
+def _event_size(event: Event) -> int:
+    """Bytes one event takes in a stored record, with its list separator."""
+    return len(event.model_dump_json(by_alias=True, exclude_none=True).encode('utf-8')) + 1
+
+
+def _binary(event: Event) -> bool:
+    """True when an event holds a part a stored record never carries."""
+    return event.content is not None and any(
+        part.inline_data is not None or part.file_data is not None
+        or part.executable_code is not None or part.code_execution_result is not None
+        for part in event.content.parts or []
+    )
+
+
 class GalaxieSessionService(InMemorySessionService):
-    """In-memory sessions, with a mark a failed run returns to."""
+    """In-memory sessions, with a mark a failed run returns to.
+
+    With a `limit` it also projects the size of the record that would store each session and fails
+    a run `unsupported` before the next dispatch when an appended event crosses it (KTD13).
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.limit: int | None = None
+        self._sizes: dict[str, list[int]] = {}
+
+    def projected(self, session_id: str) -> int:
+        """The raw bytes of the checkpoint that would store this session now."""
+        return _RECORD_BASE + sum(self._sizes.get(session_id, ()))
 
     def mark(self, session_id: str) -> tuple[int, dict[str, Any]]:
         stored = self.sessions[APP_NAME][USER_ID][session_id]
@@ -612,8 +658,38 @@ class GalaxieSessionService(InMemorySessionService):
     def rollback(self, session_id: str, mark: tuple[int, dict[str, Any]]) -> None:
         stored = self.sessions[APP_NAME][USER_ID][session_id]
         del stored.events[mark[0]:]
+        del self._sizes.get(session_id, [])[mark[0]:]
         stored.state.clear()
         stored.state.update(mark[1])
+
+    def forget(self, session_id: str) -> None:
+        self.sessions.get(APP_NAME, {}).get(USER_ID, {}).pop(session_id, None)
+        self._sizes.pop(session_id, None)
+
+    async def append_event(self, session: Any, event: Event) -> Event:
+        stored = self.sessions.get(APP_NAME, {}).get(USER_ID, {}).get(session.id)
+        before = len(stored.events) if stored is not None else 0
+        appended = await super().append_event(session, event)
+        if self.limit is None or event.partial or stored is None or len(stored.events) == before:
+            return appended
+        if _binary(event):
+            raise GalaxieError('unsupported')
+        sizes = self._sizes.setdefault(session.id, [])
+        sizes.append(_event_size(event))
+        # The final response keeps its reserve; every other event, including a long-running pause
+        # that ADK treats as final, must leave it free so the answer still fits.
+        final = event.is_final_response() and not event.long_running_tool_ids
+        if self.projected(session.id) > self.limit - (0 if final else _FINAL_RESERVE):
+            raise GalaxieError('unsupported')
+        return appended
+
+    async def load(self, session_id: str, events: list[Event]) -> None:
+        """Replace a session with stored events; the stored record was already within the limit."""
+        self.forget(session_id)
+        session = await self.create_session(app_name=APP_NAME, user_id=USER_ID, session_id=session_id)
+        for event in events:
+            await InMemorySessionService.append_event(self, session, event)
+        self._sizes[session_id] = [_event_size(event) for event in events]
 
 
 @contextlib.contextmanager
@@ -710,6 +786,74 @@ class _Ask:
 class _Pending:
     asks: list[_Ask]
     interaction: dict[str, Any]
+
+
+def _interaction_id(conversation: str, ordinal: int, asks: list[_Ask], value: dict[str, Any]) -> str:
+    """The pause's ID covers the conversation, the pause ordinal and the requests it shows (KTD12)."""
+    return hashlib.sha256(json.dumps(
+        [conversation, ordinal, [ask.request() for ask in asks], value], sort_keys=True,
+    ).encode()).hexdigest()
+
+
+def _pending_record(pause: _Pending) -> dict[str, Any]:
+    """The part of a stored record that rebuilds a pause without asking the author's hook again."""
+    return {
+        'interaction': pause.interaction,
+        'asks': [
+            {'kind': ask.kind, 'call': ask.call, 'name': ask.name, 'tool': ask.tool, 'args': ask.args}
+            for ask in pause.asks
+        ],
+    }
+
+
+def _stored_pending(raw: Any, conversation: str, pauses: int, events: list[Event]) -> _Pending:
+    """Check a stored pause against the events it claims to wait on; any mismatch is an error."""
+    if type(raw) is not dict or set(raw) != {'interaction', 'asks'} or pauses < 1:
+        raise ValueError()
+    interaction = raw['interaction']
+    if type(interaction) is not dict or set(interaction) != {'id', 'value'} or not isinstance(interaction['id'], str):
+        raise ValueError()
+    value = _interaction(interaction['value'])
+    if type(raw['asks']) is not list or not raw['asks']:
+        raise ValueError()
+    asks: list[_Ask] = []
+    for item in raw['asks']:
+        if (
+            type(item) is not dict or set(item) != {'kind', 'call', 'name', 'tool', 'args'}
+            or item['kind'] not in ('confirmation', 'long-running')
+            or any(not isinstance(item[key], str) or not item[key] for key in ('call', 'name', 'tool'))
+            or type(item['args']) is not dict
+        ):
+            raise ValueError()
+        asks.append(_Ask(item['kind'], item['call'], item['name'], item['tool'], _json(item['args'])))
+    if len({ask.call for ask in asks}) != len(asks):
+        raise ValueError()
+    calls: dict[str, types.FunctionCall] = {}
+    answered: set[str] = set()
+    for event in events:
+        for part in event.content.parts or [] if event.content is not None else []:
+            if part.function_call is not None and part.function_call.id:
+                calls[part.function_call.id] = part.function_call
+            if part.function_response is not None and part.function_response.id:
+                answered.add(part.function_response.id)
+    for ask in asks:
+        call = calls.get(ask.call)
+        # A long-running call already holds ADK's pending response; only a confirmation request
+        # must still be unanswered.
+        if call is None or (ask.kind == 'confirmation' and ask.call in answered):
+            raise ValueError()
+        if ask.kind == 'confirmation':
+            original = (call.args or {}).get('originalFunctionCall')
+            if (
+                call.name != _CONFIRMATION or ask.name != _CONFIRMATION or type(original) is not dict
+                or original.get('name') != ask.tool or _json(original.get('args') or {}) != ask.args
+            ):
+                raise ValueError()
+        elif call.name != ask.name or ask.name != ask.tool or _json(call.args or {}) != ask.args:
+            raise ValueError()
+    if interaction['id'] != _interaction_id(conversation, pauses - 1, asks, value):
+        raise ValueError()
+    return _Pending(asks, {'id': interaction['id'], 'value': value})
 
 
 def _confirmation(call: types.FunctionCall) -> _Ask:
@@ -822,8 +966,24 @@ class Executor:
         self.resume = resume
         self._sessions = GalaxieSessionService()
         self._runners: dict[str, Runner] = {}
+        self._keys: dict[str, bytes] = {}
         self._pauses: dict[str, int] = {}
         self._pending: dict[str, _Pending] = {}
+
+    @property
+    def durable(self) -> bool:
+        """True when sessions are stored, so each run must keep its record within one frame."""
+        return self._sessions.limit is not None
+
+    @durable.setter
+    def durable(self, value: bool) -> None:
+        self._sessions.limit = RECORD_LIMIT if value else None
+
+    def forget(self, session: str) -> None:
+        """Drop everything held for a session whose stored record is gone."""
+        self._sessions.forget(session)
+        for table in (self._runners, self._keys, self._pending, self._pauses):
+            table.pop(session, None)
 
     def pending(self, session: str) -> dict[str, Any] | None:
         """The one pending interaction of a session."""
@@ -841,13 +1001,104 @@ class Executor:
     def _runner(self, session: str) -> Runner:
         runner = self._runners.get(session)
         if runner is None:
-            plugin = ToolCallIntegrityPlugin(secret_key=secrets.token_bytes(32))
+            plugin = ToolCallIntegrityPlugin(secret_key=self._keys.setdefault(session, secrets.token_bytes(32)))
             runner = Runner(
                 app=App(name=APP_NAME, root_agent=self.agent, plugins=[plugin]),
                 session_service=self._sessions,
             )
             self._runners[session] = runner
         return runner
+
+    def _snapshot(self, session: str, binding: str | None = None) -> tuple[bytes, bytes]:
+        """The stored record of a session: the event log, and the key, counters and pause beside it."""
+        stored = self._sessions.sessions.get(APP_NAME, {}).get(USER_ID, {}).get(session)
+        key = self._keys.get(session)
+        if stored is None or key is None:
+            raise GalaxieError('unrecoverable')
+        pause = self._pending.get(session)
+        try:
+            checkpoint = json.dumps({
+                'v': 1, 'conversation_id': session,
+                'events': [
+                    json.loads(event.model_dump_json(by_alias=True, exclude_none=True))
+                    for event in stored.events if not event.partial
+                ],
+            }, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf-8')
+            metadata = json.dumps({
+                'v': 1, 'key': base64.b64encode(key).decode('ascii'), 'pauses': self._pauses.get(session, 0),
+                'pending': _pending_record(pause) if pause is not None else None,
+                **({'session': binding} if binding is not None else {}),
+            }, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf-8')
+        except Exception:
+            raise GalaxieError('unsupported') from None
+        # Base64 grows each array by a third; the frame holds both and the fields around them.
+        if (len(checkpoint) + 2) // 3 * 4 + (len(metadata) + 2) // 3 * 4 + _ENVELOPE + 6 * len(binding or '') > MAX_BYTES:
+            raise GalaxieError('unsupported')
+        return checkpoint, metadata
+
+    async def _restore(
+        self, checkpoint: bytes, metadata: bytes, session: str | None = None, reserved: Collection[str] = (),
+    ) -> str:
+        """Restore untrusted record bytes into this executor and return the conversation ID.
+
+        The per-session key in the metadata verifies every stored call with ADK's own plugin, and a
+        bound galaxie session must match the stored one, and a conversation another session already
+        holds is refused before anything is installed. Any mismatch is `unrecoverable`.
+        """
+        try:
+            raw = json.loads(checkpoint)
+            meta = json.loads(metadata)
+            if (
+                type(raw) is not dict or set(raw) != {'v', 'conversation_id', 'events'}
+                or type(raw['v']) is not int or raw['v'] != 1
+                or not isinstance(raw['conversation_id'], str) or not raw['conversation_id']
+                or type(raw['events']) is not list
+                or type(meta) is not dict
+                or set(meta) != {'v', 'key', 'pauses', 'pending', *(('session',) if session is not None else ())}
+                or type(meta['v']) is not int or meta['v'] != 1
+                or (session is not None and meta['session'] != session)
+                or not isinstance(meta['key'], str)
+                or type(meta['pauses']) is not int or meta['pauses'] < 0
+            ):
+                raise ValueError()
+            conversation: str = raw['conversation_id']
+            if conversation in reserved:
+                raise ValueError()
+            key = base64.b64decode(meta['key'], validate=True)
+            if len(key) != 32:
+                raise ValueError()
+            events = [Event.model_validate(item) for item in raw['events']]
+            if len({event.id for event in events}) != len(events) or any(
+                event.partial or _binary(event) or RESTORED_EVENT_KEY in (event.custom_metadata or {})
+                for event in events
+            ):
+                raise ValueError()
+            with quiet():
+                scratch = GalaxieSessionService()
+                await scratch.load(conversation, events)
+                replayed = scratch.sessions[APP_NAME][USER_ID][conversation]
+                if len(replayed.events) != len(events):
+                    raise ValueError()
+                # ADK's own check: every stored call carries a stamp made with this session's key.
+                plugin = ToolCallIntegrityPlugin(secret_key=key)
+                await plugin.before_run_callback(invocation_context=cast(Any, SimpleNamespace(session=replayed)))
+            pause = (
+                _stored_pending(meta['pending'], conversation, meta['pauses'], events)
+                if meta['pending'] is not None else None
+            )
+        except Exception:
+            raise GalaxieError('unrecoverable') from None
+        self.forget(conversation)
+        self._sessions.sessions.setdefault(APP_NAME, {}).setdefault(USER_ID, {})[conversation] = replayed
+        self._sessions._sizes[conversation] = scratch._sizes[conversation]
+        self._sessions.app_state.setdefault(APP_NAME, {}).update(scratch.app_state.get(APP_NAME, {}))
+        self._sessions.user_state.setdefault(APP_NAME, {}).setdefault(USER_ID, {}).update(
+            scratch.user_state.get(APP_NAME, {}).get(USER_ID, {}))
+        self._keys[conversation] = key
+        self._pauses[conversation] = meta['pauses']
+        if pause is not None:
+            self._pending[conversation] = pause
+        return conversation
 
     async def run(
         self, input: Any, session: str, steps: int, on_stream: Callable[[str, Any], None] | None = None,
@@ -875,6 +1126,10 @@ class Executor:
             if pause is not None:
                 raise GalaxieError('invalid')
             message = types.Content(role='user', parts=[types.Part(text=input['prompt'])])
+        limit = self._sessions.limit
+        # A stored conversation too close to the frame has no room left for the next answer.
+        if limit is not None and self._sessions.projected(session) > limit - _FINAL_RESERVE:
+            raise GalaxieError('unsupported')
         if session not in self._sessions.sessions.get(APP_NAME, {}).get(USER_ID, {}):
             await self._sessions.create_session(app_name=APP_NAME, user_id=USER_ID, session_id=session)
         stored = self._sessions.sessions[APP_NAME][USER_ID][session]
@@ -955,12 +1210,19 @@ class Executor:
         if fatal is None and thrown is not None:
             fatal = GalaxieError('executor_error')
         tracker.ended()
-        value: dict[str, Any] | None = None
+        candidate: _Pending | None = None
         if fatal is None and tracker.asks is not None:
             try:
                 if self.interaction is None:
                     raise GalaxieError('unsupported')
                 value = _interaction(self.interaction([ask.request() for ask in tracker.asks]))
+                ordinal = self._pauses.get(session, 0)
+                candidate = _Pending(tracker.asks, {
+                    'id': _interaction_id(session, ordinal, tracker.asks, value), 'value': value,
+                })
+                # A pause that cannot be stored is refused here, before it is published.
+                if limit is not None and len(json.dumps(_pending_record(candidate))) > _PENDING_LIMIT:
+                    raise GalaxieError('unsupported')
             except Exception:
                 fatal = GalaxieError('unsupported')
         if fatal is None and last is None and tracker.asks is None:
@@ -968,7 +1230,7 @@ class Executor:
         if fatal is not None:
             self._sessions.rollback(session, mark)
             raise fatal
-        if tracker.asks is not None and value is not None:
+        if tracker.asks is not None and candidate is not None:
             if on_stream is not None:
                 try:
                     for index, ask in enumerate(tracker.asks):
@@ -977,11 +1239,8 @@ class Executor:
                     # Nothing was published, so the session returns to where this run found it.
                     self._sessions.rollback(session, mark)
                     raise (_galaxie_error(error) or GalaxieError('executor_error')) from None
-            self._pending.pop(session, None)
-            ordinal = self._pauses.get(session, 0)
-            self._pauses[session] = ordinal + 1
-            identifier = hashlib.sha256(json.dumps([session, ordinal]).encode()).hexdigest()
-            self._pending[session] = _Pending(tracker.asks, {'id': identifier, 'value': value})
+            self._pauses[session] = self._pauses.get(session, 0) + 1
+            self._pending[session] = candidate
             return None
         self._pending.pop(session, None)
         assert last is not None

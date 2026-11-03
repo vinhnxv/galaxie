@@ -151,3 +151,38 @@ export function dspyCheckpointValues(value: unknown): unknown {
     ...record['journal'].map((entry: unknown) => (object(entry) ? entry['result'] : undefined)),
   ];
 }
+
+/**
+ * Register the text-bearing values of a stored ADK conversation before returning it to the Worker:
+ * event text, error messages, state values, call arguments and responses, and the pending request.
+ * The integrity key and counters are never registered.
+ */
+export function adkCheckpointValues(value: unknown): unknown {
+  if (!object(value) || !object(value['checkpoint']) || !object(value['metadata']))
+    return undefined;
+  const checkpoint = value['checkpoint'];
+  if (checkpoint['type'] !== 'adk-python.session/v1') return undefined;
+  const decode = (bytes: unknown): unknown =>
+    JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes as Uint8Array));
+  const record = decode(checkpoint['bytes']);
+  const metadata = decode(value['metadata']['bytes']);
+  if (!object(record) || !Array.isArray(record['events']) || !object(metadata))
+    throw new Error('invalid');
+  const values: unknown[] = [];
+  for (const event of record['events']) {
+    if (!object(event)) throw new Error('invalid');
+    values.push(event['errorMessage']);
+    const actions = event['actions'];
+    if (object(actions) && object(actions['stateDelta']))
+      values.push(...Object.values(actions['stateDelta']));
+    const content = event['content'];
+    for (const part of object(content) && Array.isArray(content['parts']) ? content['parts'] : []) {
+      if (!object(part)) throw new Error('invalid');
+      values.push(part['text']);
+      if (object(part['functionCall'])) values.push(part['functionCall']['args']);
+      if (object(part['functionResponse'])) values.push(part['functionResponse']['response']);
+    }
+  }
+  values.push(metadata['pending']);
+  return values;
+}

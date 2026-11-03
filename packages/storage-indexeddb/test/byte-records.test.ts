@@ -68,7 +68,7 @@ test.each(['unknown', null, undefined, 1])(
 
 describe
   .skipIf(typeof indexedDB === 'undefined')
-  .each([undefined, 'pydantic-ai-python', 'dspy-python', 'adk-js'] as const)(
+  .each([undefined, 'pydantic-ai-python', 'dspy-python', 'adk-js', 'adk-python'] as const)(
   'opaque Python checkpoint records: %s',
   (executor) => {
     const config = { ...baseConfig, ...(executor === undefined ? {} : { executor }) };

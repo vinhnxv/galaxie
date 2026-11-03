@@ -5,16 +5,25 @@
 
 import '../../../src/host/zod-config.js';
 import type { PyodideAdapterOptions } from '@galaxie/adapter-pyodide';
+import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import {
   type AdkPythonTranscript,
   adkPythonCases,
   executeAdkPythonCase,
 } from '../../../../../tests/conformance/support/adk-python.js';
+import {
+  type AdkReloadResult,
+  type AdkReloadStep,
+  adkPythonReloadCases,
+  adkPythonWriteCases,
+  executeAdkReloadStep,
+} from '../../../../../tests/conformance/support/adk-python-restore.js';
 import workerUrl from '../python-parity/pyodide-worker.ts?worker&url';
 
 declare const PYTHON_LOCAL_WHEELS: PyodideAdapterOptions['localWheels'];
 const result: {
   transcript?: AdkPythonTranscript;
+  reload?: AdkReloadResult;
   error?: string;
   violations: string[];
   done: boolean;
@@ -35,8 +44,13 @@ factory.createPolicy('default', {
 });
 void (async () => {
   try {
-    const name = new URLSearchParams(location.search).get('case') ?? '';
-    if (!(adkPythonCases as readonly string[]).includes(name))
+    const parameters = new URLSearchParams(location.search);
+    const name = parameters.get('case') ?? '';
+    const reload = parameters.has('reload');
+    const known = reload
+      ? [...adkPythonReloadCases, ...adkPythonWriteCases]
+      : (adkPythonCases as readonly string[]);
+    if (!(known as readonly string[]).includes(name))
       throw new Error('The conformance case is unknown.');
     const options: PyodideAdapterOptions = {
       runtimeUrl: new URL('/python/runtime/', location.href).href,
@@ -54,16 +68,34 @@ void (async () => {
         return worker;
       },
     };
-    result.transcript = await executeAdkPythonCase(
-      options,
-      {
-        baseUrl: new URL(`/conformance/${name}/`, location.href).href,
-        module: 'selected',
-        entry: 'create_agent',
-        files: ['suite.py', 'selected.py'],
-      },
-      name,
-    );
+    const agent = {
+      baseUrl: new URL(`/conformance/${name}/`, location.href).href,
+      module: 'selected',
+      entry: 'create_agent',
+      files: ['suite.py', 'selected.py'],
+    };
+    if (reload) {
+      const saved = sessionStorage.getItem('adkReloadStep');
+      const step: AdkReloadStep = saved
+        ? JSON.parse(saved)
+        : { name, ...(parameters.has('accepted') ? { accepted: true } : {}) };
+      if (step.name !== name) throw new Error('The reload fixture does not match its page.');
+      const saver = await IndexedDBSaver.open({
+        databaseName: 'adk-python-conformance-reload',
+        appId: 'adk-python-restore',
+        principalScope: 'fixture',
+      });
+      try {
+        result.reload = await executeAdkReloadStep(
+          options,
+          agent,
+          { checkpoints: saver.byteRecords, recovery: saver.recovery },
+          step,
+        );
+      } finally {
+        saver.close();
+      }
+    } else result.transcript = await executeAdkPythonCase(options, agent, name);
   } catch (error) {
     result.error = error instanceof Error ? error.message : 'The conformance case failed.';
   } finally {
