@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { EngineLifetime } from '../engine-lifetime.js';
 import { ModelError, ModelProviderError, type ModelUnavailableReason } from '../errors.js';
 import { classifyWebLLMError } from './classify.js';
 import {
@@ -95,80 +96,6 @@ export interface LoadWebLLMEngineOptions {
   readonly model?: WebLLMModelRecord;
   readonly onProgress?: (progress: WebLLMProgress) => void;
   readonly signal?: AbortSignal;
-}
-
-class EngineLifetime {
-  readonly #worker: WebLLMWorker;
-  #failed = false;
-  #error: unknown;
-  #terminated = false;
-  readonly #listeners = new Set<() => void>();
-
-  constructor(worker: WebLLMWorker) {
-    this.#worker = worker;
-    worker.onerror = (event): void => {
-      event.preventDefault();
-      this.fail(new ModelError('unavailable', 'worker_failed'));
-      this.terminate();
-    };
-    worker.onmessageerror = (): void => {
-      this.fail(new ModelError('unavailable', 'worker_failed'));
-      this.terminate();
-    };
-  }
-
-  get failed(): boolean {
-    return this.#failed;
-  }
-  get error(): unknown {
-    return this.#error;
-  }
-
-  fail(error: unknown): void {
-    if (this.#failed) return;
-    this.#failed = true;
-    this.#error = error;
-    for (const listener of this.#listeners) listener();
-    this.#listeners.clear();
-  }
-
-  subscribe(listener: () => void): () => void {
-    if (this.#failed) {
-      listener();
-      return () => {};
-    }
-    this.#listeners.add(listener);
-    return () => this.#listeners.delete(listener);
-  }
-
-  // A shared pending failure promise would retain every completed chunk until disposal.
-  race<T>(operation: Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const onFailure = (): void => {
-        this.#listeners.delete(onFailure);
-        reject(this.#error);
-      };
-      if (this.#failed) onFailure();
-      else this.#listeners.add(onFailure);
-      // Consume late engine rejections even after failure has already won.
-      operation.then(
-        (value) => {
-          this.#listeners.delete(onFailure);
-          resolve(value);
-        },
-        (error: unknown) => {
-          this.#listeners.delete(onFailure);
-          reject(error);
-        },
-      );
-    });
-  }
-
-  terminate(): void {
-    if (this.#terminated) return;
-    this.#terminated = true;
-    this.#worker.terminate();
-  }
 }
 
 export class WebLLMEngineHandle {

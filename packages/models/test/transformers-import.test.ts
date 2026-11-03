@@ -16,7 +16,11 @@ vi.mock('onnxruntime-web', () => {
 test('importing the Transformers.js entries loads no model library', async () => {
   const page = await import('../src/transformers/index.js');
   const worker = await import('../src/transformers/worker.js');
-  expect(Object.keys(page).sort()).toEqual(['ModelError', 'checkTransformersModel']);
-  expect(Object.keys(worker)).toEqual([]);
+  expect(Object.keys(page).sort()).toEqual([
+    'ModelError',
+    'checkTransformersModel',
+    'loadTransformersEngine',
+  ]);
+  expect(Object.keys(worker)).toEqual(['startTransformersWorker']);
   expect(loaded.names).toEqual([]);
 });
