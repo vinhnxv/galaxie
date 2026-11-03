@@ -183,11 +183,6 @@ export class TransformersEngineHandle {
         this.#worker.postMessage({ type: 'abort', id });
       } catch {}
     };
-    const onAbort = (): void => {
-      aborted.reject(signal?.reason);
-      postAbort();
-    };
-    signal?.addEventListener('abort', onAbort, { once: true });
     // A failed lifetime never answers again, so it releases the turn too.
     const unsubscribe = lifetime.subscribe(() => released.resolve());
     void released.promise.then(unsubscribe);
@@ -210,6 +205,24 @@ export class TransformersEngineHandle {
         released.resolve();
       }
     };
+    let draining = false;
+    // Releases the turn once the Worker has ended it, whether or not the consumer resumes the
+    // generator: a consumer can abort and then stop iterating.
+    const release = (): void => {
+      if (!started || channel.terminated) {
+        released.resolve();
+        return;
+      }
+      postAbort();
+      if (draining) return;
+      draining = true;
+      void drain();
+    };
+    const onAbort = (): void => {
+      aborted.reject(signal?.reason);
+      release();
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
     try {
       if (signal?.aborted) onAbort();
       await lifetime.race(Promise.race([previous, aborted.promise]));
@@ -225,6 +238,8 @@ export class TransformersEngineHandle {
       }
       started = true;
       for (;;) {
+        // After an abort the release path owns the channel; a second reader would orphan it.
+        check();
         const message = await lifetime.race(Promise.race([channel.next(), aborted.promise]));
         check();
         if (message.type === 'chunk') {
@@ -243,11 +258,7 @@ export class TransformersEngineHandle {
       throw failure(error);
     } finally {
       signal?.removeEventListener('abort', onAbort);
-      if (!started || channel.terminated) released.resolve();
-      else {
-        postAbort();
-        void drain();
-      }
+      release();
     }
   }
 

@@ -8,6 +8,12 @@ export {
   type TransformersModelAvailability,
 } from './cache.js';
 export {
+  type TransformersCallOptions,
+  type TransformersChatEngine,
+  TransformersChatModel,
+  type TransformersChatModelOptions,
+} from './chat-model.js';
+export {
   type LoadTransformersEngineOptions,
   loadTransformersEngine,
   type TransformersEngineHandle,
