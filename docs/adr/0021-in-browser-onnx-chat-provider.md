@@ -1,0 +1,63 @@
+# ADR-0021: In-browser ONNX chat models through a Transformers.js provider with a Worker-side runtime seam
+
+- **Status:** Proposed
+- **Date:** 2026-11-03
+- **Related:** brief §3, §10, §14.2; ADR-0002, ADR-0006, ADR-0012, ADR-0014, ADR-0017, ADR-0019, ADR-0020
+- **Revisions:** 2026-11-03: created with stage O1 (decision, dependency pin, package surface, strict-CSP runtime probe); probe findings recorded.
+
+## Context
+
+ADR-0006 ships one in-browser engine, WebLLM, next to Chrome Built-in AI and OpenAI-compatible endpoints. Many open chat models are published as ONNX exports and run through Transformers.js on ONNX Runtime Web, with WebGPU or WASM. The retrieval example (ADR-0019) already runs one such model, EmbeddingGemma, through the same libraries under the strict policy. Agents that need tool calling with a local model (for example Google's `adk-recipes` examples through the ADK adapter, ADR-0020) cannot use a retrieval-only runtime.
+
+Three facts shape the design:
+
+- Transformers.js has no worker engine class. WebLLM ships `WebWorkerMLCEngine`; here the provider must own a small page-to-Worker protocol and keep the model and its files out of the page.
+- WebLLM's pinned record covers config, library and tokenizer with SRI, but not weight shards. ONNX weights are the largest files and the ones a swapped cache entry would corrupt.
+- Chat templates take a `tools` list, but the reply is text: the model emits tool calls as markup (Hermes format for Qwen2.5 and Qwen3) that the caller must parse.
+
+An earlier spike (reference only, not part of the tree) ran Transformers.js 4.3.1 on one device. It produced degenerate text for Qwen2.5 with `q4f16` and a `std::bad_alloc` with `q4`. It was one device and one run, so it neither shows nor excludes a general fault, but it is the main risk of this decision.
+
+## Decision
+
+1. **A new subpath, not a new package.** The provider lives in `packages/models/src/transformers/` with the exports `@galaxie/models/transformers` and `@galaxie/models/transformers/worker`, and an optional peer `@huggingface/transformers` pinned exactly to 4.3.1, the newest release that satisfies the workspace `minimumReleaseAge` today. Core needs no change and never names the library: it sees a chat model and a routing descriptor.
+2. **The runtime is a Worker-side seam.** A `TransformersRuntime` interface (load verified files into a model; run one generation with a text callback, a token callback and an abort signal) is the only thing the Worker calls. One file, `runtime.ts`, imports `@huggingface/transformers`, dynamically and without types; `scripts/check-dependencies.ts` enforces that. The runtime uses the tokenizer's chat template and `generate` with a `TextStreamer` and `InterruptableStoppingCriteria`, not `pipeline`, so it can count tokens and template tools. Tests inject a fake runtime.
+3. **Mirror the WebLLM provider.** A shared FIFO queue per handle, a lifetime object that fails the handle once and keeps failing, a page-side device report, content-free progress, a `check*` function that never downloads, and typed `ModelError` reasons from the existing union. The router, the React model display and the host download hooks need no new code, and no reason is added.
+4. **A closed page-to-Worker protocol.** The page sends `load`, `generate`, `abort` and `dispose`; the Worker answers `ready`, `progress`, `chunk`, `done` and `failed`. Both ends validate every message and ignore the rest. Errors cross as fixed codes, never as engine text. Prompts and replies appear only in `generate` and `chunk`.
+5. **Integrity is per-file SHA-256 and size, weights included.** The pinned record lists every file the runtime reads. The Worker streams each file into one buffer preallocated at the record's size (aborting on overrun), hashes it once, stores it in Cache Storage under a name derived from model ID and revision, and re-verifies every stored file at load. The runtime sees a read-only custom cache answering from the buffers hashed during load, never from a fresh cache lookup, with `env.fetch` denied, remote models off and the browser cache off. This is the pattern `examples/rag-browser/src/retrieval/embedder.ts` runs. Source URLs are HTTPS or same-origin and carry a 40-hex revision, as for WebLLM. One file is capped at 1 GiB.
+6. **Consent and the cache check cost nothing.** `checkTransformersModel` lists Cache Storage and compares size markers written at store time; it hashes and fetches nothing. The download runs inside the loader only when the host passes `allowDownload: true` (default `false`), which only its consent path sets. A missing or hash-failing stored file with `allowDownload` false is deleted and the load fails `unavailable` with reason `integrity`, with no fetch; the next check reports `downloadable` and the router asks again.
+7. **Device is explicit.** A record says `webgpu` or `wasm`. A `webgpu` record needs `navigator.gpu` and an adapter (and `shader-f16` for an `f16` dtype), probed in the page before the Worker loads anything. There is no silent fallback between devices: a host that accepts either lists two records in route order.
+8. **Usage and limits are provider-level.** `maxTokens` (default 1024) becomes `max_new_tokens`. Prompt tokens are the templated input length; completion tokens are counted from the token callback. Usage is final-only. A prompt plus `max_new_tokens` above the record's context window fails `invalid` before generation. The router's reservation is a separate concept.
+9. **No default record; a pinning script.** A maintainer-run script reads a model repository at a revision, downloads and hashes the listed files and prints a record. Pinned records for the candidate models (Qwen2.5-0.5B-Instruct, Qwen3-0.6B and gemma-3-1b-it ONNX exports) are maintainer work.
+10. **Tool calling is a record-declared text format.** `toolFormat: 'hermes'` means the template accepts `tools` and the model emits `<tool_call>{"name": …, "arguments": …}</tool_call>`. A provider-owned parser turns blocks into tool calls with call IDs from the reply's own order; malformed blocks, more than 16 blocks and an unterminated block become invalid tool calls whose raw text the router's output check sees. `tool_choice` that forces a call fails `unsupported`, because forcing needs constrained decoding. The shared message mapper stays text-only.
+11. **Tool markup is held back while streaming.** Text outside a block streams as ordinary deltas; any suffix that could still become `<tool_call>` and trailing whitespace are held, and each complete block is emitted once as a `tool_call_chunks` entry. A reply with only tool calls streams no text.
+12. **Structured output is a late stage and may not ship.** An earlier spike ran `@huggingface/transformers-structured-output` as a logits processor once. The provider declares `structured-output` only if that stage lands and its gates (release age, license, CSP behavior) hold; otherwise the unsupported list says so.
+13. **CSP and Trusted Types stay as they are.** The provider adds no directive and no policy to any galaxie-owned header. A deployment that downloads from a model host lists that host in the Worker's `connect-src` itself, as for WebLLM (system design §8.4). The host's Worker entry imports the ONNX Runtime asset URLs as same-origin assets and the Worker URL goes through the host's existing Trusted Types policy.
+
+## Alternatives considered
+
+- **A separate package.** Rejected: `models` already holds the other providers behind subpath exports, and a package would repeat the router glue, error types and tests for no isolation gain.
+- **`pipeline('text-generation')`.** Rejected: it hides the tokenizer and token counts that usage reporting, context checks and tool templating need.
+- **Run the model on the page thread.** Rejected: weights and inference would live in the page that holds credentials, and inference would block the UI. The Worker holds the files and the runtime.
+- **Trust the browser cache instead of per-file hashes.** Rejected: a same-origin script could swap a stored weight shard, and SRI does not cover weights.
+- **Silent WebGPU-to-WASM fallback.** Rejected: it changes speed by orders of magnitude and the device class the user sees in the model display. The router already orders alternatives.
+- **Constrained decoding as a required feature.** Rejected for now: it depends on an experimental package, so forcing tool choice fails `unsupported` until the late stage proves it.
+- **Reuse the WebLLM provider's message mapper for tools.** Rejected: that mapper is text-only by contract and shared; this provider needs assistant tool calls and tool results in the template input.
+
+## Consequences
+
+- Hosts that use the provider bundle and start one Worker per runtime, import the ONNX Runtime assets as same-origin URLs and pass them to the Worker entry. Hosts that do not use it install nothing: the peer is optional.
+- Weights and the library enter the page's origin storage; hosts that download must list the model host in the Worker's `connect-src`.
+- The pinned record is a maintainer artifact. Until the candidates are pinned, the provider is demonstrated with fake runtimes and records built for tests.
+- Quality and speed of real models are demonstrations (ADR-0016) and stay unmeasured here. The risk above applies to every claim about real output.
+- A hung WebGPU decode raises no error, so the queue would block later calls; no watchdog is built in this decision.
+- Prefill cannot be interrupted, so abort latency on long prompts is unbounded. The page rejects at once and the queue waits for the turn to settle.
+- Licenses differ per model (Gemma terms among them). Records carry the license read at pin time.
+
+## Verification
+
+- **Stage O1 probe (2026-11-03), Transformers.js 4.3.1 and onnxruntime-web 1.31.0-dev.20260914-8d85527a0.** A module Worker, built with a bare Vite configuration and served with the retrieval example's mock-mode policy unchanged (`script-src 'self' 'wasm-unsafe-eval'`, `require-trusted-types-for 'script'`, `trusted-types default`, same-origin `connect-src`, no `unsafe-eval`), runs in headless Chromium. The Worker URL goes through a `default` Trusted Types policy like the example host's. Findings:
+  - **No policy relaxation is needed.** A hand-encoded one-node identity ONNX graph runs through the ONNX Runtime WASM execution provider and returns its input. The runtime loads from same-origin asset URLs with `numThreads` 1 and `proxy` false. The run records no CSP or Trusted Types violation, no page error, no global `Function` construction and no request beyond the page's own origin.
+  - **The tokenizer and chat template run from a read-only cache.** A synthetic tokenizer and a Hermes-style template load through `AutoTokenizer.from_pretrained` with a read-only `customCache`, remote models off and `env.fetch` replaced by a counter. The only keys requested are `tokenizer.json` and `tokenizer_config.json`, `env.fetch` is never called, and `apply_chat_template({ tools })` renders the tool declaration and the generation prompt.
+  - **The negative control fails for the right reason.** Without `'wasm-unsafe-eval'` the identity graph fails with a `script-src` `wasm-eval` violation. The tokenizer still works, because it is plain JavaScript.
+  - **Not proven by this probe:** WebGPU (headless CI has no usable adapter), ONNX Runtime threads and proxy mode (the probe runs one thread and no proxy; threads need cross-origin isolation), generation with `TextStreamer` and `InterruptableStoppingCriteria`, a real model's chat template, a Worker started from a built host rather than the bare probe build, and the default-mode policy variants of the other example hosts.
+- **Evidence each feature flag needs, per stage.** `streaming` and `cancellation`: fake-runtime tests on Node and Chromium (stage O3 and O4). `tool-calling`: the template mapping and parser tests, plus a router-level test through the real parser (stage O5). `structured-output`: only if stage O6 lands. The first real-device run is a maintainer demonstration, recorded as unmeasured until it exists.

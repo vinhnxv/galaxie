@@ -15,6 +15,8 @@
       "@galaxie/core": ["../../packages/core/src/index.ts"],
       "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
       "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],
+      "@galaxie/models/transformers/worker": ["../../packages/models/src/transformers/worker.ts"],
+      "@galaxie/models/transformers": ["../../packages/models/src/transformers/index.ts"],
       "@galaxie/models/webllm/worker": ["../../packages/models/src/webllm/worker.ts"],
       "@galaxie/models/webllm": ["../../packages/models/src/webllm/index.ts"],
       "@galaxie/example-english-tutor": ["../../examples/english-tutor/src/index.ts"],
