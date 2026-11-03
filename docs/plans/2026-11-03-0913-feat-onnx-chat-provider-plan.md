@@ -521,8 +521,8 @@ Raised by the non-interactive document review; none blocks O1.
 - **Candidate list and first real run.** Spike B saw degenerate Qwen2.5 `q4f16` text and `q4` allocation failures on 4.3.1. Decide whether Qwen2.5-0.5B stays a candidate and whether the first maintainer run must precede O5.
 - **WASM records.** KTD7 builds the explicit WASM device path although no candidate targets it. Decide whether to accept only `webgpu` records until a host needs WASM.
 - **Gemma 3 pinning.** It cannot serve the tool-calling demo; decide whether its pin and device run move to a separate non-blocking issue.
-- **`finish_reason` on truncation.** When `max_new_tokens` cuts generation inside a tool block, the reply holds an invalid call; decide before U12 whether the reason is `length` or `tool_calls`.
-- **Tool-call ID reuse.** Parsed IDs restart at `call_0` each reply; check the ADK and Pyodide adapters for collisions across turns before U12.
+- **`finish_reason` on truncation.** Decided in O5 (ADR-0021 decision 10): `length` wins when the token limit cut the reply, even though it then holds an invalid call; otherwise `tool_calls` when any block was seen.
+- **Tool-call ID reuse.** Checked in O5: the ADK adapter discards provider call IDs and assigns run-unique ones, so `call_0` restarting each reply cannot collide there; the Pyodide adapter was not checked.
 - **Hand-modeled template render.** U11's Hermes-style render duplicates the pin script's real-template render; keep it unless the extra dev dependency proves a burden.
 
 ## Sources & Research
