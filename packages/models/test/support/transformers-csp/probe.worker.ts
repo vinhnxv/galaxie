@@ -4,15 +4,17 @@
 import mjs from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url';
 import wasm from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url';
 import { identityModel } from './identity-model.js';
-import type { WorkerReport } from './report.js';
+import { emptyReport, type WorkerReport } from './report.js';
 import { FILES, MODEL_ID, TOOL } from './tokenizer-files.js';
 
-// Registered first, so violations raised while the library loads are recorded too.
 const violations: string[] = [];
-self.addEventListener('securitypolicyviolation', (event) => {
-  const { violatedDirective, blockedURI, sample } = event as SecurityPolicyViolationEvent;
-  violations.push(`${violatedDirective}|${blockedURI}|${sample}`);
-});
+function recordViolations(): void {
+  self.addEventListener('securitypolicyviolation', (event) => {
+    const { violatedDirective, blockedURI, sample } = event as SecurityPolicyViolationEvent;
+    violations.push(`${violatedDirective}|${blockedURI}|${sample}`);
+  });
+}
+recordViolations();
 
 let functionConstructions = 0;
 const NativeFunction = globalThis.Function;
@@ -31,15 +33,7 @@ const message = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 
 async function probe(): Promise<WorkerReport> {
-  const report: WorkerReport = {
-    identity: undefined,
-    tokenizer: undefined,
-    failures: {},
-    violations: [],
-    functionConstructions: 0,
-    fetchCalls: 0,
-    requestedKeys: [],
-  };
+  const report = emptyReport();
   const { AutoTokenizer, env } = await import('@huggingface/transformers');
   const { InferenceSession, Tensor } = await import('onnxruntime-web/webgpu');
 

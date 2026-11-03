@@ -11,6 +11,18 @@ export interface WorkerReport {
   requestedKeys: string[];
 }
 
+export function emptyReport(): WorkerReport {
+  return {
+    identity: undefined,
+    tokenizer: undefined,
+    failures: {},
+    violations: [],
+    functionConstructions: 0,
+    fetchCalls: 0,
+    requestedKeys: [],
+  };
+}
+
 export interface PageData {
   done: boolean;
   report?: WorkerReport;

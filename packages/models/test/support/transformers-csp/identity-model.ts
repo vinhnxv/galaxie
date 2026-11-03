@@ -35,7 +35,6 @@ function vector(name: string, length: number): number[] {
   return [...textField(1, name), ...bytesField(2, tensor)];
 }
 
-/** An ONNX model computing `output = Identity(input)` over `length` floats. */
 export function identityModel(length: number): Uint8Array {
   const node = [
     ...textField(1, 'input'),

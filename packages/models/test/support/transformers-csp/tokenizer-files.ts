@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// A synthetic tokenizer and a Hermes-style chat template. Nothing here is a real model's file.
-
 export const MODEL_ID = 'probe/synthetic';
 
 const WORDS = ['<unk>', 'hello', 'world', 'what', 'is', 'the', 'weather', 'in', 'paris'];

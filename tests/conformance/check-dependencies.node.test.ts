@@ -222,7 +222,7 @@ test.each([
     "export const load = (): Promise<unknown> => import('@huggingface/transformers/dist/x.js');\n",
   ],
   [
-    'a runtime path in the library',
+    'onnxruntime-web imported from runtime.ts',
     'runtime.ts',
     "export const load = (): Promise<unknown> => import('onnxruntime-web');\n",
   ],

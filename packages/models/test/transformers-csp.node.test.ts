@@ -11,13 +11,11 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { cspHeader } from '../../../examples/rag-browser/src/host/csp.js';
 import type { PageData } from './support/transformers-csp/report.js';
 
-// The strict policy of the retrieval example's mock mode, unchanged. The negative control drops
-// only `'wasm-unsafe-eval'`, so the probe can fail.
 const strict = cspHeader('mock');
 const withoutWasm = strict.replace(" 'wasm-unsafe-eval'", '');
 let directory = '';
 let browser: Browser;
-const servers: Array<{ origin: string; close: () => Promise<void> }> = [];
+const closers: Array<() => Promise<void>> = [];
 
 async function serve(header: string): Promise<string> {
   const server = await preview({
@@ -34,14 +32,13 @@ async function serve(header: string): Promise<string> {
   });
   const address = server.httpServer.address();
   if (!address || typeof address === 'string') throw new Error('The preview has no port.');
-  servers.push({
-    origin: `http://127.0.0.1:${address.port}`,
-    close: () =>
+  closers.push(
+    () =>
       new Promise<void>((resolve, reject) => {
         server.httpServer.close((error) => (error ? reject(error) : resolve()));
         if ('closeAllConnections' in server.httpServer) server.httpServer.closeAllConnections();
       }),
-  });
+  );
   return `http://127.0.0.1:${address.port}`;
 }
 
@@ -69,7 +66,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser?.close();
-  for (const server of servers) await server.close();
+  for (const close of closers) await close();
   if (directory !== '') await rm(directory, { recursive: true, force: true });
 });
 

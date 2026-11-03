@@ -19,7 +19,6 @@ interface TrustedTypesFactory {
   createPolicy(name: string, rules: { createScriptURL(value: string): string }): unknown;
 }
 
-// The same shape as the example host's Worker URL policy: one allowed same-origin script.
 const factory = (globalThis as typeof globalThis & { trustedTypes?: TrustedTypesFactory })
   .trustedTypes;
 if (factory) {
