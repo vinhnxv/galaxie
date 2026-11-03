@@ -28,6 +28,7 @@
 - [LangGraph adapter README](packages/adapter-langgraph/README.md): a minimal graph and explicit config.
 - [Python adapter README](packages/adapter-pyodide/README.md): trusted LangGraph Python/pydantic-ai/DSPy Workers, checked bridge, durable interactions, deterministic DSPy replay and JavaScript policy.
 - [ADK adapter README](packages/adapter-adk/README.md): `adk-js` executor over the ADK 2.3.0 browser bundle: router-backed models, capability tools, checked streaming, confirmations and long-running tools as interactions, durable sessions and the supported agent shapes.
+- ADK Python: the `adk-python` executor lives in the [Python adapter README](packages/adapter-pyodide/README.md#google-adk-python-agents) ([ADR-0022](docs/adr/0022-google-adk-python-through-the-pyodide-adapter.md), Proposed): authoring surface, supported agent shapes and third-party licenses.
 - [Models README](packages/models/README.md): provider subpaths, the deterministic mock and the ONNX (Transformers.js) provider's host wiring.
 - [React README](packages/react/README.md): surfaces and separate host confirmations.
 - [IndexedDB README](packages/storage-indexeddb/README.md): scoped checkpoints, recovery and storage lifecycle.

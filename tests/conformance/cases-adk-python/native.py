@@ -53,6 +53,31 @@ def renumber(requests):
     return requests
 
 
+def agent_of(request):
+    """The name ADK states in every agent's system instruction."""
+    match = re.search(r'Your internal name is "([^"]+)"', request['messages'][0]['content'])
+    if request['messages'][0]['role'] != 'system' or match is None:
+        raise ValueError('The request names no agent.')
+    return match.group(1)
+
+
+def settle(transcript):
+    """Parallel branches finish in no fixed order; order what they produced by agent, then by turn."""
+
+    def turn(request):
+        return sum(1 for message in request['messages'] if message['role'] == 'assistant')
+
+    transcript['requests'].sort(key=lambda request: (request['agent'], turn(request)))
+    seen = {}
+    for response in transcript['responses']:
+        seen[response['agent']] = seen.get(response['agent'], 0) + 1
+        response['turn'] = seen[response['agent']]
+    transcript['responses'].sort(key=lambda response: (response['agent'], response['turn']))
+    for response in transcript['responses']:
+        del response['turn']
+    transcript['capabilities'].sort(key=lambda call: json.dumps(call, sort_keys=True))
+
+
 def map_request(llm_request):
     """ADK turns as OpenAI chat messages and tools, written independently of galaxie's mapper."""
     messages = []
@@ -105,18 +130,33 @@ class ScriptedLlm(BaseLlm):
     case: str
     spec: Any
     transcript: Any
+    gates: Any = None
 
     async def generate_content_async(self, llm_request, stream=False):
         transcript = self.transcript
         if self.case == 'step-budget' and len(transcript['responses']) >= STEP_LIMIT:
             raise GalaxieError('budget_exceeded')
-        transcript['requests'].append(map_request(llm_request))
+        request = map_request(llm_request)
+        agent = None
+        entry = None
+        if 'agents' in self.spec:
+            # A multi-agent case answers by agent name; the reply is the one after the agent's own earlier turns.
+            agent = agent_of(request)
+            request['agent'] = agent
+            entry = self.spec['agents'][agent][sum(1 for message in request['messages'] if message['role'] == 'assistant')]
+        transcript['requests'].append(request)
+        if entry is not None and entry.get('after'):
+            # A reply can wait for another agent's final answer, which fixes the arrival order of parallel branches.
+            await self.gates.setdefault(entry['after'], asyncio.Event()).wait()
         if self.case == 'abort':
             # ADK ends a cancelled root node quietly, so the fixture records the outcome itself.
             transcript['error'] = {'code': 'cancelled', 'message': 'The run was cancelled.'}
             raise asyncio.CancelledError()
-        entry = self.spec['replies'][len(transcript['responses'])]
-        transcript['responses'].append({'content': entry['text'], 'toolCalls': entry.get('toolCalls', [])})
+        if entry is None:
+            entry = self.spec['replies'][len(transcript['responses'])]
+            transcript['responses'].append({'content': entry['text'], 'toolCalls': entry.get('toolCalls', [])})
+        else:
+            transcript['responses'].append({'agent': agent, 'content': entry['text'], 'toolCalls': entry.get('toolCalls', [])})
         if self.case == 'argument-block':
             raise GalaxieError('denied')
         if stream and self.case.startswith('stream-'):
@@ -135,6 +175,8 @@ class ScriptedLlm(BaseLlm):
             for call in entry.get('toolCalls', [])
         ]
         yield LlmResponse(content=types.Content(role='model', parts=parts), turn_complete=True)
+        if agent is not None and not entry.get('toolCalls'):
+            self.gates.setdefault(agent, asyncio.Event()).set()
 
 
 class NativeDouble(BaseTool):
@@ -255,7 +297,7 @@ async def _run_case(name):
         'requests': [], 'responses': [], 'capabilities': [], 'interactions': [], 'output': None, 'error': None,
         **({'streams': []} if streaming else {}),
     }
-    model = ScriptedLlm(model='answer', case=name, spec=spec, transcript=transcript)
+    model = ScriptedLlm(model='answer', case=name, spec=spec, transcript=transcript, gates={})
     agent = suite.factory(name, model, NativeDouble(name, transcript))
     runner = InMemoryRunner(agent=agent, app_name='conformance')
     session = await runner.session_service.create_session(app_name='conformance', user_id='user', session_id='conformance')
@@ -268,7 +310,13 @@ async def _run_case(name):
         transcript['error'] = {'code': 'cancelled', 'message': 'The run was cancelled.'}
     except GalaxieError as error:
         transcript['error'] = {'code': error.code, 'message': str(error)}
-    transcript['requests'] = renumber(transcript['requests'])
+    if spec.get('unordered'):
+        settle(transcript)
+        # Branches share no call history, so each request numbers its own calls.
+        for request in transcript['requests']:
+            renumber([request])
+    else:
+        transcript['requests'] = renumber(transcript['requests'])
     return normalized(transcript)
 
 

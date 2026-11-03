@@ -44,6 +44,8 @@ The M4 documentation slice adds package coding guidance, a root [AI-facing index
 
 `packages/adapter-adk` (`adk-js`) now hosts Google ADK 2.3.0 agents from its web bundle under the unchanged strict CSP and Trusted Types, with the adapter owning the Runner, router-backed models and capability-backed tools. It supports `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent` trees, checked streaming, confirmations and long-running tools as interactions, and durable sessions through the byte-record port with reload restore. `subgraphs` is false, and a pause is refused where ADK would restart earlier siblings. Evidence is Node and headless Chromium with scripted models, native-versus-galaxie goldens and no real model; ADR-0020 is Proposed. See the [adapter](packages/adapter-adk/README.md) and [unsupported list](docs/unsupported.md#google-adk-javascript).
 
+`@galaxie/adapter-pyodide` also hosts Google ADK Python 2.12.0 as `adk-python` ([ADR-0022](docs/adr/0022-google-adk-python-through-the-pyodide-adapter.md), Proposed): `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent` trees with router-backed models, capability tools, checked streaming, interactions and durable sessions, `subgraphs` false, scripted-model evidence on Node and headless Chromium only (see the [adapter](packages/adapter-pyodide/README.md#google-adk-python-agents) and [unsupported list](docs/unsupported.md#google-adk-python)).
+
 ## Read first
 
 1. `docs/galaxie-project-brief.md`: the source of truth for scope, architecture, security and the roadmap. Start with §0.
