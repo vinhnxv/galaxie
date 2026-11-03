@@ -73,7 +73,7 @@ const preparation = {
 };
 function setup(
   workers: FixtureWorker[],
-  framework?: 'pydantic-ai' | 'dspy',
+  framework?: 'pydantic-ai' | 'dspy' | 'adk',
 ): ReturnType<typeof createPyodideAdapter> {
   return createPyodideAdapter({
     ...(framework === undefined ? {} : { framework }),
@@ -195,6 +195,15 @@ test('framework selection declares only the implemented features and selects the
     interrupts: true,
     resume: true,
     checkpoints: true,
+    subgraphs: false,
+  });
+  const adk = setup([], 'adk');
+  expect(adk.id).toBe('adk-python');
+  expect(adk.features).toEqual({
+    streaming: false,
+    interrupts: false,
+    resume: false,
+    checkpoints: false,
     subgraphs: false,
   });
   expect(adapter.id).toBe('pydantic-ai-python');

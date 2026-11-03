@@ -496,3 +496,104 @@ test.skipIf(!pythonWheelsAvailable)(
   },
   90000,
 );
+
+const adkModels = {
+  providers: {
+    mock: {
+      destination: 'in-browser' as const,
+      modality: 'text' as const,
+      features: ['streaming' as const],
+      languages: ['en'],
+      pricing: { inputPerToken: 0, outputPerToken: 0 },
+    },
+  },
+  roles: {
+    'rag.answer': { providers: ['mock'], allow: ['in-browser' as const], maxTokens: 100 },
+  },
+};
+const adkBinding = {
+  kind: 'read' as const,
+  destination: 'in-browser' as const,
+  timeoutMs: 5000,
+  concurrency: 1,
+  grantScope: 'instance' as const,
+  approval: 'none' as const,
+  retry: 'none' as const,
+  invoke: async () => ({ passages: [] }),
+};
+
+test.skipIf(!pythonWheelsAvailable)(
+  'the ADK framework boots through its import probe, then reports no executor yet',
+  async () => {
+    const fixture = await createPythonFixture({
+      framework: 'adk',
+      module: 'agents',
+      sources: { 'agents.py': 'def create_agent():\n    return object()\n' },
+    });
+    const runtime = createRuntime({
+      appId: 'adk-boot',
+      executors: [createPyodideAdapter({ ...fixture.options, framework: 'adk' })],
+      outputSafety: () => 'allow',
+    });
+    try {
+      const instance = await runtime.create(
+        { ...pythonRagDefinition, executor: 'adk-python' },
+        {
+          principalScope: 'fixture',
+          agent: fixture.agent,
+          services: { chatModels: { mock: new MockChatModel({}) } },
+          models: adkModels,
+          bindings: { 'docs.search@1': adkBinding },
+        },
+      );
+      // The probe imports Runner, FastAPI models, Authlib and OpenTelemetry semantic conventions, so
+      // reaching the fixed `unsupported` code proves every lazy import resolved in the Worker.
+      await expect(instance.prepare()).rejects.toMatchObject({ code: 'unsupported' });
+      expect(fixture.workerErrors).toEqual([]);
+      const wheels = fixture.requests.filter((request) => request.url.includes('/python/wheels/'));
+      const names = new Set(wheels.map((request) => request.url.split('/').at(-1)?.split('-')[0]));
+      for (const expected of ['google_adk', 'fastapi', 'authlib', 'cryptography', 'joserfc'])
+        expect(names.has(expected), expected).toBe(true);
+      for (const absent of ['dspy', 'langgraph', 'pydantic_ai_slim', 'uvicorn', 'watchdog'])
+        expect(names.has(absent), absent).toBe(false);
+    } finally {
+      await runtime.dispose();
+      await fixture.cleanup();
+    }
+  },
+  90000,
+);
+
+test.skipIf(!pythonWheelsAvailable)(
+  'a missing ADK wheel fails the boot with the fixed unavailable error, not at the first run',
+  async () => {
+    const fixture = await createPythonFixture({
+      framework: 'adk',
+      module: 'agents',
+      sources: { 'agents.py': 'def create_agent():\n    return object()\n' },
+      withhold: ['fastapi-'],
+    });
+    const runtime = createRuntime({
+      appId: 'adk-missing-wheel',
+      executors: [createPyodideAdapter({ ...fixture.options, framework: 'adk' })],
+      outputSafety: () => 'allow',
+    });
+    try {
+      const instance = await runtime.create(
+        { ...pythonRagDefinition, executor: 'adk-python' },
+        {
+          principalScope: 'fixture',
+          agent: fixture.agent,
+          services: { chatModels: { mock: new MockChatModel({}) } },
+          models: adkModels,
+          bindings: { 'docs.search@1': adkBinding },
+        },
+      );
+      await expect(instance.prepare()).rejects.toMatchObject({ code: 'unavailable' });
+    } finally {
+      await runtime.dispose();
+      await fixture.cleanup();
+    }
+  },
+  90000,
+);

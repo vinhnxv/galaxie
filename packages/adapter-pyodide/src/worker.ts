@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { ErrorCode } from '@galaxie/core';
+import { adkDriver, adkImportProbe } from './adk-driver.js';
 import {
   type BootPayload,
   BRIDGE_VERSION,
@@ -111,11 +112,13 @@ async function boot(input: BootPayload): Promise<number> {
     if (cache !== undefined) fs?.rmSync(cache, { recursive: true, force: true });
   }
   await py.runPythonAsync(
-    framework === 'dspy'
-      ? 'import dspy\nimport galaxie'
-      : framework === 'pydantic-ai'
-        ? 'import pydantic_ai\nimport galaxie'
-        : 'import langgraph.graph\nimport langchain_core.messages\nimport galaxie\nimport ormsgpack',
+    framework === 'adk'
+      ? adkImportProbe
+      : framework === 'dspy'
+        ? 'import dspy\nimport galaxie'
+        : framework === 'pydantic-ai'
+          ? 'import pydantic_ai\nimport galaxie'
+          : 'import langgraph.graph\nimport langchain_core.messages\nimport galaxie\nimport ormsgpack',
   );
   py.FS.mkdirTree('/agent');
   for (const source of input.sources) {
@@ -158,11 +161,13 @@ async function boot(input: BootPayload): Promise<number> {
   py.globals['set']('_galaxie_entry', input.entry);
   py.globals['set']('_galaxie_durable', input.checkpoints === true);
   await py.runPythonAsync(
-    framework === 'dspy'
-      ? dspyDriver
-      : framework === 'pydantic-ai'
-        ? pydanticAiDriver
-        : `
+    framework === 'adk'
+      ? adkDriver
+      : framework === 'dspy'
+        ? dspyDriver
+        : framework === 'pydantic-ai'
+          ? pydanticAiDriver
+          : `
 import sys, json, asyncio, importlib
 from galaxie._bridge import install_transport, GalaxieError, notify_stream, receive_model_chunk
 from _galaxie_transport import request as _transport, notify as _notify

@@ -40,7 +40,9 @@ export interface PythonFixture {
   cleanup(): Promise<void>;
 }
 export interface PythonFixtureInput {
-  readonly framework?: 'langgraph' | 'pydantic-ai' | 'dspy';
+  readonly framework?: 'langgraph' | 'pydantic-ai' | 'dspy' | 'adk';
+  /** File names the fixture server answers with 404, to simulate a missing wheel. */
+  readonly withhold?: readonly string[];
   readonly sources?: Readonly<Record<string, string>>;
   readonly module?: string;
   readonly entry?: string;
@@ -90,7 +92,8 @@ export async function createPythonFixture(input: PythonFixtureInput = {}): Promi
   for (const [path, text] of Object.entries(sources))
     assets.set(`/python/agent/${path}`, new TextEncoder().encode(text));
   for (const wheel of [...lockedWheels, ...local.packages])
-    assets.set(`/python/wheels/${wheel.file}`, await readFile(join(cache, wheel.file)));
+    if (!input.withhold?.some((prefix) => wheel.file.startsWith(prefix)))
+      assets.set(`/python/wheels/${wheel.file}`, await readFile(join(cache, wheel.file)));
   for (const file of runtimeFiles)
     assets.set(`/python/runtime/${file.file}`, await readFile(join(runtime, file.file)));
   const requests: PythonFixture['requests'] = [];

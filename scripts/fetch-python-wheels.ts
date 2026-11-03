@@ -13,7 +13,7 @@ export interface LockedWheel {
   readonly file: string;
   readonly bytes: number;
   readonly sha256: string;
-  readonly frameworks?: readonly ('langgraph' | 'pydantic-ai' | 'dspy')[];
+  readonly frameworks?: readonly ('langgraph' | 'pydantic-ai' | 'dspy' | 'adk')[];
 }
 
 export interface PythonLock {

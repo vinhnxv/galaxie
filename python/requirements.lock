@@ -3,6 +3,17 @@
   "pyodide": "314.0.7",
   "packages": [
     {
+      "name": "annotated-doc",
+      "version": "0.0.5",
+      "url": "https://files.pythonhosted.org/packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl",
+      "file": "annotated_doc-0.0.5-py3-none-any.whl",
+      "bytes": 5302,
+      "sha256": "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101",
+      "frameworks": [
+        "adk"
+      ]
+    },
+    {
       "name": "annotated-types",
       "version": "0.8.0",
       "url": "https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl",
@@ -12,7 +23,8 @@
       "frameworks": [
         "langgraph",
         "pydantic-ai",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -25,7 +37,8 @@
       "frameworks": [
         "langgraph",
         "pydantic-ai",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -40,6 +53,17 @@
       ]
     },
     {
+      "name": "authlib",
+      "version": "1.9.1",
+      "url": "https://files.pythonhosted.org/packages/39/44/a46089266de32a0d809023b6bf31b80a1f26a46954446a7ce695a565cbea/authlib-1.9.1-py2.py3-none-any.whl",
+      "file": "authlib-1.9.1-py2.py3-none-any.whl",
+      "bytes": 266042,
+      "sha256": "8b9be8b1e5174dcbf5520e984f1a22dc2edae5b6e40a61d4cedbf86b97e9e69b",
+      "frameworks": [
+        "adk"
+      ]
+    },
+    {
       "name": "certifi",
       "version": "2026.10.23",
       "url": "https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl",
@@ -48,7 +72,8 @@
       "sha256": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1",
       "frameworks": [
         "langgraph",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -59,7 +84,8 @@
       "bytes": 148947,
       "sha256": "9ae1a61096321cef7248e02293f42d000fa87b73a3e795705a2444290590459d",
       "frameworks": [
-        "langgraph"
+        "langgraph",
+        "adk"
       ]
     },
     {
@@ -71,7 +97,8 @@
       "sha256": "b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685",
       "frameworks": [
         "langgraph",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -83,6 +110,17 @@
       "sha256": "9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a",
       "frameworks": [
         "dspy"
+      ]
+    },
+    {
+      "name": "cryptography",
+      "version": "47.0.0",
+      "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/cryptography-47.0.0-cp314-abi3-pyemscripten_2026_0_wasm32.whl",
+      "file": "cryptography-47.0.0-cp314-abi3-pyemscripten_2026_0_wasm32.whl",
+      "bytes": 2174338,
+      "sha256": "0b41491ced2cf85046559cac2502e875492cbef6d332addafa680e41be27f0ad",
+      "frameworks": [
+        "adk"
       ]
     },
     {
@@ -108,6 +146,17 @@
       ]
     },
     {
+      "name": "fastapi",
+      "version": "0.161.1",
+      "url": "https://files.pythonhosted.org/packages/45/2a/101012d82931d9de3855384e1667e49c0e07a0048e3868f9fec1697293a9/fastapi-0.161.1-py3-none-any.whl",
+      "file": "fastapi-0.161.1-py3-none-any.whl",
+      "bytes": 149049,
+      "sha256": "a1363080cf9aeedecd99f4e1a23669d7e77542227f6536f4d7bbd59f07ecaa94",
+      "frameworks": [
+        "adk"
+      ]
+    },
+    {
       "name": "genai-prices",
       "version": "0.1.13",
       "url": "https://files.pythonhosted.org/packages/41/5a/b6b7d55148d367d07bcd3efdf24e3086ad199ea5109d0c335a872dfaac95/genai_prices-0.1.13-py3-none-any.whl",
@@ -116,6 +165,39 @@
       "sha256": "6d2b40760a2f7f5e207bac9b98de0af80e60c58ead497872a5331a7cee610477",
       "frameworks": [
         "pydantic-ai"
+      ]
+    },
+    {
+      "name": "google-adk",
+      "version": "2.12.0",
+      "url": "https://files.pythonhosted.org/packages/d3/65/3706e52bac2f8ac1328caa7da28dfff8a9086fce5004619960f91c7f7bb4/google_adk-2.12.0-py3-none-any.whl",
+      "file": "google_adk-2.12.0-py3-none-any.whl",
+      "bytes": 4998446,
+      "sha256": "79f89ea94ccd87e4ac8c893e81c44ed2ce5568d05406a95c1d10bcef0ce0ff5d",
+      "frameworks": [
+        "adk"
+      ]
+    },
+    {
+      "name": "google-auth",
+      "version": "2.62.0",
+      "url": "https://files.pythonhosted.org/packages/eb/a3/87fe9b7203ec2e56ea6a57c75e6d632eaf9487c7f7978cdad1d801bee0af/google_auth-2.62.0-py3-none-any.whl",
+      "file": "google_auth-2.62.0-py3-none-any.whl",
+      "bytes": 267911,
+      "sha256": "4ff4319aeb4ad128409759d397a9fcafad126d0031d241cc0dd6b9a00b43e3f3",
+      "frameworks": [
+        "adk"
+      ]
+    },
+    {
+      "name": "google-genai",
+      "version": "2.33.0",
+      "url": "https://files.pythonhosted.org/packages/ba/3b/9ae8e16c5b2177bfdec1c64769a93eea9093de684e0bbb95c10c77645fef/google_genai-2.33.0-py3-none-any.whl",
+      "file": "google_genai-2.33.0-py3-none-any.whl",
+      "bytes": 1222487,
+      "sha256": "f3f8ab696b35caf95c222e05268740c1ccd6934257890506be73b126150d3b14",
+      "frameworks": [
+        "adk"
       ]
     },
     {
@@ -137,7 +219,8 @@
       "bytes": 77457,
       "sha256": "830cb1ec73bb4c46f2e38ebeb3dd50ffb45f62b804dd040519d34fe36f8fdfc7",
       "frameworks": [
-        "langgraph"
+        "langgraph",
+        "adk"
       ]
     },
     {
@@ -174,7 +257,19 @@
       "frameworks": [
         "langgraph",
         "pydantic-ai",
-        "dspy"
+        "dspy",
+        "adk"
+      ]
+    },
+    {
+      "name": "joserfc",
+      "version": "1.7.7",
+      "url": "https://files.pythonhosted.org/packages/df/9f/934db284aa22f37af59708e382903860d4b81329c137b1b0ed2745daeb65/joserfc-1.7.7-py3-none-any.whl",
+      "file": "joserfc-1.7.7-py3-none-any.whl",
+      "bytes": 71758,
+      "sha256": "06979cfbab78bc802f14c0358f32969826cc26720e13cb38926ffdc86bc0cb2c",
+      "frameworks": [
+        "adk"
       ]
     },
     {
@@ -339,7 +434,19 @@
       "bytes": 60256,
       "sha256": "b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb",
       "frameworks": [
-        "pydantic-ai"
+        "pydantic-ai",
+        "adk"
+      ]
+    },
+    {
+      "name": "opentelemetry-semantic-conventions",
+      "version": "0.66b1",
+      "url": "https://files.pythonhosted.org/packages/bc/14/67f8aa798857f8cf686f515bf93d9bb877ce952ddc8efae0fa25b45ce0d6/opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl",
+      "file": "opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl",
+      "bytes": 206279,
+      "sha256": "d4cddeb4315490b35213f55e2bdc9ac54bb1e4d318927475bed62b35545e581b",
+      "frameworks": [
+        "adk"
       ]
     },
     {
@@ -362,7 +469,8 @@
       "bytes": 129956,
       "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
       "frameworks": [
-        "langgraph"
+        "langgraph",
+        "adk"
       ]
     },
     {
@@ -373,7 +481,8 @@
       "bytes": 48172,
       "sha256": "0b4cbc12c42e25df55343342fb0da45b189181e4f360602f9721db2016fc3a4b",
       "frameworks": [
-        "langgraph"
+        "langgraph",
+        "adk"
       ]
     },
     {
@@ -386,7 +495,8 @@
       "frameworks": [
         "langgraph",
         "pydantic-ai",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -410,7 +520,8 @@
       "frameworks": [
         "langgraph",
         "pydantic-ai",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -467,7 +578,8 @@
       "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
       "frameworks": [
         "langgraph",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -500,7 +612,19 @@
       "bytes": 9560,
       "sha256": "1e0f350ca8eac5252c1af9a8d93a7edd70056c1eddf5661f6950688094d1f670",
       "frameworks": [
-        "langgraph"
+        "langgraph",
+        "adk"
+      ]
+    },
+    {
+      "name": "starlette",
+      "version": "1.9.0",
+      "url": "https://files.pythonhosted.org/packages/f3/93/181df62699d9b5aca1d87e5cfda131dac87e3cdaebf668662f7206ca3470/starlette-1.9.0-py3-none-any.whl",
+      "file": "starlette-1.9.0-py3-none-any.whl",
+      "bytes": 80335,
+      "sha256": "fd3f159936e882d06c1108f84688f7cda2cf85fc6a592a50edbd175e882c2ddc",
+      "frameworks": [
+        "adk"
       ]
     },
     {
@@ -511,7 +635,8 @@
       "bytes": 32310,
       "sha256": "9e56f17539296baab7beabb08b92f6ee3d7be92d8be72d763360677c2ad6580e",
       "frameworks": [
-        "langgraph"
+        "langgraph",
+        "adk"
       ]
     },
     {
@@ -535,7 +660,8 @@
       "frameworks": [
         "langgraph",
         "pydantic-ai",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -548,7 +674,8 @@
       "frameworks": [
         "langgraph",
         "pydantic-ai",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -560,7 +687,8 @@
       "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
       "frameworks": [
         "langgraph",
-        "dspy"
+        "dspy",
+        "adk"
       ]
     },
     {
@@ -582,7 +710,8 @@
       "bytes": 212375,
       "sha256": "dc2b495a92b3971966bf102e73589f950db3ec1ca6713265355ce7771d97b199",
       "frameworks": [
-        "langgraph"
+        "langgraph",
+        "adk"
       ]
     },
     {
