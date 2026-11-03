@@ -238,6 +238,8 @@ export class TransformersEngineHandle {
       }
       started = true;
       for (;;) {
+        // After an abort the release path owns the channel; a second reader would orphan it.
+        check();
         const message = await lifetime.race(Promise.race([channel.next(), aborted.promise]));
         check();
         if (message.type === 'chunk') {

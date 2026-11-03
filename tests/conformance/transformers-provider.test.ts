@@ -260,7 +260,12 @@ test('an uncached model asks to download; refusal fails denied and fetches nothi
     expect(received).toEqual([]);
     expect(host.parts.fetcher.calls).toEqual([]);
     expect(host.parts.runtime.loads).toEqual([]);
-    expectNoCanary({ events, diagnostics, spans: serializeSpans(exporter.getFinishedSpans()) });
+    expectNoCanary({
+      events,
+      diagnostics,
+      snapshot: instance.getSnapshot(),
+      spans: serializeSpans(exporter.getFinishedSpans()),
+    });
   } finally {
     await runtime.dispose();
     await provider.shutdown();
@@ -292,9 +297,11 @@ test('an accepted download loads with downloads allowed, re-probes available and
     // Actual usage (5 prompt + 2 completion tokens) settles each reservation.
     expect(charges).toEqual([7, 7]);
     const spans = serializeSpans(exporter.getFinishedSpans());
-    expectNoCanary({ events, diagnostics, spans });
+    expectNoCanary({ events, diagnostics, snapshot: instance.getSnapshot(), spans });
     // The reply text stays out of diagnostics and spans; raw stream events carry it by design.
-    expect(JSON.stringify({ diagnostics, spans })).not.toContain('Hello');
+    expect(JSON.stringify({ diagnostics, spans, snapshot: instance.getSnapshot() })).not.toContain(
+      'Hello',
+    );
     expect(diagnostics.map((event) => event.kind)).toEqual(['output_safety_unset']);
   } finally {
     await runtime.dispose();
@@ -322,7 +329,18 @@ test('stored files whose bytes differ fail unavailable without any fetch', async
     expect(received).toEqual([]);
     expect(host.parts.fetcher.calls).toEqual([]);
     expect(host.parts.runtime.loads).toEqual([]);
-    expectNoCanary({ events, diagnostics, spans: serializeSpans(exporter.getFinishedSpans()) });
+    // The typed reason is the integrity failure, and still nothing was fetched.
+    await expect(host.handle(false)).rejects.toMatchObject({
+      code: 'unavailable',
+      reason: 'integrity',
+    });
+    expect(host.parts.fetcher.calls).toEqual([]);
+    expectNoCanary({
+      events,
+      diagnostics,
+      snapshot: instance.getSnapshot(),
+      spans: serializeSpans(exporter.getFinishedSpans()),
+    });
   } finally {
     await runtime.dispose();
     await provider.shutdown();
@@ -407,7 +425,7 @@ test('worker failure leaves the role failing unavailable and never retries elsew
   }
 });
 
-test('cancelling and disposing a consumer leaves the shared handle for another runtime', async () => {
+test('disposing a runtime mid-call cancels it and leaves the shared handle for another runtime', async () => {
   const host = await createHost(
     { pieces: ['one ', 'two ', 'three'], holdAfter: 1 },
     { cached: true },
@@ -418,9 +436,10 @@ test('cancelling and disposing a consumer leaves the shared handle for another r
     const a = await createConsumer(first.runtime, host);
     const started = await a.instance.start({});
     await vi.waitFor(() => expect(a.received).toEqual(['one ']));
-    await a.instance.cancel(started.runId);
-    expect((await collect(a.instance.events(started.runId))).at(-1)?.type).toBe('cancelled');
+    // Disposing the runtime while the call is in flight cancels it.
+    const observed = collect(a.instance.events(started.runId));
     await first.runtime.dispose();
+    expect((await observed).at(-1)?.type).toBe('cancelled');
     const handle = await host.handle(false);
     expect(host.parts.worker.terminated).toBe(0);
     // Another runtime answers from the same handle without a second load.

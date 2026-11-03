@@ -160,6 +160,31 @@ describe('stream turns', () => {
     expect((await second).at(-1)?.type).toBe('done');
   });
 
+  it('releases the turn when a consumer resumes a stream after aborting while holding a chunk', async () => {
+    const { worker, handle } = await ready();
+    const controller = new AbortController();
+    const held = handle.stream(request as GenerateRequest, controller.signal);
+    const first = held.next();
+    const second = collect(handle.stream(request as GenerateRequest));
+    await settle();
+    worker.emit({ type: 'chunk', id: 1, text: 'a' });
+    expect((await first).value).toEqual({ type: 'chunk', text: 'a' });
+    controller.abort(new Error('stop now'));
+    await settle();
+    // Resuming after the abort must not read the channel the release path is draining.
+    await expect(held.next()).rejects.toEqual(new Error('stop now'));
+    worker.emit({
+      type: 'done',
+      id: 1,
+      usage: { promptTokens: 0, completionTokens: 0 },
+      finishReason: 'abort',
+    });
+    await settle();
+    expect(worker.of('generate').map((message) => message['id'])).toEqual([1, 2]);
+    worker.emit(finish(2));
+    expect((await second).at(-1)?.type).toBe('done');
+  });
+
   it('releases the next turn after a failed message for an aborted request', async () => {
     const { worker, handle } = await ready();
     const controller = new AbortController();
