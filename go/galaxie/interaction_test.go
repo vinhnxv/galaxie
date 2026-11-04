@@ -162,7 +162,9 @@ func TestADeclinedConfirmationNeverRunsTheToolAndTheModelSeesTheRejection(t *tes
 		t.Fatalf("result = %+v, err = %v, calls = %+v", done, err, caller.calls)
 	}
 	last := caller.models[len(caller.models)-1].Messages
-	t.Logf("model saw: %+v", last)
+	if encoded, _ := json.Marshal(last[len(last)-1]); !strings.Contains(string(encoded), "rejected") {
+		t.Fatalf("the model was not told the call was rejected: %s", encoded)
+	}
 }
 
 func values(caller *scripted) []float64 {

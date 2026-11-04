@@ -48,7 +48,9 @@ new run that continues the paused session in the same Worker.
   above it. A pause inside a `ParallelAgent`, a `LoopAgent` or an earlier child of a sequence fails
   `unsupported` (recorded against ADK Go v1.9.0 in `go/galaxie/trees_test.go`), as does a confirmation
   next to a long-running call in the same turn, and a module whose tools can pause without an
-  `Interaction` hook is refused before it runs.
+  `Interaction` hook is refused before it runs. The check for long-running tools happens before the run,
+  because such a tool executes before it pauses. A capability whose tool name equals ADK's confirmation call
+  name (`adk_request_confirmation`) is refused.
 - The paused session lives in the Worker's memory. If the Worker dies, the pause is gone and the session
   is unrecoverable; nothing is persisted until durable sessions ship.
 - Effect scopes continue across the runs of one conversation, so a resumed run never reuses the scope of

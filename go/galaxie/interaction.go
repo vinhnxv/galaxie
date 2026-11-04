@@ -87,11 +87,6 @@ type pausedCall struct {
 	request Request
 }
 
-type pending struct {
-	id    string
-	calls []pausedCall
-}
-
 func requestsOf(calls []pausedCall) []Request {
 	requests := make([]Request, len(calls))
 	for index, call := range calls {
@@ -303,19 +298,12 @@ func answerOf(calls []pausedCall, decisions []Decision) (*genai.Content, error) 
 	return &genai.Content{Role: genai.RoleUser, Parts: parts}, nil
 }
 
-// keepLossyPauses lifts the tree rule below. Only the evidence tests set it, to record what ADK
-// does when a pause is not refused.
-var keepLossyPauses = false
-
 // resumesInPlace reports whether resuming a pause raised by the agent called name continues the
 // run faithfully. ADK resumes only the agent that paused, so the work after it in the tree is
 // lost unless that agent is the last leaf under every sequential ancestor; a pause inside a
 // parallel or loop agent resumes without the surrounding iteration. An unknown or ambiguous name
 // fails closed.
 func (r *recorder) resumesInPlace(root agent.Agent, name string) bool {
-	if keepLossyPauses {
-		return true
-	}
 	var trail [][]agent.Agent
 	found := 0
 	var walk func(current agent.Agent, path []agent.Agent)
@@ -344,6 +332,19 @@ func (r *recorder) resumesInPlace(root agent.Agent, name string) bool {
 			}
 		default:
 			return false
+		}
+	}
+	return true
+}
+
+// longRunningResumes reports whether every agent holding a long-running tool resumes in place.
+// Such a tool runs before it pauses, so this is checked before the run rather than at the pause.
+func (r *recorder) longRunningResumes(root agent.Agent) bool {
+	for owner, info := range r.agents {
+		for _, each := range info.tools {
+			if r.longRunning[each] && !r.resumesInPlace(root, owner.Name()) {
+				return false
+			}
 		}
 	}
 	return true

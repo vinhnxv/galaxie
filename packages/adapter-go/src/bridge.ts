@@ -212,7 +212,7 @@ export function encodeReply(value: unknown): string {
   return text;
 }
 
-/** A run that stopped to wait for the user: the interaction to show and the tools it holds. */
+/** A run that stopped to wait for the user: the interaction to show and the ID that answers it. */
 export interface BridgePause {
   readonly interactionId: string;
   readonly request: InteractionRequest;

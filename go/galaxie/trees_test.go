@@ -111,10 +111,9 @@ func approve() any { return map[string]any{"indexes": []any{float64(0)}} }
 // run pauses the tree (the rule lifted), answers it and reports which agents the model served.
 func run(t *testing.T, kind string, replies map[string][]string) (*roleCaller, Result) {
 	t.Helper()
-	keepLossyPauses = true
-	defer func() { keepLossyPauses = false }()
 	caller := &roleCaller{replies: replies}
 	store := NewStore()
+	store.lossyPauses = true
 	definition := Definition{Build: tree(kind), Interaction: func([]Request) (map[string]any, error) {
 		return map[string]any{"surfaceId": "s", "viewRevision": "1", "component": "c/v1", "props": map[string]any{}}, nil
 	}}

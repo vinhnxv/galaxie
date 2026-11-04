@@ -42,7 +42,7 @@ import { emitPaused } from './stream.js';
 /** The Go agent a host prepares: the reviewed module and the entry it serves. */
 export interface GoAgent {
   readonly wasm: GoWasmReference;
-  /** The name the Go program registered with `galaxie.Serve`. */
+  /** The name the Go program registered with `galaxie.Serve` or `galaxie.ServeWith`. */
   readonly entry: string;
   /**
    * Asks the run for `stream` events: checked text deltas as `messages` and content-free tool
@@ -153,10 +153,9 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       let settleRun: ((result: string) => void) | undefined;
       const lost = new Set<string>();
       const conversations = new Map<string, string>();
-      // The pause each session waits on; the Go session behind it lives in the Worker.
-      const pauses = new Map<string, PendingInteraction>();
-      // Where a paused run's stream markers continue, so a resumed run never repeats an index.
-      const positions = new Map<string, number>();
+      // The pause each session waits on, with where its stream markers continue so a resumed run
+      // never repeats an index; the Go session behind it lives in the Worker.
+      const pauses = new Map<string, { interaction: PendingInteraction; position: number }>();
       let runCounter = 0;
       const send = (message: HostMessage): void => {
         worker.postMessage(encodeHostMessage(message));
@@ -165,7 +164,6 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
         dead = true;
         for (const sessionId of pauses.keys()) lost.add(sessionId);
         pauses.clear();
-        positions.clear();
         settleRun?.(failedRun('unavailable'));
       };
 
@@ -285,6 +283,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             const command = request.command;
             let answer: { interactionId: string; action: string; payload: unknown } | undefined;
             let prompt = '';
+            let position = 0;
             if (command.type === 'start') {
               const input: unknown = command.input;
               if (
@@ -297,11 +296,14 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
                 throw adapterFailure('invalid');
               prompt = Reflect.get(input, 'prompt') as string;
               pauses.delete(request.sessionId);
-              positions.delete(request.sessionId);
             } else {
               const waiting = pauses.get(request.sessionId);
-              if (waiting === undefined || waiting.interactionId !== command.interactionId)
+              if (
+                waiting === undefined ||
+                waiting.interaction.interactionId !== command.interactionId
+              )
                 throw adapterFailure('stale');
+              position = waiting.position;
               pauses.delete(request.sessionId);
               answer = {
                 interactionId: command.interactionId,
@@ -335,7 +337,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               leases: new Set(),
               streaming: agent.stream === true,
               events: [],
-              position: positions.get(request.sessionId) ?? 0,
+              position,
               modelCalls: 0,
               cancelled: false,
             };
@@ -398,18 +400,17 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
                   interactionId: outcome.paused.interactionId as InteractionId,
                   ...outcome.paused.request,
                 };
-                pauses.set(request.sessionId, interaction);
+                // A Worker that died after Go finished took the paused session with it.
+                if (dead) throw adapterFailure('unavailable');
                 if (current.streaming) {
                   emitPaused(current);
                   for (const event of current.events.splice(0)) yield event;
                 }
-                positions.set(request.sessionId, current.position);
+                pauses.set(request.sessionId, { interaction, position: current.position });
                 yield { type: 'interaction', interaction };
               } else if (outcome.ok) {
-                positions.delete(request.sessionId);
                 yield { type: 'output', output: outcome.output };
               } else {
-                positions.delete(request.sessionId);
                 yield { type: 'error', error: toErrorInfo(errorCodeOf(outcome.code)) };
               }
             }
@@ -427,7 +428,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             if (active === run) active = undefined;
           }
         },
-        pending: async (sessionId) => pauses.get(sessionId),
+        pending: async (sessionId) => pauses.get(sessionId)?.interaction,
         dispose: async () => {
           disposed = true;
           teardown();

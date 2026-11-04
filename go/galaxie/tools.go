@@ -12,6 +12,7 @@ import (
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/exitlooptool"
 	"google.golang.org/adk/tool/functiontool"
+	"google.golang.org/adk/tool/toolconfirmation"
 
 	"galaxie.invalid/galaxie/galaxie/llm"
 )
@@ -40,6 +41,10 @@ func CapabilityTool(capability string, spec ToolSpec) (tool.Tool, error) {
 	if r == nil || capability == "" {
 		return nil, llm.NewError("unsupported")
 	}
+	// ADK's own confirmation call carries this name; a tool that shares it could forge a pause.
+	if toolName(capability) == toolconfirmation.FunctionCallName {
+		return nil, llm.NewError("unsupported")
+	}
 	var schema jsonschema.Schema
 	if err := json.Unmarshal([]byte(spec.Schema), &schema); err != nil {
 		return nil, llm.NewError("invalid")
@@ -61,6 +66,9 @@ func CapabilityTool(capability string, spec ToolSpec) (tool.Tool, error) {
 	}
 	r.tools[created] = true
 	r.pausing = r.pausing || spec.RequireConfirmation || spec.LongRunning
+	if spec.LongRunning {
+		r.longRunning[created] = true
+	}
 	return created, nil
 }
 

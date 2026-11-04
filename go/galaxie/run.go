@@ -52,7 +52,8 @@ const (
 type conversation struct {
 	service session.Service
 	counter *atomic.Int64
-	pending *pending
+	id      string
+	calls   []pausedCall
 }
 
 // Store keeps the conversations of one page session. A pause ends its run, and the answer arrives
@@ -63,6 +64,9 @@ type Store struct {
 	conversations map[string]*conversation
 	ordinals      map[string]int
 	memories      map[string]*llm.Memory
+	// lossyPauses lifts the tree rules. Only the evidence tests set it, to record what ADK does
+	// when a pause is not refused.
+	lossyPauses bool
 }
 
 // NewStore creates an empty store.
@@ -85,25 +89,36 @@ func (s *Store) memory(name string) *llm.Memory {
 	return memory
 }
 
-func (s *Store) paused(name string) *conversation {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.conversations[name]
-}
-
 func (s *Store) forget(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.conversations, name)
 }
 
-func (s *Store) keep(name string, kept *conversation) int {
+// claim takes the conversation's pause when id names it, and leaves it in place otherwise.
+func (s *Store) claim(name, id string) *conversation {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.conversations[name] = kept
+	kept := s.conversations[name]
+	if kept == nil || kept.id != id {
+		return nil
+	}
+	delete(s.conversations, name)
+	return kept
+}
+
+func (s *Store) nextOrdinal(name string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	ordinal := s.ordinals[name]
 	s.ordinals[name] = ordinal + 1
 	return ordinal
+}
+
+func (s *Store) keep(name string, kept *conversation) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.conversations[name] = kept
 }
 
 // Execute runs one prompt of a plain entry to completion. A run that would pause fails
@@ -132,6 +147,11 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 	if built.pausing && definition.Interaction == nil {
 		return Result{}, llm.NewError("unsupported")
 	}
+	// A long-running tool runs before its pause, so a tree that cannot resume it is refused
+	// before anything runs.
+	if !s.lossyPauses && !built.longRunningResumes(root) {
+		return Result{}, llm.NewError("unsupported")
+	}
 	name := input.Conversation
 	var (
 		service session.Service
@@ -139,20 +159,19 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		message *genai.Content
 	)
 	if input.Resume != nil {
-		kept := s.paused(name)
-		if kept == nil || kept.pending == nil || kept.pending.id != input.Resume.InteractionID {
+		kept := s.claim(name, input.Resume.InteractionID)
+		if kept == nil {
 			return Result{}, llm.NewError("stale")
 		}
-		s.forget(name)
 		resume := definition.Resume
 		if resume == nil {
 			resume = defaultResume
 		}
-		decisions, err := resume(requestsOf(kept.pending.calls), input.Resume.Action, input.Resume.Payload)
+		decisions, err := resume(requestsOf(kept.calls), input.Resume.Action, input.Resume.Payload)
 		if err != nil {
 			return Result{}, llm.NewError("invalid")
 		}
-		message, err = answerOf(kept.pending.calls, decisions)
+		message, err = answerOf(kept.calls, decisions)
 		if err != nil {
 			return Result{}, err
 		}
@@ -230,7 +249,7 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 	if watch.calls == nil {
 		return Result{Output: output}, nil
 	}
-	if !built.resumesInPlace(root, watch.pausedBy) {
+	if !s.lossyPauses && !built.resumesInPlace(root, watch.pausedBy) {
 		return Result{}, llm.NewError("unsupported")
 	}
 	requests := requestsOf(watch.calls)
@@ -243,10 +262,8 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 	for index, each := range requests {
 		tools[index] = each.Tool
 	}
-	kept := &conversation{service: service, counter: counter}
-	ordinal := s.keep(name, kept)
-	id := interactionID(name, ordinal, requests, request)
-	kept.pending = &pending{id: id, calls: watch.calls}
+	id := interactionID(name, s.nextOrdinal(name), requests, request)
+	s.keep(name, &conversation{service: service, counter: counter, id: id, calls: watch.calls})
 	return Result{Pause: &Pause{ID: id, Request: request, Tools: tools}}, nil
 }
 

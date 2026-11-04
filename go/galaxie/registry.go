@@ -39,6 +39,8 @@ type recorder struct {
 	tools   map[tool.Tool]bool
 	models  map[*llm.LLM]bool
 	pausing bool
+	// longRunning holds the tools that run before they pause.
+	longRunning map[tool.Tool]bool
 }
 
 var (
@@ -50,9 +52,10 @@ func record(build func() (agent.Agent, error)) (agent.Agent, *recorder, error) {
 	buildMu.Lock()
 	defer buildMu.Unlock()
 	current = &recorder{
-		agents: map[agent.Agent]node{},
-		tools:  map[tool.Tool]bool{},
-		models: map[*llm.LLM]bool{},
+		agents:      map[agent.Agent]node{},
+		tools:       map[tool.Tool]bool{},
+		models:      map[*llm.LLM]bool{},
+		longRunning: map[tool.Tool]bool{},
 	}
 	defer func() { current = nil }()
 	root, err := build()
