@@ -81,14 +81,12 @@ type Pause struct {
 	Tools []string
 }
 
-// pausedCall is one ADK call a run waits on: the function-response identity its answer must carry.
 type pausedCall struct {
 	id      string
 	name    string
 	request Request
 }
 
-// pending is the pause a conversation waits on.
 type pending struct {
 	id    string
 	calls []pausedCall
@@ -131,11 +129,9 @@ func interactionID(conversation string, ordinal int, requests []Request, request
 // returned its pending result, before ADK asks the model about it, so the driver stops there.
 type tracker struct {
 	// flagged holds the long-running calls of the latest tool turn that have no answer yet.
-	flagged []*genai.FunctionCall
-	turn    []*genai.FunctionCall
-	author  string
-	calls   []pausedCall
-	// pausedBy names the agent whose turn paused.
+	flagged  []*genai.FunctionCall
+	author   string
+	calls    []pausedCall
 	pausedBy string
 }
 
@@ -205,7 +201,6 @@ func (t *tracker) observe(event *session.Event) (bool, error) {
 		return true, nil
 	}
 	if len(calls) > 0 {
-		t.turn = calls
 		t.flagged = t.flagged[:0]
 		t.author = event.Author
 		for _, call := range calls {
@@ -243,7 +238,6 @@ func (t *tracker) observe(event *session.Event) (bool, error) {
 	return true, nil
 }
 
-// unanswered reports a run that ended while long-running calls had no result event.
 func (t *tracker) unanswered() bool { return t.calls == nil && len(t.flagged) > 0 }
 
 // defaultResume approves or declines every confirmation, nothing else. The payload must be

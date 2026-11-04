@@ -233,7 +233,6 @@ function parsePause(value: unknown): BridgePause {
     !INTERACTION_ID.test(value['interactionId'])
   )
     throw adapterFailure('invalid');
-  // The author's request reaches the host only through core's four-field check.
   const request = parseInteractionRequest(value['request']);
   if (request === undefined) throw adapterFailure('invalid');
   return { interactionId: value['interactionId'], request };
@@ -243,7 +242,6 @@ export function parseRunResult(text: string): RunResult {
   const value = parseFrame(text);
   if (isRecord(value) && value['ok'] === true && keys(value, ['ok'], ['output', 'paused'])) {
     if (value['paused'] !== undefined) {
-      // A pause carries no final text.
       if (value['output'] !== undefined && value['output'] !== '') throw adapterFailure('invalid');
       return { ok: true, paused: parsePause(value['paused']) };
     }

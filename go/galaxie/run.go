@@ -143,7 +143,6 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		if kept == nil || kept.pending == nil || kept.pending.id != input.Resume.InteractionID {
 			return Result{}, llm.NewError("stale")
 		}
-		// The pause is consumed by this answer, whether or not the answer is valid.
 		s.forget(name)
 		resume := definition.Resume
 		if resume == nil {
@@ -159,7 +158,6 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		}
 		service, counter = kept.service, kept.counter
 	} else {
-		// A new prompt drops any pause the conversation was waiting on.
 		s.forget(name)
 		service = session.InMemoryService()
 		counter = &atomic.Int64{}
@@ -245,9 +243,10 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 	for index, each := range requests {
 		tools[index] = each.Tool
 	}
-	ordinal := s.keep(name, &conversation{service: service, counter: counter})
+	kept := &conversation{service: service, counter: counter}
+	ordinal := s.keep(name, kept)
 	id := interactionID(name, ordinal, requests, request)
-	s.paused(name).pending = &pending{id: id, calls: watch.calls}
+	kept.pending = &pending{id: id, calls: watch.calls}
 	return Result{Pause: &Pause{ID: id, Request: request, Tools: tools}}, nil
 }
 

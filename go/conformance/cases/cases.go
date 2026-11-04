@@ -88,12 +88,12 @@ func singleTool() (agent.Agent, error) {
 	return leaf("agent", double)
 }
 
-func pausing(name string, confirmation, longRunning bool) (agent.Agent, error) {
+func pausing(name string, confirmation, longRunningTool bool) (agent.Agent, error) {
 	double, err := galaxie.CapabilityTool("math.double@1", galaxie.ToolSpec{
 		Description:         "Double an integer.",
 		Schema:              doubleSchema,
 		RequireConfirmation: confirmation,
-		LongRunning:         longRunning,
+		LongRunning:         longRunningTool,
 	})
 	if err != nil {
 		return nil, err
@@ -105,11 +105,9 @@ func confirm() (agent.Agent, error) { return pausing("agent", true, false) }
 
 func longRunning() (agent.Agent, error) { return pausing("agent", false, true) }
 
-func plainLeaf(name string) (agent.Agent, error) { return leaf(name) }
-
 // confirmLast pauses in the last child of a sequence, which ADK resumes without losing a sibling.
 func confirmLast() (agent.Agent, error) {
-	first, err := plainLeaf("first")
+	first, err := leaf("first")
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +125,7 @@ func confirmFirst() (agent.Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	second, err := plainLeaf("second")
+	second, err := leaf("second")
 	if err != nil {
 		return nil, err
 	}

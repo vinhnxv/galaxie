@@ -163,9 +163,9 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       };
       const markDead = (): void => {
         dead = true;
-        // The Go session behind a pause died with the Worker, so nothing can answer it.
         for (const sessionId of pauses.keys()) lost.add(sessionId);
         pauses.clear();
+        positions.clear();
         settleRun?.(failedRun('unavailable'));
       };
 
@@ -296,14 +296,12 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               )
                 throw adapterFailure('invalid');
               prompt = Reflect.get(input, 'prompt') as string;
-              // A new prompt replaces the pause its session was waiting on, here and in Go.
               pauses.delete(request.sessionId);
               positions.delete(request.sessionId);
             } else {
               const waiting = pauses.get(request.sessionId);
               if (waiting === undefined || waiting.interactionId !== command.interactionId)
                 throw adapterFailure('stale');
-              // The pause is consumed by this answer, whether or not the answer is valid.
               pauses.delete(request.sessionId);
               answer = {
                 interactionId: command.interactionId,
@@ -407,8 +405,11 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
                 }
                 positions.set(request.sessionId, current.position);
                 yield { type: 'interaction', interaction };
-              } else if (outcome.ok) yield { type: 'output', output: outcome.output };
-              else {
+              } else if (outcome.ok) {
+                positions.delete(request.sessionId);
+                yield { type: 'output', output: outcome.output };
+              } else {
+                positions.delete(request.sessionId);
                 yield { type: 'error', error: toErrorInfo(errorCodeOf(outcome.code)) };
               }
             }

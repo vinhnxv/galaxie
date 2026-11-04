@@ -35,10 +35,9 @@ type node struct {
 // recorder collects the values one build function creates. The ADK interfaces have unexported
 // methods, so the concrete types cannot be inspected; the registry remembers the pointers instead.
 type recorder struct {
-	agents map[agent.Agent]node
-	tools  map[tool.Tool]bool
-	models map[*llm.LLM]bool
-	// pausing is set when a tool needs the user (a confirmation or a long-running result).
+	agents  map[agent.Agent]node
+	tools   map[tool.Tool]bool
+	models  map[*llm.LLM]bool
 	pausing bool
 }
 
