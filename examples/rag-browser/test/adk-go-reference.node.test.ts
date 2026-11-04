@@ -118,8 +118,10 @@ test.skipIf(!goAvailable)(
     expect(state.violations).toEqual([]);
     expect(external).toEqual([]);
     const scripts = await readScripts();
-    for (const name of Object.keys(scripts))
+    for (const name of Object.keys(scripts)) {
       expect(comparable(state.results[name] as Observed), name).toEqual(await readGolden(name));
+      expect((state.results[name] as Observed).streams, name).toEqual(scripts[name]?.streams ?? []);
+    }
     const coldStartMs = Math.max(...Object.values(state.results).map((r) => r.coldStartMs ?? -1));
     const wasmBytes = (await readFile(reference.file)).byteLength;
     console.info(`adk-go chromium ${JSON.stringify({ wasmBytes, coldStartMs })}`);

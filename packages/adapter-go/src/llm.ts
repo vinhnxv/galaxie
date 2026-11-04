@@ -3,7 +3,14 @@
 
 import type { ModelCall, ModelPreparation, ModelUsage, RunRequest } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+import {
+  AIMessage,
+  type AIMessageChunk,
+  type BaseMessage,
+  HumanMessage,
+  SystemMessage,
+  ToolMessage,
+} from '@langchain/core/messages';
 import {
   type BridgeToolCall,
   encodeReply,
@@ -13,6 +20,15 @@ import {
 } from './bridge.js';
 import { adapterFailure } from './errors.js';
 import { isRecord } from './protocol.js';
+import {
+  carriesCalls,
+  DeltaSplitter,
+  emitDelta,
+  emitMarker,
+  StreamJoiner,
+  type StreamSink,
+} from './stream.js';
+import { growingText } from './tool-calls.js';
 
 export type GoChatModel =
   | BaseChatModel
@@ -29,13 +45,14 @@ export interface LeasedCall {
 }
 
 /** The run the Worker is serving; every bridge call is checked against it. */
-export interface ActiveRun {
+export interface ActiveRun extends StreamSink {
   readonly id: string;
   readonly request: RunRequest;
   readonly seen: Set<string>;
   readonly leases: Set<LeasedCall>;
+  /** Whether the host asked this run for stream events. */
+  readonly streaming: boolean;
   modelCalls: number;
-  cancelled: boolean;
 }
 
 export function validServices(
@@ -116,6 +133,33 @@ function usageOf(reply: AIMessage): ModelReply['usage'] {
   };
 }
 
+/**
+ * Reads a provider's reply as it grows. Every chunk's text and call arguments pass the output
+ * check before its text reaches the host as a `messages` event, so a blocked chunk is never
+ * forwarded; Go still receives only the finished reply, checked once more by the caller.
+ */
+async function streamReply(
+  run: ActiveRun,
+  lease: ModelCall,
+  bound: Pick<BaseChatModel, 'stream'>,
+  messages: BaseMessage[],
+  options: Parameters<BaseChatModel['stream']>[1],
+  author: string,
+  offered: boolean,
+): Promise<AIMessage | AIMessageChunk> {
+  const joiner = new StreamJoiner();
+  const splitter = new DeltaSplitter();
+  for await (const chunk of await bound.stream(messages, options)) {
+    if (aborted(run)) throw adapterFailure('cancelled');
+    if (typeof chunk.content !== 'string' || (!offered && carriesCalls(chunk)))
+      throw adapterFailure('unsupported');
+    await lease.checkOutput(growingText(joiner.append(chunk)), { final: false });
+    if (aborted(run)) throw adapterFailure('cancelled');
+    for (const piece of splitter.feed(chunk.content)) emitDelta(run, author, piece);
+  }
+  return joiner.finish();
+}
+
 /** Serves one model request from Go through the run's router lease; the reply is bridge text. */
 export async function serveModel(
   run: ActiveRun,
@@ -123,7 +167,8 @@ export async function serveModel(
   text: string,
 ): Promise<string> {
   const input = parseModelPayload(text);
-  if (input.options.stream) throw adapterFailure('unsupported');
+  // Go asks for a stream only when the host did; anything else is a program the page did not start.
+  if (input.options.stream && !run.streaming) throw adapterFailure('invalid');
   if (run.modelCalls++ >= run.request.limits.steps) throw adapterFailure('budget_exceeded');
   const offered = new Set((input.options.tools ?? []).map((tool) => tool.function.name));
   const requires = [
@@ -180,12 +225,25 @@ export async function serveModel(
           throw adapterFailure('invalid');
       }
     });
-    const reply = await bound.invoke(messages, {
+    const callOptions = {
       signal: run.request.signal,
       ...(input.options.stop === undefined ? {} : { stop: [...input.options.stop] }),
       ...(input.options.jsonSchema === undefined ? {} : { jsonSchema: input.options.jsonSchema }),
       [Symbol.for('galaxie.model.destination')]: lease.destination,
-    });
+    };
+    // The parser pairs an author with `stream: true`, so the author alone selects the streamed path.
+    const reply =
+      input.author !== undefined
+        ? await streamReply(
+            run,
+            lease,
+            bound,
+            messages,
+            callOptions,
+            input.author,
+            offered.size > 0,
+          )
+        : await bound.invoke(messages, callOptions);
     if (typeof reply.content !== 'string') throw adapterFailure('unsupported');
     const calls = callsOf(reply, offered);
     if (offered.size === 0 && (reply.tool_calls?.length ?? 0) > 0)
@@ -209,6 +267,7 @@ export async function serveModel(
       ...(usage === undefined ? {} : { usage }),
     };
     const encoded = encodeReply(result);
+    if (run.streaming) for (const item of calls) emitMarker(run, 'tool_call', item.function.name);
     finish(
       run,
       call,
@@ -231,5 +290,7 @@ export async function serveCapability(run: ActiveRun, text: string): Promise<str
     ...(input.effectScope === undefined ? {} : { effectScope: input.effectScope }),
   });
   if (aborted(run)) throw adapterFailure('cancelled');
-  return encodeReply(result === undefined ? null : result);
+  const encoded = encodeReply(result === undefined ? null : result);
+  if (run.streaming) emitMarker(run, 'tool_result', input.name);
+  return encoded;
 }

@@ -12,6 +12,10 @@ capability outcomes. The Go side of every entry lives in `go/conformance/cases`.
   Chromium under the strict mock-mode CSP, and checks that the module cannot compile without
   `'wasm-unsafe-eval'`.
 
+A case with `stream: true` runs with stream events on. The native lane has no page, so its golden still
+records only the wire transcript (with each reply's `chunks` removed, since Go receives the aggregated
+reply); the Node and Chromium lanes also compare the page's stream events with the case's `streams`.
+
 The matrix in `../compatibility-matrix-adk-go.json` lists every case and the adapter's feature flags.
 
 `../adk-go-run.node.test.ts` runs the same module for behavior the native lane cannot express: a raising

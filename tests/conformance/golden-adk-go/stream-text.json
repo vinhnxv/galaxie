@@ -1,0 +1,29 @@
+{
+  "capabilities": [],
+  "error": null,
+  "output": "A streamed answer.",
+  "requests": [
+    {
+      "author": "agent",
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"agent\".",
+          "role": "system"
+        },
+        {
+          "content": "Say hello.",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "stream": true
+      },
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "A streamed answer."
+    }
+  ]
+}

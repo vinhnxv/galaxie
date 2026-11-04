@@ -6,7 +6,7 @@
     "real headless Chromium galaxie adk-go adapter under the strict mock-mode CSP (every case)"
   ],
   "features": {
-    "streaming": false,
+    "streaming": true,
     "interrupts": false,
     "resume": false,
     "checkpoints": false,
@@ -21,7 +21,10 @@
     "bounded-loop",
     "exit-loop",
     "unbounded-loop",
-    "model-unavailable"
+    "model-unavailable",
+    "stream-text",
+    "stream-tools",
+    "stream-sequential"
   ],
   "differences": [],
   "normalizations": [

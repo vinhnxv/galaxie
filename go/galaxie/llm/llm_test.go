@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"google.golang.org/adk/agent"
 	"google.golang.org/adk/model"
 	"google.golang.org/adk/platform"
 	"google.golang.org/genai"
@@ -243,14 +244,61 @@ func TestErrorsCarryOnlyFixedText(t *testing.T) {
 	}
 }
 
-func TestStreamingIsUnsupportedAndEndsTheRun(t *testing.T) {
-	caller := &fakeCaller{}
-	run, ctx := newRun(caller)
-	var failure error
-	for _, err := range New("answer").GenerateContent(ctx, userRequest("go", nil), true) {
-		failure = err
+// agentContext stands in for the invocation context ADK hands a model: it names the agent.
+type agentContext struct {
+	context.Context
+	agent agent.Agent
+}
+
+func (c agentContext) Agent() agent.Agent { return c.agent }
+
+func TestAStreamingRequestNamesItsAuthorAndReturnsOneFinalResponse(t *testing.T) {
+	caller := &fakeCaller{replies: []string{`{"content":"streamed"}`}}
+	_, ctx := newRun(caller)
+	writer, err := agent.New(agent.Config{Name: "writer"})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if CodeOf(failure) != "unsupported" || run.Fatal() == nil {
-		t.Fatalf("err = %v", failure)
+	var responses []*model.LLMResponse
+	for response, err := range New("answer").GenerateContent(agentContext{ctx, writer}, userRequest("hi", nil), true) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		responses = append(responses, response)
+	}
+	if len(responses) != 1 || responses[0].Partial || !responses[0].TurnComplete {
+		t.Fatalf("responses = %+v", responses)
+	}
+	var sent ModelRequest
+	if err := json.Unmarshal(caller.requests[0], &sent); err != nil {
+		t.Fatal(err)
+	}
+	if !sent.Options.Stream || sent.Author != "writer" {
+		t.Fatalf("request = %s", caller.requests[0])
+	}
+}
+
+func TestAStreamingRequestWithoutAnAuthorFailsWithoutDispatching(t *testing.T) {
+	caller := &fakeCaller{replies: []string{`{"content":"never"}`}}
+	run, ctx := newRun(caller)
+	for _, err := range New("answer").GenerateContent(ctx, userRequest("hi", nil), true) {
+		var failure *Error
+		if !errors.As(err, &failure) || failure.Code != "invalid" || run.Fatal() == nil {
+			t.Fatalf("err = %v", err)
+		}
+	}
+	if len(caller.requests) != 0 {
+		t.Fatalf("a request without an author was sent: %s", caller.requests[0])
+	}
+}
+
+func TestANonStreamingRequestCarriesNeitherStreamNorAuthor(t *testing.T) {
+	caller := &fakeCaller{replies: []string{`{"content":"plain"}`}}
+	_, ctx := newRun(caller)
+	if _, err := collect(t, ctx, userRequest("hi", nil)); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(caller.requests[0]), "author") || strings.Contains(string(caller.requests[0]), "stream") {
+		t.Fatalf("request = %s", caller.requests[0])
 	}
 }

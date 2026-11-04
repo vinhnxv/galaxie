@@ -28,6 +28,8 @@ type Input struct {
 	Prompt string
 	// Conversation names the run's conversation inside capability effect scopes.
 	Conversation string
+	// Stream asks the page for checked text deltas while each model reply is produced.
+	Stream bool
 }
 
 const (
@@ -65,7 +67,11 @@ func Execute(parent context.Context, caller llm.Caller, entry Entry, input Input
 	message := &genai.Content{Role: genai.RoleUser, Parts: []*genai.Part{{Text: input.Prompt}}}
 	var output string
 	var failure error
-	for event, err := range adk.Run(ctx, userID, sessionID, message, agent.RunConfig{StreamingMode: agent.StreamingModeNone}) {
+	mode := agent.StreamingModeNone
+	if input.Stream {
+		mode = agent.StreamingModeSSE
+	}
+	for event, err := range adk.Run(ctx, userID, sessionID, message, agent.RunConfig{StreamingMode: mode}) {
 		if err != nil {
 			failure = err
 			break

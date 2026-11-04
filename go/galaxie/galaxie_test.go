@@ -288,3 +288,54 @@ func TestATreeDeeperThanTheLimitIsRefused(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestAStreamingRunAsksThePageToStreamForEachAgentTurn(t *testing.T) {
+	sequence := func() (agent.Agent, error) {
+		first, err := galaxie.LlmAgent(llmagent.Config{Name: "first", Model: galaxie.Model("answer"), OutputKey: "a"})
+		if err != nil {
+			return nil, err
+		}
+		second, err := galaxie.LlmAgent(llmagent.Config{Name: "second", Model: galaxie.Model("answer")})
+		if err != nil {
+			return nil, err
+		}
+		return galaxie.SequentialAgent(agent.Config{Name: "pipeline", SubAgents: []agent.Agent{first, second}})
+	}
+	caller := &scripted{replies: []string{`{"content":"one"}`, `{"content":"two"}`}}
+	output, err := galaxie.Execute(context.Background(), caller, sequence, galaxie.Input{Prompt: "go", Conversation: "c", Stream: true})
+	if err != nil || output != "two" {
+		t.Fatalf("output = %q, err = %v", output, err)
+	}
+	if len(caller.models) != 2 {
+		t.Fatalf("model requests = %d", len(caller.models))
+	}
+	for position, author := range []string{"first", "second"} {
+		options := caller.models[position].Options
+		if !options.Stream || caller.models[position].Author != author {
+			t.Fatalf("request %d = %+v", position, caller.models[position])
+		}
+	}
+}
+
+func TestAStreamingRunStillRunsToolsAndEndsOnTheFinalText(t *testing.T) {
+	caller := &scripted{
+		replies:    []string{toolCall("math_double_1", `{"value":3}`), `{"content":"The result is 6."}`},
+		capability: func(llm.CapabilityRequest) (string, error) { return `{"value":6}`, nil },
+	}
+	output, err := galaxie.Execute(context.Background(), caller, singleAgent, galaxie.Input{Prompt: "go", Conversation: "c", Stream: true})
+	if err != nil || output != "The result is 6." {
+		t.Fatalf("output = %q, err = %v", output, err)
+	}
+	if len(caller.calls) != 1 || len(caller.models) != 2 {
+		t.Fatalf("calls = %d, model requests = %d", len(caller.calls), len(caller.models))
+	}
+}
+
+func TestAFailureWhileStreamingEndsTheRunWithItsCode(t *testing.T) {
+	caller := &scripted{replies: nil}
+	_, err := galaxie.Execute(context.Background(), caller, singleAgent, galaxie.Input{Prompt: "go", Conversation: "c", Stream: true})
+	var failure *llm.Error
+	if !errors.As(err, &failure) || failure.Code != "unavailable" {
+		t.Fatalf("err = %v", err)
+	}
+}

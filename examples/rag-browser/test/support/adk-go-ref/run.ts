@@ -6,8 +6,8 @@
 
 import { createRuntime, defineAgentDefinition, GalaxieError, type RunEvent } from '@galaxie/core';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage, type BaseMessage } from '@langchain/core/messages';
-import type { ChatResult } from '@langchain/core/outputs';
+import { AIMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages';
+import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import { z } from 'zod';
 import {
   createGoAdapter,
@@ -17,15 +17,24 @@ import {
 
 export interface ScriptedReply {
   readonly content?: string;
+  /** Text pieces a streaming run receives one by one; they join to `content`. */
+  readonly chunks?: readonly string[];
   readonly toolCalls?: ReadonlyArray<{
     readonly id: string;
     readonly function: { readonly name: string; readonly arguments: string };
   }>;
   readonly error?: string;
 }
+export interface ScriptedStream {
+  readonly mode: string;
+  readonly data: unknown;
+}
 export interface Script {
   readonly entry: string;
   readonly prompt: string;
+  /** Asks the adapter for stream events; the expected ones are listed in `streams`. */
+  readonly stream?: boolean;
+  readonly streams?: readonly ScriptedStream[];
   readonly replies: ReadonlyArray<ScriptedReply>;
   readonly capabilities: Readonly<Record<string, { result?: unknown; error?: string }>>;
 }
@@ -35,6 +44,7 @@ export interface Observed {
   readonly capabilities: unknown[];
   readonly output: string;
   readonly error: { code: string } | null;
+  readonly streams: ScriptedStream[];
   readonly coldStartMs: number | undefined;
 }
 
@@ -66,6 +76,36 @@ export class ScriptedChatModel extends BaseChatModel {
       })),
     });
     return { generations: [{ text: reply.content ?? '', message }] };
+  }
+  /** Streams the reply's chunks; a tool call arrives as one raw fragment on the last chunk. */
+  override async *_streamResponseChunks(
+    _messages: BaseMessage[],
+  ): AsyncGenerator<ChatGenerationChunk> {
+    const reply = this.#replies[this.served++];
+    if (reply === undefined) throw new GalaxieError('unavailable', 'No scripted reply is left.');
+    if (reply.error !== undefined)
+      throw new GalaxieError(reply.error as 'unavailable', 'A scripted model failure.');
+    const pieces = reply.chunks ?? [reply.content ?? ''];
+    for (const [position, text] of pieces.entries()) {
+      const last = position === pieces.length - 1;
+      yield new ChatGenerationChunk({
+        text,
+        message: new AIMessageChunk({
+          content: text,
+          ...(last && reply.toolCalls
+            ? {
+                tool_call_chunks: reply.toolCalls.map((call, index) => ({
+                  type: 'tool_call_chunk' as const,
+                  id: call.id,
+                  name: call.function.name,
+                  args: call.function.arguments,
+                  index,
+                })),
+              }
+            : {}),
+        }),
+      });
+    }
   }
 }
 
@@ -123,7 +163,7 @@ export async function runCase(
   try {
     const instance = await runtime.create(definition, {
       principalScope: 'fixture',
-      agent: { wasm, entry: script.entry },
+      agent: { wasm, entry: script.entry, ...(script.stream ? { stream: true } : {}) },
       services: { chatModels: { mock: model } },
       models: {
         providers: {
@@ -158,16 +198,24 @@ export async function runCase(
     await instance.prepare();
     const { runId } = await instance.start({ prompt: script.prompt });
     const events: RunEvent[] = [];
-    for await (const event of instance.events(runId)) events.push(event);
+    const streams: ScriptedStream[] = [];
+    for await (const event of instance.events(runId)) {
+      if (event.type === 'stream') streams.push({ mode: event.mode, data: event.data });
+      events.push(event);
+    }
     const end = events.at(-1);
     return {
       requests: frames.filter((frame) => frame.op === 'model').map((frame) => frame.payload),
-      responses: script.replies.slice(0, model.served),
+      // The goldens record the aggregated replies Go receives, never the page-side chunks.
+      responses: script.replies
+        .slice(0, model.served)
+        .map(({ chunks: _chunks, ...reply }) => reply),
       capabilities: frames
         .filter((frame) => frame.op === 'capability')
         .map((frame) => frame.payload),
       output: end?.type === 'output' ? String(end.output) : '',
       error: end?.type === 'error' ? { code: end.error.code } : null,
+      streams,
       coldStartMs,
     };
   } finally {

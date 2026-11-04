@@ -69,6 +69,8 @@ test.skipIf(!goAvailable).each(caseNames)(
       output: observed.output,
       error: observed.error,
     }).toEqual(golden);
+    // Page-side stream events are not on the wire, so the script lists the ones a case expects.
+    expect(observed.streams).toEqual(script.streams ?? []);
   },
   120000,
 );

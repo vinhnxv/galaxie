@@ -1,0 +1,53 @@
+{
+  "capabilities": [],
+  "error": null,
+  "output": "Polished greeting.",
+  "requests": [
+    {
+      "author": "first",
+      "messages": [
+        {
+          "content": "Draft an answer.\n\nYou are an agent. Your internal name is \"first\".",
+          "role": "system"
+        },
+        {
+          "content": "Write a greeting.",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "stream": true
+      },
+      "role": "answer"
+    },
+    {
+      "author": "second",
+      "messages": [
+        {
+          "content": "Polish this draft: Draft greeting.\n\nYou are an agent. Your internal name is \"second\".",
+          "role": "system"
+        },
+        {
+          "content": "Write a greeting.",
+          "role": "user"
+        },
+        {
+          "content": "For context:[first] said: Draft greeting.",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "stream": true
+      },
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "Draft greeting."
+    },
+    {
+      "content": "Polished greeting."
+    }
+  ]
+}

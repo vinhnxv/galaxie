@@ -95,5 +95,61 @@
     "prompt": "Say hello.",
     "replies": [{ "error": "unavailable" }],
     "capabilities": {}
+  },
+  "stream-text": {
+    "entry": "single",
+    "prompt": "Say hello.",
+    "stream": true,
+    "replies": [{ "content": "A streamed answer.", "chunks": ["A ", "streamed ", "answer."] }],
+    "capabilities": {},
+    "streams": [
+      { "mode": "messages", "data": { "author": "agent", "text": "A " } },
+      { "mode": "messages", "data": { "author": "agent", "text": "streamed " } },
+      { "mode": "messages", "data": { "author": "agent", "text": "answer." } }
+    ]
+  },
+  "stream-tools": {
+    "entry": "single-tool",
+    "prompt": "Double 21.",
+    "stream": true,
+    "replies": [
+      {
+        "content": "Checking.",
+        "chunks": ["Check", "ing."],
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": { "name": "math_double_1", "arguments": "{\"value\":21}" }
+          }
+        ]
+      },
+      { "content": "The result is 42.", "chunks": ["The result ", "is 42."] }
+    ],
+    "capabilities": { "math.double@1": { "result": { "value": 42 } } },
+    "streams": [
+      { "mode": "messages", "data": { "author": "agent", "text": "Check" } },
+      { "mode": "messages", "data": { "author": "agent", "text": "ing." } },
+      { "mode": "updates", "data": { "step": "tool_call", "tool": "math_double_1", "index": 0 } },
+      { "mode": "updates", "data": { "step": "tool_result", "tool": "math.double@1", "index": 1 } },
+      { "mode": "messages", "data": { "author": "agent", "text": "The result " } },
+      { "mode": "messages", "data": { "author": "agent", "text": "is 42." } }
+    ]
+  },
+  "stream-sequential": {
+    "entry": "sequential",
+    "prompt": "Write a greeting.",
+    "stream": true,
+    "replies": [
+      { "content": "Draft greeting.", "chunks": ["Draft ", "greeting."] },
+      { "content": "Polished greeting.", "chunks": ["Polished ", "greeting."] }
+    ],
+    "capabilities": {},
+    "streams": [
+      { "mode": "messages", "data": { "author": "first", "text": "Draft " } },
+      { "mode": "messages", "data": { "author": "first", "text": "greeting." } },
+      { "mode": "messages", "data": { "author": "second", "text": "Polished " } },
+      { "mode": "messages", "data": { "author": "second", "text": "greeting." } }
+    ]
   }
 }

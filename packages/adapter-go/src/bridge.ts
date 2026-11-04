@@ -29,6 +29,8 @@ export interface BridgeTool {
 
 export interface ModelPayload {
   readonly role: string;
+  /** The agent whose turn this is; present exactly when `options.stream` is true. */
+  readonly author?: string;
   readonly messages: readonly BridgeMessage[];
   readonly options: {
     readonly stop?: readonly string[];
@@ -144,11 +146,18 @@ function parseFrame(text: string): unknown {
   }
 }
 
+/** An agent name is trusted author text: any printable text of bounded length. */
+export function validAuthor(value: unknown): value is string {
+  return (
+    typeof value === 'string' && value.length >= 1 && value.length <= 128 && !/\p{Cc}/u.test(value)
+  );
+}
+
 export function parseModelPayload(text: string): ModelPayload {
   const value = parseFrame(text);
   if (
     !isRecord(value) ||
-    !keys(value, ['role', 'messages', 'options']) ||
+    !keys(value, ['role', 'messages', 'options'], ['author']) ||
     typeof value['role'] !== 'string' ||
     !/^[A-Za-z0-9_.-]{1,64}$/.test(value['role']) ||
     !Array.isArray(value['messages']) ||
@@ -170,6 +179,11 @@ export function parseModelPayload(text: string): ModelPayload {
     (options['jsonSchema'] !== undefined &&
       !(isRecord(options['jsonSchema']) && plain(options['jsonSchema'])))
   )
+    throw adapterFailure('invalid');
+  // A streamed reply is labeled with its agent, and only a streamed reply is.
+  if ((value['author'] !== undefined) !== (options['stream'] === true))
+    throw adapterFailure('invalid');
+  if (value['author'] !== undefined && !validAuthor(value['author']))
     throw adapterFailure('invalid');
   return value as unknown as ModelPayload;
 }

@@ -27,6 +27,7 @@ const (
 type script struct {
 	Entry        string                       `json:"entry"`
 	Prompt       string                       `json:"prompt"`
+	Stream       bool                         `json:"stream"`
 	Replies      []json.RawMessage            `json:"replies"`
 	Capabilities map[string]capabilityOutcome `json:"capabilities"`
 }
@@ -72,6 +73,7 @@ func (r *recorder) Call(_ context.Context, op string, payload []byte) ([]byte, e
 			r.out.Responses = append(r.out.Responses, reply)
 			return nil, llm.NewError(scripted.Error)
 		}
+		reply = withoutChunks(reply)
 		r.out.Responses = append(r.out.Responses, reply)
 		return reply, nil
 	case "capability":
@@ -90,6 +92,21 @@ func (r *recorder) Call(_ context.Context, op string, payload []byte) ([]byte, e
 		return outcome.Result, nil
 	}
 	return nil, llm.NewError("invalid")
+}
+
+// withoutChunks drops the text pieces a scripted reply streams through the page. Go receives only the
+// aggregated reply, and the goldens record that.
+func withoutChunks(reply json.RawMessage) json.RawMessage {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(reply, &fields) != nil {
+		return reply
+	}
+	delete(fields, "chunks")
+	stripped, err := json.Marshal(fields)
+	if err != nil {
+		return reply
+	}
+	return stripped
 }
 
 func loadScripts(t *testing.T) map[string]script {
@@ -147,7 +164,7 @@ func TestNativeRunsMatchTheGoldens(t *testing.T) {
 				Responses:    []json.RawMessage{},
 				Capabilities: []json.RawMessage{},
 			}}
-			output, err := galaxie.Execute(context.Background(), page, entry, galaxie.Input{Prompt: s.Prompt, Conversation: "g1"})
+			output, err := galaxie.Execute(context.Background(), page, entry, galaxie.Input{Prompt: s.Prompt, Conversation: "g1", Stream: s.Stream})
 			page.out.Output = output
 			if err != nil {
 				page.out.Error = &failure{Code: llm.CodeOf(err)}

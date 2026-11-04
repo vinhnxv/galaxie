@@ -24,6 +24,7 @@ type Request struct {
 	Entry        string `json:"entry"`
 	Prompt       string `json:"prompt"`
 	Conversation string `json:"conversation"`
+	Stream       bool   `json:"stream,omitempty"`
 }
 
 // Handler runs one request to completion. caller reaches the page for model and capability calls.

@@ -24,6 +24,7 @@ import {
   encodeBoot,
   encodeHostMessage,
   failedRun,
+  GO_EXECUTOR_ID,
   type GoBuildInfo,
   type GoWasmReference,
   type HostMessage,
@@ -40,6 +41,11 @@ export interface GoAgent {
   readonly wasm: GoWasmReference;
   /** The name the Go program registered with `galaxie.Serve`. */
   readonly entry: string;
+  /**
+   * Asks the run for `stream` events: checked text deltas as `messages` and content-free tool
+   * markers as `updates`. Absent or false, a run emits only its output.
+   */
+  readonly stream?: boolean;
 }
 
 export interface GoWorkerPort {
@@ -66,13 +72,19 @@ export interface GoAdapterOptions {
   readonly onBoot?: (event: GoBootEvent) => void;
 }
 
-export const GO_EXECUTOR_ID = 'adk-go';
 const DEFAULT_READY_TIMEOUT_MS = 30_000;
 const MAX_READY_TIMEOUT_MS = 120_000;
 const CANCEL_GRACE_MS = 500;
 
 function validAgent(agent: unknown): agent is GoAgent {
-  if (typeof agent !== 'object' || agent === null || Object.keys(agent).length !== 2) return false;
+  if (typeof agent !== 'object' || agent === null) return false;
+  const stream: unknown = Reflect.get(agent, 'stream');
+  const expected = stream === undefined ? 2 : 3;
+  if (
+    Object.keys(agent).length !== expected ||
+    (stream !== undefined && typeof stream !== 'boolean')
+  )
+    return false;
   const wasm: unknown = Reflect.get(agent, 'wasm');
   const entry: unknown = Reflect.get(agent, 'entry');
   return (
@@ -90,8 +102,9 @@ function failureCode(error: unknown, fallback: ErrorCode = 'unavailable'): Error
 /**
  * The `adk-go` executor adapter. A prepared agent owns one Worker running the reviewed Go module;
  * a run sends the prompt, serves the program's model and capability requests through the run's
- * router and broker, and ends with the final text. Streaming, interactions, resume and durable
- * sessions are not built: their features stay off.
+ * router and broker, and ends with the final text. With `stream` set, the checked text of each
+ * model reply also reaches the host while it is produced. Interactions, resume and durable sessions
+ * are not built: their features stay off.
  */
 export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAgent, GoServices> {
   return {
@@ -101,7 +114,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       interrupts: false,
       resume: false,
       checkpoints: false,
-      streaming: false,
+      streaming: true,
       subgraphs: false,
     },
     async prepare(agent, services, preparation): Promise<ExecutorAgent> {
@@ -278,6 +291,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               entry: agent.entry,
               prompt: Reflect.get(input, 'prompt'),
               conversation,
+              ...(agent.stream === true ? { stream: true } : {}),
             });
             if (!withinBridgeLimit(runRequest)) throw adapterFailure('unsupported');
             const current: ActiveRun = {
@@ -285,6 +299,9 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               request,
               seen: new Set(),
               leases: new Set(),
+              streaming: agent.stream === true,
+              events: [],
+              position: 0,
               modelCalls: 0,
               cancelled: false,
             };
@@ -322,7 +339,23 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               request: runRequest,
             });
             if (request.signal.aborted) cancel();
-            const text = await result;
+            // Stream events leave in the order the page produced them, ahead of the outcome.
+            let text: string | undefined;
+            let wake = Promise.withResolvers<void>();
+            current.wake = () => wake.resolve();
+            void result.then((value) => {
+              text = value;
+              wake.resolve();
+            });
+            for (;;) {
+              for (const event of current.events.splice(0))
+                if (!request.signal.aborted) yield event;
+              // Events queued while a yield was suspended still precede the outcome.
+              if (current.events.length > 0) continue;
+              if (text !== undefined) break;
+              await wake.promise;
+              wake = Promise.withResolvers<void>();
+            }
             settled = true;
             const outcome = parseRunResult(text);
             if (!request.signal.aborted) {
