@@ -1,6 +1,6 @@
 # ADR-0015: License: AGPL-3.0 with a commercial license
 
-- **Status:** Accepted (founder decision, 2026-10-28). The lawyer review is deferred; Verification lists when each part of it is needed.
+- **Status:** Superseded by [ADR-0024](0024-apache-2-0-license-and-dco.md) (2026-11-04). The text below is kept for history.
 - **Date:** 2026-10-28
 - **Revisions:**
   - 2026-10-28: the founder chose AGPL-3.0-only with a commercial license. Commercial use is allowed when the user complies with the AGPL. Closed-source use requires a commercial license, obtained by contacting the copyright holder.
@@ -52,7 +52,7 @@ The founder accepts the AGPL trade-off. Commercial use is fine when the product'
   - Each `package.json` sets `"license": "AGPL-3.0-only"`.
   - The repository has a [`LICENSE`](../../LICENSE) file with the verbatim text from the Free Software Foundation (gnu.org, SHA-256 `0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0`).
 - **Commercial license:** the copyright holder, Nguyễn Xuân Vĩnh (an individual), sells a commercial license for use in closed-source or proprietary products, without AGPL obligations.
-  - [`COMMERCIAL-LICENSE.md`](../../COMMERCIAL-LICENSE.md) explains who needs one and how to contact the copyright holder.
+  - `COMMERCIAL-LICENSE.md` (removed when ADR-0024 took effect) explained who needs one and how to contact the copyright holder.
   - The agreement itself (pricing, tiers, support, warranty, governing law) is drafted with a lawyer.
 - **Contributions:** a CLA is required before any external contribution is merged, and it is enforced by a CLA check in CI.
   - The CLA lets the copyright holder relicense contributions commercially, and lets those rights pass to a successor, such as a company formed later.

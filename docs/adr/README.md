@@ -35,7 +35,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0012](0012-security-baseline.md) | Mandatory security baseline | Accepted |
 | [0013](0013-typescript-first-implementation.md) | TypeScript-first implementation language | Accepted |
 | [0014](0014-data-labels-and-argument-shapes.md) | Run-level data labels and argument shapes | Proposed |
-| [0015](0015-licensing-agpl-with-commercial-license.md) | License: AGPL-3.0 with a commercial license | Accepted |
+| [0015](0015-licensing-agpl-with-commercial-license.md) | License: AGPL-3.0 with a commercial license | Superseded by ADR-0024 |
 | [0016](0016-parity-demonstrations-and-otel-traces.md) | Parity is the verdict, metrics are demonstrations, traces are OpenTelemetry spans | Accepted |
 | [0017](0017-framework-neutral-contracts.md) | Framework-neutral contracts, with an adapter per framework | Accepted |
 | [0018](0018-python-agents-through-pyodide.md) | Python agents through Pyodide in a worker, with policy kept in JavaScript | Proposed |
@@ -44,6 +44,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0021](0021-in-browser-onnx-chat-provider.md) | In-browser ONNX chat models through a Transformers.js provider with a Worker-side runtime seam | Proposed |
 | [0022](0022-google-adk-python-through-the-pyodide-adapter.md) | Google ADK (Python) through the Pyodide adapter, with an explicit wheel list | Proposed |
 | [0023](0023-google-adk-go-through-a-wasm-worker.md) | Google ADK (Go) through a WebAssembly Worker, with policy kept in JavaScript | Proposed |
+| [0024](0024-apache-2-0-license-and-dco.md) | License: Apache-2.0, with the Developer Certificate of Origin | Accepted |
 
 ## Template
 
