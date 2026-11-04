@@ -50,6 +50,8 @@ export interface Script {
   /** Asks the adapter for stream events; the expected ones are listed in `streams`. */
   readonly stream?: boolean;
   readonly streams?: readonly ScriptedStream[];
+  /** Compares the wire lists as sets: parallel branches reach the page in any order. */
+  readonly unordered?: boolean;
   readonly replies: ReadonlyArray<ScriptedReply>;
   readonly capabilities: Readonly<Record<string, { result?: unknown; error?: string }>>;
 }
@@ -62,6 +64,7 @@ export interface Observed {
   readonly output: string;
   readonly error: { code: string } | null;
   readonly streams: ScriptedStream[];
+  readonly unordered: boolean;
   readonly coldStartMs: number | undefined;
 }
 
@@ -143,12 +146,34 @@ const definition = defineAgentDefinition({
   models: { answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
 });
 
+/** Serializes a value with sorted keys, so two equal JSON values give one text. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (typeof value === 'object' && value !== null)
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
+}
+
+/** Orders a wire list by its canonical text when the case runs branches concurrently. */
+function ordered(list: unknown[], unordered: boolean): unknown[] {
+  if (!unordered) return list;
+  const keys = new Map(list.map((item) => [item, canonical(item)] as const));
+  return [...list].sort((left, right) => {
+    const a = keys.get(left) as string;
+    const b = keys.get(right) as string;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+}
+
 /** What the native golden records: the wire transcript, with pauses only when a case has any. */
 export function comparable(observed: Observed): Record<string, unknown> {
   return {
-    requests: observed.requests,
-    responses: observed.responses,
-    capabilities: observed.capabilities,
+    requests: ordered(observed.requests, observed.unordered),
+    responses: ordered(observed.responses, observed.unordered),
+    capabilities: ordered(observed.capabilities, observed.unordered),
     ...(observed.pauses.length > 0 ? { pauses: observed.pauses } : {}),
     output: observed.output,
     error: observed.error,
@@ -313,6 +338,7 @@ export async function runCase(
       output: end?.type === 'output' ? String(end.output) : '',
       error: end?.type === 'error' ? { code: end.error.code } : null,
       streams,
+      unordered: script.unordered === true,
       coldStartMs,
     };
   } finally {

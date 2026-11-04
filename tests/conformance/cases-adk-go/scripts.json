@@ -436,5 +436,59 @@
       { "mode": "messages", "data": { "author": "agent", "text": "The result " } },
       { "mode": "messages", "data": { "author": "agent", "text": "is 42." } }
     ]
+  },
+  "parallel": {
+    "entry": "parallel",
+    "prompt": "Write a note.",
+    "unordered": true,
+    "replies": [{ "content": "Note." }, { "content": "Note." }],
+    "capabilities": {}
+  },
+  "transfer": {
+    "entry": "transfer",
+    "prompt": "Who can answer this?",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "t1",
+            "type": "function",
+            "function": { "name": "transfer_to_agent", "arguments": "{\"agent_name\":\"helper\"}" }
+          }
+        ]
+      },
+      { "content": "Helper answer." }
+    ],
+    "capabilities": {}
+  },
+  "confirm-transfer": {
+    "entry": "confirm-transfer",
+    "prompt": "Double 21.",
+    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }],
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "t1",
+            "type": "function",
+            "function": { "name": "transfer_to_agent", "arguments": "{\"agent_name\":\"helper\"}" }
+          }
+        ]
+      },
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": { "name": "math_double_1", "arguments": "{\"value\":21}" }
+          }
+        ]
+      },
+      { "content": "The result is 42." }
+    ],
+    "capabilities": { "math.double@1": { "result": { "value": 42 } } }
   }
 }

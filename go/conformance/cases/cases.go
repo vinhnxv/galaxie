@@ -25,21 +25,26 @@ const doubleSchema = `{"type":"object","properties":{"value":{"type":"integer"}}
 // pause.
 func Definitions() map[string]galaxie.Definition {
 	plain := map[string]galaxie.Entry{
-		"single":       single,
-		"single-tool":  singleTool,
-		"sequential":   sequential,
-		"bounded-loop": boundedLoop,
-		"exit-loop":    exitLoop,
-		"unbounded":    unbounded,
-		"spin":         spin,
-		"panic":        panicking,
-		"exit":         exiting,
+		"single":          single,
+		"single-tool":     singleTool,
+		"sequential":      sequential,
+		"bounded-loop":    boundedLoop,
+		"parallel":        parallel,
+		"transfer":        transfer,
+		"parallel-writes": parallelWrites,
+		"exit-loop":       exitLoop,
+		"unbounded":       unbounded,
+		"spin":            spin,
+		"panic":           panicking,
+		"exit":            exiting,
 	}
 	definitions := make(map[string]galaxie.Definition, len(plain)+5)
 	for name, entry := range plain {
 		definitions[name] = galaxie.Definition{Build: entry}
 	}
 	definitions["confirm"] = galaxie.Definition{Build: confirm, Interaction: approval}
+	definitions["parallel-confirm"] = galaxie.Definition{Build: parallelConfirm, Interaction: approval}
+	definitions["confirm-transfer"] = galaxie.Definition{Build: confirmTransfer, Interaction: approval}
 	definitions["confirm-sequential"] = galaxie.Definition{Build: confirmLast, Interaction: approval}
 	definitions["confirm-sequential-first"] = galaxie.Definition{Build: confirmFirst, Interaction: approval}
 	definitions["long-running"] = galaxie.Definition{Build: longRunning, Interaction: approval, Resume: completion}
@@ -151,6 +156,84 @@ func sequential() (agent.Agent, error) {
 		return nil, err
 	}
 	return galaxie.SequentialAgent(agent.Config{Name: "pipeline", SubAgents: []agent.Agent{first, second}})
+}
+
+// parallel runs two branches at once. They ask the model concurrently and a later agent would see
+// their events in completion order, so the case ends with the fan-out and a script marks it
+// unordered.
+func parallel() (agent.Agent, error) {
+	var branches []agent.Agent
+	for _, name := range []string{"left", "right"} {
+		branch, err := leaf(name)
+		if err != nil {
+			return nil, err
+		}
+		branches = append(branches, branch)
+	}
+	return galaxie.ParallelAgent(agent.Config{Name: "fan", SubAgents: branches})
+}
+
+// parallelWrites runs two branches that each call the same write capability, for the restore
+// tests that check each branch keeps its own effect scope.
+func parallelWrites() (agent.Agent, error) {
+	var branches []agent.Agent
+	for _, name := range []string{"left", "right"} {
+		double, err := galaxie.CapabilityTool("math.double@1", galaxie.ToolSpec{
+			Description: "Double an integer.",
+			Schema:      doubleSchema,
+		})
+		if err != nil {
+			return nil, err
+		}
+		branch, err := leaf(name, double)
+		if err != nil {
+			return nil, err
+		}
+		branches = append(branches, branch)
+	}
+	return galaxie.ParallelAgent(agent.Config{Name: "fan", SubAgents: branches})
+}
+
+// parallelConfirm fans two writing branches out and then pauses in the last child of the
+// sequence, so a restore must not run the finished branches again.
+func parallelConfirm() (agent.Agent, error) {
+	fan, err := parallelWrites()
+	if err != nil {
+		return nil, err
+	}
+	final, err := pausing("final", true, false)
+	if err != nil {
+		return nil, err
+	}
+	return galaxie.SequentialAgent(agent.Config{Name: "pipeline", SubAgents: []agent.Agent{fan, final}})
+}
+
+// transferRoot builds a root agent that can hand a turn to a helper through ADK's transfer.
+func transferRoot(helper agent.Agent) (agent.Agent, error) {
+	return galaxie.LlmAgent(llmagent.Config{
+		Name:        "root",
+		Model:       galaxie.Model("answer"),
+		Instruction: "Hand the question to the helper.",
+		SubAgents:   []agent.Agent{helper},
+	})
+}
+
+func transfer() (agent.Agent, error) {
+	helper, err := leaf("helper")
+	if err != nil {
+		return nil, err
+	}
+	return transferRoot(helper)
+}
+
+// confirmTransfer pauses in a helper the root transferred to; the helper is the last agent the
+// run reaches, so the resume loses nothing.
+func confirmTransfer() (agent.Agent, error) {
+	helper, err := pausing("helper", true, false)
+	if err != nil {
+		return nil, err
+	}
+	return transferRoot(helper)
 }
 
 func boundedLoop() (agent.Agent, error) {

@@ -31,12 +31,27 @@
     "long-running",
     "confirm-sequential",
     "confirm-sequential-first",
-    "stream-confirm"
+    "stream-confirm",
+    "parallel",
+    "transfer",
+    "confirm-transfer"
   ],
   "differences": [],
+  "refusedShapes": [
+    "A tool made by `agenttool` wrapping an agent",
+    "An agent made directly with `llmagent.New`, `agent.New` or another ADK constructor instead of the galaxie constructors",
+    "A function tool or toolset made directly with ADK instead of a galaxie capability tool",
+    "A pause inside a Parallel branch, a Loop iteration or a Sequential child that is not the last one (ADK resumes only the agent that paused, so the siblings would be skipped)",
+    "An unbounded Loop with no iteration limit and no exit tool"
+  ],
+  "evidenceOutsideTheCases": [
+    "go/galaxie/shapes_test.go: each refused construction fails `unsupported` before any model or capability call",
+    "tests/conformance/adk-go-agents.node.test.ts: Parallel write branches keep branch-local effect scopes whichever branch reaches the broker first, and a restore after the pause that follows a Parallel stage runs no branch write again"
+  ],
   "normalizations": [
     "Function-call IDs on the wire are assigned by the Go model package (call-<n>) because ADK strips its own IDs from history; scripted replies use their own IDs and the transcripts compare the assigned ones.",
     "Run errors compare by galaxie error code.",
-    "Requests are compared as parsed JSON, so key order never decides a comparison."
+    "Requests are compared as parsed JSON, so key order never decides a comparison.",
+    "A case marked unordered runs sibling branches at once, so the three wire lists are compared in the order of their canonical JSON text instead of arrival order."
   ]
 }

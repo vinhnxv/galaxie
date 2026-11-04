@@ -1,0 +1,43 @@
+{
+  "capabilities": [],
+  "error": null,
+  "output": "Note.",
+  "requests": [
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"left\".",
+          "role": "system"
+        },
+        {
+          "content": "Write a note.",
+          "role": "user"
+        }
+      ],
+      "options": {},
+      "role": "answer"
+    },
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"right\".",
+          "role": "system"
+        },
+        {
+          "content": "Write a note.",
+          "role": "user"
+        }
+      ],
+      "options": {},
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "Note."
+    },
+    {
+      "content": "Note."
+    }
+  ]
+}
