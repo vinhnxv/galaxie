@@ -307,7 +307,8 @@ test.skipIf(!pythonWheelsAvailable)(
       await instance.prepare();
       // Round one: left writes, then right writes, then the model fails after both receipts exist.
       model.next(1);
-      expect((await run(instance)).error?.code).toBe('unavailable');
+      // Compare the whole error so a failure shows its message, not only its code.
+      expect((await run(instance)).error).toMatchObject({ code: 'unavailable' });
       expect([...invoked].sort()).toEqual([1, 2]);
       expect(model.arrivals).toEqual(['left', 'right']);
       expect(store.recovery.journal.size).toBe(2);
