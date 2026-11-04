@@ -1,0 +1,99 @@
+{
+  "plain-text": {
+    "entry": "single",
+    "prompt": "Say hello.",
+    "replies": [{ "content": "Hello from the model." }],
+    "capabilities": {}
+  },
+  "capability-tool": {
+    "entry": "single-tool",
+    "prompt": "Double 21.",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": { "name": "math_double_1", "arguments": "{\"value\":21}" }
+          }
+        ]
+      },
+      { "content": "The result is 42." }
+    ],
+    "capabilities": { "math.double@1": { "result": { "value": 42 } } }
+  },
+  "denied-capability": {
+    "entry": "single-tool",
+    "prompt": "Double 21.",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": { "name": "math_double_1", "arguments": "{\"value\":21}" }
+          }
+        ]
+      },
+      { "content": "The tool was denied." }
+    ],
+    "capabilities": { "math.double@1": { "error": "denied" } }
+  },
+  "fatal-capability": {
+    "entry": "single-tool",
+    "prompt": "Double 21.",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": { "name": "math_double_1", "arguments": "{\"value\":21}" }
+          }
+        ]
+      },
+      { "content": "Never asked." }
+    ],
+    "capabilities": { "math.double@1": { "error": "unavailable" } }
+  },
+  "sequential": {
+    "entry": "sequential",
+    "prompt": "Write a greeting.",
+    "replies": [{ "content": "Draft greeting." }, { "content": "Polished greeting." }],
+    "capabilities": {}
+  },
+  "bounded-loop": {
+    "entry": "bounded-loop",
+    "prompt": "Improve this.",
+    "replies": [{ "content": "Pass one." }, { "content": "Pass two." }],
+    "capabilities": {}
+  },
+  "exit-loop": {
+    "entry": "exit-loop",
+    "prompt": "Work until done.",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          { "id": "p1", "type": "function", "function": { "name": "exit_loop", "arguments": "{}" } }
+        ]
+      }
+    ],
+    "capabilities": {}
+  },
+  "unbounded-loop": {
+    "entry": "unbounded",
+    "prompt": "Never ends.",
+    "replies": [],
+    "capabilities": {}
+  },
+  "model-unavailable": {
+    "entry": "single",
+    "prompt": "Say hello.",
+    "replies": [{ "error": "unavailable" }],
+    "capabilities": {}
+  }
+}

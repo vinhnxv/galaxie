@@ -1,0 +1,118 @@
+{
+  "capabilities": [
+    {
+      "effectScope": "adk-go/g1/root/1/0",
+      "input": {
+        "value": 21
+      },
+      "name": "math.double@1"
+    }
+  ],
+  "error": null,
+  "output": "The tool was denied.",
+  "requests": [
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"agent\".",
+          "role": "system"
+        },
+        {
+          "content": "Double 21.",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "tools": [
+          {
+            "function": {
+              "description": "Double an integer.",
+              "name": "math_double_1",
+              "parameters": {
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["value"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    },
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"agent\".",
+          "role": "system"
+        },
+        {
+          "content": "Double 21.",
+          "role": "user"
+        },
+        {
+          "content": "",
+          "role": "assistant",
+          "toolCalls": [
+            {
+              "function": {
+                "arguments": "{\"value\":21}",
+                "name": "math_double_1"
+              },
+              "id": "call-1",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "content": "{\"error\":\"Policy denied the request.\"}",
+          "role": "tool",
+          "tool_call_id": "call-1"
+        }
+      ],
+      "options": {
+        "tools": [
+          {
+            "function": {
+              "description": "Double an integer.",
+              "name": "math_double_1",
+              "parameters": {
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["value"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "function": {
+            "arguments": "{\"value\":21}",
+            "name": "math_double_1"
+          },
+          "id": "p1",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "content": "The tool was denied."
+    }
+  ]
+}

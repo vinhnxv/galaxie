@@ -36,6 +36,8 @@ export interface GoLoadTimings {
 }
 
 export interface LoadedGo {
+  /** The build information the program reported when it became ready, as JSON text. */
+  readonly build: string | undefined;
   /** Resolves with the exit code when the Go program ends; the Worker is then dead. */
   readonly exited: Promise<number>;
   /** How many times Go code reached a blocked network surface. */
@@ -125,7 +127,11 @@ export async function loadGoWasm(
       code = value;
     };
     const ready = Promise.withResolvers<void>();
-    Reflect.set(environment.scope, 'galaxieReady', (): void => ready.resolve());
+    let build: string | undefined;
+    Reflect.set(environment.scope, 'galaxieReady', (info?: unknown): void => {
+      if (typeof info === 'string') build = info;
+      ready.resolve();
+    });
     const module = await environment.compile(bytes);
     const instance = await environment.instantiate(module, go.importObject);
     const compiled = performance.now();
@@ -141,6 +147,7 @@ export async function loadGoWasm(
     await Promise.race([ready.promise, early]);
     const readyAt = performance.now();
     return {
+      build,
       exited,
       egressAttempts: () => attempts,
       timings: {

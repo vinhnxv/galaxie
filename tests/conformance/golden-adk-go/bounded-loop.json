@@ -1,0 +1,47 @@
+{
+  "capabilities": [],
+  "error": null,
+  "output": "Pass two.",
+  "requests": [
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"worker\".",
+          "role": "system"
+        },
+        {
+          "content": "Improve this.",
+          "role": "user"
+        }
+      ],
+      "options": {},
+      "role": "answer"
+    },
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"worker\".",
+          "role": "system"
+        },
+        {
+          "content": "Improve this.",
+          "role": "user"
+        },
+        {
+          "content": "Pass one.",
+          "role": "assistant"
+        }
+      ],
+      "options": {},
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "Pass one."
+    },
+    {
+      "content": "Pass two."
+    }
+  ]
+}

@@ -49,7 +49,7 @@ try {
         };
     },
   });
-  const prepared = await adapter.prepare({ wasm }, undefined, {
+  const prepared = await adapter.prepare({ wasm, entry: 'gate' }, { chatModels: {} }, {
     signal: new AbortController().signal,
   } as never);
   await prepared.dispose();

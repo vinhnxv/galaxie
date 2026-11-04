@@ -7,6 +7,7 @@ import { encodeWorkerMessage, type WorkerMessage } from '../src/protocol.js';
 
 const agent: GoAgent = {
   wasm: { url: 'http://127.0.0.1/go/agent.wasm', sha256: 'a'.repeat(64), bytes: 1024 },
+  entry: 'reference',
 };
 
 class FakeWorker implements GoWorkerPort {
@@ -48,8 +49,15 @@ const options = (worker: () => GoWorkerPort, readyTimeoutMs?: number) => ({
   createWorker: worker,
   ...(readyTimeoutMs === undefined ? {} : { readyTimeoutMs }),
 });
+const services = { chatModels: {} };
 const prepare = (adapter: ReturnType<typeof createGoAdapter>, value: unknown = agent) =>
-  adapter.prepare(value as GoAgent, undefined, { signal: new AbortController().signal });
+  adapter.prepare(value as GoAgent, services, { signal: new AbortController().signal });
+const runRequest = (command: unknown = { type: 'start', input: { prompt: 'x' } }): never =>
+  ({ signal: new AbortController().signal, sessionId: 's', command }) as never;
+const firstEvent = async (
+  prepared: { run(request: never): AsyncIterable<unknown> },
+  command?: unknown,
+) => (await prepared.run(runRequest(command))[Symbol.asyncIterator]().next()).value;
 
 test('the adapter registers adk-go with every feature off', () => {
   const adapter = createGoAdapter(options(() => new FakeWorker(ready)));
@@ -64,7 +72,7 @@ test('the adapter registers adk-go with every feature off', () => {
   });
 });
 
-test('prepare boots a Worker with the reviewed module and a run fails unsupported', async () => {
+test('prepare boots a Worker with the reviewed module and a resume fails unsupported', async () => {
   const worker = new FakeWorker(ready);
   const onBoot = vi.fn();
   const adapter = createGoAdapter({ ...options(() => worker), onBoot });
@@ -74,8 +82,10 @@ test('prepare boots a Worker with the reviewed module and a run fails unsupporte
     { phase: 'booting' },
     { phase: 'ready', coldStartMs: 12 },
   ]);
-  const iterator = prepared.run({} as never)[Symbol.asyncIterator]();
-  await expect(iterator.next()).rejects.toMatchObject({ code: 'unsupported' });
+  expect(await firstEvent(prepared, { type: 'resume', interactionId: 'i' })).toMatchObject({
+    type: 'error',
+    error: { code: 'unsupported' },
+  });
   await expect(prepared.pending('s' as never)).resolves.toBeUndefined();
   await prepared.dispose();
   expect(worker.terminated).toBe(true);
@@ -96,11 +106,44 @@ test.each([
   expect(createWorker).not.toHaveBeenCalled();
 });
 
-test('services are refused until the model bridge exists', async () => {
-  const adapter = createGoAdapter(options(() => new FakeWorker(ready)));
+test.each([
+  ['no services', undefined],
+  ['services without models', {}],
+  ['a model that cannot invoke', { chatModels: { a: 1 } }],
+])('%s fail invalid before a Worker exists', async (_name, value) => {
+  const createWorker = vi.fn(() => new FakeWorker(ready));
   await expect(
-    adapter.prepare(agent, {} as unknown as undefined, { signal: new AbortController().signal }),
+    createGoAdapter({ createWorker }).prepare(agent, value as never, {
+      signal: new AbortController().signal,
+    }),
   ).rejects.toMatchObject({ code: 'invalid' });
+  expect(createWorker).not.toHaveBeenCalled();
+});
+
+test('a build that differs from the expected build fails unavailable and is terminated', async () => {
+  const module = { version: 'v1', sum: 'h1:a' };
+  const expected = { go: 'go1.27.3', adk: module, genai: module };
+  for (const reported of [
+    undefined,
+    { ...expected, go: 'go1.0' },
+    { ...expected, adk: { ...module, sum: 'h1:b' } },
+  ]) {
+    const worker = new FakeWorker({
+      v: 1,
+      kind: 'ready',
+      coldStartMs: 1,
+      ...(reported ? { build: reported } : {}),
+    });
+    await expect(
+      prepare(createGoAdapter({ ...options(() => worker), expectedBuild: expected })),
+    ).rejects.toMatchObject({ code: 'unavailable' });
+    expect(worker.terminated).toBe(true);
+  }
+  const matching = new FakeWorker({ v: 1, kind: 'ready', coldStartMs: 1, build: expected });
+  const prepared = await prepare(
+    createGoAdapter({ ...options(() => matching), expectedBuild: expected }),
+  );
+  await prepared.dispose();
 });
 
 test('a Worker that never signals ready times out and is terminated', async () => {
@@ -124,7 +167,7 @@ test('an aborted prepare terminates the Worker and fails cancelled', async () =>
   const worker = new FakeWorker();
   const controller = new AbortController();
   const adapter = createGoAdapter(options(() => worker));
-  const preparing = adapter.prepare(agent, undefined, { signal: controller.signal });
+  const preparing = adapter.prepare(agent, services, { signal: controller.signal });
   controller.abort();
   await expect(preparing).rejects.toMatchObject({ code: 'cancelled' });
   expect(worker.terminated).toBe(true);
@@ -141,14 +184,7 @@ test('a Go exit marks the Worker dead and the next prepare builds a new one', as
   );
   const first = await prepare(adapter);
   workers[0]?.emit({ v: 1, kind: 'exit', code: 2 });
-  await expect(
-    first
-      .run({} as never)
-      [Symbol.asyncIterator]()
-      .next(),
-  ).rejects.toMatchObject({
-    code: 'unavailable',
-  });
+  expect(await firstEvent(first)).toMatchObject({ type: 'error', error: { code: 'unavailable' } });
   await first.dispose();
   expect(workers[0]?.terminated).toBe(true);
   const second = await prepare(adapter);
@@ -161,13 +197,9 @@ test('a Worker error after boot marks the Worker dead', async () => {
   const worker = new FakeWorker(ready);
   const prepared = await prepare(createGoAdapter(options(() => worker)));
   worker.fail();
-  await expect(
-    prepared
-      .run({} as never)
-      [Symbol.asyncIterator]()
-      .next(),
-  ).rejects.toMatchObject({
-    code: 'unavailable',
+  expect(await firstEvent(prepared)).toMatchObject({
+    type: 'error',
+    error: { code: 'unavailable' },
   });
 });
 

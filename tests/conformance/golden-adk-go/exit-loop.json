@@ -1,0 +1,50 @@
+{
+  "capabilities": [],
+  "error": null,
+  "output": "",
+  "requests": [
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"worker\".",
+          "role": "system"
+        },
+        {
+          "content": "Work until done.",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "tools": [
+          {
+            "function": {
+              "description": "Exits the loop.\n\nCall this function only when you are instructed to do so.\n",
+              "name": "exit_loop",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "function": {
+            "arguments": "{}",
+            "name": "exit_loop"
+          },
+          "id": "p1",
+          "type": "function"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "reference": "Native Go 1.27.3 with google.golang.org/adk v1.9.0 (its own Runner and agents) run against a scripted caller by go/conformance",
+  "requestReference": "The native lane records the wire requests the galaxie model package builds from ADK's LLMRequest; the page-side validators and the router are independent code",
+  "lanes": [
+    "Node galaxie adk-go adapter with the reference module",
+    "real headless Chromium galaxie adk-go adapter under the strict mock-mode CSP (every case)"
+  ],
+  "features": {
+    "streaming": false,
+    "interrupts": false,
+    "resume": false,
+    "checkpoints": false,
+    "subgraphs": false
+  },
+  "cases": [
+    "plain-text",
+    "capability-tool",
+    "denied-capability",
+    "fatal-capability",
+    "sequential",
+    "bounded-loop",
+    "exit-loop",
+    "unbounded-loop",
+    "model-unavailable"
+  ],
+  "differences": [],
+  "normalizations": [
+    "Function-call IDs on the wire are assigned by the Go model package (call-<n>) because ADK strips its own IDs from history; scripted replies use their own IDs and the transcripts compare the assigned ones.",
+    "Run errors compare by galaxie error code.",
+    "Requests are compared as parsed JSON, so key order never decides a comparison."
+  ]
+}

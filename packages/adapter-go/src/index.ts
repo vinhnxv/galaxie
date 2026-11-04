@@ -3,4 +3,5 @@
 
 export type { GoAdapterOptions, GoAgent, GoBootEvent, GoWorkerPort } from './adapter.js';
 export { createGoAdapter, GO_EXECUTOR_ID } from './adapter.js';
-export type { GoWasmReference } from './protocol.js';
+export type { GoChatModel, GoServices } from './llm.js';
+export type { GoBuildInfo, GoModuleInfo, GoWasmReference } from './protocol.js';
