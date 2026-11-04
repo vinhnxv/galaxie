@@ -67,7 +67,8 @@ async function run(runId: string, request: string): Promise<void> {
     const handle = goHandle();
     if (typeof handle.run === 'function') result = await handle.run(request);
   } catch {
-    result = JSON.stringify({ ok: false, code: 'executor_error' });
+    // A Go program that panicked or exited cannot answer: the run fails with the fixed code.
+    result = JSON.stringify({ ok: false, code: 'unavailable' });
   }
   rejectPending('cancelled');
   activeRun = undefined;

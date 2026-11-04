@@ -13,3 +13,9 @@ capability outcomes. The Go side of every entry lives in `go/conformance/cases`.
   `'wasm-unsafe-eval'`.
 
 The matrix in `../compatibility-matrix-adk-go.json` lists every case and the adapter's feature flags.
+
+`../adk-go-run.node.test.ts` runs the same module for behavior the native lane cannot express: a raising
+model, the step budget, a blocked argument, abort, a panic (contained and reported as a fixed
+`executor_error`), `os.Exit` (the Worker dies, the run fails `unavailable`) and a loop that ignores its
+context (the Worker is terminated and the session is unrecoverable). `../adk-go-scan.node.test.ts` scans
+the bridge traffic, events, snapshots and spans for a per-call provider credential.

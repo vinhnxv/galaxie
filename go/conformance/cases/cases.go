@@ -8,8 +8,11 @@
 package cases
 
 import (
+	"os"
+
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
+	"google.golang.org/adk/model"
 	"google.golang.org/adk/tool"
 
 	"galaxie.invalid/galaxie/galaxie"
@@ -26,6 +29,9 @@ func Entries() map[string]galaxie.Entry {
 		"bounded-loop": boundedLoop,
 		"exit-loop":    exitLoop,
 		"unbounded":    unbounded,
+		"spin":         spin,
+		"panic":        panicking,
+		"exit":         exiting,
 	}
 }
 
@@ -99,4 +105,36 @@ func unbounded() (agent.Agent, error) {
 		return nil, err
 	}
 	return galaxie.LoopAgent(agent.Config{Name: "forever", SubAgents: []agent.Agent{worker}}, 0)
+}
+
+// hooked runs a callback before the first model call, so a test can make agent code misbehave.
+func hooked(before llmagent.BeforeModelCallback) (agent.Agent, error) {
+	return galaxie.LlmAgent(llmagent.Config{
+		Name:                 "agent",
+		Model:                galaxie.Model("answer"),
+		BeforeModelCallbacks: []llmagent.BeforeModelCallback{before},
+	})
+}
+
+// spin never returns and never looks at its context: only terminating the Worker ends it.
+func spin() (agent.Agent, error) {
+	return hooked(func(agent.CallbackContext, *model.LLMRequest) (*model.LLMResponse, error) {
+		for {
+		}
+	})
+}
+
+// panicking stands for agent code with a defect.
+func panicking() (agent.Agent, error) {
+	return hooked(func(agent.CallbackContext, *model.LLMRequest) (*model.LLMResponse, error) {
+		panic("conformance panic")
+	})
+}
+
+// exiting stands for agent code that ends the program.
+func exiting() (agent.Agent, error) {
+	return hooked(func(agent.CallbackContext, *model.LLMRequest) (*model.LLMResponse, error) {
+		os.Exit(3)
+		return nil, nil
+	})
 }

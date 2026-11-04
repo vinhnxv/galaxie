@@ -40,7 +40,8 @@ is trusted and can reach anything `syscall/js` reaches, so they are not an isola
 
 ## Tests
 
-Run `pnpm exec vitest run packages/adapter-go tests/conformance/adk-go.node.test.ts
+Run `pnpm exec vitest run packages/adapter-go tests/conformance/adk-go.node.test.ts tests/conformance/adk-go-run.node.test.ts
+tests/conformance/adk-go-scan.node.test.ts
 tests/conformance/check-dependencies.node.test.ts examples/rag-browser/test/go-gate.node.test.ts
 examples/rag-browser/test/adk-go-reference.node.test.ts` and `pnpm run test:go`. `test/loader.node.test.ts`
 covers the verify-before-compile order, the egress stubs and the exit handshake;
