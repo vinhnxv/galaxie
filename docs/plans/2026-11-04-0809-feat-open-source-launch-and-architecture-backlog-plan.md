@@ -204,41 +204,41 @@ These are standalone Beads issues titled `[HUMAN] ...` with the `human-gate` lab
 
 ### Unit Index
 
-| U-ID | Title | Key files | Depends on |
-| --- | --- | --- | --- |
-| U1 | ADR-0024: Apache-2.0 and DCO | `docs/adr/0024-*.md` | none |
-| U2 | Relicense the tree | `LICENSE`, `NOTICE`, `scripts/check-license.ts`, all headers | U1 |
-| U3 | Dependency license allowlist | `scripts/check-dependency-licenses.ts` | U2 |
-| U4 | Community files and DCO check | `CONTRIBUTING.md`, `SECURITY.md`, `.github/` | U1 |
-| U5 | History and secrets audit | none tracked | none |
-| U6 | Launch package metadata | `packages/*/package.json`, `docs/releasing.md` | U2 |
-| U7 | README and status document | `README.md`, `docs/status.md`, `AGENTS.md`, `llms.txt` | U2 |
-| U8 | LangGraph.js model-chosen tools | `packages/adapter-langgraph/src/*` | none |
-| U9 | OpenAI-compatible tool calling | `packages/models/src/openai/*` | U8 |
-| U10 | Per-call output cap | `packages/core/src/model-router.ts`, adapters | none |
-| U11 | Idempotency-Key for HTTP writes | `packages/core/src/http-capability.ts` | none |
-| U12 | One scope validation rule | `packages/core/src/{runtime,ownership,invalidation}.ts` | none |
-| U13 | Scoped rag-browser retrieval cache | `examples/rag-browser/src/retrieval/*` | U12 |
-| U14 | ADR-0025: adapter kit | `docs/adr/0025-*.md` | none |
-| U15 | Extract `@galaxie/adapter-kit` | `packages/adapter-kit/`, adapters | U14, galaxie-la5 AG2 |
-| U16 | Browser entry point for core | `packages/core/src/browser.ts`, `scripts/check-dependencies.ts` | none |
-| U17 | Render outcome and error boundary | `packages/react/src/surface.tsx`, `packages/core/src/agent-instance.ts` | none |
-| U18 | ADR-0026: A2UI surfaces | `docs/adr/0026-*.md` | none |
-| U19 | `@galaxie/ui-protocol` | `packages/ui-protocol/` | U18 |
-| U20 | Core pending surfaces | `packages/core/src/interactions.ts`, adapter-langgraph | U19 |
-| U21 | React A2UI renderer and tutor migration | `packages/react/`, `examples/` | U17, U20 |
-| U22 | ADR-0027: decision role | `docs/adr/0027-*.md` | none |
-| U23 | Decision modality and mock provider | `packages/core/src/models.ts`, `model-router.ts` | U22 |
-| U24 | Structured-output decision provider | `packages/models/src/decision/*` | U23 |
-| U25 | Confidence-gated interaction | adapter-langgraph helper, `tests/injection-corpus/` | U23 |
-| U26 | Spike: in-browser decision models | `spikes/decision-models/` | U22 |
-| U27 | Layered host integration guide | `docs/guides/host-integration.md` | U28 |
-| U28 | Local-only template | `templates/local-only/` | none |
-| U29 | Hybrid-gateway template | `templates/hybrid-gateway/` | U11, U28 |
-| U30 | Hosted demo build and deploy workflow | `.github/workflows/demo.yml`, `examples/rag-browser` | none |
-| U31 | Size budget in CI | `scripts/check-size.ts` | U6 |
-| U32 | Framework feasibility notes | `docs/notes/` | none |
-| U33 | Other tool helpers enforce write confirmation | `packages/adapter-adk/src/host.ts`, `python/galaxie/src/galaxie/*` | U8 |
+| U-ID | Title | Key files | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| U1 | ADR-0024: Apache-2.0 and DCO | `docs/adr/0024-*.md` | none | In review (PR #103) |
+| U2 | Relicense the tree | `LICENSE`, `NOTICE`, `scripts/check-license.ts`, all headers | U1 | Not started |
+| U3 | Dependency license allowlist | `scripts/check-dependency-licenses.ts` | U2 | Not started |
+| U4 | Community files and DCO check | `CONTRIBUTING.md`, `SECURITY.md`, `.github/` | U1 | Not started |
+| U5 | History and secrets audit | none tracked | none | Not started |
+| U6 | Launch package metadata | `packages/*/package.json`, `docs/releasing.md` | U2 | Not started |
+| U7 | README and status document | `README.md`, `docs/status.md`, `AGENTS.md`, `llms.txt` | U2 | Not started |
+| U8 | LangGraph.js model-chosen tools | `packages/adapter-langgraph/src/*` | none | Not started |
+| U9 | OpenAI-compatible tool calling | `packages/models/src/openai/*` | U8 | Not started |
+| U10 | Per-call output cap | `packages/core/src/model-router.ts`, adapters | none | Not started |
+| U11 | Idempotency-Key for HTTP writes | `packages/core/src/http-capability.ts` | none | Not started |
+| U12 | One scope validation rule | `packages/core/src/{runtime,ownership,invalidation}.ts` | none | Not started |
+| U13 | Scoped rag-browser retrieval cache | `examples/rag-browser/src/retrieval/*` | U12 | Not started |
+| U14 | ADR-0025: adapter kit | `docs/adr/0025-*.md` | none | Not started |
+| U15 | Extract `@galaxie/adapter-kit` | `packages/adapter-kit/`, adapters | U14, galaxie-la5 AG2 | Not started |
+| U16 | Browser entry point for core | `packages/core/src/browser.ts`, `scripts/check-dependencies.ts` | none | Not started |
+| U17 | Render outcome and error boundary | `packages/react/src/surface.tsx`, `packages/core/src/agent-instance.ts` | none | Not started |
+| U18 | ADR-0026: A2UI surfaces | `docs/adr/0026-*.md` | none | Not started |
+| U19 | `@galaxie/ui-protocol` | `packages/ui-protocol/` | U18 | Not started |
+| U20 | Core pending surfaces | `packages/core/src/interactions.ts`, adapter-langgraph | U19 | Not started |
+| U21 | React A2UI renderer and tutor migration | `packages/react/`, `examples/` | U17, U20 | Not started |
+| U22 | ADR-0027: decision role | `docs/adr/0027-*.md` | none | Not started |
+| U23 | Decision modality and mock provider | `packages/core/src/models.ts`, `model-router.ts` | U22 | Not started |
+| U24 | Structured-output decision provider | `packages/models/src/decision/*` | U23 | Not started |
+| U25 | Confidence-gated interaction | adapter-langgraph helper, `tests/injection-corpus/` | U23 | Not started |
+| U26 | Spike: in-browser decision models | `spikes/decision-models/` | U22 | Not started |
+| U27 | Layered host integration guide | `docs/guides/host-integration.md` | U28 | Not started |
+| U28 | Local-only template | `templates/local-only/` | none | Not started |
+| U29 | Hybrid-gateway template | `templates/hybrid-gateway/` | U11, U28 | Not started |
+| U30 | Hosted demo build and deploy workflow | `.github/workflows/demo.yml`, `examples/rag-browser` | none | Not started |
+| U31 | Size budget in CI | `scripts/check-size.ts` | U6 | Not started |
+| U32 | Framework feasibility notes | `docs/notes/` | none | Not started |
+| U33 | Other tool helpers enforce write confirmation | `packages/adapter-adk/src/host.ts`, `python/galaxie/src/galaxie/*` | U8 | Not started |
 
 ### PR group A: Open-source launch (epic, P1)
 
@@ -253,6 +253,7 @@ Waits on: nothing.
 - **Approach:** Accepted with the maintainer's decision of 2026-11-04. It supersedes ADR-0015 entirely, covers code, docs and ADRs under Apache-2.0, adds `NOTICE`, replaces the CLA with the DCO, keeps the promised dependency allowlist, and defers the SBOM. It states that the maintainer is the sole copyright holder so far, which is what makes the relicense possible.
 - **Test expectation:** none -- a decision record; `pnpm check` covers doc links.
 - **Verification:** ADR-0015 shows "Superseded by ADR-0024", and the ADR index lists 0024.
+- **Status:** Implemented in [PR #103](https://github.com/vinhnxv/galaxie/pull/103); done when it merges.
 
 ### U2. Relicense the tree
 
