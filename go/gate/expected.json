@@ -1,0 +1,117 @@
+{
+  "cancel": {
+    "events": ["root|call:wait", "root|response:wait"],
+    "extra": {
+      "cancelled": true,
+      "modelCalls": 1
+    }
+  },
+  "confirmation": {
+    "events": [
+      "root|call:double",
+      "root|response:double",
+      "root|call:adk_request_confirmation|long-running",
+      "root|response:double",
+      "root|text:confirmed"
+    ],
+    "extra": {
+      "asks": 1,
+      "modelCalls": 2,
+      "runsAfterAnswer": 1,
+      "runsWhilePaused": 0
+    }
+  },
+  "function-tool": {
+    "events": ["root|call:double", "root|response:double", "root|text:42"],
+    "extra": {
+      "modelCalls": 2
+    }
+  },
+  "long-running": {
+    "events": [
+      "root|call:lookup|long-running",
+      "root|response:lookup",
+      "root|text:working on it",
+      "root|text:looked up"
+    ],
+    "extra": {
+      "modelCalls": 3,
+      "pending": 1
+    }
+  },
+  "loop": {
+    "events": [
+      "worker|text:pass one",
+      "worker|call:exit_loop",
+      "worker|response:exit_loop|escalate"
+    ],
+    "extra": {
+      "modelCalls": 2
+    }
+  },
+  "model-error": {
+    "events": [],
+    "extra": {
+      "error": "model unavailable",
+      "failed": true
+    }
+  },
+  "output-schema": {
+    "events": ["root|text:{\"answer\":\"yes\"}"],
+    "extra": {
+      "modelCalls": 1
+    }
+  },
+  "parallel": {
+    "events": ["left|text:left done", "right|text:right done"],
+    "extra": {
+      "left": 1,
+      "right": 1
+    }
+  },
+  "plain-text": {
+    "events": ["root|text:hello"],
+    "extra": {
+      "modelCalls": 1
+    }
+  },
+  "restore": {
+    "events": ["root|text:second answer"],
+    "extra": {
+      "restoredRecords": 2,
+      "roundTrips": true,
+      "sawHistory": true
+    }
+  },
+  "sequential": {
+    "events": ["left|text:left done", "right|text:right done"],
+    "extra": {
+      "left": 1,
+      "right": 1
+    }
+  },
+  "streaming": {
+    "events": ["root|partial|text:Hel", "root|partial|text:lo ", "root|text:Hello world"],
+    "extra": {
+      "streamFlags": [true]
+    }
+  },
+  "tool-error": {
+    "events": ["root|call:double", "root|response:double", "root|text:recovered"],
+    "extra": {
+      "failed": false,
+      "modelCalls": 2
+    }
+  },
+  "transfer": {
+    "events": [
+      "root|call:transfer_to_agent",
+      "root|response:transfer_to_agent|transfer:helper",
+      "helper|text:helper here"
+    ],
+    "extra": {
+      "helperCalls": 1,
+      "rootCalls": 1
+    }
+  }
+}

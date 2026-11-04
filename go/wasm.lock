@@ -1,0 +1,256 @@
+{
+  "v": "galaxie.go-wasm-lock/v1",
+  "toolchain": "go1.27.3",
+  "build": {
+    "goos": "js",
+    "goarch": "wasm",
+    "cgo": "0",
+    "flags": [
+      "-trimpath"
+    ],
+    "ldflags": "-s -w -buildid="
+  },
+  "packages": [
+    "./gate"
+  ],
+  "cutoff": "2026-10-28T00:00:00Z",
+  "cutoffRecord": 70230551,
+  "glue": {
+    "file": "wasm_exec.js",
+    "sha256": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
+    "bytes": 16992
+  },
+  "modules": [
+    {
+      "path": "cloud.google.com/go",
+      "version": "v0.123.0",
+      "license": "Apache-2.0",
+      "time": "2025-09-22T16:26:20Z",
+      "sumdbRecord": 43931606
+    },
+    {
+      "path": "cloud.google.com/go/auth",
+      "version": "v0.20.0",
+      "license": "Apache-2.0",
+      "time": "2026-04-06T22:09:02Z",
+      "sumdbRecord": 52115175
+    },
+    {
+      "path": "cloud.google.com/go/compute/metadata",
+      "version": "v0.9.0",
+      "license": "Apache-2.0",
+      "time": "2025-09-24T19:41:55Z",
+      "sumdbRecord": 44046191
+    },
+    {
+      "path": "github.com/cespare/xxhash/v2",
+      "version": "v2.3.0",
+      "license": "MIT",
+      "time": "2024-04-04T20:00:10Z",
+      "sumdbRecord": 24962514
+    },
+    {
+      "path": "github.com/felixge/httpsnoop",
+      "version": "v1.0.4",
+      "license": "MIT",
+      "time": "2023-03-12T10:31:09Z",
+      "sumdbRecord": 20486179
+    },
+    {
+      "path": "github.com/go-logr/logr",
+      "version": "v1.4.4",
+      "license": "Apache-2.0",
+      "time": "2026-07-20T18:51:02Z",
+      "sumdbRecord": 57725636
+    },
+    {
+      "path": "github.com/go-logr/stdr",
+      "version": "v1.2.2",
+      "license": "Apache-2.0",
+      "time": "2021-12-14T08:00:35Z",
+      "sumdbRecord": 8402985
+    },
+    {
+      "path": "github.com/google/go-cmp",
+      "version": "v0.7.0",
+      "license": "BSD-3-Clause",
+      "time": "2025-01-14T18:15:44Z",
+      "sumdbRecord": 34799171
+    },
+    {
+      "path": "github.com/google/jsonschema-go",
+      "version": "v0.4.2",
+      "license": "MIT",
+      "time": "2025-12-19T13:31:10Z",
+      "sumdbRecord": 48343719
+    },
+    {
+      "path": "github.com/google/s2a-go",
+      "version": "v0.1.9",
+      "license": "Apache-2.0",
+      "time": "2025-01-06T17:53:46Z",
+      "sumdbRecord": 33270445
+    },
+    {
+      "path": "github.com/google/safehtml",
+      "version": "v0.1.0",
+      "license": "BSD-3-Clause",
+      "time": "2022-04-30T01:53:36Z",
+      "sumdbRecord": 12527006
+    },
+    {
+      "path": "github.com/google/uuid",
+      "version": "v1.6.0",
+      "license": "BSD-3-Clause",
+      "time": "2024-01-23T18:54:04Z",
+      "sumdbRecord": 22152757
+    },
+    {
+      "path": "github.com/googleapis/enterprise-certificate-proxy",
+      "version": "v0.3.15",
+      "license": "Apache-2.0",
+      "time": "2026-04-15T18:05:21Z",
+      "sumdbRecord": 52507649
+    },
+    {
+      "path": "github.com/googleapis/gax-go/v2",
+      "version": "v2.22.0",
+      "license": "BSD-3-Clause",
+      "time": "2026-04-14T19:15:00Z",
+      "sumdbRecord": 52459484
+    },
+    {
+      "path": "github.com/gorilla/websocket",
+      "version": "v1.5.3",
+      "license": "BSD-2-Clause",
+      "time": "2024-06-14T03:18:03Z",
+      "sumdbRecord": 27019088
+    },
+    {
+      "path": "go.opentelemetry.io/auto/sdk",
+      "version": "v1.2.1",
+      "license": "Apache-2.0",
+      "time": "2025-09-15T16:53:44Z",
+      "sumdbRecord": 43594843
+    },
+    {
+      "path": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+      "version": "v0.68.0",
+      "license": "Apache-2.0",
+      "time": "2026-04-07T08:53:54Z",
+      "sumdbRecord": 52126279
+    },
+    {
+      "path": "go.opentelemetry.io/otel",
+      "version": "v1.45.0",
+      "license": "Apache-2.0",
+      "time": "2026-08-03T19:26:24Z",
+      "sumdbRecord": 58702140
+    },
+    {
+      "path": "go.opentelemetry.io/otel/log",
+      "version": "v0.21.0",
+      "license": "Apache-2.0",
+      "time": "2026-08-03T19:26:24Z",
+      "sumdbRecord": 58702244
+    },
+    {
+      "path": "go.opentelemetry.io/otel/metric",
+      "version": "v1.45.0",
+      "license": "Apache-2.0",
+      "time": "2026-08-03T19:26:24Z",
+      "sumdbRecord": 58702136
+    },
+    {
+      "path": "go.opentelemetry.io/otel/trace",
+      "version": "v1.45.0",
+      "license": "Apache-2.0",
+      "time": "2026-08-03T19:26:24Z",
+      "sumdbRecord": 58702544
+    },
+    {
+      "path": "golang.org/x/crypto",
+      "version": "v0.55.0",
+      "license": "BSD-3-Clause",
+      "time": "2026-08-11T17:56:31Z",
+      "sumdbRecord": 59529548
+    },
+    {
+      "path": "golang.org/x/net",
+      "version": "v0.58.0",
+      "license": "BSD-3-Clause",
+      "time": "2026-08-12T17:41:32Z",
+      "sumdbRecord": 59638935
+    },
+    {
+      "path": "golang.org/x/sync",
+      "version": "v0.22.0",
+      "license": "BSD-3-Clause",
+      "time": "2026-07-01T17:29:34Z",
+      "sumdbRecord": 56997919
+    },
+    {
+      "path": "golang.org/x/text",
+      "version": "v0.41.0",
+      "license": "BSD-3-Clause",
+      "time": "2026-08-11T15:22:47Z",
+      "sumdbRecord": 59512222
+    },
+    {
+      "path": "google.golang.org/adk",
+      "version": "v1.9.0",
+      "license": "Apache-2.0",
+      "time": "2026-10-15T13:05:02Z",
+      "sumdbRecord": 69133881
+    },
+    {
+      "path": "google.golang.org/api",
+      "version": "v0.279.0",
+      "license": "BSD-3-Clause",
+      "time": "2026-05-12T21:28:43Z",
+      "sumdbRecord": 54013443
+    },
+    {
+      "path": "google.golang.org/genai",
+      "version": "v1.57.0",
+      "license": "Apache-2.0",
+      "time": "2026-05-13T21:48:09Z",
+      "sumdbRecord": 54086579
+    },
+    {
+      "path": "google.golang.org/genproto/googleapis/rpc",
+      "version": "v0.0.0-20260803160001-6ac0973c030d",
+      "license": "Apache-2.0",
+      "time": "2026-08-03T16:00:01Z",
+      "sumdbRecord": 58690963
+    },
+    {
+      "path": "google.golang.org/grpc",
+      "version": "v1.83.2",
+      "license": "Apache-2.0",
+      "time": "2026-08-25T15:47:16Z",
+      "sumdbRecord": 60773534
+    },
+    {
+      "path": "google.golang.org/protobuf",
+      "version": "v1.36.11",
+      "license": "BSD-3-Clause",
+      "time": "2025-12-12T08:48:31Z",
+      "sumdbRecord": 48072752
+    },
+    {
+      "path": "rsc.io/omap",
+      "version": "v1.2.0",
+      "license": "BSD-3-Clause",
+      "time": "2024-06-22T23:51:47Z",
+      "sumdbRecord": 27856140
+    },
+    {
+      "path": "rsc.io/ordered",
+      "version": "v1.1.1",
+      "license": "BSD-3-Clause",
+      "time": "2024-07-09T14:12:12Z",
+      "sumdbRecord": 28111505
+    }
+  ]
+}

@@ -20,6 +20,9 @@ const alias = {
   '@galaxie/adapter-pyodide': fileURLToPath(
     new URL('./packages/adapter-pyodide/src/index.ts', import.meta.url),
   ),
+  '@galaxie/adapter-go': fileURLToPath(
+    new URL('./packages/adapter-go/src/index.ts', import.meta.url),
+  ),
   '@orama/orama': fileURLToPath(
     new URL('./examples/rag-browser/node_modules/@orama/orama/dist/esm/index.js', import.meta.url),
   ),
@@ -152,6 +155,7 @@ const config: ViteUserConfig = defineConfig({
             '../../packages/react/test/**/*.test.tsx',
             '../../packages/adapter-pyodide/test/**/*.test.ts',
             '../../packages/adapter-adk/test/**/*.test.ts',
+            '../../packages/adapter-go/test/**/*.test.ts',
             '../../packages/storage-indexeddb/test/**/*.test.ts',
             '../../examples/*/test/**/*.test.ts',
           ],
@@ -160,6 +164,7 @@ const config: ViteUserConfig = defineConfig({
             '**/*.node.test.ts',
             '../../packages/adapter-pyodide/test/**/*.node.test.ts',
             '../../packages/adapter-adk/test/**/*.node.test.ts',
+            '../../packages/adapter-go/test/**/*.node.test.ts',
             '../../examples/*/test/**/*.node.test.ts',
           ],
           browser: {

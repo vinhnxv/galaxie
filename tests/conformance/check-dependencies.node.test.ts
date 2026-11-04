@@ -28,6 +28,7 @@ const UNCONDITIONALLY_READ_DIRECTORIES = [
     'adapter-langgraph',
     'adapter-pyodide',
     'adapter-adk',
+    'adapter-go',
     'models',
     'react',
     'storage-indexeddb',
@@ -318,4 +319,85 @@ test.each([
   const result = run({ 'packages/models/package.json': manifest });
   expect(result.status).toBe(1);
   expect(result.output).toContain('models peers must be @langchain/core');
+});
+
+test('the Go adapter may import core, LangChain core and relative files', () => {
+  const result = run({
+    'packages/adapter-go/src/a.ts': [
+      adk('@galaxie/core'),
+      adk('@langchain/core/messages'),
+      adk('./b.js'),
+    ].join(''),
+  });
+  expect(result).toMatchObject({ status: 0, output: '' });
+});
+
+test.each([
+  '@galaxie/adapter-langgraph',
+  '@galaxie/adapter-pyodide',
+  '@galaxie/adapter-adk',
+  '@langchain/langgraph/web',
+  '@google/adk',
+  'pyodide',
+])('the Go adapter importing %s fails', (specifier) => {
+  const result = run({ 'packages/adapter-go/src/a.ts': adk(specifier) });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(
+    'the Go adapter must not depend on another executor or framework',
+  );
+});
+
+test('the Go adapter rejects other packages and relative reaches into adapters', () => {
+  const other = run({ 'packages/adapter-go/src/a.ts': adk('left-pad') });
+  expect(other.status).toBe(1);
+  expect(other.output).toContain('forbidden Go adapter import left-pad');
+  const relative = run({ 'packages/adapter-go/src/a.ts': adk('../../adapter-adk/src/index.js') });
+  expect(relative.status).toBe(1);
+  expect(relative.output).toContain('reaches into a dependency or another adapter');
+});
+
+test('node and test tooling are allowed only in Go adapter tests, and never in built output', () => {
+  expect(run({ 'packages/adapter-go/src/a.ts': adk('node:fs') }).status).toBe(1);
+  expect(run({ 'packages/adapter-go/test/a.ts': adk('node:fs') }).status).toBe(0);
+  const built = run({ 'packages/adapter-go/dist/a.js': adk('node:fs') });
+  expect(built.status).toBe(1);
+  expect(built.output).toContain('built packages must not import node:fs');
+});
+
+test('syscall/js belongs only in the bridge package and the gate', () => {
+  const source = (name: string): string =>
+    `package ${name}\n\nimport "syscall/js"\n\nvar _ = js.Undefined\n`;
+  expect(
+    run({
+      'go/gate/main.go': source('main'),
+      'go/galaxie/bridge/bridge.go': source('bridge'),
+    }),
+  ).toMatchObject({ status: 0, output: '' });
+  for (const path of [
+    'go/galaxie/agent.go',
+    'go/conformance/main.go',
+    'go/galaxie/bridge/deep/a.go',
+  ]) {
+    const result = run({ [path]: source('x') });
+    expect(result.status, path).toBe(1);
+    expect(result.output).toContain(
+      `${path}: syscall/js belongs only in go/galaxie/bridge and go/gate`,
+    );
+  }
+  const forms = [
+    'package x\n\nimport (\n\tj "syscall/js"\n)\n',
+    'package x\n\nimport ("syscall/js")\n',
+    'package x\n\nimport ("fmt"; "syscall/js")\n',
+    'package x\n\nimport `syscall/js`\n',
+    'package x\n\nimport _ "syscall/js"\n',
+    'package x\n\nimport (\n\t"fmt"\n\t. "syscall/js"\n)\n',
+  ];
+  for (const form of forms) expect(run({ 'go/galaxie/agent.go': form }).status, form).toBe(1);
+  // A comment or a string that only mentions the package is not an import.
+  const mentions = [
+    'package x\n\n// import "syscall/js" is forbidden here\nvar _ = 1\n',
+    'package x\n\n/* import (\n"syscall/js"\n) */\nvar _ = 1\n',
+    'package x\n\nvar _ = "syscall/js"\n',
+  ];
+  for (const text of mentions) expect(run({ 'go/galaxie/agent.go': text }).status, text).toBe(0);
 });

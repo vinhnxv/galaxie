@@ -31,6 +31,10 @@ jobs:
           python-version: "3.14"
           enable-cache: true
           cache-dependency-glob: python/uv.lock
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
       - run: pnpm install --frozen-lockfile
       - name: Sync the pinned CPython environment
         run: uv sync --project python --locked
@@ -47,6 +51,8 @@ jobs:
       - run: pnpm exec playwright install --with-deps --only-shell chromium
       - run: CI=true pnpm test
       - run: pnpm test:python
+      - name: Test the Go module
+        run: pnpm test:go
       - name: Type-check Python with pyright
         run: pnpm run typecheck:python
       - run: pnpm run build

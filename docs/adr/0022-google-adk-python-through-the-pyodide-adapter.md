@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-03
-- **Related:** brief §6.2, §7.4; ADR-0002, ADR-0012, ADR-0017, ADR-0018, ADR-0020
+- **Related:** brief §6.2, §7.4; ADR-0002, ADR-0012, ADR-0017, ADR-0018, ADR-0020, ADR-0023 (the Go sibling)
 - **Revisions:** 2026-11-03: created with stage AP1 (pin, closure, lock strategy, first-run gate); stage AP2 adds the model, tool and run evidence (features stay false); stage AP3 adds streaming and turns `streaming` on; stage AP4 adds interactions and turns `interrupts` and `resume` on; stage AP5 adds durable sessions and turns `checkpoints` on; stage AP6 adds the agent-shape cases, the parallel-write replay test, a credential scan and the documentation, and leaves the status Proposed.
 
 ## Context
