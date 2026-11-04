@@ -244,6 +244,13 @@ importers:
       '@galaxie/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@langchain/core':
+        specifier: 1.2.20
+        version: 1.2.20(@opentelemetry/api@1.10.0)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(openai@7.42.0(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/adapter-langgraph:
     dependencies:

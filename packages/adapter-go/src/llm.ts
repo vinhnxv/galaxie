@@ -1,0 +1,235 @@
+// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import type { ModelCall, ModelPreparation, ModelUsage, RunRequest } from '@galaxie/core';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+import {
+  type BridgeToolCall,
+  encodeReply,
+  type ModelReply,
+  parseCapabilityPayload,
+  parseModelPayload,
+} from './bridge.js';
+import { adapterFailure } from './errors.js';
+
+export type GoChatModel =
+  | BaseChatModel
+  | ((options: { readonly credential: string }) => BaseChatModel);
+
+/** The models the host provides; the Go program names a role and never a provider. */
+export interface GoServices {
+  readonly chatModels: Readonly<Record<string, GoChatModel>>;
+}
+
+export interface LeasedCall {
+  readonly lease: ModelCall;
+  settled: boolean;
+}
+
+/** The run the Worker is serving; every bridge call is checked against it. */
+export interface ActiveRun {
+  readonly id: string;
+  readonly request: RunRequest;
+  readonly seen: Set<string>;
+  readonly leases: Set<LeasedCall>;
+  modelCalls: number;
+  cancelled: boolean;
+}
+
+function object(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function validServices(
+  services: unknown,
+  models?: ModelPreparation,
+): services is GoServices {
+  if (!object(services) || !object(services['chatModels'])) return false;
+  const implementations = services['chatModels'];
+  if (
+    !Object.values(implementations).every(
+      (model) =>
+        typeof model === 'function' || (object(model) && typeof model['invoke'] === 'function'),
+    )
+  )
+    return false;
+  return Object.entries(models?.providers ?? {}).every(([id, descriptor]) => {
+    const provider = Object.hasOwn(implementations, id) ? implementations[id] : undefined;
+    return provider !== undefined && (typeof provider === 'function') === descriptor.credential;
+  });
+}
+
+/** Settles a lease exactly once: usage on success, a failure mark otherwise. */
+export function finish(
+  run: ActiveRun,
+  call: LeasedCall,
+  usage?: ModelUsage,
+  succeeded = false,
+): void {
+  if (call.settled) return;
+  call.settled = true;
+  run.leases.delete(call);
+  if (succeeded) call.lease.end(usage);
+  else call.lease.fail();
+}
+
+function aborted(run: ActiveRun): boolean {
+  return run.cancelled || run.request.signal.aborted;
+}
+
+function callsOf(reply: AIMessage, offered: ReadonlySet<string>): BridgeToolCall[] {
+  if (reply.invalid_tool_calls?.length || reply.additional_kwargs['tool_calls'] !== undefined)
+    throw adapterFailure('invalid');
+  return (reply.tool_calls ?? []).map((call) => {
+    if (typeof call.id !== 'string' || call.id.length === 0 || call.id.length > 128)
+      throw adapterFailure('invalid');
+    if (!offered.has(call.name)) throw adapterFailure('invalid');
+    return {
+      id: call.id,
+      type: 'function' as const,
+      function: { name: call.name, arguments: JSON.stringify(call.args) },
+    };
+  });
+}
+
+function usageOf(reply: AIMessage): ModelReply['usage'] {
+  const reported: unknown = Reflect.get(reply, 'usage_metadata');
+  if (reported === undefined) return undefined;
+  if (!object(reported)) throw adapterFailure('invalid');
+  const input = reported['input_tokens'];
+  const output = reported['output_tokens'];
+  const total = reported['total_tokens'];
+  if (
+    !Number.isSafeInteger(input) ||
+    !Number.isSafeInteger(output) ||
+    !Number.isSafeInteger(total) ||
+    (input as number) < 0 ||
+    (output as number) < 0 ||
+    total !== (input as number) + (output as number)
+  )
+    throw adapterFailure('invalid');
+  return {
+    input_tokens: input as number,
+    output_tokens: output as number,
+    total_tokens: total as number,
+  };
+}
+
+/** Serves one model request from Go through the run's router lease; the reply is bridge text. */
+export async function serveModel(
+  run: ActiveRun,
+  services: GoServices,
+  text: string,
+): Promise<string> {
+  const input = parseModelPayload(text);
+  if (input.options.stream) throw adapterFailure('unsupported');
+  if (run.modelCalls++ >= run.request.limits.steps) throw adapterFailure('budget_exceeded');
+  const offered = new Set((input.options.tools ?? []).map((tool) => tool.function.name));
+  const requires = [
+    ...(offered.size > 0 ? ['tool-calling' as const] : []),
+    ...(input.options.jsonSchema === undefined ? [] : ['structured-output' as const]),
+  ];
+  const lease = await run.request.models.begin(input.role, {
+    signal: run.request.signal,
+    ...(requires.length ? { requires } : {}),
+  });
+  const call: LeasedCall = { lease, settled: false };
+  run.leases.add(call);
+  try {
+    if (aborted(run)) throw adapterFailure('cancelled');
+    const implementation = Object.hasOwn(services.chatModels, lease.providerId)
+      ? services.chatModels[lease.providerId]
+      : undefined;
+    if (implementation === undefined) throw adapterFailure('unavailable');
+    if (typeof implementation === 'function' && lease.credential === undefined)
+      throw adapterFailure('invalid');
+    const provider =
+      typeof implementation === 'function'
+        ? implementation({ credential: lease.credential as string })
+        : implementation;
+    if (offered.size > 0 && typeof provider.bindTools !== 'function')
+      throw adapterFailure('unsupported');
+    const bound =
+      offered.size > 0 ? provider.bindTools?.([...(input.options.tools ?? [])]) : provider;
+    if (!bound) throw adapterFailure('unsupported');
+    const messages = input.messages.map((item) => {
+      switch (item.role) {
+        case 'system':
+          return new SystemMessage(item.content);
+        case 'user':
+          return new HumanMessage(item.content);
+        case 'tool':
+          return new ToolMessage({
+            content: item.content,
+            tool_call_id: item.tool_call_id as string,
+          });
+        case 'assistant':
+          return new AIMessage({
+            content: item.content,
+            tool_calls: (item.toolCalls ?? []).map((toolCall) => {
+              let args: unknown;
+              try {
+                args = JSON.parse(toolCall.function.arguments);
+              } catch {
+                throw adapterFailure('invalid');
+              }
+              if (!object(args)) throw adapterFailure('invalid');
+              return { id: toolCall.id, name: toolCall.function.name, args };
+            }),
+          });
+        default:
+          throw adapterFailure('invalid');
+      }
+    });
+    const reply = await bound.invoke(messages, {
+      signal: run.request.signal,
+      ...(input.options.stop === undefined ? {} : { stop: [...input.options.stop] }),
+      ...(input.options.jsonSchema === undefined ? {} : { jsonSchema: input.options.jsonSchema }),
+      [Symbol.for('galaxie.model.destination')]: lease.destination,
+    });
+    if (typeof reply.content !== 'string') throw adapterFailure('unsupported');
+    const calls = callsOf(reply, offered);
+    if (offered.size === 0 && (reply.tool_calls?.length ?? 0) > 0)
+      throw adapterFailure('unsupported');
+    // Call arguments, IDs and names are model text that Go receives, so they are checked too.
+    const checked = [
+      reply.content,
+      ...calls.map((item) => item.function.arguments),
+      ...calls.map((item) => item.id),
+      ...calls.map((item) => item.function.name),
+    ].join('\n');
+    await lease.checkOutput(checked, { final: true });
+    if (aborted(run)) throw adapterFailure('cancelled');
+    const usage = usageOf(reply);
+    const result: ModelReply = {
+      content: reply.content,
+      ...(calls.length ? { toolCalls: calls } : {}),
+      ...(usage === undefined ? {} : { usage }),
+    };
+    // Validate the reply before settling usage or exposing it to Go.
+    const encoded = encodeReply(result);
+    finish(
+      run,
+      call,
+      usage === undefined
+        ? undefined
+        : { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens },
+      true,
+    );
+    return encoded;
+  } finally {
+    finish(run, call);
+  }
+}
+
+/** Serves one capability call from Go through the broker; the reply is bridge text. */
+export async function serveCapability(run: ActiveRun, text: string): Promise<string> {
+  const input = parseCapabilityPayload(text);
+  const result = await run.request.capabilities.call(input.name, input.input, {
+    signal: run.request.signal,
+    ...(input.effectScope === undefined ? {} : { effectScope: input.effectScope }),
+  });
+  if (aborted(run)) throw adapterFailure('cancelled');
+  return encodeReply(result === undefined ? null : result);
+}
