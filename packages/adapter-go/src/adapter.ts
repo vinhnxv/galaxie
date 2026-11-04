@@ -11,7 +11,8 @@ import {
   type PendingInteraction,
   toErrorInfo,
 } from '@galaxie/core';
-import { parseRunResult } from './bridge.js';
+import { type ConversationRecord, parseRunResult } from './bridge.js';
+import { loadConversation, saveConversation } from './checkpoints.js';
 import { adapterFailure, errorCodeOf } from './errors.js';
 import {
   type ActiveRun,
@@ -21,6 +22,7 @@ import {
   serveModel,
   validServices,
 } from './llm.js';
+import { newKey, restoredContent, type StoredConversation } from './persist.js';
 import {
   type BootMessage,
   encodeBoot,
@@ -108,8 +110,10 @@ function failureCode(error: unknown, fallback: ErrorCode = 'unavailable'): Error
  * router and broker, and ends with the final text. With `stream` set, the checked text of each
  * model reply also reaches the host while it is produced. A confirmation or long-running tool ends
  * the run with one interaction, and the answer arrives as a new run that continues the paused
- * session inside the same Worker. Durable sessions are not built: checkpoints stay off, so a
- * pause lives only as long as its Worker.
+ * session. With `services.checkpoints` the program returns the whole conversation as a record after
+ * each pause or completion and the adapter stores it, so a pause survives a reload or a lost Worker
+ * and a fresh instance continues it from the record alone; without it the paused session lives in
+ * the Worker and only as long as the Worker.
  */
 export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAgent, GoServices> {
   return {
@@ -118,7 +122,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
     features: {
       interrupts: true,
       resume: true,
-      checkpoints: false,
+      checkpoints: true,
       streaming: true,
       subgraphs: false,
     },
@@ -153,6 +157,11 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       let settleRun: ((result: string) => void) | undefined;
       const lost = new Set<string>();
       const conversations = new Map<string, string>();
+      const store = services.checkpoints;
+      // The durable state of each hydrated session; the pause map below mirrors its pause.
+      const stored = new Map<string, StoredConversation>();
+      const known = new Set<string>();
+      const loading = new Map<string, Promise<void>>();
       // The pause each session waits on, with where its stream markers continue so a resumed run
       // never repeats an index; the Go session behind it lives in the Worker.
       const pauses = new Map<string, { interaction: PendingInteraction; position: number }>();
@@ -162,9 +171,54 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       };
       const markDead = (): void => {
         dead = true;
-        for (const sessionId of pauses.keys()) lost.add(sessionId);
-        pauses.clear();
+        // Without a store the paused session lived in the Worker; with one, the record holds it.
+        if (store === undefined) {
+          for (const sessionId of pauses.keys()) lost.add(sessionId);
+          pauses.clear();
+        }
         settleRun?.(failedRun('unavailable'));
+      };
+      /** Registers a stored history as private with core, which clears its values at every run end. */
+      const registerStored = (
+        register: ((value: unknown) => void) | undefined,
+        record: ConversationRecord,
+      ): void => {
+        if (register === undefined) throw adapterFailure('unsupported');
+        try {
+          register(restoredContent(record));
+        } catch (error) {
+          const code = isGalaxieError(error) ? error.code : 'unrecoverable';
+          throw adapterFailure(code === 'stale' || code === 'cancelled' ? code : 'unrecoverable');
+        }
+      };
+      /** Reads a session's stored conversation once, registering its text as private first. */
+      const load = async (
+        sessionId: string,
+        register: ((value: unknown) => void) | undefined,
+      ): Promise<void> => {
+        if (store === undefined) return;
+        const found = await loadConversation(store, sessionId);
+        if (found !== undefined) {
+          registerStored(register, found.record);
+          if (disposed) return;
+          stored.set(sessionId, found);
+          conversations.set(sessionId, found.conversation);
+          if (found.pause !== undefined)
+            pauses.set(sessionId, { interaction: found.pause, position: found.position });
+        }
+        known.add(sessionId);
+      };
+      const hydrate = (
+        sessionId: string,
+        register: ((value: unknown) => void) | undefined,
+      ): Promise<void> => {
+        if (store === undefined || disposed || known.has(sessionId)) return Promise.resolve();
+        let reading = loading.get(sessionId);
+        if (reading === undefined) {
+          reading = load(sessionId, register).finally(() => loading.delete(sessionId));
+          loading.set(sessionId, reading);
+        }
+        return reading;
       };
 
       const handleCall = (message: Extract<WorkerMessage, { kind: 'call' }>): void => {
@@ -276,10 +330,26 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
           let cancel: (() => void) | undefined;
           let cancellation: Promise<void> | undefined;
           let settled = false;
+          // The pause this run took from the map, and whether the run ended in a stored state. A
+          // run that does not commit leaves the store as it was, so the pause comes back.
+          let consumed: { interaction: PendingInteraction; position: number } | undefined;
+          let committed = false;
           try {
-            if (disposed || active) throw adapterFailure('invalid');
-            if (dead)
-              throw adapterFailure(lost.has(request.sessionId) ? 'unrecoverable' : 'unavailable');
+            const usable = (): void => {
+              if (disposed || active) throw adapterFailure('invalid');
+              if (dead)
+                throw adapterFailure(lost.has(request.sessionId) ? 'unrecoverable' : 'unavailable');
+            };
+            usable();
+            if (store !== undefined) {
+              await hydrate(request.sessionId, request.registerRestoredData);
+              // The hydrate awaited: the instance may have been disposed or taken by another run.
+              usable();
+              const held = stored.get(request.sessionId);
+              if (held !== undefined) {
+                registerStored(request.registerRestoredData, held.record);
+              }
+            }
             const command = request.command;
             let answer: { interactionId: string; action: string; payload: unknown } | undefined;
             let prompt = '';
@@ -295,6 +365,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               )
                 throw adapterFailure('invalid');
               prompt = Reflect.get(input, 'prompt') as string;
+              consumed = pauses.get(request.sessionId);
               pauses.delete(request.sessionId);
             } else {
               const waiting = pauses.get(request.sessionId);
@@ -304,6 +375,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               )
                 throw adapterFailure('stale');
               position = waiting.position;
+              consumed = waiting;
               pauses.delete(request.sessionId);
               answer = {
                 interactionId: command.interactionId,
@@ -318,6 +390,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               conversations.set(request.sessionId, conversation);
             }
             let runRequest: string;
+            const held = stored.get(request.sessionId);
             try {
               runRequest = JSON.stringify({
                 entry: agent.entry,
@@ -325,6 +398,8 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
                 conversation,
                 ...(agent.stream === true ? { stream: true } : {}),
                 ...(answer === undefined ? {} : { resume: answer }),
+                ...(store === undefined ? {} : { persist: true }),
+                ...(held === undefined ? {} : { restore: held.record }),
               });
             } catch {
               throw adapterFailure('invalid');
@@ -353,7 +428,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               cancellation = new Promise<void>((resolve) => {
                 const timeout = setTimeout(() => {
                   // Go did not stop in time; the Worker is the only thing that can end it.
-                  lost.add(request.sessionId);
+                  if (store === undefined) lost.add(request.sessionId);
                   worker.terminate();
                   markDead();
                   resolve();
@@ -394,22 +469,56 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             }
             settled = true;
             const outcome = parseRunResult(text);
-            if (!request.signal.aborted) {
+            // A record comes back exactly when the host asked to persist.
+            if (outcome.ok && (outcome.record !== undefined) !== (store !== undefined))
+              throw adapterFailure('invalid');
+            // Once Go has finished, the record holds everything; only a disposed instance or a
+            // cancelled run stops the commit.
+            const stillOpen = (): boolean =>
+              !request.signal.aborted && !(store !== undefined && disposed);
+            if (stillOpen()) {
+              const sessionId = request.sessionId;
+              const commit = async (interaction?: PendingInteraction): Promise<void> => {
+                if (store === undefined || !outcome.ok || outcome.record === undefined) return;
+                const held = stored.get(sessionId);
+                const key = held?.key ?? newKey();
+                const revision = await saveConversation(
+                  store,
+                  sessionId,
+                  held?.revision ?? 0,
+                  key,
+                  outcome.record,
+                  current.position,
+                  interaction?.interactionId,
+                );
+                stored.set(sessionId, {
+                  record: outcome.record,
+                  ...(interaction === undefined ? {} : { pause: interaction }),
+                  position: current.position,
+                  conversation,
+                  key,
+                  revision,
+                });
+                committed = true;
+              };
               if (outcome.ok && outcome.paused !== undefined) {
-                const interaction: PendingInteraction = {
+                const interaction = {
                   interactionId: outcome.paused.interactionId as InteractionId,
                   ...outcome.paused.request,
-                };
-                // A Worker that died after Go finished took the paused session with it.
-                if (dead) throw adapterFailure('unavailable');
-                if (current.streaming) {
-                  emitPaused(current);
-                  for (const event of current.events.splice(0)) yield event;
-                }
+                } as PendingInteraction;
+                // A Worker that died after Go finished took the paused session with it, unless the
+                // record carries it.
+                if (dead && store === undefined) throw adapterFailure('unavailable');
+                if (current.streaming) emitPaused(current);
+                await commit(interaction);
                 pauses.set(request.sessionId, { interaction, position: current.position });
-                yield { type: 'interaction', interaction };
+                if (stillOpen()) {
+                  if (current.streaming) for (const event of current.events.splice(0)) yield event;
+                  yield { type: 'interaction', interaction };
+                }
               } else if (outcome.ok) {
-                yield { type: 'output', output: outcome.output };
+                await commit();
+                if (stillOpen()) yield { type: 'output', output: outcome.output };
               } else {
                 yield { type: 'error', error: toErrorInfo(errorCodeOf(outcome.code)) };
               }
@@ -418,6 +527,8 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             if (!request.signal.aborted)
               yield { type: 'error', error: toErrorInfo(failureCode(error, 'executor_error')) };
           } finally {
+            if (store !== undefined && !committed && consumed !== undefined && !disposed)
+              pauses.set(request.sessionId, consumed);
             if (run && settleRun) settleRun = undefined;
             if (cancel) {
               if (!settled) cancel();
@@ -428,9 +539,15 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             if (active === run) active = undefined;
           }
         },
-        pending: async (sessionId) => pauses.get(sessionId)?.interaction,
+        pending: async (sessionId, options) => {
+          await hydrate(sessionId, options?.registerRestoredData);
+          return pauses.get(sessionId)?.interaction;
+        },
         dispose: async () => {
           disposed = true;
+          stored.clear();
+          known.clear();
+          loading.clear();
           teardown();
           markDead();
         },

@@ -172,7 +172,7 @@ func TestNativeRunsMatchTheGoldens(t *testing.T) {
 				Responses:    []json.RawMessage{},
 				Capabilities: []json.RawMessage{},
 			}}
-			output, err := drive(t, page, definition, s)
+			output, err := drive(t, page, definition, s, false)
 			page.out.Output = output
 			if err != nil {
 				page.out.Error = &failure{Code: llm.CodeOf(err)}
@@ -197,24 +197,69 @@ func TestNativeRunsMatchTheGoldens(t *testing.T) {
 }
 
 // drive runs the prompt and answers each pause with the script's next answer. A pause with no answer
-// left ends the drive with the run still waiting.
-func drive(t *testing.T, page *recorder, definition galaxie.Definition, s script) (string, error) {
+// left ends the drive with the run still waiting. With persist set, every run gets a store of its own
+// and the conversation travels only as the record the previous run returned, as it does across a
+// reload.
+func drive(t *testing.T, page *recorder, definition galaxie.Definition, s script, persist bool) (string, error) {
 	t.Helper()
 	store := galaxie.NewStore()
-	input := galaxie.Input{Prompt: s.Prompt, Conversation: "g1", Stream: s.Stream}
+	input := galaxie.Input{Prompt: s.Prompt, Conversation: "g1", Stream: s.Stream, Persist: persist}
 	for next := 0; ; next++ {
 		result, err := store.Run(context.Background(), page, definition, input)
 		if err != nil || result.Pause == nil {
+			if err == nil && persist && result.Record == nil {
+				t.Fatal("a persisted run returned no record")
+			}
 			return result.Output, err
 		}
 		page.out.Pauses = append(page.out.Pauses, result.Pause.Request)
 		if next >= len(s.Answers) {
 			t.Fatalf("the run paused with no answer left in the script")
 		}
-		input = galaxie.Input{Conversation: "g1", Stream: s.Stream, Resume: &galaxie.Resumption{
+		input = galaxie.Input{Conversation: "g1", Stream: s.Stream, Persist: persist, Resume: &galaxie.Resumption{
 			InteractionID: result.Pause.ID,
 			Action:        s.Answers[next].Action,
 			Payload:       s.Answers[next].Payload,
 		}}
+		if persist {
+			store = galaxie.NewStore()
+			input.Restore = result.Record
+		}
+	}
+}
+
+// TestPersistedRunsMatchTheGoldens drives every scripted case again with each run in a fresh store
+// that sees only the previous record, and requires the same transcript as the in-memory run: the
+// stored conversation is as good as the live one.
+func TestPersistedRunsMatchTheGoldens(t *testing.T) {
+	definitions := cases.Definitions()
+	scripts := loadScripts(t)
+	names := make([]string, 0, len(scripts))
+	for name := range scripts {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			s := scripts[name]
+			page := &recorder{script: s, out: transcript{
+				Requests:     []json.RawMessage{},
+				Responses:    []json.RawMessage{},
+				Capabilities: []json.RawMessage{},
+			}}
+			output, err := drive(t, page, definitions[s.Entry], s, true)
+			page.out.Output = output
+			if err != nil {
+				page.out.Error = &failure{Code: llm.CodeOf(err)}
+			}
+			want, readErr := os.ReadFile(filepath.Join(goldenDir, name+".json"))
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			got := normalize(t, indent(t, page.out))
+			if !bytes.Equal(normalize(t, want), got) {
+				t.Fatalf("the persisted run differs from the golden\nwant:\n%s\ngot:\n%s", want, got)
+			}
+		})
 	}
 }

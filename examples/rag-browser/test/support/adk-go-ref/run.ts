@@ -4,7 +4,16 @@
 // Runs one ADK Go conformance case through the real adapter. The Node and Chromium lanes share it, so
 // both observe the same program, the same scripted model and the same bridge traffic.
 
-import { createRuntime, defineAgentDefinition, GalaxieError, type RunEvent } from '@galaxie/core';
+import {
+  type AgentInstance,
+  createRuntime,
+  defineAgentDefinition,
+  GalaxieError,
+  type RecoveryStore,
+  type RunEvent,
+  type RunId,
+  type SessionId,
+} from '@galaxie/core';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
@@ -146,45 +155,72 @@ export function comparable(observed: Observed): Record<string, unknown> {
   };
 }
 
+/** The storage a durable run reopens after every pause, as a page does after a reload. */
+export interface DurableStore {
+  readonly checkpoints: { request(value: unknown): Promise<unknown> };
+  readonly recovery: RecoveryStore;
+  close(): void;
+}
+export interface Durability {
+  open(): Promise<DurableStore>;
+}
+
+/**
+ * Runs the case. With `durable`, every pause ends the runtime and its Worker, reopens the storage
+ * and restores the session in a new runtime with a new Worker before the answer is dispatched, so
+ * the conversation travels only through the stored record.
+ */
 export async function runCase(
   name: string,
   script: Script,
   wasm: GoWasmReference,
   createWorker: () => GoWorkerPort,
+  durable?: Durability,
 ): Promise<Observed> {
   const frames: Array<{ op: string; payload: unknown }> = [];
   let coldStartMs: number | undefined;
   const model = new ScriptedChatModel(script.replies);
-  const runtime = createRuntime({
-    appId: `adk-go-${name}`,
-    executors: [
-      createGoAdapter({
-        createWorker: () => {
-          const port = createWorker();
-          port.addEventListener('message', (event) => {
-            if (typeof event.data !== 'string') return;
-            const message = JSON.parse(event.data) as {
-              kind: string;
-              op?: string;
-              payload?: string;
-            };
-            if (message.kind === 'call' && message.op && message.payload)
-              frames.push({ op: message.op, payload: JSON.parse(message.payload) });
-          });
-          return port;
-        },
-        onBoot: (event) => {
-          if (event.phase === 'ready') coldStartMs = event.coldStartMs;
-        },
-      }),
-    ],
-    outputSafety: () => 'allow',
-  });
-  try {
+  interface Life {
+    readonly runtime: ReturnType<typeof createRuntime>;
+    readonly instance: AgentInstance<unknown, unknown>;
+    readonly store: DurableStore | undefined;
+  }
+  const open = async (sessionId?: SessionId): Promise<Life> => {
+    const store = durable === undefined ? undefined : await durable.open();
+    const runtime = createRuntime({
+      appId: `adk-go-${name}`,
+      executors: [
+        createGoAdapter({
+          createWorker: () => {
+            const port = createWorker();
+            port.addEventListener('message', (event) => {
+              if (typeof event.data !== 'string') return;
+              const message = JSON.parse(event.data) as {
+                kind: string;
+                op?: string;
+                payload?: string;
+              };
+              if (message.kind === 'call' && message.op && message.payload)
+                frames.push({ op: message.op, payload: JSON.parse(message.payload) });
+            });
+            return port;
+          },
+          onBoot: (event) => {
+            if (event.phase === 'ready') coldStartMs = event.coldStartMs;
+          },
+        }),
+      ],
+      outputSafety: () => 'allow',
+    });
     const instance = await runtime.create(definition, {
       principalScope: 'fixture',
+      ...(sessionId === undefined ? {} : { sessionId }),
+      ...(store === undefined ? {} : { recovery: store.recovery }),
       agent: { wasm, entry: script.entry, ...(script.stream ? { stream: true } : {}) },
-      services: { chatModels: { mock: model } },
+      services: {
+        chatModels: { mock: model },
+        ...(store === undefined ? {} : { checkpoints: store.checkpoints }),
+      },
       models: {
         providers: {
           mock: {
@@ -216,28 +252,52 @@ export async function runCase(
       },
     });
     await instance.prepare();
-    const { runId } = await instance.start({ prompt: script.prompt });
+    return { runtime, instance: instance as AgentInstance<unknown, unknown>, store };
+  };
+  let life = await open();
+  try {
+    let runId: RunId = (await life.instance.start({ prompt: script.prompt })).runId;
     const events: RunEvent[] = [];
     const streams: ScriptedStream[] = [];
     const pauses: unknown[] = [];
+    const seen = new Set<string>();
     let answered = 0;
-    for await (const event of instance.events(runId)) {
-      if (event.type === 'stream') streams.push({ mode: event.mode, data: event.data });
-      if (event.type === 'interaction') {
-        const { interactionId: _id, ...request } = event.interaction;
-        pauses.push(request);
-        const answer = script.answers?.[answered++];
-        if (answer === undefined) throw new Error('The run paused with no answer left.');
-        const receipt = await instance.dispatch({
-          instanceId: instance.instanceId,
-          runId,
-          ...event.interaction,
-          action: answer.action,
-          payload: answer.payload,
-        });
-        if (receipt.status !== 'accepted') throw new Error('The answer was not accepted.');
+    for (;;) {
+      let reload = false;
+      for await (const event of life.instance.events(runId)) {
+        if (event.type === 'stream') streams.push({ mode: event.mode, data: event.data });
+        if (event.type === 'interaction') {
+          const { interactionId, ...request } = event.interaction;
+          // A restored run publishes the pause it waits on again; it is the same pause.
+          if (!seen.has(interactionId)) {
+            seen.add(interactionId);
+            pauses.push(request);
+            if (durable !== undefined && !reload) {
+              reload = true;
+              break;
+            }
+          }
+          const answer = script.answers?.[answered++];
+          if (answer === undefined) throw new Error('The run paused with no answer left.');
+          const receipt = await life.instance.dispatch({
+            instanceId: life.instance.instanceId,
+            runId,
+            ...event.interaction,
+            action: answer.action,
+            payload: answer.payload,
+          });
+          if (receipt.status !== 'accepted') throw new Error('The answer was not accepted.');
+        }
+        events.push(event);
       }
-      events.push(event);
+      if (!reload) break;
+      const sessionId = life.instance.sessionId;
+      await life.runtime.dispose();
+      life.store?.close();
+      life = await open(sessionId);
+      const restored = await life.instance.restore();
+      if (restored === undefined) throw new Error('The stored session was not restored.');
+      runId = restored.runId;
     }
     const end = events.at(-1);
     return {
@@ -256,6 +316,7 @@ export async function runCase(
       coldStartMs,
     };
   } finally {
-    await runtime.dispose();
+    await life.runtime.dispose();
+    life.store?.close();
   }
 }

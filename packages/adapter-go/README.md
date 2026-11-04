@@ -9,8 +9,9 @@ and the [Go module](../../go/README.md).
 
 `createGoAdapter()` registers `adk-go`: `prepare` boots and verifies the Worker, and a start command runs
 the entry the agent names, with model calls routed through the host and capability calls through the
-broker. `streaming`, `interrupts` and `resume` are on. Durable sessions arrive in a later stage and turn
-`checkpoints` on with their evidence; `subgraphs` stays off.
+broker. `streaming`, `interrupts`, `resume` and `checkpoints` are on; `subgraphs` stays off. Durable
+sessions need `services.checkpoints` (see "Durable sessions"); without it a paused session lives in
+the Worker only.
 
 ## Streaming
 
@@ -36,7 +37,8 @@ position and never carry an ADK call ID; `Resume` maps the user's action and pay
 call. Without `Resume`, the default accepts `approve` or `deny` with `{ indexes }` naming every request
 exactly once and fails `invalid` otherwise. The page checks the request with core's four-field parser
 before it reaches the host, `pending()` returns it while the pause lasts, and the answer comes back as a
-new run that continues the paused session in the same Worker.
+new run that continues the paused session: in the same Worker without a store, or from the stored
+record with one.
 
 - A pause is consumed by its answer whether or not the answer is valid; an answer for another
   interaction fails `stale` and leaves the pause. A new prompt drops the pause it replaces.
@@ -51,10 +53,52 @@ new run that continues the paused session in the same Worker.
   `Interaction` hook is refused before it runs. The check for long-running tools happens before the run,
   because such a tool executes before it pauses. A capability whose tool name equals ADK's confirmation call
   name (`adk_request_confirmation`) is refused.
-- The paused session lives in the Worker's memory. If the Worker dies, the pause is gone and the session
-  is unrecoverable; nothing is persisted until durable sessions ship.
+- Without `services.checkpoints` the paused session lives in the Worker's memory. If the Worker dies,
+  the pause is gone and the session is unrecoverable.
 - Effect scopes continue across the runs of one conversation, so a resumed run never reuses the scope of
   an earlier call.
+
+## Durable sessions
+
+Pass the byte-record port of `@galaxie/storage-indexeddb` as `services.checkpoints` (for example
+`saver.byteRecords`) and a pause or a finished conversation survives a reload, a lost Worker and a
+cancelled or failed resume.
+
+ADK Go v1.9.0's in-memory session service has no codec: it stores `*session.Event` values and state
+in process memory and offers no export. The program therefore keeps no session between runs. With
+`persist`, each run ends by returning the whole conversation as a closed-shape JSON record (the event
+log, the counters the run needs, the effect-scope memory and the pause with its verified calls). The
+page stores it and sends it back as `restore`; the program rebuilds the ADK session with `Create` and
+`AppendEvent` replay, resumes from it, and returns the next record. Every record and every restored
+pause is decoded with unknown keys, event identifiers and sizes checked, and a resume checks that each
+paused call matches the stored events and the request derived from them, and that the interaction ID
+matches the digest of the conversation, ordinal and request.
+
+- One checkpoint per revision holds the record; the key, the stream position and an HMAC-SHA-256 tag
+  over session, position and record sit in its metadata. The marker (`__interrupt__`) is written first
+  and the checkpoint commits it, so a crash between the two leaves the previous revision current. The
+  tag detects corruption, truncation, splicing between sessions and an edit made without the key; the
+  key lives beside the record, so it does not stop someone who can rewrite both.
+- The page keeps memory and store equal: a pause is published only after its record is stored, and a
+  run that fails, is cancelled or is refused leaves the stored pause answerable. A Worker that dies
+  after Go finished, but before the page recorded the result, still publishes and stores the pause.
+- Restored text is registered with core before the program sees it, again for every run that replays
+  it. A host whose core does not provide that hook gets `unsupported` rather than exposed text.
+- Effect scopes, conversation IDs and ordinals come from the record, so a restored run never reuses a
+  scope. Interaction IDs depend on the conversation, ordinal and request, not on the Worker.
+- A record is capped at 512 KiB, below the 1 MiB bridge frame. A run that would outgrow it fails
+  `unsupported` before the next model or tool call, and the previous revision stays current. The
+  guard counts stored events only, so a pause with very large call arguments, or a resume whose
+  answer pushes the events past the limit, can still fail late; the previous revision then stays
+  current and the pause stays answerable.
+- A resume that fails after an approved write ran offers the same pause again. Pair
+  `services.checkpoints` with core's `recovery` store whenever the agent binds a write capability:
+  without it the write can run a second time when the pause is answered again.
+- A failed storage call keeps its reason (`fenced`, `stale`, `unrecoverable`); any other failure is
+  `unavailable`.
+- Whoever can write the store can change the history the model sees; the tag is corruption detection,
+  not protection against a hostile page. Keep the store on-device under the checkpointer's app and
+  principal scope, with one active owner per session.
 
 ## Hosting
 

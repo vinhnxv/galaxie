@@ -22,7 +22,8 @@ export type ByteExecutor =
   | 'pydantic-ai-python'
   | 'dspy-python'
   | 'adk-js'
-  | 'adk-python';
+  | 'adk-python'
+  | 'adk-go';
 
 export function isByteExecutor(value: unknown): value is ByteExecutor {
   return (
@@ -30,7 +31,8 @@ export function isByteExecutor(value: unknown): value is ByteExecutor {
     value === 'pydantic-ai-python' ||
     value === 'dspy-python' ||
     value === 'adk-js' ||
-    value === 'adk-python'
+    value === 'adk-python' ||
+    value === 'adk-go'
   );
 }
 

@@ -52,6 +52,45 @@ func NewRun(caller Caller, conversation string, cancel context.CancelFunc) *Run 
 	}
 }
 
+// MemoryState is the part of a Memory a stored conversation carries: the turn counters and the
+// scope of every call the conversation still holds.
+type MemoryState struct {
+	Turns  map[string]int    `json:"turns"`
+	Scopes map[string]string `json:"scopes"`
+}
+
+// Snapshot returns a copy of the memory limited to the scopes keep accepts. A stored conversation
+// keeps only the scopes of calls it still holds; the turn counters always stay, so a later turn
+// never reuses a position.
+func (m *Memory) Snapshot(keep func(callID string) bool) MemoryState {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	state := MemoryState{Turns: map[string]int{}, Scopes: map[string]string{}}
+	for branch, turns := range m.turns {
+		state.Turns[branch] = turns
+	}
+	for callID, scope := range m.scopes {
+		if keep(callID) {
+			state.Scopes[callID] = scope
+		}
+	}
+	return state
+}
+
+// Restore replaces the memory with a stored state.
+func (m *Memory) Restore(state MemoryState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.turns = map[string]int{}
+	m.scopes = map[string]string{}
+	for branch, turns := range state.Turns {
+		m.turns[branch] = turns
+	}
+	for callID, scope := range state.Scopes {
+		m.scopes[callID] = scope
+	}
+}
+
 // UseMemory makes the run record and read effect scopes in the conversation's shared memory.
 func (r *Run) UseMemory(memory *Memory) { r.memory = memory }
 

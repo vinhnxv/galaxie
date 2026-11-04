@@ -18,6 +18,7 @@ import {
   parseCapabilityPayload,
   parseModelPayload,
 } from './bridge.js';
+import { validCheckpointPort } from './checkpoints.js';
 import { adapterFailure } from './errors.js';
 import { isRecord } from './protocol.js';
 import {
@@ -37,6 +38,12 @@ export type GoChatModel =
 /** The models the host provides; the Go program names a role and never a provider. */
 export interface GoServices {
   readonly chatModels: Readonly<Record<string, GoChatModel>>;
+  /**
+   * The byte-record checkpoint port of `@galaxie/storage-indexeddb`. With it, each pause and each
+   * completed conversation is stored so that a reload or a lost Worker does not lose it; without
+   * it, a paused session lives in the Worker only.
+   */
+  readonly checkpoints?: { request(value: unknown): Promise<unknown> };
 }
 
 export interface LeasedCall {
@@ -60,6 +67,12 @@ export function validServices(
   models?: ModelPreparation,
 ): services is GoServices {
   if (!isRecord(services) || !isRecord(services['chatModels'])) return false;
+  if (
+    Object.hasOwn(services, 'checkpoints') &&
+    services['checkpoints'] !== undefined &&
+    !validCheckpointPort(services['checkpoints'])
+  )
+    return false;
   const implementations = services['chatModels'];
   if (
     !Object.values(implementations).every(

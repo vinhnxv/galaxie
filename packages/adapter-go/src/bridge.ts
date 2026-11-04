@@ -218,9 +218,17 @@ export interface BridgePause {
   readonly request: InteractionRequest;
 }
 
+/** A conversation record the program returns when the host asked to persist: a JSON object. */
+export type ConversationRecord = Readonly<Record<string, unknown>>;
+
 export type RunResult =
-  | { readonly ok: true; readonly output: string; readonly paused?: undefined }
-  | { readonly ok: true; readonly paused: BridgePause }
+  | {
+      readonly ok: true;
+      readonly output: string;
+      readonly paused?: undefined;
+      readonly record?: ConversationRecord;
+    }
+  | { readonly ok: true; readonly paused: BridgePause; readonly record?: ConversationRecord }
   | { readonly ok: false; readonly code: string };
 
 const INTERACTION_ID = /^[0-9a-f]{64}$/;
@@ -240,13 +248,20 @@ function parsePause(value: unknown): BridgePause {
 
 export function parseRunResult(text: string): RunResult {
   const value = parseFrame(text);
-  if (isRecord(value) && value['ok'] === true && keys(value, ['ok'], ['output', 'paused'])) {
+  if (
+    isRecord(value) &&
+    value['ok'] === true &&
+    keys(value, ['ok'], ['output', 'paused', 'record'])
+  ) {
+    const record: unknown = value['record'];
+    if (record !== undefined && !isRecord(record)) throw adapterFailure('invalid');
+    const stored = record === undefined ? {} : { record: record as ConversationRecord };
     if (value['paused'] !== undefined) {
       if (value['output'] !== undefined && value['output'] !== '') throw adapterFailure('invalid');
-      return { ok: true, paused: parsePause(value['paused']) };
+      return { ok: true, paused: parsePause(value['paused']), ...stored };
     }
     if (value['output'] === undefined || typeof value['output'] === 'string')
-      return { ok: true, output: (value['output'] as string | undefined) ?? '' };
+      return { ok: true, output: (value['output'] as string | undefined) ?? '', ...stored };
   }
   if (
     isRecord(value) &&

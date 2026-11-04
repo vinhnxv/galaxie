@@ -31,7 +31,10 @@ func ServeWith(definitions map[string]Definition) {
 		if !ok {
 			return bridge.Outcome{}, llm.NewError("invalid")
 		}
-		input := Input{Prompt: request.Prompt, Conversation: request.Conversation, Stream: request.Stream}
+		input := Input{Prompt: request.Prompt, Conversation: request.Conversation, Stream: request.Stream, Persist: request.Persist}
+		if len(request.Restore) > 0 {
+			input.Restore = request.Restore
+		}
 		if request.Resume != nil {
 			var payload any
 			if len(request.Resume.Payload) > 0 && json.Unmarshal(request.Resume.Payload, &payload) != nil {
@@ -44,8 +47,8 @@ func ServeWith(definitions map[string]Definition) {
 			return bridge.Outcome{}, err
 		}
 		if result.Pause != nil {
-			return bridge.Outcome{Paused: &bridge.Paused{InteractionID: result.Pause.ID, Request: result.Pause.Request}}, nil
+			return bridge.Outcome{Paused: &bridge.Paused{InteractionID: result.Pause.ID, Request: result.Pause.Request}, Record: result.Record}, nil
 		}
-		return bridge.Outcome{Output: result.Output}, nil
+		return bridge.Outcome{Output: result.Output, Record: result.Record}, nil
 	})
 }

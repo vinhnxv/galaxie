@@ -3,20 +3,23 @@
 
 // Hosts configure zod before anything validates: its JIT probe is a Trusted Types sink.
 import '../../../src/host/zod-config.js';
+import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import type { GoWorkerPort } from '../../../../../packages/adapter-go/src/index.js';
 import workerUrl from '../go-gate/adapter-worker.ts?worker&url';
-import { type Observed, runCase, type Script } from './run.js';
+import { type Durability, type Observed, runCase, type Script } from './run.js';
 
 declare const REFERENCE_WASM: { url: string; sha256: string; bytes: number };
 declare const REFERENCE_SCRIPTS: Record<string, Script>;
 
 interface PageState {
   results: Record<string, Observed>;
+  /** Pausing cases run again with a reload and a new Worker at every pause, over IndexedDB. */
+  durable: Record<string, Observed>;
   errors: Record<string, string>;
   violations: string[];
   done: boolean;
 }
-const state: PageState = { results: {}, errors: {}, violations: [], done: false };
+const state: PageState = { results: {}, durable: {}, errors: {}, violations: [], done: false };
 Reflect.set(globalThis, 'adkGo', state);
 addEventListener('securitypolicyviolation', (event) =>
   state.violations.push(
@@ -47,6 +50,52 @@ for (const [name, script] of Object.entries(REFERENCE_SCRIPTS)) {
     );
   } catch (error) {
     state.errors[name] = String(error);
+  }
+}
+
+/** Storage in the page's IndexedDB that every runtime of a case reopens, as a reload does. */
+function indexedDb(name: string): Durability & { remove(): Promise<void> } {
+  const databaseName = `adk-go-durable-${name}`;
+  return {
+    async open() {
+      const saver = await IndexedDBSaver.open({
+        databaseName,
+        appId: `adk-go-${name}`,
+        principalScope: 'fixture',
+      });
+      return {
+        checkpoints: saver.byteRecords,
+        recovery: saver.recovery,
+        close: () => saver.close(),
+      };
+    },
+    remove: () =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(databaseName);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => reject(new Error('Database cleanup was blocked.'));
+      }),
+  };
+}
+
+for (const [name, script] of Object.entries(REFERENCE_SCRIPTS)) {
+  if ((script.answers?.length ?? 0) === 0) continue;
+  const storage = indexedDb(name);
+  try {
+    state.durable[name] = await runCase(
+      name,
+      script,
+      wasm,
+      () => new Worker(allowed, { type: 'module' }) as unknown as GoWorkerPort,
+      storage,
+    );
+  } catch (error) {
+    state.errors[`durable:${name}`] = String(error);
+  } finally {
+    await storage.remove().catch((error: unknown) => {
+      state.errors[`cleanup:${name}`] = String(error);
+    });
   }
 }
 state.done = true;
