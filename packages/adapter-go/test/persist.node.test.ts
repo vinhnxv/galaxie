@@ -1,0 +1,369 @@
+// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import type { ExecutorAgent, ExecutorEvent } from '@galaxie/core';
+import { expect, test, vi } from 'vitest';
+import { MemoryByteCheckpoints } from '../../../tests/conformance/support/memory-byte-checkpoints.js';
+import { createGoAdapter, type GoAgent } from '../src/index.js';
+import { decodeStored, encodeStored } from '../src/persist.js';
+import type { WorkerMessage } from '../src/protocol.js';
+import { approvalRequest, FakeGoWorker, failResult, type Program } from './support-go.js';
+
+const agent: GoAgent = {
+  wasm: { url: 'http://127.0.0.1/go/agent.wasm', sha256: 'a'.repeat(64), bytes: 1024 },
+  entry: 'reference',
+};
+const digest = (digit: string): string => digit.repeat(64);
+const start = { type: 'start', input: { prompt: 'go' } };
+const resume = (interactionId: string): unknown => ({
+  type: 'resume',
+  interactionId,
+  action: 'approve',
+  payload: { indexes: [0] },
+});
+
+/** A closed-shape record the way the program returns it, holding one pause on `id`. */
+function record(events: number, id?: string): Record<string, unknown> {
+  return {
+    v: 1,
+    conversation: 'g1',
+    ordinal: 1,
+    counter: events,
+    memory: {},
+    events: Array.from({ length: events }, (_, index) => ({
+      id: `e${index}`,
+      timestamp: 1,
+      author: 'user',
+      content: { role: 'user', parts: [{ text: `PRIVATE-${index}` }] },
+    })),
+    ...(id === undefined
+      ? {}
+      : {
+          pause: {
+            id,
+            request: approvalRequest,
+            calls: [{ id: 'c1', name: 'x', request: { value: 'PRIVATE-CALL' } }],
+          },
+        }),
+  };
+}
+const paused = (id: string, events = 1): string =>
+  JSON.stringify({
+    ok: true,
+    paused: { interactionId: id, request: approvalRequest },
+    record: record(events, id),
+  });
+const finished = (events = 2): string =>
+  JSON.stringify({ ok: true, output: 'answered', record: record(events) });
+
+/** A Worker that dies in the same turn its run result arrives. */
+class DyingWorker extends FakeGoWorker {
+  override emit(message: WorkerMessage): void {
+    super.emit(message);
+    if (message.kind === 'done') this.fail();
+  }
+}
+
+interface Setup {
+  readonly worker: FakeGoWorker;
+  readonly executor: ExecutorAgent;
+  readonly register: ReturnType<typeof vi.fn>;
+}
+async function open(
+  program: Program,
+  checkpoints: { request(value: unknown): Promise<unknown> } | undefined,
+  worker: FakeGoWorker = new FakeGoWorker(program),
+): Promise<Setup> {
+  const executor = await createGoAdapter({ createWorker: () => worker }).prepare(
+    agent,
+    { chatModels: {}, ...(checkpoints === undefined ? {} : { checkpoints }) },
+    { signal: new AbortController().signal },
+  );
+  return { worker, executor, register: vi.fn() };
+}
+async function drain(
+  setup: Setup,
+  command: unknown,
+  options: { sessionId?: string; signal?: AbortSignal; register?: boolean } = {},
+): Promise<ExecutorEvent[]> {
+  const events: ExecutorEvent[] = [];
+  for await (const event of setup.executor.run({
+    signal: options.signal ?? new AbortController().signal,
+    sessionId: options.sessionId ?? 's',
+    command,
+    ...(options.register === false ? {} : { registerRestoredData: setup.register }),
+  } as never))
+    events.push(event);
+  return events;
+}
+const pendingOf = (setup: Setup, register = true): Promise<unknown> =>
+  setup.executor.pending(
+    's' as never,
+    register ? ({ registerRestoredData: setup.register } as never) : undefined,
+  );
+const runs = (worker: FakeGoWorker): Array<Record<string, unknown>> =>
+  worker.received
+    .filter((message) => message.kind === 'run')
+    .map((message) => JSON.parse(message.request) as Record<string, unknown>);
+
+/** A program that pauses on a prompt and finishes on an answer. */
+const pausing: Program = async (api) =>
+  api.request.resume === undefined ? paused(digest('1')) : finished();
+
+test('a run asks for a record only when the host has a store', async () => {
+  const plain = await open(pausing, undefined);
+  await drain(plain, start);
+  expect(runs(plain.worker)[0]).not.toHaveProperty('persist');
+
+  const store = new MemoryByteCheckpoints();
+  const durable = await open(pausing, store);
+  await drain(durable, start);
+  expect(runs(durable.worker)[0]).toMatchObject({ persist: true });
+  expect(runs(durable.worker)[0]).not.toHaveProperty('restore');
+});
+
+test('a pause is stored, a resume carries the stored record and completion replaces it', async () => {
+  const store = new MemoryByteCheckpoints();
+  const setup = await open(pausing, store);
+  expect(await drain(setup, start)).toMatchObject([{ type: 'interaction' }]);
+  expect(store.rows.size).toBe(1);
+  expect(await drain(setup, resume(digest('1')))).toEqual([{ type: 'output', output: 'answered' }]);
+  const sent = runs(setup.worker);
+  expect(sent[1]).toMatchObject({ persist: true, restore: record(1, digest('1')) });
+  expect(store.rows.size).toBe(2);
+  const latest = [...store.rows.values()].sort((a, b) => b.id.localeCompare(a.id))[0];
+  expect(JSON.parse(new TextDecoder().decode(latest?.checkpoint.bytes))).toEqual(record(2));
+  await expect(pendingOf(setup)).resolves.toBeUndefined();
+});
+
+test('the marker is written before the commit and names the pending interaction', async () => {
+  const store = new MemoryByteCheckpoints();
+  const order: string[] = [];
+  const spying = {
+    request: async (value: unknown): Promise<unknown> => {
+      const op = (value as { op: string }).op;
+      order.push(op);
+      if (op === 'put-writes')
+        expect((value as { writes: Array<{ interruptIds: string[] }> }).writes[0]).toMatchObject({
+          interruptIds: [digest('1')],
+        });
+      return store.request(value);
+    },
+  };
+  const setup = await open(pausing, spying);
+  await drain(setup, start);
+  expect(order.filter((op) => op !== 'get')).toEqual(['put-writes', 'put']);
+});
+
+test('a fresh instance restores the pause from the record alone and resumes it', async () => {
+  const store = new MemoryByteCheckpoints();
+  const first = await open(pausing, store);
+  await drain(first, start);
+  await first.executor.dispose();
+
+  const second = await open(pausing, store);
+  await expect(pendingOf(second)).resolves.toMatchObject({
+    interactionId: digest('1'),
+  });
+  // The restored history is registered as private before the program can replay it.
+  expect(second.register).toHaveBeenCalled();
+  expect(JSON.stringify(second.register.mock.calls)).toContain('PRIVATE-0');
+  expect(JSON.stringify(second.register.mock.calls)).toContain('PRIVATE-CALL');
+  expect(await drain(second, resume(digest('1')))).toEqual([
+    { type: 'output', output: 'answered' },
+  ]);
+  expect(runs(second.worker)[0]).toMatchObject({
+    conversation: 'g1',
+    restore: record(1, digest('1')),
+  });
+});
+
+test('a restored conversation is registered as private again for every run that replays it', async () => {
+  const store = new MemoryByteCheckpoints();
+  const first = await open(pausing, store);
+  await drain(first, start);
+  const second = await open(pausing, store);
+  await drain(second, resume(digest('1')));
+  const registered = second.register.mock.calls.length;
+  expect(registered).toBeGreaterThanOrEqual(2);
+});
+
+test('a restore without the registration hook fails unsupported rather than expose the text', async () => {
+  const store = new MemoryByteCheckpoints();
+  const first = await open(pausing, store);
+  await drain(first, start);
+  const second = await open(pausing, store);
+  await expect(pendingOf(second, false)).rejects.toMatchObject({ code: 'unsupported' });
+});
+
+test('a run that fails after taking the pause leaves the stored pause answerable', async () => {
+  const store = new MemoryByteCheckpoints();
+  let calls = 0;
+  const flaky: Program = async (api) => {
+    if (api.request.resume === undefined) return paused(digest('1'));
+    calls += 1;
+    return calls === 1 ? failResult('unavailable') : finished();
+  };
+  const setup = await open(flaky, store);
+  await drain(setup, start);
+  const before = store.rows.size;
+  expect(await drain(setup, resume(digest('1')))).toMatchObject([
+    { type: 'error', error: { code: 'unavailable' } },
+  ]);
+  expect(store.rows.size).toBe(before);
+  await expect(pendingOf(setup)).resolves.toMatchObject({
+    interactionId: digest('1'),
+  });
+  expect(await drain(setup, resume(digest('1')))).toEqual([{ type: 'output', output: 'answered' }]);
+});
+
+test('a cancelled resume leaves the stored pause answerable', async () => {
+  const store = new MemoryByteCheckpoints();
+  const waiting = Promise.withResolvers<void>();
+  const slow: Program = async (api) => {
+    if (api.request.resume === undefined) return paused(digest('1'));
+    waiting.resolve();
+    await api.cancelled;
+    return failResult('cancelled');
+  };
+  const setup = await open(slow, store);
+  await drain(setup, start);
+  const abort = new AbortController();
+  const pending = drain(setup, resume(digest('1')), { signal: abort.signal });
+  await waiting.promise;
+  abort.abort();
+  await pending;
+  await expect(pendingOf(setup)).resolves.toMatchObject({
+    interactionId: digest('1'),
+  });
+});
+
+test('a Worker that dies between the run result and the page recording the pause still pauses with a store', async () => {
+  const store = new MemoryByteCheckpoints();
+  const worker = new DyingWorker(async () => paused(digest('1')));
+  const setup = await open(async () => paused(digest('1')), store, worker);
+  expect(await drain(setup, start)).toMatchObject([
+    { type: 'interaction', interaction: { interactionId: digest('1') } },
+  ]);
+  expect(store.rows.size).toBe(1);
+  // The Worker is gone, but the record is stored: a new instance continues the pause.
+  const next = await open(pausing, store);
+  await expect(pendingOf(next)).resolves.toMatchObject({
+    interactionId: digest('1'),
+  });
+  expect(await drain(next, resume(digest('1')))).toEqual([{ type: 'output', output: 'answered' }]);
+});
+
+test('a Worker that dies between the run result and the page recording the pause loses it without a store', async () => {
+  const bare = JSON.stringify({
+    ok: true,
+    paused: { interactionId: digest('1'), request: approvalRequest },
+  });
+  const worker = new DyingWorker(async () => bare);
+  const setup = await open(async () => bare, undefined, worker);
+  expect(await drain(setup, start)).toMatchObject([
+    { type: 'error', error: { code: 'unavailable' } },
+  ]);
+  await expect(pendingOf(setup)).resolves.toBeUndefined();
+});
+
+test('a store that rejects the commit fails the run and publishes no pause', async () => {
+  const broken = {
+    request: async (value: unknown): Promise<unknown> => {
+      if ((value as { op: string }).op === 'get') return null;
+      throw new Error('PRIVATE STORAGE DETAIL');
+    },
+  };
+  const setup = await open(pausing, broken);
+  const events = await drain(setup, start);
+  expect(events).toMatchObject([{ type: 'error', error: { code: 'unavailable' } }]);
+  expect(JSON.stringify(events)).not.toContain('PRIVATE STORAGE DETAIL');
+  await expect(pendingOf(setup)).resolves.toBeUndefined();
+});
+
+test('a program that returns no record for a store fails invalid', async () => {
+  const store = new MemoryByteCheckpoints();
+  const setup = await open(async () => JSON.stringify({ ok: true, output: 'no record' }), store);
+  expect(await drain(setup, start)).toMatchObject([{ type: 'error', error: { code: 'invalid' } }]);
+});
+
+test('a program that returns a record to a host with no store fails invalid', async () => {
+  const setup = await open(async () => finished(), undefined);
+  expect(await drain(setup, start)).toMatchObject([{ type: 'error', error: { code: 'invalid' } }]);
+});
+
+async function tampered(
+  edit: (stored: { checkpoint: Uint8Array; metadata: Uint8Array }) => Promise<void> | void,
+): Promise<unknown> {
+  const store = new MemoryByteCheckpoints();
+  const first = await open(pausing, store);
+  await drain(first, start);
+  const [row] = [...store.rows.values()];
+  if (row === undefined) throw new Error('No record was stored.');
+  const bytes = { checkpoint: row.checkpoint.bytes, metadata: row.metadata.bytes };
+  await edit(bytes);
+  store.rows.set(JSON.stringify(['s', '', row.id]), {
+    ...row,
+    checkpoint: { ...row.checkpoint, bytes: bytes.checkpoint },
+    metadata: { ...row.metadata, bytes: bytes.metadata },
+  });
+  const second = await open(pausing, store);
+  return pendingOf(second);
+}
+
+test('a corrupt record fails unrecoverable before any program sees it', async () => {
+  await expect(
+    tampered((stored) => {
+      stored.checkpoint = new TextEncoder().encode('{"v":1');
+    }),
+  ).rejects.toMatchObject({ code: 'unrecoverable' });
+});
+
+test('a record edited without the key fails the integrity tag', async () => {
+  await expect(
+    tampered((stored) => {
+      const text = new TextDecoder().decode(stored.checkpoint).replace('PRIVATE-0', 'FORGED-00');
+      stored.checkpoint = new TextEncoder().encode(text);
+    }),
+  ).rejects.toMatchObject({ code: 'unrecoverable' });
+});
+
+test('a record stored under another session fails the integrity tag', async () => {
+  const store = new MemoryByteCheckpoints();
+  const first = await open(pausing, store);
+  await drain(first, start, { sessionId: 'other' });
+  const [row] = [...store.rows.values()];
+  if (row === undefined) throw new Error('No record was stored.');
+  store.rows.set(JSON.stringify(['s', '', row.id]), { ...row, sessionId: 's' });
+  const second = await open(pausing, store);
+  await expect(pendingOf(second)).rejects.toMatchObject({
+    code: 'unrecoverable',
+  });
+});
+
+test('a record with unknown keys fails even under a valid tag', async () => {
+  const key = new Uint8Array(32).fill(7);
+  const body = { ...record(1, digest('1')), extra: true };
+  const { checkpoint, metadata } = await encodeStored('s', body as never, 0, key);
+  await expect(
+    decodeStored('s', {
+      id: '00000000000000000001',
+      checkpoint: { type: 'adk-go.session/v1', bytes: checkpoint },
+      metadata: { type: 'galaxie.adk-go-state/v1', bytes: metadata },
+    }),
+  ).rejects.toMatchObject({ code: 'unrecoverable' });
+});
+
+test('a record above the size limit is refused unsupported before it is stored', async () => {
+  const store = new MemoryByteCheckpoints();
+  const huge = JSON.stringify({
+    ok: true,
+    output: 'x',
+    record: { ...record(1), memory: { big: 'x'.repeat(600 * 1024) } },
+  });
+  const setup = await open(async () => huge, store);
+  expect(await drain(setup, start)).toMatchObject([
+    { type: 'error', error: { code: 'unsupported' } },
+  ]);
+  expect(store.rows.size).toBe(0);
+});

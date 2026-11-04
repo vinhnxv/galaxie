@@ -9,7 +9,7 @@
     "streaming": true,
     "interrupts": true,
     "resume": true,
-    "checkpoints": false,
+    "checkpoints": true,
     "subgraphs": false
   },
   "cases": [

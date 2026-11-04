@@ -21,6 +21,7 @@ const pageRoot = fileURLToPath(new URL('./support/adk-go-ref/', import.meta.url)
 
 interface PageState {
   results: Record<string, Observed>;
+  durable: Record<string, Observed>;
   errors: Record<string, string>;
   violations: string[];
   done: boolean;
@@ -46,6 +47,14 @@ async function runInChromium(
     define: {
       REFERENCE_WASM: JSON.stringify(reference.wasm),
       REFERENCE_SCRIPTS: JSON.stringify(scripts),
+    },
+    // The page reads the storage package from source, so the lane never depends on a stale build.
+    resolve: {
+      alias: {
+        '@galaxie/storage-indexeddb': fileURLToPath(
+          new URL('../../../packages/storage-indexeddb/src/index.ts', import.meta.url),
+        ),
+      },
     },
     worker: { format: 'es' },
     build: { outDir, emptyOutDir: true },
@@ -107,6 +116,19 @@ test.skipIf(!goAvailable)(
     for (const name of Object.keys(scripts)) {
       expect(comparable(state.results[name] as Observed), name).toEqual(await readGolden(name));
       expect((state.results[name] as Observed).streams, name).toEqual(scripts[name]?.streams ?? []);
+    }
+    // The pausing cases again, with IndexedDB reopened and a new Worker at every pause.
+    const pausing = Object.keys(scripts).filter(
+      (name) => (scripts[name]?.answers?.length ?? 0) > 0,
+    );
+    expect(Object.keys(state.durable).sort()).toEqual([...pausing].sort());
+    for (const name of pausing) {
+      expect(comparable(state.durable[name] as Observed), `durable ${name}`).toEqual(
+        await readGolden(name),
+      );
+      expect((state.durable[name] as Observed).streams, `durable ${name}`).toEqual(
+        scripts[name]?.streams ?? [],
+      );
     }
     const coldStartMs = Math.max(...Object.values(state.results).map((r) => r.coldStartMs ?? -1));
     const wasmBytes = (await readFile(reference.file)).byteLength;

@@ -59,14 +59,14 @@ const firstEvent = async (
   command?: unknown,
 ) => (await prepared.run(runRequest(command))[Symbol.asyncIterator]().next()).value;
 
-test('the adapter registers adk-go with streaming, interrupts and resume on', () => {
+test('the adapter registers adk-go with streaming, interrupts, resume and checkpoints on', () => {
   const adapter = createGoAdapter(options(() => new FakeWorker(ready)));
   expect(adapter.id).toBe('adk-go');
   expect(GO_EXECUTOR_ID).toBe('adk-go');
   expect(adapter.features).toEqual({
     interrupts: true,
     resume: true,
-    checkpoints: false,
+    checkpoints: true,
     streaming: true,
     subgraphs: false,
   });

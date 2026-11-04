@@ -38,8 +38,10 @@ Do not import another executor adapter, LangGraph, Pyodide or `@google/adk`. Do 
 
 ## Limits
 
-Durable sessions are not built yet; `checkpoints` is false and those paths fail `unsupported`. A pause
-lives only as long as its Worker. Pauses inside a parallel agent, a loop or an earlier sequence child
+Durable sessions need `services.checkpoints`; without it a pause lives only as long as its Worker.
+With it the program keeps no session: it returns a record that `persist.ts` and `checkpoints.ts` store
+and send back. Keep memory and store equal (publish a pause only after its record is stored), keep the
+record under 512 KiB and never log it. Pauses inside a parallel agent, a loop or an earlier sequence child
 fail `unsupported` (README, "Interactions"). Streaming is opt-in per agent (`stream: true`); Go receives only the final
 reply of each model call. A cancelled run is given 500 ms to finish, then its Worker is terminated
 and the session is unrecoverable. The stubs guard against accidental network use; Go code
@@ -48,12 +50,13 @@ is trusted and can reach anything `syscall/js` reaches, so they are not an isola
 ## Tests
 
 Run `pnpm exec vitest run packages/adapter-go tests/conformance/adk-go.node.test.ts tests/conformance/adk-go-run.node.test.ts
-tests/conformance/adk-go-scan.node.test.ts
+tests/conformance/adk-go-scan.node.test.ts tests/conformance/adk-go-restore.node.test.ts
 tests/conformance/check-dependencies.node.test.ts examples/rag-browser/test/go-gate.node.test.ts
 examples/rag-browser/test/adk-go-reference.node.test.ts` and `pnpm run test:go`. `test/loader.node.test.ts`
 covers the verify-before-compile order, the egress stubs and the exit handshake;
 `test/adapter.node.test.ts` covers validation and Worker lifetime; `test/interaction.node.test.ts` covers
-pauses, pending and resume against a fake Worker; `test/bridge.test.ts` has the run-result validator table;
+pauses, pending and resume against a fake Worker; `test/persist.node.test.ts` covers the stored record,
+marker order, restore and tamper checks against a fake Worker; `test/bridge.test.ts` has the run-result validator table;
 `test/adk-go.node.test.ts` runs the adapter against a scripted Worker; `test/stream.test.ts` has the
 validator, splitter and joiner tables. The gate test
 needs Go and builds the gate module itself. Run `pnpm check` before reporting the integrated change
