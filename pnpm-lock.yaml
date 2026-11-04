@@ -305,11 +305,11 @@ importers:
         specifier: 0.5.10
         version: 0.5.10
       '@huggingface/transformers':
-        specifier: 4.3.1
-        version: 4.3.1(@types/node@24.19.2)
+        specifier: 4.3.2
+        version: 4.3.2(@types/node@24.19.2)
       '@huggingface/transformers-structured-output':
-        specifier: 4.3.1
-        version: 4.3.1(@huggingface/transformers@4.3.1(@types/node@24.19.2))
+        specifier: 4.3.2
+        version: 4.3.2(@huggingface/transformers@4.3.2(@types/node@24.19.2))
       '@langchain/core':
         specifier: 1.2.20
         version: 1.2.20(@opentelemetry/api@1.10.0)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(openai@7.42.0(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
@@ -648,13 +648,16 @@ packages:
   '@huggingface/tokenizers@0.2.0':
     resolution: {integrity: sha512-LidMHe1FpcSYH4vcSjXooda34pC0M8m1gmDOv7SQi6Iv+ib1zX7J3sHBCC9/3FPCkn2k1b55FneVqMRxrr99pg==}
 
-  '@huggingface/transformers-structured-output@4.3.1':
-    resolution: {integrity: sha512-ZE1gOgDOSHVYxrO1o0c7EAZb26GXP7injcUf/9JUb/0VZnLZOKYSq82/Q79c9ZxMb3jNzAYcatQxw8B7SbVqwA==}
+  '@huggingface/transformers-structured-output@4.3.2':
+    resolution: {integrity: sha512-grWV7i/8Dn/UPoXL02IAjTfRKlCIaCf9ioQCJsAcxcJLPuJnHkYbbuJ4ARId0x9HCufbWlap3ZILKQB+pi3LbQ==}
     peerDependencies:
-      '@huggingface/transformers': ^4.3.1
+      '@huggingface/transformers': ^4.3.2
 
   '@huggingface/transformers@4.3.1':
     resolution: {integrity: sha512-5+voSeUCFK6PCKlY15dPhNOKq3/zOTxDN7oC+Wy9dFb1QZ0TSQomZRRy7URRK8YRuUoE9fGMQTTPC5d/pWBJhA==}
+
+  '@huggingface/transformers@4.3.2':
+    resolution: {integrity: sha512-V3+dqf3iWlRYJ9I9GreM3zGQd0lAXnnoPeddmkOQYWAEE4l/+Fi6p7tx/qVUJlKQgLXGim2W76rTOzz+eC0i7g==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -3047,11 +3050,21 @@ snapshots:
 
   '@huggingface/tokenizers@0.2.0': {}
 
-  '@huggingface/transformers-structured-output@4.3.1(@huggingface/transformers@4.3.1(@types/node@24.19.2))':
+  '@huggingface/transformers-structured-output@4.3.2(@huggingface/transformers@4.3.2(@types/node@24.19.2))':
     dependencies:
-      '@huggingface/transformers': 4.3.1(@types/node@24.19.2)
+      '@huggingface/transformers': 4.3.2(@types/node@24.19.2)
 
   '@huggingface/transformers@4.3.1(@types/node@24.19.2)':
+    dependencies:
+      '@huggingface/jinja': 0.5.10
+      '@huggingface/tokenizers': 0.2.0
+      onnxruntime-node: 1.30.0
+      onnxruntime-web: 1.31.0-dev.20260914-8d85527a0
+      sharp: 0.35.5(@types/node@24.19.2)
+    transitivePeerDependencies:
+      - '@types/node'
+
+  '@huggingface/transformers@4.3.2(@types/node@24.19.2)':
     dependencies:
       '@huggingface/jinja': 0.5.10
       '@huggingface/tokenizers': 0.2.0

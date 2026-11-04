@@ -36,18 +36,31 @@ const UNCONDITIONALLY_READ_DIRECTORIES = [
   ].map((name) => `packages/${name}/dist`),
 ];
 
+/** The part of pnpm-lock.yaml that records what the pinned Transformers.js depends on. */
+const lockfile = (onnxRuntime: string): string =>
+  [
+    'snapshots:',
+    '',
+    "  '@huggingface/transformers@4.3.2(@types/node@24.19.2)':",
+    '    dependencies:',
+    '      sharp: 0.35.4',
+    `      onnxruntime-web: ${onnxRuntime}`,
+    '',
+  ].join('\n');
+
 const FILES: Record<string, string> = {
   'packages/core/package.json': JSON.stringify({
     peerDependencies: { '@opentelemetry/api': '1', zod: '4' },
   }),
   'packages/models/package.json': JSON.stringify({
     peerDependencies: {
-      '@huggingface/transformers': '4.3.1',
-      '@huggingface/transformers-structured-output': '4.3.1',
+      '@huggingface/transformers': '4.3.2',
+      '@huggingface/transformers-structured-output': '4.3.2',
       '@langchain/core': '1',
       '@langchain/openai': '1.6.3',
       '@mlc-ai/web-llm': '0.2.86',
     },
+    devDependencies: { 'onnxruntime-web': '1.31.0-dev.1' },
     peerDependenciesMeta: {
       '@huggingface/transformers': { optional: true },
       '@huggingface/transformers-structured-output': { optional: true },
@@ -55,6 +68,7 @@ const FILES: Record<string, string> = {
       '@mlc-ai/web-llm': { optional: true },
     },
   }),
+  'pnpm-lock.yaml': lockfile('1.31.0-dev.1'),
 };
 
 function run(extra: Record<string, string>): { status: number | null; output: string } {
@@ -273,18 +287,18 @@ test.each([
   ['the peer is missing', modelsPackage(WEBLLM, ['@mlc-ai/web-llm'])],
   [
     'the peer is not optional',
-    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '4.3.1' }, ['@mlc-ai/web-llm']),
+    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '4.3.2' }, ['@mlc-ai/web-llm']),
   ],
   [
-    'the peer is not exactly 4.3.1',
-    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '^4.3.1' }, [
+    'the peer is not exactly 4.3.2',
+    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '^4.3.2' }, [
       '@mlc-ai/web-llm',
       '@huggingface/transformers',
     ]),
   ],
   [
     'the structured-output peer is missing',
-    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '4.3.1' }, [
+    modelsPackage({ ...WEBLLM, '@huggingface/transformers': '4.3.2' }, [
       '@mlc-ai/web-llm',
       '@huggingface/transformers',
     ]),
@@ -294,19 +308,19 @@ test.each([
     modelsPackage(
       {
         ...WEBLLM,
-        '@huggingface/transformers': '4.3.1',
-        '@huggingface/transformers-structured-output': '4.3.1',
+        '@huggingface/transformers': '4.3.2',
+        '@huggingface/transformers-structured-output': '4.3.2',
       },
       ['@mlc-ai/web-llm', '@huggingface/transformers'],
     ),
   ],
   [
-    'the structured-output peer is not exactly 4.3.1',
+    'the structured-output peer is not exactly 4.3.2',
     modelsPackage(
       {
         ...WEBLLM,
-        '@huggingface/transformers': '4.3.1',
-        '@huggingface/transformers-structured-output': '^4.3.1',
+        '@huggingface/transformers': '4.3.2',
+        '@huggingface/transformers-structured-output': '^4.3.2',
       },
       [
         '@mlc-ai/web-llm',
@@ -401,3 +415,9 @@ test('syscall/js belongs only in the bridge package and the gate', () => {
   ];
   for (const text of mentions) expect(run({ 'go/galaxie/agent.go': text }).status, text).toBe(0);
 }, 60000);
+
+test('the hand-pinned ONNX Runtime must equal the one the pinned Transformers.js declares', () => {
+  const result = run({ 'pnpm-lock.yaml': lockfile('1.31.0-dev.2') });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('onnxruntime-web must equal 1.31.0-dev.2, found 1.31.0-dev.1');
+});

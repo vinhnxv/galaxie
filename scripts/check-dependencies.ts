@@ -337,9 +337,9 @@ if (
       '@langchain/openai',
       '@mlc-ai/web-llm',
     ]) ||
-  models.peerDependencies?.['@huggingface/transformers'] !== '4.3.1' ||
+  models.peerDependencies?.['@huggingface/transformers'] !== '4.3.2' ||
   models.peerDependenciesMeta?.['@huggingface/transformers']?.optional !== true ||
-  models.peerDependencies?.['@huggingface/transformers-structured-output'] !== '4.3.1' ||
+  models.peerDependencies?.['@huggingface/transformers-structured-output'] !== '4.3.2' ||
   models.peerDependenciesMeta?.['@huggingface/transformers-structured-output']?.optional !== true ||
   models.peerDependencies?.['@langchain/openai'] !== '1.6.3' ||
   models.peerDependenciesMeta?.['@langchain/openai']?.optional !== true ||
@@ -347,8 +347,26 @@ if (
   models.peerDependenciesMeta?.['@mlc-ai/web-llm']?.optional !== true
 )
   problems.push(
-    'packages/models/package.json: models peers must be @langchain/core, optional @huggingface/transformers 4.3.1, optional @huggingface/transformers-structured-output 4.3.1, optional @langchain/openai 1.6.3 and optional @mlc-ai/web-llm 0.2.86',
+    'packages/models/package.json: models peers must be @langchain/core, optional @huggingface/transformers 4.3.2, optional @huggingface/transformers-structured-output 4.3.2, optional @langchain/openai 1.6.3 and optional @mlc-ai/web-llm 0.2.86',
   );
+// The hand-pinned ONNX Runtime must be the one the pinned Transformers.js declares, or the Worker
+// would load a runtime the library was not built against.
+{
+  const transformersVersion = models.peerDependencies?.['@huggingface/transformers'];
+  const declared = readFileSync('pnpm-lock.yaml', 'utf8').match(
+    new RegExp(
+      `^  '@huggingface/transformers@${String(transformersVersion).replaceAll('.', '\\.')}\\([^\\n]*\\)':\\n(?:    [^\\n]*\\n)*?      onnxruntime-web: (\\S+)`,
+      'm',
+    ),
+  )?.[1];
+  const pinned = (models.devDependencies as Record<string, unknown> | undefined)?.[
+    'onnxruntime-web'
+  ];
+  if (declared === undefined || declared !== pinned)
+    problems.push(
+      `packages/models/package.json: onnxruntime-web must equal ${declared ?? 'the version @huggingface/transformers declares in pnpm-lock.yaml'}, found ${String(pinned)}`,
+    );
+}
 for (const field of [
   'dependencies',
   'devDependencies',

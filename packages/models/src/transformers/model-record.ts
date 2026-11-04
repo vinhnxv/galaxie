@@ -5,7 +5,7 @@ import { ModelError } from '../errors.js';
 
 export type TransformersDevice = 'webgpu' | 'wasm';
 
-/** The dtype names Transformers.js 4.3.1 maps to ONNX file suffixes. */
+/** The dtype names Transformers.js 4.3.2 maps to ONNX file suffixes. */
 export const transformersDtypes = [
   'fp32',
   'fp16',
