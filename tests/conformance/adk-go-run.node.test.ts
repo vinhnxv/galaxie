@@ -32,7 +32,6 @@ type Reply =
   | { readonly error: Error }
   | { readonly wait: Promise<void>; readonly entered: () => void };
 
-/** Answers each call from the next scripted reply and records the history it was shown. */
 class SequenceModel extends BaseChatModel {
   readonly requests: string[][] = [];
   readonly #replies: readonly Reply[];
@@ -123,7 +122,6 @@ afterAll(async () => {
   await disposeReference();
 });
 
-/** Opens an instance on the reference module with a scripted model and a doubling capability. */
 async function open(
   runtime: ReturnType<typeof createRuntime>,
   entry: string,
@@ -335,7 +333,6 @@ test.skipIf(!goAvailable)(
     try {
       const stuck = await open(runtime, 'spin', [{ text: 'never' }]);
       const started = Date.now();
-      // The loop never calls the model; cancel once the run has begun.
       const settled = await stuck.run('go', new Promise((resolve) => setTimeout(resolve, 300)));
       expect(settled.cancelled).toBe(true);
       expect(Date.now() - started).toBeLessThan(5000);

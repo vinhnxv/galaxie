@@ -138,7 +138,6 @@ test.skipIf(!goAvailable)(
     const { state } = await runInChromium(reference, false);
     const results = Object.values(state.results);
     expect(results.length + Object.keys(state.errors).length).toBeGreaterThan(0);
-    // The adapter cannot boot the module: no run produces an answer.
     for (const result of results) expect(result.output).toBe('');
     expect(
       Object.keys(state.errors).length + results.filter((r) => r.error).length,

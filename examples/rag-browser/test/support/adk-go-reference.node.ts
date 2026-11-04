@@ -25,7 +25,6 @@ export interface Reference {
 
 let built: Promise<Reference> | undefined;
 
-/** Verifies the glue, builds the reference module with the locked flags and bundles the Worker. */
 export function buildReference(): Promise<Reference> {
   built ??= (async () => {
     if (!goAvailable) throw new Error(missingGo);
@@ -75,7 +74,6 @@ export async function disposeReference(): Promise<void> {
 }
 
 export interface NodeHost {
-  /** The agent value to prepare with: the module reference at this host's loopback origin. */
   readonly wasm: { readonly url: string; readonly sha256: string; readonly bytes: number };
   /** Builds a Worker port; every message the Worker sends the page is also appended to `traffic`. */
   createWorker(): GoWorkerPort;
@@ -84,7 +82,6 @@ export interface NodeHost {
   close(): Promise<void>;
 }
 
-/** Serves the reference module on loopback and builds Node Workers that boot it. */
 export async function startNodeHost(reference: Reference): Promise<NodeHost> {
   const wasm = await readFile(reference.file);
   const server: Server = createServer((request, response) => {
@@ -113,7 +110,6 @@ export async function startNodeHost(reference: Reference): Promise<NodeHost> {
         (event: { readonly data: unknown }) => void,
         (data: unknown) => void
       >();
-      const errors = new Map<() => void, () => void>();
       return {
         postMessage: (message) => {
           traffic.push(`page>${message}`);
@@ -128,7 +124,6 @@ export async function startNodeHost(reference: Reference): Promise<NodeHost> {
             messages.set(listener, wrapped);
             worker.on('message', wrapped);
           } else {
-            errors.set(listener, listener);
             worker.on('error', listener);
           }
         }) as GoWorkerPort['addEventListener'],
@@ -139,7 +134,6 @@ export async function startNodeHost(reference: Reference): Promise<NodeHost> {
             messages.delete(listener);
           } else {
             worker.off('error', listener);
-            errors.delete(listener);
           }
         }) as GoWorkerPort['removeEventListener'],
         terminate: () => void worker.terminate(),

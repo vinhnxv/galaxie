@@ -24,7 +24,6 @@ const CODES: ReadonlySet<string> = new Set<ErrorCode>([
   'executor_error',
 ]);
 
-/** A code the Go program reported, or `executor_error` when it is not a galaxie error code. */
 export function errorCodeOf(value: string): ErrorCode {
   return CODES.has(value) ? (value as ErrorCode) : 'executor_error';
 }

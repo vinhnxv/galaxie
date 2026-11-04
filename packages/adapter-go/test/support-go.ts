@@ -11,16 +11,13 @@ import {
   type WorkerMessage,
 } from '../src/protocol.js';
 
-/** What a scripted Go program can do while a run is in flight. */
 export interface ProgramApi {
   readonly request: {
     readonly entry: string;
     readonly prompt: string;
     readonly conversation: string;
   };
-  /** Sends one bridge call and settles with its reply text or rejects with the reply's code. */
   call(op: 'model' | 'capability', payload: unknown): Promise<string>;
-  /** Settles when the page asks the program to cancel. */
   readonly cancelled: Promise<void>;
 }
 
@@ -29,7 +26,6 @@ export type Program = (api: ProgramApi) => Promise<string>;
 export const okResult = (output: string): string => JSON.stringify({ ok: true, output });
 export const failResult = (code: string): string => JSON.stringify({ ok: false, code });
 
-/** A Worker double that plays the Go side of the page protocol with a scripted program. */
 export class FakeGoWorker implements GoWorkerPort {
   readonly received: Exclude<HostMessage, BootMessage>[] = [];
   readonly sentToPage: string[] = [];
@@ -57,7 +53,6 @@ export class FakeGoWorker implements GoWorkerPort {
   postMessage(message: string): void {
     const host = parseHostMessage(message);
     if (host === undefined) {
-      // The boot message is not a host message; answer it with the ready handshake.
       queueMicrotask(() => this.emit(this.#build));
       return;
     }
@@ -99,7 +94,6 @@ export class FakeGoWorker implements GoWorkerPort {
       () => this.emit({ v: 1, kind: 'done', runId, result: failResult('executor_error') }),
     );
   }
-  /** Emits a raw call frame, for protocol misuse tests. */
   emitCall(id: string, op: 'model' | 'capability', payload: string): void {
     this.emit({ v: 1, kind: 'call', runId: this.#runId ?? 'r1', id, op, payload });
   }

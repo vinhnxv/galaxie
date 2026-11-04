@@ -94,7 +94,6 @@ func workflow(config agent.Config, create func(agent.Config) (agent.Agent, error
 	return created, nil
 }
 
-// hasExitLoop reports whether any LlmAgent below the loop carries the exit tool.
 func hasExitLoop(root agent.Agent) bool {
 	r := active()
 	for _, child := range root.SubAgents() {

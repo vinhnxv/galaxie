@@ -12,6 +12,7 @@ import {
   parseModelPayload,
 } from './bridge.js';
 import { adapterFailure } from './errors.js';
+import { isRecord } from './protocol.js';
 
 export type GoChatModel =
   | BaseChatModel
@@ -37,20 +38,16 @@ export interface ActiveRun {
   cancelled: boolean;
 }
 
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 export function validServices(
   services: unknown,
   models?: ModelPreparation,
 ): services is GoServices {
-  if (!object(services) || !object(services['chatModels'])) return false;
+  if (!isRecord(services) || !isRecord(services['chatModels'])) return false;
   const implementations = services['chatModels'];
   if (
     !Object.values(implementations).every(
       (model) =>
-        typeof model === 'function' || (object(model) && typeof model['invoke'] === 'function'),
+        typeof model === 'function' || (isRecord(model) && typeof model['invoke'] === 'function'),
     )
   )
     return false;
@@ -79,7 +76,10 @@ function aborted(run: ActiveRun): boolean {
 }
 
 function callsOf(reply: AIMessage, offered: ReadonlySet<string>): BridgeToolCall[] {
-  if (reply.invalid_tool_calls?.length || reply.additional_kwargs['tool_calls'] !== undefined)
+  if (
+    reply.invalid_tool_calls?.length ||
+    (offered.size === 0 && reply.additional_kwargs['tool_calls'] !== undefined)
+  )
     throw adapterFailure('invalid');
   return (reply.tool_calls ?? []).map((call) => {
     if (typeof call.id !== 'string' || call.id.length === 0 || call.id.length > 128)
@@ -96,7 +96,7 @@ function callsOf(reply: AIMessage, offered: ReadonlySet<string>): BridgeToolCall
 function usageOf(reply: AIMessage): ModelReply['usage'] {
   const reported: unknown = Reflect.get(reply, 'usage_metadata');
   if (reported === undefined) return undefined;
-  if (!object(reported)) throw adapterFailure('invalid');
+  if (!isRecord(reported)) throw adapterFailure('invalid');
   const input = reported['input_tokens'];
   const output = reported['output_tokens'];
   const total = reported['total_tokens'];
@@ -148,8 +148,6 @@ export async function serveModel(
       typeof implementation === 'function'
         ? implementation({ credential: lease.credential as string })
         : implementation;
-    if (offered.size > 0 && typeof provider.bindTools !== 'function')
-      throw adapterFailure('unsupported');
     const bound =
       offered.size > 0 ? provider.bindTools?.([...(input.options.tools ?? [])]) : provider;
     if (!bound) throw adapterFailure('unsupported');
@@ -174,7 +172,7 @@ export async function serveModel(
               } catch {
                 throw adapterFailure('invalid');
               }
-              if (!object(args)) throw adapterFailure('invalid');
+              if (!isRecord(args)) throw adapterFailure('invalid');
               return { id: toolCall.id, name: toolCall.function.name, args };
             }),
           });
@@ -192,9 +190,12 @@ export async function serveModel(
     const calls = callsOf(reply, offered);
     if (offered.size === 0 && (reply.tool_calls?.length ?? 0) > 0)
       throw adapterFailure('unsupported');
-    // Call arguments, IDs and names are model text that Go receives, so they are checked too.
+    // Call arguments, IDs and names are model text that Go receives, so they are checked too. A
+    // provider that mirrors its raw calls into additional_kwargs has them checked as well.
+    const raw: unknown = reply.additional_kwargs['tool_calls'];
     const checked = [
       reply.content,
+      ...(raw === undefined ? [] : [JSON.stringify(raw)]),
       ...calls.map((item) => item.function.arguments),
       ...calls.map((item) => item.id),
       ...calls.map((item) => item.function.name),
@@ -207,7 +208,6 @@ export async function serveModel(
       ...(calls.length ? { toolCalls: calls } : {}),
       ...(usage === undefined ? {} : { usage }),
     };
-    // Validate the reply before settling usage or exposing it to Go.
     const encoded = encodeReply(result);
     finish(
       run,

@@ -47,8 +47,11 @@ async function harness(
   script: ConstructorParameters<typeof MockChatModel>[0],
   workerOptions: ConstructorParameters<typeof FakeGoWorker>[1] = {},
   capability = vi.fn(async () => ({ hits: 2 })),
+  adjust: (model: MockChatModel) => void = () => undefined,
 ) {
   const worker = new FakeGoWorker(program, workerOptions);
+  const model = new MockChatModel(script);
+  adjust(model);
   const runtime = createRuntime({
     appId: 'adk-go-test',
     executors: [createGoAdapter({ createWorker: () => worker })],
@@ -57,7 +60,7 @@ async function harness(
   const instance = await runtime.create(definition, {
     principalScope: 'fixture',
     agent,
-    services: { chatModels: { mock: new MockChatModel(script) } },
+    services: { chatModels: { mock: model } },
     models: {
       providers: { mock: provider },
       roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
@@ -290,5 +293,59 @@ test('a Worker exit during a run fails the run unavailable', async () => {
   expect(last(await collect(instance.events(runId)))).toMatchObject({
     error: { code: 'unavailable' },
   });
+  await runtime.dispose();
+});
+
+test('a prompt above the bridge limit fails unsupported without reaching the program', async () => {
+  const { instance, runtime, worker } = await harness(async () => okResult('unreachable'), {});
+  const { runId } = await instance.start({ prompt: 'x'.repeat(1_048_577) });
+  expect(last(await collect(instance.events(runId)))).toMatchObject({
+    type: 'error',
+    error: { code: 'unsupported' },
+  });
+  expect(worker.received).toEqual([]);
+  await runtime.dispose();
+});
+
+test('a reply that mirrors raw tool calls into additional_kwargs still serves the checked calls', async () => {
+  const seen: unknown[] = [];
+  const { instance, runtime } = await harness(
+    async (api) => {
+      const tools = [
+        {
+          type: 'function',
+          function: { name: 'search', parameters: { type: 'object', properties: {} } },
+        },
+      ];
+      seen.push(
+        JSON.parse(await api.call('model', modelPayload('hello', { tools }))) as {
+          content: string;
+        },
+      );
+      return okResult('done');
+    },
+    {
+      hello: {
+        id: 'a',
+        text: '',
+        toolCalls: [{ id: 'call-1', name: 'search', args: { query: 'paris' } }],
+      },
+    },
+    {},
+    vi.fn(async () => ({ hits: 2 })),
+    (model) => {
+      const invoke = model.invoke.bind(model);
+      model.invoke = (async (...input: Parameters<typeof invoke>) => {
+        const reply = await invoke(...input);
+        reply.additional_kwargs['tool_calls'] = [
+          { id: 'call-1', type: 'function', function: { name: 'search', arguments: '{}' } },
+        ];
+        return reply;
+      }) as typeof model.invoke;
+    },
+  );
+  const { runId } = await instance.start({ prompt: 'hello' });
+  expect(last(await collect(instance.events(runId)))).toMatchObject({ output: 'done' });
+  expect(seen).toHaveLength(1);
   await runtime.dispose();
 });

@@ -11,6 +11,7 @@ import type { ChatResult } from '@langchain/core/outputs';
 import { z } from 'zod';
 import {
   createGoAdapter,
+  type GoWasmReference,
   type GoWorkerPort,
 } from '../../../../../packages/adapter-go/src/index.js';
 
@@ -35,11 +36,6 @@ export interface Observed {
   readonly output: string;
   readonly error: { code: string } | null;
   readonly coldStartMs: number | undefined;
-}
-export interface WasmReference {
-  readonly url: string;
-  readonly sha256: string;
-  readonly bytes: number;
 }
 
 /** Answers with the next scripted reply whatever the messages say; the goldens compare requests. */
@@ -90,11 +86,10 @@ const definition = defineAgentDefinition({
   models: { answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
 });
 
-/** Runs one case against the reference module and records what the program sent the page. */
 export async function runCase(
   name: string,
   script: Script,
-  wasm: WasmReference,
+  wasm: GoWasmReference,
   createWorker: () => GoWorkerPort,
 ): Promise<Observed> {
   const frames: Array<{ op: string; payload: unknown }> = [];

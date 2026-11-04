@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-/** The largest module the adapter will fetch and compile. */
 export const MAX_WASM_BYTES: number = 64 * 1024 * 1024;
 
 /** The Go module the host reviewed: where to fetch it and what it must be. */
@@ -75,13 +74,24 @@ export type WorkerMessage =
     }
   | { readonly v: 1; readonly kind: 'done'; readonly runId: string; readonly result: string };
 
-function object(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Whether the text's UTF-8 form fits one bridge message; the length bounds skip most encoding. */
+export function withinBridgeLimit(text: string): boolean {
+  if (text.length > MAX_BRIDGE_BYTES) return false;
+  if (text.length * 3 <= MAX_BRIDGE_BYTES) return true;
+  return new TextEncoder().encode(text).byteLength <= MAX_BRIDGE_BYTES;
+}
+
+export function failedRun(code: string): string {
+  return JSON.stringify({ ok: false, code });
 }
 
 export function validWasmReference(value: unknown): value is GoWasmReference {
   return (
-    object(value) &&
+    isRecord(value) &&
     Object.keys(value).length === 3 &&
     typeof value['url'] === 'string' &&
     typeof value['sha256'] === 'string' &&
@@ -107,14 +117,12 @@ export function validUrl(value: unknown, base?: string): value is string {
 const IDENTIFIER = /^[A-Za-z0-9_.:-]{1,64}$/;
 
 function boundedText(value: unknown): value is string {
-  return (
-    typeof value === 'string' && new TextEncoder().encode(value).byteLength <= MAX_BRIDGE_BYTES
-  );
+  return typeof value === 'string' && withinBridgeLimit(value);
 }
 
 function validModule(value: unknown): value is GoModuleInfo {
   return (
-    object(value) &&
+    isRecord(value) &&
     Object.keys(value).length === 2 &&
     typeof value['version'] === 'string' &&
     typeof value['sum'] === 'string'
@@ -123,7 +131,7 @@ function validModule(value: unknown): value is GoModuleInfo {
 
 export function validBuildInfo(value: unknown): value is GoBuildInfo {
   return (
-    object(value) &&
+    isRecord(value) &&
     Object.keys(value).length === 3 &&
     typeof value['go'] === 'string' &&
     validModule(value['adk']) &&
@@ -153,7 +161,7 @@ export function encodeHostMessage(message: HostMessage): string {
 export function parseBoot(data: unknown): BootMessage {
   const value: unknown = typeof data === 'string' ? JSON.parse(data) : undefined;
   if (
-    !object(value) ||
+    !isRecord(value) ||
     value['v'] !== 1 ||
     value['kind'] !== 'boot' ||
     Object.keys(value).length !== 3 ||
@@ -171,7 +179,7 @@ export function parseHostMessage(data: unknown): Exclude<HostMessage, BootMessag
   } catch {
     return undefined;
   }
-  if (!object(value) || value['v'] !== 1 || typeof value['runId'] !== 'string') return undefined;
+  if (!isRecord(value) || value['v'] !== 1 || typeof value['runId'] !== 'string') return undefined;
   if (!IDENTIFIER.test(value['runId'])) return undefined;
   const keys = Object.keys(value).length;
   if (value['kind'] === 'run' && keys === 4 && boundedText(value['request']))
@@ -202,7 +210,7 @@ export function parseWorkerMessage(data: unknown): WorkerMessage | undefined {
   } catch {
     return undefined;
   }
-  if (!object(value) || value['v'] !== 1) return undefined;
+  if (!isRecord(value) || value['v'] !== 1) return undefined;
   const keys = Object.keys(value).length;
   if (
     value['kind'] === 'ready' &&

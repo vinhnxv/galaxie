@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { adapterFailure } from './errors.js';
-import { MAX_BRIDGE_BYTES } from './protocol.js';
+import { isRecord, withinBridgeLimit } from './protocol.js';
 
 /** One function call a model asked for, in the OpenAI-compatible shape the Go side sends back. */
 export interface BridgeToolCall {
@@ -54,11 +54,6 @@ export interface ModelReply {
   };
 }
 
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Accepts an object whose keys are all allowed and which has every required key. */
 function keys(
   value: Record<string, unknown>,
   required: string[],
@@ -71,7 +66,6 @@ function keys(
   );
 }
 
-/** Rejects values JSON cannot carry: non-finite numbers, cycles and anything beyond plain data. */
 function plain(value: unknown, seen: Set<object> = new Set(), depth = 0): boolean {
   if (depth > 64) return false;
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
@@ -87,14 +81,14 @@ function plain(value: unknown, seen: Set<object> = new Set(), depth = 0): boolea
 const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const CALL_ID = /^.{1,128}$/s;
 
-export function validToolCall(value: unknown): value is BridgeToolCall {
+function validToolCall(value: unknown): value is BridgeToolCall {
   return (
-    object(value) &&
+    isRecord(value) &&
     keys(value, ['id', 'type', 'function']) &&
     typeof value['id'] === 'string' &&
     CALL_ID.test(value['id']) &&
     value['type'] === 'function' &&
-    object(value['function']) &&
+    isRecord(value['function']) &&
     keys(value['function'], ['name', 'arguments']) &&
     typeof value['function']['name'] === 'string' &&
     NAME.test(value['function']['name']) &&
@@ -103,7 +97,7 @@ export function validToolCall(value: unknown): value is BridgeToolCall {
 }
 
 function validMessage(value: unknown): value is BridgeMessage {
-  if (!object(value) || typeof value['content'] !== 'string') return false;
+  if (!isRecord(value) || typeof value['content'] !== 'string') return false;
   switch (value['role']) {
     case 'system':
     case 'user':
@@ -127,24 +121,22 @@ function validMessage(value: unknown): value is BridgeMessage {
 
 function validTool(value: unknown): value is BridgeTool {
   return (
-    object(value) &&
+    isRecord(value) &&
     keys(value, ['type', 'function']) &&
     value['type'] === 'function' &&
-    object(value['function']) &&
+    isRecord(value['function']) &&
     keys(value['function'], ['name', 'parameters'], ['description']) &&
     typeof value['function']['name'] === 'string' &&
     NAME.test(value['function']['name']) &&
     (value['function']['description'] === undefined ||
       typeof value['function']['description'] === 'string') &&
-    object(value['function']['parameters']) &&
+    isRecord(value['function']['parameters']) &&
     plain(value['function']['parameters'])
   );
 }
 
-/** Parses bridge text: a frame over the limit is `unsupported`, any other defect `invalid`. */
-export function parseFrame(text: string): unknown {
-  if (new TextEncoder().encode(text).byteLength > MAX_BRIDGE_BYTES)
-    throw adapterFailure('unsupported');
+function parseFrame(text: string): unknown {
+  if (!withinBridgeLimit(text)) throw adapterFailure('unsupported');
   try {
     return JSON.parse(text);
   } catch {
@@ -155,14 +147,14 @@ export function parseFrame(text: string): unknown {
 export function parseModelPayload(text: string): ModelPayload {
   const value = parseFrame(text);
   if (
-    !object(value) ||
+    !isRecord(value) ||
     !keys(value, ['role', 'messages', 'options']) ||
     typeof value['role'] !== 'string' ||
     !/^[A-Za-z0-9_.-]{1,64}$/.test(value['role']) ||
     !Array.isArray(value['messages']) ||
     value['messages'].length === 0 ||
     !value['messages'].every(validMessage) ||
-    !object(value['options']) ||
+    !isRecord(value['options']) ||
     !keys(value['options'], [], ['stop', 'stream', 'tools', 'jsonSchema'])
   )
     throw adapterFailure('invalid');
@@ -176,7 +168,7 @@ export function parseModelPayload(text: string): ModelPayload {
     (options['tools'] !== undefined &&
       !(Array.isArray(options['tools']) && options['tools'].every(validTool))) ||
     (options['jsonSchema'] !== undefined &&
-      !(object(options['jsonSchema']) && plain(options['jsonSchema'])))
+      !(isRecord(options['jsonSchema']) && plain(options['jsonSchema'])))
   )
     throw adapterFailure('invalid');
   return value as unknown as ModelPayload;
@@ -185,11 +177,11 @@ export function parseModelPayload(text: string): ModelPayload {
 export function parseCapabilityPayload(text: string): CapabilityPayload {
   const value = parseFrame(text);
   if (
-    !object(value) ||
+    !isRecord(value) ||
     !keys(value, ['name', 'input'], ['effectScope']) ||
     typeof value['name'] !== 'string' ||
     value['name'].length === 0 ||
-    !object(value['input']) ||
+    !isRecord(value['input']) ||
     !plain(value['input']) ||
     (value['effectScope'] !== undefined &&
       !(typeof value['effectScope'] === 'string' && value['effectScope'].length <= 512))
@@ -198,33 +190,28 @@ export function parseCapabilityPayload(text: string): CapabilityPayload {
   return value as unknown as CapabilityPayload;
 }
 
-/** Encodes a reply for Go; a reply that cannot be carried is `unsupported` or `invalid`. */
 export function encodeReply(value: unknown): string {
   if (!plain(value)) throw adapterFailure('invalid');
   const text = JSON.stringify(value);
-  if (new TextEncoder().encode(text).byteLength > MAX_BRIDGE_BYTES)
-    throw adapterFailure('unsupported');
+  if (!withinBridgeLimit(text)) throw adapterFailure('unsupported');
   return text;
 }
 
-export interface RunResult {
-  readonly ok: boolean;
-  readonly output?: string;
-  readonly code?: string;
-}
+export type RunResult =
+  | { readonly ok: true; readonly output: string }
+  | { readonly ok: false; readonly code: string };
 
-/** Parses what `galaxieGo.run` settled with: `{ok:true,output}` or `{ok:false,code}`. */
 export function parseRunResult(text: string): RunResult {
   const value = parseFrame(text);
   if (
-    object(value) &&
+    isRecord(value) &&
     value['ok'] === true &&
     keys(value, ['ok'], ['output']) &&
     (value['output'] === undefined || typeof value['output'] === 'string')
   )
     return { ok: true, output: (value['output'] as string | undefined) ?? '' };
   if (
-    object(value) &&
+    isRecord(value) &&
     value['ok'] === false &&
     keys(value, ['ok', 'code']) &&
     typeof value['code'] === 'string'

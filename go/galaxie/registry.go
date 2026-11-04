@@ -18,7 +18,6 @@ import (
 
 const maxDepth = 16
 
-// node is what the registry knows about one agent.
 type node struct {
 	model *llm.LLM
 	tools []tool.Tool
@@ -30,7 +29,6 @@ type recorder struct {
 	agents map[agent.Agent]node
 	tools  map[tool.Tool]bool
 	models map[*llm.LLM]bool
-	loops  map[agent.Agent]bool // loops that may run without a bound
 }
 
 var (
@@ -38,8 +36,6 @@ var (
 	current *recorder
 )
 
-// record runs build while recording what it creates, then validates the tree it returns. Builds are
-// serialized: the constructors write to the one active recorder.
 func record(build func() (agent.Agent, error)) (agent.Agent, error) {
 	buildMu.Lock()
 	defer buildMu.Unlock()
@@ -47,7 +43,6 @@ func record(build func() (agent.Agent, error)) (agent.Agent, error) {
 		agents: map[agent.Agent]node{},
 		tools:  map[tool.Tool]bool{},
 		models: map[*llm.LLM]bool{},
-		loops:  map[agent.Agent]bool{},
 	}
 	defer func() { current = nil }()
 	root, err := build()
@@ -60,7 +55,6 @@ func record(build func() (agent.Agent, error)) (agent.Agent, error) {
 	return root, nil
 }
 
-// validate walks the tree from the root and refuses anything the constructors did not create.
 func (r *recorder) validate(root agent.Agent) error {
 	if root == nil {
 		return llm.NewError("unsupported")
@@ -91,5 +85,4 @@ func (r *recorder) walk(current agent.Agent, path map[agent.Agent]bool, depth in
 	return nil
 }
 
-// active returns the recorder of the build in progress, or nil.
 func active() *recorder { return current }

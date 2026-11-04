@@ -5,12 +5,13 @@ import { loadGoWasm, workerLoaderEnvironment } from './loader.js';
 import {
   type BridgeOp,
   encodeWorkerMessage,
-  MAX_BRIDGE_BYTES,
+  failedRun,
   parseBoot,
   parseHostMessage,
   validBuildInfo,
   validUrl,
   type WorkerMessage,
+  withinBridgeLimit,
 } from './protocol.js';
 
 // Module Workers cannot run classic scripts; fail before any caller reaches that unsupported call.
@@ -31,7 +32,6 @@ interface Pending {
   readonly reject: (error: Error) => void;
 }
 
-/** The one active run and the calls the Go program has in flight for it. */
 let activeRun: string | undefined;
 let nextCall = 0;
 const pending = new Map<string, Pending>();
@@ -40,7 +40,7 @@ const pending = new Map<string, Pending>();
 const bridge = {
   call(op: BridgeOp, payload: string): Promise<string> {
     const runId = activeRun;
-    if (runId === undefined || new TextEncoder().encode(payload).byteLength > MAX_BRIDGE_BYTES)
+    if (runId === undefined || !withinBridgeLimit(payload))
       return Promise.reject(new Error('invalid'));
     const id = `c${++nextCall}`;
     return new Promise<string>((resolve, reject) => {
@@ -62,17 +62,21 @@ function goHandle(): { run?: (request: string) => Promise<string>; cancel?: () =
 
 async function run(runId: string, request: string): Promise<void> {
   activeRun = runId;
-  let result = JSON.stringify({ ok: false, code: 'unavailable' });
+  let result = failedRun('unavailable');
   try {
     const handle = goHandle();
     if (typeof handle.run === 'function') result = await handle.run(request);
   } catch {
-    // A Go program that panicked or exited cannot answer: the run fails with the fixed code.
-    result = JSON.stringify({ ok: false, code: 'unavailable' });
+    result = failedRun('unavailable');
   }
   rejectPending('cancelled');
   activeRun = undefined;
-  send({ v: 1, kind: 'done', runId, result });
+  send({
+    v: 1,
+    kind: 'done',
+    runId,
+    result: withinBridgeLimit(result) ? result : failedRun('unsupported'),
+  });
 }
 
 // The host entry imports the hash-checked `wasm_exec.js` before this module, so `Go` is defined.
@@ -115,8 +119,7 @@ function handle(data: unknown): void {
   if (!message) return;
   if (message.kind === 'run') {
     if (activeRun === undefined) void run(message.runId, message.request);
-    else
-      send({ v: 1, kind: 'done', runId: message.runId, result: '{"ok":false,"code":"invalid"}' });
+    else send({ v: 1, kind: 'done', runId: message.runId, result: failedRun('invalid') });
   } else if (message.kind === 'cancel') {
     if (message.runId === activeRun) goHandle().cancel?.();
   } else if (message.kind === 'reply') {

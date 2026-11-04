@@ -19,13 +19,11 @@ import (
 )
 
 const (
-	scriptsPath = "../../tests/conformance/cases-adk-go/scripts.json"
-	goldenDir   = "../../tests/conformance/golden-adk-go"
-	// recordVariable switches the lane from comparing to recording the goldens.
+	scriptsPath    = "../../tests/conformance/cases-adk-go/scripts.json"
+	goldenDir      = "../../tests/conformance/golden-adk-go"
 	recordVariable = "GALAXIE_RECORD_ADK_GO"
 )
 
-// script is one case: the entry to run, the prompt and the page's scripted answers.
 type script struct {
 	Entry        string                       `json:"entry"`
 	Prompt       string                       `json:"prompt"`
@@ -38,7 +36,6 @@ type capabilityOutcome struct {
 	Error  string          `json:"error"`
 }
 
-// transcript is what the golden records: every request the program sent, in order, and its end.
 type transcript struct {
 	Requests     []json.RawMessage `json:"requests"`
 	Responses    []json.RawMessage `json:"responses"`
@@ -51,7 +48,6 @@ type failure struct {
 	Code string `json:"code"`
 }
 
-// recorder plays the page: it answers from the script and writes down what the program sent.
 type recorder struct {
 	mu     sync.Mutex
 	script script
@@ -121,7 +117,6 @@ func indent(t *testing.T, value any) []byte {
 	return buffer.Bytes()
 }
 
-// normalize re-encodes raw JSON so key order and spacing never decide a comparison.
 func normalize(t *testing.T, raw []byte) []byte {
 	t.Helper()
 	var value any

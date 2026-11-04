@@ -4,8 +4,8 @@
 // Hosts configure zod before anything validates: its JIT probe is a Trusted Types sink.
 import '../../../src/host/zod-config.js';
 import type { GoWorkerPort } from '../../../../../packages/adapter-go/src/index.js';
-import { type Observed, runCase, type Script } from './run.ts';
-import workerUrl from './worker.ts?worker&url';
+import workerUrl from '../go-gate/adapter-worker.ts?worker&url';
+import { type Observed, runCase, type Script } from './run.js';
 
 declare const REFERENCE_WASM: { url: string; sha256: string; bytes: number };
 declare const REFERENCE_SCRIPTS: Record<string, Script>;
@@ -24,7 +24,6 @@ addEventListener('securitypolicyviolation', (event) =>
   ),
 );
 
-// Only the adapter's own Worker may be constructed; anything else is refused.
 const allowed = new URL(workerUrl, location.href).href;
 const factory = Reflect.get(globalThis, 'trustedTypes') as {
   createPolicy(name: string, rules: { createScriptURL(value: string): string }): unknown;

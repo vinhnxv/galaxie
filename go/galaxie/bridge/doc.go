@@ -74,5 +74,8 @@ func encodeResult(output string, err error) string {
 		return string(encoded)
 	}
 	encoded, _ := json.Marshal(result{OK: true, Output: output})
+	if len(encoded) > llm.MaxFrameBytes {
+		encoded, _ = json.Marshal(result{Code: "unsupported"})
+	}
 	return string(encoded)
 }

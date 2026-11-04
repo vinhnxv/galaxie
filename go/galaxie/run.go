@@ -85,7 +85,7 @@ func Execute(parent context.Context, caller llm.Caller, entry Entry, input Input
 	if fatal := run.Fatal(); fatal != nil {
 		return "", fatal
 	}
-	if run.Cancelled() || ctx.Err() != nil && parent.Err() != nil {
+	if ctx.Err() != nil && parent.Err() != nil {
 		return "", llm.NewError("cancelled")
 	}
 	if failure != nil {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"google.golang.org/adk/model"
@@ -73,7 +74,6 @@ func textOf(parts []*genai.Part) (string, error) {
 	return text.String(), nil
 }
 
-// textPart reports whether a part is plain text; thought parts are not carried.
 func textPart(part *genai.Part) bool {
 	return !part.Thought && part.ThoughtSignature == nil && part.FunctionCall == nil &&
 		part.FunctionResponse == nil && part.InlineData == nil && part.FileData == nil &&
@@ -104,7 +104,7 @@ func (c *callIDs) call(call *genai.FunctionCall) string {
 func (c *callIDs) response(response *genai.FunctionResponse) (string, bool) {
 	for index, call := range c.pending {
 		if (response.ID != "" && call.id == response.ID) || (response.ID == "" && call.name == response.Name) {
-			c.pending = append(c.pending[:index], c.pending[index+1:]...)
+			c.pending = slices.Delete(c.pending, index, index+1)
 			return call.id, true
 		}
 	}
@@ -212,7 +212,6 @@ func toolDefinitions(tools []*genai.Tool) ([]ToolDefinition, error) {
 	return definitions, nil
 }
 
-// otherToolKinds reports whether a tool carries anything besides function declarations.
 func otherToolKinds(tool *genai.Tool) bool {
 	copied := *tool
 	copied.FunctionDeclarations = nil
@@ -241,7 +240,6 @@ func responseSchema(config *genai.GenerateContentConfig) (map[string]any, error)
 	}
 }
 
-// jsonObject converts any JSON-encodable schema value to a plain map.
 func jsonObject(value any) (map[string]any, error) {
 	encoded, err := json.Marshal(value)
 	if err != nil {

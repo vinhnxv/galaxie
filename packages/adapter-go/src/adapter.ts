@@ -23,6 +23,7 @@ import {
   type BootMessage,
   encodeBoot,
   encodeHostMessage,
+  failedRun,
   type GoBuildInfo,
   type GoWasmReference,
   type HostMessage,
@@ -31,6 +32,7 @@ import {
   validUrl,
   validWasmReference,
   type WorkerMessage,
+  withinBridgeLimit,
 } from './protocol.js';
 
 /** The Go agent a host prepares: the reviewed module and the entry it serves. */
@@ -67,7 +69,6 @@ export interface GoAdapterOptions {
 export const GO_EXECUTOR_ID = 'adk-go';
 const DEFAULT_READY_TIMEOUT_MS = 30_000;
 const MAX_READY_TIMEOUT_MS = 120_000;
-/** How long a cancelled run may take to settle before the Worker is terminated. */
 const CANCEL_GRACE_MS = 500;
 
 function validAgent(agent: unknown): agent is GoAgent {
@@ -117,9 +118,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       const notify = (event: GoBootEvent): void => {
         try {
           options.onBoot?.(event);
-        } catch {
-          // A host callback never changes the outcome of the boot.
-        }
+        } catch {}
       };
       notify({ phase: 'booting' });
       let worker: GoWorkerPort;
@@ -142,7 +141,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       };
       const markDead = (): void => {
         dead = true;
-        settleRun?.(JSON.stringify({ ok: false, code: 'unavailable' }));
+        settleRun?.(failedRun('unavailable'));
       };
 
       const handleCall = (message: Extract<WorkerMessage, { kind: 'call' }>): void => {
@@ -275,6 +274,12 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               conversation = `g${conversations.size + 1}`;
               conversations.set(request.sessionId, conversation);
             }
+            const runRequest = JSON.stringify({
+              entry: agent.entry,
+              prompt: Reflect.get(input, 'prompt'),
+              conversation,
+            });
+            if (!withinBridgeLimit(runRequest)) throw adapterFailure('unsupported');
             const current: ActiveRun = {
               id: `r${++runCounter}`,
               request,
@@ -307,30 +312,23 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               });
               try {
                 send({ v: 1, kind: 'cancel', runId: current.id });
-              } catch {
-                // The Worker is gone; the timeout above settles the run.
-              }
+              } catch {}
             };
             request.signal.addEventListener('abort', cancel, { once: true });
             send({
               v: 1,
               kind: 'run',
               runId: current.id,
-              request: JSON.stringify({
-                entry: agent.entry,
-                prompt: Reflect.get(input, 'prompt'),
-                conversation,
-              }),
+              request: runRequest,
             });
             if (request.signal.aborted) cancel();
             const text = await result;
             settled = true;
             const outcome = parseRunResult(text);
             if (!request.signal.aborted) {
-              if (outcome.ok) yield { type: 'output', output: outcome.output ?? '' };
+              if (outcome.ok) yield { type: 'output', output: outcome.output };
               else {
-                const code = outcome.code ?? '';
-                yield { type: 'error', error: toErrorInfo(errorCodeOf(code)) };
+                yield { type: 'error', error: toErrorInfo(errorCodeOf(outcome.code)) };
               }
             }
           } catch (error) {

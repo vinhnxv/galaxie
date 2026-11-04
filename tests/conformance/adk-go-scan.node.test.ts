@@ -148,7 +148,6 @@ test.skipIf(!goAvailable).each(['success', '401', 'transport-error'] as const)(
         ([name]) => name !== 'authorization',
       );
       expect(serialize({ body: requests[0]?.body, headers: otherHeaders })).not.toContain(canary);
-      // The Go side sees the prompt and the checked reply, never the credential.
       const traffic = nodeHost.traffic.slice(trafficStart).join('\n');
       expect(traffic).toContain(prompt);
       expect(traffic).not.toContain(canary);

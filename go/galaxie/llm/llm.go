@@ -96,7 +96,6 @@ func (m *LLM) call(ctx context.Context, run *Run, request *model.LLMRequest) (*m
 	return response, nil
 }
 
-// branchOf reads the agent branch from the context ADK passes to the model, when it exposes one.
 func branchOf(ctx context.Context) string {
 	if source, ok := ctx.(interface{ Branch() string }); ok {
 		return sanitizeBranch(source.Branch())

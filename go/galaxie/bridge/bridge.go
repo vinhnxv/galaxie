@@ -17,7 +17,6 @@ import (
 	"galaxie.invalid/galaxie/galaxie/llm"
 )
 
-// page sends requests to the page through galaxieBridge.call.
 type page struct{}
 
 func (page) Call(ctx context.Context, op string, payload []byte) ([]byte, error) {
@@ -96,5 +95,7 @@ func run(handler Handler, args []js.Value) any {
 		}()
 		return nil
 	})
-	return js.Global().Get("Promise").New(executor)
+	promise := js.Global().Get("Promise").New(executor)
+	executor.Release()
+	return promise
 }

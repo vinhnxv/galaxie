@@ -19,7 +19,6 @@ import (
 	"galaxie.invalid/galaxie/galaxie/llm"
 )
 
-// scripted answers model calls in order and capability calls with a function.
 type scripted struct {
 	mu         sync.Mutex
 	replies    []string
@@ -226,4 +225,66 @@ func (b *blocking) Call(ctx context.Context, _ string, _ []byte) ([]byte, error)
 	}
 	<-ctx.Done()
 	return nil, ctx.Err()
+}
+
+func twoToolCalls() string {
+	call := func(id string) string {
+		return `{"id":"` + id + `","type":"function","function":{"name":"math_double_1","arguments":"{\"value\":3}"}}`
+	}
+	return `{"content":"","toolCalls":[` + call("p1") + `,` + call("p2") + `]}`
+}
+
+func TestASecondToolOfTheSameTurnNeverDispatchesAfterAFatalFailure(t *testing.T) {
+	caller := &scripted{
+		replies:    []string{twoToolCalls(), `{"content":"never"}`},
+		capability: func(llm.CapabilityRequest) (string, error) { return "", llm.NewError("budget_exceeded") },
+	}
+	_, err := galaxie.Execute(context.Background(), caller, singleAgent, galaxie.Input{Prompt: "go", Conversation: "c"})
+	var failure *llm.Error
+	if !errors.As(err, &failure) || failure.Code != "budget_exceeded" {
+		t.Fatalf("err = %v", err)
+	}
+	if len(caller.calls) != 1 || len(caller.models) != 1 {
+		t.Fatalf("dispatched %d capabilities and %d model requests", len(caller.calls), len(caller.models))
+	}
+}
+
+func TestAParallelAgentRunsItsBranches(t *testing.T) {
+	parallel := func() (agent.Agent, error) {
+		var branches []agent.Agent
+		for _, name := range []string{"left", "right"} {
+			branch, err := galaxie.LlmAgent(llmagent.Config{Name: name, Model: galaxie.Model("answer")})
+			if err != nil {
+				return nil, err
+			}
+			branches = append(branches, branch)
+		}
+		return galaxie.ParallelAgent(agent.Config{Name: "fan", SubAgents: branches})
+	}
+	caller := &scripted{replies: []string{`{"content":"a"}`, `{"content":"a"}`}}
+	output, err := galaxie.Execute(context.Background(), caller, parallel, galaxie.Input{Prompt: "go", Conversation: "c"})
+	if err != nil || output != "a" || len(caller.models) != 2 {
+		t.Fatalf("output = %q, models = %d, err = %v", output, len(caller.models), err)
+	}
+}
+
+func TestATreeDeeperThanTheLimitIsRefused(t *testing.T) {
+	deep := func() (agent.Agent, error) {
+		current, err := galaxie.LlmAgent(llmagent.Config{Name: "leaf", Model: galaxie.Model("answer")})
+		if err != nil {
+			return nil, err
+		}
+		for level := 0; level < 20; level++ {
+			current, err = galaxie.SequentialAgent(agent.Config{Name: "level" + string(rune('a'+level)), SubAgents: []agent.Agent{current}})
+			if err != nil {
+				return nil, err
+			}
+		}
+		return current, nil
+	}
+	_, err := galaxie.Execute(context.Background(), &scripted{}, deep, galaxie.Input{Prompt: "go"})
+	var failure *llm.Error
+	if !errors.As(err, &failure) || failure.Code != "unsupported" {
+		t.Fatalf("err = %v", err)
+	}
 }

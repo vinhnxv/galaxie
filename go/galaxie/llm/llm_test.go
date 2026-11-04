@@ -66,8 +66,6 @@ func userRequest(text string, config *genai.GenerateContentConfig) *model.LLMReq
 func TestTextRoundTrip(t *testing.T) {
 	caller := &fakeCaller{replies: []string{`{"content":"hello","usage":{"input_tokens":3,"output_tokens":2,"total_tokens":5}}`}}
 	_, ctx := newRun(caller)
-	run := FromContext(ctx)
-	_ = run
 	response, err := collect(t, ctx, userRequest("hi", &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText("be brief", genai.RoleUser),
 	}))

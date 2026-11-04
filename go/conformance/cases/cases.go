@@ -98,7 +98,6 @@ func exitLoop() (agent.Agent, error) {
 	return galaxie.LoopAgent(agent.Config{Name: "refine", SubAgents: []agent.Agent{worker}}, 0)
 }
 
-// unbounded has neither a maximum nor an exit tool, so the registry refuses it.
 func unbounded() (agent.Agent, error) {
 	worker, err := leaf("worker")
 	if err != nil {
@@ -107,7 +106,6 @@ func unbounded() (agent.Agent, error) {
 	return galaxie.LoopAgent(agent.Config{Name: "forever", SubAgents: []agent.Agent{worker}}, 0)
 }
 
-// hooked runs a callback before the first model call, so a test can make agent code misbehave.
 func hooked(before llmagent.BeforeModelCallback) (agent.Agent, error) {
 	return galaxie.LlmAgent(llmagent.Config{
 		Name:                 "agent",
@@ -116,7 +114,6 @@ func hooked(before llmagent.BeforeModelCallback) (agent.Agent, error) {
 	})
 }
 
-// spin never returns and never looks at its context: only terminating the Worker ends it.
 func spin() (agent.Agent, error) {
 	return hooked(func(agent.CallbackContext, *model.LLMRequest) (*model.LLMResponse, error) {
 		for {
@@ -124,14 +121,12 @@ func spin() (agent.Agent, error) {
 	})
 }
 
-// panicking stands for agent code with a defect.
 func panicking() (agent.Agent, error) {
 	return hooked(func(agent.CallbackContext, *model.LLMRequest) (*model.LLMResponse, error) {
 		panic("conformance panic")
 	})
 }
 
-// exiting stands for agent code that ends the program.
 func exiting() (agent.Agent, error) {
 	return hooked(func(agent.CallbackContext, *model.LLMRequest) (*model.LLMResponse, error) {
 		os.Exit(3)

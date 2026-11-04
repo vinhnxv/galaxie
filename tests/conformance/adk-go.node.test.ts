@@ -50,7 +50,6 @@ test('the matrix lists every case and the adapter features', async () => {
   expect(matrix.features).toEqual(adapter.features);
 });
 
-/** Runs one case on the Node host against the reference module. */
 function runOnNode(name: string, script: Script): Promise<Observed> {
   if (!host) throw new Error('The host did not start.');
   const nodeHost = host;
