@@ -302,6 +302,38 @@ pnpm exec vitest run --project node tests/conformance/adk-python.node.test.ts te
 pnpm exec vitest run --project node examples/rag-browser/test/adk-python-conformance.node.test.ts
 ```
 
+## Google ADK Go conversations
+
+The separate [ADK Go matrix](compatibility-matrix-adk-go.json) lists the scripted cases for the
+`adk-go` executor against pinned `google.golang.org/adk` v1.9.0 compiled to WebAssembly: text, tools,
+denials, streaming, confirmations, long-running tools, durable restore, and the agent shapes
+`sequential`, `bounded-loop`, `exit-loop`, `parallel`, `transfer` and `confirm-transfer`. The references
+are native Go runs of ADK's own runner against a scripted page (`go/conformance`, written to
+`golden-adk-go/` with `GALAXIE_RECORD_ADK_GO=1 go test -count=1 ./conformance/` from `go/`, then
+`pnpm exec biome format --write tests/conformance/golden-adk-go`). The [Node lane](adk-go.node.test.ts)
+runs the same agents compiled into the reference module through the adapter, router and broker, the
+[restore lane](adk-go-restore.node.test.ts) reloads a fresh Worker at every pause over one store, and the
+[Chromium lane](../../examples/rag-browser/test/adk-go-reference.node.test.ts) runs every case under the
+strict CSP and Trusted Types. A case marked `unordered` (`parallel`) compares its wire lists by canonical
+JSON text because sibling branches reach the page in any order. The matrix also records the refused
+shapes.
+
+[`adk-go-agents.node.test.ts`](adk-go-agents.node.test.ts) asserts that Parallel write branches keep
+branch-local effect scopes whichever branch reaches the broker first and that a restore after the pause
+that follows a Parallel stage runs no branch write again; `go/galaxie/shapes_test.go` asserts that
+`agenttool`, agents and tools built directly with ADK, and toolsets fail `unsupported` before anything runs.
+[`adk-go-run.node.test.ts`](adk-go-run.node.test.ts) covers raising models, budgets, abort, a panic,
+`os.Exit` and a loop that ignores its context, and [`adk-go-scan.node.test.ts`](adk-go-scan.node.test.ts)
+scans the Worker traffic, events, snapshots and spans for a per-call credential. All lanes use scripted
+models; no real model, device measurement or third-party endpoint is involved. Go is required; the tests
+skip with a fixed message when it is absent.
+
+```sh
+pnpm exec vitest run --project node tests/conformance/adk-go.node.test.ts tests/conformance/adk-go-restore.node.test.ts tests/conformance/adk-go-agents.node.test.ts tests/conformance/adk-go-run.node.test.ts tests/conformance/adk-go-scan.node.test.ts
+pnpm exec vitest run --project node examples/rag-browser/test/adk-go-reference.node.test.ts
+pnpm run test:go
+```
+
 ## Running the suite
 
 - `pnpm check` runs the repository's license, lint, both TypeScript compilers, Node/Chromium tests, build and dependency checks.

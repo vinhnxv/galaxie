@@ -10,6 +10,15 @@ This directory holds the Go sources of galaxie's Google ADK (Go) executor ([ADR-
 | `conformance/` | The ADK Go conformance lane: `cases` holds the agents, `reference` is the program that registers them with `galaxie.Serve`, and `conformance_test.go` runs them natively against a scripted page to record or check the goldens in `tests/conformance/golden-adk-go`. |
 | `gate/` | The first-run gate: fourteen scripted ADK scenarios (`scenarios.go`) that the native test, the Node test and the headless Chromium test all execute, plus the wasm entry that bridges to JavaScript. `expected.json` is the native record (`go run ./gate`); the other lanes must reproduce it. It is a standalone program, not the galaxie package. |
 
+## Authoring surface and licenses
+
+Agents are built with the constructors in `galaxie/` and registered with `Serve` or `ServeWith`; the
+[adapter README](../packages/adapter-go/README.md#authoring-surface) lists the constructors, the shapes that run and the shapes that
+fail `unsupported`. The wasm build links Apache-2.0 modules (ADK, genai, gRPC, OpenTelemetry and most
+Google modules), BSD-3-Clause modules (`golang.org/x/*`, protobuf, `wasm_exec.js`) and a few MIT and
+BSD-2-Clause ones; `wasm.lock` has the license of each. Build with the command in the
+[adapter README](../packages/adapter-go/README.md#build-and-licenses).
+
 ## Commands
 
 Install Go 1.27.3 (CI uses the version in `go.mod`). From the repository root:

@@ -20,6 +20,12 @@ A case with `answers` pauses: each entry (`action`, `payload`) answers the next 
 raises. The native golden then also records `pauses`, the interaction requests the author built, and the
 Node and Chromium lanes compare the requests the host receives (without interaction IDs).
 
+A case with `unordered: true` runs sibling branches at once, so their requests, replies and capability
+calls reach the page in any order. The native recorder and the TypeScript runner both sort those three
+lists by the canonical JSON text of each entry before comparing; keep such a case's branches identical
+in shape so the sorted transcript is stable, and keep their text ASCII: Go and JavaScript order
+non-ASCII strings differently and escape some code points differently.
+
 The matrix in `../compatibility-matrix-adk-go.json` lists every case and the adapter's feature flags.
 
 `../adk-go-run.node.test.ts` runs the same module for behavior the native lane cannot express: a raising

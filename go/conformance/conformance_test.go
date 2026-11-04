@@ -28,6 +28,8 @@ type script struct {
 	Entry  string `json:"entry"`
 	Prompt string `json:"prompt"`
 	Stream bool   `json:"stream"`
+	// Unordered compares the wire lists as sets: parallel branches reach the page in any order.
+	Unordered bool `json:"unordered"`
 	// Answers reply, in order, to the pauses the run reaches.
 	Answers      []answer                     `json:"answers"`
 	Replies      []json.RawMessage            `json:"replies"`
@@ -100,6 +102,36 @@ func (r *recorder) Call(_ context.Context, op string, payload []byte) ([]byte, e
 		return outcome.Result, nil
 	}
 	return nil, llm.NewError("invalid")
+}
+
+// canonicalText is the compact text of a JSON value with sorted keys, the order the TypeScript lane
+// sorts by.
+func canonicalText(t *testing.T, raw json.RawMessage) string {
+	t.Helper()
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		t.Fatal(err)
+	}
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.String()
+}
+
+// sortUnordered orders the wire lists by their canonical text, so a run whose branches ask the page
+// concurrently records the same transcript whatever order they arrived in.
+func sortUnordered(t *testing.T, out *transcript) {
+	t.Helper()
+	for _, list := range [][]json.RawMessage{out.Requests, out.Responses, out.Capabilities} {
+		keys := make(map[string]string, len(list))
+		for _, item := range list {
+			keys[string(item)] = canonicalText(t, item)
+		}
+		sort.SliceStable(list, func(i, j int) bool { return keys[string(list[i])] < keys[string(list[j])] })
+	}
 }
 
 // withoutChunks drops the text pieces a scripted reply streams through the page. Go receives only the
@@ -177,6 +209,9 @@ func TestNativeRunsMatchTheGoldens(t *testing.T) {
 			if err != nil {
 				page.out.Error = &failure{Code: llm.CodeOf(err)}
 			}
+			if s.Unordered {
+				sortUnordered(t, &page.out)
+			}
 			golden := filepath.Join(goldenDir, name+".json")
 			got := normalize(t, indent(t, page.out))
 			if record {
@@ -251,6 +286,9 @@ func TestPersistedRunsMatchTheGoldens(t *testing.T) {
 			page.out.Output = output
 			if err != nil {
 				page.out.Error = &failure{Code: llm.CodeOf(err)}
+			}
+			if s.Unordered {
+				sortUnordered(t, &page.out)
 			}
 			want, readErr := os.ReadFile(filepath.Join(goldenDir, name+".json"))
 			if readErr != nil {

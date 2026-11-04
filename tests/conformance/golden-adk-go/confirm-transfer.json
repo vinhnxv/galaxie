@@ -1,0 +1,228 @@
+{
+  "capabilities": [
+    {
+      "effectScope": "adk-go/g1/root/2/0",
+      "input": {
+        "value": 21
+      },
+      "name": "math.double@1"
+    }
+  ],
+  "error": null,
+  "output": "The result is 42.",
+  "pauses": [
+    {
+      "component": "conformance.Approval/v1",
+      "props": {
+        "count": 1
+      },
+      "surfaceId": "main",
+      "viewRevision": "r1"
+    }
+  ],
+  "requests": [
+    {
+      "messages": [
+        {
+          "content": "Hand the question to the helper.\n\nYou are an agent. Your internal name is \"root\".\n\n\nYou have a list of other agents to transfer to:\n\n\nAgent name: helper\nAgent description: \n\n\nIf you are the best to answer the question according to your description,\nyou can answer it.\n\nIf another agent is better for answering the question according to its\ndescription, call `transfer_to_agent` function to transfer the question to that\nagent. When transferring, do not generate any text other than the function\ncall.\n\n**NOTE**: the only available agents for `transfer_to_agent` function are\n`helper`.\n",
+          "role": "system"
+        },
+        {
+          "content": "Double 21.",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "tools": [
+          {
+            "function": {
+              "description": "Transfer the question to another agent.\nThis tool hands off control to another agent when it's more suitable to answer the user's question according to the agent's description.",
+              "name": "transfer_to_agent",
+              "parameters": {
+                "properties": {
+                  "agent_name": {
+                    "description": "the agent name to transfer to",
+                    "enum": ["helper"],
+                    "type": "string"
+                  }
+                },
+                "required": ["agent_name"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    },
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"helper\".\n\n\nYou have a list of other agents to transfer to:\n\n\nAgent name: root\nAgent description: \n\n\nIf you are the best to answer the question according to your description,\nyou can answer it.\n\nIf another agent is better for answering the question according to its\ndescription, call `transfer_to_agent` function to transfer the question to that\nagent. When transferring, do not generate any text other than the function\ncall.\n\n**NOTE**: the only available agents for `transfer_to_agent` function are\n`root`.\n\nIf neither you nor the other agents are best for the question, transfer to your parent agent root.\n",
+          "role": "system"
+        },
+        {
+          "content": "Double 21.",
+          "role": "user"
+        },
+        {
+          "content": "For context:[root] called tool `transfer_to_agent` with parameters: {\"agent_name\":\"helper\"}",
+          "role": "user"
+        },
+        {
+          "content": "For context:[root] `transfer_to_agent` tool returned result: {}",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "tools": [
+          {
+            "function": {
+              "description": "Transfer the question to another agent.\nThis tool hands off control to another agent when it's more suitable to answer the user's question according to the agent's description.",
+              "name": "transfer_to_agent",
+              "parameters": {
+                "properties": {
+                  "agent_name": {
+                    "description": "the agent name to transfer to",
+                    "enum": ["root"],
+                    "type": "string"
+                  }
+                },
+                "required": ["agent_name"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          },
+          {
+            "function": {
+              "description": "Double an integer.",
+              "name": "math_double_1",
+              "parameters": {
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["value"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    },
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"helper\".\n\n\nYou have a list of other agents to transfer to:\n\n\nAgent name: root\nAgent description: \n\n\nIf you are the best to answer the question according to your description,\nyou can answer it.\n\nIf another agent is better for answering the question according to its\ndescription, call `transfer_to_agent` function to transfer the question to that\nagent. When transferring, do not generate any text other than the function\ncall.\n\n**NOTE**: the only available agents for `transfer_to_agent` function are\n`root`.\n\nIf neither you nor the other agents are best for the question, transfer to your parent agent root.\n",
+          "role": "system"
+        },
+        {
+          "content": "Double 21.",
+          "role": "user"
+        },
+        {
+          "content": "For context:[root] called tool `transfer_to_agent` with parameters: {\"agent_name\":\"helper\"}",
+          "role": "user"
+        },
+        {
+          "content": "For context:[root] `transfer_to_agent` tool returned result: {}",
+          "role": "user"
+        },
+        {
+          "content": "",
+          "role": "assistant",
+          "toolCalls": [
+            {
+              "function": {
+                "arguments": "{\"value\":21}",
+                "name": "math_double_1"
+              },
+              "id": "call-1",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "content": "{\"value\":42}",
+          "role": "tool",
+          "tool_call_id": "call-1"
+        }
+      ],
+      "options": {
+        "tools": [
+          {
+            "function": {
+              "description": "Transfer the question to another agent.\nThis tool hands off control to another agent when it's more suitable to answer the user's question according to the agent's description.",
+              "name": "transfer_to_agent",
+              "parameters": {
+                "properties": {
+                  "agent_name": {
+                    "description": "the agent name to transfer to",
+                    "enum": ["root"],
+                    "type": "string"
+                  }
+                },
+                "required": ["agent_name"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          },
+          {
+            "function": {
+              "description": "Double an integer.",
+              "name": "math_double_1",
+              "parameters": {
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["value"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "function": {
+            "arguments": "{\"agent_name\":\"helper\"}",
+            "name": "transfer_to_agent"
+          },
+          "id": "t1",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "function": {
+            "arguments": "{\"value\":21}",
+            "name": "math_double_1"
+          },
+          "id": "p1",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "content": "The result is 42."
+    }
+  ]
+}
