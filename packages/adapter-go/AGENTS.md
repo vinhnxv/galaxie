@@ -47,6 +47,14 @@ reply of each model call. A cancelled run is given 500 ms to finish, then its Wo
 and the session is unrecoverable. The stubs guard against accidental network use; Go code
 is trusted and can reach anything `syscall/js` reaches, so they are not an isolation boundary.
 
+## Agent shapes
+
+Trees are built only with the galaxie Go constructors (README, "Authoring surface"). `go/galaxie/registry.go`
+and `agents.go` validate the tree when it is built: unknown agents, models and tools, a tree deeper than
+16 and an unbounded loop fail `unsupported`. `go/galaxie/interaction.go` holds the pause rule. Add a shape
+only with a native Go case in `go/conformance/cases` and a golden, a refusal test in `go/galaxie`, and the
+matrix entry; never lift a refusal to make a case pass. `subgraphs` stays false.
+
 ## Tests
 
 Run `pnpm exec vitest run packages/adapter-go tests/conformance/adk-go.node.test.ts tests/conformance/adk-go-run.node.test.ts

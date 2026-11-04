@@ -100,6 +100,44 @@ matches the digest of the conversation, ordinal and request.
   not protection against a hostile page. Keep the store on-device under the checkpointer's app and
   principal scope, with one active owner per session.
 
+## Authoring surface
+
+Agent code imports `galaxie.invalid/galaxie/galaxie` and builds its tree only with these constructors; a
+program registers entries with `galaxie.Serve` (or `ServeWith` for entries that pause) and blocks.
+
+| Constructor | Purpose |
+| --- | --- |
+| `Model(role)` | The model of an `LlmAgent`: every request goes to the page's router for that role. |
+| `LlmAgent`, `SequentialAgent`, `ParallelAgent`, `LoopAgent(config, maxIterations)` | ADK's agents, wrapped so the tree can be checked. `LlmAgent` sub-agents give ADK's transfer. |
+| `CapabilityTool(name, spec)` | A function tool that calls a host capability through the broker. `spec` sets the description, the JSON schema and `RequireConfirmation` or `LongRunning`. |
+| `ExitLoop()` | The tool that ends a `LoopAgent`; a loop needs it or a non-zero iteration limit. |
+| `Definition{Build, Interaction, Resume}` | Pairs an entry with the hooks that turn paused calls into a request and an answer into decisions. |
+
+These shapes run: a single `LlmAgent` with capability tools, `SequentialAgent`, `ParallelAgent` and
+`LoopAgent` trees up to 16 levels deep, transfer to a sub-agent, and a confirmation or long-running tool
+where the pause rule accepts it ("Interactions"). Branches of a `ParallelAgent` get branch-local effect
+scopes, so the order in which they reach the broker does not change what a write receives or replays;
+the order of their events does vary. These shapes fail `unsupported` before anything runs: `agenttool`,
+an agent, model, function tool or toolset built directly with ADK, and a tree outside the limits above.
+`subgraphs` stays false. Every shape is recorded with its native result in `tests/conformance` and
+`go/galaxie/shapes_test.go`; see the [limits](../../docs/unsupported.md#google-adk-go).
+
+## Build and licenses
+
+```sh
+GOOS=js GOARCH=wasm CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -buildid=" -o agent.wasm ./your/agent
+```
+
+`node scripts/build-go-wasm.ts ./your/agent` runs the same command with the flags locked in
+`go/wasm.lock` and prints the size and SHA-256 to publish. The module is about 30 MB stripped, about
+6.5 MB gzip. TinyGo and `wasm-opt` are not used.
+
+The module links third-party code under permissive licenses, listed per module in `go/wasm.lock`.
+Google's ADK (`google.golang.org/adk`), genai, gRPC, OpenTelemetry and most other Google modules are
+Apache-2.0; `golang.org/x/*`, `google.golang.org/protobuf` and Go's own `wasm_exec.js` are BSD-3-Clause;
+the lock also holds MIT and BSD-2-Clause modules. Hosts that ship the module must carry those notices
+with it.
+
 ## Hosting
 
 ```ts

@@ -46,6 +46,8 @@ The M4 documentation slice adds package coding guidance, a root [AI-facing index
 
 `@galaxie/adapter-pyodide` also hosts Google ADK Python 2.12.0 as `adk-python` ([ADR-0022](docs/adr/0022-google-adk-python-through-the-pyodide-adapter.md), Proposed): `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent` trees with router-backed models, capability tools, checked streaming, interactions and durable sessions, `subgraphs` false, scripted-model evidence on Node and headless Chromium only (see the [adapter](packages/adapter-pyodide/README.md#google-adk-python-agents) and [unsupported list](docs/unsupported.md#google-adk-python)).
 
+`@galaxie/adapter-go` hosts Google ADK Go 1.9.0 as `adk-go` ([ADR-0023](docs/adr/0023-google-adk-go-through-a-wasm-worker.md), Proposed): the author compiles `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent` trees built with the galaxie Go constructors (module in `go/`) to one WebAssembly module that a dedicated Worker verifies by length and SHA-256, with policy in JavaScript, streaming, interactions and page-owned durable sessions, `subgraphs` false, and scripted-model evidence on native Go, Node and headless Chromium only (see the [adapter](packages/adapter-go/README.md), the [Go module](go/README.md) and the [unsupported list](docs/unsupported.md#google-adk-go)).
+
 ## Read first
 
 1. `docs/galaxie-project-brief.md`: the source of truth for scope, architecture, security and the roadmap. Start with §0.

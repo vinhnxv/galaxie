@@ -29,6 +29,7 @@
 - [Python adapter README](packages/adapter-pyodide/README.md): trusted LangGraph Python/pydantic-ai/DSPy Workers, checked bridge, durable interactions, deterministic DSPy replay and JavaScript policy.
 - [ADK adapter README](packages/adapter-adk/README.md): `adk-js` executor over the ADK 2.3.0 browser bundle: router-backed models, capability tools, checked streaming, confirmations and long-running tools as interactions, durable sessions and the supported agent shapes.
 - ADK Python: the `adk-python` executor lives in the [Python adapter README](packages/adapter-pyodide/README.md#google-adk-python-agents) ([ADR-0022](docs/adr/0022-google-adk-python-through-the-pyodide-adapter.md), Proposed): authoring surface, supported agent shapes and third-party licenses.
+- ADK Go: the `adk-go` executor lives in the [Go adapter README](packages/adapter-go/README.md) ([ADR-0023](docs/adr/0023-google-adk-go-through-a-wasm-worker.md), Proposed): authoring surface, supported agent shapes, build command and third-party licenses; the [Go module](go/README.md) holds the sources.
 - [Models README](packages/models/README.md): provider subpaths, the deterministic mock and the ONNX (Transformers.js) provider's host wiring.
 - [React README](packages/react/README.md): surfaces and separate host confirmations.
 - [IndexedDB README](packages/storage-indexeddb/README.md): scoped checkpoints, recovery and storage lifecycle.
@@ -40,6 +41,7 @@
 - [Core AGENTS](packages/core/AGENTS.md): lifecycle, policy and content-free instrumentation rules.
 - [LangGraph adapter AGENTS](packages/adapter-langgraph/AGENTS.md): native semantics, config and unsupported interrupts.
 - [Python adapter AGENTS](packages/adapter-pyodide/AGENTS.md): Worker lifecycle, compiled wheel hashes, CSP and Python trust limits.
+- [Go adapter AGENTS](packages/adapter-go/AGENTS.md): module verification before compile, the bridge, the stored record and the agent-shape rules.
 - [ADK adapter AGENTS](packages/adapter-adk/AGENTS.md): import rules, bundle pin, host ordering and limits of the ADK executor.
 - [Models AGENTS](packages/models/AGENTS.md): host registration and fake-only automated model tests.
 - [React AGENTS](packages/react/AGENTS.md): trusted registries, text rendering and host lifecycle.
