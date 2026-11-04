@@ -14,7 +14,6 @@ import {
   type StoredConversation,
 } from './persist.js';
 
-/** The byte-record checkpoint port of `@galaxie/storage-indexeddb`, as far as this adapter uses it. */
 export interface CheckpointPort {
   request(value: unknown): Promise<unknown>;
 }
@@ -31,7 +30,6 @@ function unavailable(error: unknown): never {
   throw isGalaxieError(error) ? error : adapterFailure('unavailable');
 }
 
-/** Reads a session's stored conversation, or `undefined` when the session has none. */
 export async function loadConversation(
   port: CheckpointPort,
   sessionId: string,

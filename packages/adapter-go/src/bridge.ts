@@ -254,8 +254,7 @@ export function parseRunResult(text: string): RunResult {
     keys(value, ['ok'], ['output', 'paused', 'record'])
   ) {
     const record: unknown = value['record'];
-    if (record !== undefined && !(isRecord(record) && !Array.isArray(record)))
-      throw adapterFailure('invalid');
+    if (record !== undefined && !isRecord(record)) throw adapterFailure('invalid');
     const stored = record === undefined ? {} : { record: record as ConversationRecord };
     if (value['paused'] !== undefined) {
       if (value['output'] !== undefined && value['output'] !== '') throw adapterFailure('invalid');

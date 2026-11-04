@@ -191,6 +191,7 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		}
 		restored = stored
 	}
+	restoredSize := 0
 	switch {
 	case input.Resume != nil && restored != nil:
 		// The record is the whole truth: whatever the store holds for this conversation is stale.
@@ -198,7 +199,8 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		if restored.Pause == nil || restored.Pause.ID != input.Resume.InteractionID {
 			return Result{}, llm.NewError("stale")
 		}
-		if restored.eventsSize() > MaxRecordBytes-recordMargin {
+		restoredSize = restored.eventsSize()
+		if restoredSize > MaxRecordBytes-recordMargin {
 			return Result{}, llm.NewError("unsupported")
 		}
 		calls, err := restored.pausedCalls()
@@ -246,13 +248,13 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		return time.UnixMilli(counter.Add(1))
 	})
 
+	resumedFromRecord := restored != nil && kept != nil
 	var service session.Service
-	switch {
-	case kept != nil && kept.service != nil:
+	if kept != nil && kept.service != nil {
 		service = kept.service
-	default:
+	} else {
 		service = session.InMemoryService()
-		if restored != nil && kept != nil {
+		if resumedFromRecord {
 			if err := restored.replay(ctx, service); err != nil {
 				return Result{}, err
 			}
@@ -262,9 +264,7 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 	}
 	if input.Persist {
 		sized := &sizedService{Service: service, run: run}
-		if restored != nil && kept != nil {
-			sized.size = restored.eventsSize()
-		}
+		sized.size = restoredSize
 		service = sized
 	}
 	adk, err := runner.New(runner.Config{AppName: appName, Agent: root, SessionService: service})
@@ -315,10 +315,13 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 	if failure != nil {
 		return Result{}, llm.NewError(llm.CodeOf(failure))
 	}
+	record := func(pause *storedPause) ([]byte, error) {
+		return recordOf(ctx, service, name, s.ordinal(name), counter.Load(), s.memory(name), pause)
+	}
 	if watch.calls == nil {
 		result := Result{Output: output}
 		if input.Persist {
-			encoded, err := recordOf(ctx, service, name, s.ordinal(name), counter.Load(), s.memory(name), nil)
+			encoded, err := record(nil)
 			if err != nil {
 				return Result{}, err
 			}
@@ -342,7 +345,7 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 	id := interactionID(name, s.nextOrdinal(name), requests, request)
 	result := Result{Pause: &Pause{ID: id, Request: request, Tools: tools}}
 	if input.Persist {
-		encoded, err := recordOf(ctx, service, name, s.ordinal(name), counter.Load(), s.memory(name), pauseRecordOf(id, request, watch.calls))
+		encoded, err := record(pauseRecordOf(id, request, watch.calls))
 		if err != nil {
 			return Result{}, err
 		}

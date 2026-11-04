@@ -5,7 +5,6 @@ import { type PendingInteraction, parseInteractionRequest } from '@galaxie/core'
 import type { ConversationRecord } from './bridge.js';
 import { adapterFailure } from './errors.js';
 
-/** Checkpoint types the byte-record port stores for this executor. */
 export const SESSION_TYPE: string = 'adk-go.session/v1';
 export const STATE_TYPE: string = 'galaxie.adk-go-state/v1';
 export const EXECUTOR: string = 'adk-go';
@@ -49,7 +48,6 @@ function only(value: Record<string, unknown>, allowed: readonly string[]): boole
 
 const encoder = new TextEncoder();
 
-/** The bytes of a record, refused (`unsupported`) above the limit. */
 export function recordBytes(record: ConversationRecord): Uint8Array {
   const bytes = encoder.encode(JSON.stringify(record));
   if (bytes.byteLength > MAX_RECORD_BYTES) throw adapterFailure('unsupported');
@@ -105,12 +103,10 @@ async function tagOf(
   return hex(new Uint8Array(await crypto.subtle.sign('HMAC', imported, message)));
 }
 
-/** A new per-session integrity key. */
 export function newKey(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(KEY_BYTES));
 }
 
-/** The bytes of one stored conversation: the checkpoint holds the record, the metadata the key. */
 export async function encodeStored(
   sessionId: string,
   record: ConversationRecord,
@@ -263,5 +259,4 @@ export function restoredContent(record: ConversationRecord): Json[] {
   return values;
 }
 
-/** The checkpoint ID of a revision: zero padded so that string order is revision order. */
 export const revisionId = (revision: number): string => String(revision).padStart(20, '0');

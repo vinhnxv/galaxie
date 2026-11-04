@@ -11,7 +11,7 @@ import {
   type PendingInteraction,
   toErrorInfo,
 } from '@galaxie/core';
-import { parseRunResult } from './bridge.js';
+import { type ConversationRecord, parseRunResult } from './bridge.js';
 import { loadConversation, saveConversation } from './checkpoints.js';
 import { adapterFailure, errorCodeOf } from './errors.js';
 import {
@@ -178,6 +178,19 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
         }
         settleRun?.(failedRun('unavailable'));
       };
+      /** Registers a stored history as private with core, which clears its values at every run end. */
+      const registerStored = (
+        register: ((value: unknown) => void) | undefined,
+        record: ConversationRecord,
+      ): void => {
+        if (register === undefined) throw adapterFailure('unsupported');
+        try {
+          register(restoredContent(record));
+        } catch (error) {
+          const code = isGalaxieError(error) ? error.code : 'unrecoverable';
+          throw adapterFailure(code === 'stale' || code === 'cancelled' ? code : 'unrecoverable');
+        }
+      };
       /** Reads a session's stored conversation once, registering its text as private first. */
       const load = async (
         sessionId: string,
@@ -186,13 +199,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
         if (store === undefined) return;
         const found = await loadConversation(store, sessionId);
         if (found !== undefined) {
-          if (register === undefined) throw adapterFailure('unsupported');
-          try {
-            register(restoredContent(found.record));
-          } catch (error) {
-            const code = isGalaxieError(error) ? error.code : 'unrecoverable';
-            throw adapterFailure(code === 'stale' || code === 'cancelled' ? code : 'unrecoverable');
-          }
+          registerStored(register, found.record);
           if (disposed) return;
           stored.set(sessionId, found);
           conversations.set(sessionId, found.conversation);
@@ -340,17 +347,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               usable();
               const held = stored.get(request.sessionId);
               if (held !== undefined) {
-                // Core clears its private values at every run end, so the stored history is
-                // registered again for each run that can replay it.
-                if (request.registerRestoredData === undefined) throw adapterFailure('unsupported');
-                try {
-                  request.registerRestoredData(restoredContent(held.record));
-                } catch (error) {
-                  const code = isGalaxieError(error) ? error.code : 'unrecoverable';
-                  throw adapterFailure(
-                    code === 'stale' || code === 'cancelled' ? code : 'unrecoverable',
-                  );
-                }
+                registerStored(request.registerRestoredData, held.record);
               }
             }
             const command = request.command;
@@ -477,10 +474,11 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               throw adapterFailure('invalid');
             // Once Go has finished, the record holds everything; only a disposed instance or a
             // cancelled run stops the commit.
-            const open = !request.signal.aborted && !(store !== undefined && disposed);
-            if (open) {
+            const stillOpen = (): boolean =>
+              !request.signal.aborted && !(store !== undefined && disposed);
+            if (stillOpen()) {
               const sessionId = request.sessionId;
-              const commit = async (pending: string | undefined): Promise<void> => {
+              const commit = async (interaction?: PendingInteraction): Promise<void> => {
                 if (store === undefined || !outcome.ok || outcome.record === undefined) return;
                 const held = stored.get(sessionId);
                 const key = held?.key ?? newKey();
@@ -491,18 +489,11 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
                   key,
                   outcome.record,
                   current.position,
-                  pending,
+                  interaction?.interactionId,
                 );
-                const pause =
-                  outcome.paused === undefined
-                    ? undefined
-                    : ({
-                        interactionId: outcome.paused.interactionId as InteractionId,
-                        ...outcome.paused.request,
-                      } as PendingInteraction);
                 stored.set(sessionId, {
                   record: outcome.record,
-                  ...(pause === undefined ? {} : { pause }),
+                  ...(interaction === undefined ? {} : { pause: interaction }),
                   position: current.position,
                   conversation,
                   key,
@@ -511,25 +502,23 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
                 committed = true;
               };
               if (outcome.ok && outcome.paused !== undefined) {
-                const interaction: PendingInteraction = {
+                const interaction = {
                   interactionId: outcome.paused.interactionId as InteractionId,
                   ...outcome.paused.request,
-                };
+                } as PendingInteraction;
                 // A Worker that died after Go finished took the paused session with it, unless the
                 // record carries it.
                 if (dead && store === undefined) throw adapterFailure('unavailable');
                 if (current.streaming) emitPaused(current);
-                await commit(interaction.interactionId);
+                await commit(interaction);
                 pauses.set(request.sessionId, { interaction, position: current.position });
-                committed = true;
-                if (!request.signal.aborted && !(store !== undefined && disposed)) {
+                if (stillOpen()) {
                   if (current.streaming) for (const event of current.events.splice(0)) yield event;
                   yield { type: 'interaction', interaction };
                 }
               } else if (outcome.ok) {
-                await commit(undefined);
-                if (!request.signal.aborted && !(store !== undefined && disposed))
-                  yield { type: 'output', output: outcome.output };
+                await commit();
+                if (stillOpen()) yield { type: 'output', output: outcome.output };
               } else {
                 yield { type: 'error', error: toErrorInfo(errorCodeOf(outcome.code)) };
               }

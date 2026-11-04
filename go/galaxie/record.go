@@ -125,25 +125,28 @@ func onlyKeys(raw []byte, allowed ...string) bool {
 
 // storedPartOf copies a part into the closed stored shape. A part with anything else, such as
 // binary data, a file or code execution, is refused: those are never stored.
+// closed reports whether the value marshals to an object with no key outside allowed.
+func closed(value any, allowed ...string) bool {
+	raw, err := json.Marshal(value)
+	return err == nil && onlyKeys(raw, allowed...)
+}
+
 func storedPartOf(part *genai.Part) (storedPart, error) {
 	if part == nil {
 		return storedPart{}, llm.NewError("unsupported")
 	}
-	raw, err := json.Marshal(part)
-	if err != nil || !onlyKeys(raw, allowedPartKeys...) {
+	if !closed(part, allowedPartKeys...) {
 		return storedPart{}, llm.NewError("unsupported")
 	}
 	stored := storedPart{Text: part.Text, Thought: part.Thought}
 	if call := part.FunctionCall; call != nil {
-		raw, err := json.Marshal(call)
-		if err != nil || !onlyKeys(raw, "id", "name", "args") {
+		if !closed(call, "id", "name", "args") {
 			return storedPart{}, llm.NewError("unsupported")
 		}
 		stored.FunctionCall = &storedCall{ID: call.ID, Name: call.Name, Args: call.Args}
 	}
 	if response := part.FunctionResponse; response != nil {
-		raw, err := json.Marshal(response)
-		if err != nil || !onlyKeys(raw, "id", "name", "response") {
+		if !closed(response, "id", "name", "response") {
 			return storedPart{}, llm.NewError("unsupported")
 		}
 		stored.FunctionResponse = &storedResponse{ID: response.ID, Name: response.Name, Response: response.Response}
