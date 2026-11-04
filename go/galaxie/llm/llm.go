@@ -7,6 +7,7 @@ import (
 	"context"
 	"iter"
 
+	"google.golang.org/adk/agent"
 	"google.golang.org/adk/model"
 	"google.golang.org/adk/platform"
 )
@@ -43,11 +44,7 @@ func (m *LLM) GenerateContent(
 			yield(nil, fatal)
 			return
 		}
-		if stream {
-			yield(nil, run.Fail(NewError("unsupported")))
-			return
-		}
-		response, err := m.call(ctx, run, request)
+		response, err := m.call(ctx, run, request, stream)
 		if err != nil {
 			yield(nil, run.Fail(err))
 			return
@@ -56,10 +53,21 @@ func (m *LLM) GenerateContent(
 	}
 }
 
-func (m *LLM) call(ctx context.Context, run *Run, request *model.LLMRequest) (*model.LLMResponse, error) {
+// call sends one request to the page. A streaming request asks the page to check the reply as it
+// grows and forward the checked text deltas to the host; the reply that comes back is still the one
+// aggregated response, so ADK never sees an unchecked or partial chunk.
+func (m *LLM) call(ctx context.Context, run *Run, request *model.LLMRequest, stream bool) (*model.LLMResponse, error) {
 	wire, err := RequestToWire(m.role, request)
 	if err != nil {
 		return nil, err
+	}
+	if stream {
+		author := authorOf(ctx)
+		if author == "" {
+			return nil, NewError("invalid")
+		}
+		wire.Options.Stream = true
+		wire.Author = author
 	}
 	offered := map[string]bool{}
 	for _, tool := range wire.Options.Tools {
@@ -94,6 +102,13 @@ func (m *LLM) call(ctx context.Context, run *Run, request *model.LLMRequest) (*m
 		part++
 	}
 	return response, nil
+}
+
+func authorOf(ctx context.Context) string {
+	if source, ok := ctx.(interface{ Agent() agent.Agent }); ok && source.Agent() != nil {
+		return source.Agent().Name()
+	}
+	return ""
 }
 
 func branchOf(ctx context.Context) string {

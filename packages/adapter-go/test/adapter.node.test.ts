@@ -59,7 +59,7 @@ const firstEvent = async (
   command?: unknown,
 ) => (await prepared.run(runRequest(command))[Symbol.asyncIterator]().next()).value;
 
-test('the adapter registers adk-go with every feature off', () => {
+test('the adapter registers adk-go with only streaming on', () => {
   const adapter = createGoAdapter(options(() => new FakeWorker(ready)));
   expect(adapter.id).toBe('adk-go');
   expect(GO_EXECUTOR_ID).toBe('adk-go');
@@ -67,7 +67,7 @@ test('the adapter registers adk-go with every feature off', () => {
     interrupts: false,
     resume: false,
     checkpoints: false,
-    streaming: false,
+    streaming: true,
     subgraphs: false,
   });
 });

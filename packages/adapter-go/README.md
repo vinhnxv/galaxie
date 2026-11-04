@@ -7,10 +7,24 @@ and the [Go module](../../go/README.md).
 
 ## Status
 
-Stage AG1 ships the Worker loader and the gate. `createGoAdapter()` registers `adk-go` with every
-feature set to `false`, `prepare` boots and verifies the Worker, and a run fails `unsupported`. The
-model bridge, tools, streaming, interactions and durable sessions arrive in later stages, each turning
-its feature on with its evidence.
+`createGoAdapter()` registers `adk-go`: `prepare` boots and verifies the Worker, and a start command runs
+the entry the agent names, with model calls routed through the host and capability calls through the
+broker. `streaming` is the only feature flag that is on. Interactions, resume and durable sessions arrive
+in later stages, each turning its feature on with its evidence.
+
+## Streaming
+
+Set `stream: true` on the agent (`{ wasm, entry, stream: true }`) to receive stream events for a run.
+Each model reply is read from the provider as it grows. Every growing reply, including call arguments,
+passes the output-safety hook before its text leaves as a `messages` event `{ author, text }`, split at
+4096 characters and never inside a surrogate pair; the finished reply passes the hook once more. A block
+fails the call `denied`: the blocked text is never forwarded, and deltas already delivered are not
+retracted. Tool turns emit content-free `updates` markers `{ step, tool, index }` with the offered name
+and a run-wide position, never a call ID, argument or result. An abort stops further events.
+
+Go still receives one aggregated reply per model call, so ADK runs in its server-sent-events mode but
+sees no partial response: the page checks and forwards the text, and nothing unchecked reaches Go. Without
+`stream`, a run emits only its output. Stream events are delivered live and are not journaled.
 
 ## Hosting
 

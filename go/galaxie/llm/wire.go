@@ -59,6 +59,9 @@ type ModelRequest struct {
 	Role     string    `json:"role"`
 	Messages []Message `json:"messages"`
 	Options  Options   `json:"options"`
+	// Author names the agent whose turn this is. It is set only on a streaming request, where
+	// the page labels the checked text deltas it forwards to the host.
+	Author string `json:"author,omitempty"`
 }
 
 type Usage struct {

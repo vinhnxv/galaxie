@@ -6,6 +6,7 @@ import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { createMockLatch, MockChatModel } from '../../models/src/mock.js';
 import { createGoAdapter, type GoAgent } from '../src/index.js';
+import { MAX_DELTA_LENGTH } from '../src/stream.js';
 import { collect, FakeGoWorker, failResult, okResult, type Program } from './support-go.js';
 
 const agent: GoAgent = {
@@ -48,6 +49,10 @@ async function harness(
   workerOptions: ConstructorParameters<typeof FakeGoWorker>[1] = {},
   capability = vi.fn(async () => ({ hits: 2 })),
   adjust: (model: MockChatModel) => void = () => undefined,
+  streaming: {
+    readonly stream?: boolean;
+    readonly safety?: NonNullable<Parameters<typeof createRuntime>[0]['outputSafety']>;
+  } = {},
 ) {
   const worker = new FakeGoWorker(program, workerOptions);
   const model = new MockChatModel(script);
@@ -55,11 +60,11 @@ async function harness(
   const runtime = createRuntime({
     appId: 'adk-go-test',
     executors: [createGoAdapter({ createWorker: () => worker })],
-    outputSafety: () => 'allow',
+    outputSafety: streaming.safety ?? (() => 'allow'),
   });
   const instance = await runtime.create(definition, {
     principalScope: 'fixture',
-    agent,
+    agent: streaming.stream ? { ...agent, stream: true } : agent,
     services: { chatModels: { mock: model } },
     models: {
       providers: { mock: provider },
@@ -177,11 +182,56 @@ test('a denied or unavailable bridge reply reaches the program as a code', async
   await runtime.dispose();
 });
 
-test('a streaming request is unsupported and the program sees a fixed code', async () => {
+const streamed = (events: readonly RunEvent[], mode: string): Record<string, unknown>[] =>
+  events.flatMap((event) =>
+    event.type === 'stream' && event.mode === mode ? [event.data as Record<string, unknown>] : [],
+  );
+const streamRequest = (content: string, options: object = {}): unknown => ({
+  role: 'answer',
+  author: 'writer',
+  messages: userMessage(content),
+  options: { stream: true, ...options },
+});
+
+test('a streaming run emits checked text deltas in order and the program gets one final reply', async () => {
+  const replies: string[] = [];
+  const { instance, runtime } = await harness(
+    async (api) => {
+      const reply = JSON.parse(await api.call('model', streamRequest('hello'))) as {
+        content: string;
+      };
+      replies.push(reply.content);
+      return okResult(reply.content);
+    },
+    { hello: { id: 'a', text: 'alpha beta gamma' } },
+    {},
+    undefined,
+    undefined,
+    { stream: true },
+  );
+  const { runId } = await instance.start({ prompt: 'hello' });
+  const events = await collect(instance.events(runId));
+  expect(streamed(events, 'messages')).toEqual([
+    { author: 'writer', text: 'alpha ' },
+    { author: 'writer', text: 'beta ' },
+    { author: 'writer', text: 'gamma' },
+  ]);
+  expect(replies).toEqual(['alpha beta gamma']);
+  expect(last(events)).toMatchObject({ type: 'output', output: 'alpha beta gamma' });
+  expect(
+    events.every(
+      (event) =>
+        event.type !== 'stream' || (event.executor === 'adk-go' && event.path.length === 0),
+    ),
+  ).toBe(true);
+  await runtime.dispose();
+});
+
+test('a run that did not ask for a stream refuses a streaming request with a fixed code', async () => {
   let code = '';
   const { instance, runtime } = await harness(
     async (api) => {
-      await api.call('model', modelPayload('hello', { stream: true })).catch((error: Error) => {
+      await api.call('model', streamRequest('hello')).catch((error: Error) => {
         code = error.message;
       });
       return okResult('after');
@@ -189,8 +239,134 @@ test('a streaming request is unsupported and the program sees a fixed code', asy
     { hello: { id: 'a', text: 'x' } },
   );
   const { runId } = await instance.start({ prompt: 'hello' });
-  await collect(instance.events(runId));
-  expect(code).toBe('unsupported');
+  const events = await collect(instance.events(runId));
+  expect(code).toBe('invalid');
+  expect(streamed(events, 'messages')).toEqual([]);
+  await runtime.dispose();
+});
+
+test('a tool turn emits content-free markers and never a call ID, argument or result', async () => {
+  const { instance, runtime } = await harness(
+    async (api) => {
+      const tools = [
+        {
+          type: 'function',
+          function: { name: 'search', parameters: { type: 'object', properties: {} } },
+        },
+      ];
+      const reply = JSON.parse(await api.call('model', streamRequest('hello', { tools }))) as {
+        toolCalls: { function: { arguments: string } }[];
+      };
+      expect(reply.toolCalls).toHaveLength(1);
+      await api.call('capability', { name: 'docs.search@1', input: { query: 'secret-arg' } });
+      return okResult('done');
+    },
+    {
+      hello: {
+        id: 'a',
+        text: 'looking',
+        toolCalls: [{ id: 'canary-call-id', name: 'search', args: { query: 'secret-arg' } }],
+      },
+    },
+    {},
+    vi.fn(async () => ({ hits: 7 })),
+    undefined,
+    { stream: true },
+  );
+  const { runId } = await instance.start({ prompt: 'hello' });
+  const events = await collect(instance.events(runId));
+  expect(streamed(events, 'updates')).toEqual([
+    { step: 'tool_call', tool: 'search', index: 0 },
+    { step: 'tool_result', tool: 'docs.search@1', index: 1 },
+  ]);
+  const wire = JSON.stringify(events.filter((event) => event.type === 'stream'));
+  for (const canary of ['canary-call-id', 'secret-arg', '"hits"'])
+    expect(wire).not.toContain(canary);
+  await runtime.dispose();
+});
+
+test('a mid-stream block fails the call denied and the blocked delta never reaches the host', async () => {
+  let code = '';
+  const { instance, runtime } = await harness(
+    async (api) => {
+      await api.call('model', streamRequest('hello')).catch((error: Error) => {
+        code = error.message;
+      });
+      return failResult(code);
+    },
+    { hello: { id: 'a', text: 'safe BLOCKED_TEXT after' } },
+    {},
+    undefined,
+    undefined,
+    { stream: true, safety: ({ text }) => (text.includes('BLOCKED_TEXT') ? 'block' : 'allow') },
+  );
+  const { runId } = await instance.start({ prompt: 'hello' });
+  const events = await collect(instance.events(runId));
+  expect(code).toBe('denied');
+  expect(last(events)).toMatchObject({ type: 'error', error: { code: 'denied' } });
+  expect(streamed(events, 'messages')).toEqual([{ author: 'writer', text: 'safe ' }]);
+  expect(JSON.stringify(events)).not.toContain('BLOCKED_TEXT');
+  await runtime.dispose();
+});
+
+test('a long delta is split at the bound and never inside a surrogate pair', async () => {
+  const long = `${'a'.repeat(MAX_DELTA_LENGTH - 1)}\u{1F600}${'b'.repeat(5)}`;
+  const { instance, runtime } = await harness(
+    async (api) => {
+      await api.call('model', streamRequest('hello'));
+      return okResult('done');
+    },
+    { hello: { id: 'a', text: long } },
+    {},
+    undefined,
+    undefined,
+    { stream: true },
+  );
+  const { runId } = await instance.start({ prompt: 'hello' });
+  const texts = streamed(await collect(instance.events(runId)), 'messages').map((data) =>
+    String(data['text']),
+  );
+  expect(texts.join('')).toBe(long);
+  expect(texts.every((text) => text.length <= MAX_DELTA_LENGTH)).toBe(true);
+  for (const text of texts) expect(text).toBe(text.toWellFormed());
+  await runtime.dispose();
+});
+
+test('an abort mid-stream stops further deltas and settles the run cancelled', async () => {
+  const gate = Promise.withResolvers<void>();
+  let checks = 0;
+  const { instance, runtime } = await harness(
+    async (api) => {
+      await api.call('model', streamRequest('hello')).catch(() => undefined);
+      await api.cancelled;
+      return failResult('cancelled');
+    },
+    { hello: { id: 'a', text: 'alpha beta gamma' } },
+    {},
+    undefined,
+    undefined,
+    {
+      stream: true,
+      safety: async (): Promise<'allow'> => {
+        checks += 1;
+        if (checks === 2) await gate.promise;
+        return 'allow';
+      },
+    },
+  );
+  const { runId } = await instance.start({ prompt: 'hello' });
+  const events: RunEvent[] = [];
+  let cancelling: ReturnType<typeof instance.cancel> | undefined;
+  for await (const event of instance.events(runId)) {
+    events.push(event);
+    if (event.type === 'stream' && cancelling === undefined) {
+      cancelling = instance.cancel(runId);
+      gate.resolve();
+    }
+  }
+  await cancelling;
+  expect(last(events)?.type).toBe('cancelled');
+  expect(streamed(events, 'messages')).toEqual([{ author: 'writer', text: 'alpha ' }]);
   await runtime.dispose();
 });
 

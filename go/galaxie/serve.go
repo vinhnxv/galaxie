@@ -18,6 +18,6 @@ func Serve(entries map[string]Entry) {
 		if !ok {
 			return "", llm.NewError("invalid")
 		}
-		return Execute(ctx, caller, entry, Input{Prompt: request.Prompt, Conversation: request.Conversation})
+		return Execute(ctx, caller, entry, Input{Prompt: request.Prompt, Conversation: request.Conversation, Stream: request.Stream})
 	})
 }

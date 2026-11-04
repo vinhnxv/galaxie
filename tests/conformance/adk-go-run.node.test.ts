@@ -10,11 +10,12 @@ import {
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
+  AIMessageChunk,
   type BaseMessage,
   type StandardMessageStructure,
   type ToolCall,
 } from '@langchain/core/messages';
-import type { ChatResult } from '@langchain/core/outputs';
+import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { z } from 'zod';
 import { createGoAdapter } from '../../packages/adapter-go/src/index.js';
@@ -46,10 +47,42 @@ class SequenceModel extends BaseChatModel {
   override bindTools(): this {
     return this;
   }
+  /** Streams a text reply word by word, so a check or an abort can land between two deltas. */
+  override async *_streamResponseChunks(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): AsyncGenerator<ChatGenerationChunk> {
+    const reply = await this.#next(messages, options);
+    for (const text of reply.text.match(/\S+\s*/g) ?? ['']) {
+      options.signal?.throwIfAborted();
+      yield new ChatGenerationChunk({
+        text,
+        message: new AIMessageChunk<StandardMessageStructure>({ content: text }),
+      });
+    }
+  }
   override async _generate(
     messages: BaseMessage[],
     options: this['ParsedCallOptions'],
   ): Promise<ChatResult> {
+    const reply = await this.#next(messages, options);
+    return {
+      generations: [
+        {
+          text: reply.text,
+          message: new AIMessage<StandardMessageStructure>({
+            content: reply.text,
+            ...(reply.toolCalls ? { tool_calls: [...reply.toolCalls] } : {}),
+            usage_metadata: { input_tokens: 2, output_tokens: 2, total_tokens: 4 },
+          }),
+        },
+      ],
+    };
+  }
+  async #next(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): Promise<{ readonly text: string; readonly toolCalls?: readonly ToolCall[] }> {
     this.requests.push(
       messages.map((message) => `${message.type}:${JSON.stringify(message.content)}`),
     );
@@ -68,18 +101,7 @@ class SequenceModel extends BaseChatModel {
       ]);
       throw new Error('The waiting reply was released.');
     }
-    return {
-      generations: [
-        {
-          text: reply.text,
-          message: new AIMessage<StandardMessageStructure>({
-            content: reply.text,
-            ...(reply.toolCalls ? { tool_calls: [...reply.toolCalls] } : {}),
-            usage_metadata: { input_tokens: 2, output_tokens: 2, total_tokens: 4 },
-          }),
-        },
-      ],
-    };
+    return reply;
   }
 }
 
@@ -126,13 +148,16 @@ async function open(
   runtime: ReturnType<typeof createRuntime>,
   entry: string,
   replies: readonly Reply[],
+  stream = false,
 ) {
   if (!host) throw new Error('The host did not start.');
   const model = new SequenceModel(replies);
   const invoked: number[] = [];
+  const deltas: string[] = [];
+  const firstDelta = Promise.withResolvers<void>();
   const instance = await runtime.create(definition, {
     principalScope: 'fixture',
-    agent: { wasm: host.wasm, entry },
+    agent: { wasm: host.wasm, entry, ...(stream ? { stream: true } : {}) },
     services: { chatModels: { mock: model } },
     bindings: {
       'math.double@1': {
@@ -167,7 +192,13 @@ async function open(
     const { runId } = await instance.start({ prompt });
     const events = (async () => {
       const recorded: RunEvent[] = [];
-      for await (const event of instance.events(runId)) recorded.push(event);
+      for await (const event of instance.events(runId)) {
+        recorded.push(event);
+        if (event.type === 'stream' && event.mode === 'messages') {
+          deltas.push(String((event.data as { text: unknown }).text));
+          firstDelta.resolve();
+        }
+      }
       return recorded;
     })();
     if (cancelWhen) {
@@ -182,7 +213,7 @@ async function open(
     }
     return result;
   };
-  return { model, run, invoked, instance };
+  return { model, run, invoked, instance, deltas, firstDelta: firstDelta.promise };
 }
 
 function runtimeWith(options: Partial<RuntimeOptions> = {}): ReturnType<typeof createRuntime> {
@@ -275,6 +306,63 @@ test.skipIf(!goAvailable)(
       release.resolve();
       expect(aborted.cancelled).toBe(true);
       expect(Date.now() - started).toBeLessThan(5000);
+      expect((await run('next')).output).toBe('again');
+    } finally {
+      await runtime.dispose();
+    }
+  },
+  120000,
+);
+
+test.skipIf(!goAvailable)(
+  goAvailable
+    ? 'a streamed reply blocked mid-stream fails denied and the blocked delta never reaches the host'
+    : missingGo,
+  async () => {
+    const runtime = runtimeWith({
+      outputSafety: ({ text }) => (/BLOCKED_TEXT/.test(text) ? 'block' : 'allow'),
+    });
+    try {
+      const before = host?.traffic.length ?? 0;
+      const { run, deltas } = await open(
+        runtime,
+        'single',
+        [{ text: 'safe BLOCKED_TEXT after' }],
+        true,
+      );
+      expect((await run('go')).error?.code).toBe('denied');
+      expect(deltas).toEqual(['safe ']);
+      expect((host?.traffic.slice(before) ?? []).join('\n')).not.toContain('BLOCKED_TEXT');
+    } finally {
+      await runtime.dispose();
+    }
+  },
+  120000,
+);
+
+test.skipIf(!goAvailable)(
+  goAvailable
+    ? 'abort during a streamed reply stops the deltas and the adapter serves another run'
+    : missingGo,
+  async () => {
+    let checks = 0;
+    const runtime = runtimeWith({
+      outputSafety: async (): Promise<'allow'> => {
+        checks += 1;
+        // The second check is still pending when the abort lands, so the next delta must not leave.
+        if (checks === 2) await new Promise((resolve) => setTimeout(resolve, 100));
+        return 'allow';
+      },
+    });
+    try {
+      const { run, deltas, firstDelta } = await open(
+        runtime,
+        'single',
+        [{ text: 'alpha beta gamma' }, { text: 'again' }],
+        true,
+      );
+      expect((await run('slow', firstDelta)).cancelled).toBe(true);
+      expect(deltas).toEqual(['alpha ']);
       expect((await run('next')).output).toBe('again');
     } finally {
       await runtime.dispose();

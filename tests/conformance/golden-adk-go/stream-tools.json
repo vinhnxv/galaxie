@@ -1,0 +1,122 @@
+{
+  "capabilities": [
+    {
+      "effectScope": "adk-go/g1/root/1/0",
+      "input": {
+        "value": 21
+      },
+      "name": "math.double@1"
+    }
+  ],
+  "error": null,
+  "output": "The result is 42.",
+  "requests": [
+    {
+      "author": "agent",
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"agent\".",
+          "role": "system"
+        },
+        {
+          "content": "Double 21.",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "stream": true,
+        "tools": [
+          {
+            "function": {
+              "description": "Double an integer.",
+              "name": "math_double_1",
+              "parameters": {
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["value"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    },
+    {
+      "author": "agent",
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"agent\".",
+          "role": "system"
+        },
+        {
+          "content": "Double 21.",
+          "role": "user"
+        },
+        {
+          "content": "Checking.",
+          "role": "assistant",
+          "toolCalls": [
+            {
+              "function": {
+                "arguments": "{\"value\":21}",
+                "name": "math_double_1"
+              },
+              "id": "call-1",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "content": "{\"value\":42}",
+          "role": "tool",
+          "tool_call_id": "call-1"
+        }
+      ],
+      "options": {
+        "stream": true,
+        "tools": [
+          {
+            "function": {
+              "description": "Double an integer.",
+              "name": "math_double_1",
+              "parameters": {
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["value"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "Checking.",
+      "toolCalls": [
+        {
+          "function": {
+            "arguments": "{\"value\":21}",
+            "name": "math_double_1"
+          },
+          "id": "p1",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "content": "The result is 42."
+    }
+  ]
+}
