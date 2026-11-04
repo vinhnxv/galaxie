@@ -7,7 +7,6 @@ import { adapterFailure } from './errors.js';
 
 export const SESSION_TYPE: string = 'adk-go.session/v1';
 export const STATE_TYPE: string = 'galaxie.adk-go-state/v1';
-export const EXECUTOR: string = 'adk-go';
 
 /**
  * A record is refused above this size. It matches the Go side, which stops a run before the next

@@ -1,18 +1,18 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { isGalaxieError } from '@galaxie/core';
+import { type ErrorCode, isGalaxieError } from '@galaxie/core';
 import type { ConversationRecord } from './bridge.js';
 import { adapterFailure } from './errors.js';
 import {
   decodeStored,
-  EXECUTOR,
   encodeStored,
   revisionId,
   SESSION_TYPE,
   STATE_TYPE,
   type StoredConversation,
 } from './persist.js';
+import { GO_EXECUTOR_ID as EXECUTOR } from './protocol.js';
 
 export interface CheckpointPort {
   request(value: unknown): Promise<unknown>;
@@ -26,8 +26,18 @@ export function validCheckpointPort(value: unknown): value is CheckpointPort {
   );
 }
 
+/** Storage reports why a write or read was refused through marker fields; keep that reason. */
+function storageCode(error: unknown): ErrorCode {
+  if (typeof error === 'object' && error !== null) {
+    if ('invalidated' in error && error.invalidated === true) return 'stale';
+    if ('fenced' in error && error.fenced === true) return 'fenced';
+    if ('unrecoverable' in error && error.unrecoverable === true) return 'unrecoverable';
+  }
+  return 'unavailable';
+}
+
 function unavailable(error: unknown): never {
-  throw isGalaxieError(error) ? error : adapterFailure('unavailable');
+  throw isGalaxieError(error) ? error : adapterFailure(storageCode(error));
 }
 
 export async function loadConversation(

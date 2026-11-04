@@ -217,7 +217,8 @@ func TestAChangedRecordIsRefusedBeforeAnyModelOrToolCall(t *testing.T) {
 
 func TestArbitraryBytesAreNotARecord(t *testing.T) {
 	definition := definitionOf(gateEntry)
-	for _, raw := range []string{`{`, `[]`, `null`, `{"v":1}`, strings.Repeat("x", galaxie.MaxRecordBytes+1)} {
+	padded := `{"v":1,"pad":"` + strings.Repeat("x", galaxie.MaxRecordBytes) + `"}`
+	for _, raw := range []string{`{`, `[]`, `null`, `{"v":1}`, `{"v":1,"conversation":"g1"} {}`, padded, strings.Repeat("x", galaxie.MaxRecordBytes+1)} {
 		caller := &scripted{replies: []string{reply("never")}, capability: echoCapability}
 		_, err := galaxie.NewStore().Run(context.Background(), caller, definition,
 			resumeFrom([]byte(raw), strings.Repeat("a", 64), "approve", approveAll(1)))

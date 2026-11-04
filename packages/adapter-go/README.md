@@ -87,7 +87,15 @@ matches the digest of the conversation, ordinal and request.
 - Effect scopes, conversation IDs and ordinals come from the record, so a restored run never reuses a
   scope. Interaction IDs depend on the conversation, ordinal and request, not on the Worker.
 - A record is capped at 512 KiB, below the 1 MiB bridge frame. A run that would outgrow it fails
-  `unsupported` before the next model or tool call, and the previous revision stays current.
+  `unsupported` before the next model or tool call, and the previous revision stays current. The
+  guard counts stored events only, so a pause with very large call arguments, or a resume whose
+  answer pushes the events past the limit, can still fail late; the previous revision then stays
+  current and the pause stays answerable.
+- A resume that fails after an approved write ran offers the same pause again. Pair
+  `services.checkpoints` with core's `recovery` store whenever the agent binds a write capability:
+  without it the write can run a second time when the pause is answered again.
+- A failed storage call keeps its reason (`fenced`, `stale`, `unrecoverable`); any other failure is
+  `unavailable`.
 - Whoever can write the store can change the history the model sees; the tag is corruption detection,
   not protection against a hostile page. Keep the store on-device under the checkpointer's app and
   principal scope, with one active owner per session.

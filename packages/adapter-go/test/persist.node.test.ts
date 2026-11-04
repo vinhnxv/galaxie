@@ -5,7 +5,7 @@ import type { ExecutorAgent, ExecutorEvent } from '@galaxie/core';
 import { expect, test, vi } from 'vitest';
 import { MemoryByteCheckpoints } from '../../../tests/conformance/support/memory-byte-checkpoints.js';
 import { createGoAdapter, type GoAgent } from '../src/index.js';
-import { decodeStored, encodeStored } from '../src/persist.js';
+import { decodeStored, encodeStored, restoredContent } from '../src/persist.js';
 import type { WorkerMessage } from '../src/protocol.js';
 import { approvalRequest, FakeGoWorker, failResult, type Program } from './support-go.js';
 
@@ -396,4 +396,162 @@ test('a Worker ended by the cancel bound leaves the stored pause for the next in
   expect(await drain(second, resume(digest('1')))).toEqual([
     { type: 'output', output: 'answered' },
   ]);
+});
+
+test('a resumed run writes the next revision and chains it to the one before', async () => {
+  const store = new MemoryByteCheckpoints();
+  const first = await open(pausing, store);
+  await drain(first, start);
+  const second = await open(pausing, store);
+  await drain(second, resume(digest('1')));
+  const rows = [...store.rows.values()].sort((a, b) => a.id.localeCompare(b.id));
+  expect(rows.map((row) => row.id)).toEqual(['00000000000000000001', '00000000000000000002']);
+  expect(rows.map((row) => row.parentId)).toEqual([null, '00000000000000000001']);
+  const keys = rows.map((row) => JSON.parse(new TextDecoder().decode(row.metadata.bytes)).key);
+  expect(keys[1]).toBe(keys[0]);
+});
+
+test('a storage refusal keeps its reason on the commit and on the load', async () => {
+  const refusing = (marker: string, op: string) => ({
+    request: async (value: unknown): Promise<unknown> => {
+      if ((value as { op: string }).op === op)
+        throw Object.assign(new Error('x'), { [marker]: true });
+      return (value as { op: string }).op === 'get' ? null : undefined;
+    },
+  });
+  for (const [marker, code] of [
+    ['fenced', 'fenced'],
+    ['invalidated', 'stale'],
+    ['unrecoverable', 'unrecoverable'],
+  ] as const) {
+    const committing = await open(pausing, refusing(marker, 'put'));
+    expect(await drain(committing, start)).toMatchObject([{ type: 'error', error: { code } }]);
+    const loading = await open(pausing, refusing(marker, 'get'));
+    await expect(pendingOf(loading)).rejects.toMatchObject({ code });
+  }
+});
+
+test('a save that failed after its marker is retried on the same revision', async () => {
+  const store = new MemoryByteCheckpoints();
+  let failures = 1;
+  const flaky = {
+    request: async (value: unknown): Promise<unknown> => {
+      if ((value as { op: string }).op === 'put' && failures > 0) {
+        failures -= 1;
+        throw new Error('quota');
+      }
+      return store.request(value);
+    },
+  };
+  const setup = await open(pausing, flaky);
+  expect(await drain(setup, start)).toMatchObject([
+    { type: 'error', error: { code: 'unavailable' } },
+  ]);
+  expect(store.rows.size).toBe(0);
+  expect(await drain(setup, start)).toMatchObject([{ type: 'interaction' }]);
+  expect([...store.rows.values()].map((row) => row.id)).toEqual(['00000000000000000001']);
+  expect([...store.writes.keys()]).toHaveLength(1);
+});
+
+test('a new prompt over a stored pause replaces it and a failing one keeps it', async () => {
+  const store = new MemoryByteCheckpoints();
+  let starts = 0;
+  const program: Program = async (api) => {
+    if (api.request.resume !== undefined) return finished();
+    starts += 1;
+    if (starts === 1) return paused(digest('1'));
+    return starts === 2 ? failResult('unavailable') : finished();
+  };
+  const setup = await open(program, store);
+  await drain(setup, start);
+  expect(await drain(setup, start)).toMatchObject([{ type: 'error' }]);
+  await expect(pendingOf(setup)).resolves.toMatchObject({ interactionId: digest('1') });
+  expect(await drain(setup, start)).toEqual([{ type: 'output', output: 'answered' }]);
+  await expect(pendingOf(setup)).resolves.toBeUndefined();
+  const fresh = await open(program, store);
+  await expect(pendingOf(fresh)).resolves.toBeUndefined();
+});
+
+async function decodeEdited(
+  edit: (parts: { body: Record<string, unknown>; state: Record<string, unknown> }) => void,
+  options: { key?: Uint8Array; position?: number } = {},
+): Promise<unknown> {
+  const key = options.key ?? new Uint8Array(32).fill(7);
+  const body = record(1, digest('1'));
+  const state: Record<string, unknown> = {};
+  edit({ body, state });
+  const { checkpoint, metadata } = await encodeStored(
+    's',
+    body as never,
+    options.position ?? 0,
+    key,
+  );
+  const merged = { ...JSON.parse(new TextDecoder().decode(metadata)), ...state };
+  return decodeStored('s', {
+    id: '00000000000000000001',
+    checkpoint: { type: 'adk-go.session/v1', bytes: checkpoint },
+    metadata: {
+      type: 'galaxie.adk-go-state/v1',
+      bytes: new TextEncoder().encode(JSON.stringify(merged)),
+    },
+  });
+}
+
+test.each([
+  ['a malformed tag', ({ state }) => (state['mac'] = 'zz')],
+  ['a key of the wrong length', ({ state }) => (state['key'] = btoa('short'))],
+  ['a key that is not base64', ({ state }) => (state['key'] = '***')],
+  ['a position edited under the old tag', ({ state }) => (state['position'] = 5)],
+  ['a conversation name outside the pattern', ({ body }) => (body['conversation'] = 'x1')],
+  ['a pause with no calls', ({ body }) => ((body['pause'] as { calls: unknown[] }).calls = [])],
+  ['a pause on ordinal zero', ({ body }) => (body['ordinal'] = 0)],
+  ['a pause id that is not a digest', ({ body }) => ((body['pause'] as { id: string }).id = 'abc')],
+  ['too many events', ({ body }) => (body['events'] = Array.from({ length: 10_001 }, () => ({})))],
+] as Array<
+  [string, (parts: { body: Record<string, unknown>; state: Record<string, unknown> }) => void]
+>)('a stored record with %s fails unrecoverable', async (_name, edit) => {
+  await expect(decodeEdited(edit)).rejects.toMatchObject({ code: 'unrecoverable' });
+});
+
+test('a stored record under a valid tag decodes, and a wrong type string does not', async () => {
+  await expect(decodeEdited(() => {})).resolves.toMatchObject({ conversation: 'g1', revision: 1 });
+  const key = new Uint8Array(32).fill(7);
+  const { checkpoint, metadata } = await encodeStored('s', record(1) as never, 0, key);
+  await expect(
+    decodeStored('s', {
+      id: '00000000000000000001',
+      checkpoint: { type: 'other', bytes: checkpoint },
+      metadata: { type: 'galaxie.adk-go-state/v1', bytes: metadata },
+    }),
+  ).rejects.toMatchObject({ code: 'unrecoverable' });
+});
+
+test('restored content lists every text-bearing value and nothing else', () => {
+  const body = {
+    ...record(0, digest('1')),
+    counter: 99,
+    events: [
+      {
+        id: 'secret-id',
+        author: 'user',
+        content: {
+          role: 'model',
+          parts: [
+            { text: 'TEXT' },
+            { functionCall: { id: 'c1', name: 'tool', args: { v: 'ARGS' } } },
+            { functionResponse: { id: 'c1', name: 'tool', response: { v: 'RESPONSE' } } },
+          ],
+        },
+        actions: {
+          stateDelta: { k: 'STATE' },
+          requestedToolConfirmations: { c1: { hint: 'CONFIRM' } },
+        },
+      },
+    ],
+  };
+  const text = JSON.stringify(restoredContent(body as never));
+  for (const value of ['TEXT', 'ARGS', 'RESPONSE', 'STATE', 'CONFIRM', 'PRIVATE-CALL'])
+    expect(text).toContain(value);
+  expect(text).not.toContain('secret-id');
+  expect(text).not.toContain('99');
 });

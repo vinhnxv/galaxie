@@ -123,14 +123,14 @@ func onlyKeys(raw []byte, allowed ...string) bool {
 	return true
 }
 
-// storedPartOf copies a part into the closed stored shape. A part with anything else, such as
-// binary data, a file or code execution, is refused: those are never stored.
 // closed reports whether the value marshals to an object with no key outside allowed.
 func closed(value any, allowed ...string) bool {
 	raw, err := json.Marshal(value)
 	return err == nil && onlyKeys(raw, allowed...)
 }
 
+// storedPartOf copies a part into the closed stored shape. A part with anything else, such as
+// binary data, a file or code execution, is refused: those are never stored.
 func storedPartOf(part *genai.Part) (storedPart, error) {
 	if part == nil {
 		return storedPart{}, llm.NewError("unsupported")
