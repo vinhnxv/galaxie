@@ -1,0 +1,26 @@
+{
+  "capabilities": [],
+  "error": null,
+  "output": "Hello from the model.",
+  "requests": [
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"agent\".",
+          "role": "system"
+        },
+        {
+          "content": "Say hello.",
+          "role": "user"
+        }
+      ],
+      "options": {},
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "Hello from the model."
+    }
+  ]
+}

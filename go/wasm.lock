@@ -11,7 +11,8 @@
     "ldflags": "-s -w -buildid="
   },
   "packages": [
-    "./gate"
+    "./gate",
+    "./conformance/reference"
   ],
   "cutoff": "2026-10-28T00:00:00Z",
   "cutoffRecord": 70230551,

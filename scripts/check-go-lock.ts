@@ -16,7 +16,7 @@ import {
 } from './go-wasm-lock.ts';
 
 const cutoff = '2026-10-28T00:00:00Z';
-const goPackages = ['./gate'];
+const goPackages = ['./gate', './conformance/reference'];
 
 /** The sumdb record number of one module version: the first line of its lookup answer. */
 async function sumdbRecord(path: string, version: string): Promise<number> {

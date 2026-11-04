@@ -1,0 +1,28 @@
+{
+  "capabilities": [],
+  "error": {
+    "code": "unavailable"
+  },
+  "output": "",
+  "requests": [
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"agent\".",
+          "role": "system"
+        },
+        {
+          "content": "Say hello.",
+          "role": "user"
+        }
+      ],
+      "options": {},
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "error": "unavailable"
+    }
+  ]
+}
