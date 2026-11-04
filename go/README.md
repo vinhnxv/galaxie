@@ -6,7 +6,7 @@ This directory holds the Go sources of galaxie's Google ADK (Go) executor ([ADR-
 | --- | --- |
 | `go.mod`, `go.sum` | The module graph: `google.golang.org/adk` v1.9.0, `google.golang.org/genai` v1.57.0, toolchain `go1.27.3`. |
 | `wasm.lock` | The supply-chain record: toolchain, build flags, every module in the wasm build with its license and checksum database record, the cutoff and the digest of `wasm_exec.js`. |
-| `galaxie/` | The packages Go agents import: `galaxie` (agent constructors, capability tools, `Execute`, `Serve`), `galaxie/llm` (the model that forwards each request to the JavaScript router, wire types and the per-run failure state) and `galaxie/bridge` (the only package besides `gate` that imports `syscall/js`). |
+| `galaxie/` | The packages Go agents import: `galaxie` (agent constructors, capability tools, `Execute`, `Store`, `Serve`, `ServeWith`), `galaxie/llm` (the model that forwards each request to the JavaScript router, wire types and the per-run failure state) and `galaxie/bridge` (the only package besides `gate` that imports `syscall/js`). |
 | `conformance/` | The ADK Go conformance lane: `cases` holds the agents, `reference` is the program that registers them with `galaxie.Serve`, and `conformance_test.go` runs them natively against a scripted page to record or check the goldens in `tests/conformance/golden-adk-go`. |
 | `gate/` | The first-run gate: fourteen scripted ADK scenarios (`scenarios.go`) that the native test, the Node test and the headless Chromium test all execute, plus the wasm entry that bridges to JavaScript. `expected.json` is the native record (`go run ./gate`); the other lanes must reproduce it. It is a standalone program, not the galaxie package. |
 

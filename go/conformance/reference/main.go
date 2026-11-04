@@ -11,5 +11,5 @@ import (
 )
 
 func main() {
-	galaxie.Serve(cases.Entries())
+	galaxie.ServeWith(cases.Definitions())
 }

@@ -43,20 +43,20 @@ func LlmAgent(config llmagent.Config) (agent.Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.agents[created] = node{model: model, tools: config.Tools}
+	r.agents[created] = node{kind: kindLLM, model: model, tools: config.Tools}
 	return created, nil
 }
 
 // SequentialAgent creates an ADK SequentialAgent over agents the constructors created.
 func SequentialAgent(config agent.Config) (agent.Agent, error) {
-	return workflow(config, func(config agent.Config) (agent.Agent, error) {
+	return workflow(kindSequential, config, func(config agent.Config) (agent.Agent, error) {
 		return sequentialagent.New(sequentialagent.Config{AgentConfig: config})
 	})
 }
 
 // ParallelAgent creates an ADK ParallelAgent over agents the constructors created.
 func ParallelAgent(config agent.Config) (agent.Agent, error) {
-	return workflow(config, func(config agent.Config) (agent.Agent, error) {
+	return workflow(kindParallel, config, func(config agent.Config) (agent.Agent, error) {
 		return parallelagent.New(parallelagent.Config{AgentConfig: config})
 	})
 }
@@ -64,7 +64,7 @@ func ParallelAgent(config agent.Config) (agent.Agent, error) {
 // LoopAgent creates an ADK LoopAgent. A loop needs MaxIterations, or a sub-agent with ExitLoop,
 // so it cannot run without bound.
 func LoopAgent(config agent.Config, maxIterations uint) (agent.Agent, error) {
-	created, err := workflow(config, func(config agent.Config) (agent.Agent, error) {
+	created, err := workflow(kindLoop, config, func(config agent.Config) (agent.Agent, error) {
 		return loopagent.New(loopagent.Config{AgentConfig: config, MaxIterations: maxIterations})
 	})
 	if err != nil {
@@ -76,7 +76,7 @@ func LoopAgent(config agent.Config, maxIterations uint) (agent.Agent, error) {
 	return created, nil
 }
 
-func workflow(config agent.Config, create func(agent.Config) (agent.Agent, error)) (agent.Agent, error) {
+func workflow(kind string, config agent.Config, create func(agent.Config) (agent.Agent, error)) (agent.Agent, error) {
 	r := active()
 	if r == nil {
 		return nil, llm.NewError("unsupported")
@@ -90,7 +90,7 @@ func workflow(config agent.Config, create func(agent.Config) (agent.Agent, error
 	if err != nil {
 		return nil, err
 	}
-	r.agents[created] = node{}
+	r.agents[created] = node{kind: kind}
 	return created, nil
 }
 

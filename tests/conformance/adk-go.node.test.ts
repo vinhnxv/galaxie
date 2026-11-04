@@ -3,7 +3,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { runCase } from '../../examples/rag-browser/test/support/adk-go-ref/run.js';
+import { comparable, runCase } from '../../examples/rag-browser/test/support/adk-go-ref/run.js';
 import { createGoAdapter } from '../../packages/adapter-go/src/index.js';
 import {
   buildReference,
@@ -62,13 +62,7 @@ test.skipIf(!goAvailable).each(caseNames)(
     const script = scripts[name] as Script;
     const golden = await readGolden(name);
     const observed = await runOnNode(name, script);
-    expect({
-      requests: observed.requests,
-      responses: observed.responses,
-      capabilities: observed.capabilities,
-      output: observed.output,
-      error: observed.error,
-    }).toEqual(golden);
+    expect(comparable(observed)).toEqual(golden);
     // Page-side stream events are not on the wire, so the script lists the ones a case expects.
     expect(observed.streams).toEqual(script.streams ?? []);
   },

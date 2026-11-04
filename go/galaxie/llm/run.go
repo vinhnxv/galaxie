@@ -25,8 +25,21 @@ type Run struct {
 
 	mu     sync.Mutex
 	fatal  *Error
+	memory *Memory
+}
+
+// Memory holds the effect scopes of one conversation. A run that resumes a paused conversation
+// shares it with the run that paused, so the call a user confirmed keeps the scope it was given
+// when the model asked for it, and the turn counters continue instead of starting over.
+type Memory struct {
+	mu     sync.Mutex
 	turns  map[string]int
 	scopes map[string]string
+}
+
+// NewMemory creates an empty scope memory.
+func NewMemory() *Memory {
+	return &Memory{turns: map[string]int{}, scopes: map[string]string{}}
 }
 
 // NewRun creates the state of a run. cancel ends the run's context.
@@ -35,10 +48,12 @@ func NewRun(caller Caller, conversation string, cancel context.CancelFunc) *Run 
 		caller:       caller,
 		cancel:       cancel,
 		conversation: conversation,
-		turns:        map[string]int{},
-		scopes:       map[string]string{},
+		memory:       NewMemory(),
 	}
 }
+
+// UseMemory makes the run record and read effect scopes in the conversation's shared memory.
+func (r *Run) UseMemory(memory *Memory) { r.memory = memory }
 
 func (r *Run) With(ctx context.Context) context.Context {
 	return context.WithValue(ctx, runKey{}, r)
@@ -83,19 +98,21 @@ func (r *Run) remember(callID, branch string, part int) {
 	if branch == "" {
 		branch = "root"
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	m := r.memory
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if part == 0 {
-		r.turns[branch]++
+		m.turns[branch]++
 	}
-	r.scopes[callID] = fmt.Sprintf("adk-go/%s/%s/%d/%d", r.conversation, branch, r.turns[branch], part)
+	m.scopes[callID] = fmt.Sprintf("adk-go/%s/%s/%d/%d", r.conversation, branch, m.turns[branch], part)
 }
 
 // EffectScope returns the stable namespace of one function call, or "" if the call is unknown.
 func (r *Run) EffectScope(callID string) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.scopes[callID]
+	m := r.memory
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.scopes[callID]
 }
 
 func sanitizeBranch(branch string) string {

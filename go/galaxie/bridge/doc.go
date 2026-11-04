@@ -25,10 +25,33 @@ type Request struct {
 	Prompt       string `json:"prompt"`
 	Conversation string `json:"conversation"`
 	Stream       bool   `json:"stream,omitempty"`
+	// Resume answers the pause a previous run ended with; the prompt is empty then.
+	Resume *Resume `json:"resume,omitempty"`
 }
 
-// Handler runs one request to completion. caller reaches the page for model and capability calls.
-type Handler func(ctx context.Context, request Request, caller llm.Caller) (string, error)
+// Resume is the user's answer to a pause: the interaction it answers, the action and its payload.
+type Resume struct {
+	InteractionID string          `json:"interactionId"`
+	Action        string          `json:"action"`
+	Payload       json.RawMessage `json:"payload"`
+}
+
+// Paused reports a run that stopped to wait for the user. Request is the four-field interaction
+// request the author built.
+type Paused struct {
+	InteractionID string         `json:"interactionId"`
+	Request       map[string]any `json:"request"`
+}
+
+// Outcome is what a finished request produced: the final text, or the pause it ended with.
+type Outcome struct {
+	Output string
+	Paused *Paused
+}
+
+// Handler runs one request to completion or to a pause. caller reaches the page for model and
+// capability calls.
+type Handler func(ctx context.Context, request Request, caller llm.Caller) (Outcome, error)
 
 // Module is a dependency version and checksum as recorded in the binary.
 type Module struct {
@@ -64,17 +87,18 @@ func ReadBuildInfo() BuildInfo {
 	return info
 }
 
-func encodeResult(output string, err error) string {
+func encodeResult(outcome Outcome, err error) string {
 	type result struct {
-		OK     bool   `json:"ok"`
-		Output string `json:"output,omitempty"`
-		Code   string `json:"code,omitempty"`
+		OK     bool    `json:"ok"`
+		Output string  `json:"output,omitempty"`
+		Paused *Paused `json:"paused,omitempty"`
+		Code   string  `json:"code,omitempty"`
 	}
 	if err != nil {
 		encoded, _ := json.Marshal(result{Code: llm.CodeOf(err)})
 		return string(encoded)
 	}
-	encoded, _ := json.Marshal(result{OK: true, Output: output})
+	encoded, _ := json.Marshal(result{OK: true, Output: outcome.Output, Paused: outcome.Paused})
 	if len(encoded) > llm.MaxFrameBytes {
 		encoded, _ = json.Marshal(result{Code: "unsupported"})
 	}

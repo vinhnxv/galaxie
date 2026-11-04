@@ -29,9 +29,15 @@ export interface ScriptedStream {
   readonly mode: string;
   readonly data: unknown;
 }
+export interface ScriptedAnswer {
+  readonly action: string;
+  readonly payload?: unknown;
+}
 export interface Script {
   readonly entry: string;
   readonly prompt: string;
+  /** Replies, in order, to the interactions the run raises. */
+  readonly answers?: readonly ScriptedAnswer[];
   /** Asks the adapter for stream events; the expected ones are listed in `streams`. */
   readonly stream?: boolean;
   readonly streams?: readonly ScriptedStream[];
@@ -39,6 +45,8 @@ export interface Script {
   readonly capabilities: Readonly<Record<string, { result?: unknown; error?: string }>>;
 }
 export interface Observed {
+  /** The interaction requests the run raised, without their interaction IDs. */
+  readonly pauses: unknown[];
   readonly requests: unknown[];
   readonly responses: unknown[];
   readonly capabilities: unknown[];
@@ -126,6 +134,18 @@ const definition = defineAgentDefinition({
   models: { answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
 });
 
+/** What the native golden records: the wire transcript, with pauses only when a case has any. */
+export function comparable(observed: Observed): Record<string, unknown> {
+  return {
+    requests: observed.requests,
+    responses: observed.responses,
+    capabilities: observed.capabilities,
+    ...(observed.pauses.length > 0 ? { pauses: observed.pauses } : {}),
+    output: observed.output,
+    error: observed.error,
+  };
+}
+
 export async function runCase(
   name: string,
   script: Script,
@@ -199,12 +219,29 @@ export async function runCase(
     const { runId } = await instance.start({ prompt: script.prompt });
     const events: RunEvent[] = [];
     const streams: ScriptedStream[] = [];
+    const pauses: unknown[] = [];
+    let answered = 0;
     for await (const event of instance.events(runId)) {
       if (event.type === 'stream') streams.push({ mode: event.mode, data: event.data });
+      if (event.type === 'interaction') {
+        const { interactionId: _id, ...request } = event.interaction;
+        pauses.push(request);
+        const answer = script.answers?.[answered++];
+        if (answer === undefined) throw new Error('The run paused with no answer left.');
+        const receipt = await instance.dispatch({
+          instanceId: instance.instanceId,
+          runId,
+          ...event.interaction,
+          action: answer.action,
+          payload: answer.payload,
+        });
+        if (receipt.status !== 'accepted') throw new Error('The answer was not accepted.');
+      }
       events.push(event);
     }
     const end = events.at(-1);
     return {
+      pauses,
       requests: frames.filter((frame) => frame.op === 'model').map((frame) => frame.payload),
       // The goldens record the aggregated replies Go receives, never the page-side chunks.
       responses: script.replies

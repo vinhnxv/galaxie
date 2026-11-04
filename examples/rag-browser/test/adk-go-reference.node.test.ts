@@ -7,13 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { build, preview } from 'vite';
 import { afterAll, expect, test } from 'vitest';
-import {
-  type Golden,
-  readGolden,
-  readScripts,
-} from '../../../tests/conformance/support/adk-go.node.js';
+import { readGolden, readScripts } from '../../../tests/conformance/support/adk-go.node.js';
 import { cspHeader } from '../src/host/csp.js';
-import type { Observed } from './support/adk-go-ref/run.js';
+import { comparable, type Observed } from './support/adk-go-ref/run.js';
 import {
   buildReference,
   disposeReference,
@@ -97,16 +93,6 @@ async function runInChromium(
       if ('closeAllConnections' in server.httpServer) server.httpServer.closeAllConnections();
     });
   }
-}
-
-function comparable(observed: Observed): Omit<Golden, never> {
-  return {
-    requests: observed.requests,
-    responses: observed.responses,
-    capabilities: observed.capabilities,
-    output: observed.output,
-    error: observed.error,
-  };
 }
 
 test.skipIf(!goAvailable)(

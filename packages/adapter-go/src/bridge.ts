@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { type InteractionRequest, parseInteractionRequest } from '@galaxie/core';
 import { adapterFailure } from './errors.js';
 import { isRecord, withinBridgeLimit } from './protocol.js';
 
@@ -211,19 +212,42 @@ export function encodeReply(value: unknown): string {
   return text;
 }
 
+/** A run that stopped to wait for the user: the interaction to show and the ID that answers it. */
+export interface BridgePause {
+  readonly interactionId: string;
+  readonly request: InteractionRequest;
+}
+
 export type RunResult =
-  | { readonly ok: true; readonly output: string }
+  | { readonly ok: true; readonly output: string; readonly paused?: undefined }
+  | { readonly ok: true; readonly paused: BridgePause }
   | { readonly ok: false; readonly code: string };
+
+const INTERACTION_ID = /^[0-9a-f]{64}$/;
+
+function parsePause(value: unknown): BridgePause {
+  if (
+    !isRecord(value) ||
+    !keys(value, ['interactionId', 'request']) ||
+    typeof value['interactionId'] !== 'string' ||
+    !INTERACTION_ID.test(value['interactionId'])
+  )
+    throw adapterFailure('invalid');
+  const request = parseInteractionRequest(value['request']);
+  if (request === undefined) throw adapterFailure('invalid');
+  return { interactionId: value['interactionId'], request };
+}
 
 export function parseRunResult(text: string): RunResult {
   const value = parseFrame(text);
-  if (
-    isRecord(value) &&
-    value['ok'] === true &&
-    keys(value, ['ok'], ['output']) &&
-    (value['output'] === undefined || typeof value['output'] === 'string')
-  )
-    return { ok: true, output: (value['output'] as string | undefined) ?? '' };
+  if (isRecord(value) && value['ok'] === true && keys(value, ['ok'], ['output', 'paused'])) {
+    if (value['paused'] !== undefined) {
+      if (value['output'] !== undefined && value['output'] !== '') throw adapterFailure('invalid');
+      return { ok: true, paused: parsePause(value['paused']) };
+    }
+    if (value['output'] === undefined || typeof value['output'] === 'string')
+      return { ok: true, output: (value['output'] as string | undefined) ?? '' };
+  }
   if (
     isRecord(value) &&
     value['ok'] === false &&

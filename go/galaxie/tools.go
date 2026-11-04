@@ -12,6 +12,7 @@ import (
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/exitlooptool"
 	"google.golang.org/adk/tool/functiontool"
+	"google.golang.org/adk/tool/toolconfirmation"
 
 	"galaxie.invalid/galaxie/galaxie/llm"
 )
@@ -24,6 +25,12 @@ type ToolSpec struct {
 	Description string
 	// Schema is a JSON Schema object for the tool's input, as JSON.
 	Schema string
+	// RequireConfirmation holds the call until the user approves it. The capability does not run
+	// before then, and a declined call is reported to the model as rejected.
+	RequireConfirmation bool
+	// LongRunning marks a capability whose real result arrives later: the run runs the capability,
+	// pauses with its pending result, and continues when the user supplies the result.
+	LongRunning bool
 }
 
 // CapabilityTool creates a tool that calls a host capability, for example "math.double@1". The
@@ -34,14 +41,23 @@ func CapabilityTool(capability string, spec ToolSpec) (tool.Tool, error) {
 	if r == nil || capability == "" {
 		return nil, llm.NewError("unsupported")
 	}
+	// ADK's own confirmation call carries this name; a tool that shares it could forge a pause.
+	if toolName(capability) == toolconfirmation.FunctionCallName {
+		return nil, llm.NewError("unsupported")
+	}
 	var schema jsonschema.Schema
 	if err := json.Unmarshal([]byte(spec.Schema), &schema); err != nil {
 		return nil, llm.NewError("invalid")
 	}
+	if spec.RequireConfirmation && spec.LongRunning {
+		return nil, llm.NewError("unsupported")
+	}
 	created, err := functiontool.New(functiontool.Config{
-		Name:        toolName(capability),
-		Description: spec.Description,
-		InputSchema: &schema,
+		Name:                toolName(capability),
+		Description:         spec.Description,
+		InputSchema:         &schema,
+		IsLongRunning:       spec.LongRunning,
+		RequireConfirmation: spec.RequireConfirmation,
 	}, func(ctx agent.ToolContext, args map[string]any) (map[string]any, error) {
 		return call(ctx, capability, args)
 	})
@@ -49,6 +65,10 @@ func CapabilityTool(capability string, spec ToolSpec) (tool.Tool, error) {
 		return nil, err
 	}
 	r.tools[created] = true
+	r.pausing = r.pausing || spec.RequireConfirmation || spec.LongRunning
+	if spec.LongRunning {
+		r.longRunning[created] = true
+	}
 	return created, nil
 }
 

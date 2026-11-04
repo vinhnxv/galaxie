@@ -16,6 +16,11 @@ export interface ProgramApi {
     readonly entry: string;
     readonly prompt: string;
     readonly conversation: string;
+    readonly resume?: {
+      readonly interactionId: string;
+      readonly action: string;
+      readonly payload?: unknown;
+    };
   };
   call(op: 'model' | 'capability', payload: unknown): Promise<string>;
   readonly cancelled: Promise<void>;
@@ -24,6 +29,16 @@ export interface ProgramApi {
 export type Program = (api: ProgramApi) => Promise<string>;
 
 export const okResult = (output: string): string => JSON.stringify({ ok: true, output });
+export const approvalRequest = {
+  surfaceId: 'main',
+  viewRevision: 'r1',
+  component: 'conformance.Approval/v1',
+  props: { count: 1 },
+};
+export const pausedResult = (
+  interactionId: string = 'a'.repeat(64),
+  request: unknown = approvalRequest,
+): string => JSON.stringify({ ok: true, paused: { interactionId, request } });
 export const failResult = (code: string): string => JSON.stringify({ ok: false, code });
 
 export class FakeGoWorker implements GoWorkerPort {

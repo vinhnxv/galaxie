@@ -151,5 +151,290 @@
       { "mode": "messages", "data": { "author": "second", "text": "Polished " } },
       { "mode": "messages", "data": { "author": "second", "text": "greeting." } }
     ]
+  },
+  "confirm-approve": {
+    "entry": "confirm",
+    "prompt": "Double 21.",
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":21}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The result is 42."
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 42
+        }
+      }
+    }
+  },
+  "confirm-deny": {
+    "entry": "confirm",
+    "prompt": "Double 21.",
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":21}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "I did not double it."
+      }
+    ],
+    "capabilities": {}
+  },
+  "confirm-chain": {
+    "entry": "confirm",
+    "prompt": "Double 21 and then 4.",
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      },
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":21}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p2",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":4}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done twice."
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 42
+        }
+      }
+    }
+  },
+  "long-running": {
+    "entry": "long-running",
+    "prompt": "Double 21.",
+    "answers": [
+      {
+        "action": "complete",
+        "payload": {
+          "value": 42
+        }
+      }
+    ],
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":21}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The result is 42."
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 0
+        }
+      }
+    }
+  },
+  "confirm-sequential": {
+    "entry": "confirm-sequential",
+    "prompt": "Double 21.",
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "replies": [
+      {
+        "content": "First step."
+      },
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":21}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The result is 42."
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 42
+        }
+      }
+    }
+  },
+  "confirm-sequential-first": {
+    "entry": "confirm-sequential-first",
+    "prompt": "Double 21.",
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":21}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Never asked."
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 42
+        }
+      }
+    }
+  },
+  "stream-confirm": {
+    "entry": "confirm",
+    "prompt": "Double 21.",
+    "stream": true,
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":21}"
+            }
+          }
+        ],
+        "chunks": [""]
+      },
+      {
+        "content": "The result is 42.",
+        "chunks": ["The result ", "is 42."]
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 42
+        }
+      }
+    },
+    "streams": [
+      { "mode": "updates", "data": { "step": "tool_call", "tool": "math_double_1", "index": 0 } },
+      { "mode": "updates", "data": { "step": "paused", "index": 1 } },
+      { "mode": "updates", "data": { "step": "tool_result", "tool": "math.double@1", "index": 2 } },
+      { "mode": "messages", "data": { "author": "agent", "text": "The result " } },
+      { "mode": "messages", "data": { "author": "agent", "text": "is 42." } }
+    ]
   }
 }

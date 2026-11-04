@@ -32,6 +32,11 @@ export function emitMarker(
   push(sink, 'updates', { step, tool, index: sink.position++ });
 }
 
+/** The marker for a run that stops to wait for the user; it names no tool and holds no content. */
+export function emitPaused(sink: StreamSink): void {
+  push(sink, 'updates', { step: 'paused', index: sink.position++ });
+}
+
 export function emitDelta(sink: StreamSink, author: string, text: string): void {
   push(sink, 'messages', { author, text });
 }

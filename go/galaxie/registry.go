@@ -18,7 +18,16 @@ import (
 
 const maxDepth = 16
 
+// Agent kinds the constructors create.
+const (
+	kindLLM        = "llm"
+	kindSequential = "sequential"
+	kindParallel   = "parallel"
+	kindLoop       = "loop"
+)
+
 type node struct {
+	kind  string
 	model *llm.LLM
 	tools []tool.Tool
 }
@@ -26,9 +35,12 @@ type node struct {
 // recorder collects the values one build function creates. The ADK interfaces have unexported
 // methods, so the concrete types cannot be inspected; the registry remembers the pointers instead.
 type recorder struct {
-	agents map[agent.Agent]node
-	tools  map[tool.Tool]bool
-	models map[*llm.LLM]bool
+	agents  map[agent.Agent]node
+	tools   map[tool.Tool]bool
+	models  map[*llm.LLM]bool
+	pausing bool
+	// longRunning holds the tools that run before they pause.
+	longRunning map[tool.Tool]bool
 }
 
 var (
@@ -36,23 +48,24 @@ var (
 	current *recorder
 )
 
-func record(build func() (agent.Agent, error)) (agent.Agent, error) {
+func record(build func() (agent.Agent, error)) (agent.Agent, *recorder, error) {
 	buildMu.Lock()
 	defer buildMu.Unlock()
 	current = &recorder{
-		agents: map[agent.Agent]node{},
-		tools:  map[tool.Tool]bool{},
-		models: map[*llm.LLM]bool{},
+		agents:      map[agent.Agent]node{},
+		tools:       map[tool.Tool]bool{},
+		models:      map[*llm.LLM]bool{},
+		longRunning: map[tool.Tool]bool{},
 	}
 	defer func() { current = nil }()
 	root, err := build()
 	if err != nil {
-		return nil, llm.NewError("unsupported")
+		return nil, nil, llm.NewError("unsupported")
 	}
 	if err := current.validate(root); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return root, nil
+	return root, current, nil
 }
 
 func (r *recorder) validate(root agent.Agent) error {

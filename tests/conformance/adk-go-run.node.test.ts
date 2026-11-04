@@ -433,3 +433,153 @@ test.skipIf(!goAvailable)(
   },
   120000,
 );
+
+type Instance = Awaited<ReturnType<typeof open>>['instance'];
+
+/** Runs a prompt and answers each interaction with `answer`; reports the receipts and the outcome. */
+async function converse(
+  instance: Instance,
+  prompt: string,
+  answer: (index: number) => { action: string; payload: unknown; interactionId?: string },
+): Promise<{
+  interactions: Array<{ interactionId: string; props: unknown }>;
+  receipts: Array<{ status: string }>;
+  output?: unknown;
+  error?: { code: string };
+}> {
+  const { runId } = await instance.start({ prompt });
+  const result: Awaited<ReturnType<typeof converse>> = { interactions: [], receipts: [] };
+  for await (const event of instance.events(runId)) {
+    if (event.type === 'interaction') {
+      const index = result.interactions.length;
+      result.interactions.push({
+        interactionId: event.interaction.interactionId,
+        props: event.interaction.props,
+      });
+      const reply = answer(index);
+      result.receipts.push(
+        await instance.dispatch({
+          instanceId: instance.instanceId,
+          runId,
+          ...event.interaction,
+          ...(reply.interactionId === undefined
+            ? {}
+            : { interactionId: reply.interactionId as never }),
+          action: reply.action,
+          payload: reply.payload,
+        }),
+      );
+      if (reply.interactionId !== undefined) {
+        // A rejected answer leaves the pause; the right one follows.
+        const retry = answer(index + 1000);
+        result.receipts.push(
+          await instance.dispatch({
+            instanceId: instance.instanceId,
+            runId,
+            ...event.interaction,
+            action: retry.action,
+            payload: retry.payload,
+          }),
+        );
+      }
+    } else if (event.type === 'output') result.output = event.output;
+    else if (event.type === 'error') result.error = event.error;
+  }
+  return result;
+}
+
+const approve = (indexes: number[]): { action: string; payload: unknown } => ({
+  action: 'approve',
+  payload: { indexes },
+});
+
+test.skipIf(!goAvailable)(
+  goAvailable
+    ? 'two confirmations in one response form one interaction that one answer covers'
+    : missingGo,
+  async () => {
+    const runtime = runtimeWith();
+    try {
+      const { instance, invoked, model } = await open(runtime, 'confirm', [
+        { text: '', toolCalls: [double('a', 1), double('b', 2)] },
+        { text: 'Both doubled.' },
+      ]);
+      const outcome = await converse(instance, 'go', () => approve([0, 1]));
+      expect(outcome.interactions).toHaveLength(1);
+      expect(outcome.interactions[0]?.props).toEqual({ count: 2 });
+      expect(outcome.receipts.map((receipt) => receipt.status)).toEqual(['accepted']);
+      expect(outcome.output).toBe('Both doubled.');
+      expect([...invoked].sort()).toEqual([1, 2]);
+      expect(model.requests).toHaveLength(2);
+    } finally {
+      await runtime.dispose();
+    }
+  },
+  120000,
+);
+
+test.skipIf(!goAvailable)(
+  goAvailable ? 'an answer that misses one confirmation fails invalid and runs nothing' : missingGo,
+  async () => {
+    const runtime = runtimeWith();
+    try {
+      const { instance, invoked } = await open(runtime, 'confirm', [
+        { text: '', toolCalls: [double('a', 1), double('b', 2)] },
+        { text: 'never' },
+      ]);
+      const outcome = await converse(instance, 'go', () => approve([0]));
+      expect(outcome.error?.code).toBe('invalid');
+      expect(invoked).toEqual([]);
+    } finally {
+      await runtime.dispose();
+    }
+  },
+  120000,
+);
+
+test.skipIf(!goAvailable)(
+  goAvailable
+    ? 'an answer to another interaction is rejected stale and the pause stays'
+    : missingGo,
+  async () => {
+    const runtime = runtimeWith();
+    try {
+      const { instance, invoked } = await open(runtime, 'confirm', [
+        { text: '', toolCalls: [double('a', 21)] },
+        { text: 'Doubled.' },
+      ]);
+      const outcome = await converse(instance, 'go', (index) => ({
+        ...approve([0]),
+        ...(index < 1000 ? { interactionId: 'f'.repeat(64) } : {}),
+      }));
+      expect(outcome.receipts.map((receipt) => receipt.status)).toEqual(['rejected', 'accepted']);
+      expect(outcome.output).toBe('Doubled.');
+      expect(invoked).toEqual([21]);
+    } finally {
+      await runtime.dispose();
+    }
+  },
+  120000,
+);
+
+test.skipIf(!goAvailable)(
+  goAvailable ? 'consecutive pauses of one session have distinct interaction IDs' : missingGo,
+  async () => {
+    const runtime = runtimeWith();
+    try {
+      const { instance, invoked } = await open(runtime, 'confirm', [
+        { text: '', toolCalls: [double('a', 1)] },
+        { text: '', toolCalls: [double('b', 2)] },
+        { text: 'Twice.' },
+      ]);
+      const first = await converse(instance, 'go', () => approve([0]));
+      expect(first.interactions).toHaveLength(2);
+      const ids = first.interactions.map((item) => item.interactionId);
+      expect(new Set(ids).size).toBe(2);
+      expect(invoked).toEqual([1, 2]);
+    } finally {
+      await runtime.dispose();
+    }
+  },
+  120000,
+);
