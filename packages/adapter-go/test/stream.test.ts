@@ -5,7 +5,7 @@ import { AIMessage, AIMessageChunk } from '@langchain/core/messages';
 import { expect, test } from 'vitest';
 import { toolCallChecks } from '../../../tests/conformance/support/tool-call-checks.js';
 import { parseModelPayload, validAuthor } from '../src/bridge.js';
-import { DeltaSplitter, MAX_DELTA_LENGTH, StreamJoiner } from '../src/stream.js';
+import { carriesCalls, DeltaSplitter, MAX_DELTA_LENGTH, StreamJoiner } from '../src/stream.js';
 import { growingText, outputText, replyCalls } from '../src/tool-calls.js';
 
 const base = {
@@ -166,4 +166,63 @@ test('a provider-reported invalid call chunk is refused as invalid', () => {
 
 test('an empty provider stream fails unavailable', () => {
   expect(() => join([])).toThrow(expect.objectContaining({ code: 'unavailable' }));
+});
+
+test('one whole call joins to one call', () => {
+  const whole = new AIMessageChunk({
+    content: '',
+    tool_calls: [{ id: 'a', name: 'lookup', args: { q: 'x' } }],
+  });
+  expect(join([whole]).tool_calls).toEqual([
+    expect.objectContaining({ id: 'a', args: { q: 'x' } }),
+  ]);
+});
+
+test('two whole calls in one stream are refused as unsupported', () => {
+  const whole = (id: string): AIMessageChunk =>
+    new AIMessageChunk({ content: '', tool_calls: [{ id, name: 'lookup', args: {} }] });
+  expect(() => join([whole('a'), whole('b')])).toThrow(
+    expect.objectContaining({ code: 'unsupported' }),
+  );
+});
+
+test('fragments keyed by id without an index join to separate calls', () => {
+  const byId = (id: string, args: string): AIMessageChunk =>
+    new AIMessageChunk({
+      content: '',
+      tool_call_chunks: [{ id, name: 'lookup', args, type: 'tool_call_chunk' }],
+    });
+  const joined = join([byId('a', '{"q":1}'), byId('b', '{"q":2}')]);
+  expect(joined.tool_calls?.map((call) => call.args)).toEqual([{ q: 1 }, { q: 2 }]);
+});
+
+test('append returns the reply joined so far', () => {
+  const joiner = new StreamJoiner();
+  expect(joiner.append(new AIMessageChunk({ content: 'one ' })).content).toBe('one ');
+  expect(joiner.append(new AIMessageChunk({ content: 'two' })).content).toBe('one two');
+});
+
+test.each([
+  ['plain text', new AIMessageChunk({ content: 'hi' }), false],
+  [
+    'a normalized call',
+    new AIMessage({ content: '', tool_calls: [{ id: 'a', name: 'n', args: {} }] }),
+    true,
+  ],
+  ['an argument fragment', fragment('{"q":'), true],
+  [
+    'a provider mirror',
+    new AIMessage({ content: '', additional_kwargs: { tool_calls: [] } }),
+    true,
+  ],
+  [
+    'an invalid call',
+    new AIMessage({
+      content: '',
+      invalid_tool_calls: [{ name: 'n', args: '{', error: 'bad', type: 'invalid_tool_call' }],
+    }),
+    true,
+  ],
+])('a chunk carrying %s is detected as carrying calls: %s', (_name, chunk, expected) => {
+  expect(carriesCalls(chunk)).toBe(expected);
 });

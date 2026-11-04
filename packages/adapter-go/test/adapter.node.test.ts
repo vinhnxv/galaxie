@@ -97,6 +97,9 @@ test.each([
   ['a relative module URL', { ...agent, wasm: { ...agent.wasm, url: '/go/agent.wasm' } }],
   ['a URL with credentials', { wasm: { ...agent.wasm, url: 'http://user:pw@127.0.0.1/a.wasm' } }],
   ['an extra field', { ...agent, extra: true }],
+  ['a non-boolean stream flag', { ...agent, stream: 'yes' }],
+  ['a numeric stream flag', { ...agent, stream: 1 }],
+  ['an undefined stream key', { ...agent, stream: undefined }],
   ['no agent', null],
 ])('%s fails invalid before a Worker exists', async (_name, value) => {
   const createWorker = vi.fn(() => new FakeWorker(ready));

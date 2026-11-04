@@ -5,16 +5,13 @@ import type { ExecutorEvent } from '@galaxie/core';
 import type { AIMessage, AIMessageChunk } from '@langchain/core/messages';
 import { concat } from '@langchain/core/utils/stream';
 import { adapterFailure } from './errors.js';
+import { GO_EXECUTOR_ID } from './protocol.js';
 import { fragmentsOf } from './tool-calls.js';
 
-export const GO_EXECUTOR_ID = 'adk-go';
-/** The longest text one `messages` event carries; a longer delta is split. */
 export const MAX_DELTA_LENGTH = 4096;
 
-/** What the stream projection needs from a run: a place to put events and a step counter. */
 export interface StreamSink {
   readonly events: ExecutorEvent[];
-  /** Wakes the run loop that drains `events`. */
   wake?: () => void;
   position: number;
   cancelled: boolean;
@@ -69,7 +66,6 @@ export class DeltaSplitter {
   }
 }
 
-/** Whether a streamed chunk carries any tool-call material, whichever field the provider used. */
 export function carriesCalls(chunk: AIMessage | AIMessageChunk): boolean {
   return (
     (chunk.tool_calls?.length ?? 0) > 0 ||
@@ -100,9 +96,10 @@ export class StreamJoiner {
 
   /**
    * Adds one streamed piece. A provider without native streaming yields its whole reply as one
-   * message that is not a chunk and may report an invalid call, so both kinds are accepted.
+   * message that is not a chunk and may report an invalid call, so both kinds are accepted. Returns
+   * the reply joined so far.
    */
-  append(chunk: AIMessage | AIMessageChunk): void {
+  append(chunk: AIMessage | AIMessageChunk): AIMessage | AIMessageChunk {
     const pieces = fragmentsOf(chunk);
     // A fragment alone is rarely valid JSON, so only a provider-reported invalid call counts here.
     if (pieces.length === 0 && (chunk.invalid_tool_calls?.length ?? 0) > 0)
@@ -128,14 +125,9 @@ export class StreamJoiner {
       this.#joined === undefined
         ? chunk
         : concat(this.#joined as AIMessageChunk, chunk as AIMessageChunk);
-  }
-
-  /** The reply so far, for the growing output check. */
-  get joined(): AIMessage | AIMessageChunk | undefined {
     return this.#joined;
   }
 
-  /** The finished reply, or a fixed failure when the join does not match the provider's calls. */
   finish(): AIMessage | AIMessageChunk {
     const joined = this.#joined;
     if (joined === undefined) throw adapterFailure('unavailable');

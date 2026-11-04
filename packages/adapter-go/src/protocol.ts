@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
+/** The executor id the host selects this adapter by. */
+export const GO_EXECUTOR_ID = 'adk-go';
+
 export const MAX_WASM_BYTES: number = 64 * 1024 * 1024;
 
 /** The Go module the host reviewed: where to fetch it and what it must be. */

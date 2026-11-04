@@ -8,8 +8,8 @@ import {
   isAIMessage,
   type StandardMessageStructure,
 } from '@langchain/core/messages';
+import { isRecord } from './protocol.js';
 
-/** One model-originated tool call as the output check sees it. */
 export interface ReplyCall {
   readonly id: string | undefined;
   readonly name: string | undefined;
@@ -20,15 +20,11 @@ type ArgumentChunk = NonNullable<
   AIMessageChunk<StandardMessageStructure>['tool_call_chunks']
 >[number];
 
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function rawArgumentChunks(message: BaseMessage): ArgumentChunk[] {
   const raw: unknown = message.additional_kwargs['tool_calls'];
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((call, position) => {
-    if (!object(call) || !object(call['function'])) return [];
+    if (!isRecord(call) || !isRecord(call['function'])) return [];
     const fn = call['function'];
     if (typeof fn['arguments'] !== 'string') return [];
     return [
@@ -77,7 +73,6 @@ export function outputText(message: BaseMessage): string {
   return [message.text, ...replyCalls(message).map((call) => call.args)].join('\n');
 }
 
-/** The raw argument fragments of a streamed piece; a whole message has none. */
 export function fragmentsOf(message: AIMessage | AIMessageChunk): ArgumentChunk[] {
   return 'tool_call_chunks' in message ? (message.tool_call_chunks ?? []) : [];
 }

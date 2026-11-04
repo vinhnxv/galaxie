@@ -51,15 +51,38 @@ async function harness(
   adjust: (model: MockChatModel) => void = () => undefined,
   streaming: {
     readonly stream?: boolean;
+    /** Pause after each event the adapter yields, as a slow consumer of its generator would. */
+    readonly pauseMs?: number;
     readonly safety?: NonNullable<Parameters<typeof createRuntime>[0]['outputSafety']>;
   } = {},
 ) {
   const worker = new FakeGoWorker(program, workerOptions);
   const model = new MockChatModel(script);
   adjust(model);
+  const adapter = createGoAdapter({ createWorker: () => worker });
+  const pauseMs = streaming.pauseMs;
+  const executor =
+    pauseMs === undefined
+      ? adapter
+      : {
+          ...adapter,
+          prepare: async (...args: Parameters<typeof adapter.prepare>) => {
+            const prepared = await adapter.prepare(...args);
+            return {
+              ...prepared,
+              run: (request: Parameters<typeof prepared.run>[0]) =>
+                (async function* () {
+                  for await (const event of prepared.run(request)) {
+                    yield event;
+                    await new Promise<void>((resolve) => setTimeout(resolve, pauseMs));
+                  }
+                })(),
+            };
+          },
+        };
   const runtime = createRuntime({
     appId: 'adk-go-test',
-    executors: [createGoAdapter({ createWorker: () => worker })],
+    executors: [executor],
     outputSafety: streaming.safety ?? (() => 'allow'),
   });
   const instance = await runtime.create(definition, {
@@ -224,6 +247,35 @@ test('a streaming run emits checked text deltas in order and the program gets on
         event.type !== 'stream' || (event.executor === 'adk-go' && event.path.length === 0),
     ),
   ).toBe(true);
+  await runtime.dispose();
+});
+
+test('events queued while the adapter generator is suspended still precede the output', async () => {
+  const { instance, runtime } = await harness(
+    async (api) => {
+      await api.call('model', streamRequest('hello'));
+      // Later events are queued while the consumer is still suspended on an earlier one.
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      const reply = JSON.parse(await api.call('model', streamRequest('again'))) as {
+        content: string;
+      };
+      return okResult(reply.content);
+    },
+    { hello: { id: 'a', text: 'alpha beta' }, again: { id: 'b', text: 'delta epsilon' } },
+    {},
+    undefined,
+    undefined,
+    { stream: true, pauseMs: 40 },
+  );
+  const { runId } = await instance.start({ prompt: 'hello' });
+  const events = await collect(instance.events(runId));
+  expect(streamed(events, 'messages').map((item) => item['text'])).toEqual([
+    'alpha ',
+    'beta',
+    'delta ',
+    'epsilon',
+  ]);
+  expect(last(events)).toMatchObject({ type: 'output', output: 'delta epsilon' });
   await runtime.dispose();
 });
 

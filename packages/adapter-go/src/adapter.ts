@@ -24,6 +24,7 @@ import {
   encodeBoot,
   encodeHostMessage,
   failedRun,
+  GO_EXECUTOR_ID,
   type GoBuildInfo,
   type GoWasmReference,
   type HostMessage,
@@ -34,7 +35,6 @@ import {
   type WorkerMessage,
   withinBridgeLimit,
 } from './protocol.js';
-import { GO_EXECUTOR_ID } from './stream.js';
 
 /** The Go agent a host prepares: the reviewed module and the entry it serves. */
 export interface GoAgent {
@@ -350,6 +350,8 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             for (;;) {
               for (const event of current.events.splice(0))
                 if (!request.signal.aborted) yield event;
+              // Events queued while a yield was suspended still precede the outcome.
+              if (current.events.length > 0) continue;
               if (text !== undefined) break;
               await wake.promise;
               wake = Promise.withResolvers<void>();

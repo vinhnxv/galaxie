@@ -153,10 +153,7 @@ async function streamReply(
     if (aborted(run)) throw adapterFailure('cancelled');
     if (typeof chunk.content !== 'string' || (!offered && carriesCalls(chunk)))
       throw adapterFailure('unsupported');
-    joiner.append(chunk);
-    await lease.checkOutput(growingText(joiner.joined as AIMessage | AIMessageChunk), {
-      final: false,
-    });
+    await lease.checkOutput(growingText(joiner.append(chunk)), { final: false });
     if (aborted(run)) throw adapterFailure('cancelled');
     for (const piece of splitter.feed(chunk.content)) emitDelta(run, author, piece);
   }
@@ -234,15 +231,16 @@ export async function serveModel(
       ...(input.options.jsonSchema === undefined ? {} : { jsonSchema: input.options.jsonSchema }),
       [Symbol.for('galaxie.model.destination')]: lease.destination,
     };
+    // The parser pairs an author with `stream: true`, so the author alone selects the streamed path.
     const reply =
-      input.options.stream && run.streaming
+      input.author !== undefined
         ? await streamReply(
             run,
             lease,
             bound,
             messages,
             callOptions,
-            input.author as string,
+            input.author,
             offered.size > 0,
           )
         : await bound.invoke(messages, callOptions);
