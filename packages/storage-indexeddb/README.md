@@ -61,7 +61,7 @@ and `recovery: saver.recovery`. Compile a LangGraph Python graph with
 `galaxie.langgraph.checkpointer()`; the pydantic-ai driver instead snapshots its
 conversation at pauses and completion. The Worker serializes checkpoints and pending
 writes; JavaScript stores their opaque bytes in the existing version-1 envelopes
-and key layout, marked with the closed set `langgraph-python | pydantic-ai-python | dspy-python | adk-js | adk-python`.
+and key layout, marked with the closed set `langgraph-python | pydantic-ai-python | dspy-python | adk-js | adk-python | adk-go`.
 The adapter supplies its executor ID on port requests; an omitted ID retains the
 original `langgraph-python` contract. Reads select the requested executor's rows,
 and existing LangGraph bytes remain readable without a rewrite. The JavaScript saver's

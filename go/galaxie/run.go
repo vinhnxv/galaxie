@@ -33,12 +33,21 @@ type Input struct {
 	Stream bool
 	// Resume answers the pause the conversation's previous run ended with; Prompt is ignored.
 	Resume *Resumption
+	// Persist asks for the conversation's record when the run ends in a pause or completes. The
+	// store then keeps no paused session: the caller hands the record back as Restore.
+	Persist bool
+	// Restore is the record a previous persisted run returned. With Resume it rebuilds the paused
+	// session; with a new prompt it only carries the counters on, so identifiers and effect scopes
+	// of the new conversation never repeat the stored ones.
+	Restore []byte
 }
 
-// Result is how a run ended: the final text, or the pause it waits on.
+// Result is how a run ended: the final text, or the pause it waits on. Record is the persisted
+// conversation, set only for a run that asked to Persist.
 type Result struct {
 	Output string
 	Pause  *Pause
+	Record []byte
 }
 
 const (
@@ -115,6 +124,22 @@ func (s *Store) nextOrdinal(name string) int {
 	return ordinal
 }
 
+// adopt makes the store continue a stored conversation's counters.
+func (s *Store) adopt(name string, stored *conversationRecord) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ordinals[name] = stored.Ordinal
+	memory := llm.NewMemory()
+	memory.Restore(stored.Memory)
+	s.memories[name] = memory
+}
+
+func (s *Store) ordinal(name string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ordinals[name]
+}
+
 func (s *Store) keep(name string, kept *conversation) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -154,15 +179,49 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 	}
 	name := input.Conversation
 	var (
-		service session.Service
-		counter *atomic.Int64
-		message *genai.Content
+		restored *conversationRecord
+		kept     *conversation
+		message  *genai.Content
 	)
-	if input.Resume != nil {
-		kept := s.claim(name, input.Resume.InteractionID)
+	counter := &atomic.Int64{}
+	if input.Restore != nil {
+		stored, err := decodeRecord(input.Restore)
+		if err != nil || stored.Conversation != name {
+			return Result{}, llm.NewError("invalid")
+		}
+		restored = stored
+	}
+	switch {
+	case input.Resume != nil && restored != nil:
+		// The record is the whole truth: whatever the store holds for this conversation is stale.
+		s.forget(name)
+		if restored.Pause == nil || restored.Pause.ID != input.Resume.InteractionID {
+			return Result{}, llm.NewError("stale")
+		}
+		if restored.eventsSize() > MaxRecordBytes-recordMargin {
+			return Result{}, llm.NewError("unsupported")
+		}
+		calls, err := restored.pausedCalls()
+		if err != nil {
+			return Result{}, err
+		}
+		kept = &conversation{counter: counter, id: restored.Pause.ID, calls: calls}
+		counter.Store(restored.Counter)
+		s.adopt(name, restored)
+	case input.Resume != nil:
+		kept = s.claim(name, input.Resume.InteractionID)
 		if kept == nil {
 			return Result{}, llm.NewError("stale")
 		}
+		counter = kept.counter
+	default:
+		s.forget(name)
+		if restored != nil {
+			s.adopt(name, restored)
+		}
+		message = &genai.Content{Role: genai.RoleUser, Parts: []*genai.Part{{Text: input.Prompt}}}
+	}
+	if kept != nil {
 		resume := definition.Resume
 		if resume == nil {
 			resume = defaultResume
@@ -175,12 +234,6 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		if err != nil {
 			return Result{}, err
 		}
-		service, counter = kept.service, kept.counter
-	} else {
-		s.forget(name)
-		service = session.InMemoryService()
-		counter = &atomic.Int64{}
-		message = &genai.Content{Role: genai.RoleUser, Parts: []*genai.Part{{Text: input.Prompt}}}
 	}
 
 	ctx, cancel := context.WithCancel(parent)
@@ -193,10 +246,26 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		return time.UnixMilli(counter.Add(1))
 	})
 
-	if input.Resume == nil {
-		if _, err := service.Create(ctx, &session.CreateRequest{AppName: appName, UserID: userID, SessionID: sessionID}); err != nil {
+	var service session.Service
+	switch {
+	case kept != nil && kept.service != nil:
+		service = kept.service
+	default:
+		service = session.InMemoryService()
+		if restored != nil && kept != nil {
+			if err := restored.replay(ctx, service); err != nil {
+				return Result{}, err
+			}
+		} else if _, err := service.Create(ctx, &session.CreateRequest{AppName: appName, UserID: userID, SessionID: sessionID}); err != nil {
 			return Result{}, llm.NewError("unavailable")
 		}
+	}
+	if input.Persist {
+		sized := &sizedService{Service: service, run: run}
+		if restored != nil && kept != nil {
+			sized.size = restored.eventsSize()
+		}
+		service = sized
 	}
 	adk, err := runner.New(runner.Config{AppName: appName, Agent: root, SessionService: service})
 	if err != nil {
@@ -247,7 +316,15 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		return Result{}, llm.NewError(llm.CodeOf(failure))
 	}
 	if watch.calls == nil {
-		return Result{Output: output}, nil
+		result := Result{Output: output}
+		if input.Persist {
+			encoded, err := recordOf(ctx, service, name, s.ordinal(name), counter.Load(), s.memory(name), nil)
+			if err != nil {
+				return Result{}, err
+			}
+			result.Record = encoded
+		}
+		return result, nil
 	}
 	if !s.lossyPauses && !built.resumesInPlace(root, watch.pausedBy) {
 		return Result{}, llm.NewError("unsupported")
@@ -263,8 +340,17 @@ func (s *Store) Run(parent context.Context, caller llm.Caller, definition Defini
 		tools[index] = each.Tool
 	}
 	id := interactionID(name, s.nextOrdinal(name), requests, request)
+	result := Result{Pause: &Pause{ID: id, Request: request, Tools: tools}}
+	if input.Persist {
+		encoded, err := recordOf(ctx, service, name, s.ordinal(name), counter.Load(), s.memory(name), pauseRecordOf(id, request, watch.calls))
+		if err != nil {
+			return Result{}, err
+		}
+		result.Record = encoded
+		return result, nil
+	}
 	s.keep(name, &conversation{service: service, counter: counter, id: id, calls: watch.calls})
-	return Result{Pause: &Pause{ID: id, Request: request, Tools: tools}}, nil
+	return result, nil
 }
 
 func textOf(content *genai.Content) string {

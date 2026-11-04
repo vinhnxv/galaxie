@@ -27,6 +27,10 @@ type Request struct {
 	Stream       bool   `json:"stream,omitempty"`
 	// Resume answers the pause a previous run ended with; the prompt is empty then.
 	Resume *Resume `json:"resume,omitempty"`
+	// Persist asks for the conversation's record; Restore hands a stored one back. Both are set
+	// when the page keeps the conversation durably.
+	Persist bool            `json:"persist,omitempty"`
+	Restore json.RawMessage `json:"restore,omitempty"`
 }
 
 // Resume is the user's answer to a pause: the interaction it answers, the action and its payload.
@@ -47,6 +51,8 @@ type Paused struct {
 type Outcome struct {
 	Output string
 	Paused *Paused
+	// Record is the persisted conversation: a JSON object the page stores and hands back.
+	Record json.RawMessage
 }
 
 // Handler runs one request to completion or to a pause. caller reaches the page for model and
@@ -89,16 +95,17 @@ func ReadBuildInfo() BuildInfo {
 
 func encodeResult(outcome Outcome, err error) string {
 	type result struct {
-		OK     bool    `json:"ok"`
-		Output string  `json:"output,omitempty"`
-		Paused *Paused `json:"paused,omitempty"`
-		Code   string  `json:"code,omitempty"`
+		OK     bool            `json:"ok"`
+		Output string          `json:"output,omitempty"`
+		Paused *Paused         `json:"paused,omitempty"`
+		Record json.RawMessage `json:"record,omitempty"`
+		Code   string          `json:"code,omitempty"`
 	}
 	if err != nil {
 		encoded, _ := json.Marshal(result{Code: llm.CodeOf(err)})
 		return string(encoded)
 	}
-	encoded, _ := json.Marshal(result{OK: true, Output: outcome.Output, Paused: outcome.Paused})
+	encoded, _ := json.Marshal(result{OK: true, Output: outcome.Output, Paused: outcome.Paused, Record: outcome.Record})
 	if len(encoded) > llm.MaxFrameBytes {
 		encoded, _ = json.Marshal(result{Code: "unsupported"})
 	}
