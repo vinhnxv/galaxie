@@ -1,12 +1,21 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import {
+  createRuntime,
+  defineAgentDefinition,
+  type SessionId,
+  type UserInteractionEvent,
+} from '@galaxie/core';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { z } from 'zod';
 import {
   comparable,
   type Durability,
   runCase,
+  ScriptedChatModel,
 } from '../../examples/rag-browser/test/support/adk-go-ref/run.js';
+import { createGoAdapter } from '../../packages/adapter-go/src/index.js';
 import { decodeStored, encodeStored } from '../../packages/adapter-go/src/persist.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import {
@@ -210,6 +219,120 @@ test.skipIf(!goAvailable)(
       });
     });
     await expect(run('unkeyed-edit', script, durable)).rejects.toThrow();
+  },
+  120000,
+);
+
+const writing = defineAgentDefinition({
+  id: 'conformance/adk-go-restore-write',
+  version: '1.0.0',
+  executor: 'adk-go',
+  input: z.object({ prompt: z.string() }),
+  capabilities: {
+    required: {
+      'math.double@1': {
+        kind: 'write',
+        input: z.object({ value: z.number() }),
+        output: z.object({ value: z.number() }),
+      },
+    },
+  },
+  models: { answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
+});
+
+test.skipIf(!goAvailable)(
+  goAvailable
+    ? 'an approved write executed before a failed resume replays its receipt after a restore'
+    : missingGo,
+  async () => {
+    const nodeHost = host;
+    if (!nodeHost) throw new Error('The host did not start.');
+    const bytes = new MemoryByteCheckpoints();
+    const recovery = new MemoryRecoveryStore();
+    const model = new ScriptedChatModel([
+      {
+        content: '',
+        toolCalls: [{ id: 'p1', function: { name: 'math_double_1', arguments: '{"value":21}' } }],
+      },
+      // The first resume reaches the model after the write ran and fails there, as a crash would.
+      { error: 'unavailable' },
+      { content: 'The result is 42.' },
+    ]);
+    const writes: number[] = [];
+    const life = async (sessionId?: SessionId) => {
+      const runtime = createRuntime({
+        appId: 'adk-go-restore-write',
+        executors: [createGoAdapter({ createWorker: () => nodeHost.createWorker() })],
+        budgets: { steps: 10, toolCalls: 10, tokens: 5000 },
+        outputSafety: () => 'allow',
+      });
+      const instance = await runtime.create(writing, {
+        principalScope: 'fixture',
+        ...(sessionId === undefined ? {} : { sessionId }),
+        recovery,
+        agent: { wasm: nodeHost.wasm, entry: 'confirm' },
+        services: { chatModels: { mock: model }, checkpoints: bytes },
+        bindings: {
+          'math.double@1': {
+            kind: 'write',
+            destination: 'in-browser',
+            timeoutMs: 5000,
+            concurrency: 1,
+            grantScope: 'instance',
+            approval: 'none',
+            retry: 'none',
+            async invoke(input: { value: number }) {
+              writes.push(input.value);
+              return { value: input.value * 2 };
+            },
+          },
+        },
+        models: {
+          providers: {
+            mock: {
+              destination: 'in-browser',
+              modality: 'text',
+              features: ['tool-calling'],
+              languages: ['en'],
+              pricing: { inputPerToken: 0, outputPerToken: 0 },
+            },
+          },
+          roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
+        },
+      });
+      await instance.prepare();
+      return { runtime, instance };
+    };
+    const status = (current: Awaited<ReturnType<typeof life>>) =>
+      current.instance.getSnapshot().run?.status;
+    const approval = (current: Awaited<ReturnType<typeof life>>): UserInteractionEvent => {
+      const run = current.instance.getSnapshot().run;
+      if (run?.pending === undefined) throw new Error('The run did not pause.');
+      return {
+        instanceId: current.instance.instanceId,
+        runId: run.runId,
+        ...run.pending,
+        action: 'approve',
+        payload: { indexes: [0] },
+      };
+    };
+
+    const first = await life();
+    await first.instance.start({ prompt: 'Double 21.' });
+    await vi.waitFor(() => expect(status(first)).toBe('waiting_input'));
+    await first.instance.dispatch(approval(first));
+    await vi.waitFor(() => expect(status(first)).toBe('failed'));
+    expect(writes).toEqual([21]);
+    await first.runtime.dispose();
+
+    const second = await life(first.instance.sessionId);
+    expect(await second.instance.restore()).toBeDefined();
+    await vi.waitFor(() => expect(['waiting_input', 'succeeded']).toContain(status(second)));
+    if (status(second) === 'waiting_input') await second.instance.dispatch(approval(second));
+    await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
+    // The second life replayed the stored receipt instead of writing again.
+    expect(writes).toEqual([21]);
+    await second.runtime.dispose();
   },
   120000,
 );

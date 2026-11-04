@@ -367,3 +367,33 @@ test('a record above the size limit is refused unsupported before it is stored',
   ]);
   expect(store.rows.size).toBe(0);
 });
+
+test('a Worker ended by the cancel bound leaves the stored pause for the next instance', async () => {
+  const store = new MemoryByteCheckpoints();
+  const entered = Promise.withResolvers<void>();
+  const stuck: Program = async (api) => {
+    if (api.request.resume === undefined) return paused(digest('1'));
+    entered.resolve();
+    // The program ignores the cancel message, so only the page's bound can end the run.
+    await new Promise<never>(() => {});
+    return failResult('cancelled');
+  };
+  const worker = new FakeGoWorker(stuck, { silentOnCancel: true });
+  const first = await open(stuck, store, worker);
+  await drain(first, start);
+  const abort = new AbortController();
+  const running = drain(first, resume(digest('1')), { signal: abort.signal });
+  await entered.promise;
+  abort.abort();
+  await running;
+  expect(worker.terminated).toBe(true);
+  // The Worker is gone, yet the record still describes the pause the aborted run had taken.
+  await expect(pendingOf(first)).resolves.toMatchObject({ interactionId: digest('1') });
+  await first.executor.dispose();
+
+  const second = await open(pausing, store);
+  await expect(pendingOf(second)).resolves.toMatchObject({ interactionId: digest('1') });
+  expect(await drain(second, resume(digest('1')))).toEqual([
+    { type: 'output', output: 'answered' },
+  ]);
+});
