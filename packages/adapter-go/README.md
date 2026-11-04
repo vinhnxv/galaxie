@@ -116,7 +116,7 @@ program registers entries with `galaxie.Serve` (or `ServeWith` for entries that 
 These shapes run: a single `LlmAgent` with capability tools, `SequentialAgent`, `ParallelAgent` and
 `LoopAgent` trees up to 16 levels deep, transfer to a sub-agent, and a confirmation or long-running tool
 where the pause rule accepts it ("Interactions"). Branches of a `ParallelAgent` get branch-local effect
-scopes, so the order in which they reach the broker does not change what a write receives or replays;
+scopes, so the order in which they reach the broker does not change what a write receives, and a restore after a later pause does not run them again;
 the order of their events does vary. These shapes fail `unsupported` before anything runs: `agenttool`,
 an agent, model, function tool or toolset built directly with ADK, and a tree outside the limits above.
 `subgraphs` stays false. Every shape is recorded with its native result in `tests/conformance` and
@@ -129,14 +129,16 @@ GOOS=js GOARCH=wasm CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -buildid=" 
 ```
 
 `node scripts/build-go-wasm.ts ./your/agent` runs the same command with the flags locked in
-`go/wasm.lock` and prints the size and SHA-256 to publish. The module is about 30 MB stripped, about
-6.5 MB gzip. TinyGo and `wasm-opt` are not used.
+`go/wasm.lock` and prints the size and SHA-256 to publish; the package path is relative to the `go/`
+module and the script requires the locked toolchain, Go 1.27.3. The module is about 30 MB stripped,
+about 6.5 MB gzip. TinyGo and `wasm-opt` are not used.
 
 The module links third-party code under permissive licenses, listed per module in `go/wasm.lock`.
 Google's ADK (`google.golang.org/adk`), genai, gRPC, OpenTelemetry and most other Google modules are
 Apache-2.0; `golang.org/x/*`, `google.golang.org/protobuf` and Go's own `wasm_exec.js` are BSD-3-Clause;
-the lock also holds MIT and BSD-2-Clause modules. Hosts that ship the module must carry those notices
-with it.
+the lock also holds MIT and BSD-2-Clause modules. The Go standard library and runtime linked into the
+module are BSD-3-Clause and are not in the lock, which lists modules only. Hosts that ship the module
+must carry those notices with it.
 
 ## Hosting
 

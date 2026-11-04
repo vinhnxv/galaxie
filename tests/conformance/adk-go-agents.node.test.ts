@@ -44,8 +44,6 @@ type Branch = 'left' | 'right' | 'final';
 class BranchModel extends BaseChatModel {
   /** The branches in the order their first reply left the model. */
   readonly replied: Branch[] = [];
-  /** What each branch saw as the result of its capability call. */
-  readonly results: Partial<Record<Branch, string>> = {};
   readonly #delays: Partial<Record<Branch, number>>;
   constructor(delays: Partial<Record<Branch, number>>) {
     super({});
@@ -79,7 +77,6 @@ class BranchModel extends BaseChatModel {
       });
       return { generations: [{ text: '', message }] };
     }
-    this.results[branch] = String(answered.content);
     return {
       generations: [
         { text: `${branch} done`, message: new AIMessage({ content: `${branch} done` }) },
@@ -192,7 +189,7 @@ const status = (current: Open) => current.instance.getSnapshot().run?.status;
 
 test.skipIf(!goAvailable)(
   goAvailable
-    ? 'parallel write branches keep their own effect scopes whichever branch reaches the broker first'
+    ? 'parallel write branches keep their own effect scopes whichever branch asks the model first'
     : missingGo,
   async () => {
     const scopes: string[][] = [];
@@ -207,12 +204,20 @@ test.skipIf(!goAvailable)(
       };
       const model = new BranchModel(delays);
       const current = await open('parallel-writes', model, shared);
-      await current.instance.start({ prompt: 'Double both.' });
-      await vi.waitFor(() => expect(status(current)).toBe('succeeded'));
-      expect(model.replied).toEqual(delays.left === 0 ? ['left', 'right'] : ['right', 'left']);
-      expect([...shared.writes].sort()).toEqual([1, 2]);
-      scopes.push(shared.frames.map((frame) => frame.effectScope).sort());
-      await current.runtime.dispose();
+      try {
+        await current.instance.start({ prompt: 'Double both.' });
+        await vi.waitFor(() => expect(status(current)).toBe('succeeded'));
+        const order = delays.left === 0 ? ['left', 'right'] : ['right', 'left'];
+        expect(model.replied).toEqual(order);
+        // The capability calls reached the broker in the same order as the model replies.
+        expect(
+          shared.frames.map((frame) => frame.effectScope.split('/')[2]?.replace('fan.', '')),
+        ).toEqual(order);
+        expect([...shared.writes].sort()).toEqual([1, 2]);
+        scopes.push(shared.frames.map((frame) => frame.effectScope).sort());
+      } finally {
+        await current.runtime.dispose();
+      }
     }
     // One scope per branch, the same in both arrival orders, and no two branches share one.
     expect(scopes[0]).toEqual(scopes[1]);
@@ -248,25 +253,33 @@ test.skipIf(!goAvailable)(
       };
     };
     const first = await open('parallel-confirm', new BranchModel({ left: 60, right: 0 }), shared);
-    await first.instance.start({ prompt: 'Double all.' });
-    await vi.waitFor(() => expect(status(first)).toBe('waiting_input'));
-    expect([...shared.writes].sort((a, b) => a - b)).toEqual([1, 2]);
-    const sessionId = first.instance.sessionId;
-    await first.runtime.dispose();
+    let sessionId: SessionId;
+    try {
+      await first.instance.start({ prompt: 'Double all.' });
+      await vi.waitFor(() => expect(status(first)).toBe('waiting_input'));
+      expect([...shared.writes].sort((a, b) => a - b)).toEqual([1, 2]);
+      sessionId = first.instance.sessionId;
+    } finally {
+      await first.runtime.dispose();
+    }
 
-    // The branches reach the broker in the other order in the new life, if they ran at all.
+    // The branches would reach the broker in the other order in the new life, if they ran at all.
     const second = await open(
       'parallel-confirm',
       new BranchModel({ left: 0, right: 60 }),
       shared,
       sessionId,
     );
-    expect(await second.instance.restore()).toBeDefined();
-    await vi.waitFor(() => expect(status(second)).toBe('waiting_input'));
-    await second.instance.dispatch(approval(second));
-    await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
-    expect([...shared.writes].sort((a, b) => a - b)).toEqual([1, 2, 21]);
-    await second.runtime.dispose();
+    try {
+      expect(await second.instance.restore()).toBeDefined();
+      await vi.waitFor(() => expect(status(second)).toBe('waiting_input'));
+      await second.instance.dispatch(approval(second));
+      await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
+      // Only the approved final write ran; neither branch write ran again.
+      expect([...shared.writes].sort((a, b) => a - b)).toEqual([1, 2, 21]);
+    } finally {
+      await second.runtime.dispose();
+    }
   },
   120000,
 );
