@@ -147,7 +147,7 @@ Today:
 
 ```text
 galaxie/
-├── .github/workflows/ci.yml   CI: license, lint, TS 7 and 6, Node/Chromium tests, build, dependency guard
+├── .github/workflows/ci.yml   CI: parallel jobs for static checks, build, tests (grouped), Python and Go
 ├── docs/                      brief, framework overview, this document, ADRs
 ├── packages/
 │   ├── core/                  runtime and framework-neutral contracts (§6)

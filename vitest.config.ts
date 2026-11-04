@@ -91,6 +91,58 @@ const alias = {
   ),
 };
 
+/**
+ * CI splits the suite into groups that share no file. The Python groups hold every test that needs
+ * the Pyodide wheels, which dominate the run time; `general` is everything else. Without
+ * `GALAXIE_TEST_GROUP` the whole suite runs, as it does on a developer machine; `python` is all
+ * the Python groups together.
+ */
+const groupName = process.env['GALAXIE_TEST_GROUP'];
+/** File-name terms that put a test in a named Python group. */
+const pythonShards: Readonly<Record<string, string>> = {
+  'python-dspy': 'dspy',
+  'python-pydantic': 'pydantic',
+  'python-adk': 'adk-python',
+};
+const pythonTerms = ['python', 'pyodide', 'dspy', 'pydantic'];
+/**
+ * Directories whose tests load the Pyodide wheels, whatever their names say, except the Go ones in
+ * the example: those belong to `general`, so a Go-only change still runs them.
+ */
+const pythonDirectories = [
+  'examples/rag-browser/test/**/!(*adk-go*|*go-gate*)',
+  'packages/adapter-pyodide/test/**/*',
+];
+const groups = ['general', 'python', 'python-rest', ...Object.keys(pythonShards)];
+if (groupName !== undefined && !groups.includes(groupName))
+  throw new Error(`GALAXIE_TEST_GROUP must be one of ${groups.join(', ')}, not "${groupName}".`);
+
+/**
+ * Picks a project's files for the selected group. Every group is derived from the project's own
+ * globs, so none reaches outside them, and `python-rest` is `python` minus the named groups.
+ */
+const forGroup = (
+  include: string[],
+  exclude: string[],
+  prefix: string,
+): { include: string[]; exclude: string[] } => {
+  const named = (term: string): string[] =>
+    include.map((glob) => glob.replace('*.test.', `*${term}*.test.`));
+  const python = [
+    ...pythonTerms.flatMap(named),
+    ...pythonDirectories.map((directory) => `${prefix}${directory}.test.{ts,tsx}`),
+  ];
+  if (groupName === 'general') return { include, exclude: [...exclude, ...python] };
+  if (groupName === 'python') return { include: python, exclude };
+  if (groupName === 'python-rest')
+    return {
+      include: python,
+      exclude: [...exclude, ...Object.values(pythonShards).flatMap(named)],
+    };
+  const term = groupName === undefined ? undefined : pythonShards[groupName];
+  return term === undefined ? { include, exclude } : { include: named(term), exclude };
+};
+
 const config: ViteUserConfig = defineConfig({
   server: { host: '127.0.0.1' },
   test: {
@@ -101,17 +153,20 @@ const config: ViteUserConfig = defineConfig({
         test: {
           name: 'node',
           globalSetup: ['tests/conformance/support/mcp-global.node.ts'],
-          include: [
-            'packages/*/test/**/*.test.ts',
-            'tests/conformance/**/*.test.ts',
-            'examples/*/test/**/*.test.ts',
-          ],
-          exclude: [
-            ...configDefaults.exclude,
-            'packages/storage-indexeddb/test/schema.test.ts',
-            'packages/storage-indexeddb/test/saver.test.ts',
-            'tests/conformance/indexeddb.test.ts',
-          ],
+          ...forGroup(
+            [
+              'packages/*/test/**/*.test.ts',
+              'tests/conformance/**/*.test.ts',
+              'examples/*/test/**/*.test.ts',
+            ],
+            [
+              ...configDefaults.exclude,
+              'packages/storage-indexeddb/test/schema.test.ts',
+              'packages/storage-indexeddb/test/saver.test.ts',
+              'tests/conformance/indexeddb.test.ts',
+            ],
+            '',
+          ),
           setupFiles: ['tests/conformance/support/clean-env.node.ts'],
         },
       },
@@ -149,24 +204,27 @@ const config: ViteUserConfig = defineConfig({
           name: 'browser',
           api: { host: '127.0.0.1', port: 63315, strictPort: true },
           globalSetup: ['support/mcp-global.node.ts'],
-          include: [
-            '**/*.test.ts',
-            '**/*.test.tsx',
-            '../../packages/react/test/**/*.test.tsx',
-            '../../packages/adapter-pyodide/test/**/*.test.ts',
-            '../../packages/adapter-adk/test/**/*.test.ts',
-            '../../packages/adapter-go/test/**/*.test.ts',
-            '../../packages/storage-indexeddb/test/**/*.test.ts',
-            '../../examples/*/test/**/*.test.ts',
-          ],
-          exclude: [
-            ...configDefaults.exclude,
-            '**/*.node.test.ts',
-            '../../packages/adapter-pyodide/test/**/*.node.test.ts',
-            '../../packages/adapter-adk/test/**/*.node.test.ts',
-            '../../packages/adapter-go/test/**/*.node.test.ts',
-            '../../examples/*/test/**/*.node.test.ts',
-          ],
+          ...forGroup(
+            [
+              '**/*.test.ts',
+              '**/*.test.tsx',
+              '../../packages/react/test/**/*.test.tsx',
+              '../../packages/adapter-pyodide/test/**/*.test.ts',
+              '../../packages/adapter-adk/test/**/*.test.ts',
+              '../../packages/adapter-go/test/**/*.test.ts',
+              '../../packages/storage-indexeddb/test/**/*.test.ts',
+              '../../examples/*/test/**/*.test.ts',
+            ],
+            [
+              ...configDefaults.exclude,
+              '**/*.node.test.ts',
+              '../../packages/adapter-pyodide/test/**/*.node.test.ts',
+              '../../packages/adapter-adk/test/**/*.node.test.ts',
+              '../../packages/adapter-go/test/**/*.node.test.ts',
+              '../../examples/*/test/**/*.node.test.ts',
+            ],
+            '../../',
+          ),
           browser: {
             enabled: true,
             commands: { mcpAdmin: mcpAdminCommand, mcpCorpusAdmin: mcpCorpusAdminCommand },
