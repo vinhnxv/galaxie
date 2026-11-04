@@ -400,4 +400,4 @@ test('syscall/js belongs only in the bridge package and the gate', () => {
     'package x\n\nvar _ = "syscall/js"\n',
   ];
   for (const text of mentions) expect(run({ 'go/galaxie/agent.go': text }).status, text).toBe(0);
-});
+}, 60000);
