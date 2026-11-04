@@ -72,12 +72,12 @@ func run(handler Handler, args []js.Value) any {
 		go func() {
 			defer func() {
 				if recover() != nil {
-					resolve.Invoke(encodeResult("", llm.NewError("executor_error")))
+					resolve.Invoke(encodeResult(Outcome{}, llm.NewError("executor_error")))
 				}
 			}()
 			var parsed Request
 			if err := json.Unmarshal([]byte(request), &parsed); err != nil {
-				resolve.Invoke(encodeResult("", llm.NewError("invalid")))
+				resolve.Invoke(encodeResult(Outcome{}, llm.NewError("invalid")))
 				return
 			}
 			ctx, stop := context.WithCancel(context.Background())
@@ -90,8 +90,8 @@ func run(handler Handler, args []js.Value) any {
 				cancel = nil
 				mu.Unlock()
 			}()
-			output, err := handler(ctx, parsed, page{})
-			resolve.Invoke(encodeResult(output, err))
+			outcome, err := handler(ctx, parsed, page{})
+			resolve.Invoke(encodeResult(outcome, err))
 		}()
 		return nil
 	})

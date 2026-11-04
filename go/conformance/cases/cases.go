@@ -16,13 +16,15 @@ import (
 	"google.golang.org/adk/tool"
 
 	"galaxie.invalid/galaxie/galaxie"
+	"galaxie.invalid/galaxie/galaxie/llm"
 )
 
 const doubleSchema = `{"type":"object","properties":{"value":{"type":"integer"}},"required":["value"]}`
 
-// Entries returns every conformance entry by name.
-func Entries() map[string]galaxie.Entry {
-	return map[string]galaxie.Entry{
+// Definitions returns every conformance entry by name, with the pause handling of the ones that can
+// pause.
+func Definitions() map[string]galaxie.Definition {
+	plain := map[string]galaxie.Entry{
 		"single":       single,
 		"single-tool":  singleTool,
 		"sequential":   sequential,
@@ -33,6 +35,35 @@ func Entries() map[string]galaxie.Entry {
 		"panic":        panicking,
 		"exit":         exiting,
 	}
+	definitions := make(map[string]galaxie.Definition, len(plain)+5)
+	for name, entry := range plain {
+		definitions[name] = galaxie.Definition{Build: entry}
+	}
+	definitions["confirm"] = galaxie.Definition{Build: confirm, Interaction: approval}
+	definitions["confirm-sequential"] = galaxie.Definition{Build: confirmLast, Interaction: approval}
+	definitions["confirm-sequential-first"] = galaxie.Definition{Build: confirmFirst, Interaction: approval}
+	definitions["long-running"] = galaxie.Definition{Build: longRunning, Interaction: approval, Resume: completion}
+	return definitions
+}
+
+// approval shows one Approval component for every pause; the count is all the page needs to see.
+func approval(requests []galaxie.Request) (map[string]any, error) {
+	return map[string]any{
+		"surfaceId":    "main",
+		"viewRevision": "r1",
+		"component":    "conformance.Approval/v1",
+		"props":        map[string]any{"count": len(requests)},
+	}, nil
+}
+
+// completion answers a long-running request with the value the user sends.
+func completion(requests []galaxie.Request, action string, payload any) ([]galaxie.Decision, error) {
+	fields, ok := payload.(map[string]any)
+	value, numeric := fields["value"].(float64)
+	if action != "complete" || len(requests) != 1 || !ok || !numeric || len(fields) != 1 {
+		return nil, llm.NewError("invalid")
+	}
+	return []galaxie.Decision{galaxie.Respond(map[string]any{"value": value})}, nil
 }
 
 func leaf(name string, tools ...tool.Tool) (agent.Agent, error) {
@@ -55,6 +86,52 @@ func singleTool() (agent.Agent, error) {
 		return nil, err
 	}
 	return leaf("agent", double)
+}
+
+func pausing(name string, confirmation, longRunning bool) (agent.Agent, error) {
+	double, err := galaxie.CapabilityTool("math.double@1", galaxie.ToolSpec{
+		Description:         "Double an integer.",
+		Schema:              doubleSchema,
+		RequireConfirmation: confirmation,
+		LongRunning:         longRunning,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return leaf(name, double)
+}
+
+func confirm() (agent.Agent, error) { return pausing("agent", true, false) }
+
+func longRunning() (agent.Agent, error) { return pausing("agent", false, true) }
+
+func plainLeaf(name string) (agent.Agent, error) { return leaf(name) }
+
+// confirmLast pauses in the last child of a sequence, which ADK resumes without losing a sibling.
+func confirmLast() (agent.Agent, error) {
+	first, err := plainLeaf("first")
+	if err != nil {
+		return nil, err
+	}
+	second, err := pausing("second", true, false)
+	if err != nil {
+		return nil, err
+	}
+	return galaxie.SequentialAgent(agent.Config{Name: "pipeline", SubAgents: []agent.Agent{first, second}})
+}
+
+// confirmFirst pauses in the first child of a sequence; the resume would skip the second child, so
+// the adapter refuses it.
+func confirmFirst() (agent.Agent, error) {
+	first, err := pausing("first", true, false)
+	if err != nil {
+		return nil, err
+	}
+	second, err := plainLeaf("second")
+	if err != nil {
+		return nil, err
+	}
+	return galaxie.SequentialAgent(agent.Config{Name: "pipeline", SubAgents: []agent.Agent{first, second}})
 }
 
 func sequential() (agent.Agent, error) {

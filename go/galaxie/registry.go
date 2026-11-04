@@ -18,7 +18,16 @@ import (
 
 const maxDepth = 16
 
+// Agent kinds the constructors create.
+const (
+	kindLLM        = "llm"
+	kindSequential = "sequential"
+	kindParallel   = "parallel"
+	kindLoop       = "loop"
+)
+
 type node struct {
+	kind  string
 	model *llm.LLM
 	tools []tool.Tool
 }
@@ -29,6 +38,8 @@ type recorder struct {
 	agents map[agent.Agent]node
 	tools  map[tool.Tool]bool
 	models map[*llm.LLM]bool
+	// pausing is set when a tool needs the user (a confirmation or a long-running result).
+	pausing bool
 }
 
 var (
@@ -36,7 +47,7 @@ var (
 	current *recorder
 )
 
-func record(build func() (agent.Agent, error)) (agent.Agent, error) {
+func record(build func() (agent.Agent, error)) (agent.Agent, *recorder, error) {
 	buildMu.Lock()
 	defer buildMu.Unlock()
 	current = &recorder{
@@ -47,12 +58,12 @@ func record(build func() (agent.Agent, error)) (agent.Agent, error) {
 	defer func() { current = nil }()
 	root, err := build()
 	if err != nil {
-		return nil, llm.NewError("unsupported")
+		return nil, nil, llm.NewError("unsupported")
 	}
 	if err := current.validate(root); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return root, nil
+	return root, current, nil
 }
 
 func (r *recorder) validate(root agent.Agent) error {

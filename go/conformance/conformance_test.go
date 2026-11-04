@@ -25,11 +25,18 @@ const (
 )
 
 type script struct {
-	Entry        string                       `json:"entry"`
-	Prompt       string                       `json:"prompt"`
-	Stream       bool                         `json:"stream"`
+	Entry  string `json:"entry"`
+	Prompt string `json:"prompt"`
+	Stream bool   `json:"stream"`
+	// Answers reply, in order, to the pauses the run reaches.
+	Answers      []answer                     `json:"answers"`
 	Replies      []json.RawMessage            `json:"replies"`
 	Capabilities map[string]capabilityOutcome `json:"capabilities"`
+}
+
+type answer struct {
+	Action  string `json:"action"`
+	Payload any    `json:"payload"`
 }
 
 type capabilityOutcome struct {
@@ -41,6 +48,7 @@ type transcript struct {
 	Requests     []json.RawMessage `json:"requests"`
 	Responses    []json.RawMessage `json:"responses"`
 	Capabilities []json.RawMessage `json:"capabilities"`
+	Pauses       []map[string]any  `json:"pauses,omitempty"`
 	Output       string            `json:"output"`
 	Error        *failure          `json:"error"`
 }
@@ -144,7 +152,7 @@ func normalize(t *testing.T, raw []byte) []byte {
 }
 
 func TestNativeRunsMatchTheGoldens(t *testing.T) {
-	entries := cases.Entries()
+	definitions := cases.Definitions()
 	scripts := loadScripts(t)
 	names := make([]string, 0, len(scripts))
 	for name := range scripts {
@@ -155,7 +163,7 @@ func TestNativeRunsMatchTheGoldens(t *testing.T) {
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			s := scripts[name]
-			entry, ok := entries[s.Entry]
+			definition, ok := definitions[s.Entry]
 			if !ok {
 				t.Fatalf("the script names the unknown entry %q", s.Entry)
 			}
@@ -164,7 +172,7 @@ func TestNativeRunsMatchTheGoldens(t *testing.T) {
 				Responses:    []json.RawMessage{},
 				Capabilities: []json.RawMessage{},
 			}}
-			output, err := galaxie.Execute(context.Background(), page, entry, galaxie.Input{Prompt: s.Prompt, Conversation: "g1", Stream: s.Stream})
+			output, err := drive(t, page, definition, s)
 			page.out.Output = output
 			if err != nil {
 				page.out.Error = &failure{Code: llm.CodeOf(err)}
@@ -185,5 +193,28 @@ func TestNativeRunsMatchTheGoldens(t *testing.T) {
 				t.Fatalf("the native run differs from %s\nwant:\n%s\ngot:\n%s", golden, want, got)
 			}
 		})
+	}
+}
+
+// drive runs the prompt and answers each pause with the script's next answer. A pause with no answer
+// left ends the drive with the run still waiting.
+func drive(t *testing.T, page *recorder, definition galaxie.Definition, s script) (string, error) {
+	t.Helper()
+	store := galaxie.NewStore()
+	input := galaxie.Input{Prompt: s.Prompt, Conversation: "g1", Stream: s.Stream}
+	for next := 0; ; next++ {
+		result, err := store.Run(context.Background(), page, definition, input)
+		if err != nil || result.Pause == nil {
+			return result.Output, err
+		}
+		page.out.Pauses = append(page.out.Pauses, result.Pause.Request)
+		if next >= len(s.Answers) {
+			t.Fatalf("the run paused with no answer left in the script")
+		}
+		input = galaxie.Input{Conversation: "g1", Stream: s.Stream, Resume: &galaxie.Resumption{
+			InteractionID: result.Pause.ID,
+			Action:        s.Answers[next].Action,
+			Payload:       s.Answers[next].Payload,
+		}}
 	}
 }

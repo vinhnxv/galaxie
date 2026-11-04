@@ -11,8 +11,10 @@ stay in JavaScript. See the [README](README.md), the [Go module](../../go/README
 
 - [src/index.ts](src/index.ts) exports `createGoAdapter`, the host types and the executor id.
 - [src/adapter.ts](src/adapter.ts) is the adapter: it validates the agent, boots one Worker per prepare
-  and runs start commands, draining stream events ahead of the outcome. Resume fails `unsupported`.
-- [src/bridge.ts](src/bridge.ts) serves the Worker's `call` messages; [src/llm.ts](src/llm.ts) checks and
+  and runs start and resume commands, draining stream events ahead of the outcome. It keeps the pause each
+  session waits on and answers `pending()` from it.
+- [src/bridge.ts](src/bridge.ts) parses the Worker's run results, a pause included, through core's
+  four-field interaction parser; it serves the Worker's `call` messages; [src/llm.ts](src/llm.ts) checks and
   routes model calls through `host.langchain.chatModel(role)`, and capability calls through the broker.
 - [src/stream.ts](src/stream.ts) projects checked text into `messages` deltas and tool markers into
   `updates` events and joins streamed provider chunks; [src/tool-calls.ts](src/tool-calls.ts) builds the
@@ -36,8 +38,9 @@ Do not import another executor adapter, LangGraph, Pyodide or `@google/adk`. Do 
 
 ## Limits
 
-Interactions, resume and durable sessions are not built yet; their feature flags are false and those
-paths fail `unsupported`. Streaming is opt-in per agent (`stream: true`); Go receives only the final
+Durable sessions are not built yet; `checkpoints` is false and those paths fail `unsupported`. A pause
+lives only as long as its Worker. Pauses inside a parallel agent, a loop or an earlier sequence child
+fail `unsupported` (README, "Interactions"). Streaming is opt-in per agent (`stream: true`); Go receives only the final
 reply of each model call. A cancelled run is given 500 ms to finish, then its Worker is terminated
 and the session is unrecoverable. The stubs guard against accidental network use; Go code
 is trusted and can reach anything `syscall/js` reaches, so they are not an isolation boundary.
@@ -49,7 +52,8 @@ tests/conformance/adk-go-scan.node.test.ts
 tests/conformance/check-dependencies.node.test.ts examples/rag-browser/test/go-gate.node.test.ts
 examples/rag-browser/test/adk-go-reference.node.test.ts` and `pnpm run test:go`. `test/loader.node.test.ts`
 covers the verify-before-compile order, the egress stubs and the exit handshake;
-`test/adapter.node.test.ts` covers validation, Worker lifetime and the unsupported run;
+`test/adapter.node.test.ts` covers validation and Worker lifetime; `test/interaction.node.test.ts` covers
+pauses, pending and resume against a fake Worker; `test/bridge.test.ts` has the run-result validator table;
 `test/adk-go.node.test.ts` runs the adapter against a scripted Worker; `test/stream.test.ts` has the
 validator, splitter and joiner tables. The gate test
 needs Go and builds the gate module itself. Run `pnpm check` before reporting the integrated change

@@ -1,0 +1,57 @@
+{
+  "capabilities": [],
+  "error": {
+    "code": "unsupported"
+  },
+  "output": "",
+  "requests": [
+    {
+      "messages": [
+        {
+          "content": "Answer briefly.\n\nYou are an agent. Your internal name is \"first\".",
+          "role": "system"
+        },
+        {
+          "content": "Double 21.",
+          "role": "user"
+        }
+      ],
+      "options": {
+        "tools": [
+          {
+            "function": {
+              "description": "Double an integer.",
+              "name": "math_double_1",
+              "parameters": {
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["value"],
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      },
+      "role": "answer"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "function": {
+            "arguments": "{\"value\":21}",
+            "name": "math_double_1"
+          },
+          "id": "p1",
+          "type": "function"
+        }
+      ]
+    }
+  ]
+}

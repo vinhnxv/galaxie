@@ -7,8 +7,8 @@
   ],
   "features": {
     "streaming": true,
-    "interrupts": false,
-    "resume": false,
+    "interrupts": true,
+    "resume": true,
     "checkpoints": false,
     "subgraphs": false
   },
@@ -24,7 +24,14 @@
     "model-unavailable",
     "stream-text",
     "stream-tools",
-    "stream-sequential"
+    "stream-sequential",
+    "confirm-approve",
+    "confirm-deny",
+    "confirm-chain",
+    "long-running",
+    "confirm-sequential",
+    "confirm-sequential-first",
+    "stream-confirm"
   ],
   "differences": [],
   "normalizations": [

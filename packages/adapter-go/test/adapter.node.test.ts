@@ -59,20 +59,20 @@ const firstEvent = async (
   command?: unknown,
 ) => (await prepared.run(runRequest(command))[Symbol.asyncIterator]().next()).value;
 
-test('the adapter registers adk-go with only streaming on', () => {
+test('the adapter registers adk-go with streaming, interrupts and resume on', () => {
   const adapter = createGoAdapter(options(() => new FakeWorker(ready)));
   expect(adapter.id).toBe('adk-go');
   expect(GO_EXECUTOR_ID).toBe('adk-go');
   expect(adapter.features).toEqual({
-    interrupts: false,
-    resume: false,
+    interrupts: true,
+    resume: true,
     checkpoints: false,
     streaming: true,
     subgraphs: false,
   });
 });
 
-test('prepare boots a Worker with the reviewed module and a resume fails unsupported', async () => {
+test('prepare boots a Worker with the reviewed module and a resume with no pause fails stale', async () => {
   const worker = new FakeWorker(ready);
   const onBoot = vi.fn();
   const adapter = createGoAdapter({ ...options(() => worker), onBoot });
@@ -84,7 +84,7 @@ test('prepare boots a Worker with the reviewed module and a resume fails unsuppo
   ]);
   expect(await firstEvent(prepared, { type: 'resume', interactionId: 'i' })).toMatchObject({
     type: 'error',
-    error: { code: 'unsupported' },
+    error: { code: 'stale' },
   });
   await expect(prepared.pending('s' as never)).resolves.toBeUndefined();
   await prepared.dispose();

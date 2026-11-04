@@ -5,19 +5,47 @@ package galaxie
 
 import (
 	"context"
+	"encoding/json"
 
 	"galaxie.invalid/galaxie/galaxie/bridge"
 	"galaxie.invalid/galaxie/galaxie/llm"
 )
 
 // Serve registers the named entries with the page and blocks for the life of the Worker. A run
-// names its entry; an unknown name fails "invalid". Under native Go it returns at once.
+// names its entry; an unknown name fails "invalid". Under native Go it returns at once. An entry
+// served this way cannot pause; ServeWith registers entries that can.
 func Serve(entries map[string]Entry) {
-	bridge.Serve(bridge.ReadBuildInfo(), func(ctx context.Context, request bridge.Request, caller llm.Caller) (string, error) {
-		entry, ok := entries[request.Entry]
+	definitions := make(map[string]Definition, len(entries))
+	for name, entry := range entries {
+		definitions[name] = Definition{Build: entry}
+	}
+	ServeWith(definitions)
+}
+
+// ServeWith registers named definitions, their pause handling included, and blocks for the life
+// of the Worker. One store serves every run, so an answer finds the session its pause left.
+func ServeWith(definitions map[string]Definition) {
+	store := NewStore()
+	bridge.Serve(bridge.ReadBuildInfo(), func(ctx context.Context, request bridge.Request, caller llm.Caller) (bridge.Outcome, error) {
+		definition, ok := definitions[request.Entry]
 		if !ok {
-			return "", llm.NewError("invalid")
+			return bridge.Outcome{}, llm.NewError("invalid")
 		}
-		return Execute(ctx, caller, entry, Input{Prompt: request.Prompt, Conversation: request.Conversation, Stream: request.Stream})
+		input := Input{Prompt: request.Prompt, Conversation: request.Conversation, Stream: request.Stream}
+		if request.Resume != nil {
+			var payload any
+			if len(request.Resume.Payload) > 0 && json.Unmarshal(request.Resume.Payload, &payload) != nil {
+				return bridge.Outcome{}, llm.NewError("invalid")
+			}
+			input.Resume = &Resumption{InteractionID: request.Resume.InteractionID, Action: request.Resume.Action, Payload: payload}
+		}
+		result, err := store.Run(ctx, caller, definition, input)
+		if err != nil {
+			return bridge.Outcome{}, err
+		}
+		if result.Pause != nil {
+			return bridge.Outcome{Paused: &bridge.Paused{InteractionID: result.Pause.ID, Request: result.Pause.Request}}, nil
+		}
+		return bridge.Outcome{Output: result.Output}, nil
 	})
 }

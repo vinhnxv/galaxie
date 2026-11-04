@@ -29,6 +29,7 @@ export interface Golden {
   readonly requests: unknown[];
   readonly responses: unknown[];
   readonly capabilities: unknown[];
+  readonly pauses?: unknown[];
   readonly output: string;
   readonly error: { readonly code: string } | null;
 }

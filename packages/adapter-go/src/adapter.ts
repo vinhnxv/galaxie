@@ -6,7 +6,9 @@ import {
   type ExecutorAdapter,
   type ExecutorAgent,
   type ExecutorEvent,
+  type InteractionId,
   isGalaxieError,
+  type PendingInteraction,
   toErrorInfo,
 } from '@galaxie/core';
 import { parseRunResult } from './bridge.js';
@@ -35,6 +37,7 @@ import {
   type WorkerMessage,
   withinBridgeLimit,
 } from './protocol.js';
+import { emitPaused } from './stream.js';
 
 /** The Go agent a host prepares: the reviewed module and the entry it serves. */
 export interface GoAgent {
@@ -103,16 +106,18 @@ function failureCode(error: unknown, fallback: ErrorCode = 'unavailable'): Error
  * The `adk-go` executor adapter. A prepared agent owns one Worker running the reviewed Go module;
  * a run sends the prompt, serves the program's model and capability requests through the run's
  * router and broker, and ends with the final text. With `stream` set, the checked text of each
- * model reply also reaches the host while it is produced. Interactions, resume and durable sessions
- * are not built: their features stay off.
+ * model reply also reaches the host while it is produced. A confirmation or long-running tool ends
+ * the run with one interaction, and the answer arrives as a new run that continues the paused
+ * session inside the same Worker. Durable sessions are not built: checkpoints stay off, so a
+ * pause lives only as long as its Worker.
  */
 export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAgent, GoServices> {
   return {
     id: GO_EXECUTOR_ID,
     version: '0.0.0',
     features: {
-      interrupts: false,
-      resume: false,
+      interrupts: true,
+      resume: true,
       checkpoints: false,
       streaming: true,
       subgraphs: false,
@@ -148,12 +153,19 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       let settleRun: ((result: string) => void) | undefined;
       const lost = new Set<string>();
       const conversations = new Map<string, string>();
+      // The pause each session waits on; the Go session behind it lives in the Worker.
+      const pauses = new Map<string, PendingInteraction>();
+      // Where a paused run's stream markers continue, so a resumed run never repeats an index.
+      const positions = new Map<string, number>();
       let runCounter = 0;
       const send = (message: HostMessage): void => {
         worker.postMessage(encodeHostMessage(message));
       };
       const markDead = (): void => {
         dead = true;
+        // The Go session behind a pause died with the Worker, so nothing can answer it.
+        for (const sessionId of pauses.keys()) lost.add(sessionId);
+        pauses.clear();
         settleRun?.(failedRun('unavailable'));
       };
 
@@ -271,28 +283,52 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             if (dead)
               throw adapterFailure(lost.has(request.sessionId) ? 'unrecoverable' : 'unavailable');
             const command = request.command;
-            if (command.type !== 'start') throw adapterFailure('unsupported');
-            const input: unknown = command.input;
-            if (
-              typeof input !== 'object' ||
-              input === null ||
-              Array.isArray(input) ||
-              Object.keys(input).length !== 1 ||
-              typeof Reflect.get(input, 'prompt') !== 'string'
-            )
-              throw adapterFailure('invalid');
+            let answer: { interactionId: string; action: string; payload: unknown } | undefined;
+            let prompt = '';
+            if (command.type === 'start') {
+              const input: unknown = command.input;
+              if (
+                typeof input !== 'object' ||
+                input === null ||
+                Array.isArray(input) ||
+                Object.keys(input).length !== 1 ||
+                typeof Reflect.get(input, 'prompt') !== 'string'
+              )
+                throw adapterFailure('invalid');
+              prompt = Reflect.get(input, 'prompt') as string;
+              // A new prompt replaces the pause its session was waiting on, here and in Go.
+              pauses.delete(request.sessionId);
+              positions.delete(request.sessionId);
+            } else {
+              const waiting = pauses.get(request.sessionId);
+              if (waiting === undefined || waiting.interactionId !== command.interactionId)
+                throw adapterFailure('stale');
+              // The pause is consumed by this answer, whether or not the answer is valid.
+              pauses.delete(request.sessionId);
+              answer = {
+                interactionId: command.interactionId,
+                action: command.action,
+                payload: command.payload,
+              };
+            }
             if (request.signal.aborted) throw adapterFailure('cancelled');
             let conversation = conversations.get(request.sessionId);
             if (conversation === undefined) {
               conversation = `g${conversations.size + 1}`;
               conversations.set(request.sessionId, conversation);
             }
-            const runRequest = JSON.stringify({
-              entry: agent.entry,
-              prompt: Reflect.get(input, 'prompt'),
-              conversation,
-              ...(agent.stream === true ? { stream: true } : {}),
-            });
+            let runRequest: string;
+            try {
+              runRequest = JSON.stringify({
+                entry: agent.entry,
+                prompt,
+                conversation,
+                ...(agent.stream === true ? { stream: true } : {}),
+                ...(answer === undefined ? {} : { resume: answer }),
+              });
+            } catch {
+              throw adapterFailure('invalid');
+            }
             if (!withinBridgeLimit(runRequest)) throw adapterFailure('unsupported');
             const current: ActiveRun = {
               id: `r${++runCounter}`,
@@ -301,7 +337,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               leases: new Set(),
               streaming: agent.stream === true,
               events: [],
-              position: 0,
+              position: positions.get(request.sessionId) ?? 0,
               modelCalls: 0,
               cancelled: false,
             };
@@ -359,7 +395,19 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             settled = true;
             const outcome = parseRunResult(text);
             if (!request.signal.aborted) {
-              if (outcome.ok) yield { type: 'output', output: outcome.output };
+              if (outcome.ok && outcome.paused !== undefined) {
+                const interaction: PendingInteraction = {
+                  interactionId: outcome.paused.interactionId as InteractionId,
+                  ...outcome.paused.request,
+                };
+                pauses.set(request.sessionId, interaction);
+                if (current.streaming) {
+                  emitPaused(current);
+                  for (const event of current.events.splice(0)) yield event;
+                }
+                positions.set(request.sessionId, current.position);
+                yield { type: 'interaction', interaction };
+              } else if (outcome.ok) yield { type: 'output', output: outcome.output };
               else {
                 yield { type: 'error', error: toErrorInfo(errorCodeOf(outcome.code)) };
               }
@@ -378,7 +426,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             if (active === run) active = undefined;
           }
         },
-        pending: async () => undefined,
+        pending: async (sessionId) => pauses.get(sessionId),
         dispose: async () => {
           disposed = true;
           teardown();

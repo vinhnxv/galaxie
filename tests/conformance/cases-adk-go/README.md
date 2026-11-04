@@ -16,6 +16,10 @@ A case with `stream: true` runs with stream events on. The native lane has no pa
 records only the wire transcript (with each reply's `chunks` removed, since Go receives the aggregated
 reply); the Node and Chromium lanes also compare the page's stream events with the case's `streams`.
 
+A case with `answers` pauses: each entry (`action`, `payload`) answers the next interaction the run
+raises. The native golden then also records `pauses`, the interaction requests the author built, and the
+Node and Chromium lanes compare the requests the host receives (without interaction IDs).
+
 The matrix in `../compatibility-matrix-adk-go.json` lists every case and the adapter's feature flags.
 
 `../adk-go-run.node.test.ts` runs the same module for behavior the native lane cannot express: a raising
