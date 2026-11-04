@@ -22,6 +22,9 @@ export async function buildGoWasm(
   ),
 ): Promise<GoWasmBuild> {
   const lock = await readGoWasmLock();
+  const toolchain = runGo(['env', 'GOVERSION'], goEnvironment(lock)).trim();
+  if (toolchain !== lock.toolchain)
+    throw new Error(`The Go toolchain is ${toolchain}; go/wasm.lock pins ${lock.toolchain}.`);
   await mkdir(dirname(output), { recursive: true });
   runGo(
     ['build', `-ldflags=${lock.build.ldflags}`, '-o', output, packagePath],

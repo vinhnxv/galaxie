@@ -30,7 +30,7 @@ interface Harness {
 /** A fake runtime; `ready` decides whether the program reports ready after it starts. */
 function harness(
   bytes: Uint8Array = module,
-  options: { ready?: boolean; status?: number } = {},
+  options: { ready?: boolean; status?: number; contentLength?: number } = {},
 ): Harness {
   const log: string[] = [];
   const scope: Record<string, unknown> = {
@@ -39,7 +39,12 @@ function harness(
   for (const name of egressSurfaces) scope[name] = () => 'real';
   const fetch = vi.fn(async () => {
     log.push('fetch');
-    return new Response(new Uint8Array(bytes), { status: options.status ?? 200 });
+    return new Response(new Uint8Array(bytes), {
+      status: options.status ?? 200,
+      ...(options.contentLength === undefined
+        ? {}
+        : { headers: { 'content-length': String(options.contentLength) } }),
+    });
   });
   const compile = vi.fn(async () => {
     log.push('compile');
@@ -113,6 +118,10 @@ test.each([
   ],
   ['a wrong length', () => harness(module.subarray(0, module.byteLength - 1))],
   ['a failed response', () => harness(module, { status: 404 })],
+  [
+    'a declared length that disagrees with the reference',
+    () => harness(module, { contentLength: module.byteLength + 1 }),
+  ],
 ])('%s fails before compile with the fixed error', async (_name, make) => {
   const test_ = make();
   await expect(loadGoWasm(reference, test_.environment)).rejects.toMatchObject({

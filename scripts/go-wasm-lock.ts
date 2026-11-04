@@ -49,7 +49,11 @@ export async function readGoWasmLock(): Promise<GoWasmLock> {
   return JSON.parse(await readFile(lockUrl, 'utf8')) as GoWasmLock;
 }
 
-/** The environment every Go command runs in: no toolchain download, no cgo, the wasm target. */
+/**
+ * The environment every Go command runs in: no toolchain download, no cgo, the wasm target, and
+ * none of the variables that change the module graph or the emitted bytes (a stray go.work, GOWASM,
+ * GOEXPERIMENT or a module-flag override in the caller's shell).
+ */
 export function goEnvironment(lock?: GoWasmLock): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -57,7 +61,10 @@ export function goEnvironment(lock?: GoWasmLock): NodeJS.ProcessEnv {
     GOOS: 'js',
     GOARCH: 'wasm',
     CGO_ENABLED: '0',
-    GOFLAGS: lock ? lock.build.flags.join(' ') : '-trimpath',
+    GOWORK: 'off',
+    GOWASM: '',
+    GOEXPERIMENT: '',
+    GOFLAGS: ['-mod=readonly', ...(lock ? lock.build.flags : ['-trimpath'])].join(' '),
   };
 }
 

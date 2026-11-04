@@ -127,8 +127,21 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
         timeoutMs > MAX_READY_TIMEOUT_MS
       )
         throw adapterFailure('invalid');
-      options.onBoot?.({ phase: 'booting' });
-      const worker = options.createWorker();
+      const notify = (event: GoBootEvent): void => {
+        try {
+          options.onBoot?.(event);
+        } catch {
+          // A host callback never changes the outcome of the boot.
+        }
+      };
+      notify({ phase: 'booting' });
+      let worker: GoWorkerPort;
+      try {
+        worker = options.createWorker();
+      } catch {
+        notify({ phase: 'failed' });
+        throw adapterFailure('unavailable');
+      }
       let dead = false;
       try {
         const coldStartMs = await boot(
@@ -140,9 +153,9 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             dead = true;
           },
         );
-        options.onBoot?.({ phase: 'ready', coldStartMs });
+        notify({ phase: 'ready', coldStartMs });
       } catch (error) {
-        options.onBoot?.({ phase: 'failed' });
+        notify({ phase: 'failed' });
         throw error;
       }
       return {

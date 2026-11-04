@@ -170,3 +170,32 @@ test('a Worker error after boot marks the Worker dead', async () => {
     code: 'unavailable',
   });
 });
+
+test('a throwing createWorker fails unavailable and a throwing onBoot never leaks the Worker', async () => {
+  const onBoot = vi.fn();
+  await expect(
+    prepare(
+      createGoAdapter({
+        createWorker: () => {
+          throw new Error('no Worker');
+        },
+        onBoot,
+      }),
+    ),
+  ).rejects.toMatchObject({ code: 'unavailable' });
+  expect(onBoot.mock.calls.map(([event]) => event)).toEqual([
+    { phase: 'booting' },
+    { phase: 'failed' },
+  ]);
+  const worker = new FakeWorker(ready);
+  const prepared = await prepare(
+    createGoAdapter({
+      createWorker: () => worker,
+      onBoot: () => {
+        throw new Error('observer failed');
+      },
+    }),
+  );
+  await prepared.dispose();
+  expect(worker.terminated).toBe(true);
+});

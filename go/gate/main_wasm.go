@@ -78,6 +78,9 @@ func (jsHost) Capability(ctx context.Context, name string, value int) (int, erro
 	if err != nil {
 		return 0, err
 	}
+	if result.Type() != js.TypeNumber {
+		return 0, errors.New("the host returned a value that is not a number")
+	}
 	return result.Int(), nil
 }
 

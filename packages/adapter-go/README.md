@@ -21,7 +21,7 @@ const adapter = createGoAdapter({
 // agent: the reviewed module, an absolute same-origin URL with its length and SHA-256
 await adapter.prepare(
   {
-    wasm: { url: 'https://app.example/go/agent.wasm', sha256: '<hex>', bytes: 27_212_737 },
+    wasm: { url: 'https://app.example/go/agent.wasm', sha256: '<hex>', bytes: 29_960_388 },
   },
   undefined,
   { signal },
@@ -32,8 +32,10 @@ await adapter.prepare(
   and publish its SHA-256. The Worker fetches same-origin bytes, checks length and digest, and only then
   compiles; any mismatch fails `unavailable` with a fixed message.
 - The host's Worker entry imports `wasm_exec.js` first, then `@galaxie/adapter-go/worker`. Fetch the file
-  with `scripts/fetch-go-glue.ts`, which checks its digest against `go/wasm.lock`, and let the bundler
-  include it; the Worker never loads script text at run time.
+  with `scripts/fetch-go-glue.ts`, which checks the copied source file against the digest in
+  `go/wasm.lock`, and let the bundler include it; the Worker never loads script text at run time. The
+  digest covers that source file only: a bundler may minify or re-wrap it, so the shipped bytes are
+  not hash-checked. Hosts that need that should pin the built output themselves.
 - The page CSP needs `'wasm-unsafe-eval'` for the Worker and nothing else beyond the strict baseline.
 - The loader replaces `fetch`, `WebSocket`, `EventSource`, `XMLHttpRequest`, `Worker` and `SharedWorker`
   with throwing stubs before the module starts, and discards Go standard output and error. Go code is

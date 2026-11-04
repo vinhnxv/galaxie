@@ -204,14 +204,27 @@ for (const area of ['src', 'dist', 'test']) {
   }
 }
 
+/**
+ * Whether Go source imports `syscall/js` in any import form: single or grouped, aliased or blank,
+ * interpreted or raw string, on one line or several. Comments are removed first, strings kept.
+ */
+function importsSyscallJs(source: string): boolean {
+  const code = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (match) =>
+    match.startsWith('/*') ? ' ' : '',
+  );
+  const declarations = code.matchAll(/(?:^|[^\w.])import\s*(?:\(([^)]*)\)|([^\n(]*))/g);
+  return [...declarations].some((match) =>
+    /(?:^|[\s;(])(?:[\w.]+\s+)?(?:"syscall\/js"|`syscall\/js`)/.test(match[1] ?? match[2] ?? ''),
+  );
+}
+
 // Only the bridge package and the first-run gate may call into JavaScript.
 const SYSCALL_JS_DIRECTORIES = ['go/galaxie/bridge', 'go/gate'];
 if (existsSync('go')) {
   for (const entry of readdirSync('go', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.go')) continue;
     const file = join(entry.parentPath, entry.name);
-    if (!/^\s*(?:import\s+)?(?:[\w.]+\s+)?"syscall\/js"/m.test(readFileSync(file, 'utf8')))
-      continue;
+    if (!importsSyscallJs(readFileSync(file, 'utf8'))) continue;
     if (!SYSCALL_JS_DIRECTORIES.some((allowed) => dirname(file) === allowed))
       problems.push(`${file}: syscall/js belongs only in go/galaxie/bridge and go/gate`);
   }

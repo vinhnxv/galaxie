@@ -36,7 +36,11 @@ interface PageState {
 }
 
 afterAll(async () => {
-  if (goAvailable) await rm((await buildGate()).directory, { recursive: true, force: true });
+  if (goAvailable)
+    await buildGate().then(
+      (gate) => rm(gate.directory, { recursive: true, force: true }),
+      () => undefined,
+    );
 });
 
 /** Serves the built page with the strict mock-mode CSP, optionally without wasm compilation. */

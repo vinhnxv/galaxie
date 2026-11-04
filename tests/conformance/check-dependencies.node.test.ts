@@ -384,6 +384,20 @@ test('syscall/js belongs only in the bridge package and the gate', () => {
       `${path}: syscall/js belongs only in go/galaxie/bridge and go/gate`,
     );
   }
-  const aliased = run({ 'go/galaxie/agent.go': 'package x\n\nimport (\n\tj "syscall/js"\n)\n' });
-  expect(aliased.status).toBe(1);
+  const forms = [
+    'package x\n\nimport (\n\tj "syscall/js"\n)\n',
+    'package x\n\nimport ("syscall/js")\n',
+    'package x\n\nimport ("fmt"; "syscall/js")\n',
+    'package x\n\nimport `syscall/js`\n',
+    'package x\n\nimport _ "syscall/js"\n',
+    'package x\n\nimport (\n\t"fmt"\n\t. "syscall/js"\n)\n',
+  ];
+  for (const form of forms) expect(run({ 'go/galaxie/agent.go': form }).status, form).toBe(1);
+  // A comment or a string that only mentions the package is not an import.
+  const mentions = [
+    'package x\n\n// import "syscall/js" is forbidden here\nvar _ = 1\n',
+    'package x\n\n/* import (\n"syscall/js"\n) */\nvar _ = 1\n',
+    'package x\n\nvar _ = "syscall/js"\n',
+  ];
+  for (const text of mentions) expect(run({ 'go/galaxie/agent.go': text }).status, text).toBe(0);
 });
