@@ -17,6 +17,14 @@ export const RESULT_ITEMS = 5;
 const INVALID = 'The capability arguments are invalid.';
 const privateField = galaxieField({ label: 'private-user' });
 const publicField = galaxieField({ label: 'public' });
+export const marketSearchInput: z.ZodObject<{ query: z.ZodString }> = z.strictObject({
+  query: z
+    .string()
+    .trim()
+    .min(1)
+    .max(160)
+    .meta(galaxieField({ shape: 'freeText' })),
+});
 const applicationId = z
   .string()
   .max(52)
@@ -132,14 +140,7 @@ export const capabilityRequests: {
 } = {
   'market.search@1': {
     kind: 'read',
-    input: z.strictObject({
-      query: z
-        .string()
-        .trim()
-        .min(1)
-        .max(160)
-        .meta(galaxieField({ shape: 'freeText' })),
-    }),
+    input: marketSearchInput,
     output: collection(marketItem).extend({ trust: z.literal('untrusted-tool-output') }),
   },
   'loan.documents@1': { kind: 'read', input: applicationInput, output: collection(documentItem) },
