@@ -199,6 +199,12 @@ test('a valid record offers ONNX first for every recipe role and a consented fak
   expect(host.runtime.generations).toHaveLength(5);
   expect(host.runtime.generations[0]?.request.tools).toHaveLength(1);
   expect(host.runtime.generations[1]?.request.messages.at(-1)).toMatchObject({ role: 'tool' });
+  // A real Qwen run failed `invalid` when each reply could use the default 1024 tokens: the third
+  // agent's prompt alone reached 4007 of the 4096-token window. Every request stays well below it.
+  for (const generation of host.runtime.generations)
+    expect(generation.request.maxTokens).toBeLessThanOrEqual(384);
+  for (const route of Object.values(host.models.routing.roles))
+    expect(route.maxTokens).toBeLessThanOrEqual(384);
   expect(host.worker.terminated).toBe(1);
 });
 
