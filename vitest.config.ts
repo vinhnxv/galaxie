@@ -17,6 +17,9 @@ const alias = {
       import.meta.url,
     ),
   ),
+  '@galaxie/adapter-adk': fileURLToPath(
+    new URL('./packages/adapter-adk/src/index.ts', import.meta.url),
+  ),
   '@galaxie/adapter-pyodide': fileURLToPath(
     new URL('./packages/adapter-pyodide/src/index.ts', import.meta.url),
   ),
