@@ -48,4 +48,4 @@ Added to the MVP compared with v0.1:
 
 ## Verification
 
-- M4 release gate: no cut item ships without its gate; scope review in the Claude review prompt (item 16).
+- M4 release gate: no cut item ships without its gate; scope is reviewed against the cut list before release.

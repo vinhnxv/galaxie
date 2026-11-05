@@ -1,6 +1,6 @@
 # galaxie — Browser-first Agent Runtime
 
-> Project brief, proposed architecture and implementation contract, written to be handed to Codex CLI and then reviewed with Claude Code.
+> Project brief, proposed architecture and implementation contract.
 
 - **Project name:** `galaxie`.
 - **Document version:** 0.3. A starting point for implementation and critique, not a specification validated by code.
@@ -22,7 +22,7 @@ Founder decisions after the first two spikes. [ADR-0016][ADR-0017]
 - Traces are OpenTelemetry spans from M1, so a development tool such as Langfuse can read them. galaxie filters everything it records in a span, and span content follows the data labels. (§3.3, §14.4, §16.3) [ADR-0016]
 - galaxie's contracts are a framework-neutral standard for browser agents. LangGraph.js is the first framework behind them, and they reuse open protocols where one exists. (§7.6) [ADR-0017]
 - Agents also provide data to the app and give it directives, such as navigation, through capabilities the host binds. (§11.2)
-- The milestone order changes. M1 starts now, and a spike runs only when a milestone needs its answer. What remained of Spike A becomes the M1 conformance suite. (§16.2, §21)
+- The milestone order changes. M1 starts now, and a spike runs only when a milestone needs its answer. What remained of Spike A becomes the M1 conformance suite. (§16.2)
 
 ### Changes in 0.2 (2026-10-28)
 
@@ -36,7 +36,7 @@ Updated after an architecture review, an ecosystem survey and founder decisions.
 - A mandatory security baseline is now a release condition. (§9.6–§9.9) [ADR-0012]
 - The roadmap now has spikes, entry gates for post-MVP phases and a watch list. Go/Revise decisions have numeric thresholds (replaced in 0.3). (§16, §18)
 - The whole document is now in English.
-- Revised after an external read-only review with Codex CLI:
+- Revised after an external read-only review:
   - Privacy now rests on run-level data labels and argument shapes, not on destination classes alone. (§3.3) [ADR-0014]
   - Submission recovery uses a durable inbox. (§12.2)
   - Multi-tab takeover is cooperative first and fenced atomically. (§8.3)
@@ -1714,130 +1714,7 @@ This is a product hypothesis. The milestones in §16 exist to prove it.
 
 Default implementation: TypeScript-first, LangGraph.js, React, trusted packages, per-role model routing with local inference first, IndexedDB, the OpenTelemetry API for traces, and named domain UI components. Reopen a decision only with a blocker or clear evidence.
 
-## 21. Handoff prompt for Codex CLI
-
-Copy the block below into a session in the repository. It is an implementation request; the illustrative APIs in this brief do not exist yet.
-
-```text
-You are starting the galaxie project. Read docs/galaxie-project-brief.md, every
-ADR in docs/adr/, and any AGENTS.md or instructions in the repository before
-changing code.
-
-The goal is a browser-first agent host/harness. It is NOT a new LangGraph, NOT
-a universal Python/Node-to-WASM compiler and NOT a marketplace.
-
-Start with M1 (brief §16.3). A spike runs only when a milestone needs its
-answer (brief §16.2); spike code is throwaway and stays out of packages/. Do
-not implement the whole roadmap in one pass. If the repository already has
-code or uncommitted changes, preserve them and integrate carefully; never
-reset or overwrite unrelated work.
-
-1. Inspect the repo, toolchain and actual dependency versions.
-2. Prove parity first (ADR-0016): the conformance suite runs the same
-   LangGraph.js graphs with a deterministic fake chat model on Node and in
-   Chrome, and compares stream events, state, checkpoints, interrupts and
-   resume. Do not confuse a remote SDK with the local execution engine.
-3. The executor runs on the main thread (ADR-0003); local inference runs in a
-   worker. Never pass closures through postMessage. A Web Worker is not a
-   sandbox for untrusted code.
-4. Pending interactions come from the checkpoint interrupt (ADR-0004). The
-   host validates a submit against the interrupt payload, records it in the
-   durable submission inbox, and only then calls Command({ resume }) (brief
-   §12.2). Code before interrupt() is deterministic and side effect free;
-   interaction IDs never come from the LLM.
-5. Model access goes through per-role policy and destination classes
-   (ADR-0006). Run-level data labels (ADR-0014) apply to every model call
-   and every free-text capability argument. No silent fallback between
-   classes. Credentials come only from the host callback and are never
-   stored.
-6. MCP connects only to servers the project controls, with a per-tool
-   allowlist and definition pinning (ADR-0011).
-7. UI goes through the typed registry, schemas, named actions and surface
-   ownership (ADR-0007). Never eval or inject HTML/JS produced by an LLM.
-8. Implement the security baseline in brief §9.7 (ADR-0012) as tests, not as
-   comments.
-9. Use mock models/tools for deterministic unit tests, and keep a separate
-   real WebGPU path. If the environment has no suitable GPU, report it as
-   blocked with smoke-test instructions; never fake a pass.
-10. Pin the dependencies you verified; record assumptions and unsupported
-    features.
-11. Add tests and run what the environment allows. Do not add cloud fallback,
-    telemetry with user content, public deployment or publication beyond the
-    request.
-12. Emit traces as OpenTelemetry spans through @opentelemetry/api only.
-    Filter every attribute, event and error you record, and apply the data
-    labels to span content; never ship an exporter or tracing credentials
-    (brief §14.4).
-13. Keep the core contracts framework-neutral: no LangGraph type in them
-    (ADR-0017).
-
-The brief separates VISION, PROPOSED, OPEN and INVARIANT. Improve proposals
-through ADRs with evidence, but never silently drop security or correctness
-invariants to make a demo run.
-
-Finish with: what was implemented; files/modules changed; test commands and
-results; what is mocked or unverified; blockers; architecture decisions; next
-step. Never call the project production-ready before the acceptance tests pass.
-```
-
-## 22. Handoff prompt for a Claude Code review
-
-```text
-Review the galaxie architecture and implementation against
-docs/galaxie-project-brief.md, the ADRs in docs/adr/, the repository
-instructions and the actual diff/code.
-
-This is a READ-ONLY REVIEW first. Do not change code unless asked afterwards.
-Do not just confirm the design is reasonable; look for ways it fails in
-practice.
-
-Priorities:
-1. Do two systems both own graph state or next-node scheduling?
-2. Is browser execution real, or just a hook calling an agent server?
-3. Is trusted JS or a Worker advertised as an untrusted-code sandbox?
-4. Where are permissions enforced, and how can code go around the broker?
-5. Do RPC boundaries pass functions, leak credentials or confuse session
-   identity?
-6. Does each model role's policy actually block other destination classes?
-   Can data labelled private-user leave through an allowed endpoint or a
-   free-text argument? Is tool egress explicit? Can a provider key reach
-   storage, traces or prompts?
-7. Does a pending quiz or writing prompt survive reload with the same content
-   and revision, rebuilt from the checkpoint interrupt?
-8. Can stale events, double submits, rerenders, multi-tab take-over or late
-   results cause duplicate execution or cross-session state?
-9. What does recovery do when a remote effect succeeded but no receipt was
-   saved? Is there an unproven exactly-once promise?
-10. Can UI schema, action or URL validation be bypassed? Can an agent take
-    over a surface it does not own, render a fake confirmation, or run
-    arbitrary code?
-11. Can an MCP tool outside the allowlist be called, or a changed tool
-    definition run without re-approval?
-12. Does the model pool keep each session's context separate, and handle
-    device loss and cancellation?
-13. Do two host apps use the same agent package without graph changes?
-14. Do the tests prove the implementation, or only mock its assumptions? Does
-    the injection corpus exercise real paths?
-15. Does the code follow the accepted ADRs? Is any deviation recorded in a
-    new or superseding ADR?
-16. Has scope grown into a compiler, marketplace, custom graph engine or new
-    UI protocol without a use case?
-17. Does the conformance suite run the same graphs on Node and in Chrome, and
-    is every difference in the compatibility matrix with its reason?
-18. Can a span carry a prompt, learner text or a credential, or leave the
-    device without an exporter the host registered?
-
-Report findings as P0/P1/P2, with file:line where code exists, a failure
-scenario or reproduction, the impact and the minimal fix. Separate observed
-bugs, architecture risks and unverified assumptions. Say so when evidence is
-insufficient.
-
-End with: whether the next milestone can start; mandatory blockers; missing
-tests; what to drop or defer. Never declare security or production readiness
-just because reading the code found no bugs.
-```
-
-## 23. Technical sources and verification level
+## 21. Technical sources and verification level
 
 Public sources consulted on 2026-10-28. `main`/`latest` pages can change; re-read them and pin a release or commit before implementing. Reading sources does not replace compile tests, browser tests or benchmarks on real machines.
 
@@ -1971,7 +1848,7 @@ Further reading for implementation and review:
 - [MDN local speech recognition mode](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition/processLocally)
 - [Javy — JavaScript runtime embedded in WASM](https://github.com/bytecodealliance/javy)
 
-## 24. Conclusion: keeping the project on course
+## 22. Conclusion: keeping the project on course
 
 Galaxie does not need to become a tool for rewriting every agent. Its expected value is to make agents written with existing tools a managed, reusable and interactive part of web applications: they run on the user's device with no agent backend, and they behave as they do on a server.
 
