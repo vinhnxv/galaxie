@@ -2,7 +2,7 @@
   "name": "galaxie-spike-c-ui-path",
   "private": true,
   "description": "Throwaway spike: typed quiz UI from a committed interrupt, with reload.",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.21.0",
   "engines": {

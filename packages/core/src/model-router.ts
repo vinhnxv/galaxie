@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { BudgetExceeded, type ModelReservation, type RunBudget } from './budgets.js';
 import type { AgentDefinition } from './definition.js';

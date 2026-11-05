@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Guided JSON generation: the provider-side schema enforcement that LangChain's ProviderStrategy
 // expects from a hosted model, done in this page's own decoding loop. The guide writes the reply's

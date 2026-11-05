@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "An English tutor host with a remote quiz model, HTTP bindings and confirmed saves.",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

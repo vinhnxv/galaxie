@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Text-to-speech with English voices installed on this device. Voices whose `localService` is
 // false may synthesize on a remote server, so the page never uses them.

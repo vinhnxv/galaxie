@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // A hand-encoded ONNX model holding one `Identity` node over a float vector, so the probe needs
 // no binary fixture. Field numbers follow onnx.proto3 (ModelProto, GraphProto, NodeProto,

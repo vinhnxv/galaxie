@@ -49,7 +49,7 @@ The M4 documentation slice adds package coding guidance, an AI-facing index, tra
 
 ## Intended use and disclaimer
 
-galaxie is experimental, pre-release software, provided "as is", without warranty of any kind. Sections 15 to 17 of the [AGPL](LICENSE) (disclaimer of warranty and limitation of liability) apply.
+galaxie is experimental, pre-release software, provided "as is", without warranty of any kind. Sections 7 and 8 of the [Apache License 2.0](LICENSE) (disclaimer of warranty and limitation of liability) apply.
 
 galaxie is not designed, tested or certified for high-risk or regulated uses, including:
 
@@ -95,10 +95,8 @@ You need Node.js 24 and pnpm 11 (through Corepack). Run `pnpm install`, then `pn
 
 ## License
 
-galaxie is licensed under the [GNU Affero General Public License v3.0 only](LICENSE). Commercial use is allowed under the terms of the AGPL.
-
-Using galaxie in a closed-source or proprietary product requires a [commercial license](COMMERCIAL-LICENSE.md).
+galaxie is licensed under the [Apache License 2.0](LICENSE) ([ADR-0024](docs/adr/0024-apache-2-0-license-and-dco.md)). Use in open-source and closed-source products is allowed under its terms. See [NOTICE](NOTICE).
 
 ## Contributing
 
-Code contributions are not accepted yet.
+Outside contributions are accepted under the [Developer Certificate of Origin](https://developercertificate.org/): sign off each commit with `git commit -s`. No contributor license agreement is required.

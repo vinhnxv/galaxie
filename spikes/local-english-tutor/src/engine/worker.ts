@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // The inference worker: loads LFM3-1.7B-ONNX (q4f16) with onnxruntime-web on WebGPU and runs one
 // generation at a time, in the order the page asks. The session setup and the generation loop come

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { createRuntime, defineAgentDefinition, type RunEvent } from '@galaxie/core';
 import { createMockLatch, MockChatModel } from '@galaxie/models/mock';

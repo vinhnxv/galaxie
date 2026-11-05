@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { readFile } from 'node:fs/promises';
 import { adkPythonCases } from './adk-python.js';
@@ -10,7 +10,7 @@ export async function adkPythonSources(name: string): Promise<Record<string, str
     throw new Error('The conformance case is unknown.');
   return {
     'suite.py': await readFile(new URL('../cases-adk-python/suite.py', import.meta.url), 'utf8'),
-    'selected.py': `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh\n# SPDX-License-Identifier: AGPL-3.0-only\nfrom suite import factory\ndef create_agent():\n    return factory(${JSON.stringify(name)})\n`,
+    'selected.py': `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh\n# SPDX-License-Identifier: Apache-2.0\nfrom suite import factory\ndef create_agent():\n    return factory(${JSON.stringify(name)})\n`,
   };
 }
 
@@ -21,7 +21,7 @@ export async function adkPythonWriteSources(name: string): Promise<Record<string
   return {
     'suite.py': await readFile(new URL('../cases-adk-python/suite.py', import.meta.url), 'utf8'),
     'selected.py': `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 from google.adk.agents import LlmAgent
 from galaxie.adk import Executor, capability_tool, llm
 from suite import PARAMETERS, interaction

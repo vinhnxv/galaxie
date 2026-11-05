@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // The lesson's content design: one schema and one instruction per section. The model generates all
 // of a section's data from its prompt. The pipeline supplies the context: the sentence, its words
