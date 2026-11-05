@@ -338,5 +338,5 @@ test.skipIf(!pythonWheelsAvailable)(
       await fixture.cleanup();
     }
   },
-  240000,
+  { timeout: 240000, repeats: 25 },
 );
