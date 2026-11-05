@@ -47,6 +47,9 @@ export function checkCommits(commits: readonly Commit[]): CheckResult {
   return { checked, skipped, failures };
 }
 
+// hash, author name, author email, parents, subject, body: the order `main` reads them in.
+const LOG_FIELDS = ['%H', '%an', '%ae', '%P', '%s', '%B'] as const;
+
 function main(): void {
   const range = process.argv[2];
   if (range === undefined) {
@@ -56,11 +59,11 @@ function main(): void {
   }
   const fields = execFileSync(
     'git',
-    ['log', '-z', '--format=%H%x00%an%x00%ae%x00%P%x00%s%x00%B', range, '--'],
-    { encoding: 'utf8' },
+    ['log', '-z', `--format=${LOG_FIELDS.join('%x00')}`, range, '--'],
+    { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
   ).split('\0');
   const commits: Commit[] = [];
-  for (let index = 0; index < fields.length - 1; index += 6) {
+  for (let index = 0; index < fields.length - 1; index += LOG_FIELDS.length) {
     commits.push({
       hash: fields[index] ?? '',
       authorName: fields[index + 1] ?? '',
