@@ -28,6 +28,8 @@ obedient-attacker mock, not a robustness evaluation of a real model.
 
 The [browser-built RAG example](../examples/rag-browser/README.md) adds Node and headless Chromium lanes with a synthetic corpus, deterministic embeddings/chat and a fake Transformers engine. They cover retrieval, citations, injected directives, real module Workers, IndexedDB restore and clear fencing, strict CSP, keyboard controls and phone-width layout. The optional Python host loop adds lazy interpreter startup, executor switching, boot cancellation/failure and disposal. All five JavaScript/Pyodide/CPython transcript lanes match the shared golden. Real Pyodide execution does not imply real inference. [Local headless startup and response-body observations](../examples/rag-browser/README.md#local-python-observations) are demonstrations, separate from GitHub CI execution and the reference-device rows below. Full SQuAD indexing, real EmbeddingGemma/WebGPU, citation quality and reference-device metrics remain unmeasured.
 
+The [ADK recipe example](../examples/adk-recipes/README.md) adds scripted Node and headless Chromium checks for JavaScript and Go financial pipelines and Python auditor/loan pipelines. Rendered host tests cover the picker, model destinations, checked text, abort-before-switch, loan approval/denial, paused reload and Start over under the strict CSP and Trusted Types policy with same-origin assets. Python and Go use their existing prerequisite gates. These checks add no real-model or device-performance result.
+
 ## Real-device demonstrations
 
 | Device and browser | Date and record | What was real | Limits |

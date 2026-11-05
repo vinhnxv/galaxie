@@ -14,6 +14,21 @@ const recipeDirectory = fileURLToPath(
   new URL('../../../../go/recipes/financial/', import.meta.url),
 );
 
+/** Bundle the glue already verified by the page build; absent Go needs no glue. */
+export function goWorkerGlue(): Plugin {
+  return {
+    name: 'adk-recipes-go-glue',
+    resolveId(id) {
+      return id === 'virtual:adk-recipes-go-glue' ? '\0adk-recipes-go-glue' : undefined;
+    },
+    load(id) {
+      if (id !== '\0adk-recipes-go-glue') return undefined;
+      const file = join(example, '.cache/wasm_exec.js');
+      return existsSync(file) ? readFileSync(file, 'utf8') : 'export {};';
+    },
+  };
+}
+
 export function goAssets(): Plugin {
   let building = false;
   let wasm: { url: string; bytes: number; sha256: string } | undefined;

@@ -4,7 +4,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type UserConfigExport } from 'vite';
 import { cspHeader } from './src/host/csp.js';
-import { goAssets } from './src/host/go-assets.js';
+import { goAssets, goWorkerGlue } from './src/host/go-assets.js';
 import { pythonAssets } from './src/host/python-assets.js';
 
 const config: UserConfigExport = defineConfig({
@@ -23,6 +23,15 @@ const config: UserConfigExport = defineConfig({
         ),
       },
       ...Object.entries({
+        '@galaxie/react': fileURLToPath(
+          new URL('../../packages/react/src/index.ts', import.meta.url),
+        ),
+        '@galaxie/storage-indexeddb': fileURLToPath(
+          new URL('../../packages/storage-indexeddb/src/index.ts', import.meta.url),
+        ),
+        '@galaxie/adapter-go/worker': fileURLToPath(
+          new URL('../../packages/adapter-go/src/worker.ts', import.meta.url),
+        ),
         '@galaxie/core': fileURLToPath(
           new URL('../../packages/core/src/index.ts', import.meta.url),
         ),
@@ -45,6 +54,7 @@ const config: UserConfigExport = defineConfig({
     ],
   },
   worker: {
+    plugins: () => [goWorkerGlue()],
     format: 'es',
     rolldownOptions: {
       external: ['pyodide'],

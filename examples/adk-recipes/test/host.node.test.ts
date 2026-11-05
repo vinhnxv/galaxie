@@ -47,7 +47,14 @@ test.each(['mock', 'production'])(
         const scope = globalThis as typeof globalThis & { violations: string[] };
         scope.violations = [];
         document.addEventListener('securitypolicyviolation', (event) =>
-          scope.violations.push(event.violatedDirective),
+          scope.violations.push(
+            JSON.stringify({
+              directive: event.violatedDirective,
+              source: event.sourceFile,
+              line: event.lineNumber,
+              sample: event.sample,
+            }),
+          ),
         );
       });
       const response = await page.goto(origin);
@@ -62,8 +69,11 @@ test.each(['mock', 'production'])(
         `Go recipe assets: ${goInstalled() ? 'available' : 'unavailable'}.`,
       );
       expect(await page.locator('#disclaimer').textContent()).toBe(LEGAL_DISCLAIMER);
-      expect(await page.getByRole('button').count()).toBe(0);
-      await page.getByText('Upstream financial disclaimer', { exact: true }).click();
+      expect(await page.getByLabel('Recipe').count()).toBe(1);
+      expect(await page.getByRole('button', { name: 'Run', exact: true }).isDisabled()).toBe(
+        mode !== 'mock',
+      );
+      expect(await page.locator('#disclaimer').isVisible()).toBe(true);
       for (const width of [1280, 390]) {
         await page.setViewportSize({ width, height: 900 });
         expect(
