@@ -9,6 +9,7 @@ import {
   parseModelRecord,
   transformersDtypes,
 } from '../../packages/models/src/transformers/model-record.js';
+import { xmlTemplate } from '../../packages/models/test/support/xml-template.js';
 import {
   PinError,
   type PinRequest,
@@ -175,6 +176,84 @@ test('selects the plain model file for fp32 and honors the device and context wi
     'tokenizer_config.json',
   ]);
   expect(result.record).toMatchObject({ device: 'wasm', dtype: 'fp32', contextWindow: 2048 });
+});
+
+function splitRepository(): FakeRepository {
+  const repo = repository(xmlTemplate);
+  for (const path of repo.files.keys()) if (path.startsWith('onnx/')) repo.files.delete(path);
+  for (const name of ['embed_tokens', 'decoder_model_merged', 'vision_encoder', 'audio_encoder']) {
+    repo.files.set(`onnx/${name}_q4.onnx`, new Uint8Array([1, 2, 3]));
+    repo.files.set(`onnx/${name}_q4.onnx_data`, new Uint8Array([4, 5]));
+    repo.files.set(`onnx/${name}_q4.onnx_data_1`, new Uint8Array([6]));
+    repo.files.set(`onnx/${name}_fp16.onnx`, new Uint8Array([7]));
+  }
+  return repo;
+}
+
+test('selects split decoder and embed shards, omits encoders and prints the text-only size', async () => {
+  const repo = splitRepository();
+  const network = serve(repo);
+  const result = await pinModel(request, { fetch: network.fetch });
+  expect(result.record.files.map((file) => file.path)).toEqual([
+    'config.json',
+    'generation_config.json',
+    'onnx/decoder_model_merged_q4.onnx',
+    'onnx/decoder_model_merged_q4.onnx_data',
+    'onnx/decoder_model_merged_q4.onnx_data_1',
+    'onnx/embed_tokens_q4.onnx',
+    'onnx/embed_tokens_q4.onnx_data',
+    'onnx/embed_tokens_q4.onnx_data_1',
+    'tokenizer.json',
+    'tokenizer_config.json',
+  ]);
+  expect(network.urls.some((url) => /vision_encoder|audio_encoder|fp16/.test(url))).toBe(false);
+  expect(result.record.toolFormat).toBe('xml');
+  expect(result.textOnlyBytes).toBe(result.record.files.reduce((sum, file) => sum + file.bytes, 0));
+  expect(result.license).toBe('apache-2.0');
+  expect(parseModelRecord(JSON.parse(JSON.stringify(result.record)))).toEqual(result.record);
+});
+
+test.each(['embed_tokens', 'decoder_model_merged'])(
+  'a split export missing %s fails with the fixed missing-file message before fetching files',
+  async (name) => {
+    const repo = splitRepository();
+    repo.files.delete(`onnx/${name}_q4.onnx`);
+    const network = serve(repo);
+    await expect(pinModel(request, { fetch: network.fetch })).rejects.toThrow(
+      'The model repository lacks a file the provider needs.',
+    );
+    expect(network.urls).toHaveLength(1);
+  },
+);
+
+test('prefers the single model when both single and split files are listed', async () => {
+  const repo = splitRepository();
+  repo.files.set('onnx/model_q4.onnx', new Uint8Array([1]));
+  const result = await pinModel(request, { fetch: serve(repo).fetch });
+  expect(
+    result.record.files.filter((file) => file.path.startsWith('onnx/')).map((file) => file.path),
+  ).toEqual(['onnx/model_q4.onnx']);
+  expect(() => parseModelRecord(result.record)).not.toThrow();
+});
+
+test('detects XML in a single-file export and validates the printed record', async () => {
+  const result = await pinModel(request, { fetch: serve(repository(xmlTemplate)).fetch });
+  expect(result.record.toolFormat).toBe('xml');
+  expect(result.template.hermes).toBe(false);
+  expect(() => parseModelRecord(result.record)).not.toThrow();
+});
+
+test('a declaration with tool_call instructions and another call syntax gets no tool format', async () => {
+  const other = `{% if tools %}{{ tools | tojson }} <tool_call>instructions</tool_call>{% endif %}{% for message in messages %}{{ message.content }}{% for call in message.tool_calls or [] %}call:{{ call.function | tojson }}{% endfor %}{% endfor %}`;
+  const result = await pinModel(request, { fetch: serve(repository(other)).fetch });
+  expect(result.template).toMatchObject({
+    declarations: true,
+    calls: true,
+    results: true,
+    hermes: false,
+  });
+  expect(result.record).not.toHaveProperty('toolFormat');
+  expect(() => parseModelRecord(result.record)).not.toThrow();
 });
 
 test('a template that declares tools but never renders the call or its result gets no tool format', async () => {

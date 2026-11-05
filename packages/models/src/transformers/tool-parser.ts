@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { JsonObject } from './protocol.js';
+import type { TransformersModelRecord } from './model-record.js';
+import type { JsonObject, JsonValue } from './protocol.js';
 
 /**
- * The `hermes` tool-call text format (ADR-0021 decisions 10 and 11): the model writes
- * `<tool_call>{"name": …, "arguments": {…}}</tool_call>` blocks among its reply text.
+ * Record-declared `hermes` JSON or `xml` function/parameter bodies inside `<tool_call>`
+ * blocks (ADR-0021 decisions 10 and 11).
  *
  * Text outside blocks keeps its characters except at a seam: trailing whitespace before a block
  * and leading whitespace after one are dropped, so a whitespace-only run beside a block vanishes.
@@ -54,16 +55,80 @@ function plainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function blockItem(raw: string, index: number): ParsedToolCall | InvalidToolBlock {
-  const id = `call_${index}`;
-  const invalid = (name?: string): InvalidToolBlock => ({
+function invalidBlock(raw: string, index: number, name?: string): InvalidToolBlock {
+  return {
     kind: 'invalid',
     index,
-    id,
+    id: `call_${index}`,
     ...(name === undefined ? {} : { name }),
     args: raw,
-  });
+  };
+}
+
+/** Markup has no value types; convert only a declared scalar with an exact textual round trip. */
+function parameterValue(raw: string, schema: unknown): JsonValue {
+  if (!plainObject(schema)) return raw;
+  const type = schema['type'];
+  if (type === 'boolean' && (raw === 'true' || raw === 'false')) return raw === 'true';
+  if (type === 'integer' || type === 'number') {
+    const value = Number(raw);
+    if (
+      Number.isFinite(value) &&
+      String(value) === raw &&
+      (type !== 'integer' || Number.isSafeInteger(value))
+    )
+      return value;
+  }
+  return raw;
+}
+
+function xmlCall(
+  raw: string,
+  tools: readonly JsonObject[],
+): { name: string; args: JsonObject } | undefined {
+  const match = /^\s*<function=([^\s<>=]+)>([\s\S]*?)<\/function>\s*$/.exec(raw);
+  if (match === null) return undefined;
+  const name = match[1] as string;
+  const declaration = tools.find((tool) => {
+    const fn = tool['function'];
+    return plainObject(fn) && fn['name'] === name;
+  })?.['function'];
+  const schema = plainObject(declaration) ? declaration['parameters'] : undefined;
+  const properties =
+    plainObject(schema) && plainObject(schema['properties']) ? schema['properties'] : {};
+  const entries: [string, JsonValue][] = [];
+  const names = new Set<string>();
+  let body = (match[2] as string).trim();
+  while (body !== '') {
+    const parameter = /^<parameter=([^\s<>=]+)>([\s\S]*?)<\/parameter>/.exec(body);
+    if (parameter === null) return undefined;
+    const key = parameter[1] as string;
+    const value = (parameter[2] as string).trim();
+    if (names.has(key) || /<\/?(?:function|parameter|tool_call)(?:[=>\s])/.test(value))
+      return undefined;
+    names.add(key);
+    entries.push([
+      key,
+      parameterValue(value, Object.hasOwn(properties, key) ? properties[key] : undefined),
+    ]);
+    body = body.slice(parameter[0].length).trimStart();
+  }
+  return { name, args: Object.fromEntries(entries) };
+}
+
+function blockItem(
+  raw: string,
+  index: number,
+  format: TransformersModelRecord['toolFormat'],
+  tools: readonly JsonObject[],
+): ParsedToolCall | InvalidToolBlock {
+  const id = `call_${index}`;
+  const invalid = (name?: string): InvalidToolBlock => invalidBlock(raw, index, name);
   if (index >= maxToolBlocks) return invalid();
+  if (format === 'xml') {
+    const call = xmlCall(raw, tools);
+    return call === undefined ? invalid() : { kind: 'call', index, id, ...call };
+  }
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -97,6 +162,16 @@ export class ToolBlockSplitter {
   #inBlock = false;
   #seam = false;
   #blocks = 0;
+  readonly #format: TransformersModelRecord['toolFormat'];
+  readonly #tools: readonly JsonObject[];
+
+  constructor(
+    format: TransformersModelRecord['toolFormat'] = 'hermes',
+    tools: readonly JsonObject[] = [],
+  ) {
+    this.#format = format;
+    this.#tools = tools;
+  }
 
   push(chunk: string): ToolItem[] {
     this.#pending += chunk;
@@ -122,13 +197,15 @@ export class ToolBlockSplitter {
         const end = this.#pending.indexOf(close);
         if (end === -1) {
           if (final) {
-            items.push(blockItem(this.#pending, this.#blocks++));
+            items.push(invalidBlock(this.#pending, this.#blocks++));
             this.#pending = '';
             this.#inBlock = false;
           }
           return items;
         }
-        items.push(blockItem(this.#pending.slice(0, end), this.#blocks++));
+        items.push(
+          blockItem(this.#pending.slice(0, end), this.#blocks++, this.#format, this.#tools),
+        );
         this.#pending = this.#pending.slice(end + close.length);
         this.#inBlock = false;
         this.#seam = true;
@@ -145,7 +222,7 @@ export class ToolBlockSplitter {
       if (stray !== -1) {
         this.#text(this.#pending.slice(0, stray).trimEnd(), items);
         // A closing tag with no opener is a malformed block; its raw text is the tag itself.
-        items.push(invalidStray(this.#blocks++));
+        items.push(invalidBlock(close, this.#blocks++));
         this.#pending = this.#pending.slice(stray + close.length);
         this.#seam = true;
         continue;
@@ -168,13 +245,13 @@ export class ToolBlockSplitter {
   }
 }
 
-function invalidStray(index: number): InvalidToolBlock {
-  return { kind: 'invalid', index, id: `call_${index}`, args: close };
-}
-
 /** The one-shot parse of a complete reply. */
-export function parseToolBlocks(text: string): ParsedReply {
-  const splitter = new ToolBlockSplitter();
+export function parseToolBlocks(
+  text: string,
+  format: TransformersModelRecord['toolFormat'] = 'hermes',
+  tools: readonly JsonObject[] = [],
+): ParsedReply {
+  const splitter = new ToolBlockSplitter(format, tools);
   const items = [...splitter.push(text), ...splitter.finish()];
   return foldItems(items);
 }

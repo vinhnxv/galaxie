@@ -29,6 +29,7 @@ import { mapMessages } from '../messages.js';
 import { type OutputSchema, structuredOutput } from '../structured-output.js';
 import type { TransformersStreamEvent } from './engine.js';
 import { mapToolMessages } from './messages.js';
+import type { TransformersModelRecord } from './model-record.js';
 import type { GenerateRequest, JsonObject } from './protocol.js';
 import { type InvalidToolBlock, ToolBlockSplitter, type ToolItem } from './tool-parser.js';
 
@@ -39,7 +40,7 @@ import { type InvalidToolBlock, ToolBlockSplitter, type ToolItem } from './tool-
 export interface TransformersChatEngine {
   readonly modelId: string;
   /** The record's tool-call format; without one `bindTools` fails `unsupported`. */
-  readonly toolFormat?: 'hermes' | undefined;
+  readonly toolFormat?: TransformersModelRecord['toolFormat'];
   stream(request: GenerateRequest, signal?: AbortSignal): AsyncGenerator<TransformersStreamEvent>;
 }
 
@@ -157,7 +158,8 @@ export class TransformersChatModel extends BaseChatModel<TransformersCallOptions
       temperature: options.temperature ?? this.#temperature,
     };
     // Tool markup is parsed only when tools were offered; otherwise the reply is plain text.
-    const splitter = tools === undefined ? undefined : new ToolBlockSplitter();
+    const splitter =
+      tools === undefined ? undefined : new ToolBlockSplitter(this.#handle.toolFormat, tools);
     let blocks = 0;
     const items = function* (found: readonly ToolItem[]): Generator<ToolItem> {
       for (const item of found) {

@@ -34,12 +34,13 @@ export async function createSyntheticModel(
     readonly baseUrl?: string;
     readonly sizes?: readonly number[];
     readonly modelId?: string;
-    readonly toolFormat?: 'hermes';
+    readonly toolFormat?: TransformersModelRecord['toolFormat'];
+    readonly paths?: readonly string[];
   } = {},
 ): Promise<SyntheticModel> {
   const modelId = options.modelId ?? `example-org/tiny-${crypto.randomUUID().slice(0, 8)}`;
   const baseUrl = options.baseUrl ?? `https://models.example.test/${modelId}/resolve/${revision}/`;
-  const paths = ['config.json', 'tokenizer.json', 'tokenizer_config.json'];
+  const paths = options.paths ?? ['config.json', 'tokenizer.json', 'tokenizer_config.json'];
   const sizes = options.sizes ?? [2500, 6000, 3500];
   const contents = paths.map((_, index) => patternBytes(sizes[index] ?? 1000, index + 1));
   const files = await Promise.all(
