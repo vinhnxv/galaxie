@@ -12,7 +12,8 @@
   },
   "packages": [
     "./gate",
-    "./conformance/reference"
+    "./conformance/reference",
+    "./recipes/financial/main"
   ],
   "cutoff": "2026-10-28T00:00:00Z",
   "cutoffRecord": 70230551,

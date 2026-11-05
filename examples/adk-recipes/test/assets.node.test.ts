@@ -14,6 +14,7 @@ const fixture = vi.hoisted(() => ({
   goSource: false,
   goInstalled: true,
   builds: 0,
+  goPackage: '',
   pythonFiles: ['example.py'],
 }));
 const digest = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
@@ -56,8 +57,9 @@ vi.mock('../../../packages/adapter-pyodide/src/runtime-files.js', () => ({
   runtimeFiles: [{ file: 'pyodide.mjs', bytes: 3 }],
 }));
 vi.mock('../../../scripts/build-go-wasm.ts', () => ({
-  buildGoWasm: async () => {
+  buildGoWasm: async (packagePath: string) => {
     fixture.builds++;
+    fixture.goPackage = packagePath;
     return { file: '/synthetic/financial.wasm', bytes: 3, sha256: 'synthetic-wasm-digest' };
   },
 }));
@@ -105,6 +107,7 @@ beforeEach(() => {
   fixture.goSource = true;
   fixture.goInstalled = true;
   fixture.builds = 0;
+  fixture.goPackage = '';
   fixture.pythonFiles = ['example.py'];
   fixture.files.set(
     join(cache, 'local-wheels.json'),
@@ -189,6 +192,7 @@ test('Go build includes verified-helper metadata and glue, and omits the missing
   const run = harness(goAssets());
   await run.call('configResolved', { command: 'build' });
   await run.call('buildStart');
+  expect(fixture.goPackage).toBe('./recipes/financial/main');
   expect(metadata(await run.call('load', '\0adk-recipes-go'))).toEqual({
     available: true,
     wasm: { url: '/go/financial.wasm', bytes: 3, sha256: 'synthetic-wasm-digest' },
@@ -206,6 +210,9 @@ test('Go build includes verified-helper metadata and glue, and omits the missing
     wasm: null,
     glueUrl: null,
   });
+  await run.call('generateBundle');
+  expect(fixture.builds).toBe(1);
+  expect(run.emitted).toHaveLength(2);
 });
 
 test('serve mode never advertises or builds assets that only generateBundle can emit', async () => {
