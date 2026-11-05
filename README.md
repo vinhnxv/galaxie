@@ -1,51 +1,102 @@
 # galaxie
 
-A browser-first agent runtime SDK for web apps.
+Run AI agents inside a web page, on the user's own device, with no agent backend.
 
-galaxie lets a web application host AI agents as first-class parts of the app. Each agent has an identity, state, a lifecycle, permissions, a UI region and a recovery story.
+galaxie is an experimental SDK for web apps. It lets an app host AI agents as part of the app: each agent has an identity, a lifecycle, permissions, a place in the UI and a way to recover after a reload. Your app keeps its own backend, APIs and databases. The agent itself runs in the browser.
 
-The agent pipeline (a single agent, a multi-agent system, or the harness around them) runs in the browser on the user's own device, so the developer deploys no agent backend and no container for it. The app's backend keeps its APIs, MCP servers, databases and tools.
+> **Status: experimental and pre-release.** The packages are not published to npm yet, and most testing uses mock and fake models. Read [Project status](#project-status) and [Intended use and disclaimer](#intended-use-and-disclaimer) before you build on it.
 
-Agent logic stays in the frameworks developers already use, such as LangGraph.js, and the goal is parity: code written with LangChain and LangGraph should behave in the browser as it does natively on a server. galaxie's contracts are framework-neutral, so other frameworks can follow through adapters.
+## Why
 
-The runtime is designed to add what the browser lacks:
+Most agent frameworks assume a server: a process, a container, a queue and an API key. For many web apps that is more than the job needs. An English tutor, a school Q&A bot, a customer-care assistant or a search over public documents can run on the user's device, which keeps the user's text on that device and removes the agent infrastructure.
 
-- **Model routing:** local models in the browser (WebGPU), Chrome Built-in AI, a model server on the user's machine, or an OpenAI-compatible endpoint chosen by the app or the user, under a per-role policy.
-- **A capability broker:** agents act only within the app's own permissions, deny-by-default.
-- **UI through the app's own components:** the agent drives an assigned UI region, provides data to the app and asks it to act, such as navigating, through capabilities the host binds; the host owns the DOM.
-- **Recovery:** a reload, a second tab or a double click does not repeat a side effect or lose a pending answer.
-- **A mandatory security baseline** on every path the SDK controls.
-- **Development tracing:** OpenTelemetry spans that a tool such as Langfuse can show, through an exporter the host registers.
+The browser has no built-in answer for the hard parts: which model may see which data, what an agent may do, what happens after a reload or a double click, and how to show the agent's work in the app's own UI. galaxie supplies those parts.
 
-**MVP evidence is recorded; the maintainer decided Go on 2026-10-30, with the open items in the exit record still open.** The [exit record](docs/mvp-exit-record.md) maps AT-01 through AT-36 to existing evidence and gaps, and the [unsupported-features list](docs/unsupported.md) states current limits and unverified paths.
+## What you get
 
-> **Status: M1 runtime controls, M2 local models, routing and typed React UI, M3 durable recovery, write journaling, storage lifecycle, app-wide ownership and logout invalidation, and M4 host-rendered capability confirmations and second-host reuse.** The workspace includes instance and run lifecycles, cancellation, replayable in-memory events, a LangGraph.js adapter, a capability broker with grants and validation, sticky data labels and argument shapes, finite step/tool-call/wall-clock/payload/token/cost budgets, and allowlisted OpenTelemetry spans. The model router selects providers per role under destination allowlists, labels and consent, with per-call credentials and route snapshots. The submission inbox confirms and deduplicates interrupt-ID resume, with optional durable acceptance and restore reconciliation. Core checks interaction URL origins before publishing pending state and gates development trace text by live labels and the declared trace destination. `@galaxie/models/mock` supplies a deterministic test provider. `@galaxie/models/webllm` adds a lazy WebLLM 0.2.86 worker provider with FIFO serialization, reset per request, cancellation, final-only usage, schema decoding and provider-level structured output, commit-pinned assets with SRI, content-free progress and typed errors, and a page-side device report. Twelve graph cases compare native Node, galaxie on Node and Chromium, alongside dual-lane policy, lifecycle, budget and tracing tests. See the [conformance guide](tests/conformance/README.md) and [M1 coverage map](docs/system-design.md#9-security-baseline-map). Packages remain private and unpublished. WebLLM loading, streaming, cancellation and schema wiring are tested with fakes only; the real-device run, prefill abort latency, page/worker adapter match and KV-cache reuse cost remain unmeasured. Worker failure or device loss leaves the selected provider failing `unavailable`, without fallback; the host recovers with a new handle, model and runtime. Hosts bundle one inference worker per runtime and may declare `structured-output` for routing. SRI covers config, library and tokenizer, not weight shards; host records must pin an immutable weight revision. Only the worker needs model-download hosts and WASM CSP directives; see [model integration](docs/system-design.md#84-a-model-call). `@galaxie/models/builtin-ai` adds a page-only Chrome Prompt API provider with a fresh session per call, streaming, cancellation and provider-level schema output through `responseConstraint`, omitting the schema from input. Hosts configure input/output languages and register destination `in-browser`, zero pricing, features `['streaming', 'cancellation', 'structured-output']` and the role's languages. Calls need `available` and never download. Use `checkBuiltInAI` to check readiness and `prepareBuiltInAI` from an intentional download click, with content-free progress. Typed reasons distinguish missing API, unsupported languages, required download or activation, failed download and denied browser access. It reports no usage, so routing charges the reservation; `maxTokens` and temperature have no effect. The model identity cannot be pinned and replies vary. Only a fake `LanguageModel` ran on Node and Chromium, with any existing global saved and restored. The M2 exit slice covers real-device verification, stable/beta smoke tests and session-creation cost; the router probes readiness before selection, without retrying a dispatched call on another provider. The router now supports host availability and download hooks, cached-before-download ordering for ADR-ordered routes, shared download decisions, optional site-storage `persist()`, per-call feature requirements and class-change notices through `snapshot.routes[role].changedFrom`. Routed `withStructuredOutput` forwards constrained decoding and validates replies with fixed errors. `RuntimeOptions.outputSafety` adds a host hook for routed reply text and tool-call arguments, checked before non-streaming return and before each growing streamed chunk, with one final check. Blocks fail `denied`; hook failures fail closed with `unavailable`, fixed errors and content-free diagnostics and span outcomes. Without a hook, core reports `output_safety_unset` once per routed instance. The host owns the hook's handling of reply text; earlier allowed chunks cannot be retracted, and direct models, tool outputs, capability results and other display callbacks remain outside this check. Mock-provider tests cover the LangGraph `messages` stream on Node and Chromium. `checkWebLLMModel` reports cached weights, not a loaded engine; WebLLM must still load before prepare until lazy host construction ships. The Prompt API reports no byte size, a known gap against ADR-0006 decision 5; hosts must state that the browser manages the download and its size is not reported. `@galaxie/models/openai` now supplies a call-scoped OpenAI-compatible provider for host proxies and user endpoints, with per-call credentials, fixed errors, usage, streaming, cancellation and schema output tested through injected fetch on Node and Chromium. Download-consent UI and per-call provider caps from the router remain unimplemented. The [M3 exit record](docs/m3-exit-record.md) records a real-model reload, double-submit, two-tab and sign-out run on one device; the external developer trial is still open.
->
-> `@galaxie/storage-indexeddb` supplies a scoped checkpoint saver and `saver.recovery` with transaction-completion barriers. Core's optional recovery port adds durable submission acceptance, restore reconciliation and a write-effect journal: successful receipts replay without invocation, while unknown `retry: 'none'` writes fail `outcome_unknown`. Host-local wires both ports. Node/Chromium fault tests cover all durability modes and Chromium IndexedDB reopen, with unchanged parity goldens. Restored runs receive fresh IDs/budgets and all data labels. Host-controlled retention defaults to 7-day history and 30-day inactivity; explicit deletion, upgrade handover and fixed-code error observation cover storage lifecycle outcomes. Core refuses missing or incompatible agent identity metadata before restore. Use one active owner/instance per session; core app-wide ownership and transaction-local epoch fencing now protect local writes after takeover. Per-principal logout generations now fence every state write, and one transaction wipes principal data. Core broadcasts invalidation across tabs; host-local offers Sign out even before model preparation or after ownership loss. See the [logout contract](docs/system-design.md#86-logout) for delivery and host-cleanup limits. See the [recovery contract and limits](docs/system-design.md#82-reload-and-crash-recovery).
->
-> `@galaxie/react` adds a typed registry, `useAgentSnapshot`, `AgentSurface` and unstyled Quiz, WritingPrompt, Feedback and Progress entries. Pass `ui: registry.bindings({ surfaces })` to `runtime.create` so core checks required UI, pending surfaces and allowed actions and payloads. The registry validates props and declared URL origins; the surface uses render-time identity and duplicate guards, with no lifecycle ownership. Model text renders only as React text. Drafts reset on remount and are not persisted. Chromium tests include Strict Mode and a real LangGraph resume. See the [React wiring sketch](docs/system-design.md#4-packages-and-dependency-rules) for the API and URL-policy limits.
+- **Your agent code, unchanged.** Write agents in a framework you already use. The goal is parity: an agent should behave in the browser as it does natively on a server. See [supported frameworks](#supported-frameworks).
+- **Model routing.** Pick a model per role from local models in the browser (WebGPU), Chrome's built-in AI, a model server on the user's machine, or an OpenAI-compatible endpoint, under a policy the app sets.
+- **A capability broker.** An agent can only do what the host app grants it. Everything else is denied by default, and data labels stop private text from reaching an endpoint that policy does not allow.
+- **UI through your own components.** The agent drives a region of the page through a typed component registry. The host app owns the DOM, and model text renders as plain text.
+- **Recovery.** A reload, a second tab or a double click does not repeat a side effect or lose a pending answer. State lives in IndexedDB, scoped to the user.
+- **Budgets and tracing.** Limits on steps, tool calls, time, tokens and cost, plus OpenTelemetry spans that tools such as Langfuse can display.
+- **A written security baseline** for every path the SDK controls, with its known limits stated in the [security review](docs/security-review.md).
 
-The private workspace package [`@galaxie/example-english-tutor`](examples/english-tutor) runs the lesson → quiz → writing → Feedback → save → Progress flow with mocks on Node and headless Chromium. It commits one quiz and its key before pausing and grades deterministically for local practice only. WritingPrompt marks sentences `private-user`; core applies bound payload-schema labels before resume, so the default policy keeps review in-browser. Run output is exactly `{ lessonId, score, total, saved }`, and Quiz props omit the key. Feedback shows the correct option labels after grading. Raw `stream` events include graph state and the answer key; hosts must not render them as display data. This projection covers run output and interaction props only.
+## Supported frameworks
 
-The tutor checkpointer contains the sentence and key: keep it on the device, scoped to the learner and session (as the default in-memory saver is). The host must derive the learner from trusted context in `progress.save@1` and authorize access to the lesson before writing; the agent sends only `{ lessonId, score, total }`. The private [`@galaxie/example-host-local`](examples/host-local) Vite host adds a strict CSP with Trusted Types, local bindings and an output safety demonstration, with mock-only headless Chromium network capture for AT-04 and an inert default-mode worker smoke. Reload restores the pending quiz or writing prompt from IndexedDB using an app/principal session key and the core app-wide Web Lock. Drafts reset on reload. Accepted answers reconcile through `saver.recovery`. The host opens storage before claiming ownership, then sweeps before restore, observes quota and upgrade outcomes, and offers explicit Start over deletion after an unrecoverable restore. Unsupported agent versions clear only the session key, preserving old data until a sweep. Persistence is not permanence: eviction returns to Start. Core app-wide ownership provides cooperative handover, forced takeover and bfcache checks; real providers and devices remain exit work. Optional model-generated quiz explanations and rubric quality evaluation are outside this slice.
+| Framework | How it runs | Notes |
+| --- | --- | --- |
+| LangGraph.js | Directly in the page | The reference adapter, checked against native runs on Node and Chromium |
+| LangGraph (Python), pydantic-ai, DSPy | In a Worker through Pyodide | Routing, credentials and policy stay in JavaScript |
+| Google ADK (JavaScript) | Directly in the page | Sequential, parallel, loop and LLM agents |
+| Google ADK (Python) | In a Worker through Pyodide | Same agent shapes |
+| Google ADK (Go) | Compiled to WebAssembly, in a Worker | Same agent shapes |
 
-[`examples/host-remote`](examples/host-remote/README.md) now runs the unchanged tutor with a same-origin OpenAI-compatible quiz stub, HTTP lesson/progress bindings, renewable 300-second demo tokens and host-rendered save confirmation. Feedback stays in-browser (mock-only in test mode; available Chrome Built-in AI in default mode). It uses MemorySaver, so reload starts over. Node and headless Chromium tests cover the full loop, both decline paths, token renewal and expiry, Host/Origin checks, CSP and sentence-free loopback requests. The backend is a demonstration with one learner and no upstream provider; real-provider verification and the second external developer trial remain outside this slice.
+Each adapter lists what it does not support in the [unsupported-features list](docs/unsupported.md).
 
-Ownership protects local writes only when hosts compose `acquireOwnership({ appId, fence: saver.fencing, onHandoverRequest })` with runtime disposal. The lock is `galaxie:<appId>:runtime`; "Use here" requests cooperative handover before a timed forced takeover. A former host owner shows "The lesson moved to another tab." and disables input until reload. Epoch checks share each write's transaction and span every principal of the app. Reads remain available. Fencing does not protect against a tab that bypasses ownership; an already-sent remote request may complete, and a synchronous loop delays noticing loss. Backends can reject stale epochs when the host implements that protocol; galaxie sends no epoch headers. Node hosts need both Web Locks and `BroadcastChannel`. See [the ownership contract](docs/system-design.md#85-tab-ownership-and-takeover).
+## Supported models
 
-Routing, labels, consent and model budgets cover calls through `host.langchain.chatModel(role)`; trusted agent code holding a model instance can bypass them (ADR-0002). The router's `maxTokens` reserves budget: a call can use more, and an actual-usage overrun fails the run after that call returns. WebLLM separately sends its own `maxTokens` as the per-request output limit `max_tokens` (default 1024); the router does not pass its reservation as that limit. `getCredential` hands credentials to page code per call. An XSS or malicious dependency on the origin can read them; hosts should return short-lived, host-proxy-scoped tokens rather than long-lived provider keys (ADR-0012).
+| Provider | What it is |
+| --- | --- |
+| WebLLM | Models on WebGPU, in a Worker |
+| Transformers.js | ONNX chat models, in a Worker |
+| Chrome Built-in AI | The browser's Prompt API |
+| OpenAI-compatible | A host proxy or an endpoint the user chooses |
+| Mock | A deterministic provider for tests |
 
-`@galaxie/tools-mcp` now binds allowlisted, pinned MCP tools through principal-scoped Streamable HTTP sessions on protocol 2025-11-25, with byte/idle limits and a loopback reference server tested through the broker on Node and Chromium. Write tools run through host-rendered, single-use confirmations when the host configures `CreateOptions.confirmations`; without that option they still fail `unsupported`. Core publishes frozen arguments in host-only confirmation snapshots, and `@galaxie/react` supplies a separate host registry and `ConfirmationPrompt`. Approvals expire and are invalidated by policy changes, run end, disposal and configured logout/takeover signals; they are never persisted. See [confirmation wiring and limits](packages/react/README.md). Pinning detects metadata changes only.
+## Project status
 
-`@galaxie/core` now generates manifests and JSON Schemas from code-first definitions. The build writes and verifies the tutor's manifest under `dist/galaxie`, including SHA-256 digests of the entry, shipped files and nearest lockfile. Verification writes nothing and detects missing, added or changed files. Custom schema refinements remain runtime-only. Digests prove only that the package matches the checked manifest; hosts must obtain that manifest, or pin its digest, from trusted build output or a reviewed commit. Without signing, replacing both package and manifest passes verification. A hash does not prove safe behavior. See the [manifest layout, commands and trust model](docs/system-design.md#62-generated-agent-manifests).
+What is true today:
 
-`@galaxie/eslint-plugin` now provides five ESLint 10 flat-config rules for agent packages: direct network, storage, DOM and HTML sinks, eval-style execution, and direct model-provider access. ESTree scope analysis respects shadowed locals without type information or runtime dependencies. RuleTester covers the rules, and a Node conformance test lints all unchanged tutor sources after type stripping. The plugin is a linting aid with no runtime enforcement; aliases, dependencies and runtime-built code can escape detection. TypeScript users supply a TypeScript-capable parser running on TypeScript 6 under ADR-0013; this repository does not test that parser. See the [plugin usage and limits](packages/eslint-plugin/README.md).
+- **Tested mostly with mocks.** Continuous integration runs the whole suite on Node and headless Chromium with scripted and fake models. A few real-model runs on one Apple laptop are recorded in the [M2](docs/m2-exit-record.md) and [M3](docs/m3-exit-record.md) exit records, as demonstrations and not as measurements.
+- **Not published.** Every package is private. There is no npm release and no stability promise yet.
+- **MVP evidence is recorded.** The [MVP exit record](docs/mvp-exit-record.md) maps 36 acceptance tests to their evidence, states which are only partly covered, and lists what nobody has measured yet, such as real-device speed and an outside developer trial.
+- **Known limits are written down.** The [unsupported-features list](docs/unsupported.md) records exclusions and unverified paths.
 
-`@galaxie/core` now offers opt-in `RuntimeOptions.developmentWarnings`: content-free advice for page CSP/Trusted Types enforcement, optional unbound capabilities, roles without a usable provider, provider-key-shaped storage values and blocked interaction URLs. Omitting the option skips every warning check and extra provider probe. Host-local enables it only in Vite development; built preview pages emit nothing. These are best-effort integration checks with [documented limits](docs/system-design.md#development-warnings), tested with mock models on Node and Chromium; they do not change policy or routing.
+## Try it
 
-The M4 documentation slice adds package coding guidance, an AI-facing index, tracing and host integration guides, a tested device matrix, and an offline documentation check in `pnpm check`.
+You need Node.js 24 and pnpm 11 (through Corepack).
 
-[`examples/rag-browser`](examples/rag-browser/README.md) builds an Orama retrieval index in a Worker, supports pasted text and answers with citations through LangGraph.js or an optional LangGraph Python/Pyodide Worker. The Python bridge keeps routing, credentials, output checks and capability policy in JavaScript. Synthetic Node/Chromium and CPython lanes compare prompts, capability calls and final output; host loops cover strict CSP, lazy executor selection, retrieval, cache restore, clear fencing and injected instructions. Python interrupts, checkpoints, streaming and durable recovery remain outside this example. Full-corpus, real-model and reference-device demonstrations remain unmeasured.
+```sh
+pnpm install
+pnpm --filter @galaxie/example-host-local exec vite build --mode mock
+pnpm --filter @galaxie/example-host-local exec vite preview --mode mock --host 127.0.0.1
+```
+
+This serves a local English-tutor host with a scripted mock model, so nothing is downloaded: a lesson, a quiz, a writing prompt and feedback, with reload recovery. Without `--mode mock` the host asks the user to download a real model, which needs a WebGPU device. The other examples:
+
+- [`examples/host-remote`](examples/host-remote/README.md): the same tutor with a remote quiz model and confirmed saves.
+- [`examples/rag-browser`](examples/rag-browser/README.md): retrieval built in the browser, with cited answers. `pnpm --filter @galaxie/example-rag-browser dev:mock` serves it with mock models.
+- [`examples/mcp-server`](examples/mcp-server/README.md): a reference MCP server used by the tests.
+
+`pnpm check` runs every check that CI runs, including the Go and Python lanes, so it also needs a Go toolchain and Python with `uv`. The [toolchain section](docs/system-design.md#10-toolchain) describes the TypeScript tooling.
+
+## Repository map
+
+| Package | Purpose |
+| --- | --- |
+| [`@galaxie/core`](packages/core/README.md) | Runtime, lifecycle, capability broker, model router, budgets, tracing |
+| [`@galaxie/models`](packages/models/README.md) | Model providers |
+| [`@galaxie/react`](packages/react/README.md) | Typed component registry, snapshot hook and headless components |
+| [`@galaxie/storage-indexeddb`](packages/storage-indexeddb/README.md) | Checkpoints, recovery journal and session export in IndexedDB |
+| [`@galaxie/tools-mcp`](packages/tools-mcp/README.md) | MCP client that binds allowlisted tools as capabilities |
+| [`@galaxie/adapter-langgraph`](packages/adapter-langgraph/README.md) | LangGraph.js adapter |
+| [`@galaxie/adapter-pyodide`](packages/adapter-pyodide/README.md) | Python frameworks through Pyodide |
+| [`@galaxie/adapter-adk`](packages/adapter-adk/README.md) | Google ADK (JavaScript) adapter |
+| [`@galaxie/adapter-go`](packages/adapter-go/README.md) | Google ADK (Go) through WebAssembly |
+| [`@galaxie/eslint-plugin`](packages/eslint-plugin/README.md) | Lint rules that flag direct platform access in agent code |
+
+## Documentation
+
+- [Host integration guide](docs/guides/host-integration.md): CSP, model hosting, storage, ownership, logout, confirmations and proxies.
+- [Development tracing guide](docs/guides/tracing.md): spans and exporting through a collector.
+- [System design](docs/system-design.md): components, contracts and runtime flows.
+- [Architecture decision records](docs/adr/README.md): one file per decision.
+- [Project brief](docs/galaxie-project-brief.md): scope, security model, roadmap and acceptance tests.
+- [Framework overview](docs/framework-overview.md): the role of the project at a glance.
+- [Security review](docs/security-review.md): controls, test evidence and residual risks.
+- [Tested device matrix](docs/device-matrix.md): what has run where.
+- [AI-facing index](llms.txt): a short map for coding assistants.
 
 ## Intended use and disclaimer
 
@@ -64,39 +115,10 @@ Language models make mistakes. galaxie validates the shape of their output, not 
 
 No test suite or review proves that software is secure. The known limits are listed in [brief §9.9](docs/galaxie-project-brief.md#99-limits-to-state-plainly) and [ADR-0012](docs/adr/0012-security-baseline.md).
 
-## Documentation
-
-- [MVP exit record](docs/mvp-exit-record.md): acceptance evidence, engineering checks, demonstrations and open decision inputs.
-- [Unsupported features](docs/unsupported.md): current exclusions, implementation limits and unverified paths.
-- [AI-facing index](llms.txt): package READMEs, coding guidance, guides and test evidence.
-- [Host integration guide](docs/guides/host-integration.md): CSP, model hosting, storage, ownership, logout, confirmations and proxies.
-- [Development tracing guide](docs/guides/tracing.md): span filters and host-owned export through a collector.
-- [Tested device matrix](docs/device-matrix.md): mock/fake CI coverage and the recorded real-device demonstrations.
-- [Project brief](docs/galaxie-project-brief.md): scope, architecture, security model, roadmap and acceptance tests.
-- [Framework overview](docs/framework-overview.md): role, audiences and the roadmap at a glance.
-- [Architecture decision records](docs/adr/README.md): one file per decision.
-- [System design](docs/system-design.md): components, packages, contracts and runtime flows.
-- [Security review](docs/security-review.md): ADR-0012 and OWASP LLM Top 10 controls, test evidence and residual risks, including the mock-only [prompt injection corpus](tests/injection-corpus/README.md).
-
-## Roadmap
-
-| Milestone | Focus |
-| --- | --- |
-| M1 | Headless host, adapter, capability broker, security skeleton, the parity conformance suite and OpenTelemetry spans |
-| M2 | Local models and the English Tutor vertical slice |
-| M3 | Durable interaction and recovery |
-| M4 | Remote integration, reuse and the MVP release gate |
-
-Spikes run when a milestone needs their answer: local inference and the UI path before M2, remote providers and MCP before M4. Details are in [brief §16](docs/galaxie-project-brief.md#16-roadmap).
-
-## Development
-
-You need Node.js 24 and pnpm 11 (through Corepack). Run `pnpm install`, then `pnpm check`, which runs every check CI runs. The toolchain is described in [system design §10](docs/system-design.md#10-toolchain).
-
 ## License
 
 galaxie is licensed under the [Apache License 2.0](LICENSE) ([ADR-0024](docs/adr/0024-apache-2-0-license-and-dco.md)). Use in open-source and closed-source products is allowed under its terms. See [NOTICE](NOTICE).
 
 ## Contributing
 
-Outside contributions are accepted under the [Developer Certificate of Origin](https://developercertificate.org/): sign off each commit with `git commit -s`. No contributor license agreement is required.
+Outside contributions are accepted under the [Developer Certificate of Origin](https://developercertificate.org/): sign off each commit with `git commit -s`. No contributor license agreement is required. Run `pnpm check` before you open a pull request, and read [`AGENTS.md`](AGENTS.md) for the repository rules.
