@@ -1,0 +1,54 @@
+/* SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+   SPDX-License-Identifier: Apache-2.0 */
+
+body {
+  font:
+    1rem / 1.5 system-ui,
+    sans-serif;
+  margin: 0;
+  color: #172332;
+  background: #f8fafb;
+}
+main {
+  max-width: 56rem;
+  margin: auto;
+  padding: 1.5rem;
+}
+label {
+  display: block;
+  margin: 1rem 0;
+}
+select,
+textarea,
+button {
+  font: inherit;
+  max-width: 100%;
+}
+select,
+textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.5rem;
+}
+textarea {
+  min-height: 8rem;
+}
+button {
+  margin: 0.25rem 0.5rem 0.25rem 0;
+  padding: 0.5rem 1rem;
+}
+pre,
+#disclaimer {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#disclaimer {
+  padding: 1rem;
+  border: 2px solid #705521;
+  background: #fff5d8;
+}
+section {
+  padding: 1rem;
+  border: 1px solid #62758a;
+}

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import goUrl from './go-worker.ts?worker&url';
 import pyodideUrl from './pyodide-worker.ts?worker&url';
 
 interface TrustedTypesFactory {
@@ -19,14 +20,22 @@ export function checkWorkerUrl(value: string, allowed: readonly string[], base: 
   return candidate.href;
 }
 
-export function createPyodideWorker(): Worker {
+function createWorker(url: string): Worker {
   if (!installed) {
     const factory = (globalThis as typeof globalThis & { trustedTypes?: TrustedTypesFactory })
       .trustedTypes;
     factory?.createPolicy('default', {
-      createScriptURL: (value) => checkWorkerUrl(value, [pyodideUrl], location.href),
+      createScriptURL: (value) => checkWorkerUrl(value, [pyodideUrl, goUrl], location.href),
     });
     installed = true;
   }
-  return new Worker(pyodideUrl, { type: 'module' });
+  return new Worker(url, { type: 'module' });
+}
+
+export function createPyodideWorker(): Worker {
+  return createWorker(pyodideUrl);
+}
+
+export function createGoWorker(): Worker {
+  return createWorker(goUrl);
 }

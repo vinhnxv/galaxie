@@ -51,6 +51,8 @@
 
 - [Browser-built RAG example](examples/rag-browser/README.md): four executors (LangGraph.js, LangGraph Python, mock-only pydantic-ai and DSPy), cited streams, durable passage review, verified files and Orama; DSPy real-model paths unverified.
 
+- [ADK recipe example](examples/adk-recipes/README.md): a scripted JavaScript/Go financial advisor and Python auditor/loan picker, checked text, model destinations, durable approval and explicit finalization; synthetic fixtures, refused shapes and no real-model result.
+
 ## Verification
 
 - [Conformance suite](tests/conformance/README.md): parity lanes, explicit-config rules and protected goldens.
