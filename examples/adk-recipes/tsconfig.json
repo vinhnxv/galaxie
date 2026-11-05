@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vite/client"],
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@galaxie/core": ["../../packages/core/src/index.ts"],
+      "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],
+      "@galaxie/adapter-pyodide/worker": ["../../packages/adapter-pyodide/src/worker.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

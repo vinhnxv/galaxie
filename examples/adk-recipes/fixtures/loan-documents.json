@@ -1,0 +1,24 @@
+[
+  {
+    "applicationId": "application-lantern",
+    "documents": [
+      {
+        "title": "Synthetic application",
+        "text": "Mira Vale applies for 40000 demo dollars over 36 months for Lantern Orchard Workshop, an invented company. This is fictional fixture data."
+      },
+      {
+        "title": "Synthetic equipment estimate",
+        "text": "The workshop requests two invented cutting machines and a training bench. No real purchase or applicant exists."
+      }
+    ]
+  },
+  {
+    "applicationId": "application-cloudberry",
+    "documents": [
+      {
+        "title": "Synthetic application",
+        "text": "Tarin Moss requests 12000 demo dollars over 24 months for Cloudberry Kite Works, an invented company. No real applicant or credit decision exists."
+      }
+    ]
+  }
+]
