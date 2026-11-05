@@ -36,9 +36,5 @@ test('default mode changes only connect-src for the pinned Hugging Face download
   const { 'connect-src': connections, ...directives } = cspDirectives('production');
   const { 'connect-src': _mockConnections, ...mock } = cspDirectives('mock');
   expect(directives).toEqual(mock);
-  expect(connections).toEqual([
-    "'self'",
-    'https://huggingface.co',
-    'https://us.aws.cdn.hf.co',
-  ]);
+  expect(connections).toEqual(["'self'", 'https://huggingface.co', 'https://us.aws.cdn.hf.co']);
 });
