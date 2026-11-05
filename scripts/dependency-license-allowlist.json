@@ -1,0 +1,81 @@
+{
+  "permissive": [
+    "MIT",
+    "ISC",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "0BSD",
+    "BlueOak-1.0.0",
+    "CC0-1.0",
+    "Unlicense",
+    "Python-2.0"
+  ],
+  "exceptions": [
+    {
+      "package": "@img/sharp-libvips-darwin-arm64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-darwin-x64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-linux-arm",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-linux-arm64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-linux-ppc64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-linux-riscv64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-linux-s390x",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-linux-x64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-linuxmusl-arm64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-libvips-linuxmusl-x64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "Optional prebuilt shared library that sharp installs for one platform. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-win32-arm64",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "reason": "Platform package of sharp that bundles a prebuilt libvips build under LGPL-3.0-or-later alongside sharp's own Apache-2.0 code. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-win32-ia32",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "reason": "Platform package of sharp that bundles a prebuilt libvips build under LGPL-3.0-or-later alongside sharp's own Apache-2.0 code. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    },
+    {
+      "package": "@img/sharp-win32-x64",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "reason": "Platform package of sharp that bundles a prebuilt libvips build under LGPL-3.0-or-later alongside sharp's own Apache-2.0 code. sharp is a dependency of @huggingface/transformers, whose web build does not import it; only its Node build does. The binary is installed from npm and is not vendored in this repository. Re-review when the transformers or sharp version changes."
+    }
+  ]
+}
