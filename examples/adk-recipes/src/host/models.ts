@@ -13,6 +13,13 @@ import {
   type TransformersWorker,
 } from '@galaxie/models/transformers';
 
+/**
+ * One reply's token limit, for the router reservation and for generation. Later agents receive the
+ * earlier replies in their prompt, and the 4096-token context must fit the whole prompt plus the
+ * reply: the default 1024 left the third agent with a 4007-token prompt and no room to answer.
+ */
+const replyTokens = 384;
+
 export { default as pinnedModelRecord } from './model-records/qwen3.5-0.8b-onnx-opt-q4.json' with {
   type: 'json',
 };
@@ -41,7 +48,7 @@ export function createOnnxModels(
   const roles: Record<string, ModelRouting['roles'][string]> = {};
   for (const [role, needs] of Object.entries(definition.models ?? {})) {
     if (needs.requires?.includes('tool-calling') && record.toolFormat === undefined) continue;
-    roles[role] = { providers: ['onnx'], allow: ['in-browser'], maxTokens: 1500 };
+    roles[role] = { providers: ['onnx'], allow: ['in-browser'], maxTokens: replyTokens };
   }
   if (Object.keys(roles).length === 0)
     return { chatModels: {}, routing: { providers: {}, roles }, async dispose() {} };
@@ -62,13 +69,16 @@ export function createOnnxModels(
     });
     return loading;
   };
-  const model = new TransformersChatModel({
-    modelId: record.modelId,
-    toolFormat: record.toolFormat,
-    async *stream(request, signal) {
-      yield* (await load(false, signal)).stream(request, signal);
+  const model = new TransformersChatModel(
+    {
+      modelId: record.modelId,
+      toolFormat: record.toolFormat,
+      async *stream(request, signal) {
+        yield* (await load(false, signal)).stream(request, signal);
+      },
     },
-  });
+    { maxTokens: replyTokens },
+  );
   return {
     chatModels: { onnx: model },
     routing: {
