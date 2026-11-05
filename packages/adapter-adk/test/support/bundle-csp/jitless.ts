@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Mirrors `examples/*/src/zod-config.ts`. The ADK web bundle inlines its own zod and reads the
 // shared `globalThis.__zod_globalConfig` object when its module is evaluated, so this module must

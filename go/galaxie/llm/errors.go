@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package llm maps Google ADK model requests to the JSON messages galaxie's page side routes, and
 // carries the per-run state that makes a galaxie failure end the run.

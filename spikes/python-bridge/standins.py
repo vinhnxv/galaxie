@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 
 """Build a deliberately limited, same-name ormsgpack wheel for this spike only."""
 
@@ -11,7 +11,7 @@ import zipfile
 
 SOURCE = '''
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 """Spike-only API subset; not an ormsgpack compatibility implementation."""
 from msgpack.fallback import Packer, unpackb as _unpackb
 from msgpack import ExtType as Ext

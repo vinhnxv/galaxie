@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { ModelError } from '../errors.js';
 
 export type TransformersDevice = 'webgpu' | 'wasm';
 
-/** The dtype names Transformers.js 4.3.1 maps to ONNX file suffixes. */
+/** The dtype names Transformers.js 4.3.2 maps to ONNX file suffixes. */
 export const transformersDtypes = [
   'fp32',
   'fp16',

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // A tool for the lesson pipeline: pronunciations from the CMU Pronouncing Dictionary, converted to
 // IPA. The pipeline hands them to the model, which reviews them against the sentence and writes the

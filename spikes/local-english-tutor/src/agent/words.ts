@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // The words of a sentence, as the pipeline lists them for the model and the page shows them.
 

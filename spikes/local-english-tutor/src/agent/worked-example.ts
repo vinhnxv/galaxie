@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Prompt fixture: every section prompt shows the model this request and its answer before the
 // learner's sentence, so the model sees the exact shape and style to generate. The page never shows

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 /** A length mismatch owns its array path, while siblings still receive a full comparison. */
 export function diff(expected: unknown, actual: unknown, path: string = '$'): string[] {

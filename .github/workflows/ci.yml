@@ -1,5 +1,9 @@
 name: ci
 
+# The checks run as parallel jobs. The Python-heavy tests are split into groups (see
+# GALAXIE_TEST_GROUP in vitest.config.ts) and skipped for a pull request whose changes cannot
+# affect them (scripts/ci-scope.ts). A push to main always runs everything.
+
 on:
   push:
     branches: [main]
@@ -13,48 +17,144 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  scope:
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 10
+    outputs:
+      python: ${{ steps.scope.outputs.python }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - id: scope
+        name: Decide whether the Python jobs can be skipped
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "python=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only --no-renames "$BASE...$HEAD") || {
+            echo "python=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          printf '%s\n' "$files" | node scripts/ci-scope.ts | tee -a "$GITHUB_OUTPUT"
+
+  static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6
-        with:
-          version: "0.11.23"
-          python-version: "3.14"
-          enable-cache: true
-          cache-dependency-glob: python/uv.lock
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
-      - run: pnpm install --frozen-lockfile
-      - name: Sync the pinned CPython environment
-        run: uv sync --project python --locked
-      - name: Fetch and build the pinned Python wheels
-        run: |
-          node scripts/fetch-python-wheels.ts
-          node scripts/build-python-wheels.ts
+      - uses: ./.github/actions/setup
       - run: pnpm run check:license
       - run: pnpm exec biome ci .
       - name: Type-check with TypeScript 7
         run: pnpm run typecheck
       - name: Type-check with TypeScript 6 (ADR-0013)
         run: pnpm run typecheck:ts6
-      - run: pnpm exec playwright install --with-deps --only-shell chromium
-      - run: CI=true pnpm test
-      - run: pnpm test:python
-      - name: Test the Go module
-        run: pnpm test:go
-      - name: Type-check Python with pyright
-        run: pnpm run typecheck:python
+
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The example builds pack the Python wheels, so this job builds them too.
+      - uses: ./.github/actions/setup
+        with:
+          python: "true"
       - run: pnpm run build
       - run: pnpm run check:deps
       - run: pnpm run check:docs
+
+  test-general:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          go: "true"
+          browser: "true"
+      - run: CI=true GALAXIE_TEST_GROUP=general pnpm test
+
+  test-python:
+    needs: scope
+    if: needs.scope.outputs.python == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [python-dspy, python-pydantic, python-adk, python-rest]
+    name: test-python (${{ matrix.group }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          python: "true"
+          go: "true"
+          browser: "true"
+      - run: CI=true pnpm test
+        env:
+          GALAXIE_TEST_GROUP: ${{ matrix.group }}
+
+  python-checks:
+    needs: scope
+    if: needs.scope.outputs.python == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          python: "true"
+      - run: pnpm test:python
+      - name: Type-check Python with pyright
+        run: pnpm run typecheck:python
+
+  go:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          go: "true"
+      - name: Test the Go module
+        run: pnpm test:go
+
+  # One check that stands for the whole run: it fails when any job failed or was cancelled and
+  # passes when jobs succeeded or were skipped, so a required check can name it alone.
+  ci:
+    if: always()
+    needs: [scope, static, build, test-general, test-python, python-checks, go]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to have passed or been skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          case " $RESULTS " in
+            *" failure "* | *" cancelled "*) exit 1 ;;
+          esac

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
 import { type AgentInstance, createRuntime, type ModelRouting, type RunEvent } from '@galaxie/core';

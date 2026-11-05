@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package galaxie hosts Google ADK Go agents inside galaxie. An agent module builds its agents with
 // the constructors here instead of the ADK ones, so the executor can check that every agent, tool

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // RFC 8785: ECMAScript number/string serialization and UTF-16 property ordering.
 export function canonical(value: unknown): string {

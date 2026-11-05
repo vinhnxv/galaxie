@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 /** Instance lifecycle (brief §8.3). A failed `prepare` returns to `created`, so the host can retry or dispose. */
 export type InstanceState = 'created' | 'preparing' | 'ready' | 'disposing' | 'disposed';

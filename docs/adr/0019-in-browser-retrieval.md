@@ -18,7 +18,7 @@ Orama stores IDs, titles, text, source and 256-dimensional vectors. Its custom t
 
 The separate IndexedDB database `galaxie-rag:<appId>` stores a whole index and pasted passages under a fingerprint covering the model revision, embedding settings, library versions, tokenizer, schema version and corpus file digest. A mismatch discards the saved index and rebuilds. This defines the update path for browser-built indexes only. Cache writes and clearing share a Web Lock. Clear broadcasts invalidation so other Workers cannot write deleted pasted text back. Clear deletes the database but retains downloaded model files; a separate action removes those files. This cache is outside galaxie storage's principal, retention and logout controls. Pasted text remains until clear or browser eviction.
 
-The corpus builder pins official SQuAD validation bytes and emits distinct contexts plus linked questions. The generated corpus is not committed. SQuAD is CC BY-SA 4.0, attributed to Rajpurkar et al. (2016), with a notice in the file and page. EmbeddingGemma 2, Orama and Transformers.js are Apache-2.0. Example source uses the repository's AGPL-3.0-only license.
+The corpus builder pins official SQuAD validation bytes and emits distinct contexts plus linked questions. The generated corpus is not committed. SQuAD is CC BY-SA 4.0, attributed to Rajpurkar et al. (2016), with a notice in the file and page. EmbeddingGemma 2, Orama and Transformers.js are Apache-2.0. Example source uses the repository's Apache-2.0 license.
 
 ## Alternatives considered
 

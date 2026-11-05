@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package cases holds the agents the ADK Go conformance lane runs. The same entries run natively
 // against a scripted caller to record the goldens, and compiled into the reference module they run

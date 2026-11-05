@@ -48,7 +48,7 @@ When a lesson finishes, the page logs a summary to the console, prefixed `[tutor
 
 ## Licenses
 
-- The model weights are under the LFM Open License v1.0, not AGPL-3.0. The page downloads them at run time, and they are not part of this repository.
+- The model weights are under the LFM Open License v1.0, not Apache-2.0. The page downloads them at run time, and they are not part of this repository.
 - The dictionary is the npm package `cmu-pronouncing-dictionary` 3.0.0, under the ISC license, with data from CMUdict, which Carnegie Mellon University publishes under a BSD-style license. It is a dependency and not part of this repository.
 
 ## Results

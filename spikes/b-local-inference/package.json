@@ -2,7 +2,7 @@
   "name": "galaxie-spike-b-local-inference",
   "private": true,
   "description": "Throwaway spike: compare in-browser inference engines with one measurement harness.",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.21.0",
   "engines": {

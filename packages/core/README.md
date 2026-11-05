@@ -34,4 +34,4 @@ agent platform access bypasses those controls.
 See [coding guidance](AGENTS.md), [runtime contracts](../../docs/system-design.md#6-core-runtime-and-contracts),
 [the mandatory baseline](../../docs/adr/0012-security-baseline.md) and
 [conformance coverage](../../tests/conformance/README.md).
-Code is AGPL-3.0-only; closed-source use requires a [commercial license](../../COMMERCIAL-LICENSE.md).
+Code is Apache-2.0 (see [LICENSE](../../LICENSE)).

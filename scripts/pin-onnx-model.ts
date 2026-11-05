@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -19,7 +19,7 @@ const maxFileBytes = 1024 ** 3;
 const maxFiles = 64;
 const defaultContextWindow = 4096;
 
-/** The ONNX file suffix Transformers.js 4.3.1 uses for each dtype. */
+/** The ONNX file suffix Transformers.js 4.3.2 uses for each dtype. */
 const dtypeSuffixes = {
   fp32: '',
   fp16: '_fp16',

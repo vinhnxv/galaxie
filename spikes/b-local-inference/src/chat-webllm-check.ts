@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { ChatWebLLM } from '@langchain/community/chat_models/webllm';
 import type { MLCEngineInterface } from '@mlc-ai/web-llm';

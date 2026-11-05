@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // The page: the model's load state (with the user's consent before the first download), the
 // sentence input, and the current lesson. Starting a lesson cancels the one in progress.

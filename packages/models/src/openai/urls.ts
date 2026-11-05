@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Keep literal address classification aligned with core/urls.ts. Models cannot depend on core.
 export function isLocalEndpoint(url: URL): boolean {

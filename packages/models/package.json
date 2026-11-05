@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Mock, WebLLM, Transformers.js ONNX, Chrome Built-in AI and OpenAI-compatible model providers for galaxie.",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -40,8 +40,8 @@
     "dist"
   ],
   "peerDependencies": {
-    "@huggingface/transformers": "4.3.1",
-    "@huggingface/transformers-structured-output": "4.3.1",
+    "@huggingface/transformers": "4.3.2",
+    "@huggingface/transformers-structured-output": "4.3.2",
     "@langchain/core": "~1.2.20",
     "@langchain/openai": "1.6.3",
     "@mlc-ai/web-llm": "0.2.86"
@@ -62,8 +62,8 @@
   },
   "devDependencies": {
     "@huggingface/jinja": "0.5.10",
-    "@huggingface/transformers": "4.3.1",
-    "@huggingface/transformers-structured-output": "4.3.1",
+    "@huggingface/transformers": "4.3.2",
+    "@huggingface/transformers-structured-output": "4.3.2",
     "@langchain/core": "1.2.20",
     "@langchain/openai": "1.6.3",
     "@mlc-ai/web-llm": "0.2.86",

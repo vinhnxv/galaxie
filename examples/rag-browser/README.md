@@ -138,4 +138,4 @@ Timing starts with a fresh Worker and ends after interpreter boot, wheel size/ha
 
 ## Licenses
 
-SQuAD v1.1: Rajpurkar et al. (2016), [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The derived corpus and page carry this notice. The committed fixture is original synthetic text and copies no SQuAD passage. EmbeddingGemma 2, Orama and Transformers.js are Apache-2.0; ONNX Runtime is MIT. Example source is AGPL-3.0-only. [ADR-0019](../../docs/adr/0019-in-browser-retrieval.md) records the browser-built retrieval decision and its limits.
+SQuAD v1.1: Rajpurkar et al. (2016), [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The derived corpus and page carry this notice. The committed fixture is original synthetic text and copies no SQuAD passage. EmbeddingGemma 2, Orama and Transformers.js are Apache-2.0; ONNX Runtime is MIT. Example source is Apache-2.0. [ADR-0019](../../docs/adr/0019-in-browser-retrieval.md) records the browser-built retrieval decision and its limits.

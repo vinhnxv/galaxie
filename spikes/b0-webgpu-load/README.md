@@ -26,7 +26,7 @@ The first run downloads about 1.40 GB from huggingface.co: the q4f16 graph and i
 
 ## Model license
 
-The weights are under the LFM Open License v1.0, not AGPL-3.0. The page downloads them at run time, and they are not part of this repository.
+The weights are under the LFM Open License v1.0, not Apache-2.0. The page downloads them at run time, and they are not part of this repository.
 
 ## Results
 

@@ -2,7 +2,7 @@
   "name": "galaxie-spike-b0-webgpu-load",
   "private": true,
   "description": "Throwaway M0 spike: load LFM3-1.7B-ONNX on WebGPU in Chrome and generate text.",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.21.0",
   "engines": {

@@ -101,7 +101,7 @@ flowchart TD
 Proposed rules; M1 confirms them:
 
 1. `core` has no `dependencies`; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Only the OpenTelemetry API is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries.
-2. The `models` package imports `@langchain/core/*` subpaths and relative files, plus the exact optional peer `@mlc-ai/web-llm` 0.2.86 only in its WebLLM engine, cache probe and worker files, and the exact optional peers `@huggingface/transformers` and `@huggingface/transformers-structured-output` 4.3.1 only as dynamic, type-free imports in `transformers/runtime.ts`; it has no `core` dependency. WebLLM types are local structural types because its declaration re-exports do not resolve under NodeNext. `storage-indexeddb` also has no `core` dependency: its peers are `@langchain/langgraph-checkpoint` `~1.2.0` and type-only `@langchain/core` `~1.2.20`, tested at 1.2.0 and 1.2.20. Other integration packages depend on `core` and on their own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
+2. The `models` package imports `@langchain/core/*` subpaths and relative files, plus the exact optional peer `@mlc-ai/web-llm` 0.2.86 only in its WebLLM engine, cache probe and worker files, and the exact optional peers `@huggingface/transformers` and `@huggingface/transformers-structured-output` 4.3.2 only as dynamic, type-free imports in `transformers/runtime.ts`; it has no `core` dependency. WebLLM types are local structural types because its declaration re-exports do not resolve under NodeNext. `storage-indexeddb` also has no `core` dependency: its peers are `@langchain/langgraph-checkpoint` `~1.2.0` and type-only `@langchain/core` `~1.2.20`, tested at 1.2.0 and 1.2.20. Other integration packages depend on `core` and on their own library: LangGraph.js, LangChain, the MCP SDK or React. Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2).
 3. Agent packages depend on `core` and their engine, never on a host package. The private `@galaxie/example-english-tutor` workspace package also uses `adapter-langgraph` for its host and interrupt contracts; its source and build import allowlist admits only those two galaxie packages, `@langchain/langgraph/web`, `@langchain/core/*`, `zod` and relative files. It imports neither React nor model implementations. The M4 ESLint plugin flags direct network, storage, DOM/HTML sinks, eval and model-provider access (brief §9.7 C). It is a linting aid with no runtime enforcement; aliases and dependency-provided values can escape detection. See [usage and limits](../packages/eslint-plugin/README.md). Its source imports only relative modules and type-only `eslint`; `check:deps` enforces that boundary.
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
 5. `tools-mcp` source and build imports are limited to `@galaxie/core`, SDK client subpaths, SDK shared `types.js` and relative files. It imports no SDK server entry or Node module. `examples/mcp-server` uses SDK server/shared subpaths, `node:*`, `zod` and relative files. No package source or build imports examples; tests use source aliases without new dependencies. Hosts may import `@galaxie/tools-mcp`. `check:deps` enforces these rules.
@@ -147,7 +147,7 @@ Today:
 
 ```text
 galaxie/
-├── .github/workflows/ci.yml   CI: license, lint, TS 7 and 6, Node/Chromium tests, build, dependency guard
+├── .github/workflows/ci.yml   CI: parallel jobs for static checks, build, tests (grouped), Python and Go
 ├── docs/                      brief, framework overview, this document, ADRs
 ├── packages/
 │   ├── core/                  runtime and framework-neutral contracts (§6)
@@ -155,12 +155,12 @@ galaxie/
 │   ├── models/                mock and local model providers, with a host-bundled worker entry
 │   └── react/                 typed registry, snapshot hook, surfaces and headless education entries
 ├── scripts/
-│   ├── check-license.ts       SPDX headers and package license fields (ADR-0015)
+│   ├── check-license.ts       SPDX headers and package license fields (ADR-0024)
 │   └── check-dependencies.ts  source and built-package dependency boundaries
 ├── tests/conformance/         shared cases, native goldens and compatibility-matrix.json
 ├── spikes/                    throwaway spike code, outside the root workspace (brief §16.2)
 ├── biome.json  package.json  pnpm-workspace.yaml  tsconfig.base.json  vitest.config.ts
-└── AGENTS.md  COMMERCIAL-LICENSE.md  LICENSE  README.md
+└── AGENTS.md  LICENSE  NOTICE  README.md
 ```
 
 Target (brief §15), with the milestone that first needs each path:
@@ -801,7 +801,7 @@ The conformance files in both test columns run on Node and Chromium. Node packag
 | Command | What it runs |
 | --- | --- |
 | `pnpm check` | Everything CI runs, in the same order |
-| `pnpm check:license` | SPDX headers and package license fields (ADR-0015) |
+| `pnpm check:license` | SPDX headers and package license fields (ADR-0024) |
 | `pnpm check:deps` | Core and models peers/imports, WebLLM imports limited to engine/worker value imports, adapter web imports and Node-free built packages; run after build |
 | `pnpm lint` | Biome lint and format check |
 | `pnpm format` | Biome formatting and safe fixes, written to disk |

@@ -107,7 +107,7 @@ What galaxie does for this audience:
   - provider keys found in storage;
   - model-produced URLs blocked by the allowlist;
   - roles without an available provider.
-- **AI-facing docs (M4).** Each package ships `AGENTS.md` and the docs site ships `llms.txt`: short, current rules, plus "do this, never that" examples that coding assistants can load. They also state the license plainly: a closed-source product needs a commercial license [ADR-0015].
+- **AI-facing docs (M4).** Each package ships `AGENTS.md` and the docs site ships `llms.txt`: short, current rules, plus "do this, never that" examples that coding assistants can load. They also state the license plainly: Apache-2.0, with a DCO sign-off for outside contributions [ADR-0024].
 - **Lint rules for agent code (M4).** The ESLint plugin flags direct `fetch`, storage, DOM and `eval` calls, and side effects before `interrupt()`.
 - **Templates (examples in M4, a scaffolder later).** Working host apps with the CSP, a host-proxy endpoint and an MCP server already set up, so the first copy-paste is correct.
 - **Mock provider and fixtures.** Assistants can write tests that run without a GPU.
@@ -150,7 +150,7 @@ Galaxie serves three groups. End users never install galaxie; they meet it insid
 | Audit | Content-free audit events (who, which agent, which capability, which destination, when) exportable to the host's logging or SIEM |
 | Incident response | Host-controlled kill switch per agent, role, provider or MCP server; staged rollout of model updates |
 | Stability | LTS releases with security backports; documented support windows |
-| Legal clarity | AGPL-3.0 for open use, or a commercial license for closed products [ADR-0015]; model and dependency license metadata |
+| Legal clarity | Apache-2.0 [ADR-0024]; model and dependency license metadata |
 | Offline or air-gapped use | Self-hosted weights and runtimes; in-browser providers only |
 | Accessibility procurement | An accessibility conformance report for the reference components |
 
@@ -218,8 +218,7 @@ Spikes are not a stage. Each runs before the milestone that needs its answer: Sp
 
 **Governance**
 
-- License (AGPL-3.0-only plus a commercial license) reviewed by a lawyer [ADR-0015].
-- Contribution guide with a CLA, which dual licensing needs (a DCO is not enough), a code of conduct and a trademark policy.
+- Contribution guide with the DCO sign-off [ADR-0024], a code of conduct and a trademark policy.
 - Release process, named maintainers, and a public roadmap.
 
 **Compliance support**
@@ -232,12 +231,11 @@ Galaxie is an SDK, so it cannot be certified on behalf of its users, and it neve
 
 ## 8. What to make public and what to keep private
 
-Under the license (AGPL-3.0-only plus a commercial license [ADR-0015], see [`COMMERCIAL-LICENSE.md`](../COMMERCIAL-LICENSE.md)):
+Under the license (Apache-2.0 [ADR-0024]):
 
 - The code is public and open source.
-- Forks must stay open when they are distributed or offered over a network.
-- Closed-source use needs a commercial license.
-- The security baseline is the same under both licenses. It is never a paid feature.
+- Forks and closed-source use are allowed under the license terms.
+- The security baseline is never a paid feature.
 
 **Public**
 
@@ -276,6 +274,6 @@ Rust is not chosen for the MVP:
 Rust remains a candidate for a WASM isolation guest (Phase 7), for measured hot paths, and for a high-load gateway.
 
 [ADR-0013]: adr/0013-typescript-first-implementation.md
-[ADR-0015]: adr/0015-licensing-agpl-with-commercial-license.md
+[ADR-0024]: adr/0024-apache-2-0-license-and-dco.md
 [ADR-0016]: adr/0016-parity-demonstrations-and-otel-traces.md
 [ADR-0017]: adr/0017-framework-neutral-contracts.md

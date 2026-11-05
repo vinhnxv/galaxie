@@ -44,7 +44,7 @@ Updated after an architecture review, an ecosystem survey and founder decisions.
   - The controlled MCP server has a security profile. (§9.5)
   - An external developer trial comes in M3. (§16.5)
   - Thresholds are frozen before the Spike B bake-off (replaced in 0.3). (§18)
-- The license is AGPL-3.0-only plus a commercial license (founder decision). Commercial use is allowed under the AGPL; closed-source use needs a commercial license. [ADR-0015]
+- The license is Apache-2.0, with outside contributions under the Developer Certificate of Origin (maintainer decision, 2026-11-04). [ADR-0024]
 
 ## 0. Read this before writing code
 
@@ -1535,8 +1535,7 @@ Galaxie targets end users of host apps, developers and enterprises. "Many users"
   - performance demonstrations on low-end reference devices, published with their setup (§18);
   - destination labels and consent everywhere.
 - **Governance:**
-  - the AGPL and commercial license setup reviewed by a lawyer (ADR-0015);
-  - a CLA for contributions;
+  - the DCO sign-off for contributions (ADR-0024);
   - a trademark policy;
   - a code of conduct, a release process and named maintainers.
 - **Measurable commitments.** Every production claim (LTS, kill switch, air-gapped use, audit events) has:
@@ -1699,7 +1698,7 @@ This is a product hypothesis. The milestones in §16 exist to prove it.
 | [ADR-0012] | Mandatory security baseline | Accepted |
 | [ADR-0013] | TypeScript-first implementation language | Accepted |
 | [ADR-0014] | Run-level data labels and argument shapes | Proposed |
-| [ADR-0015] | License: AGPL-3.0 with a commercial license | Accepted |
+| [ADR-0024] | License: Apache-2.0, with the Developer Certificate of Origin | Accepted |
 | [ADR-0016] | Parity is the verdict, metrics are demonstrations, traces are OpenTelemetry spans | Accepted |
 | [ADR-0017] | Framework-neutral contracts, with an adapter per framework | Accepted |
 
@@ -1954,7 +1953,7 @@ Public sources consulted on 2026-10-28. `main`/`latest` pages can change; re-rea
 [ADR-0012]: adr/0012-security-baseline.md
 [ADR-0013]: adr/0013-typescript-first-implementation.md
 [ADR-0014]: adr/0014-data-labels-and-argument-shapes.md
-[ADR-0015]: adr/0015-licensing-agpl-with-commercial-license.md
+[ADR-0024]: adr/0024-apache-2-0-license-and-dco.md
 [ADR-0016]: adr/0016-parity-demonstrations-and-otel-traces.md
 [ADR-0017]: adr/0017-framework-neutral-contracts.md
 

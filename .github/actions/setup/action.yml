@@ -1,0 +1,49 @@
+name: setup
+description: Install the toolchains one CI job needs, then the workspace.
+
+inputs:
+  python:
+    description: Sync the pinned CPython environment and build the pinned Python wheels.
+    default: "false"
+  go:
+    description: Install the Go toolchain pinned in go/go.mod.
+    default: "false"
+  browser:
+    description: Install the Chromium build the browser tests drive.
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+    - if: inputs.python == 'true'
+      uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6
+      with:
+        version: "0.11.23"
+        python-version: "3.14"
+        enable-cache: true
+        cache-dependency-glob: python/uv.lock
+    - if: inputs.go == 'true'
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go/go.mod
+        cache-dependency-path: go/go.sum
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+    - if: inputs.python == 'true'
+      name: Sync the pinned CPython environment
+      run: uv sync --project python --locked
+      shell: bash
+    - if: inputs.python == 'true'
+      name: Fetch and build the pinned Python wheels
+      run: |
+        node scripts/fetch-python-wheels.ts
+        node scripts/build-python-wheels.ts
+      shell: bash
+    - if: inputs.browser == 'true'
+      run: pnpm exec playwright install --with-deps --only-shell chromium
+      shell: bash

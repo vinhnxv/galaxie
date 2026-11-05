@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { type CapabilityContext, GalaxieError } from '@galaxie/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
