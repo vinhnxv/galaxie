@@ -53,7 +53,14 @@ function ActiveRecipe({ host, loan }: { host: RecipeHost; loan: boolean }): Reac
         </>
       )}
       {invalid && <p role="alert">The loan confirmation is invalid. Use Start over to clear it.</p>}
-      {snapshot.run?.error && <p role="alert">{snapshot.run.error.message}</p>}
+      {snapshot.run?.error && (
+        <p role="alert">
+          {Object.keys(snapshot.routes ?? {}).length === 0 &&
+          (snapshot.run.error.code === 'unavailable' || snapshot.run.error.code === 'denied')
+            ? 'No model is available: WebGPU or device storage may be unavailable, or the download was declined. Use Start over to try again, or run dev:mock.'
+            : snapshot.run.error.message}
+        </p>
+      )}
     </>
   );
 }
@@ -105,7 +112,7 @@ export function App(): ReactElement {
   );
 
   useEffect(() => {
-    if (loan && mock && recipe.available && sessionStorage.getItem(loanSessionKey)) {
+    if (loan && recipe.available && sessionStorage.getItem(loanSessionKey)) {
       setBusy(true);
       setStatus('preparing');
       setStarted(true);
@@ -190,13 +197,13 @@ export function App(): ReactElement {
   return (
     <main>
       <h1>ADK recipes in the browser</h1>
-      <p>Invented companies, applicants and market bulletins. Scripted mock models only.</p>
+      <p>Invented companies, applicants and market bulletins. No real-model result is claimed.</p>
       <p>galaxie is not affiliated with or endorsed by Google.</p>
       <p>Do not use these fixtures or outputs for real financial or lending decisions.</p>
       <p id="providers">
         {mock
           ? 'Model available: deterministic mock (in browser). No download is needed.'
-          : 'No model provider is configured. Use dev:mock to run the recipes.'}
+          : 'Local ONNX: Qwen3.5-0.8B (WebGPU required). First use asks permission to download 666 MB from Hugging Face. If unavailable or declined, use dev:mock.'}
       </p>
       <p id="assets">
         Python recipe assets: {pythonBuild.available ? 'available' : 'unavailable'}. Go recipe
@@ -243,7 +250,7 @@ export function App(): ReactElement {
       </p>
       <button
         type="button"
-        disabled={!mock || !recipe.available || busy || started}
+        disabled={!recipe.available || busy || started}
         onClick={() => {
           void run();
         }}

@@ -84,6 +84,7 @@ test('the page never displays a streamed reply blocked by the host output-safety
       .poll(() => page.locator('#run-status').textContent(), { timeout: 30000 })
       .toContain('failed');
     expect(await page.locator('#output').textContent()).not.toContain('Risk assessment:');
+    expect(await page.getByRole('alert').textContent()).not.toContain('No model is available');
     await probe.verify();
   } finally {
     await probe.context.close();

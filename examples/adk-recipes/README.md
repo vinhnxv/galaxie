@@ -1,6 +1,6 @@
 # ADK recipes in the browser
 
-Choose a recipe in one Vite page and run it with deterministic scripted models. The page offers the financial advisor on ADK JavaScript and ADK Go, the LLM auditor on ADK Python, and the small-business loan pipeline on ADK Python. It shows checked streamed text and selected model destinations; the verbatim upstream financial disclaimer appears above financial output. Default mode has no model provider. Mock mode requires no model download and contains no ONNX records.
+Choose a recipe in one Vite page. The page offers the financial advisor on ADK JavaScript and ADK Go, the LLM auditor on ADK Python, and the small-business loan pipeline on ADK Python. It shows checked streamed text and selected model destinations; the verbatim upstream financial disclaimer appears above financial output. Mock mode uses deterministic scripted models and requires no model download. Default mode offers the pinned local ONNX model below; its real-model behavior remains unmeasured.
 
 | Recipe | Browser shape | Rewrite details |
 | --- | --- | --- |
@@ -17,10 +17,26 @@ From the repository root:
 pnpm install --frozen-lockfile
 pnpm --filter @galaxie/example-adk-recipes dev:mock
 pnpm --filter @galaxie/example-adk-recipes exec vite build --mode mock
+pnpm --filter @galaxie/example-adk-recipes build
+pnpm --filter @galaxie/example-adk-recipes preview
 pnpm exec vitest run examples/adk-recipes
 ```
 
-`dev:mock` serves a built preview so the unchanged strict script policy needs no development-client exception. Both modes allow connections only to the same origin, require Trusted Types for scripts and permit only same-origin Workers. There is no `unsafe-eval`. The ADK runtime setup disables span content capture and uses jitless Zod; the Vite alias selects ADK's pinned web bundle. Only recipe authoring files may import the ADK root package.
+Use the built preview for either mode so the strict script policy needs no development-client exception. Mock mode retains the exact same-origin-only CSP. Default mode changes only `connect-src`, adding `https://huggingface.co` for the record's immutable resolve URLs and `https://us.aws.cdn.hf.co` for Hugging Face's weight redirects (the host observed from the maintainer machine on 2026-11-05; it may differ by region or over time, and no real download has confirmed it, so a blocked download means this list needs updating). There are no wildcard sources or GitHub download hosts. The Vite server shares the header with the dedicated inference Worker's response; production hosting must serve that header too. Both modes retain `script-src 'self' 'wasm-unsafe-eval'`, `worker-src 'self'`, `require-trusted-types-for 'script'` and `trusted-types default`, with no `unsafe-eval`. The existing exact-URL Trusted Types validator additionally permits the bundled same-origin ONNX module Worker; it still refuses arbitrary, blob and off-origin Worker URLs. All tests, including the default-bundle browser probe, serve the original same-origin-only header and block external requests. The ADK runtime setup disables span content capture and uses jitless Zod; the Vite alias selects ADK's pinned web bundle. Only recipe authoring files may import the ADK root package.
+
+## Pinned local model
+
+| Model | Immutable revision | License | Configuration | Text-only download |
+| --- | --- | --- | --- | --- |
+| `onnx-community/Qwen3.5-0.8B-ONNX-OPT` | `9a4c21d8f724176b0a7edaaed36303044451886e` | Apache-2.0 | q4, WebGPU, context window 4096, XML tool calls | 666 MB (666,378,110 bytes) |
+
+The [reviewed record](src/host/model-records/qwen3.5-0.8b-onnx-opt-q4.json) is unchanged from the maintainer's pin output: nine files, including the text-only split decoder and embeddings, with per-file sizes and SHA-256 digests. No weights are redistributed or committed. The weights come from Hugging Face on first use only after the user accepts the download prompt showing its size and origin. The Worker verifies sizes and hashes before use and stores verified files in Cache Storage. A cached load re-verifies those bytes without download permission; integrity failure does not silently fetch replacements. Storage eviction can require another consented download.
+
+`models.ts` validates the record with `parseModelRecord` and lists ONNX first for each eligible recipe role, with `in-browser` destination and zero pricing. A missing or invalid record offers no ONNX provider; a record without a declared tool format is omitted for tool-using roles. Mock mode continues to use only its recipe's scripted providers. The router prefers a ready in-browser alternative before asking to download. Declining a download may select a later ordered provider before dispatch; this host configures no default alternative and shows an unavailable message for absent WebGPU/storage or a declined download. After dispatch there is no fallback, including on engine or Worker failure. Start over creates a fresh document and handle. The provider bundles Transformers.js 4.3.2 through its optional peer and same-origin ONNX Runtime assets; the example imports no Transformers.js library directly.
+
+The pin probe reports that Qwen3.5's template mentions `enable_thinking`. The provider passes `enable_thinking` only when the record declares `template.enableThinking`. This unchanged record declares no override, so the template's default applies; thinking mode has not been disabled here. `TransformersChatModel` parses tool markup when tools are offered but does not strip `<think>` text. Any such emitted text remains ordinary checked reply text, consumes the generation budget and can appear in the output. The provider's default output cap is 1024 tokens, separate from the router's 1500-token reservation, and prompt plus output must fit the 4096-token context window. No provider semantics were changed.
+
+`LiquidAI/LFM3-1.7B-ONNX` remains unpinned: its q4 data file is about 1.63 GB, above the record's 1 GiB per-file limit. There is no record, provider entry or result for it. The maintainer real-model run (`galaxie-82y`) is unmeasured. No real-model result, tool reliability, answer quality, download performance or device metric is claimed.
 
 | Capability | Input | Result and policy |
 | --- | --- | --- |
@@ -71,7 +87,7 @@ The finalize binding retains its independent broker confirmation. Hosts must con
 | Loan cloud storage, Firestore callbacks, custom Gemini model and LLM judge | Omitted; fixture capabilities and host-owned persistence replace these paths |
 | Loan pause before later sequential siblings | Refused; only the final Python child may pause in this rewrite |
 | `core/python/safety-plugins` and Model Armor | Deliberately not rewritten: plugins are refused and Model Armor requires a cloud project; the host's existing output-safety hook owns routed output checks |
-| Forced tool call on the local ONNX provider | Unavailable; no ONNX record is wired here and a loan reply without a finalize call is undecided |
+| Forced tool call on the local ONNX provider | Unsupported by the provider; a loan reply without a finalize call is undecided |
 
 ## Page lifecycle and loan approval
 
@@ -82,6 +98,8 @@ The loan surface uses `loanInteractionBindings` through the React registry and d
 Loan checkpoints and the recovery journal share the app/principal-scoped IndexedDB saver. A sessionStorage reference identifies this tab's paused session. The host composes a fenced Web Lock with disposal so another active owner cannot write the same app's state. Reload restores the pending approval; the in-page broker confirmation asks again because it is not persisted. **Start over** settles the run before deleting its checkpoints and recovery records. Other recipes and the visible answer text are not restored. Browser eviction loses the session. This is not a durable lending backend, cross-device recovery or an unknown-outcome reconciliation service.
 
 ## Evidence and limits
+
+[Model wiring tests](test/models.test.ts) use a tiny synthetic record and the provider's fake runtime through the real Worker protocol, ADK adapter, router and broker. They check consented download, missing/invalid records, tool-format eligibility, cached-before-download ordering, refusal before dispatch, failure after dispatch, missing WebGPU, thinking-text handling and every committed file digest. They download no real weights. The committed model license is documented beside its revision above.
 
 [Rendered host tests](test/host-browser.node.test.ts) cover the JavaScript and optional Go picker runs, disclaimer ordering, model destinations, checked output, unknown questions and abort-before-switch behavior. [Python host tests](test/adk-python-host-browser.node.test.ts) cover the auditor, loan approval and denial, pause reload, Start over and text-only undecided completion. Both use headless Chromium, record CSP/Trusted Types violations and reject requests outside the preview origin. These are scripted model tests; there is no real-model, real-device, answer-quality, financial-quality or lending-quality result. No model download, latency distribution or device metric is claimed.
 

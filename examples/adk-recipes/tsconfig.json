@@ -11,6 +11,8 @@
       "@galaxie/adapter-go": ["../../packages/adapter-go/src/index.ts"],
       "@galaxie/adapter-pyodide": ["../../packages/adapter-pyodide/src/index.ts"],
       "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],
+      "@galaxie/models/transformers": ["../../packages/models/src/transformers/index.ts"],
+      "@galaxie/models/transformers/worker": ["../../packages/models/src/transformers/worker.ts"],
       "@galaxie/adapter-pyodide/worker": ["../../packages/adapter-pyodide/src/worker.ts"],
       "@galaxie/react": ["../../packages/react/src/index.ts"],
       "@galaxie/storage-indexeddb": ["../../packages/storage-indexeddb/src/index.ts"],
