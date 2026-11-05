@@ -8,6 +8,7 @@
     "paths": {
       "@galaxie/core": ["../../packages/core/src/index.ts"],
       "@galaxie/adapter-adk": ["../../packages/adapter-adk/src/index.ts"],
+      "@galaxie/adapter-go": ["../../packages/adapter-go/src/index.ts"],
       "@galaxie/adapter-pyodide": ["../../packages/adapter-pyodide/src/index.ts"],
       "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],
       "@galaxie/adapter-pyodide/worker": ["../../packages/adapter-pyodide/src/worker.ts"]
