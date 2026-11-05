@@ -27,7 +27,10 @@ const lookup = tool(async () => 'unused', {
 const call = (name: string, args: unknown): string =>
   `<tool_call>${JSON.stringify({ name, arguments: args })}</tool_call>`;
 
-async function fixture(runtime: FakeRuntimeOptions = {}, toolFormat: 'hermes' | 'none' = 'hermes') {
+async function fixture(
+  runtime: FakeRuntimeOptions = {},
+  toolFormat: 'hermes' | 'xml' | 'none' = 'hermes',
+) {
   const model = await createSyntheticModel(toolFormat === 'none' ? {} : { toolFormat });
   const parts = await setup({ model, runtime });
   const handle = await createTransformersEngine(
@@ -38,6 +41,48 @@ async function fixture(runtime: FakeRuntimeOptions = {}, toolFormat: 'hermes' | 
 }
 
 describe('Transformers tool calling', () => {
+  it('uses the XML record and bound schema for streamed calls without leaking markup', async () => {
+    const reply =
+      '<tool_call><function=lookup><parameter=q>2</parameter><parameter=limit>2</parameter></function></tool_call>';
+    const { handle, model } = await fixture({ pieces: ['Before ', ...reply, ' After'] }, 'xml');
+    try {
+      const chunks: AIMessageChunk[] = [];
+      for await (const chunk of await model.bindTools([lookup]).stream('find')) chunks.push(chunk);
+      expect(chunks.map((chunk) => chunk.content).join('')).toBe('BeforeAfter');
+      expect(chunks.flatMap((chunk) => chunk.tool_call_chunks ?? [])).toEqual([
+        expect.objectContaining({
+          index: 0,
+          id: 'call_0',
+          name: 'lookup',
+          args: '{"q":"2","limit":2}',
+        }),
+      ]);
+      expect(chunks.flatMap((chunk) => chunk.invalid_tool_calls ?? [])).toEqual([]);
+      const result = await model.bindTools([lookup]).invoke('find');
+      expect(result.tool_calls).toEqual([
+        { type: 'tool_call', id: 'call_0', name: 'lookup', args: { q: '2', limit: 2 } },
+      ]);
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  it('streams an XML body with no closing block as an invalid call, never argument fragments', async () => {
+    const body = '<function=lookup><parameter=q>x</parameter></function>';
+    const { handle, model } = await fixture({ pieces: [`<tool_call>${body}`] }, 'xml');
+    try {
+      const chunks: AIMessageChunk[] = [];
+      for await (const chunk of await model.bindTools([lookup]).stream('find')) chunks.push(chunk);
+      expect(chunks.flatMap((chunk) => chunk.tool_call_chunks ?? [])).toEqual([]);
+      expect(chunks.flatMap((chunk) => chunk.tool_calls ?? [])).toEqual([]);
+      expect(chunks.flatMap((chunk) => chunk.invalid_tool_calls ?? [])).toEqual([
+        expect.objectContaining({ id: 'call_0', args: body }),
+      ]);
+    } finally {
+      await handle.dispose();
+    }
+  });
+
   it('returns parsed tool calls with no tool text in the content and counts the block tokens', async () => {
     const { runtime, handle, model } = await fixture({
       pieces: [call('lookup', { q: 'x', limit: 2 })],

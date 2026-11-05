@@ -133,7 +133,7 @@ class Channel {
 export class TransformersEngineHandle {
   readonly modelId: string;
   /** The record's tool-call text format; a handle without one refuses tools. */
-  readonly toolFormat: 'hermes' | undefined;
+  readonly toolFormat: TransformersModelRecord['toolFormat'];
   readonly device: DeviceReport;
   readonly #worker: TransformersWorker;
   readonly #channel: Channel;
@@ -149,7 +149,7 @@ export class TransformersEngineHandle {
     lifetime: EngineLifetime,
     modelId: string,
     device: DeviceReport,
-    toolFormat: 'hermes' | undefined,
+    toolFormat: TransformersModelRecord['toolFormat'],
   ) {
     this.#worker = worker;
     this.#channel = channel;

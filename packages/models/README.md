@@ -52,7 +52,10 @@ not use the provider install nothing. `onnxruntime-web` arrives with the library
 a host that imports its `?url` assets in its own Worker entry should list it as its
 own dependency. The package ships no
 model record; a maintainer pins one with `scripts/pin-onnx-model.ts`, which prints
-the license it reads at that revision. Library licenses as read in the installed package manifests:
+the license it reads at that revision and the total selected bytes. It selects a single
+`model` export or the text-only `embed_tokens` and `decoder_model_merged` pair
+with dtype-matched external data shards, excluding vision/audio encoders. Both
+use the same flat per-file record and verified-cache loader. Library licenses as read in the installed package manifests:
 `@huggingface/transformers` and `@huggingface/transformers-structured-output`
 Apache-2.0, `onnxruntime-web` MIT. Each model has its own license, which the
 record's maintainer must read and record; Gemma terms differ from Apache-2.0.
@@ -91,9 +94,19 @@ const engine: TransformersChatEngine = {
 // services: { chatModels: { local: new TransformersChatModel(engine) } }
 ```
 
+Tool formats are record-declared: `hermes` uses a JSON body within `<tool_call>`;
+`xml` uses `<tool_call><function=NAME><parameter=ARG>VALUE</parameter></function></tool_call>`.
+Both hold markup back while streaming and allow at most 16 blocks. XML tolerates
+whitespace between tags and trims values. Values stay strings unless the bound
+parameter schema declares an integer, number or boolean with an exact textual
+round trip (integers must also be safe). Nested functions, duplicate parameters
+and unterminated blocks become raw invalid tool calls. The pin script parses a
+rendered probe call to detect the format; unknown syntax leaves `toolFormat` absent
+and `bindTools` fails `unsupported`.
+
 Register the provider with destination `in-browser`, zero pricing and the features
 its tests support: `streaming` and `cancellation`, plus `tool-calling` when the
-record has `toolFormat: 'hermes'` (verified through the ADK adapter's routed model only; the routed LangGraph model has no `bindTools`) and `structured-output` when the constraint
+record has `toolFormat: 'hermes'` or `'xml'` (verified through the ADK adapter's routed model only; the routed LangGraph model has no `bindTools`) and `structured-output` when the constraint
 package is installed. `availability` and `download` arrange consent before any file
 is fetched; a refusal fetches nothing. Files are checked against the record's size
 and SHA-256 before they are stored. The record names one device (`webgpu` or

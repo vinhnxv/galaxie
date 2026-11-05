@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Template } from '@huggingface/jinja';
+import { parseToolBlocks } from '../packages/models/src/transformers/tool-parser.ts';
 
 /**
  * Maintainer-run: reads a Hugging Face model repository at one revision, downloads and hashes the
@@ -74,7 +75,7 @@ export interface PinnedRecord {
   readonly device: 'webgpu' | 'wasm';
   readonly dtype: PinDtype;
   readonly contextWindow: number;
-  readonly toolFormat?: 'hermes';
+  readonly toolFormat?: 'hermes' | 'xml';
   readonly files: readonly PinnedFile[];
 }
 
@@ -85,8 +86,10 @@ export interface TemplateOutcome {
   /** The assistant tool call and the tool result reached the rendered prompt. */
   readonly calls: boolean;
   readonly results: boolean;
-  /** Declarations plus `<tool_call>` markup: the record gets `toolFormat: 'hermes'`. */
+  /** The rendered assistant call has a Hermes JSON body. */
   readonly hermes: boolean;
+  /** Present only when the rendered assistant call has an XML function/parameter body. */
+  readonly xml?: true;
   /** The template reads `enable_thinking`; set the record's `template` option by hand if needed. */
   readonly mentionsEnableThinking: boolean;
 }
@@ -96,6 +99,8 @@ export interface PinResult {
   /** The model card license, or `null` when the card names none. */
   readonly license: string | null;
   readonly template: TemplateOutcome;
+  /** All selected text-provider files, including decoder and embedding weights, in bytes. */
+  readonly textOnlyBytes: number;
 }
 
 export interface PinDependencies {
@@ -191,7 +196,12 @@ function selectPaths(
   listed: ReadonlyMap<string, number | undefined>,
 ): string[] {
   const suffix = dtypeSuffixes[request.dtype].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const weights = new RegExp(`^onnx/model${suffix}\\.onnx(?:_data(?:_\\d+)?)?$`);
+  const components = listed.has(`onnx/model${dtypeSuffixes[request.dtype]}.onnx`)
+    ? ['model']
+    : ['embed_tokens', 'decoder_model_merged'];
+  const weights = new RegExp(
+    `^onnx/(?:${components.join('|')})${suffix}\\.onnx(?:_data(?:_\\d+)?)?$`,
+  );
   const paths = [...listed.keys()].filter(
     (path) =>
       (requiredFiles as readonly string[]).includes(path) ||
@@ -200,7 +210,7 @@ function selectPaths(
   );
   const missing =
     !requiredFiles.every((path) => paths.includes(path)) ||
-    !paths.includes(`onnx/model${dtypeSuffixes[request.dtype]}.onnx`);
+    !components.every((name) => paths.includes(`onnx/${name}${dtypeSuffixes[request.dtype]}.onnx`));
   if (missing || paths.length > maxFiles)
     throw new PinError('The model repository lacks a file the provider needs.');
   return paths.sort();
@@ -326,12 +336,23 @@ export function probeTemplate(
   const declarations = output.includes('Look up the weather for one city.');
   const calls = output.includes('Hanoi');
   const results = output.includes('temperature');
+  const matchesCall = (format: 'hermes' | 'xml'): boolean =>
+    declarations &&
+    calls &&
+    results &&
+    parseToolBlocks(output, format).calls.some(
+      (call) =>
+        call.name === 'get_weather' &&
+        call.args['city'] === 'Hanoi' &&
+        Object.keys(call.args).length === 1,
+    );
   return {
     rendered: true,
     declarations,
     calls,
     results,
-    hermes: declarations && calls && results && output.includes('<tool_call>'),
+    hermes: matchesCall('hermes'),
+    ...(matchesCall('xml') ? { xml: true as const } : {}),
     mentionsEnableThinking: source.includes('enable_thinking'),
   };
 }
@@ -387,11 +408,16 @@ export async function pinModel(
       device: request.device,
       dtype: request.dtype,
       contextWindow,
-      ...(template.hermes ? { toolFormat: 'hermes' as const } : {}),
+      ...(template.hermes
+        ? { toolFormat: 'hermes' as const }
+        : template.xml
+          ? { toolFormat: 'xml' as const }
+          : {}),
       files,
     },
     license,
     template,
+    textOnlyBytes: files.reduce((sum, file) => sum + file.bytes, 0),
   };
 }
 

@@ -177,7 +177,12 @@ const config: ViteUserConfig = defineConfig({
         root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
         resolve: { alias },
         optimizeDeps: {
-          exclude: ['@mlc-ai/web-llm', '@huggingface/transformers', 'onnxruntime-web'],
+          exclude: [
+            '@mlc-ai/web-llm',
+            '@huggingface/transformers',
+            '@huggingface/transformers-structured-output',
+            'onnxruntime-web',
+          ],
           include: [
             'react',
             'react-dom/client',
@@ -197,10 +202,12 @@ const config: ViteUserConfig = defineConfig({
             '@langchain/core/utils/function_calling',
             '@langchain/core/language_models/structured_output',
             '@langchain/core/output_parsers',
+            '@langchain/core/tools',
             '@langchain/core/runnables',
             '@opentelemetry/sdk-trace',
             'zod',
             '@orama/orama',
+            '@huggingface/jinja',
           ],
         },
         test: {

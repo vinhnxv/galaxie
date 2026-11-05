@@ -1,0 +1,22 @@
+[
+  {
+    "repository": "onnx-community/Qwen3.5-0.8B-ONNX-OPT",
+    "revision": "9a4c21d8f724176b0a7edaaed36303044451886e",
+    "license": "apache-2.0",
+    "licenseName": "Apache-2.0",
+    "licenseUrl": "https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/main/LICENSE",
+    "source": "tokenizer_config.json",
+    "sourceSha256": "5dcac2c1306b11d1e18ec4c024a174bded2ca3178ce87b0aa590711696407f3d",
+    "rendered": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"lookup\", \"description\": \"Search local documents.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"q\": {\"type\": \"string\"}, \"limit\": {\"type\": \"integer\"}}, \"required\": [\"q\", \"limit\"]}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\nFind a local document.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<tool_call>\n<function=lookup>\n<parameter=q>\nbrowser notes\n</parameter>\n<parameter=limit>\n2\n</parameter>\n</function>\n</tool_call><|im_end|>\n<|im_start|>user\n<tool_response>\nFound two notes.\n</tool_response><|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+  },
+  {
+    "repository": "LiquidAI/LFM3-1.7B-ONNX",
+    "revision": "e90558fd7388a536a029a4196ddc1c90a234ae9b",
+    "license": "other",
+    "licenseName": "lfm1.0",
+    "licenseUrl": "https://huggingface.co/LiquidAI/LFM3-1.7B-ONNX/blob/e90558fd7388a536a029a4196ddc1c90a234ae9b/LICENSE",
+    "source": "tokenizer_config.json",
+    "sourceSha256": "e51ed3e47fe9150f6635ab00b9cb41658faf9cbd0dccbcddb55e7eb391bcf7a1",
+    "rendered": "<|startoftext|><|im_start|>system\nYou are a helpful assistant.\n\n<tools>\n{\"name\": \"lookup\", \"description\": \"Search local documents.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"q\": {\"type\": \"string\"}, \"limit\": {\"type\": \"integer\"}}, \"required\": [\"q\", \"limit\"]}}\n</tools><|im_end|>\n<|im_start|>user\nFind a local document.<|im_end|>\n<|im_start|>assistant\n<think></think><tool_call>\n<function=lookup>\n<parameter=q>\nbrowser notes\n</parameter>\n<parameter=limit>\n2\n</parameter>\n</function>\n</tool_call><|im_end|>\n<|im_start|>tool\n<tool_response>\nFound two notes.\n</tool_response><|im_end|>\n<|im_start|>assistant\n<think>"
+  }
+]

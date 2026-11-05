@@ -39,7 +39,7 @@ export interface TransformersModelRecord {
   readonly device: TransformersDevice;
   readonly dtype: TransformersDtype;
   readonly contextWindow: number;
-  readonly toolFormat?: 'hermes';
+  readonly toolFormat?: 'hermes' | 'xml';
   readonly template?: { readonly enableThinking?: boolean };
   readonly files: readonly TransformersModelFile[];
 }
@@ -172,7 +172,7 @@ export function parseModelRecord(value: unknown): TransformersModelRecord {
     (device !== 'webgpu' && device !== 'wasm') ||
     !transformersDtypes.includes(dtype as TransformersDtype) ||
     !sizeInRange(contextWindow, Number.MAX_SAFE_INTEGER) ||
-    (toolFormat !== undefined && toolFormat !== 'hermes') ||
+    (toolFormat !== undefined && toolFormat !== 'hermes' && toolFormat !== 'xml') ||
     template === false ||
     files === undefined ||
     !Number.isSafeInteger(files.reduce((sum, file) => sum + file.bytes, 0))
@@ -204,7 +204,8 @@ export function modelCacheName(record: TransformersModelRecord): string {
 /** The absolute URL a record file is stored under; same-origin bases resolve against the page. */
 export function modelFileUrl(record: TransformersModelRecord, file: TransformersModelFile): string {
   try {
-    return new URL(`${record.baseUrl}${file.path}`, globalThis.location?.href).href;
+    const location = (globalThis as { readonly location?: { readonly href: string } }).location;
+    return new URL(`${record.baseUrl}${file.path}`, location?.href).href;
   } catch {
     throw new ModelError('invalid');
   }

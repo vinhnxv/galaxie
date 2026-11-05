@@ -40,6 +40,19 @@ function failure(value: unknown): unknown {
 }
 
 describe('Transformers.js model record', () => {
+  it('accepts XML tool calls and split text files in the existing flat record', () => {
+    const split = {
+      ...valid,
+      toolFormat: 'xml',
+      files: [
+        ...files.slice(0, 3),
+        { path: 'onnx/embed_tokens_q4.onnx', bytes: 100, sha256: hash('d') },
+        { path: 'onnx/decoder_model_merged_q4.onnx', bytes: 200, sha256: hash('e') },
+      ],
+    };
+    expect(parseModelRecord(split)).toEqual(split);
+  });
+
   it('accepts a synthetic record and returns a deeply frozen copy', () => {
     const input = structuredClone(valid);
     const record = parseModelRecord(input);

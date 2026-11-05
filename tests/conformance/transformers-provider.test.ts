@@ -34,7 +34,10 @@ import { RunBudget } from '../../packages/core/src/budgets.js';
 import { collect } from '../../packages/core/test/fake-executor.js';
 import { recordNetwork } from '../../packages/core/test/network-recorder.js';
 import { createSpanRecorder, serializeSpans } from '../../packages/core/test/span-tree.js';
-import { modelCacheName } from '../../packages/models/src/transformers/model-record.js';
+import {
+  modelCacheName,
+  type TransformersModelRecord,
+} from '../../packages/models/src/transformers/model-record.js';
 import type { FakeRuntimeOptions } from '../../packages/models/test/support/fake-transformers-runtime.js';
 import { seed, setup } from '../../packages/models/test/support/transformers-loopback.js';
 import {
@@ -42,6 +45,13 @@ import {
   type MemoryStore,
 } from '../../packages/models/test/support/transformers-model.js';
 import { toolCallChecks } from './support/tool-call-checks.js';
+
+// Exercise the format contract in Chromium without collecting the Node suites twice.
+if (typeof window !== 'undefined') {
+  await import('../../packages/models/test/transformers-tool-parser.test.js');
+  await import('../../packages/models/test/transformers-tool-template.test.js');
+  await import('../../packages/models/test/transformers-chat-model-tools.test.js');
+}
 
 const promptCanary = 'private prompt canary';
 const state = Annotation.Root({ answer: Annotation<string> });
@@ -92,7 +102,12 @@ interface Host {
 /** A host that loads the engine lazily: after a consented download, or from stored files. */
 async function createHost(
   runtimeOptions: FakeRuntimeOptions,
-  options: { cached: boolean; accept?: boolean; toolFormat?: 'hermes' } = { cached: false },
+  options: {
+    cached: boolean;
+    accept?: boolean;
+    toolFormat?: TransformersModelRecord['toolFormat'];
+    split?: boolean;
+  } = { cached: false },
 ): Promise<Host> {
   const storage = globalThis.caches as unknown as MemoryCacheStorage;
   const { createSyntheticModel } = await import(
@@ -101,6 +116,19 @@ async function createHost(
   const model = await createSyntheticModel({
     modelId: 'example-org/tiny-fixture',
     ...(options.toolFormat === undefined ? {} : { toolFormat: options.toolFormat }),
+    ...(options.split
+      ? {
+          paths: [
+            'config.json',
+            'tokenizer.json',
+            'tokenizer_config.json',
+            'onnx/embed_tokens_q4.onnx',
+            'onnx/embed_tokens_q4.onnx_data',
+            'onnx/decoder_model_merged_q4.onnx',
+            'onnx/decoder_model_merged_q4.onnx_data',
+          ],
+        }
+      : {}),
   });
   const store = (await storage.open(modelCacheName(model.record))) as MemoryStore;
   if (options.cached) await seed(store, model);
@@ -320,6 +348,53 @@ test('an accepted download loads with downloads allowed, re-probes available and
     await runtime.dispose();
     await provider.shutdown();
   }
+});
+
+test('a split text record loads only verified decoder and embedding files and answers', async () => {
+  const host = await createHost({}, { cached: false, accept: true, split: true });
+  const { runtime, provider } = createTestRuntime();
+  try {
+    const { instance } = await createConsumer(runtime, host);
+    const { runId } = await instance.start({});
+    const events = await collect(instance.events(runId));
+    expect(events.at(-1)).toMatchObject({ type: 'output', output: { answer: 'Hello world' } });
+    const paths = [...host.parts.runtime.read.keys()];
+    expect(paths).toEqual([
+      'config.json',
+      'tokenizer.json',
+      'tokenizer_config.json',
+      'onnx/embed_tokens_q4.onnx',
+      'onnx/embed_tokens_q4.onnx_data',
+      'onnx/decoder_model_merged_q4.onnx',
+      'onnx/decoder_model_merged_q4.onnx_data',
+    ]);
+    expect(host.parts.fetcher.calls).toEqual(host.parts.model.urls);
+    expect(host.parts.fetcher.calls.some((url) => /vision|audio|encoder_model/.test(url))).toBe(
+      false,
+    );
+    for (const [path, bytes] of host.parts.runtime.read) {
+      expect(bytes).toEqual(
+        host.parts.model.served.get(`${host.parts.model.record.baseUrl}${path}`),
+      );
+    }
+  } finally {
+    await runtime.dispose();
+    await provider.shutdown();
+  }
+});
+
+test('a split decoder shard with a wrong hash fails unavailable before reaching the runtime', async () => {
+  const host = await createHost({}, { cached: false, split: true });
+  const url = `${host.parts.model.record.baseUrl}onnx/decoder_model_merged_q4.onnx_data`;
+  const bytes = host.parts.model.served.get(url);
+  if (bytes === undefined) throw new Error('Missing synthetic decoder shard.');
+  bytes[0] = (bytes[0] ?? 0) ^ 1;
+  await expect(host.handle(true)).rejects.toMatchObject({
+    code: 'unavailable',
+    reason: 'integrity',
+  });
+  expect(host.parts.runtime.loads).toEqual([]);
+  expect(host.parts.fetcher.calls.some((entry) => /vision|audio/.test(entry))).toBe(false);
 });
 
 test('stored files whose bytes differ fail unavailable without any fetch', async () => {
@@ -565,40 +640,48 @@ async function runWithTools(
   return { events, searched, checked, dispose: () => runtime.dispose() };
 }
 
-test('a routed tool call runs the capability and the next request replays the call and result', async () => {
-  const host = await createHost(
-    {
-      scripts: [
-        ['Checking. ', block('lookup', { q: 'x' })],
-        ['It is ', 'found.'],
-      ],
-    },
-    { cached: true, toolFormat: 'hermes' },
-  );
-  const charges = reservationCharges();
-  const run = await runWithTools(host);
-  try {
-    expect(run.events.at(-1)).toMatchObject({ type: 'output' });
-    expect(run.searched).toEqual([{ q: 'x' }]);
-    const [first, second] = host.parts.runtime.generations;
-    expect(first?.request.tools).toMatchObject([
-      { type: 'function', function: { name: 'lookup', description: 'Search the documents.' } },
-    ]);
-    // The second request holds the assistant call and the capability result, in order.
-    const roles = second?.request.messages.map((message) => message.role);
-    expect(roles).toEqual(['system', 'user', 'assistant', 'tool']);
-    expect(second?.request.messages.at(2)).toMatchObject({
-      role: 'assistant',
-      toolCalls: [{ name: 'lookup', arguments: { q: 'x' } }],
-    });
-    expect(second?.request.messages.at(3)?.content).toContain('found x');
-    // Each call is charged its actual usage: 5 prompt tokens plus one token per piece.
-    expect(charges).toEqual([7, 7]);
-    expect(run.checked.some((text) => text.includes('"q":"x"'))).toBe(true);
-  } finally {
-    await run.dispose();
-  }
-});
+test.each(['hermes', 'xml'] as const)(
+  'a routed %s tool call runs the capability and the next request replays the call and result',
+  async (toolFormat) => {
+    const host = await createHost(
+      {
+        scripts: [
+          [
+            'Checking. ',
+            toolFormat === 'xml'
+              ? '<tool_call>\n<function=lookup>\n<parameter=q>\nx\n</parameter>\n</function>\n</tool_call>'
+              : block('lookup', { q: 'x' }),
+          ],
+          ['It is ', 'found.'],
+        ],
+      },
+      { cached: true, toolFormat },
+    );
+    const charges = reservationCharges();
+    const run = await runWithTools(host);
+    try {
+      expect(run.events.at(-1)).toMatchObject({ type: 'output' });
+      expect(run.searched).toEqual([{ q: 'x' }]);
+      const [first, second] = host.parts.runtime.generations;
+      expect(first?.request.tools).toMatchObject([
+        { type: 'function', function: { name: 'lookup', description: 'Search the documents.' } },
+      ]);
+      // The second request holds the assistant call and the capability result, in order.
+      const roles = second?.request.messages.map((message) => message.role);
+      expect(roles).toEqual(['system', 'user', 'assistant', 'tool']);
+      expect(second?.request.messages.at(2)).toMatchObject({
+        role: 'assistant',
+        toolCalls: [{ name: 'lookup', arguments: { q: 'x' } }],
+      });
+      expect(second?.request.messages.at(3)?.content).toContain('found x');
+      // Each call is charged its actual usage: 5 prompt tokens plus one token per piece.
+      expect(charges).toEqual([7, 7]);
+      expect(run.checked.some((text) => text.includes('"q":"x"'))).toBe(true);
+    } finally {
+      await run.dispose();
+    }
+  },
+);
 
 test('two blocks in one reply run both calls in order', async () => {
   const host = await createHost(
@@ -661,6 +744,32 @@ test('a record without a tool format fails the routed tool call unsupported befo
   try {
     expect(run.events.at(-1)).toMatchObject({ type: 'error', error: { code: 'unsupported' } });
     expect(host.parts.runtime.generations).toEqual([]);
+  } finally {
+    await run.dispose();
+  }
+});
+
+test.each([
+  ['no closing tag', '<tool_call><function=lookup><parameter=q>x</parameter></function>'],
+  [
+    'missing function name',
+    '<tool_call><function=><parameter=q>x</parameter></function></tool_call>',
+  ],
+  [
+    'nested function',
+    '<tool_call><function=lookup><function=other></function></function></tool_call>',
+  ],
+  [
+    'seventeenth block',
+    '<tool_call><function=lookup><parameter=q>x</parameter></function></tool_call>'.repeat(17),
+  ],
+])('a routed XML reply with %s fails invalid and invokes no capability', async (_label, reply) => {
+  const host = await createHost({ pieces: [...reply] }, { cached: true, toolFormat: 'xml' });
+  const run = await runWithTools(host);
+  try {
+    expect(run.events.at(-1)).toMatchObject({ type: 'error', error: { code: 'invalid' } });
+    expect(run.searched).toEqual([]);
+    expect(host.parts.runtime.generations).toHaveLength(1);
   } finally {
     await run.dispose();
   }
