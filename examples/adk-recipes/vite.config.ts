@@ -35,6 +35,9 @@ const config: UserConfigExport = defineConfig({
         '@galaxie/adapter-pyodide/worker': fileURLToPath(
           new URL('../../packages/adapter-pyodide/src/worker.ts', import.meta.url),
         ),
+        '@galaxie/adapter-pyodide': fileURLToPath(
+          new URL('../../packages/adapter-pyodide/src/index.ts', import.meta.url),
+        ),
       }).map(([find, replacement]) => ({ find, replacement })),
     ],
   },

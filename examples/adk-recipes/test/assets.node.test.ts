@@ -14,6 +14,7 @@ const fixture = vi.hoisted(() => ({
   goSource: false,
   goInstalled: true,
   builds: 0,
+  pythonFiles: ['example.py'],
 }));
 const digest = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 vi.mock('node:fs', () => ({
@@ -21,7 +22,12 @@ vi.mock('node:fs', () => ({
     fixture.files.has(path) ||
     (fixture.pythonSource && path.endsWith('/agent_py/')) ||
     (fixture.goSource && path.endsWith('/go/recipes/financial/')),
-  readdirSync: (path: string) => [{ name: 'example.py', parentPath: path, isFile: () => true }],
+  readdirSync: (path: string) =>
+    fixture.pythonFiles.map((file) => ({
+      name: file.slice(file.lastIndexOf('/') + 1),
+      parentPath: file.includes('/') ? join(path, file.slice(0, file.lastIndexOf('/'))) : path,
+      isFile: () => true,
+    })),
   readFileSync: (path: string, encoding?: string) => {
     const text = fixture.files.get(path);
     if (text === undefined) throw new Error('The synthetic asset is missing.');
@@ -99,6 +105,7 @@ beforeEach(() => {
   fixture.goSource = true;
   fixture.goInstalled = true;
   fixture.builds = 0;
+  fixture.pythonFiles = ['example.py'];
   fixture.files.set(
     join(cache, 'local-wheels.json'),
     JSON.stringify({
@@ -146,6 +153,36 @@ test('Python build omits missing prerequisites and rejects a changed wheel', asy
   expect(run.emitted).toEqual([]);
   fixture.files.set(join(cache, 'adk.whl'), 'abd');
   await expect(run.call('buildStart')).rejects.toThrow('The Python wheel inventory is invalid.');
+});
+
+test('Python build emits both recipe packages and leaves lint tests out of hosted assets', async () => {
+  fixture.pythonFiles = [
+    'llm_auditor/__init__.py',
+    'llm_auditor/agent.py',
+    'llm_auditor/prompts.py',
+    'loan/__init__.py',
+    'loan/agent.py',
+    'loan/prompts.py',
+    'tests/test_lint.py',
+  ];
+  for (const file of fixture.pythonFiles)
+    fixture.files.set(join(agent, file), '# Synthetic module\n');
+  const run = harness(pythonAssets(cache));
+  await run.call('configResolved', { command: 'build' });
+  await run.call('buildStart');
+  await run.call('generateBundle');
+  expect(
+    run.emitted
+      .filter((asset) => asset.fileName.startsWith('python/agent/'))
+      .map((asset) => asset.fileName),
+  ).toEqual([
+    'python/agent/llm_auditor/__init__.py',
+    'python/agent/llm_auditor/agent.py',
+    'python/agent/llm_auditor/prompts.py',
+    'python/agent/loan/__init__.py',
+    'python/agent/loan/agent.py',
+    'python/agent/loan/prompts.py',
+  ]);
 });
 
 test('Go build includes verified-helper metadata and glue, and omits the missing toolchain', async () => {
