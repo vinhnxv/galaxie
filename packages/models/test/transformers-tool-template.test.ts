@@ -33,6 +33,18 @@ function request(messages: GenerateRequest['messages']): GenerateRequest {
   return { messages, tools: [lookup], maxTokens: 64, temperature: 0 };
 }
 
+/** An assistant turn that carries its call as the OpenAI-format mirror, followed by the result. */
+function rawCallHistory(fn: { name: string; arguments: string }) {
+  return [
+    new HumanMessage('hi'),
+    new AIMessage({
+      content: '',
+      additional_kwargs: { tool_calls: [{ id: 'a', type: 'function', function: fn }] },
+    }),
+    new ToolMessage({ content: 'result', tool_call_id: 'a' }),
+  ];
+}
+
 describe('tool message mapping', () => {
   it('maps assistant calls to object arguments and tool messages to tool turns, in order', () => {
     expect(mapToolMessages(history)).toEqual([
@@ -106,6 +118,17 @@ describe('tool message mapping', () => {
     expect(mapped.map((message) => message.role)).toEqual(['user', 'assistant', 'tool']);
   });
 
+  it('maps the OpenAI-format mirror of a call exactly like the native call', () => {
+    const native = [
+      new HumanMessage('hi'),
+      new AIMessage({ content: '', tool_calls: [{ id: 'a', name: 'x', args: { q: 'y' } }] }),
+      new ToolMessage({ content: 'result', tool_call_id: 'a' }),
+    ];
+    expect(mapToolMessages(rawCallHistory({ name: 'x', arguments: '{"q":"y"}' }))).toEqual(
+      mapToolMessages(native),
+    );
+  });
+
   it('accepts a conversation that ends with a human or a tool turn', () => {
     expect(mapToolMessages(history).at(-1)?.role).toBe('tool');
     expect(mapToolMessages([new HumanMessage('hi')]).at(-1)?.role).toBe('user');
@@ -130,16 +153,40 @@ describe('tool message mapping', () => {
       ],
     ],
     [
-      'raw provider tool calls',
-      () => [
-        new HumanMessage('hi'),
-        new AIMessage({
+      'provider tool calls with a non-object arguments string',
+      () => rawCallHistory({ name: 'x', arguments: '[1]' }),
+    ],
+    [
+      'provider tool calls with unparseable arguments',
+      () => rawCallHistory({ name: 'x', arguments: '{' }),
+    ],
+    ['provider tool calls without a name', () => rawCallHistory({ name: '', arguments: '{}' })],
+    [
+      'provider tool calls that disagree with the native tool calls',
+      () => {
+        const message = new AIMessage({
           content: '',
           additional_kwargs: {
             tool_calls: [{ id: 'a', type: 'function', function: { name: 'x', arguments: '{}' } }],
           },
+        });
+        message.tool_calls = [{ id: 'a', name: 'other', args: {}, type: 'tool_call' }];
+        return [
+          new HumanMessage('hi'),
+          message,
+          new ToolMessage({ content: 'r', tool_call_id: 'a' }),
+        ];
+      },
+    ],
+    [
+      'provider tool calls on a user turn',
+      () => [
+        new HumanMessage({
+          content: 'hi',
+          additional_kwargs: {
+            tool_calls: [{ id: 'a', type: 'function', function: { name: 'x', arguments: '{}' } }],
+          },
         }),
-        new HumanMessage('again'),
       ],
     ],
     [

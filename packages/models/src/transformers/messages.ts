@@ -6,13 +6,47 @@ import { ModelError } from '../errors.js';
 import { textContent } from '../messages.js';
 import type { JsonObject, ProtocolMessage, ProtocolToolCall } from './protocol.js';
 
+function plainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** One call from the OpenAI-format mirror: a function name and arguments as a JSON object string. */
+function mirroredCall(call: unknown): ProtocolToolCall {
+  const fn = plainRecord(call) ? call['function'] : undefined;
+  if (!plainRecord(fn) || typeof fn['name'] !== 'string' || fn['name'] === '')
+    throw new ModelError('invalid');
+  const text = fn['arguments'];
+  if (typeof text !== 'string') throw new ModelError('invalid');
+  let args: unknown;
+  try {
+    args = JSON.parse(text);
+  } catch {
+    throw new ModelError('invalid');
+  }
+  if (!plainRecord(args)) throw new ModelError('invalid');
+  return { name: fn['name'], arguments: args as JsonObject };
+}
+
+/**
+ * The calls of an assistant turn. Adapters that carry provider-format history store them as the
+ * OpenAI-format `additional_kwargs.tool_calls` mirror, and LangChain then derives `tool_calls` from
+ * it. The mirror must be exact, and `tool_calls`, when present beside it, must say the same.
+ * IDs are dropped: results pair by position.
+ */
 function toolCallsOf(message: BaseMessage): ProtocolToolCall[] {
-  const calls =
-    'tool_calls' in message && Array.isArray(message.tool_calls) ? message.tool_calls : [];
-  return calls.map((call: { name: string; args: unknown }) => ({
+  const native: ProtocolToolCall[] = (
+    'tool_calls' in message && Array.isArray(message.tool_calls) ? message.tool_calls : []
+  ).map((call: { name: string; args: unknown }) => ({
     name: call.name,
     arguments: call.args as JsonObject,
   }));
+  const mirror: unknown = message.additional_kwargs['tool_calls'];
+  if (mirror === undefined) return native;
+  if (!Array.isArray(mirror)) throw new ModelError('invalid');
+  const mirrored = mirror.map(mirroredCall);
+  if (native.length > 0 && JSON.stringify(native) !== JSON.stringify(mirrored))
+    throw new ModelError('invalid');
+  return mirrored;
 }
 
 /**
@@ -31,7 +65,7 @@ export function mapToolMessages(messages: BaseMessage[]): readonly ProtocolMessa
       ('invalid_tool_calls' in message &&
         Array.isArray(message.invalid_tool_calls) &&
         message.invalid_tool_calls.length > 0) ||
-      message.additional_kwargs['tool_calls'] !== undefined ||
+      (message.type !== 'ai' && message.additional_kwargs['tool_calls'] !== undefined) ||
       message.additional_kwargs['function_call'] !== undefined
     )
       throw new ModelError('invalid');
