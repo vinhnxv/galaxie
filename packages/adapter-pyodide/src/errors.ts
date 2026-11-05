@@ -5,6 +5,7 @@ import { type ErrorCode, GalaxieError, isGalaxieError, toErrorInfo } from '@gala
 import { BridgeValidationError } from './bridge.js';
 
 export function adapterFailure(code: ErrorCode): GalaxieError {
+  if (code === 'invalid') console.error('INVALIDTRACE js', new Error().stack);
   return new GalaxieError(code, toErrorInfo(code).message);
 }
 export function failureCode(error: unknown, fallback: ErrorCode = 'executor_error'): ErrorCode {

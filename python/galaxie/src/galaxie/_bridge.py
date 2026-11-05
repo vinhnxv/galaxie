@@ -34,6 +34,15 @@ ERROR_MESSAGES = {
 class GalaxieError(Exception):
     def __init__(self, code: str):
         self.code = code if code in ERROR_MESSAGES else "invalid"
+        if self.code == "invalid":
+            try:
+                import traceback
+
+                import js  # type: ignore[import-not-found]
+
+                js.console.error("INVALIDTRACE py\n" + "".join(traceback.format_stack()))
+            except Exception:
+                pass
         super().__init__(ERROR_MESSAGES[self.code])
 
 
