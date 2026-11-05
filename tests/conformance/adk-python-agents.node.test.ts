@@ -264,11 +264,14 @@ test.skipIf(!pythonWheelsAvailable)(
       sources: { 'agents.py': refusedAgents },
     });
     const store = { checkpoints: new MemoryByteCheckpoints(), recovery: new MemoryRecoveryStore() };
+    // Content-free diagnostics explain a first-round failure whose public error is a fixed message.
+    const diagnostics: unknown[] = [];
     const runtime = createRuntime({
       appId: 'adk-python-parallel-writes',
       executors: [createPyodideAdapter({ ...fixture.options, framework: 'adk' })],
       budgets: { steps: 20, toolCalls: 10, tokens: 5000 },
       outputSafety: () => 'allow',
+      diagnostics: (event) => diagnostics.push(event),
     });
     const model = new BranchModel();
     const invoked: number[] = [];
@@ -308,7 +311,11 @@ test.skipIf(!pythonWheelsAvailable)(
       // Round one: left writes, then right writes, then the model fails after both receipts exist.
       model.next(1);
       // Match against the serialized error so a failure prints the whole error, message included.
-      expect(JSON.stringify((await run(instance)).error)).toMatch(/"code":"unavailable"/);
+      const first = JSON.stringify((await run(instance)).error);
+      expect(
+        first,
+        `diagnostics: ${JSON.stringify(diagnostics, (_key, value) => (value instanceof Error ? { name: value.name, message: value.message } : value))}; worker errors: ${JSON.stringify(fixture.workerErrors)}`,
+      ).toMatch(/"code":"unavailable"/);
       expect([...invoked].sort()).toEqual([1, 2]);
       expect(model.arrivals).toEqual(['left', 'right']);
       expect(store.recovery.journal.size).toBe(2);
