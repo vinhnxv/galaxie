@@ -94,7 +94,6 @@ function allowedExpression(expression: string, permissive: ReadonlySet<string>):
   return valid && position === tokens.length && allowed;
 }
 
-/** Checks a locked dependency inventory using an injected package-license reader. */
 export function checkDependencyLicenses(
   dependencies: readonly Dependency[],
   readLicense: (dependency: Dependency) => {
@@ -218,10 +217,20 @@ function readManifest(directory: string): Manifest {
   return JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) as Manifest;
 }
 
+let linuxLibc: string | undefined;
+
+function hostLibc(): string {
+  if (process.platform !== 'linux') return '';
+  if (linuxLibc === undefined) {
+    // The diagnostic report is costly to build, and the answer cannot change within one run.
+    const report = process.report.getReport() as { header: { glibcVersionRuntime?: string } };
+    linuxLibc = report.header.glibcVersionRuntime ? 'glibc' : 'musl';
+  }
+  return linuxLibc;
+}
+
 function platformExcluded(entry: LockEntry): boolean {
-  const report = process.report.getReport() as { header: { glibcVersionRuntime?: string } };
-  const libc =
-    process.platform === 'linux' ? (report.header.glibcVersionRuntime ? 'glibc' : 'musl') : '';
+  const libc = hostLibc();
   const matches = (values: readonly string[] | undefined, actual: string): boolean =>
     values === undefined ||
     (!values.includes(`!${actual}`) &&
