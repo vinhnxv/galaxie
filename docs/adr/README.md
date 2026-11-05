@@ -45,6 +45,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0022](0022-google-adk-python-through-the-pyodide-adapter.md) | Google ADK (Python) through the Pyodide adapter, with an explicit wheel list | Proposed |
 | [0023](0023-google-adk-go-through-a-wasm-worker.md) | Google ADK (Go) through a WebAssembly Worker, with policy kept in JavaScript | Proposed |
 | [0024](0024-apache-2-0-license-and-dco.md) | License: Apache-2.0, with the Developer Certificate of Origin | Accepted |
+| [0025](0025-adk-recipes-demo.md) | ADK recipe demonstrations through a separate browser host | Proposed |
 
 ## Template
 

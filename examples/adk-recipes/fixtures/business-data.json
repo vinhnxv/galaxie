@@ -1,0 +1,16 @@
+[
+  {
+    "applicationId": "application-lantern",
+    "company": "Lantern Orchard Workshop",
+    "applicant": "Mira Vale",
+    "annualRevenue": 180000,
+    "creditScore": 750
+  },
+  {
+    "applicationId": "application-cloudberry",
+    "company": "Cloudberry Kite Works",
+    "applicant": "Tarin Moss",
+    "annualRevenue": 60000,
+    "creditScore": 649
+  }
+]

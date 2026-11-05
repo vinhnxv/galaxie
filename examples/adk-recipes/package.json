@@ -1,0 +1,28 @@
+{
+  "name": "@galaxie/example-adk-recipes",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A fixture-only browser host scaffold for ADK recipe demonstrations.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "vite build --mode mock && vite preview --mode mock --host 127.0.0.1 --port 4173 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run --root ../.. examples/adk-recipes"
+  },
+  "dependencies": {
+    "@galaxie/core": "workspace:*",
+    "@galaxie/models": "workspace:*",
+    "@galaxie/adapter-adk": "workspace:*",
+    "@galaxie/adapter-pyodide": "workspace:*",
+    "@galaxie/adapter-go": "workspace:*",
+    "@google/adk": "2.3.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1",
+    "vite": "8.3.4"
+  }
+}

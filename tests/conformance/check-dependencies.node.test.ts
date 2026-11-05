@@ -193,6 +193,23 @@ test('the conformance lane may import the root specifier for native reference ru
   expect(run({ 'tests/conformance/a.test.ts': adk('@google/adk') }).status).toBe(0);
 });
 
+test('recipe authoring may import the ADK root specifier', () => {
+  expect(
+    run({ 'examples/adk-recipes/src/recipes/financial/agent.ts': adk('@google/adk') }),
+  ).toMatchObject({ status: 0, output: '' });
+});
+
+test.each([
+  ['examples/adk-recipes/src/host/runtime.ts', '@google/adk'],
+  ['examples/adk-recipes/src/recipes-other/agent.ts', '@google/adk'],
+  ['examples/adk-recipes/test/agent.test.ts', '@google/adk'],
+  ['examples/adk-recipes/src/recipes/financial/agent.ts', '@google/adk/tools/mcp'],
+])('recipe imports stay confined at %s', (path, specifier) => {
+  const result = run({ [path]: adk(specifier) });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${path}: ADK imports belong only in packages/adapter-adk`);
+});
+
 const TRANSFORMERS = 'packages/models/src/transformers';
 const modelsPackage = (peers: Record<string, string>, optional: readonly string[]): string =>
   JSON.stringify({
