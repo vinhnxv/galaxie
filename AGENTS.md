@@ -75,7 +75,7 @@ The compiler settings are strict (system design §10): relative imports end in `
   // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
   // SPDX-License-Identifier: Apache-2.0
   ```
-- Outside contributions are accepted under the Developer Certificate of Origin (ADR-0024): merge outside code only when every commit carries a `Signed-off-by` line that matches its author (`git commit -s`). Do not copy or adapt code from anywhere else without checking that its license is compatible with Apache-2.0.
+- Outside contributions are accepted under the Developer Certificate of Origin (ADR-0024): merge outside code only when every commit carries a `Signed-off-by` line that matches its author (`git commit -s`). Every commit, agent commits included, is made with `git commit -s` so it carries a matching `Signed-off-by` line; CI checks this with `scripts/check-dco.ts` (see [CONTRIBUTING.md](CONTRIBUTING.md)). Do not copy or adapt code from anywhere else without checking that its license is compatible with Apache-2.0.
 - Never commit secrets: API keys, tokens, credentials or `.env` files. A local gitleaks pre-commit hook blocks them.
 - The security baseline (ADR-0012) is mandatory. Never weaken a guarantee to make a test pass.
 - Never describe galaxie as secure, compliant, certified or suitable for regulated or high-risk uses, in docs, comments, commit messages or anything user-facing. Describe the controls and their documented limits instead (README, "Intended use and disclaimer").
