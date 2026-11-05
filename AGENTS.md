@@ -55,8 +55,6 @@ The M4 documentation slice adds package coding guidance, a root [AI-facing index
 3. `docs/system-design.md`: components, package boundaries, contracts and runtime flows. Read it before you add a package or change a contract.
 4. `docs/framework-overview.md`: role, audiences and the roadmap at a glance.
 
-Handoff prompts: brief §21 (implementation) and §22 (review).
-
 ## Commands
 
 Node.js 24 and pnpm 11 (through Corepack).
