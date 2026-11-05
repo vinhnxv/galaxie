@@ -4,6 +4,7 @@
     "python/galaxie/tests",
     "python/standins",
     "examples/rag-browser/agent_py",
+    "examples/adk-recipes/agent_py",
     "tests/conformance/cases-python",
     "scripts",
     "tests/conformance/cases-pydantic-ai",
@@ -21,6 +22,10 @@
   ],
   "exclude": ["**/build", "**/node_modules", "**/__pycache__", "**/.*"],
   "executionEnvironments": [
+    {
+      "root": "examples/adk-recipes/agent_py",
+      "extraPaths": ["python/galaxie/src", "examples/adk-recipes/agent_py"]
+    },
     {
       "root": "tests/conformance/cases-dspy",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]

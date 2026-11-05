@@ -3,7 +3,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import {
@@ -35,7 +35,8 @@ export function pythonAssets(cacheDirectory: string = join(root, '.cache/python-
         return;
       const sources = readdirSync(agentDirectory, { recursive: true, withFileTypes: true })
         .filter((entry) => entry.isFile() && entry.name.endsWith('.py'))
-        .map((entry) => join(entry.parentPath, entry.name));
+        .map((entry) => join(entry.parentPath, entry.name))
+        .filter((file) => !relative(agentDirectory, file).split(sep).includes('tests'));
       if (sources.length === 0) return;
       const local = (
         JSON.parse(readFileSync(join(cacheDirectory, 'local-wheels.json'), 'utf8')) as {
