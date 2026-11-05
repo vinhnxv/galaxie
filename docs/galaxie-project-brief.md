@@ -10,42 +10,6 @@
 - **Scope:** an SDK/runtime for developers, and the framework-neutral contracts it defines for browser agents (§7.6). The English Tutor is the reference application, not the whole product.
 - **Companion documents:** [framework overview](framework-overview.md) (role, direction, audiences, production readiness, public vs private) and [ADRs](adr/README.md).
 
-### Changes in 0.3 (2026-10-28)
-
-Founder decisions after the first two spikes. [ADR-0016][ADR-0017]
-
-- The mission is stated in full. galaxie packages agent pipelines (a single agent, a multi-agent system, or the harness around them) so that they run on the user's own device, in the browser. The developer deploys no agent backend and no container for the orchestration. (§0, §1.1)
-- Example deployments: customer care for a small company and questions and answers for a school, with a retrieval index of public documents shipped with the app. Retrieval over public documents is a Phase 5 item. (§1.4, §16.7)
-- New watch-list items: agents that run elsewhere (A2A), the OpenTelemetry GenAI conventions, and coding agents on the user's machine, such as Codex CLI and Claude Code. (§16.8)
-- The verdict on galaxie is **parity**: code written with LangChain and LangGraph runs in galaxie the way it runs natively on a server. A conformance suite runs the same graphs on Node and in Chrome and compares the results. (§0.2, §16.3, §17, §18) [ADR-0016]
-- Accuracy, latency and other system metrics are **demonstrations** with no pass/fail thresholds, because they depend on the model, the tools and the pipeline the agent builder chooses. This replaces the 0.2 thresholds, the frozen eval plan and the numeric Go/Revise decision. (§18) [ADR-0016]
-- Traces are OpenTelemetry spans from M1, so a development tool such as Langfuse can read them. galaxie filters everything it records in a span, and span content follows the data labels. (§3.3, §14.4, §16.3) [ADR-0016]
-- galaxie's contracts are a framework-neutral standard for browser agents. LangGraph.js is the first framework behind them, and they reuse open protocols where one exists. (§7.6) [ADR-0017]
-- Agents also provide data to the app and give it directives, such as navigation, through capabilities the host binds. (§11.2)
-- The milestone order changes. M1 starts now, and a spike runs only when a milestone needs its answer. What remained of Spike A becomes the M1 conformance suite. (§16.2)
-
-### Changes in 0.2 (2026-10-28)
-
-Updated after an architecture review, an ecosystem survey and founder decisions. Each decision has an ADR in [`docs/adr/`](adr/README.md).
-
-- The vertical slice gains a per-user step (free-text writing feedback) so that local inference has a reason to exist. (§4.2)
-- Model providers are chosen per model role. The local options are WebLLM, Transformers.js v4 and Chrome Built-in AI. The remote options are an OpenAI-compatible provider through a host proxy or through an endpoint the user configures. [ADR-0006]
-- MCP is back in the MVP, limited to servers or gateways the project controls. Third-party MCP servers with OAuth come after the MVP. [ADR-0011]
-- The executor runs on the main thread in the MVP; local inference runs in a worker. [ADR-0003]
-- For pending interactions, the source of truth is the interrupt payload in the LangGraph checkpoint. [ADR-0004]
-- A mandatory security baseline is now a release condition. (§9.6–§9.9) [ADR-0012]
-- The roadmap now has spikes, entry gates for post-MVP phases and a watch list. Go/Revise decisions have numeric thresholds (replaced in 0.3). (§16, §18)
-- The whole document is now in English.
-- Revised after an external read-only review:
-  - Privacy now rests on run-level data labels and argument shapes, not on destination classes alone. (§3.3) [ADR-0014]
-  - Submission recovery uses a durable inbox. (§12.2)
-  - Multi-tab takeover is cooperative first and fenced atomically. (§8.3)
-  - Security guarantees are scoped to SDK-controlled paths. (§9.7)
-  - The controlled MCP server has a security profile. (§9.5)
-  - An external developer trial comes in M3. (§16.5)
-  - Thresholds are frozen before the Spike B bake-off (replaced in 0.3). (§18)
-- The license is Apache-2.0, with outside contributions under the Developer Certificate of Origin (maintainer decision, 2026-11-04). [ADR-0024]
-
 ## 0. Read this before writing code
 
 **Galaxie is an environment for installing, running and managing AI agents as first-class entities inside a web application: they have identity, state, lifecycle, capabilities and an interactive UI.**
