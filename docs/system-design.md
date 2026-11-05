@@ -155,12 +155,12 @@ galaxie/
 │   ├── models/                mock and local model providers, with a host-bundled worker entry
 │   └── react/                 typed registry, snapshot hook, surfaces and headless education entries
 ├── scripts/
-│   ├── check-license.ts       SPDX headers and package license fields (ADR-0015)
+│   ├── check-license.ts       SPDX headers and package license fields (ADR-0024)
 │   └── check-dependencies.ts  source and built-package dependency boundaries
 ├── tests/conformance/         shared cases, native goldens and compatibility-matrix.json
 ├── spikes/                    throwaway spike code, outside the root workspace (brief §16.2)
 ├── biome.json  package.json  pnpm-workspace.yaml  tsconfig.base.json  vitest.config.ts
-└── AGENTS.md  COMMERCIAL-LICENSE.md  LICENSE  README.md
+└── AGENTS.md  LICENSE  NOTICE  README.md
 ```
 
 Target (brief §15), with the milestone that first needs each path:
@@ -801,7 +801,7 @@ The conformance files in both test columns run on Node and Chromium. Node packag
 | Command | What it runs |
 | --- | --- |
 | `pnpm check` | Everything CI runs, in the same order |
-| `pnpm check:license` | SPDX headers and package license fields (ADR-0015) |
+| `pnpm check:license` | SPDX headers and package license fields (ADR-0024) |
 | `pnpm check:deps` | Core and models peers/imports, WebLLM imports limited to engine/worker value imports, adapter web imports and Node-free built packages; run after build |
 | `pnpm lint` | Biome lint and format check |
 | `pnpm format` | Biome formatting and safe fixes, written to disk |

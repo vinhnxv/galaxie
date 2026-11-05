@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package bridge connects a galaxie Go program to the page. It is the only package outside the
 // gate that imports syscall/js, and only in its js/wasm files; every other galaxie package stays

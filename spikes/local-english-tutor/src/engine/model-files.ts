@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // The pinned model files, and how the worker gets them: from Cache Storage when present, otherwise
 // from huggingface.co, and in both cases checked against the size and hash the Hub lists.

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 
 """What native ADK 2.12.0 does with the shapes the adk-python executor refuses (ADR-0022 decision 12).
 

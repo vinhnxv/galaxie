@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { createRuntime, defineAgentDefinition, type RunEvent } from '@galaxie/core';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -22,7 +22,7 @@ import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-rec
 import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
 
 const header = `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 from google.adk.agents import LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from galaxie.adk import Executor, capability_tool, llm
 

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Reference MCP server over Streamable HTTP for galaxie development and tests, following the brief's MCP server profile.",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "module",
   "exports": {
     ".": {

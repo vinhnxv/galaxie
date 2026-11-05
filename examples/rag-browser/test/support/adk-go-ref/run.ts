@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Runs one ADK Go conformance case through the real adapter. The Node and Chromium lanes share it, so
 // both observe the same program, the same scripted model and the same bridge traffic.

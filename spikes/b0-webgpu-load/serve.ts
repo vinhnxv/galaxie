@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Serves this spike at http://127.0.0.1:4173/ (or $PORT): the page, its script and the installed
 // packages in node_modules. Chrome treats 127.0.0.1 as a secure context, so WebGPU is available.

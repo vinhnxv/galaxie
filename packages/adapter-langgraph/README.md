@@ -45,4 +45,4 @@ the node's explicit config. After an await, interactions use
 See [coding guidance](AGENTS.md), [explicit context rules and parity](../../tests/conformance/README.md)
 and [runtime contracts](../../docs/system-design.md#6-core-runtime-and-contracts).
 Parallel interrupts and static breakpoints remain unsupported.
-Code is AGPL-3.0-only; closed-source use requires a [commercial license](../../COMMERCIAL-LICENSE.md).
+Code is Apache-2.0 (see [LICENSE](../../LICENSE)).

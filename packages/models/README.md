@@ -130,4 +130,4 @@ human verification.
 
 See [coding guidance](AGENTS.md), [model routing and provider limits](../../docs/system-design.md#84-a-model-call)
 and [the baseline](../../docs/adr/0012-security-baseline.md).
-Code is AGPL-3.0-only; closed-source use requires a [commercial license](../../COMMERCIAL-LICENSE.md).
+Code is Apache-2.0 (see [LICENSE](../../LICENSE)).

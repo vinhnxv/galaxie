@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "LangGraph.js executor adapter for galaxie.",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {

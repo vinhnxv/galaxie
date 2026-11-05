@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // A real module Worker for the loader test: the production Worker host with a fake runtime, an
 // in-memory store and a fake fetch. It never touches the network or the real library.

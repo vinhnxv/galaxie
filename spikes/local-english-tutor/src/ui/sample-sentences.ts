@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 /** Input sentences the page offers to click. The first one comes from the maintainer's reference app. */
 export const SAMPLE_SENTENCES: readonly string[] = [

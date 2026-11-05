@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // M0 smoke test (throwaway, brief §16.2): load LFM3-1.7B-ONNX (q4f16) with onnxruntime-web on
 // WebGPU and generate text. The result object is also exposed as `window.__b0`.

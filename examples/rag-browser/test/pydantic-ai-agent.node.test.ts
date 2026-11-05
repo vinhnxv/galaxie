@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 import { createPyodideAdapter } from '@galaxie/adapter-pyodide';
 import { createRuntime, type RunEvent } from '@galaxie/core';
@@ -112,7 +112,7 @@ test.skipIf(!pythonWheelsAvailable).each(cases)(
         ? {
             sources: {
               'agent.py': `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 import json
 from pydantic import BaseModel
 from pydantic_ai import Agent, PromptedOutput

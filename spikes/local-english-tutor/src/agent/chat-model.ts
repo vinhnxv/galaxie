@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // A LangChain chat model over the inference worker. Graph nodes call the in-browser model the way
 // they would call any other LangChain provider, so the graph does not know where the model runs.

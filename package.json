@@ -2,7 +2,7 @@
   "name": "galaxie",
   "private": true,
   "description": "A browser-first agent runtime SDK for web apps.",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.21.0",
   "engines": {
