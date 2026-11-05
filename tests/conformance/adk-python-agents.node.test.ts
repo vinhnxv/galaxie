@@ -257,6 +257,7 @@ test.skipIf(!pythonWheelsAvailable)(
   pythonWheelsAvailable
     ? 'ADK Python replays each parallel branch write from its own receipt in reversed order'
     : missingPythonWheels,
+  { timeout: 240000, repeats: 25 },
   async () => {
     const fixture = await createPythonFixture({
       framework: 'adk',
@@ -338,5 +339,4 @@ test.skipIf(!pythonWheelsAvailable)(
       await fixture.cleanup();
     }
   },
-  { timeout: 240000, repeats: 25 },
 );
