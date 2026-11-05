@@ -40,6 +40,10 @@ class GalaxieError(Exception):
 _transport: Callable[[str], Awaitable[str]] | None = None
 _notify: Callable[[str], None] | None = None
 _streams: dict[str, Callable[[dict[str, Any]], None]] = {}
+# Streams that ended while JavaScript could still be sending chunks, oldest first. A chunk sent
+# before the host saw a cancellation arrives after the request is gone; it is dropped, never an error.
+_closed_streams: dict[str, None] = {}
+_CLOSED_STREAMS_LIMIT = 1024
 _ids = itertools.count(1)
 
 
@@ -188,7 +192,10 @@ async def request(
     except Exception:
         raise GalaxieError("unavailable") from None
     finally:
-        _streams.pop(identifier, None)
+        if _streams.pop(identifier, None) is not None:
+            _closed_streams[identifier] = None
+            if len(_closed_streams) > _CLOSED_STREAMS_LIMIT:
+                del _closed_streams[next(iter(_closed_streams))]
     try:
         if not isinstance(reply, str):
             raise GalaxieError("invalid")
@@ -242,9 +249,12 @@ def receive_model_chunk(raw: str) -> None:
             not isinstance(message, dict) or set(message) != {'v', 'kind', 'id', 'op', 'payload'}
             or message['v'] != VERSION or message['kind'] != 'notify'
             or message['op'] != 'model-chunk' or not isinstance(message['id'], str)
-            or message['id'] not in _streams or not isinstance(message['payload'], dict)
-            or not _model_chunk(message['payload'])
+            or not isinstance(message['payload'], dict) or not _model_chunk(message['payload'])
         ):
+            raise GalaxieError('invalid')
+        if message['id'] in _closed_streams:
+            return
+        if message['id'] not in _streams:
             raise GalaxieError('invalid')
         _streams[message['id']](message['payload'])
     except (ValueError, TypeError, UnicodeError):

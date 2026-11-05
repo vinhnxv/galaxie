@@ -156,6 +156,38 @@ def test_unsolicited_model_chunk_is_rejected():
         }))
 
 
+def test_a_chunk_for_a_stream_that_just_ended_is_dropped_but_other_ids_stay_invalid():
+    seen = []
+
+    async def cancelled(raw):
+        raise asyncio.CancelledError()
+
+    _bridge.install_transport(cancelled)
+    payload = {'role': 'answer', 'messages': [{'role': 'user', 'content': 'hi'}], 'options': {'stream': True}}
+
+    async def attempt():
+        identifier = str(next(_bridge._ids) + 1)
+        with pytest.raises(asyncio.CancelledError):
+            await _bridge.request('model', payload, on_chunk=seen.append)
+        return identifier
+
+    identifier = asyncio.run(attempt())
+    late = json.dumps({
+        'v': _bridge.VERSION, 'kind': 'notify', 'op': 'model-chunk',
+        'id': identifier, 'payload': {'content': 'late'},
+    })
+    _bridge.receive_model_chunk(late)
+    assert seen == []
+    for message in (
+        {'id': 'never-registered', 'payload': {'content': 'x'}},
+        {'id': identifier, 'payload': {'content': 'x', 'extra': 1}},
+    ):
+        with pytest.raises(GalaxieError, match='^The request is invalid\\.$'):
+            _bridge.receive_model_chunk(json.dumps({
+                'v': _bridge.VERSION, 'kind': 'notify', 'op': 'model-chunk', **message,
+            }))
+
+
 def test_model_tool_shapes_are_closed_on_both_sides():
     tool = {'type': 'function', 'function': {'name': 'double', 'parameters': {'type': 'object'}}}
     call = {'id': 'one', 'type': 'function', 'function': {'name': 'double', 'arguments': '{"value":2}'}}
