@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Decides whether a pull request can skip the Python test jobs. A change confined to the paths
 // below cannot change a Python result: no Python test reads them. Every other path, an empty list
