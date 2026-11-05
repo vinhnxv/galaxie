@@ -10,7 +10,7 @@ real model or device was exercised for this documentation slice.
 
 Configuration checked on 2026-10-30: [CI workflow](../.github/workflows/ci.yml),
 [Node version](../.nvmrc), [pinned Playwright](../package.json), and
-[Vitest projects](../vitest.config.ts). CI runs on `ubuntu-24.04`.
+[Vitest projects](../vitest.config.ts). CI runs on `ubuntu-24.04`, one job per check group.
 
 | Environment | What runs | Model/device substitution | Evidence |
 | --- | --- | --- | --- |
