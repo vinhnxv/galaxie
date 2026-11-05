@@ -1,12 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-export function cspDirectives(): Readonly<Record<string, readonly string[]>> {
+export function cspDirectives(mode = 'mock'): Readonly<Record<string, readonly string[]>> {
   return {
     'default-src': ["'none'"],
     'script-src': ["'self'", "'wasm-unsafe-eval'"],
     'worker-src': ["'self'"],
-    'connect-src': ["'self'"],
+    'connect-src':
+      mode === 'mock'
+        ? ["'self'"]
+        : ["'self'", 'https://huggingface.co', 'https://us.aws.cdn.hf.co'],
     'style-src': ["'self'"],
     'img-src': ["'self'"],
     'font-src': ["'self'"],
@@ -22,8 +25,8 @@ export function cspDirectives(): Readonly<Record<string, readonly string[]>> {
   };
 }
 
-export function cspHeader(): string {
-  return Object.entries(cspDirectives())
+export function cspHeader(mode = 'mock'): string {
+  return Object.entries(cspDirectives(mode))
     .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
     .join('; ');
 }

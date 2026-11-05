@@ -7,7 +7,7 @@ import { cspHeader } from './src/host/csp.js';
 import { goAssets, goWorkerGlue } from './src/host/go-assets.js';
 import { pythonAssets } from './src/host/python-assets.js';
 
-const config: UserConfigExport = defineConfig({
+const config: UserConfigExport = defineConfig(({ mode }) => ({
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [pythonAssets(), goAssets()],
   define: { 'process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS': '"false"' },
@@ -44,6 +44,12 @@ const config: UserConfigExport = defineConfig({
         '@galaxie/models/mock': fileURLToPath(
           new URL('../../packages/models/src/mock.ts', import.meta.url),
         ),
+        '@galaxie/models/transformers/worker': fileURLToPath(
+          new URL('../../packages/models/src/transformers/worker.ts', import.meta.url),
+        ),
+        '@galaxie/models/transformers': fileURLToPath(
+          new URL('../../packages/models/src/transformers/index.ts', import.meta.url),
+        ),
         '@galaxie/adapter-pyodide/worker': fileURLToPath(
           new URL('../../packages/adapter-pyodide/src/worker.ts', import.meta.url),
         ),
@@ -61,8 +67,8 @@ const config: UserConfigExport = defineConfig({
       output: { paths: { pyodide: '/python/runtime/pyodide.mjs' } },
     },
   },
-  server: { headers: { 'Content-Security-Policy': cspHeader() } },
-  preview: { headers: { 'Content-Security-Policy': cspHeader() } },
-});
+  server: { headers: { 'Content-Security-Policy': cspHeader(mode) } },
+  preview: { headers: { 'Content-Security-Policy': cspHeader(mode) } },
+}));
 
 export default config;

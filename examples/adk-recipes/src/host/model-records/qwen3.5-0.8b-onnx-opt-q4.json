@@ -1,0 +1,56 @@
+{
+  "modelId": "onnx-community/Qwen3.5-0.8B-ONNX-OPT",
+  "baseUrl": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-ONNX-OPT/resolve/9a4c21d8f724176b0a7edaaed36303044451886e/",
+  "revision": "9a4c21d8f724176b0a7edaaed36303044451886e",
+  "device": "webgpu",
+  "dtype": "q4",
+  "contextWindow": 4096,
+  "toolFormat": "xml",
+  "files": [
+    {
+      "path": "chat_template.jinja",
+      "bytes": 7755,
+      "sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+    },
+    {
+      "path": "config.json",
+      "bytes": 2849,
+      "sha256": "36fed6a902ccd06ef19a452bd5a0750bd88fe347d06ab75ef515615bac5b296d"
+    },
+    {
+      "path": "generation_config.json",
+      "bytes": 248,
+      "sha256": "dc0cbe66543f310896469b7b1448af792f403293a1080baaf04d586c57b23e48"
+    },
+    {
+      "path": "onnx/decoder_model_merged_q4.onnx",
+      "bytes": 576621,
+      "sha256": "7390858c80a67275d8cb81fb70f66a24d3b86fe333057c1312de09c184a2d41b"
+    },
+    {
+      "path": "onnx/decoder_model_merged_q4.onnx_data",
+      "bytes": 483655680,
+      "sha256": "1a9165072dd51a9b6a917b6357a3686372b7429313022802cd4c9a730e8c9749"
+    },
+    {
+      "path": "onnx/embed_tokens_q4.onnx",
+      "bytes": 857,
+      "sha256": "8773dcf4858f855bfce13def4356ca17e0bc516a477154496b6ffb6dd6d084dc"
+    },
+    {
+      "path": "onnx/embed_tokens_q4.onnx_data",
+      "bytes": 162897920,
+      "sha256": "9210b1d26eb14136d3522584d17da14cc5f4b82b6f5607e6d80d59424a8cbe99"
+    },
+    {
+      "path": "tokenizer.json",
+      "bytes": 19226111,
+      "sha256": "89da80cc6689bef4d90cc1028249436975ffb0814618f1d93c65310e05801a9b"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "bytes": 10069,
+      "sha256": "5dcac2c1306b11d1e18ec4c024a174bded2ca3178ce87b0aa590711696407f3d"
+    }
+  ]
+}

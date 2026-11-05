@@ -21,6 +21,7 @@ test('importing the Transformers.js entries loads no model library', async () =>
     'TransformersChatModel',
     'checkTransformersModel',
     'loadTransformersEngine',
+    'parseModelRecord',
   ]);
   expect(Object.keys(worker)).toEqual(['startTransformersWorker']);
   expect(loaded.names).toEqual([]);

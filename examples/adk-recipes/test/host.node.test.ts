@@ -26,7 +26,12 @@ test.each(['mock', 'production'])(
         configFile,
         mode,
         build: { outDir },
-        preview: { host: '127.0.0.1', port: 0 },
+        // Test even the default bundle under the original same-origin-only policy.
+        preview: {
+          host: '127.0.0.1',
+          port: 0,
+          headers: { 'Content-Security-Policy': cspHeader() },
+        },
       });
       const address = server.httpServer.address();
       if (address === null || typeof address === 'string')
@@ -44,6 +49,8 @@ test.each(['mock', 'production'])(
         return route.continue();
       });
       await page.addInitScript(() => {
+        // Never probe a real GPU or permit a real model download in this host test.
+        Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
         const scope = globalThis as typeof globalThis & { violations: string[] };
         scope.violations = [];
         document.addEventListener('securitypolicyviolation', (event) =>
@@ -61,7 +68,7 @@ test.each(['mock', 'production'])(
       expect(response?.headers()['content-security-policy']).toBe(cspHeader());
       await expect
         .poll(() => page.locator('#providers').textContent())
-        .toContain(mode === 'mock' ? 'deterministic mock' : 'No model provider is configured');
+        .toContain(mode === 'mock' ? 'deterministic mock' : 'Local ONNX: Qwen3.5-0.8B');
       expect(await page.locator('#assets').textContent()).toMatch(
         /^Python recipe assets: (?:available|unavailable)\. Go recipe assets: (?:available|unavailable)\.$/,
       );
@@ -70,15 +77,18 @@ test.each(['mock', 'production'])(
       );
       expect(await page.locator('#disclaimer').textContent()).toBe(LEGAL_DISCLAIMER);
       expect(await page.getByLabel('Recipe').count()).toBe(1);
-      expect(await page.getByRole('button', { name: 'Run', exact: true }).isDisabled()).toBe(
-        mode !== 'mock',
-      );
+      expect(await page.getByRole('button', { name: 'Run', exact: true }).isEnabled()).toBe(true);
       expect(await page.locator('#disclaimer').isVisible()).toBe(true);
       for (const width of [1280, 390]) {
         await page.setViewportSize({ width, height: 900 });
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
         ).toBe(true);
+      }
+      if (mode !== 'mock') {
+        await page.getByRole('button', { name: 'Run', exact: true }).click();
+        await expect.poll(() => page.locator('#run-status').textContent()).toBe('failed');
+        expect(await page.getByRole('alert').textContent()).toContain('No model is available');
       }
       expect(await page.evaluate(() => Reflect.get(globalThis, 'violations'))).toEqual([]);
       expect(errors).toEqual([]);

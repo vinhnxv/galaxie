@@ -31,3 +31,14 @@ test('worker URLs must match an exact same-origin entry', () => {
       'The worker script URL is not allowed.',
     );
 });
+
+test('default mode changes only connect-src for the pinned Hugging Face download hosts', () => {
+  const { 'connect-src': connections, ...directives } = cspDirectives('production');
+  const { 'connect-src': _mockConnections, ...mock } = cspDirectives('mock');
+  expect(directives).toEqual(mock);
+  expect(connections).toEqual([
+    "'self'",
+    'https://huggingface.co',
+    'https://us.aws.cdn.hf.co',
+  ]);
+});

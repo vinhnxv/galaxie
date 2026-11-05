@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import goUrl from './go-worker.ts?worker&url';
+import onnxUrl from './onnx-worker.ts?worker&url';
 import pyodideUrl from './pyodide-worker.ts?worker&url';
 
 interface TrustedTypesFactory {
@@ -25,7 +26,8 @@ function createWorker(url: string): Worker {
     const factory = (globalThis as typeof globalThis & { trustedTypes?: TrustedTypesFactory })
       .trustedTypes;
     factory?.createPolicy('default', {
-      createScriptURL: (value) => checkWorkerUrl(value, [pyodideUrl, goUrl], location.href),
+      createScriptURL: (value) =>
+        checkWorkerUrl(value, [pyodideUrl, goUrl, onnxUrl], location.href),
     });
     installed = true;
   }
@@ -38,4 +40,8 @@ export function createPyodideWorker(): Worker {
 
 export function createGoWorker(): Worker {
   return createWorker(goUrl);
+}
+
+export function createOnnxWorker(): Worker {
+  return createWorker(onnxUrl);
 }

@@ -11,7 +11,9 @@ import {
 import type { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import { createHostCapabilities } from './capabilities.js';
 import { loanConfirmations, loanRegistry } from './loan-approval.js';
+import { createOnnxModels, pinnedModelRecord } from './models.js';
 import { type RecipeId, recipes } from './registry.js';
+import { createOnnxWorker } from './trusted-types.js';
 
 export const loanSessionKey = 'galaxie:adk-recipes:demo:loan';
 const appId = 'adk-recipes';
@@ -61,12 +63,24 @@ export interface RecipeHost {
 /** One host and one executor per document. Switching or clearing loads a fresh document. */
 export async function createRecipeHost(id: RecipeId, signal: AbortSignal): Promise<RecipeHost> {
   const recipe = recipes.find((entry) => entry.id === id);
-  if (!recipe?.available || import.meta.env.MODE !== 'mock')
-    throw new Error('The selected recipe is unavailable.');
+  if (!recipe?.available) throw new Error('The selected recipe is unavailable.');
   signal.throwIfAborted();
   const selected = await recipe.load();
   signal.throwIfAborted();
-  const models = recipe.models();
+  const models =
+    import.meta.env.MODE === 'mock'
+      ? recipe.models()
+      : createOnnxModels(recipe.definition, pinnedModelRecord, {
+          createWorker: createOnnxWorker,
+          confirmDownload: ({ bytes }) =>
+            confirm(
+              `Download Qwen3.5-0.8B (Apache-2.0) from Hugging Face? ${Math.round((bytes ?? 0) / 1_000_000)} MB will be stored on this device. No real-model result is claimed.`,
+            ),
+        });
+  if (
+    Object.keys(models.routing.roles).length !== Object.keys(recipe.definition.models ?? {}).length
+  )
+    throw new Error('The selected recipe has no usable model record.');
   const capabilities = createHostCapabilities('demo');
   const { 'market.search@1': search, ...loanBindings } = capabilities.bindings;
   let saver: IndexedDBSaver | undefined;
@@ -90,6 +104,7 @@ export async function createRecipeHost(id: RecipeId, signal: AbortSignal): Promi
           await instance?.cancel(run.runId);
         await runtime.dispose();
       } finally {
+        if ('dispose' in models) await models.dispose();
         await ownership?.release();
         saver?.close();
       }

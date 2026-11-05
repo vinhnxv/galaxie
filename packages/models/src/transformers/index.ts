@@ -21,11 +21,12 @@ export {
   type TransformersStreamEvent,
   type TransformersWorker,
 } from './engine.js';
-export type {
-  TransformersDevice,
-  TransformersDtype,
-  TransformersModelFile,
-  TransformersModelRecord,
+export {
+  parseModelRecord,
+  type TransformersDevice,
+  type TransformersDtype,
+  type TransformersModelFile,
+  type TransformersModelRecord,
 } from './model-record.js';
 export type {
   DeviceReport as TransformersDeviceReport,
