@@ -29,6 +29,9 @@ const config: UserConfigExport = defineConfig({
         '@galaxie/adapter-adk': fileURLToPath(
           new URL('../../packages/adapter-adk/src/index.ts', import.meta.url),
         ),
+        '@galaxie/adapter-go': fileURLToPath(
+          new URL('../../packages/adapter-go/src/index.ts', import.meta.url),
+        ),
         '@galaxie/models/mock': fileURLToPath(
           new URL('../../packages/models/src/mock.ts', import.meta.url),
         ),

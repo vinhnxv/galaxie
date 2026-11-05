@@ -28,20 +28,27 @@ export function goAssets(): Plugin {
       assets.length = 0;
       if (!building) return;
       if (!existsSync(recipeDirectory) || !goInstalled()) return;
-      // The scaffold never fetches modules or a toolchain, even if the Go cache is incomplete.
+      // The example never fetches modules or a toolchain, even if the Go cache is incomplete.
       const previousProxy = process.env['GOPROXY'];
       const previousSumdb = process.env['GOSUMDB'];
       process.env['GOPROXY'] = 'off';
       process.env['GOSUMDB'] = 'off';
       try {
         const built = await buildGoWasm(
-          './recipes/financial',
+          './recipes/financial/main',
           join(example, '.cache/financial.wasm'),
         );
         const glue = await fetchGoGlue(undefined, join(example, '.cache'));
         assets.push({ fileName: 'go/financial.wasm', source: readFileSync(built.file) });
         assets.push({ fileName: 'go/wasm_exec.js', source: readFileSync(glue) });
         wasm = { url: '/go/financial.wasm', bytes: built.bytes, sha256: built.sha256 };
+      } catch (error) {
+        // An incomplete module cache leaves the Go recipe unavailable instead of failing the build.
+        wasm = undefined;
+        assets.length = 0;
+        this.warn(
+          `The Go recipe is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
       } finally {
         if (previousProxy === undefined) delete process.env['GOPROXY'];
         else process.env['GOPROXY'] = previousProxy;

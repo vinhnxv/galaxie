@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { build, preview } from 'vite';
 import { expect, test } from 'vitest';
+import { goInstalled } from '../../../scripts/go-wasm-lock.ts';
 import { cspHeader } from '../src/host/csp.js';
 import { LEGAL_DISCLAIMER } from '../src/host/disclaimer.js';
 
@@ -56,6 +57,9 @@ test.each(['mock', 'production'])(
         .toContain(mode === 'mock' ? 'deterministic mock' : 'No model provider is configured');
       expect(await page.locator('#assets').textContent()).toMatch(
         /^Python recipe assets: (?:available|unavailable)\. Go recipe assets: (?:available|unavailable)\.$/,
+      );
+      expect(await page.locator('#assets').textContent()).toContain(
+        `Go recipe assets: ${goInstalled() ? 'available' : 'unavailable'}.`,
       );
       expect(await page.locator('#disclaimer').textContent()).toBe(LEGAL_DISCLAIMER);
       expect(await page.getByRole('button').count()).toBe(0);

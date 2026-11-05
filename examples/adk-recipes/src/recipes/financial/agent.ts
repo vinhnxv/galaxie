@@ -23,10 +23,8 @@
 // google/adk-recipes commit 1e5ed1a5713b739ff8ba58b39454c02bf8bad118.
 
 import type { AdkHost } from '@galaxie/adapter-adk';
-import { type AgentDefinition, defineAgentDefinition } from '@galaxie/core';
 import { LlmAgent, SequentialAgent } from '@google/adk';
-import { z } from 'zod';
-import { capabilityRequests, marketSearchInput } from '../../host/capabilities.js';
+import { marketSearchInput } from '../../host/capabilities.js';
 import {
   DATA_ANALYST_PROMPT,
   EXECUTION_ANALYST_PROMPT,
@@ -34,31 +32,7 @@ import {
   TRADING_ANALYST_PROMPT,
 } from './prompts.js';
 
-export interface FinancialDefinition extends AgentDefinition {
-  readonly input: z.ZodType<{ prompt: string }>;
-  readonly capabilities: {
-    readonly required: Pick<typeof capabilityRequests, 'market.search@1'>;
-  };
-}
-
-export const financialDefinition: FinancialDefinition = defineAgentDefinition({
-  id: 'galaxie.adk-recipes.financial-js',
-  version: '0.0.0',
-  executor: 'adk-js',
-  input: z.strictObject({ prompt: z.string().trim().min(1).max(4096) }),
-  models: {
-    'financial.data': {
-      modality: 'text',
-      languages: ['en'],
-      requires: ['tool-calling'],
-      defaultPolicy: 'local-only',
-    },
-    'financial.trading': { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' },
-    'financial.execution': { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' },
-    'financial.risk': { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' },
-  },
-  capabilities: { required: { 'market.search@1': capabilityRequests['market.search@1'] } },
-});
+export { type FinancialDefinition, financialDefinition } from './definition.js';
 
 /** Each invocation builds fresh ADK agents; the adapter owns their runner and session. */
 export function financialAgent(host: AdkHost): SequentialAgent {

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { buildGoWasm } from '../../scripts/build-go-wasm.ts';
-import { classifyLicense } from '../../scripts/check-go-lock.ts';
+import { classifyLicense, goPackages } from '../../scripts/check-go-lock.ts';
 import { fetchGoGlue, invalidGlue } from '../../scripts/fetch-go-glue.ts';
 import {
   allowedLicenses,
@@ -49,7 +49,10 @@ test.skipIf(!goInstalled())(
   async () => {
     const lock = await readGoWasmLock();
     expect(lock.toolchain).toBe(runGo(['env', 'GOVERSION'], goEnvironment()).trim());
-    expect(wasmModules(lock)).toEqual(lock.modules.map(({ path, version }) => ({ path, version })));
+    expect(lock.packages).toEqual(goPackages);
+    expect(wasmModules({ packages: goPackages })).toEqual(
+      lock.modules.map(({ path, version }) => ({ path, version })),
+    );
   },
 );
 
