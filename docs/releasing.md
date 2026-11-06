@@ -26,8 +26,10 @@ public. These are maintainer-only steps.
 1. Check out the release commit on a green `main`.
 2. Run `pnpm install --frozen-lockfile`, then `pnpm check`.
 3. Bump the version in all five launch package manifests to the same release version,
-   and set `VERSION` in `packages/core/src/version.ts` to match. Core reports it as the
-   instrumentation scope version, and a core test fails when the two differ.
+   and set the same version in `packages/core/src/version.ts` and in the adapter object
+   in `packages/adapter-langgraph/src/adapter.ts`. Core reports its constant as the
+   instrumentation scope version and the adapter advertises its own, and tests fail
+   when either differs from its manifest.
 4. Run `pnpm run build`.
 5. Run `pnpm pack` in each launch package directory and inspect each tarball. It
    must contain `dist`, `LICENSE`, `NOTICE`, `README.md` and `package.json`, with no
