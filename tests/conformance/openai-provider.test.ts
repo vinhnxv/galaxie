@@ -10,12 +10,19 @@ import {
 } from '@galaxie/core';
 import { MockChatModel } from '@galaxie/models/mock';
 import { OpenAICompatibleChatModel, openAICompatible } from '@galaxie/models/openai';
-import type { BaseMessage } from '@langchain/core/messages';
-import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
+import {
+  type AIMessageChunk,
+  type BaseMessage,
+  HumanMessage,
+  isAIMessage,
+} from '@langchain/core/messages';
+import { concat } from '@langchain/core/utils/stream';
+import { ToolNode } from '@langchain/langgraph/prebuilt';
+import { Annotation, END, messagesStateReducer, START, StateGraph } from '@langchain/langgraph/web';
 import { afterAll, beforeAll, expect, inject, test, vi } from 'vitest';
 import { z } from 'zod';
 import { RunBudget } from '../../packages/core/src/budgets.js';
-import { collect } from '../../packages/core/test/fake-executor.js';
+import { binding, collect } from '../../packages/core/test/fake-executor.js';
 import {
   assertSpanTree,
   createSpanRecorder,
@@ -63,6 +70,148 @@ const schema = {
   required: ['answer'],
   additionalProperties: false,
 };
+
+test.each(['invoke', 'stream'] as const)(
+  'a routed OpenAI-compatible loopback model completes a capability tool loop: %s',
+  async (mode) => {
+    const endpoint =
+      typeof window === 'undefined'
+        ? httpFixture.corsUrl
+        : httpFixture.corsUrl.replace('127.0.0.1', 'localhost');
+    const baseURL = `${endpoint}/v1`;
+    expect((await fetch(httpFixture.adminUrl, { method: 'POST' })).status).toBe(200);
+    const { exporter, provider } = createSpanRecorder();
+    const diagnostics: DiagnosticEvent[] = [];
+    const invoke = vi.fn(async (input: unknown) => ({ found: (input as { q: string }).q }));
+    const parameters = z.object({ q: z.string() });
+    const toolState = Annotation.Root({
+      messages: Annotation<BaseMessage[]>({ reducer: messagesStateReducer, default: () => [] }),
+      answer: Annotation<string>,
+    });
+    const runtime = createRuntime({
+      appId: 'openai-tool-loop',
+      dataPolicy: { app: { allow: ['user-device', 'in-browser'] } },
+      executors: [createLangGraphAdapter()],
+      tracerProvider: provider,
+      diagnostics: (event) => diagnostics.push(event),
+    });
+    try {
+      const instance = await runtime.create(
+        {
+          ...definition,
+          id: 'conformance/openai-tools',
+          capabilities: {
+            required: {
+              'echo@1': {
+                input: parameters,
+                output: z.object({ found: z.string() }),
+                kind: 'read',
+              },
+            },
+          },
+        },
+        {
+          principalScope: 'test',
+          bindings: { 'echo@1': { ...binding(), invoke } },
+          services: {
+            chatModels: { endpoint: openAICompatible({ baseURL, model: 'fake-tools' }) },
+          },
+          models: {
+            providers: {
+              endpoint: {
+                destination: 'user-device',
+                modality: 'text',
+                features: ['streaming', 'tool-calling'],
+                pricing: { inputPerToken: 0, outputPerToken: 0 },
+                credential: true,
+              },
+            },
+            roles: {
+              assistant: { providers: ['endpoint'], allow: ['user-device'], maxTokens: 100 },
+            },
+            consent: () => true,
+            getCredential: () => 'tool-loop-credential-canary',
+          },
+          agent: (host) => {
+            const capability = host.langchain.capabilityTool('echo@1', {
+              description: 'Look up a public query.',
+              parameters,
+            });
+            const model = host.langchain.chatModel('assistant');
+            model.disableStreaming = mode === 'invoke';
+            const routed = model.bindTools?.([capability]);
+            if (routed === undefined) throw new Error('Missing routed tool binding.');
+            const tools = new ToolNode([capability], { handleToolErrors: false });
+            return new StateGraph(toolState)
+              .addNode('agent', async (state, config) => {
+                const initial =
+                  state.messages.length === 0 ? [new HumanMessage('Find a public item.')] : [];
+                const history = [...state.messages, ...initial];
+                let reply: BaseMessage;
+                if (mode === 'invoke') reply = await routed.invoke(history, config);
+                else {
+                  let assembled: AIMessageChunk | undefined;
+                  for await (const chunk of await routed.stream(history, config))
+                    assembled = assembled === undefined ? chunk : concat(assembled, chunk);
+                  if (assembled === undefined) throw new Error('Missing streamed tool-loop reply.');
+                  reply = assembled;
+                }
+                return { messages: [...initial, reply], answer: reply.text };
+              })
+              .addNode('tools', tools)
+              .addEdge(START, 'agent')
+              .addConditionalEdges('agent', (state) => {
+                const last = state.messages.at(-1);
+                return last !== undefined && isAIMessage(last) && last.tool_calls?.length
+                  ? 'tools'
+                  : END;
+              })
+              .addEdge('tools', 'agent')
+              .compile();
+          },
+        },
+      );
+      await instance.prepare();
+      const { runId } = await instance.start({});
+      const events = await collect(instance.events(runId));
+      expect(events.at(-1)).toMatchObject({ type: 'output', output: { answer: 'loopback reply' } });
+      expect(events.filter((event) => event.type === 'error')).toEqual([]);
+      expect(instance.getSnapshot().run?.status).toBe('succeeded');
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(invoke.mock.calls[0]?.[0]).toEqual({ q: 'query' });
+      const response = await fetch(httpFixture.adminUrl);
+      expect(response.status).toBe(200);
+      const recorded = (await response.json()) as HttpAdminState;
+      expect(recorded.requests.filter((request) => request.method === 'POST')).toEqual([
+        expect.objectContaining({ path: '/v1/chat/completions', status: 200 }),
+        expect.objectContaining({ path: '/v1/chat/completions', status: 200 }),
+      ]);
+      await runtime.dispose();
+      await provider.forceFlush();
+      const spans = exporter.getFinishedSpans();
+      assertSpanTree(spans);
+      expect(
+        spans.filter((span) => span.attributes['gen_ai.operation.name'] === 'chat'),
+      ).toHaveLength(2);
+      const exposed = JSON.stringify({
+        events,
+        snapshot: instance.getSnapshot(),
+        diagnostics: diagnostics.map(({ error, ...event }) => ({
+          ...event,
+          error:
+            error instanceof Error
+              ? { ...error, message: error.message, stack: error.stack }
+              : error,
+        })),
+        spans: serializeSpans(spans),
+      });
+      expect(exposed).not.toContain('tool-loop-credential-canary');
+    } finally {
+      await runtime.dispose();
+      await provider.shutdown();
+    }
+  },
+);
 
 test.each(['invoke', 'stream'] as const)(
   'AT-24 a CORS-allowed loopback user-device model endpoint succeeds: %s',

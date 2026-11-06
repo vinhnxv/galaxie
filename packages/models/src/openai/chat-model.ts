@@ -9,6 +9,7 @@ import type {
 import {
   BaseChatModel,
   type BaseChatModelCallOptions,
+  type BindToolsInput,
   type LangSmithParams,
 } from '@langchain/core/language_models/chat_models';
 import {
@@ -16,17 +17,22 @@ import {
   AIMessageChunk,
   type BaseMessage,
   HumanMessage,
+  isAIMessage,
+  isAIMessageChunk,
   type StandardMessageStructure,
   SystemMessage,
   type UsageMetadata,
 } from '@langchain/core/messages';
+import { parsePartialJson } from '@langchain/core/output_parsers';
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';
 import type { Runnable } from '@langchain/core/runnables';
+import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
 import { ChatOpenAICompletions } from '@langchain/openai';
 import { ModelError, ModelProviderError } from '../errors.js';
 import { mapMessages } from '../messages.js';
 import { type OutputSchema, structuredOutput } from '../structured-output.js';
 import { classifyOpenAIError, type EndpointDestination } from './classify.js';
+import { mapToolMessages } from './messages.js';
 
 // Adapter-owned call metadata; callOptions never forwards it to the SDK.
 const ROUTED_DESTINATION = Symbol.for('galaxie.model.destination');
@@ -37,6 +43,56 @@ const DESTINATIONS: readonly EndpointDestination[] = [
   'host-server',
   'third-party',
 ];
+
+// Only bindTools can issue these one-use copy tokens. No credential is retained or re-read.
+const copies = new WeakMap<OpenAICompatibleOptions, OpenAICompatibleChatModel>();
+type ToolDeclaration = ReturnType<typeof convertToOpenAITool>;
+type ToolChoice = ChatOpenAICompletions['ParsedCallOptions']['tool_choice'];
+
+function declarations(tools: readonly BindToolsInput[]): ToolDeclaration[] {
+  try {
+    return tools.map((tool) => {
+      const declared: unknown = JSON.parse(JSON.stringify(convertToOpenAITool(tool)));
+      if (typeof declared !== 'object' || declared === null || Array.isArray(declared))
+        throw new ModelError('invalid');
+      const declaration = declared as ToolDeclaration;
+      if (
+        declaration.type !== 'function' ||
+        typeof declaration.function !== 'object' ||
+        declaration.function === null ||
+        typeof declaration.function.name !== 'string' ||
+        declaration.function.name === ''
+      )
+        throw new ModelError('invalid');
+      return declaration;
+    });
+  } catch {
+    throw new ModelError('invalid');
+  }
+}
+
+function toolChoice(choice: unknown, tools: readonly ToolDeclaration[]): ToolChoice {
+  if (choice === undefined || choice === 'auto' || choice === 'none' || choice === 'required')
+    return choice;
+  if (typeof choice === 'string' && tools.some((tool) => tool.function.name === choice))
+    return choice;
+  if (
+    typeof choice === 'object' &&
+    choice !== null &&
+    'type' in choice &&
+    choice.type === 'function' &&
+    'function' in choice &&
+    typeof choice.function === 'object' &&
+    choice.function !== null &&
+    'name' in choice.function &&
+    typeof choice.function.name === 'string'
+  ) {
+    const name = choice.function.name;
+    if (tools.some((tool) => tool.function.name === name))
+      return { type: 'function', function: { name } };
+  }
+  throw new ModelError('unsupported');
+}
 
 export interface OpenAICompatibleOptions {
   readonly baseURL: string;
@@ -97,9 +153,14 @@ function cleanMessages(messages: BaseMessage[]): BaseMessage[] {
 
 function callOptions(
   options: OpenAICompatibleCallOptions,
+  tools: ToolDeclaration[] | undefined,
+  choice: ToolChoice,
 ): ChatOpenAICompletions['ParsedCallOptions'] {
+  if (options.jsonSchema !== undefined && tools !== undefined) throw new ModelError('unsupported');
   return {
     ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(tools === undefined ? {} : { tools }),
+    ...(choice === undefined ? {} : { tool_choice: choice }),
     ...(options.jsonSchema === undefined
       ? {}
       : {
@@ -129,20 +190,24 @@ function usageOf(usage: UsageMetadata | undefined): UsageMetadata | undefined {
   };
 }
 
-function assertTextReply(message: BaseMessage): string {
+function assertTextReply(message: BaseMessage, toolsEnabled = false): string {
   const rawToolCalls = message.additional_kwargs['tool_calls'];
   if (
     message.type !== 'ai' ||
     typeof message.content !== 'string' ||
-    (rawToolCalls !== undefined && (!Array.isArray(rawToolCalls) || rawToolCalls.length > 0)) ||
+    (rawToolCalls !== undefined &&
+      (!Array.isArray(rawToolCalls) || (!toolsEnabled && rawToolCalls.length > 0))) ||
     message.additional_kwargs['function_call'] !== undefined ||
-    ('tool_calls' in message &&
+    (!toolsEnabled &&
+      'tool_calls' in message &&
       Array.isArray(message.tool_calls) &&
       message.tool_calls.length > 0) ||
-    ('invalid_tool_calls' in message &&
+    (!toolsEnabled &&
+      'invalid_tool_calls' in message &&
       Array.isArray(message.invalid_tool_calls) &&
       message.invalid_tool_calls.length > 0) ||
-    ('tool_call_chunks' in message &&
+    (!toolsEnabled &&
+      'tool_call_chunks' in message &&
       Array.isArray(message.tool_call_chunks) &&
       message.tool_call_chunks.length > 0)
   )
@@ -155,6 +220,34 @@ function assertTextReply(message: BaseMessage): string {
   if (raw?.choices?.some((choice) => choice.message?.refusal || choice.delta?.refusal))
     throw new ModelProviderError();
   return message.content;
+}
+
+const MAX_TOOL_CALLS = 16;
+
+function assertToolCalls(
+  calls: readonly { readonly name?: string | undefined }[],
+  tools: readonly ToolDeclaration[],
+): void {
+  if (
+    calls.length > MAX_TOOL_CALLS ||
+    calls.some((call) => !tools.some((tool) => tool.function.name === call.name))
+  )
+    throw new ModelProviderError();
+}
+
+function isArguments(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Streamed arguments that are cut off but that partial parsing would silently complete. */
+function isTruncated(args: string | undefined): boolean {
+  if (args === undefined || args.trim() === '') return false;
+  try {
+    JSON.parse(args);
+    return false;
+  } catch {
+    return isArguments(parsePartialJson(args));
+  }
 }
 
 function providerFailure(
@@ -178,9 +271,18 @@ function providerFailure(
 export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCallOptions> {
   readonly #inner: ChatOpenAICompletions;
   readonly #endpoint: OpenAICompatibleOptions;
+  #tools: ToolDeclaration[] | undefined;
+  #choice: ToolChoice;
 
   constructor(options: OpenAICompatibleOptions, credential: string) {
     super({});
+    const source = copies.get(options);
+    if (source !== undefined) {
+      copies.delete(options);
+      this.#endpoint = source.#endpoint;
+      this.#inner = source.#inner;
+      return;
+    }
     const valid = validateOptions(options);
     this.#endpoint = valid;
     if (typeof credential !== 'string' || credential.trim().length === 0)
@@ -220,20 +322,75 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
     };
   }
 
+  /** A model copy offering these declarations, sharing the existing credential-scoped SDK. */
+  override bindTools(
+    tools: BindToolsInput[],
+    kwargs?: Partial<OpenAICompatibleCallOptions>,
+  ): OpenAICompatibleChatModel {
+    const declared = declarations(tools);
+    const choice = toolChoice(kwargs?.tool_choice, declared);
+    if (declared.length > 0 && choice !== 'none' && kwargs?.jsonSchema !== undefined)
+      throw new ModelError('unsupported');
+    const token = { ...this.#endpoint };
+    copies.set(token, this);
+    const bound = new OpenAICompatibleChatModel(token, '');
+    bound.#tools = declared;
+    bound.#choice = choice;
+    return bound;
+  }
+
+  #request(
+    messages: BaseMessage[],
+    options: OpenAICompatibleCallOptions,
+  ): {
+    messages: BaseMessage[];
+    options: ChatOpenAICompletions['ParsedCallOptions'];
+    tools: ToolDeclaration[] | undefined;
+  } {
+    const choice = toolChoice(
+      options.tool_choice === undefined ? this.#choice : options.tool_choice,
+      this.#tools ?? [],
+    );
+    const tools = choice !== 'none' && this.#tools?.length ? this.#tools : undefined;
+    return {
+      messages: tools === undefined ? cleanMessages(messages) : mapToolMessages(messages),
+      // A choice without tools would only make the endpoint reject the request.
+      options: callOptions(options, tools, tools === undefined ? undefined : choice),
+      tools,
+    };
+  }
+
   override async _generate(
     messages: BaseMessage[],
     options: this['ParsedCallOptions'],
   ): Promise<ChatResult> {
-    const mapped = cleanMessages(messages);
+    const request = this.#request(messages, options);
     options.signal?.throwIfAborted();
     try {
-      const result = await this.#inner._generate(mapped, callOptions(options));
+      const result = await this.#inner._generate(request.messages, request.options);
       options.signal?.throwIfAborted();
       if (result.generations.length !== 1) throw new ModelProviderError();
       const message = result.generations[0]?.message;
       if (message === undefined) throw new ModelProviderError();
-      const text = assertTextReply(message);
-      if (text.length === 0) throw new ModelProviderError();
+      const text = assertTextReply(message, request.tools !== undefined);
+      if (!isAIMessage(message)) throw new ModelProviderError();
+      const parsed = message.tool_calls ?? [];
+      // Arguments that are not a JSON object cannot be a call's input; offer them as invalid.
+      const calls = parsed.filter((call) => isArguments(call.args));
+      const invalid = [
+        ...(message.invalid_tool_calls ?? []),
+        ...parsed
+          .filter((call) => !isArguments(call.args))
+          .map(({ id, name, args }) => ({ id, name, args: JSON.stringify(args) })),
+      ];
+      if (request.tools !== undefined) assertToolCalls([...calls, ...invalid], request.tools);
+      // The history mapper pairs results by ID, so every call needs a distinct, non-empty one.
+      const ids = new Set<string>();
+      for (const { id } of calls) {
+        if (typeof id !== 'string' || id === '' || ids.has(id)) throw new ModelProviderError();
+        ids.add(id);
+      }
+      if (text.length === 0 && calls.length + invalid.length === 0) throw new ModelProviderError();
       // The pinned LangChain converter omits zero counts; read the reported usage directly.
       const raw = message.additional_kwargs['__raw_response'] as
         | {
@@ -260,6 +417,19 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
             text,
             message: new AIMessage<StandardMessageStructure>({
               content: text,
+              tool_calls: calls.map(({ id, name, args }) => ({
+                type: 'tool_call' as const,
+                ...(id === undefined ? {} : { id }),
+                name,
+                args,
+              })),
+              invalid_tool_calls: invalid.map(({ id, name, args }) => ({
+                type: 'invalid_tool_call' as const,
+                ...(id === undefined ? {} : { id }),
+                ...(name === undefined ? {} : { name }),
+                ...(args === undefined ? {} : { args }),
+                error: 'The tool call is malformed.',
+              })),
               ...(usage === undefined ? {} : { usage_metadata: usage }),
             }),
           },
@@ -276,17 +446,29 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
     options: this['ParsedCallOptions'],
     runManager?: CallbackManagerForLLMRun,
   ): AsyncGenerator<ChatGenerationChunk> {
-    const mapped = cleanMessages(messages);
+    const request = this.#request(messages, options);
     options.signal?.throwIfAborted();
     let hasText = false;
     let finished = false;
+    let finishReason: string | undefined;
+    let assembled: AIMessageChunk<StandardMessageStructure> | undefined;
     try {
-      for await (const inner of this.#inner._streamResponseChunks(mapped, callOptions(options))) {
+      for await (const inner of this.#inner._streamResponseChunks(
+        request.messages,
+        request.options,
+      )) {
         options.signal?.throwIfAborted();
-        const text = assertTextReply(inner.message);
+        const text = assertTextReply(inner.message, request.tools !== undefined);
+        const fragments =
+          request.tools !== undefined && isAIMessageChunk(inner.message)
+            ? inner.message.tool_call_chunks
+            : undefined;
         hasText ||= text.length > 0;
         const reason = inner.generationInfo?.['finish_reason'];
-        if (typeof reason === 'string' && reason.length > 0) finished = true;
+        if (typeof reason === 'string' && reason.length > 0) {
+          finished = true;
+          finishReason = reason;
+        }
         const usage = usageOf(
           'usage_metadata' in inner.message
             ? (inner.message.usage_metadata as UsageMetadata | undefined)
@@ -296,9 +478,26 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
           text,
           message: new AIMessageChunk<StandardMessageStructure>({
             content: text,
+            ...(fragments === undefined
+              ? {}
+              : {
+                  tool_call_chunks: fragments.map(({ index, id, name, args }) => ({
+                    type: 'tool_call_chunk' as const,
+                    ...(index === undefined ? {} : { index }),
+                    ...(id === undefined ? {} : { id }),
+                    ...(name === undefined ? {} : { name }),
+                    ...(args === undefined ? {} : { args }),
+                  })),
+                }),
             ...(usage === undefined ? {} : { usage_metadata: usage }),
           }),
         });
+        if (request.tools !== undefined && isAIMessageChunk(chunk.message)) {
+          assembled = assembled === undefined ? chunk.message : assembled.concat(chunk.message);
+          // Names can arrive in pieces, so only the count is checked until the stream ends.
+          if ((assembled.tool_call_chunks?.length ?? 0) > MAX_TOOL_CALLS)
+            throw new ModelProviderError();
+        }
         if (text.length > 0)
           await runManager?.handleLLMNewToken(text, undefined, undefined, undefined, undefined, {
             chunk,
@@ -307,7 +506,18 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
         yield chunk;
       }
       options.signal?.throwIfAborted();
-      if (!hasText || !finished) throw new ModelProviderError();
+      const streamed = assembled?.tool_call_chunks ?? [];
+      if ((!hasText && streamed.length === 0) || !finished) throw new ModelProviderError();
+      if (request.tools !== undefined && streamed.length > 0) {
+        assertToolCalls(streamed, request.tools);
+        // A reply cut off by the token limit or a filter must not run as a complete call, and
+        // consumers repair partial JSON, so truncated arguments fail here.
+        if (
+          (finishReason !== 'tool_calls' && finishReason !== 'stop') ||
+          streamed.some((call) => isTruncated(call.args))
+        )
+          throw new ModelProviderError();
+      }
     } catch (error) {
       options.signal?.throwIfAborted();
       throw providerFailure(error, this.#endpoint, options);

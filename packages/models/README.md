@@ -116,6 +116,31 @@ All tests use a fake runtime; there is no real-device run, so output quality, sp
 and memory are unmeasured ([unsupported list](../../docs/unsupported.md#models-and-providers),
 [device matrix](../../docs/device-matrix.md#untested-or-unmeasured)).
 
+## OpenAI-compatible tools
+
+`OpenAICompatibleChatModel.bindTools(tools, kwargs?)` returns a new model offering
+those tools and shares the original call-scoped SDK model; it leaves the receiver
+unchanged. `kwargs.tool_choice` (or a call's `tool_choice`) accepts unset, `auto`,
+`none`, `required`, a bound tool's name, or
+`{ type: 'function', function: { name: 'bound_tool_name' } }`. Other choices fail
+with fixed `unsupported` errors. `none` and an empty tools array offer no tools;
+tool replies then fail just as they do on an unbound model.
+
+Enabled tools support text alongside calls, parallel streamed calls, and assistant
+and tool-result history with the provider's call IDs preserved. Malformed argument
+JSON is returned as `invalid_tool_calls`. Unknown tool names, more than 16 calls
+in one reply, and refusals fail with fixed provider errors. A tool request and
+`jsonSchema` structured output cannot share one call (`unsupported`). The provider
+returns fresh messages without raw endpoint metadata and never includes arguments
+or tool results in thrown errors.
+
+The host must still declare the provider's `tool-calling` feature for routed roles.
+Use `host.langchain.chatModel(role).bindTools(...)` with capability tools so routing,
+consent, labels, budgets and output checks apply; a native `ToolNode` must use
+`{ handleToolErrors: false }`. Coverage uses injected-fetch mocks and loopback
+JSON/SSE fixtures on Node and Chromium only; no real-endpoint or real-model result
+is claimed.
+
 ## User endpoints
 
 `openAICompatible` reports `unreachable` when a request fails before any HTTP
