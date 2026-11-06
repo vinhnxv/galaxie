@@ -1,15 +1,25 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { GalaxieError, type ModelPort, type ModelPreparation } from '@galaxie/core';
+import {
+  type CapabilityPort,
+  capabilityBindingPolicy,
+  GalaxieError,
+  isGalaxieError,
+  type ModelPort,
+  type ModelPreparation,
+  toErrorInfo,
+} from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { DynamicStructuredTool, type StructuredToolInterface } from '@langchain/core/tools';
+import type { InteropZodObject } from '@langchain/core/utils/types';
 import {
   type BaseCheckpointSaver,
   type LangGraphRunnableConfig,
   MemorySaver,
   type StateSnapshot,
 } from '@langchain/langgraph/web';
-import { RoutedChatModel } from './routed-chat-model.js';
+import { capabilityToolChecks, RoutedChatModel } from './routed-chat-model.js';
 import type { LangGraphTraceHandler } from './trace-handler.js';
 
 type StreamOptions = LangGraphRunnableConfig & {
@@ -38,12 +48,21 @@ export interface LangGraphServices {
   readonly checkpointer?: BaseCheckpointSaver;
 }
 
+export interface CapabilityToolSpec {
+  /** Defaults to the capability name with punctuation replaced by underscores. */
+  readonly toolName?: string;
+  readonly description: string;
+  readonly parameters: InteropZodObject;
+}
+
 export interface LangGraphHost {
   readonly capabilities: {
     call(name: string, input: unknown, config?: LangGraphRunnableConfig): Promise<unknown>;
   };
   readonly langchain: {
     chatModel(role: string): BaseChatModel;
+    /** Offer a broker-backed capability; writes require a host confirmation binding. */
+    capabilityTool(name: string, spec: CapabilityToolSpec): StructuredToolInterface;
     checkpointer(): BaseCheckpointSaver;
   };
 }
@@ -52,7 +71,13 @@ export function createHost(
   services: LangGraphServices,
   capabilities: LangGraphHost['capabilities'],
   models: ModelPreparation | undefined,
-  active: () => { readonly models: ModelPort; readonly handler: LangGraphTraceHandler } | undefined,
+  active: () =>
+    | {
+        readonly capabilities: CapabilityPort;
+        readonly models: ModelPort;
+        readonly handler: LangGraphTraceHandler;
+      }
+    | undefined,
 ): LangGraphHost {
   for (const [providerId, descriptor] of Object.entries(models?.providers ?? {})) {
     const provider = Object.hasOwn(services.chatModels, providerId)
@@ -76,6 +101,42 @@ export function createHost(
         if (model === undefined)
           throw new GalaxieError('unavailable', 'The requested model role is unavailable.');
         return model;
+      },
+      capabilityTool(name, spec) {
+        const toolName = spec.toolName ?? name.replace(/[^A-Za-z0-9_]/g, '_');
+        if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(toolName))
+          throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+        const check = (): void => {
+          const run = active();
+          if (run === undefined) throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+          const policy = capabilityBindingPolicy(run.capabilities, name);
+          // Fail closed: a capability without a broker policy, or any effectful kind that does
+          // not require a configured host confirmation, is never offered or run as a tool.
+          if (
+            policy === undefined ||
+            (policy.kind !== 'read' &&
+              (policy.approval !== 'confirm' || !policy.confirmationAvailable))
+          )
+            throw new GalaxieError('invalid', toErrorInfo('invalid').message);
+        };
+        const capability = new DynamicStructuredTool({
+          name: toolName,
+          description: spec.description,
+          schema: spec.parameters,
+          func: async (input, _runManager, config): Promise<unknown> => {
+            check();
+            try {
+              // The adapter forwards this config's full checkpoint namespace to the broker.
+              return await capabilities.call(name, input, config);
+            } catch (error) {
+              if (isGalaxieError(error) && (error.code === 'denied' || error.code === 'invalid'))
+                return { error: toErrorInfo(error.code).message };
+              throw error;
+            }
+          },
+        });
+        capabilityToolChecks.set(capability, check);
+        return capability;
       },
       checkpointer: () => checkpointer,
     },

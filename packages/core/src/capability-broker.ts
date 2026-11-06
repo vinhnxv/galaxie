@@ -37,6 +37,23 @@ import type { Schema } from './schema.js';
 import type { RunInstrumentation } from './tracing.js';
 
 type Policy = Readonly<Record<DataLabel, DestinationAllowlist>>;
+
+/** Host policy only: no invocation authority or implementation is exposed to adapters. */
+export interface CapabilityBindingPolicy {
+  readonly kind: CapabilityBinding['kind'];
+  readonly approval: CapabilityBinding['approval'];
+  readonly confirmationAvailable: boolean;
+}
+
+const bindingPolicies = new WeakMap<CapabilityPort, ReadonlyMap<string, CapabilityBindingPolicy>>();
+
+/** Immutable host policy for a broker-created port; unknown ports/bindings have no policy. */
+export function capabilityBindingPolicy(
+  port: CapabilityPort,
+  name: string,
+): CapabilityBindingPolicy | undefined {
+  return bindingPolicies.get(port)?.get(name);
+}
 export function dataPolicy(overrides: DataPolicy = {}): Policy {
   const result = { ...DEFAULT_DATA_POLICY };
   for (const [label, allowlist] of Object.entries(overrides)) {
@@ -349,7 +366,7 @@ export class CapabilityBroker {
     return new Set(grants);
   }
   port(run: BrokerRun): CapabilityPort {
-    return {
+    const port: CapabilityPort = {
       call: async (name, input, options) => {
         const compiled = this.#capabilities.get(name);
         const binding = compiled?.binding;
@@ -627,5 +644,19 @@ export class CapabilityBroker {
         }
       },
     };
+    const policies = new Map<string, CapabilityBindingPolicy>();
+    for (const [name, { binding }] of this.#capabilities) {
+      if (binding === undefined) continue;
+      policies.set(
+        name,
+        Object.freeze({
+          kind: binding.kind,
+          approval: binding.approval,
+          confirmationAvailable: this.#confirmations !== undefined,
+        }),
+      );
+    }
+    bindingPolicies.set(port, policies);
+    return port;
   }
 }

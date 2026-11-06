@@ -15,6 +15,7 @@ export type {
   RetryPolicy,
 } from './capabilities.js';
 export { attributionHeaders } from './capabilities.js';
+export { type CapabilityBindingPolicy, capabilityBindingPolicy } from './capability-broker.js';
 export type {
   ConfirmationId,
   ConfirmationOptions,
