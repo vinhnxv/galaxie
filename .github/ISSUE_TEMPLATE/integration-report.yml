@@ -1,0 +1,56 @@
+name: Integration report
+description: Tell us how an integration attempt went.
+title: "[Integration]: "
+labels: [integration]
+body:
+  - type: dropdown
+    id: starting-point
+    attributes:
+      label: Which template or starting point did you use?
+      options:
+        - templates/local-only
+        - templates/hybrid-gateway
+        - built an app from the package READMEs
+        - other
+    validations:
+      required: true
+  - type: dropdown
+    id: duration
+    attributes:
+      label: How long did the integration take?
+      options:
+        - under 30 minutes
+        - 30 to 60 minutes
+        - 1 to 3 hours
+        - more than 3 hours
+        - did not finish
+    validations:
+      required: true
+  - type: dropdown
+    id: help
+    attributes:
+      label: Was help needed?
+      options:
+        - no help needed
+        - read the docs only
+        - asked the maintainer or a community member
+        - could not finish without help
+    validations:
+      required: true
+  - type: textarea
+    id: unclear
+    attributes:
+      label: What was unclear?
+  - type: input
+    id: device-browser
+    attributes:
+      label: Device and browser
+      description: Include browser version and operating system.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What worked and what did not?
+    validations:
+      required: true

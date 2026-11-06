@@ -1,0 +1,54 @@
+name: Bug report
+description: Report unexpected behavior in galaxie.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report vulnerabilities privately through the process in SECURITY.md.
+        Do not include vulnerability details or secrets in a public issue.
+  - type: checkboxes
+    id: vulnerability-check
+    attributes:
+      label: Vulnerability reporting
+      options:
+        - label: This is not a security vulnerability; I have read SECURITY.md.
+          required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal reproduction when possible.
+    validations:
+      required: true
+  - type: input
+    id: package-version
+    attributes:
+      label: Package and version or commit
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version or browser and version, and operating system.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Remove credentials and personal data before sharing.
