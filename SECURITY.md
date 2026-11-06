@@ -22,9 +22,10 @@ release branches yet.
 
 ## Scope
 
-In scope are the published packages `@galaxie/core`, `@galaxie/adapter-langgraph`,
-`@galaxie/models`, `@galaxie/storage-indexeddb` and `@galaxie/react`, and their
-documented controls.
+In scope are the packages `@galaxie/core`, `@galaxie/adapter-langgraph`,
+`@galaxie/models`, `@galaxie/storage-indexeddb` and `@galaxie/react` in this
+repository, and their documented controls. None of them is published to a package
+registry yet.
 
 Out of scope:
 
