@@ -1,5 +1,7 @@
 # @galaxie/adapter-pyodide
 
+> This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
+
 An experimental executor adapter for trusted LangGraph Python graphs, pydantic-ai
 agents and DSPy programs running in a dedicated Pyodide 314.0.7 module Worker. Agents use the Python `galaxie` proxies;
 the existing JavaScript router and broker own routing, consent, labels, budgets,

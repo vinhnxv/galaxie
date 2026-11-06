@@ -1,9 +1,20 @@
 {
   "name": "@galaxie/models",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Mock, WebLLM, Transformers.js ONNX, Chrome Built-in AI and OpenAI-compatible model providers for galaxie.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinhnxv/galaxie.git",
+    "directory": "packages/models"
+  },
+  "homepage": "https://github.com/vinhnxv/galaxie/tree/main/packages/models#readme",
+  "bugs": {
+    "url": "https://github.com/vinhnxv/galaxie/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -37,7 +48,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "peerDependencies": {
     "@huggingface/transformers": "4.3.2",

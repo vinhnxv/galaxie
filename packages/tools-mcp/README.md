@@ -1,5 +1,7 @@
 # @galaxie/tools-mcp
 
+> This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
+
 Host-configured MCP tools as galaxie capability bindings, over Streamable HTTP with SDK 1.32.1 and protocol 2025-11-25. Only servers or gateways the host controls are supported (ADR-0011).
 
 ```ts

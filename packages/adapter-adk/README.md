@@ -1,5 +1,7 @@
 # @galaxie/adapter-adk
 
+> This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
+
 The Google ADK (JavaScript) executor adapter (executor id `adk-js`). It pins ADK, runs its
 browser bundle under galaxie's strict CSP and Trusted Types, and hosts agents through galaxie's
 router, broker and budgets, with checked streaming, pauses for confirmations and long-running
