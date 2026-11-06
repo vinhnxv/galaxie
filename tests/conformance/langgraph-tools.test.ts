@@ -425,7 +425,7 @@ async function injectionFixture(entry: InjectionCase) {
         policyRevision: () => 'injection-v1',
       },
       bindings: {
-        'content.get@1': binding({ invoke: source }),
+        'content.get@1': { ...binding(), invoke: source },
         'record.save@1': binding({ kind: 'write', approval: 'confirm', invoke: write }),
         'network.send@1': binding({ kind: 'read', destination: 'third-party', invoke: remote }),
       },

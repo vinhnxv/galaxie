@@ -11,8 +11,8 @@ import {
   toErrorInfo,
 } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { type StructuredToolInterface, tool } from '@langchain/core/tools';
-import type { SerializableSchema } from '@langchain/core/utils/standard_schema';
+import { DynamicStructuredTool, type StructuredToolInterface } from '@langchain/core/tools';
+import type { InteropZodObject } from '@langchain/core/utils/types';
 import {
   type BaseCheckpointSaver,
   type LangGraphRunnableConfig,
@@ -52,7 +52,7 @@ export interface CapabilityToolSpec {
   /** Defaults to the capability name with punctuation replaced by underscores. */
   readonly toolName?: string;
   readonly description: string;
-  readonly parameters: SerializableSchema<Record<string, unknown>>;
+  readonly parameters: InteropZodObject;
 }
 
 export interface LangGraphHost {
@@ -110,14 +110,20 @@ export function createHost(
           const run = active();
           if (run === undefined) throw new GalaxieError('invalid', toErrorInfo('invalid').message);
           const policy = capabilityBindingPolicy(run.capabilities, name);
+          // Fail closed: a capability without a broker policy, or any effectful kind that does
+          // not require a configured host confirmation, is never offered or run as a tool.
           if (
-            policy?.kind === 'write' &&
-            (policy.approval !== 'confirm' || !policy.confirmationAvailable)
+            policy === undefined ||
+            (policy.kind !== 'read' &&
+              (policy.approval !== 'confirm' || !policy.confirmationAvailable))
           )
             throw new GalaxieError('invalid', toErrorInfo('invalid').message);
         };
-        const capability = tool(
-          async (input, config): Promise<unknown> => {
+        const capability = new DynamicStructuredTool({
+          name: toolName,
+          description: spec.description,
+          schema: spec.parameters,
+          func: async (input, _runManager, config): Promise<unknown> => {
             check();
             try {
               // The adapter forwards this config's full checkpoint namespace to the broker.
@@ -128,8 +134,7 @@ export function createHost(
               throw error;
             }
           },
-          { name: toolName, description: spec.description, schema: spec.parameters },
-        );
+        });
         capabilityToolChecks.set(capability, check);
         return capability;
       },

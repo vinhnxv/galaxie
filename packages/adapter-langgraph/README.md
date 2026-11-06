@@ -45,8 +45,8 @@ the node's explicit config. After an await, interactions use
 ## Model-chosen capability tools
 
 `host.langchain.capabilityTool(name: string, spec: CapabilityToolSpec)` returns a
-LangChain `StructuredToolInterface`. The spec has `description`, a Standard Schema
-`parameters` object (for example `z.object(...)`), and optional `toolName`. The
+LangChain `StructuredToolInterface`. The spec has `description`, a Zod object
+schema as `parameters` (for example `z.object(...)`), and optional `toolName`. The
 function name defaults to the capability name with punctuation replaced by `_`.
 The capability must be declared by the agent and bound by the host.
 
@@ -77,11 +77,17 @@ broker failures into model observations.
 
 Every call goes through the existing broker's labels, grants, validation,
 budgets and effect IDs. The helper checks the host binding before offering a
-write to a provider and before invoking it. A write binding must have
-`approval: 'confirm'` and a configured host confirmation registry; otherwise the
-call fails with fixed `invalid`. Only `instance.respond(id, 'approve')` approves
+tool to a provider and before invoking it. Only a `read` binding, or a binding
+of another kind with `approval: 'confirm'` and a configured host confirmation
+registry, is offered; a capability with no broker binding is refused too, and the
+call fails with fixed `invalid`. Two declarations with one tool name in the same
+`bindTools` call also fail `invalid`. Only `instance.respond(id, 'approve')` approves
 the broker's frozen real arguments. Model text or tool output cannot approve it.
 Host code owns rendering the confirmation and authorizing backend operations.
+A declined confirmation comes back to the model as the fixed `denied` text, and a
+model may request the same write again; each request produces a new confirmation,
+bounded by the run's tool-call budget, so set that budget for agents that offer
+writes.
 
 With recovery, the forwarded full checkpoint namespace and deterministic
 per-task call order preserve write receipts across resume, including concurrent

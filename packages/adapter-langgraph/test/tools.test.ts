@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  type CapabilityBindingPolicy,
   type CapabilityPort,
   GalaxieError,
   type ModelCall,
@@ -24,6 +25,19 @@ import { createHost } from '../src/host.js';
 import { RoutedChatModel } from '../src/routed-chat-model.js';
 import { LangGraphTraceHandler } from '../src/trace-handler.js';
 
+const readPolicy: CapabilityBindingPolicy = {
+  kind: 'read',
+  approval: 'none',
+  confirmationAvailable: false,
+};
+const policy = vi.hoisted<{ current: CapabilityBindingPolicy | undefined }>(() => ({
+  current: undefined,
+}));
+vi.mock('@galaxie/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@galaxie/core')>()),
+  capabilityBindingPolicy: vi.fn(() => policy.current),
+}));
+
 const parameters = z.object({ q: z.string() });
 const declaration = tool(async ({ q }) => q, {
   name: 'echo_1',
@@ -39,6 +53,7 @@ const script = {
 };
 
 function fixture(provider: BaseChatModel = new MockChatModel(script)) {
+  policy.current = readPolicy;
   const checkOutput = vi.fn<ModelCall['checkOutput']>(async () => {});
   const end = vi.fn<ModelCall['end']>();
   const fail = vi.fn<ModelCall['fail']>();
@@ -207,3 +222,51 @@ test.each(['denied', 'invalid', 'unavailable', 'timeout'] as const)(
     }
   },
 );
+
+test.each([
+  { name: 'no broker policy', current: undefined },
+  { name: 'a write without approval', current: { ...readPolicy, kind: 'write' as const } },
+  {
+    name: 'a device capability without approval',
+    current: { ...readPolicy, kind: 'device' as const },
+  },
+  {
+    name: 'a ui capability without a configured confirmation',
+    current: { ...readPolicy, kind: 'ui' as const, approval: 'confirm' as const },
+  },
+])('the helper refuses $name before dispatch and before the tool is offered', async (entry) => {
+  const provider = new MockChatModel(script);
+  const f = fixture(provider);
+  policy.current = entry.current;
+  const host = createHost({ chatModels: {} }, f.capabilities, undefined, f.active);
+  const capability = host.langchain.capabilityTool('echo@1', { description: 'Echo.', parameters });
+  await expect(f.model.bindTools([capability]).invoke('go')).rejects.toMatchObject({
+    code: 'invalid',
+  });
+  await expect(capability.invoke({ q: 'x' })).rejects.toMatchObject({ code: 'invalid' });
+  expect(f.begin).not.toHaveBeenCalled();
+  expect(provider.calls).toBe(0);
+  expect(f.capabilities.call).not.toHaveBeenCalled();
+});
+
+test('a confirmed write with a configured confirmation is offered', async () => {
+  const f = fixture();
+  policy.current = { kind: 'write', approval: 'confirm', confirmationAvailable: true };
+  const host = createHost({ chatModels: {} }, f.capabilities, undefined, f.active);
+  const capability = host.langchain.capabilityTool('echo@1', { description: 'Echo.', parameters });
+  const message = await f.model.bindTools([capability]).invoke('go');
+  expect(message.tool_calls).toMatchObject([{ name: 'echo_1' }]);
+});
+
+test('two declarations with one tool name fail invalid before any lease', async () => {
+  const f = fixture();
+  const other = tool(async () => 'other', {
+    name: 'echo_1',
+    description: 'Other.',
+    schema: parameters,
+  });
+  await expect(f.model.bindTools([declaration, other]).invoke('go')).rejects.toMatchObject({
+    code: 'invalid',
+  });
+  expect(f.begin).not.toHaveBeenCalled();
+});

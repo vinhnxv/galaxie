@@ -41,7 +41,7 @@ import type { LangGraphServices } from './host.js';
 import type { LangGraphTraceHandler } from './trace-handler.js';
 
 interface RoutedChatModelCallOptions extends BaseChatModelCallOptions {
-  readonly tools?: BindToolsInput[];
+  tools?: BindToolsInput[];
   readonly jsonSchema?: Readonly<Record<string, unknown>>;
   readonly repairAttempt?: number;
 }
@@ -298,7 +298,16 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     const tools: BindToolsInput[] | undefined =
       options === undefined ? undefined : Reflect.get(options, 'tools');
     if (tools !== undefined && !Array.isArray(tools)) throw failure('invalid');
-    for (const tool of tools ?? []) capabilityToolChecks.get(tool)?.();
+    const names = new Set<string>();
+    for (const tool of tools ?? []) {
+      capabilityToolChecks.get(tool)?.();
+      // Two declarations with one name would let the model's choice run the other capability.
+      const toolName: unknown = Reflect.get(tool, 'name');
+      if (typeof toolName === 'string') {
+        if (names.has(toolName)) throw failure('invalid');
+        names.add(toolName);
+      }
+    }
     const requires: ModelFeature[] = [
       ...((tools?.length ?? 0) > 0 ? ['tool-calling' as const] : []),
       ...(structured ? ['structured-output' as const] : []),
