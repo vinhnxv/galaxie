@@ -94,13 +94,15 @@ test.each(packages)('$directory packs resolved workspace dependencies', (pkg) =>
 });
 
 test.each(packages)('$directory has public metadata and the root license files', (pkg) => {
+  const packed = JSON.parse(pkg.packedJson) as Manifest;
   expect(pkg.source).not.toHaveProperty('private');
-  expect(pkg.source.version).toBe(coreVersion);
-  expect(pkg.source.version).toMatch(/^0\.\d+\.\d+$/);
-  expect(pkg.source.publishConfig?.access).toBe('public');
-  expect(pkg.source.repository?.url).toBeTruthy();
-  expect(pkg.source.homepage).toBeTruthy();
-  expect(pkg.source.bugs?.url).toBeTruthy();
+  expect(packed).not.toHaveProperty('private');
+  expect(packed.version).toBe(coreVersion);
+  expect(packed.version).toMatch(/^0\.\d+\.\d+$/);
+  expect(packed.publishConfig?.access).toBe('public');
+  expect(packed.repository?.url).toBeTruthy();
+  expect(packed.homepage).toBeTruthy();
+  expect(packed.bugs?.url).toBeTruthy();
   for (const name of ['LICENSE', 'NOTICE'])
     expect(readFileSync(join(root, 'packages', pkg.directory, name))).toEqual(
       readFileSync(join(root, name)),
