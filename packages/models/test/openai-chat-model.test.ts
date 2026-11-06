@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+import { concat } from '@langchain/core/utils/stream';
 import { OpenAIClient } from '@langchain/openai';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { classifyOpenAIError } from '../src/openai/classify.js';
-import { openAICompatible } from '../src/openai/index.js';
+import { OpenAICompatibleChatModel, openAICompatible } from '../src/openai/index.js';
 import { FakeOpenAIFetch } from './support/fake-openai-fetch.js';
 
 describe('OpenAI-compatible error classification', () => {
@@ -513,4 +514,480 @@ describe('OpenAI-compatible chat model', () => {
     expect(fake.requests).toHaveLength(1);
     expect(fake.cancellations).toBe(1);
   });
+});
+
+const lookupTool = {
+  type: 'function' as const,
+  function: {
+    name: 'lookup',
+    description: 'Look up a public item.',
+    parameters: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] },
+  },
+};
+const otherTool = { ...lookupTool, function: { ...lookupTool.function, name: 'other' } };
+
+function toolReply(
+  name = 'lookup',
+  args = '{"q":"tool-argument-canary"}',
+  id = 'provider-call-id',
+) {
+  return { id, type: 'function' as const, function: { name, arguments: args } };
+}
+
+function toolFixture(calls = [toolReply()]) {
+  return fixture({
+    message: { content: null, tool_calls: calls, reasoning_content: 'hidden-endpoint-metadata' },
+    deltas: [{ role: 'assistant', tool_calls: calls.map((call, index) => ({ ...call, index })) }],
+    finishReason: 'tool_calls',
+  });
+}
+
+async function toolResult(model: OpenAICompatibleChatModel, mode: 'invoke' | 'stream') {
+  if (mode === 'invoke') return model.invoke('hello');
+  const chunks = [];
+  for await (const chunk of await model.stream('hello')) {
+    expect(chunk.additional_kwargs).toEqual({});
+    expect(chunk.response_metadata).toEqual({});
+    chunks.push(chunk);
+  }
+  return chunks.reduce((total, chunk) => concat(total, chunk));
+}
+
+describe('OpenAI-compatible bound tools', () => {
+  it('returns a fresh tool reply with provider IDs, arguments and usage', async () => {
+    const { model } = toolFixture();
+    const reply = await model.bindTools([lookupTool]).invoke('hello');
+    expect(reply.content).toBe('');
+    expect(reply.tool_calls).toEqual([
+      {
+        type: 'tool_call',
+        id: 'provider-call-id',
+        name: 'lookup',
+        args: { q: 'tool-argument-canary' },
+      },
+    ]);
+    expect(reply.invalid_tool_calls).toEqual([]);
+    expect(reply.usage_metadata).toEqual({ input_tokens: 3, output_tokens: 2, total_tokens: 5 });
+    expect(reply.additional_kwargs).toEqual({});
+    expect(reply.response_metadata).toEqual({});
+    expect(JSON.stringify(reply)).not.toContain('hidden-endpoint-metadata');
+  });
+
+  it('concatenates interleaved streaming arguments for two parallel tools in order', async () => {
+    const { model } = fixture({
+      deltas: [
+        {
+          role: 'assistant',
+          tool_calls: [
+            { ...toolReply('lookup', '{"q":', 'first-id'), index: 0 },
+            { ...toolReply('other', '{"q":', 'second-id'), index: 1 },
+          ],
+          reasoning_content: 'hidden-endpoint-metadata',
+        },
+        { tool_calls: [{ index: 1, function: { arguments: '"second"}' } }] },
+        { tool_calls: [{ index: 0, function: { arguments: '"first"}' } }] },
+      ],
+      finishReason: 'tool_calls',
+    });
+    const reply = await toolResult(model.bindTools([lookupTool, otherTool]), 'stream');
+    expect(reply.content).toBe('');
+    expect(reply.tool_calls).toEqual([
+      { type: 'tool_call', id: 'first-id', name: 'lookup', args: { q: 'first' } },
+      { type: 'tool_call', id: 'second-id', name: 'other', args: { q: 'second' } },
+    ]);
+    expect(reply.invalid_tool_calls).toEqual([]);
+    expect(reply.usage_metadata).toMatchObject({
+      input_tokens: 3,
+      output_tokens: 2,
+      total_tokens: 5,
+    });
+    expect(JSON.stringify(reply)).not.toContain('hidden-endpoint-metadata');
+  });
+
+  it.each(['invoke', 'stream'] as const)(
+    'rejects tools when unbound, empty or disabled: %s',
+    async (mode) => {
+      const { model } = toolFixture();
+      for (const selected of [
+        model,
+        model.bindTools([]),
+        model.bindTools([lookupTool], { tool_choice: 'none' }),
+      ])
+        await expect(toolResult(selected, mode)).rejects.toMatchObject({
+          name: 'ModelProviderError',
+        });
+      const bound = model.bindTools([lookupTool]);
+      await expect(bound.invoke('hello', { tool_choice: 'none' })).rejects.toMatchObject({
+        name: 'ModelProviderError',
+      });
+    },
+  );
+
+  it.each(['invoke', 'stream'] as const)(
+    'rejects refusals with and without tools: %s',
+    async (mode) => {
+      const { model } = fixture({
+        message: { refusal: 'refusal-canary' },
+        deltas: [{ role: 'assistant', content: 'text', refusal: 'refusal-canary' }],
+      });
+      for (const selected of [model, model.bindTools([lookupTool])]) {
+        const error = await toolResult(selected, mode).catch((failure: unknown) => failure);
+        expect(error).toMatchObject({ name: 'ModelProviderError' });
+        expect(String(error)).not.toContain('refusal-canary');
+      }
+    },
+  );
+
+  it.each(['invoke', 'stream'] as const)(
+    'returns malformed arguments as an invalid call: %s',
+    async (mode) => {
+      const { model } = toolFixture([toolReply('lookup', 'not-json-argument-canary')]);
+      const reply = await toolResult(model.bindTools([lookupTool]), mode);
+      expect(reply.tool_calls).toEqual([]);
+      expect(reply.invalid_tool_calls).toMatchObject([
+        { id: 'provider-call-id', name: 'lookup', args: 'not-json-argument-canary' },
+      ]);
+    },
+  );
+
+  it.each(['invoke', 'stream'] as const)(
+    'rejects unknown tools and more than sixteen calls with fixed errors: %s',
+    async (mode) => {
+      for (const calls of [
+        [toolReply('unbound-name-canary')],
+        [toolReply('unbound-name-canary', 'not-json-argument-canary')],
+        Array.from({ length: 17 }, (_, index) => toolReply('lookup', '{}', `call-${index}`)),
+      ]) {
+        const { model } = toolFixture(calls);
+        const error = await toolResult(model.bindTools([lookupTool]), mode).catch(
+          (failure: unknown) => failure,
+        );
+        expect(error).toMatchObject({
+          name: 'ModelProviderError',
+          message: 'The model provider failed.',
+        });
+        const serialized = JSON.stringify(error, Object.getOwnPropertyNames(error));
+        for (const canary of [
+          credential,
+          'unbound-name-canary',
+          'tool-argument-canary',
+          'not-json-argument-canary',
+        ])
+          expect(serialized).not.toContain(canary);
+        expect(error).not.toHaveProperty('cause');
+      }
+      const { model } = toolFixture(
+        Array.from({ length: 16 }, (_, index) => toolReply('lookup', '{}', `call-${index}`)),
+      );
+      expect((await toolResult(model.bindTools([lookupTool]), mode)).tool_calls).toHaveLength(16);
+    },
+  );
+
+  it.each([
+    [undefined, undefined],
+    ['auto', 'auto'],
+    ['none', undefined],
+    ['required', 'required'],
+    ['lookup', { type: 'function', function: { name: 'lookup' } }],
+    [
+      { type: 'function', function: { name: 'lookup' } },
+      { type: 'function', function: { name: 'lookup' } },
+    ],
+  ] as const)('sends only declarations and accepted tool choice: %j', async (choice, expected) => {
+    const { model, fake } = fixture();
+    const kwargs = choice === undefined ? {} : { tool_choice: choice };
+    await model.bindTools([lookupTool], kwargs).invoke('hello', {
+      stop: ['unrelated-option-canary'],
+      metadata: { marker: 'unrelated-option-canary' },
+    });
+    expect(fake.requests[0]?.body['tools']).toEqual(choice === 'none' ? undefined : [lookupTool]);
+    expect(fake.requests[0]?.body['tool_choice']).toEqual(expected);
+    expect(JSON.stringify(fake.requests[0]?.body)).not.toContain('unrelated-option-canary');
+    expect(JSON.stringify(fake.requests[0]?.body)).not.toContain(credential);
+  });
+
+  it('sends no tool choice when no tools are offered', async () => {
+    const { model, fake } = fixture();
+    await model.invoke('hello', { tool_choice: 'required' });
+    await model.bindTools([]).invoke('hello', { tool_choice: 'required' });
+    for (const request of fake.requests) {
+      expect(request.body['tools']).toBeUndefined();
+      expect(request.body['tool_choice']).toBeUndefined();
+    }
+  });
+
+  it('accepts call-time choices and disables tools for schema replies', async () => {
+    const { model, fake } = fixture({ text: '{"answer":"yes"}' });
+    const bound = model.bindTools([lookupTool]);
+    await bound.invoke('hello', { tool_choice: 'required' });
+    expect(fake.requests[0]?.body['tool_choice']).toBe('required');
+    await bound.invoke('hello', { tool_choice: 'none', jsonSchema: schema });
+    expect(fake.requests[1]?.body['tools']).toBeUndefined();
+    expect(fake.requests[1]?.body['response_format']).toMatchObject({ type: 'json_schema' });
+  });
+
+  it.each([
+    'unknown',
+    '',
+    { type: 'function', function: { name: 'unknown' } },
+    { type: 'other' },
+    1,
+    null,
+    false,
+  ])('rejects unsupported tool choices before dispatch: %j', async (choice) => {
+    const { model, fake } = fixture();
+    const kwargs = {
+      tool_choice: choice as NonNullable<
+        OpenAICompatibleChatModel['ParsedCallOptions']['tool_choice']
+      >,
+    };
+    expect(() => model.bindTools([lookupTool], kwargs)).toThrow(
+      'The model operation is unsupported.',
+    );
+    await expect(model.bindTools([lookupTool]).invoke('hello', kwargs)).rejects.toMatchObject({
+      code: 'unsupported',
+    });
+    expect(fake.requests).toHaveLength(0);
+  });
+
+  it('rejects unserializable declarations with a fixed invalid error', () => {
+    const { model } = fixture();
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+    expect(() =>
+      model.bindTools([
+        { ...lookupTool, function: { ...lookupTool.function, parameters: circular } },
+      ]),
+    ).toThrow('The model request is invalid.');
+  });
+
+  it.each(['invoke', 'stream'] as const)(
+    'rejects tools plus schema and empty or unfinished replies: %s',
+    async (mode) => {
+      const { model, fake } = fixture();
+      const bound = model.bindTools([lookupTool]);
+      await expect(
+        mode === 'invoke'
+          ? bound.invoke('hello', { jsonSchema: schema })
+          : (async () => {
+              for await (const _ of await bound.stream('hello', { jsonSchema: schema })) {
+                /* drain */
+              }
+            })(),
+      ).rejects.toMatchObject({ code: 'unsupported' });
+      expect(fake.requests).toHaveLength(0);
+      expect(() => model.bindTools([lookupTool], { jsonSchema: schema })).toThrow(
+        'The model operation is unsupported.',
+      );
+      const empty = fixture({ text: '', deltas: [{ role: 'assistant', content: '' }] }).model;
+      await expect(toolResult(empty.bindTools([lookupTool]), mode)).rejects.toMatchObject({
+        name: 'ModelProviderError',
+      });
+      if (mode === 'stream') {
+        const unfinished = fixture({
+          deltas: [{ role: 'assistant', tool_calls: [{ ...toolReply(), index: 0 }] }],
+          truncate: true,
+        }).model;
+        await expect(toolResult(unfinished.bindTools([lookupTool]), mode)).rejects.toMatchObject({
+          name: 'ModelProviderError',
+        });
+      }
+    },
+  );
+
+  it('maps assistant/tool history to fresh SDK messages with matching IDs', async () => {
+    const { model, fake } = fixture();
+    const calls = [{ id: 'provider-call-id', name: 'lookup', args: { q: 'query' } }];
+    const assistant = new AIMessage({
+      content: '',
+      tool_calls: calls,
+      additional_kwargs: { tool_calls: [toolReply('lookup', '{"q":"query"}')] },
+      response_metadata: { hidden: 'metadata-canary' },
+    });
+    const result = new ToolMessage({
+      content: 'tool-result',
+      tool_call_id: 'provider-call-id',
+      additional_kwargs: { hidden: 'metadata-canary' },
+    });
+    await model
+      .bindTools([lookupTool])
+      .invoke([new SystemMessage('system'), new HumanMessage('hello'), assistant, result]);
+    expect(fake.requests[0]?.body['messages']).toEqual([
+      { role: 'system', content: 'system' },
+      { role: 'user', content: 'hello' },
+      expect.objectContaining({
+        role: 'assistant',
+        tool_calls: [toolReply('lookup', '{"q":"query"}')],
+      }),
+      { role: 'tool', content: 'tool-result', tool_call_id: 'provider-call-id' },
+    ]);
+    expect(JSON.stringify(fake.requests[0]?.body)).not.toContain('metadata-canary');
+    expect(assistant.response_metadata).toEqual({ hidden: 'metadata-canary' });
+  });
+
+  it('rejects unmatched, reused and unsupported tool history before dispatch', async () => {
+    const assistant = new AIMessage({
+      content: '',
+      tool_calls: [{ id: 'id', name: 'lookup', args: {} }],
+    });
+    const result = new ToolMessage({ content: 'result', tool_call_id: 'id' });
+    const histories = [
+      [result],
+      [new HumanMessage('hello'), result],
+      [assistant, new ToolMessage({ content: 'result', tool_call_id: 'wrong-id' })],
+      [assistant, result, result],
+      [assistant],
+      [new HumanMessage('hello'), new SystemMessage('late'), new HumanMessage('last')],
+      [assistant, new HumanMessage('last')],
+      [
+        new AIMessage({
+          content: '',
+          additional_kwargs: { function_call: { name: 'lookup', arguments: '{}' } },
+        }),
+        new HumanMessage('last'),
+      ],
+      [
+        new AIMessage({
+          content: '',
+          tool_calls: [{ id: 'id', name: 'lookup', args: {} }],
+          additional_kwargs: { tool_calls: [toolReply('lookup', '{"q":"mismatch"}', 'id')] },
+        }),
+        result,
+      ],
+      [
+        assistant,
+        new ToolMessage({
+          content: [{ type: 'image_url', image_url: { url: 'https://image.example' } }],
+          tool_call_id: 'id',
+        }),
+      ],
+    ];
+    const { model, fake } = fixture();
+    for (const history of histories)
+      await expect(model.bindTools([lookupTool]).invoke(history)).rejects.toMatchObject({
+        code: 'invalid',
+      });
+    expect(fake.requests).toHaveLength(0);
+  });
+
+  it('drops invalid calls from the history instead of failing the next turn', async () => {
+    const { model, fake } = fixture();
+    await model.bindTools([lookupTool]).invoke([
+      new HumanMessage('hello'),
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'id', name: 'lookup', args: {} }],
+        invalid_tool_calls: [{ id: 'bad-id', name: 'lookup', args: 'bad-argument-canary' }],
+      }),
+      new ToolMessage({ content: 'result', tool_call_id: 'id' }),
+    ]);
+    const body = JSON.stringify(fake.requests[0]?.body);
+    expect(body).toContain('"id"');
+    expect(body).not.toContain('bad-argument-canary');
+    expect(body).not.toContain('bad-id');
+  });
+
+  it.each(['length', 'content_filter', 'stop', 'tool_calls'] as const)(
+    'fails a stream whose arguments were cut off, finish reason %s',
+    async (finishReason) => {
+      const calls = [toolReply('lookup', '{"q":"cut')];
+      const { model } = fixture({
+        deltas: [
+          { role: 'assistant', tool_calls: calls.map((call, index) => ({ ...call, index })) },
+        ],
+        finishReason,
+      });
+      await expect(toolResult(model.bindTools([lookupTool]), 'stream')).rejects.toMatchObject({
+        name: 'ModelProviderError',
+      });
+    },
+  );
+
+  it('fails a stream that ends with a non-tool finish reason after complete arguments', async () => {
+    const calls = [toolReply('lookup', '{"q":"done"}')];
+    const { model } = fixture({
+      deltas: [{ role: 'assistant', tool_calls: calls.map((call, index) => ({ ...call, index })) }],
+      finishReason: 'length',
+    });
+    await expect(toolResult(model.bindTools([lookupTool]), 'stream')).rejects.toMatchObject({
+      name: 'ModelProviderError',
+    });
+  });
+
+  it('accepts a tool name that arrives split across deltas', async () => {
+    const { model } = fixture({
+      deltas: [
+        { role: 'assistant', tool_calls: [{ index: 0, id: 'split-id', function: { name: '' } }] },
+        { tool_calls: [{ index: 0, function: { name: 'lookup', arguments: '{}' } }] },
+      ],
+      finishReason: 'tool_calls',
+    });
+    const reply = await toolResult(model.bindTools([lookupTool]), 'stream');
+    expect(reply.tool_calls).toMatchObject([{ id: 'split-id', name: 'lookup', args: {} }]);
+  });
+
+  it.each([
+    ['duplicate IDs', [toolReply('lookup', '{}', 'same'), toolReply('lookup', '{}', 'same')]],
+    ['an empty ID', [toolReply('lookup', '{}', '')]],
+  ] as const)('fails a reply with %s', async (_name, calls) => {
+    const { model } = toolFixture([...calls]);
+    await expect(model.bindTools([lookupTool]).invoke('hello')).rejects.toMatchObject({
+      name: 'ModelProviderError',
+    });
+  });
+
+  it.each(['[]', '5', 'null', '"text"'])(
+    'returns arguments that are not an object as an invalid call: %s',
+    async (args) => {
+      const { model } = toolFixture([toolReply('lookup', args)]);
+      const reply = await model.bindTools([lookupTool]).invoke('hello');
+      expect(reply.tool_calls).toEqual([]);
+      expect(reply.invalid_tool_calls).toHaveLength(1);
+    },
+  );
+
+  it('copies without mutating the receiver or bypassing credential validation', async () => {
+    const { model, fake } = toolFixture();
+    const bound = model.bindTools([lookupTool]);
+    expect(bound).not.toBe(model);
+    expect(bound).toBeInstanceOf(model.constructor);
+    await bound.invoke('hello');
+    await expect(model.invoke('hello')).rejects.toMatchObject({ name: 'ModelProviderError' });
+    expect(fake.requests[0]?.body['tools']).toEqual([lookupTool]);
+    expect(fake.requests[1]?.body['tools']).toBeUndefined();
+    expect(() => new OpenAICompatibleChatModel({ baseURL, model: 'fake' }, '')).toThrow(
+      'The model request is invalid.',
+    );
+  });
+
+  it.each(['invoke', 'stream'] as const)(
+    'retains routed third-party failure classification on a bound copy: %s',
+    async (mode) => {
+      const fake = new FakeOpenAIFetch({ failure: true });
+      const model = openAICompatible({
+        baseURL: 'http://localhost/v1',
+        model: 'fake',
+        fetch: fake.fetch,
+      })({ credential });
+      const options = {
+        signal: new AbortController().signal,
+        [Symbol.for('galaxie.model.destination')]: 'third-party',
+      };
+      for (const selected of [model, model.bindTools([lookupTool])]) {
+        const run =
+          mode === 'invoke'
+            ? selected._generate([new HumanMessage('hello')], options)
+            : (async () => {
+                for await (const _ of selected._streamResponseChunks(
+                  [new HumanMessage('hello')],
+                  options,
+                )) {
+                  /* drain */
+                }
+              })();
+        await expect(run).rejects.toMatchObject({ code: 'unavailable', reason: 'network' });
+      }
+      expect(JSON.stringify(fake.requests.map(({ body }) => body))).not.toContain('third-party');
+    },
+  );
 });

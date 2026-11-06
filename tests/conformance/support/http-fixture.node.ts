@@ -63,6 +63,7 @@ export async function createHttpFixture(): Promise<HttpControl> {
       let rejected = false;
       let body: unknown = { error: 'not_found' };
       let streaming = false;
+      let toolCall = false;
       if (method === 'OPTIONS') {
         status = 204;
       } else if (name === 'cors' && method === 'POST' && path === '/v1/chat/completions') {
@@ -70,7 +71,38 @@ export async function createHttpFixture(): Promise<HttpControl> {
           request.setEncoding('utf8');
           let input = '';
           for await (const chunk of request) input += chunk;
-          streaming = (JSON.parse(input) as { stream?: boolean }).stream === true;
+          const parsed = JSON.parse(input) as {
+            model?: string;
+            stream?: boolean;
+            tools?: { function?: { name?: string } }[];
+            messages?: {
+              role?: string;
+              content?: string;
+              tool_call_id?: string;
+              tool_calls?: { id?: string; function?: { name?: string; arguments?: string } }[];
+            }[];
+          };
+          streaming = parsed.stream === true;
+          if (parsed.model === 'fake-tools') {
+            if (!parsed.tools?.some((tool) => tool.function?.name === 'echo_1'))
+              throw new Error('Missing fixture tool declaration.');
+            const last = parsed.messages?.at(-1);
+            toolCall = last?.role !== 'tool';
+            if (!toolCall) {
+              const assistant = parsed.messages?.at(-2);
+              const call = assistant?.tool_calls?.[0];
+              if (
+                assistant?.role !== 'assistant' ||
+                assistant.tool_calls?.length !== 1 ||
+                call?.id !== 'loopback-tool-id' ||
+                call.function?.name !== 'echo_1' ||
+                call.function.arguments !== '{"q":"query"}' ||
+                last?.tool_call_id !== 'loopback-tool-id' ||
+                last.content !== '{"found":"query"}'
+              )
+                throw new Error('Invalid fixture tool history.');
+            }
+          }
           status = 200;
           body = {
             ...completion,
@@ -78,14 +110,27 @@ export async function createHttpFixture(): Promise<HttpControl> {
             choices: [
               {
                 index: 0,
-                finish_reason: 'stop',
-                message: { role: 'assistant', content: 'loopback reply' },
+                finish_reason: toolCall ? 'tool_calls' : 'stop',
+                message: toolCall
+                  ? {
+                      role: 'assistant',
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: 'loopback-tool-id',
+                          type: 'function',
+                          function: { name: 'echo_1', arguments: '{"q":"query"}' },
+                        },
+                      ],
+                    }
+                  : { role: 'assistant', content: 'loopback reply' },
               },
             ],
             usage,
           };
         } catch {
           status = 400;
+          streaming = false;
           body = { error: 'invalid_request' };
         }
       } else if (method === 'GET' && /^\/public\/items\/[^/]+$/.test(path)) {
@@ -117,13 +162,35 @@ export async function createHttpFixture(): Promise<HttpControl> {
       if (status === 0) return;
       if (streaming) {
         response.writeHead(200, { 'content-type': 'text/event-stream' });
-        const deltas = [{ role: 'assistant', content: 'loopback ' }, { content: 'reply' }, {}];
+        const deltas = toolCall
+          ? [
+              {
+                role: 'assistant',
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: 'loopback-tool-id',
+                    type: 'function',
+                    function: { name: 'echo_1', arguments: '{"q":' },
+                  },
+                ],
+              },
+              { tool_calls: [{ index: 0, function: { arguments: '"query"}' } }] },
+              {},
+            ]
+          : [{ role: 'assistant', content: 'loopback ' }, { content: 'reply' }, {}];
         for (const [index, delta] of deltas.entries())
           response.write(
             `data: ${JSON.stringify({
               ...completion,
               object: 'chat.completion.chunk',
-              choices: [{ index: 0, delta, finish_reason: index === 2 ? 'stop' : null }],
+              choices: [
+                {
+                  index: 0,
+                  delta,
+                  finish_reason: index === 2 ? (toolCall ? 'tool_calls' : 'stop') : null,
+                },
+              ],
             })}\n\n`,
           );
         response.write(
