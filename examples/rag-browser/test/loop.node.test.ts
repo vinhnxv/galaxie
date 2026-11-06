@@ -807,10 +807,17 @@ pythonTest.each(answerExecutors)(
       await select(page);
       await page.getByLabel('Text to index').fill(injection);
       await page.getByRole('button', { name: 'Index pasted text', exact: true }).click();
-      await expect.poll(() => page.getByText('Added 1 passages.', { exact: true }).count()).toBe(1);
+      // A loaded hosted runner can take far longer than the 5 s default to run a Python executor.
+      await expect
+        .poll(() => page.getByText('Added 1 passages.', { exact: true }).count(), {
+          timeout: 30000,
+        })
+        .toBe(1);
       const requestCount = requests.length;
       await askPydanticAi(page, 'Nebula archives');
-      await expect.poll(() => page.getByText('Run: failed', { exact: true }).count()).toBe(1);
+      await expect
+        .poll(() => page.getByText('Run: failed', { exact: true }).count(), { timeout: 30000 })
+        .toBe(1);
       expect(await page.getByRole('article').count()).toBe(0);
       expect(await page.getByRole('button', { name: 'Answer with kept passages' }).count()).toBe(0);
       expect(requests).toHaveLength(requestCount);
@@ -823,7 +830,7 @@ pythonTest.each(answerExecutors)(
       await page.context().close();
     }
   },
-  60000,
+  120000,
 );
 
 test('default mode omits pydantic-ai without a tool-calling provider', async () => {
