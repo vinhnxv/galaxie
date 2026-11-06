@@ -1,5 +1,7 @@
 # @galaxie/adapter-go
 
+> This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
+
 The Google ADK (Go) executor adapter (executor id `adk-go`). It runs an agent that the author compiled
 to WebAssembly in a dedicated Worker, after checking the module's length and SHA-256, and keeps policy
 in JavaScript. See [ADR-0023](../../docs/adr/0023-google-adk-go-through-a-wasm-worker.md) (Proposed)

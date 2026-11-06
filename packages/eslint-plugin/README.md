@@ -1,5 +1,7 @@
 # @galaxie/eslint-plugin
 
+> This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
+
 ESLint 10 flat-config rules for reviewed, bundled agent packages. The plugin has zero runtime dependencies, uses ESTree and scope analysis without type information, and never executes the code it lints. Every recommended rule is an error; none has an autofix.
 
 ```js

@@ -22,6 +22,7 @@ import {
   type TraceHandle,
 } from '../src/index.js';
 import { startRunTrace } from '../src/tracing.js';
+import { VERSION } from '../src/version.js';
 import {
   binding,
   collect,
@@ -341,7 +342,7 @@ test.each(codes)('capability %s errors use fixed span types and statuses', (code
   const exporter = new InMemorySpanExporter();
   const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
   const instrumentation = startRunTrace(
-    provider.getTracer('@galaxie/core', '0.0.0'),
+    provider.getTracer('@galaxie/core', VERSION),
     ROOT_CONTEXT,
     {
       appId: 'test',
@@ -431,7 +432,7 @@ test('run finish ends an open capability span without accepting a later end', ()
   const exporter = new InMemorySpanExporter();
   const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
   const instrumentation = startRunTrace(
-    provider.getTracer('@galaxie/core', '0.0.0'),
+    provider.getTracer('@galaxie/core', VERSION),
     ROOT_CONTEXT,
     {
       appId: 'test',
@@ -558,7 +559,7 @@ test('trace text omits non-serializable input without throwing and defaults to n
     executorVersion: '1',
   };
   const absent = startRunTrace(
-    provider.getTracer('@galaxie/core', '0.0.0'),
+    provider.getTracer('@galaxie/core', VERSION),
     ROOT_CONTEXT,
     metadata,
     { policy: DEFAULT_DATA_POLICY, labels: () => new Set(['public']) },
@@ -572,7 +573,7 @@ test('trace text omits non-serializable input without throwing and defaults to n
   absentCapability.end({ status: 'ok' });
   absent.finish('succeeded');
   const enabled = startRunTrace(
-    provider.getTracer('@galaxie/core', '0.0.0'),
+    provider.getTracer('@galaxie/core', VERSION),
     ROOT_CONTEXT,
     metadata,
     {

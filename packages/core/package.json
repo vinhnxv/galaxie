@@ -1,9 +1,20 @@
 {
   "name": "@galaxie/core",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Runtime and framework-neutral contracts for browser agents.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinhnxv/galaxie.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/vinhnxv/galaxie/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/vinhnxv/galaxie/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -13,7 +24,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "peerDependencies": {
     "zod": "^4.6.0",
