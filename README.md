@@ -1,10 +1,12 @@
 # galaxie
 
-Run AI agents inside a web page, on the user's own device, with no agent backend.
+galaxie lets web apps run AI agents inside a web page, on the user's own device, with no agent backend. Each agent has an identity, a lifecycle, permissions, a place in the UI and a way to recover after a reload. Your app keeps its own backend, APIs and databases.
 
-galaxie is an experimental SDK for web apps. It lets an app host AI agents as part of the app: each agent has an identity, a lifecycle, permissions, a place in the UI and a way to recover after a reload. Your app keeps its own backend, APIs and databases. The agent itself runs in the browser.
+**Start here:** [Run the local English-tutor example](#try-it) with a scripted mock model, no model download and reload recovery.
 
-> **Status: experimental and pre-release.** The packages are not published to npm yet, and most testing uses mock and fake models. Read [Project status](#project-status) and [Intended use and disclaimer](#intended-use-and-disclaimer) before you build on it.
+Choose inference per model role under the app's policy: **local in the browser** with WebLLM, Transformers.js or Chrome Built-in AI; **partly local** by mixing local roles with roles using endpoints; or through a **backend or user endpoint** using an OpenAI-compatible provider.
+
+> **Status: experimental and pre-release.** The packages are not published to npm yet, and most testing uses mock and fake models. Read the [known limits](docs/unsupported.md), [project status](docs/status.md) and [Intended use and disclaimer](#intended-use-and-disclaimer) before you build on it.
 
 ## Why
 
@@ -46,12 +48,7 @@ Each adapter lists what it does not support in the [unsupported-features list](d
 
 ## Project status
 
-What is true today:
-
-- **Tested mostly with mocks.** Continuous integration runs the whole suite on Node and headless Chromium with scripted and fake models. A few real-model runs on one Apple laptop are recorded in the [M2](docs/m2-exit-record.md) and [M3](docs/m3-exit-record.md) exit records, as demonstrations and not as measurements.
-- **Not published.** Every package is private. There is no npm release and no stability promise yet.
-- **MVP evidence is recorded.** The [MVP exit record](docs/mvp-exit-record.md) maps 36 acceptance tests to their evidence, states which are only partly covered, and lists what nobody has measured yet, such as real-device speed and an outside developer trial.
-- **Known limits are written down.** The [unsupported-features list](docs/unsupported.md) records exclusions and unverified paths.
+See [the detailed project status](docs/status.md) for implemented behavior, verification and unmeasured paths. Testing is mostly with mocks; the packages are not published to npm yet and carry no stability promise. The [MVP exit record](docs/mvp-exit-record.md) records acceptance evidence and gaps, and the [unsupported-features list](docs/unsupported.md) records known limits and unverified paths.
 
 ## Try it
 
