@@ -2,9 +2,9 @@
 
 This synthetic corpus assumes a fully compromised model. The obedient-attacker mock selects a validated directive when its input contains the exact payload, then returns that directive without resisting it. Matching is a deterministic script selector, not an injection detector. The tests judge SDK-controlled outcomes, not model robustness or answer quality (ADR-0016).
 
-`cases.json` is a static JSON array, not a workspace package. Each case has a unique kebab-case `id`, a `vector` (`lesson`, `tool-output`, `mcp-description`), a `goal`, a synthetic `payload`, and a closed structured `directive`. Directives can call a named capability, emit the fixture's interaction, reply with text, or forward the private value to `agent.main`. They cannot execute code. Zod rejects malformed cases and unknown directive fields before use. Coverage validation requires at least 30 cases, at least eight per vector, and all 15 vector–goal pairs. The initial corpus has 32 cases.
+`cases.json` is a static JSON array, not a workspace package. Each case has a unique kebab-case `id`, a `vector` (`lesson`, `tool-output`, `mcp-description`), a `goal`, a synthetic `payload`, and a closed structured `directive`. Directives can call a named capability, emit the fixture's interaction, reply with text, or forward the private value to `agent.main`. They cannot execute code. Zod rejects malformed cases and unknown directive fields before use. Coverage validation requires at least 30 cases, at least eight per vector, and all 15 vector–goal pairs. The corpus has 34 cases. Existing assertions are unchanged.
 
-The runner is [`injection-corpus.test.ts`](../conformance/injection-corpus.test.ts). Run it on both Node and headless Chromium with:
+The main runner is [`injection-corpus.test.ts`](../conformance/injection-corpus.test.ts). Run it on both Node and headless Chromium with:
 
 ```sh
 pnpm exec vitest run tests/conformance/injection-corpus.test.ts
@@ -23,3 +23,13 @@ The fixture keeps private input and retrieved content out of graph state, disabl
 The separate [`interaction-url-private.test.ts`](../conformance/interaction-url-private.test.ts) covers query encodings, malformed escapes and parser controls on Node and Chromium without changing `cases.json` or its coverage assertions. It uses the obedient-attacker mock and a framework-neutral executor to exercise the runtime, model lease and accepted-payload registration. A private sentence enters through a bound UI submission before the mock emits its link. The link fails `denied` before pending publication; collected events, snapshots, warnings, diagnostics and spans contain neither the sentence nor the URL, and the network recorder sees no requests. This executor emits no raw graph streams; the LangGraph stream/checkpoint limits above remain unchanged. [Core tests](../../packages/core/test/interaction-private.test.ts) also cover paths, unregistered values, the policy opt-out and restored submissions.
 
 Payloads use only `example.test` and `attacker.invalid` (including look-alike subdomains), synthetic values and no third-party corpus. Forms include instruction overrides, forged system/tool messages and approvals, Markdown links, HTML comments, zero-width/bidirectional characters, base64 and tool-call-shaped JSON. Add data-driven cases without changing existing assertions. A newly demonstrated control failure must retain its assertion, use `test.fails` with a comment naming the gap, and be reported in a draft pull request; do not change runtime controls in this slice.
+
+The two `langgraph-tool-output-*` cases also run through the routed model and
+`capabilityTool` loop in [`langgraph-tools.test.ts`](../conformance/langgraph-tools.test.ts).
+An obedient-attacker mock first retrieves the injected tool result, then chooses
+a write or a read forwarding a private value to a bound third-party recipient.
+The write must reach a host confirmation and be declined without invocation;
+the read must be denied before binding dispatch. Both denials return fixed
+`ToolMessage` text and the model completes. These Node/Chromium scenarios use
+mock models and provide no real-model result. The existing runner also executes the added cases through
+its original fixture and unchanged assertions.

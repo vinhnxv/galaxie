@@ -106,7 +106,7 @@ and `bindTools` fails `unsupported`.
 
 Register the provider with destination `in-browser`, zero pricing and the features
 its tests support: `streaming` and `cancellation`, plus `tool-calling` when the
-record has `toolFormat: 'hermes'` or `'xml'` (verified through the ADK adapter's routed model only; the routed LangGraph model has no `bindTools`) and `structured-output` when the constraint
+record has `toolFormat: 'hermes'` or `'xml'` (routed `bindTools` is available through the ADK and LangGraph.js adapters; LangGraph.js coverage uses mock models only, with no real-model result) and `structured-output` when the constraint
 package is installed. `availability` and `download` arrange consent before any file
 is fetched; a refusal fetches nothing. Files are checked against the record's size
 and SHA-256 before they are stored. The record names one device (`webgpu` or

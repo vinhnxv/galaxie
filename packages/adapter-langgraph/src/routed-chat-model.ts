@@ -4,6 +4,7 @@
 import {
   GalaxieError,
   type ModelCall,
+  type ModelFeature,
   type ModelPort,
   type ModelUsage,
   type SelectedModelRoute,
@@ -17,6 +18,7 @@ import type {
 import {
   BaseChatModel,
   type BaseChatModelCallOptions,
+  type BindToolsInput,
   type LangSmithParams,
 } from '@langchain/core/language_models/chat_models';
 import { createContentParser } from '@langchain/core/language_models/structured_output';
@@ -39,6 +41,7 @@ import type { LangGraphServices } from './host.js';
 import type { LangGraphTraceHandler } from './trace-handler.js';
 
 interface RoutedChatModelCallOptions extends BaseChatModelCallOptions {
+  readonly tools?: BindToolsInput[];
   readonly jsonSchema?: Readonly<Record<string, unknown>>;
   readonly repairAttempt?: number;
 }
@@ -66,10 +69,14 @@ interface ActiveRun {
 interface CallState {
   readonly lease: ModelCall;
   readonly provider: BaseChatModel;
+  readonly bound?: ReturnType<NonNullable<BaseChatModel['bindTools']>>;
   readonly handler: LangGraphTraceHandler;
   settled: boolean;
 }
 const calls = new WeakMap<object, CallState>();
+
+/** Helper-owned checks run before declarations can reach the selected provider. */
+export const capabilityToolChecks: WeakMap<object, () => void> = new WeakMap();
 
 function failure(code: 'invalid' | 'unavailable' | 'unsupported'): GalaxieError {
   return new GalaxieError(code, toErrorInfo(code).message);
@@ -201,6 +208,13 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     return 'galaxie-routed';
   }
 
+  override bindTools(
+    tools: BindToolsInput[],
+    kwargs?: Partial<RoutedChatModelCallOptions>,
+  ): Runnable<BaseLanguageModelInput, AIMessageChunk, RoutedChatModelCallOptions> {
+    return this.withConfig({ ...kwargs, tools: [...tools] });
+  }
+
   override withStructuredOutput<
     RunOutput extends Record<string, unknown> = Record<string, unknown>,
   >(
@@ -281,13 +295,21 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     const structured = plainObject(jsonSchema);
     const repairAttempt: number | undefined =
       options === undefined ? undefined : Reflect.get(options, 'repairAttempt');
+    const tools: BindToolsInput[] | undefined =
+      options === undefined ? undefined : Reflect.get(options, 'tools');
+    if (tools !== undefined && !Array.isArray(tools)) throw failure('invalid');
+    for (const tool of tools ?? []) capabilityToolChecks.get(tool)?.();
+    const requires: ModelFeature[] = [
+      ...((tools?.length ?? 0) > 0 ? ['tool-calling' as const] : []),
+      ...(structured ? ['structured-output' as const] : []),
+    ];
     const lease = await run.models.begin(
       this.#role,
-      options?.signal === undefined && !structured && repairAttempt === undefined
+      options?.signal === undefined && requires.length === 0 && repairAttempt === undefined
         ? undefined
         : {
             ...(options?.signal === undefined ? {} : { signal: options.signal }),
-            ...(structured ? { requires: ['structured-output'] as const } : {}),
+            ...(requires.length === 0 ? {} : { requires }),
             ...(repairAttempt === undefined ? {} : { repairAttempt }),
           },
     );
@@ -298,11 +320,29 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       if (implementation === undefined) throw failure('unavailable');
       if (typeof implementation === 'function' && lease.credential === undefined)
         throw failure('invalid');
-      const provider =
+      let provider =
         typeof implementation === 'function'
           ? implementation({ credential: lease.credential as string })
           : implementation;
-      return { lease, provider, handler: run.handler, settled: false };
+      let bound: CallState['bound'];
+      if (tools !== undefined && tools.length > 0) {
+        if (
+          typeof provider.bindTools !== 'function' ||
+          provider.bindTools === BaseChatModel.prototype.bindTools
+        )
+          throw failure('unsupported');
+        const selected = provider.bindTools(tools);
+        if (selected === undefined) throw failure('unsupported');
+        if (selected instanceof BaseChatModel) provider = selected;
+        else bound = selected;
+      }
+      return {
+        lease,
+        provider,
+        handler: run.handler,
+        settled: false,
+        ...(bound === undefined ? {} : { bound }),
+      };
     } catch (error) {
       if (lease.credential !== undefined) run.handler.recordCredentialFailure(error);
       lease.fail();
@@ -382,11 +422,20 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     try {
       if (runManager !== undefined) call.handler.setModelRoute(runManager.runId, call.lease);
       const providerOptions = { ...options, [ROUTED_DESTINATION]: call.lease.destination };
-      const result = await call.provider._generate(
-        messages,
-        providerOptions,
-        filteredManager(runManager),
-      );
+      delete providerOptions.tools;
+      const manager = filteredManager(runManager);
+      const message =
+        call.bound === undefined
+          ? undefined
+          : await call.bound.invoke(messages, {
+              ...providerOptions,
+              callbacks: [],
+              tags: ['nostream'],
+            });
+      const result: ChatResult =
+        message === undefined
+          ? await call.provider._generate(messages, providerOptions, manager)
+          : { generations: [{ text: message.text, message }] };
       await call.lease.checkOutput(
         result.generations.map((generation) => outputText(generation.message)).join('\n'),
         { final: true },
@@ -422,11 +471,14 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       const fragmentSlots = new Map<string, number>();
       const providerManager = filteredManager(runManager);
       const providerOptions = { ...options, [ROUTED_DESTINATION]: call.lease.destination };
+      delete providerOptions.tools;
       const chunks =
-        call.provider.disableStreaming === true ||
-        call.provider._streamResponseChunks === BaseChatModel.prototype._streamResponseChunks
-          ? this.#generateChunk(call.provider, messages, providerOptions, providerManager)
-          : call.provider._streamResponseChunks(messages, providerOptions, providerManager);
+        call.bound !== undefined
+          ? this.#boundChunks(call.bound, messages, providerOptions)
+          : call.provider.disableStreaming === true ||
+              call.provider._streamResponseChunks === BaseChatModel.prototype._streamResponseChunks
+            ? this.#generateChunk(call.provider, messages, providerOptions, providerManager)
+            : call.provider._streamResponseChunks(messages, providerOptions, providerManager);
       for await (const chunk of chunks) {
         text += chunk.text;
         const fragments = isAIMessageChunk(chunk.message)
@@ -496,6 +548,21 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       if (runManager !== undefined)
         call.handler.setOutputSafetyOutcome(runManager.runId, call.lease.outputSafetyOutcome);
       finish(call, false);
+    }
+  }
+
+  async *#boundChunks(
+    bound: NonNullable<CallState['bound']>,
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): AsyncGenerator<ChatGenerationChunk> {
+    // The routed run alone publishes checked output; provider child callbacks must not publish it.
+    for await (const message of await bound.stream(messages, {
+      ...options,
+      callbacks: [],
+      tags: ['nostream'],
+    })) {
+      yield new ChatGenerationChunk({ text: message.text, message });
     }
   }
 

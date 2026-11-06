@@ -3,6 +3,7 @@
 
 export { createLangGraphAdapter, STREAM_MODES } from './adapter.js';
 export type {
+  CapabilityToolSpec,
   LangGraphAgent,
   LangGraphChatModel,
   LangGraphGraph,
