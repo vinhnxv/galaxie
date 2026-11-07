@@ -5,6 +5,7 @@
     "jsx": "react-jsx",
     "types": ["node", "vite/client"],
     "paths": {
+      "@galaxie/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
       "@galaxie/core": ["../../packages/core/src/index.ts"],
       "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
       "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],

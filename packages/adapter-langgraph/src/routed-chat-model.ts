@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  argumentChunks,
+  hasArgumentMirror,
+  outputText,
+  rawArgumentChunks,
+  resolveProvider,
+} from '@galaxie/adapter-kit';
+import {
   GalaxieError,
   type ModelCall,
   type ModelFeature,
@@ -121,63 +128,6 @@ function filteredManager(
   });
 }
 
-type ArgumentChunk = NonNullable<
-  AIMessageChunk<StandardMessageStructure>['tool_call_chunks']
->[number];
-
-function rawArgumentChunks(message: BaseMessage): ArgumentChunk[] {
-  const raw: unknown = message.additional_kwargs['tool_calls'];
-  if (!Array.isArray(raw)) return [];
-  const calls: ArgumentChunk[] = [];
-  for (const [position, call] of raw.entries()) {
-    if (!plainObject(call) || !plainObject(call['function'])) continue;
-    const fn = call['function'];
-    if (typeof fn['arguments'] !== 'string') continue;
-    calls.push({
-      ...(typeof fn['name'] === 'string' ? { name: fn['name'] } : {}),
-      ...(typeof call['id'] === 'string' ? { id: call['id'] } : {}),
-      index: typeof call['index'] === 'number' ? call['index'] : position,
-      args: fn['arguments'],
-    });
-  }
-  return calls;
-}
-
-function argumentChunks(message: BaseMessage): ArgumentChunk[] {
-  if (!isAIMessage(message)) return [];
-  const calls: Array<{ name: string | undefined; id: string | undefined; args: string }> = [
-    ...(message.tool_calls ?? []).map((call) => ({
-      name: call.name,
-      id: call.id,
-      args: JSON.stringify(call.args) ?? '',
-    })),
-    ...(message.invalid_tool_calls ?? []).map((call) => ({
-      name: call.name,
-      id: call.id,
-      args: call.args ?? '',
-    })),
-  ];
-  const normalized = [...calls];
-  // AIMessageChunk can clear invalid_tool_calls while retaining the raw provider arguments.
-  for (const { name, id, args: rawArgs } of rawArgumentChunks(message)) {
-    let args = rawArgs ?? '';
-    try {
-      args = JSON.stringify(JSON.parse(args));
-    } catch {}
-    if (!normalized.some((known) => known.name === name && known.id === id && known.args === args))
-      calls.push({ name, id, args });
-  }
-  return calls.map(({ name, id, args }, index) => ({
-    ...(name === undefined ? {} : { name }),
-    ...(id === undefined ? {} : { id }),
-    index,
-    args,
-  }));
-}
-
-function outputText(message: BaseMessage): string {
-  return [message.text, ...argumentChunks(message).map((call) => call.args)].join('\n');
-}
 export function selectedRouteFromOptions(options: unknown): SelectedModelRoute | undefined {
   if (typeof options !== 'object' || options === null) return undefined;
   const carrier: unknown = Reflect.get(options, LEASE);
@@ -324,16 +274,7 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
           },
     );
     try {
-      const implementation = Object.hasOwn(this.#providers, lease.providerId)
-        ? this.#providers[lease.providerId]
-        : undefined;
-      if (implementation === undefined) throw failure('unavailable');
-      if (typeof implementation === 'function' && lease.credential === undefined)
-        throw failure('invalid');
-      let provider =
-        typeof implementation === 'function'
-          ? implementation({ credential: lease.credential as string })
-          : implementation;
+      let provider = resolveProvider(this.#providers, lease);
       let bound: CallState['bound'];
       if (tools !== undefined && tools.length > 0) {
         if (
@@ -451,7 +392,9 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
           ? await call.provider._generate(messages, providerOptions, manager)
           : { generations: [{ text: message.text, message }] };
       await call.lease.checkOutput(
-        result.generations.map((generation) => outputText(generation.message)).join('\n'),
+        result.generations
+          .map((generation) => outputText(generation.message, isAIMessage(generation.message)))
+          .join('\n'),
         { final: true },
       );
       finish(
@@ -520,20 +463,15 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
             argumentsText[slot] = (argumentsText[slot] ?? '') + (fragment.args ?? '');
           }
           for (const raw of rawArgumentChunks(chunk.message)) {
-            const mirrored = fragments.some(
-              (fragment, position) =>
-                fragment.args === raw.args &&
-                (fragment.name === undefined ||
-                  raw.name === undefined ||
-                  fragment.name === raw.name) &&
-                (fragment.id !== undefined && raw.id !== undefined
-                  ? fragment.id === raw.id
-                  : (fragment.index ?? position) === raw.index),
-            );
+            const mirrored = hasArgumentMirror(raw, fragments);
             if (!mirrored) argumentsText.push(raw.args ?? '');
           }
         } else {
-          argumentsText.push(...argumentChunks(chunk.message).map((call) => call.args ?? ''));
+          argumentsText.push(
+            ...argumentChunks(chunk.message, isAIMessage(chunk.message)).map(
+              (call) => call.args ?? '',
+            ),
+          );
         }
         // Preserve original arguments: native concat can drop complete calls beside fragments.
         const next = [text, ...argumentsText.filter((value) => value.length > 0)].join('\n');
@@ -597,7 +535,7 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       text: generation.text,
       message: new AIMessageChunk<StandardMessageStructure>({
         ...generation.message,
-        tool_call_chunks: argumentChunks(generation.message),
+        tool_call_chunks: argumentChunks(generation.message, isAIMessage(generation.message)),
       }),
       ...(generation.generationInfo === undefined
         ? {}

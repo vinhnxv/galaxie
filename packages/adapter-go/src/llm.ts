@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { resolveProvider } from '@galaxie/adapter-kit';
 import type { ModelCall, ModelPreparation, ModelUsage, RunRequest } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
@@ -196,16 +197,7 @@ export async function serveModel(
   run.leases.add(call);
   try {
     if (aborted(run)) throw adapterFailure('cancelled');
-    const implementation = Object.hasOwn(services.chatModels, lease.providerId)
-      ? services.chatModels[lease.providerId]
-      : undefined;
-    if (implementation === undefined) throw adapterFailure('unavailable');
-    if (typeof implementation === 'function' && lease.credential === undefined)
-      throw adapterFailure('invalid');
-    const provider =
-      typeof implementation === 'function'
-        ? implementation({ credential: lease.credential as string })
-        : implementation;
+    const provider = resolveProvider(services.chatModels, lease);
     const bound =
       offered.size > 0 ? provider.bindTools?.([...(input.options.tools ?? [])]) : provider;
     if (!bound) throw adapterFailure('unsupported');

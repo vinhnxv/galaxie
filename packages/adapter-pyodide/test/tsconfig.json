@@ -5,6 +5,7 @@
     "resolveJsonModule": true,
     "types": ["node"],
     "paths": {
+      "@galaxie/adapter-kit": ["../../adapter-kit/src/index.ts"],
       "@galaxie/core": ["../../core/src/index.ts"]
     }
   },

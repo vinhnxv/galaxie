@@ -25,6 +25,7 @@ const UNCONDITIONALLY_READ_DIRECTORIES = [
   'scripts',
   ...[
     'core',
+    'adapter-kit',
     'adapter-langgraph',
     'adapter-pyodide',
     'adapter-adk',
@@ -437,4 +438,174 @@ test('the hand-pinned ONNX Runtime must equal the one the pinned Transformers.js
   const result = run({ 'pnpm-lock.yaml': lockfile('1.31.0-dev.2') });
   expect(result.status).toBe(1);
   expect(result.output).toContain('onnxruntime-web must equal 1.31.0-dev.2, found 1.31.0-dev.1');
+});
+
+const EXECUTOR_ADAPTERS = ['adapter-langgraph', 'adapter-pyodide', 'adapter-adk', 'adapter-go'];
+const ADAPTER_AREAS = ['src', 'dist', 'test'];
+
+test.each(EXECUTOR_ADAPTERS)(
+  '%s may import the adapter-kit public root in source, build and tests',
+  (adapter) => {
+    const extra = Object.fromEntries(
+      ADAPTER_AREAS.map((area) => [
+        `packages/${adapter}/${area}/kit.${area === 'dist' ? 'js' : 'ts'}`,
+        adk('@galaxie/adapter-kit'),
+      ]),
+    );
+    expect(run(extra)).toMatchObject({ status: 0, output: '' });
+  },
+);
+
+test.each(EXECUTOR_ADAPTERS.flatMap((adapter) => ADAPTER_AREAS.map((area) => [adapter, area])))(
+  '%s/%s may not reach into kit subpaths or relative internals',
+  (adapter, area) => {
+    const extension = area === 'dist' ? 'js' : 'ts';
+    const extra = {
+      [`packages/${adapter}/${area}/subpath.${extension}`]: adk('@galaxie/adapter-kit/tool-calls'),
+      [`packages/${adapter}/${area}/relative.${extension}`]: adk('../../adapter-kit/src/index.js'),
+      [`packages/${adapter}/${area}/relative-dist.${extension}`]: adk(
+        '../../adapter-kit/dist/index.js',
+      ),
+    };
+    const result = run(extra);
+    expect(result.status).toBe(1);
+    for (const file of Object.keys(extra))
+      expect(result.output).toContain(`${file}: adapter-kit imports must use the public root`);
+  },
+);
+
+test.each(
+  EXECUTOR_ADAPTERS.flatMap((adapter) =>
+    ADAPTER_AREAS.flatMap((area) =>
+      EXECUTOR_ADAPTERS.filter((other) => other !== adapter).map((other) => [adapter, area, other]),
+    ),
+  ),
+)('%s/%s may not import %s by package, subpath or relative path', (adapter, area, other) => {
+  const extension = area === 'dist' ? 'js' : 'ts';
+  const extra = {
+    [`packages/${adapter}/${area}/package.${extension}`]: adk(`@galaxie/${other}`),
+    [`packages/${adapter}/${area}/subpath.${extension}`]: adk(`@galaxie/${other}/internal`),
+    [`packages/${adapter}/${area}/relative.${extension}`]: adk(`../../${other}/src/index.js`),
+  };
+  const result = run(extra);
+  expect(result.status).toBe(1);
+  for (const file of Object.keys(extra)) expect(result.output).toContain(`${file}:`);
+  expect(result.output).toContain('must not depend on another executor');
+  expect(result.output).toContain('reaches into a dependency or another adapter');
+});
+
+test.each(['src/allowed.ts', 'dist/allowed.d.ts'])(
+  'adapter-kit %s permits core public exports, erased LangChain types and kit-relative files',
+  (path) => {
+    expect(
+      run({
+        [`packages/adapter-kit/${path}`]: [
+          adk('@galaxie/core'),
+          adk('@langchain/core', 'type'),
+          adk('@langchain/core/messages', 'type'),
+          "export type { BaseMessage } from '@langchain/core/messages';\n",
+          "type Message = import('@langchain/core/messages').BaseMessage;\n",
+          adk('./local.js'),
+        ].join(''),
+      }),
+    ).toMatchObject({ status: 0, output: '' });
+  },
+);
+
+test.each(ADAPTER_AREAS)('adapter-kit %s may never import an executor adapter', (area) => {
+  const extension = area === 'dist' ? 'js' : 'ts';
+  const extra = Object.fromEntries(
+    EXECUTOR_ADAPTERS.flatMap((adapter) => [
+      [`packages/adapter-kit/${area}/${adapter}.${extension}`, adk(`@galaxie/${adapter}`)],
+      [
+        `packages/adapter-kit/${area}/${adapter}-subpath.${extension}`,
+        adk(`@galaxie/${adapter}/internal`),
+      ],
+      [
+        `packages/adapter-kit/${area}/${adapter}-relative.${extension}`,
+        adk(`../../${adapter}/src/index.js`),
+      ],
+    ]),
+  );
+  const result = run(extra);
+  expect(result.status).toBe(1);
+  for (const file of Object.keys(extra))
+    expect(result.output).toContain(`${file}: forbidden adapter-kit import`);
+});
+
+test.each([
+  '@galaxie/core/internal',
+  '../../core/src/index.js',
+  '../../core/dist/index.js',
+  '../../models/src/mock.js',
+  '../node_modules/@langchain/core/messages.js',
+  '../../../../outside.js',
+  '@google/adk',
+  'pyodide',
+  'react',
+  'node:fs',
+  'fs',
+  'left-pad',
+])('adapter-kit production rejects %s', (specifier) => {
+  for (const path of ['src/a.ts', 'dist/a.js']) {
+    const result = run({ [`packages/adapter-kit/${path}`]: adk(specifier) });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain(`packages/adapter-kit/${path}: forbidden adapter-kit import`);
+  }
+});
+
+test.each([
+  "import { BaseMessage } from '@langchain/core/messages';\n",
+  "import '@langchain/core/messages';\n",
+  "export { BaseMessage } from '@langchain/core/messages';\n",
+  "export * from '@langchain/core/messages';\n",
+  "const module = import('@langchain/core/messages');\n",
+  "import { type BaseMessage } from '@langchain/core/messages';\n",
+  "export { type BaseMessage } from '@langchain/core/messages';\n",
+])('adapter-kit rejects runtime LangChain references: %s', (source) => {
+  for (const path of ['src/a.ts', 'dist/a.js']) {
+    const result = run({ [`packages/adapter-kit/${path}`]: source });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('forbidden adapter-kit import @langchain/core/messages');
+  }
+});
+
+test.each([
+  "import models = require('@langchain/core/messages');\n",
+  "const models = require('@langchain/core/messages');\n",
+])('adapter-kit rejects CommonJS loads: %s', (source) => {
+  const result = run({ 'packages/adapter-kit/src/a.ts': source });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('CommonJS loads are not allowed');
+});
+
+test('test tooling, runtime message fixtures and shared conformance support stay test-only in adapter-kit', () => {
+  const source = [
+    adk('vitest'),
+    adk('node:fs'),
+    adk('@langchain/core/messages'),
+    adk('../../../tests/conformance/support/tool-call-checks.js'),
+  ].join('');
+  expect(run({ 'packages/adapter-kit/test/a.test.ts': source })).toMatchObject({
+    status: 0,
+    output: '',
+  });
+  const production = run({ 'packages/adapter-kit/src/a.ts': source });
+  expect(production.status).toBe(1);
+  for (const specifier of [
+    'vitest',
+    'node:fs',
+    '@langchain/core/messages',
+    '../../../tests/conformance/support/tool-call-checks.js',
+  ])
+    expect(production.output).toContain(`forbidden adapter-kit import ${specifier}`);
+});
+
+test('the built adapter-kit rejects Node imports and async_hooks', () => {
+  const node = run({ 'packages/adapter-kit/dist/a.js': adk('node:fs') });
+  expect(node.status).toBe(1);
+  expect(node.output).toContain('built packages must not import node:fs');
+  const hooks = run({ 'packages/adapter-kit/dist/a.js': '// async_hooks\n' });
+  expect(hooks.status).toBe(1);
+  expect(hooks.output).toContain('built packages must not contain async_hooks');
 });

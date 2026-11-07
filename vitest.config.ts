@@ -11,6 +11,9 @@ import {
 } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
+  '@galaxie/adapter-kit': fileURLToPath(
+    new URL('./packages/adapter-kit/src/index.ts', import.meta.url),
+  ),
   '@google/adk': fileURLToPath(
     new URL(
       './packages/adapter-adk/node_modules/@google/adk/dist/web/index_web.js',
@@ -219,6 +222,7 @@ const config: ViteUserConfig = defineConfig({
               '**/*.test.ts',
               '**/*.test.tsx',
               '../../packages/react/test/**/*.test.tsx',
+              '../../packages/adapter-kit/test/**/*.test.ts',
               '../../packages/adapter-pyodide/test/**/*.test.ts',
               '../../packages/adapter-adk/test/**/*.test.ts',
               '../../packages/adapter-go/test/**/*.test.ts',
@@ -228,6 +232,7 @@ const config: ViteUserConfig = defineConfig({
             [
               ...configDefaults.exclude,
               '**/*.node.test.ts',
+              '../../packages/adapter-kit/test/**/*.node.test.ts',
               '../../packages/adapter-pyodide/test/**/*.node.test.ts',
               '../../packages/adapter-adk/test/**/*.node.test.ts',
               '../../packages/adapter-go/test/**/*.node.test.ts',

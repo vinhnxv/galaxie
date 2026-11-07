@@ -1,6 +1,16 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import {
+  encodeJsonText,
+  isRecord,
+  MAX_BRIDGE_BYTES,
+  parseJsonText,
+  withinBridgeLimit,
+} from '@galaxie/adapter-kit';
+
+export { isRecord, MAX_BRIDGE_BYTES, withinBridgeLimit };
+
 /** The executor id the host selects this adapter by. */
 export const GO_EXECUTOR_ID = 'adk-go';
 
@@ -18,9 +28,6 @@ export interface BootMessage {
   readonly kind: 'boot';
   readonly wasm: GoWasmReference;
 }
-
-/** The largest bridge message in either direction, as on the Python bridge. */
-export const MAX_BRIDGE_BYTES: number = 1_048_576;
 
 /** A dependency version and checksum as recorded in the Go binary. */
 export interface GoModuleInfo {
@@ -76,17 +83,6 @@ export type WorkerMessage =
       readonly payload: string;
     }
   | { readonly v: 1; readonly kind: 'done'; readonly runId: string; readonly result: string };
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Whether the text's UTF-8 form fits one bridge message; the length bounds skip most encoding. */
-export function withinBridgeLimit(text: string): boolean {
-  if (text.length > MAX_BRIDGE_BYTES) return false;
-  if (text.length * 3 <= MAX_BRIDGE_BYTES) return true;
-  return new TextEncoder().encode(text).byteLength <= MAX_BRIDGE_BYTES;
-}
 
 export function failedRun(code: string): string {
   return JSON.stringify({ ok: false, code });
@@ -157,7 +153,7 @@ export function encodeBoot(message: BootMessage): string {
 }
 
 export function encodeHostMessage(message: HostMessage): string {
-  return JSON.stringify(message);
+  return encodeJsonText(message);
 }
 
 /** Parses the page's boot message inside the Worker; anything else is refused. */
@@ -178,7 +174,7 @@ export function parseBoot(data: unknown): BootMessage {
 export function parseHostMessage(data: unknown): Exclude<HostMessage, BootMessage> | undefined {
   let value: unknown;
   try {
-    value = typeof data === 'string' ? JSON.parse(data) : undefined;
+    value = typeof data === 'string' ? parseJsonText(data) : undefined;
   } catch {
     return undefined;
   }
@@ -202,14 +198,14 @@ export function parseHostMessage(data: unknown): Exclude<HostMessage, BootMessag
 }
 
 export function encodeWorkerMessage(message: WorkerMessage): string {
-  return JSON.stringify(message);
+  return encodeJsonText(message);
 }
 
 /** Parses a Worker message on the page; returns undefined for anything unexpected. */
 export function parseWorkerMessage(data: unknown): WorkerMessage | undefined {
   let value: unknown;
   try {
-    value = typeof data === 'string' ? JSON.parse(data) : undefined;
+    value = typeof data === 'string' ? parseJsonText(data) : undefined;
   } catch {
     return undefined;
   }

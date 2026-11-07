@@ -1,12 +1,26 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import {
+  encodeValidatedJson,
+  isJsonValue as json,
+  hasOnlyKeys as keys,
+  MAX_BRIDGE_BYTES,
+  isRecord as object,
+  parseJsonText,
+  validBridgeTool as toolDefinition,
+  validBridgeToolCall,
+  validCapabilityRequest,
+  validChatMessage,
+  validModelOption,
+  withinBridgeLimit,
+} from '@galaxie/adapter-kit';
 import { type ErrorCode, toErrorInfo } from '@galaxie/core';
 import { validCheckpointReply, validCheckpointRequest } from './checkpoints.js';
 import type { LockedWheel, PythonFramework } from './runtime-files.js';
 
 export const BRIDGE_VERSION: 'galaxie.bridge/v2' = 'galaxie.bridge/v2';
-export const MAX_BRIDGE_BYTES: number = 1_048_576;
+export { MAX_BRIDGE_BYTES };
 export type BridgeOp =
   | 'boot'
   | 'run'
@@ -143,19 +157,6 @@ const codes: ReadonlySet<string> = new Set([
   'outcome_unknown',
   'executor_error',
 ]);
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-function keys(
-  value: Record<string, unknown>,
-  required: readonly string[],
-  optional: readonly string[] = [],
-): boolean {
-  return (
-    required.every((key) => Object.hasOwn(value, key)) &&
-    Object.keys(value).every((key) => required.includes(key) || optional.includes(key))
-  );
-}
 function text(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
@@ -198,48 +199,8 @@ function wheel(value: unknown): boolean {
     (value['url'] === undefined || text(value['url']))
   );
 }
-function json(value: unknown, ancestors = new Set<object>()): boolean {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  if (typeof value !== 'object' || ancestors.has(value)) return false;
-  if (
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) !== Object.prototype &&
-    Object.getPrototypeOf(value) !== null
-  )
-    return false;
-  ancestors.add(value);
-  const valid = Object.values(value).every((entry) => json(entry, ancestors));
-  ancestors.delete(value);
-  return valid;
-}
-function toolDefinition(value: unknown): boolean {
-  return (
-    object(value) &&
-    keys(value, ['type', 'function']) &&
-    value['type'] === 'function' &&
-    object(value['function']) &&
-    keys(value['function'], ['name', 'parameters'], ['description', 'strict']) &&
-    text(value['function']['name']) &&
-    object(value['function']['parameters']) &&
-    json(value['function']['parameters']) &&
-    (value['function']['description'] === undefined ||
-      typeof value['function']['description'] === 'string') &&
-    (value['function']['strict'] === undefined || typeof value['function']['strict'] === 'boolean')
-  );
-}
 export function validToolCall(value: unknown): value is ToolCall {
-  return (
-    object(value) &&
-    keys(value, ['id', 'type', 'function']) &&
-    text(value['id']) &&
-    value['id'].length <= 128 &&
-    value['type'] === 'function' &&
-    object(value['function']) &&
-    keys(value['function'], ['name', 'arguments']) &&
-    text(value['function']['name']) &&
-    typeof value['function']['arguments'] === 'string'
-  );
+  return validBridgeToolCall(value);
 }
 function toolChoice(value: unknown): boolean {
   return (
@@ -253,16 +214,7 @@ function toolChoice(value: unknown): boolean {
   );
 }
 function modelMessage(value: unknown): boolean {
-  if (!object(value) || typeof value['content'] !== 'string') return false;
-  if (value['role'] === 'tool')
-    return keys(value, ['role', 'content', 'tool_call_id']) && text(value['tool_call_id']);
-  if (value['role'] === 'assistant')
-    return (
-      keys(value, ['role', 'content'], ['toolCalls']) &&
-      (value['toolCalls'] === undefined ||
-        (Array.isArray(value['toolCalls']) && value['toolCalls'].every(validToolCall)))
-    );
-  return ['system', 'user'].includes(value['role'] as string) && keys(value, ['role', 'content']);
+  return validChatMessage(value, validToolCall);
 }
 function toolDelta(value: unknown): boolean {
   return (
@@ -338,24 +290,17 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
         value['messages'].every(modelMessage) &&
         object(value['options']) &&
         keys(value['options'], [], ['stop', 'stream', 'tools', 'toolChoice', 'jsonSchema']) &&
-        (value['options']['tools'] === undefined ||
-          (Array.isArray(value['options']['tools']) &&
-            value['options']['tools'].every(toolDefinition))) &&
+        validModelOption('tools', value['options']['tools'], toolDefinition) &&
         (value['options']['toolChoice'] === undefined ||
           toolChoice(value['options']['toolChoice'])) &&
-        (value['options']['jsonSchema'] === undefined ||
-          (object(value['options']['jsonSchema']) && json(value['options']['jsonSchema']))) &&
-        (value['options']['stream'] === undefined ||
-          typeof value['options']['stream'] === 'boolean') &&
-        (value['options']['stop'] === undefined ||
-          (Array.isArray(value['options']['stop']) &&
-            value['options']['stop'].every((item: unknown) => typeof item === 'string')))
+        validModelOption('jsonSchema', value['options']['jsonSchema']) &&
+        validModelOption('stream', value['options']['stream']) &&
+        validModelOption('stop', value['options']['stop'])
       );
     case 'capability':
       return (
         keys(value, ['name', 'input'], ['effectScope', 'tool']) &&
-        text(value['name']) &&
-        json(value['input']) &&
+        validCapabilityRequest(value) &&
         (value['tool'] === undefined || typeof value['tool'] === 'boolean') &&
         (value['effectScope'] === undefined || text(value['effectScope']))
       );
@@ -488,11 +433,11 @@ function valid(value: unknown): value is BridgeMessage {
   );
 }
 export function parseBridge(value: unknown): BridgeMessage {
-  if (typeof value === 'string' && new TextEncoder().encode(value).length > MAX_BRIDGE_BYTES)
+  if (typeof value === 'string' && !withinBridgeLimit(value))
     throw new BridgeValidationError('unsupported');
   try {
     if (typeof value !== 'string') throw new BridgeValidationError();
-    const parsed: unknown = JSON.parse(value);
+    const parsed = parseJsonText(value);
     if (!valid(parsed)) throw new BridgeValidationError();
     return parsed;
   } catch {
@@ -502,18 +447,18 @@ export function parseBridge(value: unknown): BridgeMessage {
 export function encodeBridge(message: BridgeMessage): string {
   let encoded: string;
   try {
-    if (!json(message))
-      throw new BridgeValidationError(
-        message.kind === 'notify' && message.op === 'stream' ? 'unsupported' : 'invalid',
-      );
-    if (!valid(message)) throw new BridgeValidationError();
-    encoded = JSON.stringify(message);
+    encoded = encodeValidatedJson(message, () => {
+      if (!json(message))
+        throw new BridgeValidationError(
+          message.kind === 'notify' && message.op === 'stream' ? 'unsupported' : 'invalid',
+        );
+      if (!valid(message)) throw new BridgeValidationError();
+    });
   } catch (error) {
     if (error instanceof BridgeValidationError) throw error;
     throw new BridgeValidationError();
   }
-  if (new TextEncoder().encode(encoded).length > MAX_BRIDGE_BYTES)
-    throw new BridgeValidationError('unsupported');
+  if (!withinBridgeLimit(encoded)) throw new BridgeValidationError('unsupported');
   return encoded;
 }
 export function success(

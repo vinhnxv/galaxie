@@ -26,6 +26,7 @@
 ## Package introductions
 
 - [Core README](packages/core/README.md): framework-neutral contracts and host runtime setup.
+- [Adapter kit README](packages/adapter-kit/README.md): shared internal adapter helpers, public-root imports and no standalone API stability promise.
 - [LangGraph adapter README](packages/adapter-langgraph/README.md): a minimal graph and explicit config.
 - [Python adapter README](packages/adapter-pyodide/README.md): trusted LangGraph Python/pydantic-ai/DSPy Workers, checked bridge, durable interactions, deterministic DSPy replay and JavaScript policy.
 - [ADK adapter README](packages/adapter-adk/README.md): `adk-js` executor over the ADK 2.3.0 browser bundle: router-backed models, capability tools, checked streaming, confirmations and long-running tools as interactions, durable sessions and the supported agent shapes.
@@ -40,6 +41,7 @@
 ## Package coding guidance
 
 - [Core AGENTS](packages/core/AGENTS.md): lifecycle, policy and content-free instrumentation rules.
+- [Adapter kit AGENTS](packages/adapter-kit/AGENTS.md): pure shared helpers, erased framework types and preserved adapter boundaries.
 - [LangGraph adapter AGENTS](packages/adapter-langgraph/AGENTS.md): native semantics, config and unsupported interrupts.
 - [Python adapter AGENTS](packages/adapter-pyodide/AGENTS.md): Worker lifecycle, compiled wheel hashes, CSP and Python trust limits.
 - [Go adapter AGENTS](packages/adapter-go/AGENTS.md): module verification before compile, the bridge, the stored record and the agent-shape rules.

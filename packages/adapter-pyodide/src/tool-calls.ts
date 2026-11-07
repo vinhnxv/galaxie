@@ -2,71 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  type ArgumentChunk,
+  hasArgumentMirror,
+  isRecord as object,
+  rawArgumentChunks,
+  argumentChunks as sharedArgumentChunks,
+  outputText as sharedOutputText,
+} from '@galaxie/adapter-kit';
+import {
   type AIMessageChunk,
   type BaseMessage,
   isAIMessage,
   isAIMessageChunk,
-  type StandardMessageStructure,
 } from '@langchain/core/messages';
 import { type ToolCall, type ToolCallDelta, validToolCall } from './bridge.js';
 import { adapterFailure } from './errors.js';
 
-type ArgumentChunk = NonNullable<
-  AIMessageChunk<StandardMessageStructure>['tool_call_chunks']
->[number];
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-function rawArgumentChunks(message: BaseMessage): ArgumentChunk[] {
-  const raw: unknown = message.additional_kwargs['tool_calls'];
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((call, position) => {
-    if (!object(call) || !object(call['function'])) return [];
-    const fn = call['function'];
-    if (typeof fn['arguments'] !== 'string') return [];
-    return [
-      {
-        ...(typeof fn['name'] === 'string' ? { name: fn['name'] } : {}),
-        ...(typeof call['id'] === 'string' ? { id: call['id'] } : {}),
-        index: typeof call['index'] === 'number' ? call['index'] : position,
-        args: fn['arguments'],
-      },
-    ];
-  });
-}
 function argumentChunks(message: BaseMessage, includeRaw = true): ArgumentChunk[] {
-  if (!isAIMessage(message)) return [];
-  const calls = [
-    ...(message.tool_calls ?? []).map((call) => ({
-      name: call.name,
-      id: call.id,
-      args: JSON.stringify(call.args) ?? '',
-    })),
-    ...(message.invalid_tool_calls ?? []).map((call) => ({
-      name: call.name,
-      id: call.id,
-      args: call.args ?? '',
-    })),
-  ];
-  const normalized = [...calls];
-  for (const { name, id, args: rawArgs } of includeRaw ? rawArgumentChunks(message) : []) {
-    let args = rawArgs ?? '';
-    try {
-      args = JSON.stringify(JSON.parse(args));
-    } catch {}
-    if (!normalized.some((known) => known.name === name && known.id === id && known.args === args))
-      calls.push({ name, id, args });
-  }
-  return calls.map(({ name, id, args }, index) => ({
-    ...(name === undefined ? {} : { name }),
-    ...(id === undefined ? {} : { id }),
-    index,
-    args,
-  }));
+  return sharedArgumentChunks(message, isAIMessage(message), includeRaw, object);
 }
 
 export function outputText(message: BaseMessage): string {
-  return [message.text, ...argumentChunks(message).map((call) => call.args)].join('\n');
+  return sharedOutputText(message, isAIMessage(message), object);
 }
 // Python acts on the parsed calls only; raw provider mirrors stay in the checked text.
 export function toolCalls(message: BaseMessage): ToolCall[] {
@@ -139,15 +96,8 @@ export class GrowingOutput {
       ? (message as AIMessageChunk).tool_call_chunks
       : undefined;
     if (fragments?.length) {
-      for (const raw of rawArgumentChunks(message)) {
-        const mirrored = fragments.some(
-          (fragment, position) =>
-            fragment.args === raw.args &&
-            (fragment.name === undefined || raw.name === undefined || fragment.name === raw.name) &&
-            (fragment.id !== undefined && raw.id !== undefined
-              ? fragment.id === raw.id
-              : (fragment.index ?? position) === raw.index),
-        );
+      for (const raw of rawArgumentChunks(message, object)) {
+        const mirrored = hasArgumentMirror(raw, fragments);
         if (!mirrored) this.rawArgumentsText.push(raw.args ?? '');
       }
     }
