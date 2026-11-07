@@ -19,6 +19,7 @@
 - **`examples/host-remote`:** the unchanged English tutor with a same-origin OpenAI-compatible quiz stub, HTTP capabilities, renewable demo tokens and host-rendered progress confirmation. Feedback stays in-browser; MemorySaver starts over after reload. Node and headless Chromium tests exercise request privacy, consent, confirmation, tokens and CSP. See [the host README](../examples/host-remote/README.md) for the stub and deployment limits.
 - **`examples/adk-recipes`:** a [separate scripted browser host](../examples/adk-recipes/README.md) for financial-advisor rewrites on ADK JavaScript and Go and auditor/loan rewrites on ADK Python, with one chosen executor per document, checked text, model destinations and scoped loan checkpoint/recovery storage; missing optional runtime assets disable their entries, and no real-model result is claimed.
 - **`templates/local-only`:** a [copyable Vite + React starter](../templates/local-only/README.md) with its own one-question LangGraph agent, available Built-in AI first, immediate scripted mock fallback, size-disclosed WebLLM opt-in, an exhaustive fixed-message model-state table and fenced IndexedDB checkpoint/recovery restore. Automated tests use injected probes and fake engine handles; real-device behavior for this template is unverified.
+- **`templates/hybrid-gateway`:** a [copyable browser and Node starter](../templates/hybrid-gateway/README.md) running the identical agent through one host-server model route, with server-rendered prompt IDs, scoped demo tokens, per-user call quotas, idempotent notes and private document search. MemorySaver starts over on reload. Stub-upstream Node and headless-Chromium loopback tests are supplied. Production authentication/storage and real upstream behavior remain unverified.
 - **`tests/conformance`:** twelve graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix, plus dual-lane policy, lifecycle, budget and tracing tests. The [conformance README](../tests/conformance/README.md) lists the explicit-config APIs.
 - **`spikes/`:** three throwaway spikes: B0 (a 1.7B model on WebGPU), the local English tutor (a LangGraph.js agent on that model in Chrome) and [Spike C](../spikes/c-ui-path/README.md) (typed interrupt UI and session-checkpoint reload). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
@@ -95,6 +96,8 @@ flowchart TD
     Host["Host apps: examples/host-local, examples/host-http"]
     Starter["Template: templates/local-only, bundled one-question agent"]
     Starter --> Adapter & Models & Storage & ReactPkg
+    HybridStarter["Template: templates/hybrid-gateway, same agent and Node gateway"]
+    HybridStarter --> Adapter & Models & ReactPkg
     Tutor["Agent package: examples/english-tutor"]
     Host --> Tutor
     Host --> Adapter["adapter-langgraph"] & Models["models"] & Mcp["tools-mcp"] & Storage["storage-indexeddb"] & ReactPkg["react"]
@@ -166,6 +169,9 @@ galaxie/
 ├── scripts/
 │   ├── check-license.ts       SPDX headers and package license fields (ADR-0024)
 │   └── check-dependencies.ts  source and built-package dependency boundaries
+├── templates/
+│   ├── local-only/            browser-local starter with pending-question recovery
+│   └── hybrid-gateway/        same agent with a Node model and capability gateway
 ├── tests/conformance/         shared cases, native goldens and compatibility-matrix.json
 ├── spikes/                    throwaway spike code, outside the root workspace (brief §16.2)
 ├── biome.json  package.json  pnpm-workspace.yaml  tsconfig.base.json  vitest.config.ts
