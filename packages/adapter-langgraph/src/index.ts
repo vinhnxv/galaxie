@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export { createLangGraphAdapter, STREAM_MODES } from './adapter.js';
+export { type DecisionGate, type GatedDecision, gateDecision } from './decide.js';
 export type {
   CapabilityToolSpec,
   LangGraphAgent,

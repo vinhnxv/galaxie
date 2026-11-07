@@ -9,9 +9,10 @@ See the [README](README.md) and [contracts](../../docs/system-design.md#6-core-r
 ## Entry points
 
 - `@galaxie/adapter-langgraph` exports `createLangGraphAdapter`, `STREAM_MODES`
-  and `requestInteraction`/`requestSurface` from [src/index.ts](src/index.ts).
+  and `requestInteraction`/`requestSurface`/`gateDecision` from [src/index.ts](src/index.ts).
 - Exported types include `LangGraphAgent`, `LangGraphHost`, `LangGraphGraph`,
-  `LangGraphServices` and `LangGraphChatModel`; there are no public subpaths.
+  `LangGraphServices`, `LangGraphChatModel`, `DecisionGate` and `GatedDecision`;
+  there are no public subpaths.
 - The adapter uses `@langchain/langgraph/web`; keep Node context imports out.
 
 ## Do
@@ -30,6 +31,9 @@ async function reply(host: LangGraphHost, config: LangGraphRunnableConfig) {
 The role and provider must already be declared and bound by the host.
 
 - Pass `config` to `requestInteraction(request, config)` or `requestSurface(record, config)`, including after an await. Surface records are reduced plain JSON; core revalidates them.
+- Put `host.langchain.decide` and `gateDecision` in separate nodes, storing answers in
+  state: an interrupted node re-runs from its start on resume. Gate thresholds and
+  interaction text are host-authored; a decision can add a question, never remove a confirmation.
 - Keep one interrupt per node. New surface revisions use a later node and a new interrupt ID, never an in-place pending update.
 - Compile graphs with `host.langchain.checkpointer()` and call tools through
   `host.capabilities.call(name, input, config)`.

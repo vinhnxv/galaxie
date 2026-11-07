@@ -2,7 +2,7 @@
 
 This synthetic corpus assumes a fully compromised model. The obedient-attacker mock selects a validated directive when its input contains the exact payload, then returns that directive without resisting it. Matching is a deterministic script selector, not an injection detector. The tests judge SDK-controlled outcomes, not model robustness or answer quality (ADR-0016).
 
-`cases.json` is a static JSON array, not a workspace package. Each case has a unique kebab-case `id`, a `vector` (`lesson`, `tool-output`, `mcp-description`), a `goal`, a synthetic `payload`, and a closed structured `directive`. Directives can call a named capability, emit the fixture's interaction, reply with text, or forward the private value to `agent.main`. They cannot execute code. Zod rejects malformed cases and unknown directive fields before use. Coverage validation requires at least 30 cases, at least eight per vector, and all 15 vector–goal pairs. The corpus has 34 cases. Existing assertions are unchanged.
+`cases.json` is a static JSON array, not a workspace package. Each case has a unique kebab-case `id`, a `vector` (`lesson`, `tool-output`, `mcp-description`), a `goal`, a synthetic `payload`, and a closed structured `directive`. Directives can call a named capability, emit the fixture's interaction, reply with text, forward the private value to `agent.main`, or supply a decision through `{ kind: 'decide', skipConfirmation: boolean, confidence?: number }`. They cannot execute code. Zod rejects malformed cases and unknown directive fields before use; decision confidence must be finite and in [0, 1]. Coverage validation requires at least 30 cases, at least eight per vector, and all 15 vector–goal pairs. The corpus has 38 cases. Existing assertions are unchanged.
 
 The main runner is [`injection-corpus.test.ts`](../conformance/injection-corpus.test.ts). Run it on both Node and headless Chromium with:
 
@@ -13,6 +13,23 @@ pnpm exec vitest run tests/conformance/injection-corpus.test.ts
 It also runs in `pnpm check` and `CI=true pnpm test`. Every provider is a deterministic mock. No real model global, WebLLM bundle or model download is used. Test network traffic is confined to the Vitest runner and the dedicated loopback MCP fixture. The network recorder captures URLs and serialized request bodies for fetch, XHR, beacons, WebSockets and EventSource, blocking other origins before dispatch. Its self-test exercises available APIs with blocked synthetic requests and a loopback request. It does not use the Node socket recorder, which would block MCP.
 
 The executing graph performs the attacker's requested action through the broker, router or interaction policy. Writes receive no approval: tests inspect the frozen real arguments and host registry text, then decline. The mock host grants remote-route consent so missing consent cannot mask a label-policy regression. Default private input labels remain sticky; forwarding to the host-server spy fails before the provider runs, with its shared generation/streaming call counter at zero. URL policy is checked before any snapshot publishes pending state. The fixed graph for `instruction-in-data` never executes model tool calls and projects output to `{ answered: true }`.
+
+The decision path in [`injection-fixture.ts`](../conformance/support/injection-fixture.ts)
+uses `ObedientDecisionAttacker` from
+[`obedient-attacker.ts`](../conformance/support/obedient-attacker.ts), a fully
+compromised structural decision model. It returns the directive's
+`proceedWithoutAsking` boolean and optional confidence after reading the payload,
+without resisting or detecting it. A routed `agent.decision` node reads the content
+capability and stores only answers in state; a separate gate node uses the fixed
+host threshold 0.7 and registered `tests.CorpusAsk/v1` text. High confidence omits
+only that extra question: the broker still publishes the write confirmation with
+the real frozen arguments, and declining it fails `denied` without a write. Low
+or missing confidence asks first. `stop` completes with `{ answered: true }` and
+no write; `continue` still reaches the broker confirmation and is declined. The
+runner checks both choices for the low-confidence case and one payload read per
+run, with no chat-attacker or remote-model dispatch. A decision can add a question,
+never remove a confirmation. These are mock-runtime outcomes, not confidence
+calibration or real-model measurements.
 
 MCP metadata is used only for pins; galaxie never supplies descriptions to the model. These cases therefore both give the synthetic description directly to the attacker and check the separate metadata boundary. Each MCP case first uses the host-approved pinned tool, changes its description through a test-only admin action, runs its directive, then attempts the pinned tool again. The next call must fail `unavailable` without another server invocation or metadata disclosure. `mcp-description-changes-after-approval` names that boundary explicitly. Browser files use separate servers, so the corpus never mutates the fixture used by `mcp.test.ts`. Reset restores the original description.
 

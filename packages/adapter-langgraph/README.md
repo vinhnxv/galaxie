@@ -113,8 +113,76 @@ is never returned or stored. Custom executors supplying `RunRequest` directly mu
 its `payload` callback to use decisions; the adapter fails closed without it.
 
 The [structured-output decision provider](../models/README.md#structured-output-decisions)
-reuses an available chat model without a nested text lease. Confidence gates,
-dedicated models, media, extraction and automatic batching remain outside this implementation.
+reuses an available chat model without a nested text lease. Dedicated models,
+media, extraction and automatic batching remain outside this implementation.
+
+## Confidence-gated decisions
+
+`gateDecision(answers, gate, config)` adds a registered interaction when any checked
+answer lacks confidence or has confidence strictly below the host's threshold.
+Equality passes. `threshold` must be finite and in [0, 1]; it comes only from trusted
+host configuration, never state, model output or tool output. The host must calibrate
+confidence on its own questions and domains before enabling a threshold (ADR-0028).
+`questions` optionally restricts the check to named answers; the default checks every
+answered question. An empty selection, duplicate or absent name fails with fixed
+`invalid`, as does an invalid threshold or non-object interaction.
+
+No confidence always asks, even at threshold zero. Malformed confidence on hand-built
+answers counts as missing, and confidence accessors are never invoked. The
+structured-output decision provider supplies no confidence, even if its generated
+JSON volunteers one, so a gate over that provider always asks. Answers returned by
+the gate are detached and frozen.
+
+Keep the decision call and gate in **separate graph nodes**, storing the answers in
+graph state. LangGraph re-runs an interrupted node from its start on resume;
+combining inference and the gate in one node leases the model again. This helper
+does not work around native node re-execution.
+
+```ts
+import { gateDecision } from '@galaxie/adapter-langgraph';
+import type { DecisionResult, ViewRevision } from '@galaxie/core';
+import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
+
+const state = Annotation.Root({
+  message: Annotation<string>,
+  answers: Annotation<DecisionResult['answers']>,
+  continue: Annotation<boolean>,
+});
+// Inside the agent factory; triage and tests.DecisionAsk/v1 are host-bound.
+const graph = new StateGraph(state)
+  .addNode('decide', async ({ message }, config) => ({
+    answers: await host.langchain.decide('triage', {
+      state: { message },
+      questions: { proceed: { type: 'boolean', instructions: 'May the agent continue?' } },
+    }, config),
+  }))
+  .addNode('gate', ({ answers }, config) => {
+    const result = gateDecision(answers, {
+      threshold: 0.7, // Host-calibrated configuration, never read from state.
+      interaction: {
+        component: 'tests.DecisionAsk/v1',
+        props: { text: 'Would you like to continue?' },
+        surfaceId: 'decision',
+        viewRevision: 'v1' as ViewRevision,
+      },
+    }, config);
+    return { continue: result.asked
+      ? result.submission?.action === 'continue'
+      : result.answers['proceed']?.value === true };
+  })
+  .addEdge(START, 'decide')
+  .addEdge('decide', 'gate')
+  .addEdge('gate', END)
+  .compile({ checkpointer: host.langchain.checkpointer() });
+```
+
+The gate returns `{ answers, asked: false }` when confidence passes, or
+`{ answers, asked: true, submission }` after the host dispatches a valid action to
+the pending question. The interaction must be host-authored and contain no answers,
+state or model text. The helper only adds a question: it never removes, skips or
+satisfies capability confirmations, host confirmations, approvals or consent prompts,
+and never calls a capability. A confident model decision can still be influenced by
+untrusted state; required confirmations remain with the broker.
 
 ## Model-chosen capability tools
 

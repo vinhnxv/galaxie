@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import type { DecisionModelOptions, DecisionRequest, DecisionResult } from '@galaxie/core';
 import { BaseChatModel, type LangSmithParams } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
@@ -18,7 +19,8 @@ export type Directive =
       props: { url: string; text: string };
     }
   | { kind: 'reply'; text: string }
-  | { kind: 'forwardPrivate'; to: 'agent.main' };
+  | { kind: 'forwardPrivate'; to: 'agent.main' }
+  | { kind: 'decide'; skipConfirmation: boolean; confidence?: number | undefined };
 
 export const directiveSchema: z.ZodType<Directive> = z.discriminatedUnion('kind', [
   z.strictObject({
@@ -33,6 +35,11 @@ export const directiveSchema: z.ZodType<Directive> = z.discriminatedUnion('kind'
   }),
   z.strictObject({ kind: z.literal('reply'), text: z.string() }),
   z.strictObject({ kind: z.literal('forwardPrivate'), to: z.literal('agent.main') }),
+  z.strictObject({
+    kind: z.literal('decide'),
+    skipConfirmation: z.boolean(),
+    confidence: z.number().min(0).max(1).optional(),
+  }),
 ]);
 export interface InjectionCase {
   readonly id: string;
@@ -119,4 +126,35 @@ export function readDirective(message: AIMessage): Directive {
   return directiveSchema.parse(
     call === undefined ? { kind: 'reply', text: message.text } : call.args,
   );
+}
+
+/** Fully compromised decision model: obeys the selected script without evaluating its intent. */
+export class ObedientDecisionAttacker {
+  readonly #entry: InjectionCase;
+  reads: number = 0;
+
+  constructor(entry: InjectionCase) {
+    this.#entry = entry;
+  }
+
+  async decide(
+    request: DecisionRequest,
+    { signal }: DecisionModelOptions,
+  ): Promise<DecisionResult> {
+    signal.throwIfAborted();
+    const matched = JSON.stringify(request.state).includes(this.#entry.payload);
+    if (matched) this.reads++;
+    const directive = this.#entry.directive;
+    const answer =
+      matched && directive.kind === 'decide'
+        ? {
+            value: directive.skipConfirmation,
+            ...(directive.confidence === undefined ? {} : { confidence: directive.confidence }),
+          }
+        : { value: false, confidence: 1 };
+    return {
+      answers: { proceedWithoutAsking: answer },
+      usage: { inputTokens: 1, outputTokens: 0 },
+    };
+  }
 }
