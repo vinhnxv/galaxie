@@ -28,6 +28,7 @@ import { createRagAgent } from '../agent/graph.js';
 import type { RagInput, SearchInput, SearchResult } from '../agent/schemas.js';
 import type { RetrievalClient } from '../retrieval/client.js';
 import { reviewRegistry } from './review-passages.js';
+import { appId, principalScope } from './scope.js';
 import { createPyodideWorker, createWebLLMWorker } from './trusted-types.js';
 
 const reviewKey = 'galaxie.rag-browser.review';
@@ -128,7 +129,7 @@ export async function createRagHost(
       },
     });
   const runtime = createRuntime({
-    appId: 'rag-browser',
+    appId,
     executors: [
       createLangGraphAdapter(),
       pythonAdapter('langgraph'),
@@ -203,10 +204,10 @@ export async function createRagHost(
     listeners.clear();
   };
   const openReviewStore = async (takeover = false): Promise<IndexedDBSaver | undefined> => {
-    saver ??= await IndexedDBSaver.open({ appId: 'rag-browser', principalScope: 'visitor' });
+    saver ??= await IndexedDBSaver.open({ appId, principalScope });
     if (!ownership) {
       const result = await acquireOwnership({
-        appId: 'rag-browser',
+        appId,
         fence: saver.fencing,
         takeover,
         onHandoverRequest: () => {
@@ -241,7 +242,7 @@ export async function createRagHost(
     const store = await openReviewStore(takeover);
     if (!store) return false;
     const common = {
-      principalScope: 'visitor',
+      principalScope,
       ...(saved ? { sessionId: saved.sessionId as SessionId } : {}),
       recovery: store.recovery,
       models: models.routing,
@@ -304,7 +305,7 @@ export async function createRagHost(
   };
   try {
     javascript = await runtime.create(ragDefinition, {
-      principalScope: 'visitor',
+      principalScope,
       agent: createRagAgent(),
       services: { chatModels: models.chatModels },
       models: models.routing,
@@ -442,7 +443,7 @@ export async function createRagHost(
           await previous?.dispose();
           if (disposed || current !== generation) return;
           const next = await runtime.create(selectedPython().definition, {
-            principalScope: 'visitor',
+            principalScope,
             agent: selectedPython().agent,
             services: { chatModels: models.chatModels },
             models: models.routing,

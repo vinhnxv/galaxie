@@ -26,7 +26,12 @@ test.skipIf(typeof indexedDB === 'undefined')(
     });
     const events: RetrievalEvent[] = [];
     const service = new RetrievalService((event) => events.push(event));
-    const input = { appId: `cached-files-${crypto.randomUUID()}`, mock: false, corpus: null };
+    const input = {
+      appId: `cached-files-${crypto.randomUUID()}`,
+      principalScope: 'visitor',
+      mock: false,
+      corpus: null,
+    };
     try {
       await service.handle({ id: 1, type: 'init', input });
       expect(events.at(-1)).toMatchObject({

@@ -47,7 +47,7 @@ describe.skipIf(typeof indexedDB === 'undefined')('model removal and cached inde
   let fresh: RetrievalService | undefined;
   let cache: IndexCache;
   let digest: string;
-  let input: { appId: string; mock: boolean; corpus: Corpus };
+  let input: { appId: string; principalScope: string; mock: boolean; corpus: Corpus };
 
   beforeEach(async () => {
     fake.files = true;
@@ -62,8 +62,13 @@ describe.skipIf(typeof indexedDB === 'undefined')('model removal and cached inde
     events = [];
     fresh = undefined;
     service = new RetrievalService((event) => events.push(event));
-    input = { appId: `remove-model-${crypto.randomUUID()}`, mock: false, corpus };
-    cache = new IndexCache(input.appId);
+    input = {
+      appId: `remove-model-${crypto.randomUUID()}`,
+      principalScope: 'visitor',
+      mock: false,
+      corpus,
+    };
+    cache = new IndexCache(input.appId, input.principalScope);
     digest = await fingerprint(
       await sha256(new TextEncoder().encode(JSON.stringify(corpus))),
       false,

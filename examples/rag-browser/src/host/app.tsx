@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { pythonBuild } from 'virtual:rag-python';
-import type { RunId } from '@galaxie/core';
+import { type RunId, watchInvalidation } from '@galaxie/core';
 import { AgentSurface, ModelRoutes } from '@galaxie/react';
 import { type ReactElement, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { type RagOutput, RagOutputSchema, type SearchMode } from '../agent/schemas.js';
@@ -11,6 +11,7 @@ import type { RetrievalClient } from '../retrieval/client.js';
 import { type EvaluationRow, evaluate } from './evaluate.js';
 import { reviewRegistry } from './review-passages.js';
 import type { RagExecutor, RagHost } from './runtime.js';
+import { appId, principalScope } from './scope.js';
 import { answerDelta, startsModelTurn } from './stream.js';
 
 export interface AppProps {
@@ -235,6 +236,15 @@ export function App({
   const clear = async (): Promise<void> => {
     if (host?.reviewing) await host.startOver();
     await retrieval.clear();
+    // Best effort: the local wipe above has already committed.
+    try {
+      const watcher = watchInvalidation({ appId, principalScope });
+      try {
+        watcher.announce();
+      } finally {
+        watcher.close();
+      }
+    } catch {}
   };
   const runEvaluation = async (): Promise<void> => {
     controller.current = new AbortController();
@@ -694,8 +704,10 @@ export function App({
           . Mock mode uses original synthetic passages.
         </p>
         <p>
-          The retrieval cache is separate from galaxie session storage and its retention and logout
-          controls. Model answers and retrieved passages render as text.
+          The retrieval cache is scoped by app and principal and wiped by Clear data or the
+          principal-invalidation signal. It is separate from galaxie session storage and has no
+          retention sweep. This example uses a constant visitor principal and has no login. Model
+          answers and retrieved passages render as text.
         </p>
         <button
           type="button"

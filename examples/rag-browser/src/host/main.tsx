@@ -5,6 +5,7 @@ import './zod-config.js';
 import { createRoot } from 'react-dom/client';
 import type { Corpus } from '../corpus.js';
 import type { RagHost, RagModels } from './runtime.js';
+import { appId, principalScope } from './scope.js';
 
 const [
   { parseCorpus },
@@ -51,7 +52,8 @@ if (import.meta.env.MODE === 'mock') {
 }
 const startIndex = (): Promise<unknown> =>
   retrieval.init({
-    appId: 'rag-browser',
+    appId,
+    principalScope,
     mock,
     ...(mock ? { corpus } : { corpusUrl: '/data/squad-dev.json' as const }),
   });

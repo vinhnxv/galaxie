@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { type InvalidationWatcher, watchInvalidation } from '@galaxie/core';
 import { type Corpus, parseCorpus, sha256 } from '../corpus.js';
 import { fingerprint, IndexCache } from './cache.js';
 import { chunkText } from './chunk.js';
@@ -18,11 +19,12 @@ import {
 } from './protocol.js';
 
 const clearedMessage = 'The retrieval data was cleared. Please retry.';
+const cacheUnavailableMessage = 'The retrieval cache is unavailable.';
 const knownErrors = new Set([
   invalidMessage,
   webgpuMessage,
   clearedMessage,
-  'The retrieval cache is unavailable.',
+  cacheUnavailableMessage,
   'The embedding model download failed.',
   'The embedding model file failed verification.',
   'The WebGPU embedding model could not be started.',
@@ -39,6 +41,7 @@ export class RetrievalService {
   private corpus: Corpus | null = null;
   private digest: string = '';
   private cache: IndexCache | undefined;
+  private invalidation: InvalidationWatcher | undefined;
   private epoch: number = 0;
   private index: RetrievalIndex | undefined;
   private embedder: Embedder | undefined;
@@ -59,6 +62,34 @@ export class RetrievalService {
     this.index = undefined;
     this.pasted = [];
     this.publish({ ...emptySnapshot, corpusMissing: this.corpus === null });
+  }
+  private async clear(cache = this.cache): Promise<void> {
+    if (!cache) throw new Error('The index is not ready.');
+    const epoch = await cache.clear();
+    if (this.cache === cache) this.invalidate(epoch);
+  }
+  private watchPrincipal(input: InitInput, cache: IndexCache): void {
+    const watcher = watchInvalidation(input);
+    this.invalidation = watcher;
+    watcher.signal.addEventListener(
+      'abort',
+      () => {
+        watcher.close();
+        void this.clear(cache)
+          .catch(() => {
+            if (this.cache !== cache) return;
+            // The stored wipe failed: drop what this Worker holds anyway, and keep watching so
+            // the next notice retries the wipe.
+            this.index = undefined;
+            this.pasted = [];
+            this.publish({ status: 'failed', message: cacheUnavailableMessage });
+          })
+          .finally(() => {
+            if (this.cache === cache) this.watchPrincipal(input, cache);
+          });
+      },
+      { once: true },
+    );
   }
   private async makeEmbedder(): Promise<Embedder> {
     if (this.embedder) return this.embedder;
@@ -81,7 +112,10 @@ export class RetrievalService {
     return this.embedder;
   }
   private async initialize(input: InitInput): Promise<void> {
+    this.invalidation?.close();
+    this.invalidation = undefined;
     this.cache?.close();
+    this.cache = undefined;
     await this.embedder?.dispose();
     this.embedder = undefined;
     this.index = undefined;
@@ -110,7 +144,17 @@ export class RetrievalService {
       }
     }
     this.digest = await fingerprint(await sha256(bytes), input.mock);
-    this.cache = new IndexCache(input.appId, (epoch) => this.invalidate(epoch));
+    try {
+      if (typeof navigator === 'undefined' || !navigator.locks) throw new Error();
+      this.cache = new IndexCache(input.appId, input.principalScope, (epoch) =>
+        this.invalidate(epoch),
+      );
+      this.watchPrincipal(input, this.cache);
+    } catch {
+      this.cache?.close();
+      this.cache = undefined;
+      throw new Error(cacheUnavailableMessage);
+    }
     this.snapshot = { ...emptySnapshot, corpusMissing: this.corpus === null };
     await this.prepare(false);
   }
@@ -270,8 +314,7 @@ export class RetrievalService {
           break;
         }
         case 'clear': {
-          if (!this.cache) throw new Error('The index is not ready.');
-          this.invalidate(await this.cache.clear());
+          await this.clear();
           result = this.snapshot;
           break;
         }
@@ -301,7 +344,10 @@ export class RetrievalService {
     }
   }
   async dispose(): Promise<void> {
+    this.invalidation?.close();
+    this.invalidation = undefined;
     this.cache?.close();
+    this.cache = undefined;
     await this.embedder?.dispose();
   }
 }
