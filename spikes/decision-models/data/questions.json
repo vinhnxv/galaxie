@@ -1,0 +1,2840 @@
+{
+  "schema": "galaxie.spike-decision-models.questions/v1",
+  "seed": 20261107,
+  "splitPolicy": "Even template index: calibration; odd: evaluation; paired slots stratified by domain and type.",
+  "eceBins": 10,
+  "questions": [
+    {
+      "id": "tutor-boolean-01",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261107 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-02",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261108 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-boolean-03",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261109 is incomplete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-04",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261110 is incomplete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-boolean-05",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261111 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-06",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261112 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-boolean-07",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261113 is incomplete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-08",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261114 is incomplete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-boolean-09",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261115 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-10",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261116 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-boolean-11",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261117 is incomplete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-12",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261118 is incomplete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-boolean-13",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261119 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-14",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261120 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-boolean-15",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261121 is incomplete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-16",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261122 is incomplete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-boolean-17",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261123 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-boolean-18",
+      "domain": "tutor",
+      "type": "boolean",
+      "state": "Exercise 20261124 is complete. Completion requires all steps.",
+      "prompt": "Are all required steps complete?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-choice-01",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261107 concerns needs a hint.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "hint",
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-choice-02",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261108 concerns needs a hint.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "hint",
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-choice-03",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261109 concerns needs repeated practice.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "practice",
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-choice-04",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261110 concerns needs repeated practice.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "practice",
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-choice-05",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261111 concerns is ready to advance.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "advance",
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-choice-06",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261112 concerns is ready to advance.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "advance",
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-choice-07",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261113 concerns needs a hint.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "hint",
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-choice-08",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261114 concerns needs a hint.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "hint",
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-choice-09",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261115 concerns needs repeated practice.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "practice",
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-choice-10",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261116 concerns needs repeated practice.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "practice",
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-choice-11",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261117 concerns is ready to advance.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "advance",
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-choice-12",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261118 concerns is ready to advance.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "advance",
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-choice-13",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261119 concerns needs a hint.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "hint",
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-choice-14",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261120 concerns needs a hint.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "hint",
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-choice-15",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261121 concerns needs repeated practice.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "practice",
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-choice-16",
+      "domain": "tutor",
+      "type": "choice",
+      "state": "Synthetic case 20261122 concerns needs repeated practice.",
+      "prompt": "Which lesson action matches the recorded need?",
+      "options": {
+        "hint": "Offer a hint",
+        "practice": "Repeat practice",
+        "advance": "Advance lesson"
+      },
+      "label": "practice",
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-score-01",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261107: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-score-02",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261108: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-score-03",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261109: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-score-04",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261110: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-score-05",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261111: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-score-06",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261112: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-score-07",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261113: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-score-08",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261114: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-score-09",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261115: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-score-10",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261116: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-score-11",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261117: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-score-12",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261118: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-score-13",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261119: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-score-14",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261120: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "evaluation"
+    },
+    {
+      "id": "tutor-score-15",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261121: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "calibration"
+    },
+    {
+      "id": "tutor-score-16",
+      "domain": "tutor",
+      "type": "score",
+      "state": "Synthetic tutor checklist 20261122: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-01",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261207 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-02",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261208 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-03",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261209 has no active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-04",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261210 has no active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-05",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261211 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-06",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261212 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-07",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261213 has no active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-08",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261214 has no active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-09",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261215 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-10",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261216 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-11",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261217 has no active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-12",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261218 has no active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-13",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261219 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-14",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261220 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-15",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261221 has no active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-16",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261222 has no active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-boolean-17",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261223 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "support-boolean-18",
+      "domain": "support",
+      "type": "boolean",
+      "state": "Ticket 20261224 has an active subscription. Only active subscriptions include priority care.",
+      "prompt": "Does this ticket qualify for priority care?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-choice-01",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261207 concerns a parcel issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "delivery",
+      "split": "calibration"
+    },
+    {
+      "id": "support-choice-02",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261208 concerns a parcel issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "delivery",
+      "split": "evaluation"
+    },
+    {
+      "id": "support-choice-03",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261209 concerns a software error.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "technical",
+      "split": "calibration"
+    },
+    {
+      "id": "support-choice-04",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261210 concerns a software error.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "technical",
+      "split": "evaluation"
+    },
+    {
+      "id": "support-choice-05",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261211 concerns an invoice issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "billing",
+      "split": "calibration"
+    },
+    {
+      "id": "support-choice-06",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261212 concerns an invoice issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "billing",
+      "split": "evaluation"
+    },
+    {
+      "id": "support-choice-07",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261213 concerns a parcel issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "delivery",
+      "split": "calibration"
+    },
+    {
+      "id": "support-choice-08",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261214 concerns a parcel issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "delivery",
+      "split": "evaluation"
+    },
+    {
+      "id": "support-choice-09",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261215 concerns a software error.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "technical",
+      "split": "calibration"
+    },
+    {
+      "id": "support-choice-10",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261216 concerns a software error.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "technical",
+      "split": "evaluation"
+    },
+    {
+      "id": "support-choice-11",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261217 concerns an invoice issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "billing",
+      "split": "calibration"
+    },
+    {
+      "id": "support-choice-12",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261218 concerns an invoice issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "billing",
+      "split": "evaluation"
+    },
+    {
+      "id": "support-choice-13",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261219 concerns a parcel issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "delivery",
+      "split": "calibration"
+    },
+    {
+      "id": "support-choice-14",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261220 concerns a parcel issue.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "delivery",
+      "split": "evaluation"
+    },
+    {
+      "id": "support-choice-15",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261221 concerns a software error.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "technical",
+      "split": "calibration"
+    },
+    {
+      "id": "support-choice-16",
+      "domain": "support",
+      "type": "choice",
+      "state": "Synthetic case 20261222 concerns a software error.",
+      "prompt": "Which support queue owns this issue?",
+      "options": {
+        "billing": "Billing queue",
+        "delivery": "Delivery queue",
+        "technical": "Technical queue"
+      },
+      "label": "technical",
+      "split": "evaluation"
+    },
+    {
+      "id": "support-score-01",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261207: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "calibration"
+    },
+    {
+      "id": "support-score-02",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261208: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-score-03",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261209: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "calibration"
+    },
+    {
+      "id": "support-score-04",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261210: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-score-05",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261211: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "calibration"
+    },
+    {
+      "id": "support-score-06",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261212: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-score-07",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261213: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "calibration"
+    },
+    {
+      "id": "support-score-08",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261214: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-score-09",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261215: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "calibration"
+    },
+    {
+      "id": "support-score-10",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261216: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-score-11",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261217: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "calibration"
+    },
+    {
+      "id": "support-score-12",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261218: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-score-13",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261219: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "calibration"
+    },
+    {
+      "id": "support-score-14",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261220: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "evaluation"
+    },
+    {
+      "id": "support-score-15",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261221: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "calibration"
+    },
+    {
+      "id": "support-score-16",
+      "domain": "support",
+      "type": "score",
+      "state": "Synthetic support checklist 20261222: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-01",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261307: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-02",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261308: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-03",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261309: the user has not confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-04",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261310: the user has not confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-05",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261311: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-06",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261312: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-07",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261313: the user has not confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-08",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261314: the user has not confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-09",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261315: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-10",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261316: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-11",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261317: the user has not confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-12",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261318: the user has not confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-13",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261319: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-14",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261320: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-15",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261321: the user has not confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-16",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261322: the user has not confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-boolean-17",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261323: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-boolean-18",
+      "domain": "write-confirmation",
+      "type": "boolean",
+      "state": "Draft 20261324: the user has already confirmed this exact write. Confirmation is mandatory.",
+      "prompt": "Has the user confirmed this exact write?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-choice-01",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261307 concerns denied by the user.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "stop",
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-choice-02",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261308 concerns denied by the user.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "stop",
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-choice-03",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261309 concerns pending confirmation.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "ask",
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-choice-04",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261310 concerns pending confirmation.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "ask",
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-choice-05",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261311 concerns confirmed for this exact write.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "submit",
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-choice-06",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261312 concerns confirmed for this exact write.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "submit",
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-choice-07",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261313 concerns denied by the user.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "stop",
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-choice-08",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261314 concerns denied by the user.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "stop",
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-choice-09",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261315 concerns pending confirmation.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "ask",
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-choice-10",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261316 concerns pending confirmation.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "ask",
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-choice-11",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261317 concerns confirmed for this exact write.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "submit",
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-choice-12",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261318 concerns confirmed for this exact write.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "submit",
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-choice-13",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261319 concerns denied by the user.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "stop",
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-choice-14",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261320 concerns denied by the user.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "stop",
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-choice-15",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261321 concerns pending confirmation.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "ask",
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-choice-16",
+      "domain": "write-confirmation",
+      "type": "choice",
+      "state": "Synthetic case 20261322 concerns pending confirmation.",
+      "prompt": "Which action follows the recorded confirmation state?",
+      "options": {
+        "ask": "Ask for confirmation",
+        "submit": "Submit confirmed write",
+        "stop": "Stop after denial"
+      },
+      "label": "ask",
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-score-01",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261307: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-score-02",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261308: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-score-03",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261309: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-score-04",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261310: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-score-05",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261311: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-score-06",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261312: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-score-07",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261313: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-score-08",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261314: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-score-09",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261315: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-score-10",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261316: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-score-11",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261317: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-score-12",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261318: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-score-13",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261319: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-score-14",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261320: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "evaluation"
+    },
+    {
+      "id": "write-confirmation-score-15",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261321: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "calibration"
+    },
+    {
+      "id": "write-confirmation-score-16",
+      "domain": "write-confirmation",
+      "type": "score",
+      "state": "Synthetic write-confirmation checklist 20261322: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-01",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261407 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-02",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261408 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-03",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261409 is labeled public. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-04",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261410 is labeled public. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-05",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261411 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-06",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261412 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-07",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261413 is labeled public. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-08",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261414 is labeled public. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-09",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261415 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-10",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261416 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-11",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261417 is labeled public. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-12",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261418 is labeled public. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-13",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261419 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-14",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261420 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-15",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261421 is labeled public. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": false,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-16",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261422 is labeled public. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": false,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-boolean-17",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261423 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-boolean-18",
+      "domain": "privacy",
+      "type": "boolean",
+      "state": "Document 20261424 is labeled private-user. The default policy keeps private-user documents in the browser.",
+      "prompt": "Does this document require browser-only processing?",
+      "options": null,
+      "label": true,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-choice-01",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261407 concerns private-user text for local processing.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "browser",
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-choice-02",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261408 concerns private-user text for local processing.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "browser",
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-choice-03",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261409 concerns a public catalog lookup.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "public-index",
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-choice-04",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261410 concerns a public catalog lookup.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "public-index",
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-choice-05",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261411 concerns a private database update requiring backend authorization.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "backend",
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-choice-06",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261412 concerns a private database update requiring backend authorization.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "backend",
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-choice-07",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261413 concerns private-user text for local processing.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "browser",
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-choice-08",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261414 concerns private-user text for local processing.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "browser",
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-choice-09",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261415 concerns a public catalog lookup.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "public-index",
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-choice-10",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261416 concerns a public catalog lookup.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "public-index",
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-choice-11",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261417 concerns a private database update requiring backend authorization.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "backend",
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-choice-12",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261418 concerns a private database update requiring backend authorization.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "backend",
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-choice-13",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261419 concerns private-user text for local processing.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "browser",
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-choice-14",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261420 concerns private-user text for local processing.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "browser",
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-choice-15",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261421 concerns a public catalog lookup.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "public-index",
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-choice-16",
+      "domain": "privacy",
+      "type": "choice",
+      "state": "Synthetic case 20261422 concerns a public catalog lookup.",
+      "prompt": "Which destination matches the stated operation and policy?",
+      "options": {
+        "browser": "Browser-only processing",
+        "public-index": "Public index lookup",
+        "backend": "Authorized backend capability"
+      },
+      "label": "public-index",
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-score-01",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261407: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-score-02",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261408: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-score-03",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261409: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-score-04",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261410: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-score-05",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261411: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-score-06",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261412: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-score-07",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261413: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-score-08",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261414: 1 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 2,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-score-09",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261415: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-score-10",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261416: 2 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 3,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-score-11",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261417: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-score-12",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261418: 3 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 4,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-score-13",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261419: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-score-14",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261420: 4 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 5,
+      "split": "evaluation"
+    },
+    {
+      "id": "privacy-score-15",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261421: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "calibration"
+    },
+    {
+      "id": "privacy-score-16",
+      "domain": "privacy",
+      "type": "score",
+      "state": "Synthetic privacy checklist 20261422: 0 of 4 required checks are complete. The recorded level is completed checks plus one.",
+      "prompt": "What is the recorded checklist level on the five-level scale?",
+      "options": {
+        "levels": 5,
+        "legend": {
+          "1": "No checks",
+          "2": "One check",
+          "3": "Two checks",
+          "4": "Three checks",
+          "5": "All four checks"
+        }
+      },
+      "label": 1,
+      "split": "evaluation"
+    }
+  ]
+}
