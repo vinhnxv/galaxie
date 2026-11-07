@@ -44,6 +44,7 @@ export const SearchResultSchema: z.ZodType<SearchResult, SearchResult> = z.stric
 
 export interface InitInput {
   appId: string;
+  principalScope: string;
   mock: boolean;
   corpus?: Corpus | null | undefined;
   corpusUrl?: '/data/squad-dev.json' | undefined;
@@ -51,6 +52,7 @@ export interface InitInput {
 export const InitInputSchema: z.ZodType<InitInput, InitInput> = z
   .strictObject({
     appId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/),
+    principalScope: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/),
     mock: z.boolean(),
     corpus: CorpusSchema.nullable().optional(),
     corpusUrl: z.literal('/data/squad-dev.json').optional(),

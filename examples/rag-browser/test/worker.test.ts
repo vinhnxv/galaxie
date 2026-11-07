@@ -16,16 +16,26 @@ test('a terminal Worker failure rejects pending and future requests', async () =
   });
   const client = new RetrievalClient(port as unknown as Worker);
   try {
-    const pending = client.init({ appId: 'failed-worker', mock: true, corpus: null });
+    const pending = client.init({
+      appId: 'failed-worker',
+      principalScope: 'visitor',
+      mock: true,
+      corpus: null,
+    });
     const rejected = expect(pending).rejects.toThrow('The retrieval Worker is unavailable.');
     port.dispatchEvent(new Event('error'));
     await rejected;
     await expect(
       client.search({ query: 'capital of France', mode: 'fulltext', k: 10 }),
     ).rejects.toThrow('The retrieval Worker is unavailable.');
-    await expect(client.init({ appId: 'failed-worker', mock: true, corpus: null })).rejects.toThrow(
-      'The retrieval Worker is unavailable.',
-    );
+    await expect(
+      client.init({
+        appId: 'failed-worker',
+        principalScope: 'visitor',
+        mock: true,
+        corpus: null,
+      }),
+    ).rejects.toThrow('The retrieval Worker is unavailable.');
     expect(port.postMessage).toHaveBeenCalledTimes(1);
   } finally {
     client.dispose();
@@ -58,13 +68,17 @@ test.skipIf(typeof indexedDB === 'undefined' || typeof Worker === 'undefined')(
       await add.call(this, passages, progress);
     });
     try {
-      await service.handle({ id: 1, type: 'init', input: { appId, mock: true, corpus } });
+      await service.handle({
+        id: 1,
+        type: 'init',
+        input: { appId, principalScope: 'visitor', mock: true, corpus },
+      });
       await service.handle({
         id: 2,
         type: 'paste',
         text: 'Cobalt observatories count seven comets.',
       });
-      await peer.init({ appId, mock: true, corpus });
+      await peer.init({ appId, principalScope: 'visitor', mock: true, corpus });
       const pending = service.handle({
         id: 3,
         type: 'paste',
@@ -79,7 +93,7 @@ test.skipIf(typeof indexedDB === 'undefined' || typeof Worker === 'undefined')(
         id: 3,
         message: 'The retrieval data was cleared. Please retry.',
       });
-      await peer.init({ appId, mock: true, corpus });
+      await peer.init({ appId, principalScope: 'visitor', mock: true, corpus });
       expect(peer.getSnapshot().pastedCount).toBe(0);
       for (const query of ['Cobalt observatories', 'Violet archives'])
         expect((await peer.search({ query, mode: 'fulltext', k: 10 })).passages).toEqual([]);
@@ -101,7 +115,11 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const appId = `test-service-${crypto.randomUUID()}`;
     const corpus = parseCorpus(fixture);
     const first = new RetrievalService((event) => events.push(event));
-    await first.handle({ id: 1, type: 'init', input: { appId, mock: true, corpus } });
+    await first.handle({
+      id: 1,
+      type: 'init',
+      input: { appId, principalScope: 'visitor', mock: true, corpus },
+    });
     expect(events.at(-1)).toMatchObject({
       type: 'result',
       result: { status: 'ready', count: 12, restored: false },
@@ -120,7 +138,11 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const restoredEvents: RetrievalEvent[] = [];
     const restored = new RetrievalService((event) => restoredEvents.push(event));
     try {
-      await restored.handle({ id: 1, type: 'init', input: { appId, mock: true, corpus } });
+      await restored.handle({
+        id: 1,
+        type: 'init',
+        input: { appId, principalScope: 'visitor', mock: true, corpus },
+      });
       expect(restoredEvents.at(-1)).toMatchObject({
         type: 'result',
         result: { status: 'ready', count: 14, pastedCount: 2, restored: true },
@@ -138,7 +160,12 @@ test.skipIf(typeof indexedDB === 'undefined')(
       await restored.handle({
         id: 3,
         type: 'init',
-        input: { appId, mock: true, corpus: { ...corpus, passages: corpus.passages.slice(0, 2) } },
+        input: {
+          appId,
+          principalScope: 'visitor',
+          mock: true,
+          corpus: { ...corpus, passages: corpus.passages.slice(0, 2) },
+        },
       });
       expect(restoredEvents.at(-1)).toMatchObject({
         type: 'result',
@@ -166,9 +193,9 @@ test.skipIf(typeof Worker === 'undefined')(
     const b = makeClient();
     let reopened: RetrievalClient | undefined;
     try {
-      await a.init({ appId, mock: true, corpus });
+      await a.init({ appId, principalScope: 'visitor', mock: true, corpus });
       await a.paste('Cobalt observatories count seven comets.');
-      await b.init({ appId, mock: true, corpus });
+      await b.init({ appId, principalScope: 'visitor', mock: true, corpus });
       expect(b.getSnapshot().restored).toBe(true);
       await a.clear();
       // B must fence stale data even if the clear broadcast has not arrived yet.
@@ -178,7 +205,7 @@ test.skipIf(typeof Worker === 'undefined')(
       const fresh = await b.search({ query: 'Amber libraries', mode: 'fulltext', k: 10 });
       expect(fresh.passages[0]?.text).toBe('Amber libraries hold eleven books.');
       reopened = makeClient();
-      await reopened.init({ appId, mock: true, corpus });
+      await reopened.init({ appId, principalScope: 'visitor', mock: true, corpus });
       expect(reopened.getSnapshot()).toMatchObject({ restored: true, pastedCount: 1 });
       expect(
         (await reopened.search({ query: 'Cobalt observatories', mode: 'fulltext', k: 10 }))
@@ -218,7 +245,12 @@ test.skipIf(typeof indexedDB === 'undefined')(
       await service.handle({
         id: 1,
         type: 'init',
-        input: { appId: `test-gpu-${crypto.randomUUID()}`, mock: false, corpus: null },
+        input: {
+          appId: `test-gpu-${crypto.randomUUID()}`,
+          principalScope: 'visitor',
+          mock: false,
+          corpus: null,
+        },
       });
       await service.handle({ id: 2, type: 'consent' });
       expect(events.at(-1)).toMatchObject({

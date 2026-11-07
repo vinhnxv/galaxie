@@ -84,6 +84,10 @@ test('enforces k and byte limits on otherwise valid message envelopes', () => {
   };
   expect(parseCorpus(corpus).passages).toHaveLength(1);
   expect(() =>
-    parseMessage({ id: 1, type: 'init', input: { appId: 'test', mock: true, corpus } }),
+    parseMessage({
+      id: 1,
+      type: 'init',
+      input: { appId: 'test', principalScope: 'visitor', mock: true, corpus },
+    }),
   ).toThrow('The retrieval message is invalid.');
 });

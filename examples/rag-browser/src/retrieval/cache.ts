@@ -91,9 +91,11 @@ async function removeDatabase(name: string): Promise<void> {
 
 export class IndexCache {
   readonly name: string;
+  private readonly appId: string;
   private readonly channel: BroadcastChannel;
-  constructor(appId: string, onClear: (epoch: number) => void = () => {}) {
-    this.name = `galaxie-rag:${appId}`;
+  constructor(appId: string, principalScope: string, onClear: (epoch: number) => void = () => {}) {
+    this.appId = appId;
+    this.name = `galaxie-rag:${encodeURIComponent(appId)}:${encodeURIComponent(principalScope)}`;
     this.channel = new BroadcastChannel(this.name);
     this.channel.onmessage = (event: MessageEvent<unknown>): void => {
       const value = event.data;
@@ -145,6 +147,9 @@ export class IndexCache {
       const epoch = (await this.epoch()) + 1;
       await putValue(epochsName, 'epochs', this.name, epoch);
       await removeDatabase(this.name);
+      // Earlier builds named the content database by app only; Clear data still removes it.
+      const legacy = `galaxie-rag:${this.appId}`;
+      if (legacy !== epochsName) await removeDatabase(legacy);
       this.channel.postMessage({ type: 'clear', epoch });
       return epoch;
     });
