@@ -262,6 +262,9 @@ importers:
 
   packages/adapter-adk:
     dependencies:
+      '@galaxie/adapter-kit':
+        specifier: workspace:*
+        version: link:../adapter-kit
       '@galaxie/core':
         specifier: workspace:*
         version: link:../core
@@ -290,6 +293,9 @@ importers:
 
   packages/adapter-go:
     dependencies:
+      '@galaxie/adapter-kit':
+        specifier: workspace:*
+        version: link:../adapter-kit
       '@galaxie/core':
         specifier: workspace:*
         version: link:../core
@@ -301,8 +307,21 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  packages/adapter-kit:
+    dependencies:
+      '@galaxie/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@langchain/core':
+        specifier: 1.2.20
+        version: 1.2.20(@opentelemetry/api@1.10.0)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(openai@7.42.0(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+
   packages/adapter-langgraph:
     dependencies:
+      '@galaxie/adapter-kit':
+        specifier: workspace:*
+        version: link:../adapter-kit
       '@galaxie/core':
         specifier: workspace:*
         version: link:../core
@@ -319,6 +338,9 @@ importers:
 
   packages/adapter-pyodide:
     dependencies:
+      '@galaxie/adapter-kit':
+        specifier: workspace:*
+        version: link:../adapter-kit
       '@galaxie/core':
         specifier: workspace:*
         version: link:../core
@@ -424,6 +446,9 @@ importers:
 
   tests/conformance:
     dependencies:
+      '@galaxie/adapter-kit':
+        specifier: workspace:*
+        version: link:../../packages/adapter-kit
       '@galaxie/adapter-langgraph':
         specifier: workspace:*
         version: link:../../packages/adapter-langgraph
@@ -473,6 +498,9 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+      vite:
+        specifier: 8.3.4
+        version: 8.3.4(@types/node@24.19.2)
       zod:
         specifier: 4.6.7
         version: 4.6.7

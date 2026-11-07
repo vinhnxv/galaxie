@@ -77,6 +77,7 @@ This serves a local English-tutor host with a scripted mock model, so nothing is
 | [`@galaxie/react`](packages/react/README.md) | Typed component registry, snapshot hook and headless components |
 | [`@galaxie/storage-indexeddb`](packages/storage-indexeddb/README.md) | Checkpoints, recovery journal and session export in IndexedDB |
 | [`@galaxie/tools-mcp`](packages/tools-mcp/README.md) | MCP client that binds allowlisted tools as capabilities |
+| [`@galaxie/adapter-kit`](packages/adapter-kit/README.md) | Shared internal adapter translation and bridge helpers |
 | [`@galaxie/adapter-langgraph`](packages/adapter-langgraph/README.md) | LangGraph.js adapter |
 | [`@galaxie/adapter-pyodide`](packages/adapter-pyodide/README.md) | Python frameworks through Pyodide |
 | [`@galaxie/adapter-adk`](packages/adapter-adk/README.md) | Google ADK (JavaScript) adapter |

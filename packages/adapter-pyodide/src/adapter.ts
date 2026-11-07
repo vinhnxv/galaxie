@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { resolveProvider } from '@galaxie/adapter-kit';
 import {
   capabilityBindingPolicy,
   type ErrorCode,
@@ -491,16 +492,7 @@ export function createPyodideAdapter(
               call = { lease, settled: false };
               run.leases.add(call);
               if (run.cancelled || run.request.signal.aborted) throw adapterFailure('cancelled');
-              const implementation = Object.hasOwn(services.chatModels, lease.providerId)
-                ? services.chatModels[lease.providerId]
-                : undefined;
-              if (implementation === undefined) throw adapterFailure('unavailable');
-              if (typeof implementation === 'function' && lease.credential === undefined)
-                throw adapterFailure('invalid');
-              const provider =
-                typeof implementation === 'function'
-                  ? implementation({ credential: lease.credential as string })
-                  : implementation;
+              const provider = resolveProvider(services.chatModels, lease);
               if (offered && typeof provider.bindTools !== 'function')
                 throw adapterFailure('unsupported');
               const bound = offered

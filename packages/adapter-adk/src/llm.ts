@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { resolveProvider, sameJson } from '@galaxie/adapter-kit';
 import type { ModelCall, ModelFeature } from '@galaxie/core';
 import { BaseLlm, type LlmRequest, type LlmResponse } from '@google/adk';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -139,15 +140,6 @@ export function openAiTools(request: LlmRequest): OpenAiTool[] {
     }
   }
   return tools;
-}
-
-/** Whether `text` is complete JSON that equals `value`. */
-function sameJson(text: string, value: unknown): boolean {
-  try {
-    return JSON.stringify(JSON.parse(text)) === JSON.stringify(value);
-  } catch {
-    return false;
-  }
 }
 
 function usageOf(reply: AIMessage | AIMessageChunk): { input: number; output: number } | undefined {
@@ -307,16 +299,7 @@ export class GalaxieLlm extends BaseLlm {
     jsonSchema: Record<string, unknown> | undefined,
     request: LlmRequest,
   ) {
-    const implementation = Object.hasOwn(this.#providers, lease.providerId)
-      ? this.#providers[lease.providerId]
-      : undefined;
-    if (implementation === undefined) throw failure('unavailable');
-    if (typeof implementation === 'function' && lease.credential === undefined)
-      throw failure('invalid');
-    const provider =
-      typeof implementation === 'function'
-        ? implementation({ credential: lease.credential as string })
-        : implementation;
+    const provider = resolveProvider(this.#providers, lease);
     if (tools.length > 0 && typeof provider.bindTools !== 'function') throw failure('unsupported');
     const bound = tools.length > 0 ? provider.bindTools?.([...tools]) : provider;
     if (bound === undefined) throw failure('unsupported');

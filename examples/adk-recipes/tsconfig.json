@@ -6,6 +6,7 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "paths": {
+      "@galaxie/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
       "@galaxie/core": ["../../packages/core/src/index.ts"],
       "@galaxie/adapter-adk": ["../../packages/adapter-adk/src/index.ts"],
       "@galaxie/adapter-go": ["../../packages/adapter-go/src/index.ts"],

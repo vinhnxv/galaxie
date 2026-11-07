@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const launchPackages = [
   'packages/core',
+  'packages/adapter-kit',
   'packages/adapter-langgraph',
   'packages/models',
   'packages/storage-indexeddb',

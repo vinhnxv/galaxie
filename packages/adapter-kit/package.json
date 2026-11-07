@@ -1,0 +1,40 @@
+{
+  "name": "@galaxie/adapter-kit",
+  "version": "0.1.0",
+  "description": "Shared internal building blocks for galaxie executor adapters.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinhnxv/galaxie.git",
+    "directory": "packages/adapter-kit"
+  },
+  "homepage": "https://github.com/vinhnxv/galaxie/tree/main/packages/adapter-kit#readme",
+  "bugs": {
+    "url": "https://github.com/vinhnxv/galaxie/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "dependencies": {
+    "@galaxie/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@langchain/core": "~1.2.20"
+  },
+  "devDependencies": {
+    "@langchain/core": "1.2.20"
+  }
+}

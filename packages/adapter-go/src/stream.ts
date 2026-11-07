@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { sameJson } from '@galaxie/adapter-kit';
 import type { ExecutorEvent } from '@galaxie/core';
 import type { AIMessage, AIMessageChunk } from '@langchain/core/messages';
 import { concat } from '@langchain/core/utils/stream';
@@ -78,14 +79,6 @@ export function carriesCalls(chunk: AIMessage | AIMessageChunk): boolean {
     fragmentsOf(chunk).length > 0 ||
     chunk.additional_kwargs['tool_calls'] !== undefined
   );
-}
-
-function sameJson(left: string, right: unknown): boolean {
-  try {
-    return JSON.stringify(JSON.parse(left)) === JSON.stringify(right);
-  } catch {
-    return false;
-  }
 }
 
 /**

@@ -29,7 +29,8 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@galaxie/core": "workspace:*"
+    "@galaxie/core": "workspace:*",
+    "@galaxie/adapter-kit": "workspace:*"
   },
   "peerDependencies": {
     "@langchain/core": "~1.2.20",

@@ -6,6 +6,8 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
+import { build } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
 interface Manifest {
@@ -20,7 +22,14 @@ interface Manifest {
 }
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const launchPackages = ['core', 'adapter-langgraph', 'models', 'storage-indexeddb', 'react'];
+const launchPackages = [
+  'core',
+  'adapter-kit',
+  'adapter-langgraph',
+  'models',
+  'storage-indexeddb',
+  'react',
+];
 
 function readManifest(directory: string): Manifest {
   return JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) as Manifest;
@@ -87,9 +96,10 @@ test.each(packages)('$directory packs only distribution files and includes every
 
 test.each(packages)('$directory packs resolved workspace dependencies', (pkg) => {
   expect(pkg.packedJson).not.toContain('workspace:');
-  if (pkg.source.dependencies?.['@galaxie/core'] !== undefined) {
-    const manifest = JSON.parse(pkg.packedJson) as Manifest;
-    expect(manifest.dependencies?.['@galaxie/core']).toBe(coreVersion);
+  const manifest = JSON.parse(pkg.packedJson) as Manifest;
+  for (const dependency of ['@galaxie/core', '@galaxie/adapter-kit']) {
+    if (pkg.source.dependencies?.[dependency] !== undefined)
+      expect(manifest.dependencies?.[dependency]).toBe(coreVersion);
   }
 });
 
@@ -108,6 +118,45 @@ test.each(packages)('$directory has public metadata and the root license files',
       readFileSync(join(root, name)),
     );
 });
+
+test('release size measurements include the kit and its LangGraph consumer bundle', async () => {
+  for (const directory of ['adapter-kit', 'adapter-langgraph']) {
+    const result = await build({
+      configFile: false,
+      root,
+      logLevel: 'silent',
+      build: {
+        write: false,
+        minify: true,
+        lib: {
+          entry: join(root, 'packages', directory, 'dist/index.js'),
+          formats: ['es'],
+          fileName: directory,
+        },
+      },
+    });
+    const outputs = Array.isArray(result) ? result : [result];
+    const code: string[] = [];
+    const modules: string[] = [];
+    for (const output of outputs) {
+      if (!('output' in output)) throw new Error('Expected an in-memory release bundle.');
+      for (const chunk of output.output) {
+        if (chunk.type !== 'chunk') continue;
+        code.push(chunk.code);
+        modules.push(...Object.keys(chunk.modules));
+      }
+    }
+    expect(
+      modules.some((module) => module.replaceAll('\\', '/').includes('/adapter-kit/dist/')),
+    ).toBe(true);
+    const text = code.join('\n');
+    expect(text).not.toContain('@galaxie/adapter-kit');
+    expect(text.length).toBeGreaterThan(0);
+    console.info(
+      `${directory} release bundle: ${Buffer.byteLength(text)} bytes, ${gzipSync(text).byteLength} gzip bytes (includes adapter-kit).`,
+    );
+  }
+}, 120_000);
 
 test('all other packages remain private', () => {
   for (const entry of readdirSync(join(root, 'packages'), { withFileTypes: true })) {

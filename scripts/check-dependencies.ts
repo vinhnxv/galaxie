@@ -131,12 +131,84 @@ for (const file of files('packages/core/src', /\.[cm]?tsx?$/)) {
   }
 }
 
-for (const file of files('packages/adapter-langgraph/src', /\.[cm]?tsx?$/)) {
-  for (const { specifier } of imports(file)) {
-    if (specifier.startsWith('@langchain/langgraph') && specifier !== '@langchain/langgraph/web')
-      problems.push(
-        `${file}: LangGraph imports must use @langchain/langgraph/web, received ${specifier}`,
-      );
+/** The kit is not an executor, and adapters reach it only through its public root. */
+function kitImport(file: string, specifier: string): boolean {
+  if (specifier === '@galaxie/adapter-kit') return true;
+  if (specifier.startsWith('@galaxie/adapter-kit/')) {
+    problems.push(`${file}: adapter-kit imports must use the public root @galaxie/adapter-kit`);
+    return true;
+  }
+  if (specifier.startsWith('./') || specifier.startsWith('../')) {
+    const target = resolve(dirname(file), specifier);
+    if (
+      target === resolve('packages/adapter-kit') ||
+      target.startsWith(`${resolve('packages/adapter-kit')}/`)
+    ) {
+      problems.push(`${file}: adapter-kit imports must use the public root @galaxie/adapter-kit`);
+      return true;
+    }
+  }
+  return false;
+}
+
+function relativeAdapterImport(file: string, specifier: string, ownPackage: string): boolean {
+  const target = resolve(dirname(file), specifier);
+  const [package_] = relative(resolve('packages'), target).split(/[\\/]/);
+  if (
+    target.split(/[\\/]/).includes('node_modules') ||
+    (package_?.startsWith('adapter-') === true && package_ !== ownPackage)
+  ) {
+    problems.push(
+      `${file}: relative import ${specifier} reaches into a dependency or another adapter`,
+    );
+    return true;
+  }
+  return false;
+}
+
+for (const area of ['src', 'dist', 'test']) {
+  const directory = join('packages/adapter-langgraph', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (kitImport(file, specifier)) continue;
+      if (specifier.startsWith('@galaxie/adapter-')) {
+        problems.push(`${file}: the LangGraph adapter must not depend on another executor adapter`);
+        continue;
+      }
+      if (specifier.startsWith('@langchain/langgraph') && specifier !== '@langchain/langgraph/web')
+        problems.push(
+          `${file}: LangGraph imports must use @langchain/langgraph/web, received ${specifier}`,
+        );
+      if (specifier.startsWith('./') || specifier.startsWith('../'))
+        relativeAdapterImport(file, specifier, 'adapter-langgraph');
+    }
+  }
+}
+
+for (const area of ['src', 'dist', 'test']) {
+  const directory = join('packages/adapter-kit', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier, erased } of imports(file)) {
+      if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        const target = resolve(dirname(file), specifier);
+        if (
+          !target.split(/[\\/]/).includes('node_modules') &&
+          (target.startsWith(`${resolve('packages/adapter-kit')}/`) ||
+            (area === 'test' && target.startsWith(`${resolve('tests/conformance/support')}/`)))
+        )
+          continue;
+      } else if (specifier === '@galaxie/core') {
+        continue;
+      } else if (specifier === '@langchain/core' || specifier.startsWith('@langchain/core/')) {
+        if (area === 'test' || (erased && (area !== 'dist' || /\.d\.[cm]?ts$/.test(file))))
+          continue;
+      } else if (area === 'test' && (specifier === 'vitest' || specifier.startsWith('node:'))) {
+        continue;
+      }
+      problems.push(`${file}: forbidden adapter-kit import ${specifier}`);
+    }
   }
 }
 
@@ -145,16 +217,15 @@ for (const area of ['src', 'dist', 'test']) {
   if (!existsSync(directory)) continue;
   for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
     for (const { specifier } of imports(file)) {
-      if (
-        specifier.startsWith('@langchain/langgraph') ||
-        specifier.startsWith('@galaxie/adapter-langgraph') ||
-        specifier.startsWith('@galaxie/adapter-go')
-      )
+      if (kitImport(file, specifier)) continue;
+      if (specifier.startsWith('@langchain/langgraph') || specifier.startsWith('@galaxie/adapter-'))
         problems.push(`${file}: the Python adapter must not depend on another executor`);
+      if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        relativeAdapterImport(file, specifier, 'adapter-pyodide');
+        continue;
+      }
       const worker = file === `${directory}/worker.${area === 'dist' ? 'js' : 'ts'}`;
       if (
-        specifier.startsWith('./') ||
-        specifier.startsWith('../') ||
         specifier === '@galaxie/core' ||
         specifier.startsWith('@langchain/core/') ||
         (worker && ['pyodide', 'node:worker_threads', 'node:fs', 'node:os'].includes(specifier)) ||
@@ -173,6 +244,7 @@ for (const area of ['src', 'dist', 'test']) {
   if (!existsSync(directory)) continue;
   for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
     for (const { specifier } of imports(file)) {
+      if (kitImport(file, specifier)) continue;
       if (
         specifier.startsWith('@langchain/langgraph') ||
         specifier.startsWith('@galaxie/adapter-') ||
@@ -182,15 +254,7 @@ for (const area of ['src', 'dist', 'test']) {
       )
         problems.push(`${file}: the Go adapter must not depend on another executor or framework`);
       else if (specifier.startsWith('./') || specifier.startsWith('../')) {
-        const target = resolve(dirname(file), specifier);
-        const [package_] = relative(resolve('packages'), target).split(/[\\/]/);
-        if (
-          target.split(/[\\/]/).includes('node_modules') ||
-          (package_?.startsWith('adapter-') === true && package_ !== 'adapter-go')
-        )
-          problems.push(
-            `${file}: relative import ${specifier} reaches into a dependency or another adapter`,
-          );
+        relativeAdapterImport(file, specifier, 'adapter-go');
       } else if (
         specifier === '@galaxie/core' ||
         specifier.startsWith('@langchain/core/') ||
@@ -244,6 +308,7 @@ for (const area of ['src', 'dist', 'test']) {
   if (!existsSync(directory)) continue;
   for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
     for (const { specifier, erased } of imports(file)) {
+      if (kitImport(file, specifier)) continue;
       if (specifier.startsWith('@google/adk/')) {
         problems.push(
           `${file}: ADK subpath imports are not allowed (Node-only or networked code), received ${specifier}`,
@@ -260,15 +325,7 @@ for (const area of ['src', 'dist', 'test']) {
       if (specifier.startsWith('@langchain/langgraph') || specifier.startsWith('@galaxie/adapter-'))
         problems.push(`${file}: the ADK adapter must not depend on another executor adapter`);
       if (specifier.startsWith('./') || specifier.startsWith('../')) {
-        const target = resolve(dirname(file), specifier);
-        const [package_] = relative(resolve('packages'), target).split(/[\\/]/);
-        if (
-          target.split(/[\\/]/).includes('node_modules') ||
-          (package_?.startsWith('adapter-') === true && package_ !== 'adapter-adk')
-        )
-          problems.push(
-            `${file}: relative import ${specifier} reaches into a dependency or another adapter`,
-          );
+        relativeAdapterImport(file, specifier, 'adapter-adk');
         continue;
       }
       if (
@@ -663,6 +720,7 @@ for (const area of ['src', 'server', 'test']) {
 
 for (const directory of [
   'packages/core/dist',
+  'packages/adapter-kit/dist',
   'packages/adapter-langgraph/dist',
   'packages/adapter-pyodide/dist',
   'packages/adapter-adk/dist',

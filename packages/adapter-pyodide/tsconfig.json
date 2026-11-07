@@ -4,7 +4,10 @@
     "noEmit": true,
     "types": ["node"],
     "resolveJsonModule": true,
-    "paths": { "@galaxie/core": ["../core/src/index.ts"] }
+    "paths": {
+      "@galaxie/adapter-kit": ["../adapter-kit/src/index.ts"],
+      "@galaxie/core": ["../core/src/index.ts"]
+    }
   },
   "include": ["src"]
 }

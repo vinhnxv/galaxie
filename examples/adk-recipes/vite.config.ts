@@ -32,6 +32,9 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
         '@galaxie/adapter-go/worker': fileURLToPath(
           new URL('../../packages/adapter-go/src/worker.ts', import.meta.url),
         ),
+        '@galaxie/adapter-kit': fileURLToPath(
+          new URL('../../packages/adapter-kit/src/index.ts', import.meta.url),
+        ),
         '@galaxie/core': fileURLToPath(
           new URL('../../packages/core/src/index.ts', import.meta.url),
         ),
