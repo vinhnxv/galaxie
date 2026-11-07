@@ -68,6 +68,8 @@ This serves a local English-tutor host with a scripted mock model, so nothing is
 
 `pnpm check` runs every check that CI runs, including the Go and Python lanes, so it also needs a Go toolchain and Python with `uv`. The [toolchain section](docs/system-design.md#10-toolchain) describes the TypeScript tooling.
 
+The [local-only starter template](templates/local-only/README.md) has its own tiny agent, uses available Built-in AI or an immediate mock, and loads WebLLM only after a size-disclosed opt-in.
+
 ## Repository map
 
 | Package | Purpose |
@@ -83,6 +85,7 @@ This serves a local English-tutor host with a scripted mock model, so nothing is
 | [`@galaxie/adapter-adk`](packages/adapter-adk/README.md) | Google ADK (JavaScript) adapter |
 | [`@galaxie/adapter-go`](packages/adapter-go/README.md) | Google ADK (Go) through WebAssembly |
 | [`@galaxie/eslint-plugin`](packages/eslint-plugin/README.md) | Lint rules that flag direct platform access in agent code |
+| [`templates/local-only`](templates/local-only/README.md) | Copyable local-only Vite + React starter with mock fallback and pending-question recovery |
 
 ## Documentation
 

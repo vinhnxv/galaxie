@@ -21,6 +21,7 @@ const UNCONDITIONALLY_READ_DIRECTORIES = [
   'examples/host-remote/src',
   'examples/host-remote/server',
   'examples/host-remote/test',
+  'templates',
   'tests/conformance',
   'scripts',
   ...[
