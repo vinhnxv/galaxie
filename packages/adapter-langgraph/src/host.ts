@@ -4,6 +4,9 @@
 import {
   type CapabilityPort,
   capabilityBindingPolicy,
+  type DecisionProvider,
+  type DecisionRequest,
+  type DecisionResult,
   GalaxieError,
   isGalaxieError,
   type ModelPort,
@@ -20,6 +23,7 @@ import {
   type StateSnapshot,
 } from '@langchain/langgraph/web';
 import { capabilityToolChecks, RoutedChatModel } from './routed-chat-model.js';
+import { routedDecision } from './routed-decision.js';
 import type { LangGraphTraceHandler } from './trace-handler.js';
 
 type StreamOptions = LangGraphRunnableConfig & {
@@ -45,6 +49,8 @@ export type LangGraphChatModel =
 export interface LangGraphServices {
   /** Provider IDs, rather than role names (ADR-0006). */
   readonly chatModels: Readonly<Record<string, LangGraphChatModel>>;
+  /** Decision provider IDs, with credentials supplied through call-scoped factories. */
+  readonly decisionModels?: Readonly<Record<string, DecisionProvider>>;
   readonly checkpointer?: BaseCheckpointSaver;
 }
 
@@ -61,6 +67,11 @@ export interface LangGraphHost {
   };
   readonly langchain: {
     chatModel(role: string): BaseChatModel;
+    decide(
+      role: string,
+      request: DecisionRequest,
+      config?: LangGraphRunnableConfig,
+    ): Promise<DecisionResult['answers']>;
     /** Offer a broker-backed capability; writes require a host confirmation binding. */
     capabilityTool(name: string, spec: CapabilityToolSpec): StructuredToolInterface;
     checkpointer(): BaseCheckpointSaver;
@@ -76,21 +87,25 @@ export function createHost(
         readonly capabilities: CapabilityPort;
         readonly models: ModelPort;
         readonly handler: LangGraphTraceHandler;
+        readonly signal?: AbortSignal;
+        readonly payload?: (value: unknown) => string;
       }
     | undefined,
 ): LangGraphHost {
   for (const [providerId, descriptor] of Object.entries(models?.providers ?? {})) {
-    const provider = Object.hasOwn(services.chatModels, providerId)
-      ? services.chatModels[providerId]
+    const implementations =
+      descriptor.modality === 'decision' ? (services.decisionModels ?? {}) : services.chatModels;
+    const provider = Object.hasOwn(implementations, providerId)
+      ? implementations[providerId]
       : undefined;
     if (provider === undefined || (typeof provider === 'function') !== descriptor.credential)
       throw new GalaxieError('invalid', 'The routed model implementations must be valid.');
   }
+  const decisions = new Set(models?.decisionRoles ?? []);
   const routed = new Map(
-    (models?.roles ?? []).map((role) => [
-      role,
-      new RoutedChatModel(role, services.chatModels, active),
-    ]),
+    (models?.roles ?? [])
+      .filter((role) => !decisions.has(role))
+      .map((role) => [role, new RoutedChatModel(role, services.chatModels, active)]),
   );
   const checkpointer = services.checkpointer ?? new MemorySaver();
   return {
@@ -101,6 +116,11 @@ export function createHost(
         if (model === undefined)
           throw new GalaxieError('unavailable', 'The requested model role is unavailable.');
         return model;
+      },
+      async decide(role, request, config) {
+        if (!decisions.has(role) || !models?.roles.includes(role))
+          throw new GalaxieError('unavailable', toErrorInfo('unavailable').message);
+        return routedDecision(role, request, config, services.decisionModels ?? {}, active());
       },
       capabilityTool(name, spec) {
         const toolName = spec.toolName ?? name.replace(/[^A-Za-z0-9_]/g, '_');
@@ -158,6 +178,23 @@ export function validServices(value: unknown): value is LangGraphServices {
     )
   )
     return false;
+  if ('decisionModels' in value && value.decisionModels !== undefined) {
+    const decisions = value.decisionModels;
+    if (
+      typeof decisions !== 'object' ||
+      decisions === null ||
+      Array.isArray(decisions) ||
+      !Object.values(decisions).every(
+        (model: unknown) =>
+          typeof model === 'function' ||
+          (typeof model === 'object' &&
+            model !== null &&
+            'decide' in model &&
+            typeof model.decide === 'function'),
+      )
+    )
+      return false;
+  }
   if (!('checkpointer' in value) || value.checkpointer === undefined) return true;
   const saver = value.checkpointer;
   return (

@@ -9,7 +9,7 @@ See the [README](README.md) and [model flow](../../docs/system-design.md#84-a-mo
 ## Entry points
 
 - There is no `@galaxie/models` root export; use a declared subpath.
-- `/mock`: `MockChatModel`, `MockModelError`, `createMockLatch` and script types.
+- `/mock`: `MockChatModel`, `MockDecisionModel`, `MockModelError`, `createMockLatch` and script types.
 - `/webllm`: `loadWebLLMEngine`, `WebLLMChatModel`, `checkWebLLMModel`,
   `defaultWebLLMModel`, engine handles and record/options types.
 - `/webllm/worker`: `startWebLLMWorker` for a host-bundled worker.
@@ -33,6 +33,8 @@ await model.invoke('Hello');
 
 - Hosts register models under provider IDs in `services.chatModels`; agents call
   `host.langchain.chatModel(role)` so router policy and budgets apply.
+  Register decision providers in `services.decisionModels` and call
+  `host.langchain.decide(role, request, config)` for decision roles.
 - The host owns provider handles. Instance and runtime disposal never unload them;
   the host disposes a WebLLM handle when its last consumer is gone. A handle/worker
   can serve multiple instances or runtimes in the same page through its shared FIFO.

@@ -75,6 +75,7 @@ function matchesRequirements(
   requirements: ModelRoleRequirements,
 ): boolean {
   return (
+    descriptor.modality === requirements.modality &&
     !requirements.requires?.some((feature) => !descriptor.features.includes(feature)) &&
     !requirements.languages?.some(
       (language) =>
@@ -180,7 +181,7 @@ export class ModelRouter {
         !/^[A-Za-z0-9._-]{1,64}$/.test(providerId) ||
         !record(descriptor) ||
         !DESTINATIONS.includes(descriptor.destination) ||
-        descriptor.modality !== 'text' ||
+        (descriptor.modality !== 'text' && descriptor.modality !== 'decision') ||
         !strings(descriptor.features) ||
         !descriptor.features.every((feature) => MODEL_FEATURES.includes(feature)) ||
         (descriptor.languages !== undefined && !strings(descriptor.languages)) ||
@@ -215,11 +216,12 @@ export class ModelRouter {
       [...requirements.keys()].some((role) => !routes.has(role))
     )
       throw failure('invalid');
-    const providers = new Map<string, { readonly credential: boolean }>();
+    const providers = new Map<string, ModelPreparation['providers'][string]>();
     for (const [role, route] of routes) {
       const needs = requirements.get(role);
       if (
-        needs === undefined ||
+        !record(needs) ||
+        (needs.modality !== 'text' && needs.modality !== 'decision') ||
         !record(route) ||
         !strings(route.providers) ||
         route.providers.length === 0 ||
@@ -237,10 +239,20 @@ export class ModelRouter {
       let unknownPrice = false;
       for (const providerId of route.providers) {
         const descriptor = this.#providers.get(providerId);
-        if (descriptor === undefined || !route.allow.includes(descriptor.destination))
+        if (
+          descriptor === undefined ||
+          descriptor.modality !== needs.modality ||
+          !route.allow.includes(descriptor.destination)
+        )
           throw failure('invalid');
         unknownPrice ||= descriptor.pricing === 'unknown';
-        providers.set(providerId, Object.freeze({ credential: descriptor.credential === true }));
+        providers.set(
+          providerId,
+          Object.freeze({
+            credential: descriptor.credential === true,
+            ...(descriptor.modality === 'decision' ? { modality: descriptor.modality } : {}),
+          }),
+        );
       }
       if (unknownPrice !== (route.maxCost !== undefined)) throw failure('invalid');
       this.#roles.set(role, {
@@ -258,8 +270,12 @@ export class ModelRouter {
         }),
       });
     }
+    const decisionRoles = [...this.#roles]
+      .filter(([, role]) => role.requirements.modality === 'decision')
+      .map(([name]) => name);
     this.summary = Object.freeze({
       roles: Object.freeze([...this.#roles.keys()]),
+      ...(decisionRoles.length === 0 ? {} : { decisionRoles: Object.freeze(decisionRoles) }),
       providers: Object.freeze(Object.fromEntries(providers)),
     });
   }

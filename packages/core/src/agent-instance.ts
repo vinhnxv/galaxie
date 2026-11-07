@@ -4,7 +4,7 @@
 import type { ProtocolErrorCode } from '@galaxie/ui-protocol';
 import { type Context, context, type Tracer } from '@opentelemetry/api';
 import { type Annotations, readAnnotations } from './annotations.js';
-import { deadlineTimer, RunBudget } from './budgets.js';
+import { BudgetExceeded, deadlineTimer, RunBudget } from './budgets.js';
 import { CapabilityBroker } from './capability-broker.js';
 import { ConfirmationGate } from './confirmations.js';
 import type { AgentDefinition } from './definition.js';
@@ -739,6 +739,16 @@ export function createAgentInstance(
           limits: { steps: instrumentation.limits.steps },
           capabilities: broker.port(ports),
           models: router.port(ports),
+          payload(value: unknown): string {
+            if (!active(run, segment))
+              throw new GalaxieError('cancelled', toErrorInfo('cancelled').message);
+            try {
+              return run.budget.payload(value);
+            } catch (error) {
+              if (error instanceof BudgetExceeded) ports.failBudget(error.budget);
+              throw error;
+            }
+          },
           registerRestoredData(value: unknown): void {
             if (!active(run, segment))
               throw new GalaxieError('stale', 'The run is no longer active.');

@@ -50,6 +50,64 @@ value. Actual usage may still differ from the reservation. Coverage uses mocks,
 fake engines and injected fetch only; no real provider limit behavior is measured.
 See [provider limits](../models/README.md#output-token-limits).
 
+## Decision roles
+
+Declare `models: { triage: { modality: 'decision' } }` in the agent definition.
+The host supplies a decision descriptor and route through `CreateOptions.models`,
+and registers its implementation by provider ID in `services.decisionModels`:
+
+```ts
+import type { LangGraphServices } from '@galaxie/adapter-langgraph';
+import type { ModelRouting } from '@galaxie/core';
+import { MockDecisionModel } from '@galaxie/models/mock';
+
+const services: LangGraphServices = {
+  chatModels: {},
+  decisionModels: {
+    localDecision: new MockDecisionModel([
+      { answers: { route: { value: 'ask' } }, usage: { inputTokens: 4, outputTokens: 0 } },
+    ]),
+  },
+};
+const models: ModelRouting = {
+  providers: {
+    localDecision: {
+      modality: 'decision', destination: 'in-browser', features: [],
+      pricing: { inputPerToken: 0, outputPerToken: 0 },
+    },
+  },
+  roles: { triage: { providers: ['localDecision'], allow: ['in-browser'], maxTokens: 64 } },
+};
+// Supply services and models when creating the instance. Inside a graph node:
+const answers = await host.langchain.decide('triage', {
+  state: { message: 'Example state' },
+  questions: {
+    route: { type: 'choice', instructions: 'Choose the next route.', options: { ask: 'Ask', answer: 'Answer' } },
+  },
+}, config);
+```
+
+Forward node `config` explicitly, including after an await. The call uses one
+ordinary model lease with the active run's sticky labels, consent, cancellation
+and token/cost budgets. Preparation requires a decision implementation for each
+routed decision descriptor; `credential: true` requires a per-call factory
+`({ credential }) => decisionModel`. `chatModel` refuses decision roles, and
+`decide` refuses text or unknown roles with `unavailable`.
+
+The request and every answer pass core's
+[decision validation](../core/README.md#decision-roles). Both complete values pass
+the run's payload budget. The complete answer JSON passes
+`checkOutput(json, { final: true })` before delivery; blocked or failed hooks
+prevent delivery, and an absent hook retains the text path's `unset` outcome.
+Successful calls settle reported usage once; failures charge the reservation
+once. Invalid answers fail with fixed `invalid` and are never repaired or sent to
+another provider. Custom executors supplying `RunRequest` directly must supply
+its `payload` callback to use decisions; the adapter fails closed without it.
+
+Only the deterministic mock is supplied here. Structured-output decision
+providers, confidence gates, dedicated models, media, extraction and automatic
+batching remain outside this implementation.
+
 ## Model-chosen capability tools
 
 `host.langchain.capabilityTool(name: string, spec: CapabilityToolSpec)` returns a
