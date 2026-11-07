@@ -67,6 +67,70 @@ export type MockScriptEntry =
 
 export type MockScript = Readonly<Record<string, MockScriptEntry | readonly MockScriptEntry[]>>;
 
+/** Structural decision contract: the models package has no dependency on core. */
+export interface MockDecisionReply {
+  readonly answers: Readonly<
+    Record<
+      string,
+      {
+        readonly value: boolean | string | readonly string[] | number;
+        readonly probabilities?: Readonly<
+          Record<string, number | { readonly yes: number; readonly no: number }>
+        >;
+        readonly confidence?: number;
+      }
+    >
+  >;
+  readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
+}
+
+export type MockDecisionScriptEntry = (
+  | MockDecisionReply
+  | { readonly invalid: unknown }
+  | { readonly error: Error }
+) & { readonly wait?: MockLatch };
+
+export interface MockDecisionCall {
+  readonly request: unknown;
+  readonly signal: AbortSignal;
+  readonly maxTokens: number;
+}
+
+/** Call-ordered fixtures only: no inference, validation, repair or network activity. */
+export class MockDecisionModel {
+  readonly #script: readonly MockDecisionScriptEntry[];
+  readonly #calls: MockDecisionCall[] = [];
+
+  constructor(script: readonly MockDecisionScriptEntry[]) {
+    this.#script = script;
+  }
+
+  get calls(): number {
+    return this.#calls.length;
+  }
+
+  get recordedCalls(): readonly MockDecisionCall[] {
+    return [...this.#calls];
+  }
+
+  async decide(
+    request: unknown,
+    options: { readonly signal: AbortSignal; readonly maxTokens: number },
+  ): Promise<MockDecisionReply> {
+    const entry = this.#script[this.#calls.length];
+    this.#calls.push({ request, ...options });
+    options.signal.throwIfAborted();
+    if (entry === undefined)
+      throw new MockModelError('The mock has no script for this decision call.');
+    await entry.wait?.wait(options.signal);
+    options.signal.throwIfAborted();
+    if ('error' in entry) throw entry.error;
+    if ('invalid' in entry) return entry.invalid as MockDecisionReply;
+    const { answers, usage } = entry;
+    return { answers, ...(usage === undefined ? {} : { usage }) };
+  }
+}
+
 interface MockCallOptions extends BaseChatModelCallOptions {
   readonly maxTokens?: number;
 }
