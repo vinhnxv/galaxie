@@ -38,6 +38,7 @@ attribute or a schema URL supplied to `getTracer`. The conventions are Developme
 | --- | --- |
 | Root identity | `gen_ai.operation.name`, `gen_ai.agent.name`, `galaxie.app.id`, `galaxie.agent.version`, `galaxie.instance.id`, `galaxie.session.id`, `galaxie.run.id`, `galaxie.run.segment`, `galaxie.executor.id`, `galaxie.executor.version` |
 | Root settlement | `galaxie.run.status`, `galaxie.run.labels`, `galaxie.budget.name` when exhausted |
+| Render outcome (`galaxie.render`, child of the paused segment's run span) | `galaxie.render.status` (`rendered` or `failed`), `galaxie.render.error.code` for a failure |
 | Node | `galaxie.node.name`, `galaxie.node.step` |
 | Model | `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `galaxie.model.provider`, `galaxie.destination.class`, `galaxie.output_safety` when supplied |
 | Capability | `gen_ai.operation.name`, `gen_ai.tool.name`, `galaxie.capability.kind`, `galaxie.destination.class` |
@@ -48,6 +49,13 @@ not become invented values. `error.type` is a constrained type name, never the
 error message. Failed spans have `ERROR` status; cancellation leaves `UNSET`.
 galaxie adds no span events, links, recorded exceptions or status descriptions.
 Timing comes from span start/end timestamps. There is no model-role attribute.
+
+Render outcomes contain no props, model text, user content or thrown error details.
+Each recorded outcome is one short `galaxie.render` span, started as a child of the
+paused segment's run span. A page renders a pause after that run span has closed;
+a child may start after its parent ended, and no closed span is changed. A failed
+outcome carries `galaxie.render.error.code`. Render failures keep the run paused in
+`waiting_input`; resuming on a failed render is not supported yet.
 
 ## Default filter and development text
 

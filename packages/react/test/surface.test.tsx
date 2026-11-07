@@ -12,8 +12,10 @@ import { act, type ReactElement, StrictMode, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, test, vi } from 'vitest';
 import { z } from 'zod';
+import { collect, flush, ready } from '../../core/test/fake-executor.js';
 import {
   AgentSurface,
+  type AgentSurfaceControls,
   type ComponentProps,
   createRegistry,
   defineComponent,
@@ -119,7 +121,12 @@ test('the surface renders validated props and registry action labels', async () 
 test.each([
   ['unsupported', { component: 'tests.Unknown/v1' as const }],
   ['invalid', { props: { title: 1 } }],
-  ['denied', { props: { title: 'Question', image: 'https://images.example.test/private-canary' } }],
+  [
+    'denied',
+    {
+      props: { title: 'Question', image: 'https://images.example.test/private-canary' },
+    },
+  ],
 ] as const)(
   'rejected interactions report %s once from an effect under Strict Mode',
   async (code, overrides) => {
@@ -142,6 +149,13 @@ test.each([
     expect(container.querySelector('[data-error]')?.getAttribute('data-error')).toBe(code);
     expect(container.querySelector('button')).toBeNull();
     expect(onError).toHaveBeenCalledTimes(1);
+    expect(instance.recordRenderOutcome).toHaveBeenCalledExactlyOnceWith({
+      runId: 'run-1',
+      interactionId: 'interaction-1',
+      viewRevision: 'r1',
+      status: 'failed',
+      code,
+    });
     expect(onError.mock.calls[0]?.[0]).toMatchObject({ code });
     expect(JSON.stringify(onError.mock.calls)).not.toContain('private-canary');
     await act(async () => root.render(element));
@@ -349,4 +363,187 @@ test('submit takes the payload schema input and dispatches it unchanged', async 
   await act(async () => container.querySelector('button')?.click());
   expect(instance.dispatch).toHaveBeenCalledTimes(1);
   expect(instance.dispatch.mock.calls[0]?.[0].payload).toEqual({ count: '5' });
+});
+
+function throwingFixture() {
+  const entry = defineComponent({
+    id: 'tests.Question/v1',
+    props: propsSchema,
+    actions,
+    component: ({ props }): ReactElement => {
+      if (props.title === 'throw') throw new Error('private-thrown-message-canary');
+      return <p>{props.title}</p>;
+    },
+  });
+  const registry = createRegistry({ components: [entry] });
+  const instance = new FakeInstance();
+  instance.setPending(interaction({ props: { title: 'throw', label: 'private-props-canary' } }));
+  return { registry, instance };
+}
+
+test('a throwing component keeps the host mounted, reports once and offers run cancellation', async () => {
+  const { registry, instance } = throwingFixture();
+  const onError = vi.fn();
+  let controls: AgentSurfaceControls | undefined;
+  const view = (): ReactElement => (
+    <StrictMode>
+      <button type="button" data-host>
+        Host remains
+      </button>
+      <AgentSurface
+        instance={instance}
+        registry={registry}
+        surfaceId="lesson-main"
+        onError={onError}
+        fallback={(error, current) => {
+          controls = current;
+          return <p data-fallback>{error.message}</p>;
+        }}
+      />
+    </StrictMode>
+  );
+  const { root, container } = await mount(view());
+  expect(container.querySelector('[data-host]')?.textContent).toBe('Host remains');
+  expect(container.querySelector('[data-fallback]')?.textContent).toBe(
+    'The step could not be shown.',
+  );
+  expect(onError).toHaveBeenCalledExactlyOnceWith({
+    code: 'render_failed',
+    message: 'The step could not be shown.',
+  });
+  expect(instance.recordRenderOutcome).toHaveBeenCalledExactlyOnceWith({
+    runId: 'run-1',
+    interactionId: 'interaction-1',
+    viewRevision: 'r1',
+    status: 'failed',
+    code: 'render_failed',
+  });
+  await act(async () => root.render(view()));
+  expect(onError).toHaveBeenCalledTimes(1);
+  expect(instance.recordRenderOutcome).toHaveBeenCalledTimes(1);
+  const observation =
+    container.innerHTML +
+    JSON.stringify([instance.recordRenderOutcome.mock.calls, onError.mock.calls]);
+  for (const secret of ['private-thrown-message-canary', 'private-props-canary']) {
+    expect(observation).not.toContain(secret);
+  }
+  if (controls === undefined) throw new Error('The fallback controls were not supplied.');
+  await expect(controls.cancel()).resolves.toBeUndefined();
+  expect(instance.cancel).toHaveBeenCalledExactlyOnceWith('run-1');
+  const cancellation = new Error('host-cancel-rejection');
+  instance.cancel.mockRejectedValueOnce(cancellation);
+  await expect(controls.cancel()).rejects.toBe(cancellation);
+});
+
+test('the default render failure alert contains fixed text, takes focus once and resets on revision', async () => {
+  const { registry, instance } = throwingFixture();
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  try {
+    const view = (): ReactElement => (
+      <StrictMode>
+        <AgentSurface instance={instance} registry={registry} surfaceId="lesson-main" />
+      </StrictMode>
+    );
+    const { root, container } = await mount(view());
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert?.textContent).toBe('This step could not be shown.');
+    expect(container.children).toHaveLength(1);
+    expect(container.querySelectorAll(':empty')).toHaveLength(0);
+    expect(document.activeElement).toBe(alert);
+    expect(focus).toHaveBeenCalledTimes(1);
+    await act(async () => root.render(view()));
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(container.innerHTML).not.toContain('private-thrown-message-canary');
+    expect(container.innerHTML).not.toContain('private-props-canary');
+    await act(async () =>
+      instance.setPending(
+        interaction({
+          viewRevision: 'r2' as ViewRevision,
+          props: { title: 'Recovered revision' },
+        }),
+      ),
+    );
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.textContent).toBe('Recovered revision');
+    expect(instance.recordRenderOutcome).toHaveBeenLastCalledWith({
+      runId: 'run-1',
+      interactionId: 'interaction-1',
+      viewRevision: 'r2',
+      status: 'rendered',
+    });
+  } finally {
+    focus.mockRestore();
+  }
+});
+
+test('a successful Strict Mode mount reports once and a later update may fail', async () => {
+  const { registry, instance } = throwingFixture();
+  instance.setPending(interaction({ props: { title: 'Initially rendered' } }));
+  const onError = vi.fn();
+  const view = (): ReactElement => (
+    <StrictMode>
+      <AgentSurface
+        instance={instance}
+        registry={registry}
+        surfaceId="lesson-main"
+        onError={onError}
+      />
+    </StrictMode>
+  );
+  const { root, container } = await mount(view());
+  expect(instance.recordRenderOutcome).toHaveBeenCalledExactlyOnceWith({
+    runId: 'run-1',
+    interactionId: 'interaction-1',
+    viewRevision: 'r1',
+    status: 'rendered',
+  });
+  await act(async () => root.render(view()));
+  expect(instance.recordRenderOutcome).toHaveBeenCalledTimes(1);
+  await act(async () => instance.setPending(interaction({ props: { title: 'throw' } })));
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+    'This step could not be shown.',
+  );
+  expect(instance.recordRenderOutcome).toHaveBeenCalledTimes(2);
+  expect(instance.recordRenderOutcome).toHaveBeenLastCalledWith({
+    runId: 'run-1',
+    interactionId: 'interaction-1',
+    viewRevision: 'r1',
+    status: 'failed',
+    code: 'render_failed',
+  });
+  expect(onError).toHaveBeenCalledTimes(1);
+});
+
+test('core ignores an older render revision after a successful Strict Mode mount', async () => {
+  const { registry } = fixture();
+  const pending = interaction({ viewRevision: 'r2' as ViewRevision });
+  const { instance, runtime } = await ready([[{ type: 'interaction', interaction: pending }]]);
+  try {
+    const { runId } = await instance.start('input');
+    await flush();
+    await mount(
+      <StrictMode>
+        <AgentSurface instance={instance} registry={registry} surfaceId="lesson-main" />
+      </StrictMode>,
+    );
+    instance.recordRenderOutcome({
+      runId,
+      interactionId: pending.interactionId,
+      viewRevision: 'r1' as ViewRevision,
+      status: 'failed',
+      code: 'render_failed',
+    });
+    expect(instance.getSnapshot().run?.status).toBe('waiting_input');
+    await act(async () => {
+      await instance.cancel(runId);
+    });
+    const events = (await collect(instance.events(runId))).filter(
+      (event) => event.type === 'render',
+    );
+    expect(events).toMatchObject([
+      { status: 'rendered', viewRevision: 'r2', interactionId: pending.interactionId },
+    ]);
+  } finally {
+    await act(async () => runtime.dispose());
+  }
 });

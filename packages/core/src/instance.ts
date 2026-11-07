@@ -3,9 +3,9 @@
 
 import type { CapabilityName } from './capabilities.js';
 import type { ConfirmationId, ConfirmationReceipt, PendingConfirmation } from './confirmations.js';
-import type { ErrorInfo } from './errors.js';
+import type { ErrorCode, ErrorInfo } from './errors.js';
 import type { RunEvent } from './events.js';
-import type { InstanceId, InteractionId, RunId, SessionId } from './ids.js';
+import type { InstanceId, InteractionId, RunId, SessionId, ViewRevision } from './ids.js';
 import type {
   DispatchReceipt,
   InboxStatus,
@@ -49,6 +49,13 @@ export interface CancelReceipt {
   readonly status: RunStatus;
 }
 
+/** Content-free host report for the current pending interaction. */
+export type RenderOutcome = {
+  readonly runId: RunId;
+  readonly interactionId: InteractionId;
+  readonly viewRevision: ViewRevision;
+} & ({ readonly status: 'rendered' } | { readonly status: 'failed'; readonly code: ErrorCode });
+
 /** The agent instance a host works with (brief §14.1). At most one run is active per instance (brief §8.3). */
 export interface AgentInstance<Input, View> {
   readonly instanceId: InstanceId;
@@ -62,6 +69,8 @@ export interface AgentInstance<Input, View> {
   restore(options?: StartOptions): Promise<{ readonly runId: RunId } | undefined>;
   /** Checks the event against the pending interrupt, then records it in the submission inbox (ADR-0004). */
   dispatch(event: UserInteractionEvent): Promise<DispatchReceipt>;
+  /** Records once per outcome while waiting; stale/disposed calls are ignored without throwing. */
+  recordRenderOutcome(outcome: RenderOutcome): void;
   /** Single-use host response; unknown or closed IDs return stale without throwing. */
   respond(id: ConfirmationId, decision: 'approve' | 'decline'): ConfirmationReceipt;
   cancel(runId: RunId): Promise<CancelReceipt>;

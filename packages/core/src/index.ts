@@ -65,6 +65,7 @@ export type {
   AgentInstance,
   AgentSnapshot,
   CancelReceipt,
+  RenderOutcome,
   RunSnapshot,
   StartOptions,
 } from './instance.js';

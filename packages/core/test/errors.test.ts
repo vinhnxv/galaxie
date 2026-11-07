@@ -2,7 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from 'vitest';
+import { isErrorCode } from '../src/errors.js';
 import { GalaxieError, isGalaxieError, toErrorInfo } from '../src/index.js';
+
+test('render_failed is recognized and has only the fixed display message', () => {
+  expect(isErrorCode('render_failed')).toBe(true);
+  expect(toErrorInfo('render_failed')).toEqual({
+    code: 'render_failed',
+    message: 'The step could not be shown.',
+  });
+});
 
 test('a GalaxieError carries its code and cause', () => {
   const cause = new TypeError('Failed to fetch');

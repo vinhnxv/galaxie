@@ -43,6 +43,8 @@ const ALLOWED = new Set([
   'galaxie.output_safety',
   'galaxie.run.labels',
   'galaxie.budget.name',
+  'galaxie.render.status',
+  'galaxie.render.error.code',
   'gen_ai.agent.name',
   'galaxie.app.id',
   'galaxie.agent.version',

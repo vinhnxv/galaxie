@@ -12,7 +12,16 @@ import {
   toErrorInfo,
   validateSync,
 } from '@galaxie/core';
-import { type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Component,
+  type ReactElement,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useAlertFocus } from './components/alert-focus.js';
 import { useAgentSnapshot } from './hooks.js';
 import type {
   ActionDefinitions,
@@ -22,34 +31,129 @@ import type {
   Registry,
 } from './registry.js';
 
+export interface AgentSurfaceControls {
+  /** Cancels this run; a rejected cancel is returned to the host. */
+  cancel(): Promise<void>;
+}
+
 export interface AgentSurfaceProps<Input = unknown, View = unknown> {
   readonly instance: AgentInstance<Input, View>;
   readonly registry: Registry;
   readonly surfaceId: SurfaceId;
-  readonly fallback?: (error: ErrorInfo) => ReactNode;
+  readonly fallback?: (error: ErrorInfo, controls: AgentSurfaceControls) => ReactNode;
   readonly onError?: (error: ErrorInfo) => void;
+}
+
+interface InteractionIdentity<Input, View> {
+  readonly instance: AgentInstance<Input, View>;
+  readonly runId: RunId;
+  readonly pending: PendingInteraction;
+}
+
+function DefaultRenderAlert(): ReactElement {
+  const alert = useAlertFocus(true, true);
+  return (
+    <p role="alert" tabIndex={-1} ref={alert}>
+      This step could not be shown.
+    </p>
+  );
+}
+
+function failureView(
+  error: ErrorInfo,
+  fallback: AgentSurfaceProps['fallback'],
+  controls: AgentSurfaceControls,
+): ReactNode {
+  return fallback === undefined ? <DefaultRenderAlert /> : fallback(error, controls);
+}
+
+function cancelControls<Input, View>(
+  instance: AgentInstance<Input, View>,
+  runId: RunId,
+): AgentSurfaceControls {
+  return {
+    async cancel(): Promise<void> {
+      await instance.cancel(runId);
+    },
+  };
+}
+
+class RenderBoundary extends Component<{
+  readonly children: ReactNode;
+  readonly failed: () => void;
+  readonly fallback: AgentSurfaceProps['fallback'];
+  readonly controls: AgentSurfaceControls;
+}> {
+  override state: { readonly failed: boolean } = { failed: false };
+  private reported: boolean = false;
+
+  static getDerivedStateFromError(): { readonly failed: boolean } {
+    return { failed: true };
+  }
+
+  override componentDidCatch(): void {
+    if (this.reported) return;
+    this.reported = true;
+    this.props.failed();
+  }
+
+  override render(): ReactNode {
+    return this.state.failed
+      ? failureView(toErrorInfo('render_failed'), this.props.fallback, this.props.controls)
+      : this.props.children;
+  }
+}
+
+function RenderCommit<Input, View>({
+  instance,
+  runId,
+  pending,
+  children,
+}: InteractionIdentity<Input, View> & { readonly children: ReactNode }): ReactNode {
+  const reported = useRef(false);
+  useEffect(() => {
+    if (reported.current) return;
+    reported.current = true;
+    instance.recordRenderOutcome({
+      runId,
+      interactionId: pending.interactionId,
+      viewRevision: pending.viewRevision,
+      status: 'rendered',
+    });
+  }, [instance, runId, pending]);
+  return children;
 }
 
 function rejected(code: ErrorCode): DispatchReceipt {
   return { status: 'rejected', error: toErrorInfo(code) };
 }
 
-function RejectedInteraction({
+function RejectedInteraction<Input, View>({
+  instance,
+  runId,
+  pending,
   error,
   fallback,
   onError,
-}: {
+}: InteractionIdentity<Input, View> & {
   readonly error: ErrorInfo;
   readonly fallback: AgentSurfaceProps['fallback'];
   readonly onError: AgentSurfaceProps['onError'];
 }): ReactElement | null {
   const reported = useRef(false);
   useEffect(() => {
-    if (reported.current || onError === undefined) return;
+    if (reported.current) return;
     reported.current = true;
-    onError(error);
-  }, [error, onError]);
-  return fallback === undefined ? null : <>{fallback(error)}</>;
+    instance.recordRenderOutcome({
+      runId,
+      interactionId: pending.interactionId,
+      viewRevision: pending.viewRevision,
+      status: 'failed',
+      code: error.code,
+    });
+    onError?.(error);
+  }, [error, onError, instance, runId, pending]);
+  return <>{failureView(error, fallback, cancelControls(instance, runId))}</>;
 }
 
 function RenderedInteraction<Input, View>({
@@ -58,12 +162,13 @@ function RenderedInteraction<Input, View>({
   pending,
   entry,
   props,
-}: {
-  readonly instance: AgentInstance<Input, View>;
-  readonly runId: RunId;
-  readonly pending: PendingInteraction;
+  fallback,
+  onError,
+}: InteractionIdentity<Input, View> & {
   readonly entry: ComponentEntry;
   readonly props: unknown;
+  readonly fallback: AgentSurfaceProps['fallback'];
+  readonly onError: AgentSurfaceProps['onError'];
 }): ReactElement | null {
   const [status, setStatus] = useState<InteractionStatus>('idle');
   const guard = useRef<'idle' | 'submitting' | 'accepted'>('idle');
@@ -108,8 +213,27 @@ function RenderedInteraction<Input, View>({
       ),
     [entry, instance, pending, runId],
   );
-  const Component = entry.component;
-  return <Component props={props} actions={actions} status={status} />;
+  const RegisteredComponent = entry.component;
+  return (
+    <RenderBoundary
+      fallback={fallback}
+      controls={cancelControls(instance, runId)}
+      failed={() => {
+        instance.recordRenderOutcome({
+          runId,
+          interactionId: pending.interactionId,
+          viewRevision: pending.viewRevision,
+          status: 'failed',
+          code: 'render_failed',
+        });
+        onError?.(toErrorInfo('render_failed'));
+      }}
+    >
+      <RenderCommit instance={instance} runId={runId} pending={pending}>
+        <RegisteredComponent props={props} actions={actions} status={status} />
+      </RenderCommit>
+    </RenderBoundary>
+  );
 }
 
 /** Renders only a validated interaction on the host-assigned surface. */
@@ -134,10 +258,19 @@ export function AgentSurface<Input, View>({
     pending.interactionId,
     pending.viewRevision,
   ]);
-  if (!resolved.ok)
+  if (!resolved.ok) {
     return (
-      <RejectedInteraction key={key} error={resolved.error} fallback={fallback} onError={onError} />
+      <RejectedInteraction
+        key={key}
+        instance={instance}
+        runId={run.runId}
+        pending={pending}
+        error={resolved.error}
+        fallback={fallback}
+        onError={onError}
+      />
     );
+  }
   return (
     <RenderedInteraction
       key={key}
@@ -146,6 +279,8 @@ export function AgentSurface<Input, View>({
       pending={pending}
       entry={resolved.entry}
       props={resolved.props}
+      fallback={fallback}
+      onError={onError}
     />
   );
 }

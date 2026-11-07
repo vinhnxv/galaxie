@@ -21,6 +21,7 @@
  * - `cancelled`: the run or the call was cancelled.
  * - `unrecoverable`: stored state cannot be read or migrated (brief §12.4).
  * - `outcome_unknown`: a previous write may have reached its destination and cannot be retried.
+ * - `render_failed`: a registered component failed to render the pending step.
  * - `executor_error`: the executor or agent code failed.
  */
 export type ErrorCode =
@@ -37,6 +38,7 @@ export type ErrorCode =
   | 'cancelled'
   | 'unrecoverable'
   | 'outcome_unknown'
+  | 'render_failed'
   | 'executor_error';
 
 /**
@@ -64,6 +66,7 @@ const ERROR_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   cancelled: 'The operation was cancelled.',
   unrecoverable: 'Stored state cannot be recovered.',
   outcome_unknown: 'The outcome of an earlier call is unknown.',
+  render_failed: 'The step could not be shown.',
   executor_error: 'The executor or agent code failed.',
 };
 

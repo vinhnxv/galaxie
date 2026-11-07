@@ -34,6 +34,8 @@ const ALLOWED = new Set([
   'galaxie.output_safety',
   'galaxie.run.labels',
   'galaxie.budget.name',
+  'galaxie.render.status',
+  'galaxie.render.error.code',
   'gen_ai.agent.name',
   'galaxie.app.id',
   'galaxie.agent.version',
@@ -120,6 +122,7 @@ export interface RunInstrumentation {
   ): CapabilitySpan;
   setLabels(labels: readonly DataLabel[]): void;
   recordBudget(name: keyof BudgetLimits): void;
+  recordRender(status: 'rendered' | 'failed', code?: ErrorCode): void;
   finish(status: RunStatus, error?: ErrorInfo): void;
 }
 
@@ -310,6 +313,25 @@ export function startRunTrace(
     },
     recordBudget(name): void {
       if (!closed) root.setAttributes(attributes({ 'galaxie.budget.name': name }));
+    },
+    recordRender(status, code): void {
+      // A page renders a pause only after the segment's run span has closed, so each outcome is its
+      // own short child span of that run span (a child may start after its parent ended).
+      tracer
+        .startSpan(
+          'galaxie.render',
+          {
+            kind: SpanKind.INTERNAL,
+            attributes: attributes({
+              'galaxie.render.status': status,
+              ...(status === 'failed' && code !== undefined
+                ? { 'galaxie.render.error.code': code }
+                : {}),
+            }),
+          },
+          rootContext,
+        )
+        .end();
     },
     finish(status, error): void {
       if (closed) return;
