@@ -316,6 +316,8 @@ See ADR-0010 for the cuts and the reasons, and §16 for when each item comes bac
 - A published CLI, json-render and a multi-model pool. A dedicated executor worker too, unless its measured trigger fires during the MVP (§6.2). (Trace export is the host's OpenTelemetry exporter from M1, §14.4.)
 - LLM-composed UI (§11.2) and LLM-chosen tool calls with small local models (§10.6).
 
+A2UI surfaces are proposed in [ADR-0027](adr/0027-a2ui-surfaces.md); the existing deferral remains until that proposal is accepted.
+
 ### 5.3. Initial target platform [PROPOSED]
 
 Desktop browsers with WebGPU, on a set of reference devices that has been tested. Never hardcode the promise that "every laptop can run it". Probe the GPU adapter and the needed features, load the model and run real inference. Seeing `navigator.gpu` does not prove a model runs.
@@ -898,6 +900,8 @@ flowchart TB
 
 ### 11.2. Catalog, registry and surfaces
 
+A2UI surfaces are proposed in [ADR-0027](adr/0027-a2ui-surfaces.md), retaining host-owned catalogs and regions.
+
 - The catalog defines component types, props schemas and allowed events/actions.
 - The registry maps the catalog to the host's actual React, Vue or Web Components. Each catalog ships headless reference components. [ADR-0007]
 - An agent package can require catalog `education/v1`; the host reports supported components before the run.
@@ -987,6 +991,8 @@ The IDs are examples. The renderer and host create the event and check it agains
 These pieces play different roles; they are not three names for the same thing. json-render documents A2UI/AG-UI integration as conceptual examples. Do not assume a production bridge exists at every version. [S9][S10][S11]
 
 **Recommendation:** in the MVP, one small typed registry that we own, pinned and tested. Keep an adapter boundary for A2UI, json-render and MCP Apps instead of building every standard at once. Local agents can talk over in-process calls or a `MessagePort`; no backend is needed just because protocol examples use HTTP.
+
+[ADR-0027](adr/0027-a2ui-surfaces.md) proposes A2UI v1.0 surfaces in place of the registry format; this proposal has not yet replaced the MVP recommendation above.
 
 ## 12. Persistence, recovery and side effects
 
@@ -1447,6 +1453,8 @@ Nothing below starts unless the M4 decision is **Go** and the phase's own entry 
 | A2UI / MCP Apps / json-render bridge | A host or MCP server needs it | Conformance tests per pinned version |
 | LLM-composed UI | Strong model available for the role; tighter allowlist designed | §11.2 |
 | Published CLI | Developers ask for it in M4 feedback | Trace spans and the host's exporter are M1 work (§14.4) |
+
+[ADR-0027](adr/0027-a2ui-surfaces.md) proposes lifting the A2UI deferral through a pinned surface format; the other bridges remain deferred.
 
 **Phase 7 — Isolation and distribution**
 
