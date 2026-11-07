@@ -46,6 +46,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0023](0023-google-adk-go-through-a-wasm-worker.md) | Google ADK (Go) through a WebAssembly Worker, with policy kept in JavaScript | Proposed |
 | [0024](0024-apache-2-0-license-and-dco.md) | License: Apache-2.0, with the Developer Certificate of Origin | Accepted |
 | [0025](0025-adk-recipes-demo.md) | ADK recipe demonstrations through a separate browser host | Proposed |
+| [0026](0026-adapter-kit-package.md) | Shared adapter helpers in a non-adapter package | Proposed |
 
 ## Template
 
