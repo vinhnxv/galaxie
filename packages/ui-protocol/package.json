@@ -1,0 +1,31 @@
+{
+  "name": "@galaxie/ui-protocol",
+  "version": "0.1.0",
+  "description": "Pure A2UI message parsing, catalog validation and surface reduction for galaxie.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinhnxv/galaxie.git",
+    "directory": "packages/ui-protocol"
+  },
+  "homepage": "https://github.com/vinhnxv/galaxie/tree/main/packages/ui-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/vinhnxv/galaxie/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

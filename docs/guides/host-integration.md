@@ -5,9 +5,10 @@ and runtime teardown. galaxie constrains SDK-controlled paths; reviewed agents,
 XSS and other same-origin code can bypass those paths. Read the
 [mandatory baseline](../adr/0012-security-baseline.md),
 [security review](../security-review.md) and [package guidance](../../llms.txt)
-alongside these integration steps. The five launch packages (`@galaxie/core`,
-`@galaxie/adapter-langgraph`, `@galaxie/models`, `@galaxie/storage-indexeddb`
-and `@galaxie/react`) are versioned 0.1.0 and not published to a registry yet.
+alongside these integration steps. The seven launch packages (`@galaxie/ui-protocol`,
+`@galaxie/core`, `@galaxie/adapter-kit`, `@galaxie/adapter-langgraph`, `@galaxie/models`,
+`@galaxie/storage-indexeddb` and `@galaxie/react`) are versioned 0.1.0 and not published
+to a registry yet.
 The other packages remain private workspace packages.
 
 ## Layer map
