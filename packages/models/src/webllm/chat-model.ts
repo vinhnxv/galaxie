@@ -107,7 +107,7 @@ export class WebLLMChatModel extends BaseChatModel<WebLLMCallOptions> {
       messages: mapped,
       stream: true,
       stream_options: { include_usage: true },
-      max_tokens: options.maxTokens ?? this.#maxTokens,
+      max_tokens: Math.min(options.maxTokens ?? this.#maxTokens, this.#maxTokens),
       temperature: options.temperature ?? this.#temperature,
       ...(format === undefined ? {} : { response_format: format }),
     };

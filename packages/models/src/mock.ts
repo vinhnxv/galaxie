@@ -4,6 +4,7 @@
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import {
   BaseChatModel,
+  type BaseChatModelCallOptions,
   type BindToolsInput,
   type LangSmithParams,
 } from '@langchain/core/language_models/chat_models';
@@ -66,13 +67,18 @@ export type MockScriptEntry =
 
 export type MockScript = Readonly<Record<string, MockScriptEntry | readonly MockScriptEntry[]>>;
 
+interface MockCallOptions extends BaseChatModelCallOptions {
+  readonly maxTokens?: number;
+}
+
 /** Deterministic scripted provider for tests and CI; performs no network requests. */
-export class MockChatModel extends BaseChatModel {
+export class MockChatModel extends BaseChatModel<MockCallOptions> {
   readonly #script: MockScript;
   readonly #provider: string;
   readonly #model: string;
   readonly #sequence: 'tool-calls' | 'assistant-turns';
   #counts = { calls: 0 };
+  #limits: (number | undefined)[] = [];
   #tools: ReadonlySet<string> = new Set();
 
   constructor(
@@ -103,6 +109,11 @@ export class MockChatModel extends BaseChatModel {
     return this.#counts.calls;
   }
 
+  /** Received limits in dispatch order, separate from scripted replies and transcripts. */
+  get maxTokens(): readonly (number | undefined)[] {
+    return [...this.#limits];
+  }
+
   override bindTools(tools: BindToolsInput[]): MockChatModel {
     const bound = new MockChatModel(this.#script, {
       provider: this.#provider,
@@ -111,14 +122,16 @@ export class MockChatModel extends BaseChatModel {
     });
     bound.#tools = new Set(tools.map((tool) => convertToOpenAITool(tool).function.name));
     bound.#counts = this.#counts;
+    bound.#limits = this.#limits;
     return bound;
   }
 
   async #reply(
     messages: BaseMessage[],
-    signal?: AbortSignal,
+    options: this['ParsedCallOptions'],
   ): Promise<Exclude<MockScriptEntry, { readonly error: Error }>> {
     this.#counts.calls++;
+    this.#limits.push(options.maxTokens);
     const humanIndex = messages.findLastIndex(
       (message) =>
         message.type === 'human' &&
@@ -147,8 +160,8 @@ export class MockChatModel extends BaseChatModel {
     if ('error' in entry) throw entry.error;
     if (entry.toolCalls?.some((call) => !this.#tools.has(call.name)))
       throw new MockModelError('The mock tool call was not offered.');
-    await entry.wait?.wait(signal);
-    signal?.throwIfAborted();
+    await entry.wait?.wait(options.signal);
+    options.signal?.throwIfAborted();
     return entry;
   }
 
@@ -156,7 +169,7 @@ export class MockChatModel extends BaseChatModel {
     messages: BaseMessage[],
     options: this['ParsedCallOptions'],
   ): Promise<ChatResult> {
-    const entry = await this.#reply(messages, options.signal);
+    const entry = await this.#reply(messages, options);
     return {
       generations: [
         {
@@ -177,7 +190,7 @@ export class MockChatModel extends BaseChatModel {
     options: this['ParsedCallOptions'],
     runManager?: CallbackManagerForLLMRun,
   ): AsyncGenerator<ChatGenerationChunk> {
-    const entry = await this.#reply(messages, options.signal);
+    const entry = await this.#reply(messages, options);
     const parts: { text: string; calls?: ToolCallChunk[] }[] = (
       entry.text.match(/\S+\s*/g) ?? []
     ).map((text) => ({ text }));

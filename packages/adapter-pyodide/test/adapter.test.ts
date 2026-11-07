@@ -5,6 +5,7 @@ import { GalaxieError, type ModelCall, type RunRequest } from '@galaxie/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, AIMessageChunk, type StandardMessageStructure } from '@langchain/core/messages';
 import { afterEach, expect, test, vi } from 'vitest';
+import { MockChatModel } from '../../models/src/mock.js';
 import { createPyodideAdapter, type PyodideWorkerPort } from '../src/adapter.js';
 import {
   BRIDGE_VERSION,
@@ -105,6 +106,7 @@ function request(
   const lease: ModelCall = {
     providerId: 'model',
     destination: 'in-browser',
+    maxTokens: 64,
     outputSafetyOutcome: undefined,
     ...(credential === undefined ? {} : { credential }),
     checkOutput: vi.fn(async () => {}),
@@ -300,7 +302,7 @@ test.each(['allowed', 'route-refused'] as const)(
     if (outcome === 'allowed') {
       expect(provider.invoke).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ jsonSchema }),
+        expect.objectContaining({ jsonSchema, maxTokens: 64 }),
       );
       expect(result).toMatchObject([{ type: 'output', output: { content: '{"answer":"42"}' } }]);
     } else {
@@ -329,9 +331,40 @@ test('a model request without a JSON Schema leaves the lease and provider option
     signal: run.request.signal,
   });
   const options = vi.mocked(provider.invoke).mock.calls[0]?.[1] as Record<string | symbol, unknown>;
-  expect(Object.keys(options)).toEqual(['signal', 'stop']);
+  expect(Object.keys(options)).toEqual(['signal', 'maxTokens', 'stop']);
+  expect(options['maxTokens']).toBe(64);
   await executor.dispose();
 });
+
+test.each([false, true])(
+  'the lease output limit reaches every provider call (stream=%s)',
+  async (stream) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const provider = new MockChatModel({ capital: { id: 'reply', text: 'checked reply' } });
+    const executor = await setup(workers).prepare(
+      descriptor,
+      { chatModels: { model: provider } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('The fixture Worker is missing.');
+    try {
+      for (const tools of [undefined, offeredTools]) {
+        modelRoundTrip(worker, false, { stream, ...(tools === undefined ? {} : { tools }) });
+        const run = request();
+        expect(await collect(executor.run(run.request))).toMatchObject([
+          { type: 'output', output: { content: 'checked reply' } },
+        ]);
+        expect(run.lease.end).toHaveBeenCalledExactlyOnceWith(undefined);
+        expect(run.lease.fail).not.toHaveBeenCalled();
+      }
+      expect(provider.maxTokens).toEqual([64, 64]);
+    } finally {
+      await executor.dispose();
+    }
+  },
+);
 
 test.each(['allow', 'block', 'hook-error', 'no-bind'] as const)(
   'tool calls bind the leased provider and stay behind final output checks: %s',

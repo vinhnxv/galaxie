@@ -43,6 +43,28 @@ are recorded in the [M2 exit record](../../docs/m2-exit-record.md).
 Shared-model lifetime has [fake-engine and fake Prompt API conformance evidence](../../tests/conformance/shared-model-lifetime.test.ts)
 on Node and headless Chromium only. Real prefill abort latency remains unmeasured.
 
+## Output-token limits
+
+WebLLM, Transformers and OpenAI-compatible models accept `maxTokens` per call.
+They send the lower of that value and a configured constructor `maxTokens`.
+Without a per-call value, constructor behavior is unchanged: WebLLM and
+Transformers default to 1024, while OpenAI-compatible models send no limit unless
+configured. OpenAI uses the transport's `max_tokens` or `max_completion_tokens`
+field for the model, including on tool-bound copies.
+
+The LangGraph, Pyodide and ADK JavaScript adapters forward the route's reservation
+through the lease as this per-call limit on invoke and stream. LangGraph caller
+`maxTokens` and ADK `maxOutputTokens` can lower it further, including on structured
+and repair calls. The Go adapter is not covered. Built-in AI has no output-token
+limit and ignores this value. Providers may overshoot and actual usage may differ
+from the reservation; router reservation and settlement accounting are unchanged.
+Hard spending limits still belong on the host proxy.
+
+Limit coverage uses mocks, fake engines and injected fetch only; no real provider
+limit behavior has been measured. `MockChatModel.maxTokens` records the received
+limits in call order, including `undefined` for calls without one, shared across
+tool-bound copies. This record does not change scripted replies or transcripts.
+
 ## Transformers (ONNX models)
 
 `/transformers` runs an ONNX chat model through Transformers.js inside a host-owned

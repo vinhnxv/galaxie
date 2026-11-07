@@ -535,6 +535,7 @@ export function createPyodideAdapter(
               });
               const modelOptions = {
                 signal: run.request.signal,
+                maxTokens: lease.maxTokens,
                 ...(input.options.stop === undefined ? {} : { stop: [...input.options.stop] }),
                 ...(input.options.jsonSchema === undefined
                   ? {}

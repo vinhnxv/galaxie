@@ -28,6 +28,14 @@ Services are `{ chatModels, checkpoints? }`; `chatModels` is keyed by provider I
 the provider descriptor requires per-call credentials. Implementations are checked
 against core's preparation requirements. Credentials remain in JavaScript.
 
+Every provider invoke and stream receives the lease's `maxTokens` output limit,
+including tool-bound and schema calls. The closed Python bridge has no caller
+token-limit option. Supported providers retain any lower constructor limit;
+Built-in AI has no output-token limit and ignores the value. Actual usage may
+still differ from the reservation. Coverage uses mocks and injected provider
+fakes only; no real provider limit behavior is measured. See
+[provider limits](../models/README.md#output-token-limits).
+
 `galaxie.bridge/v2` accepts JSON strings up to 1,048,576 UTF-8 bytes. It carries boot,
 run, pending, checkpoint, model, capability, abort and result operations. Both directions validate the
 closed envelopes and payloads without code generation. Model replies reach Python

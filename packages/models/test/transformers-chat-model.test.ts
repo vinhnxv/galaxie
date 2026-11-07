@@ -21,6 +21,37 @@ async function fixture(runtime: FakeRuntimeOptions = {}) {
 }
 
 describe('Transformers chat model', () => {
+  it.each([
+    { configured: 128, perCall: 32, expected: 32 },
+    { configured: 32, perCall: 128, expected: 32 },
+    { configured: 128, perCall: undefined, expected: 128 },
+    { configured: undefined, perCall: 64, expected: 64 },
+    { configured: undefined, perCall: 2048, expected: 1024 },
+    { configured: undefined, perCall: undefined, expected: 1024 },
+  ])(
+    'invoke and stream keep the lower output limit: %j',
+    async ({ configured, perCall, expected }) => {
+      const { runtime, handle } = await fixture();
+      try {
+        const model = new TransformersChatModel(
+          handle,
+          configured === undefined ? {} : { maxTokens: configured },
+        );
+        const options = perCall === undefined ? {} : { maxTokens: perCall };
+        await model.invoke('hello', options);
+        for await (const _chunk of await model.stream('hello', options)) {
+          /* drain */
+        }
+        expect(runtime.generations.map((generation) => generation.request.maxTokens)).toEqual([
+          expected,
+          expected,
+        ]);
+      } finally {
+        await handle.dispose();
+      }
+    },
+  );
+
   it('streams deltas in order and reports usage and finish reason on the final chunk only', async () => {
     const { runtime, handle, model } = await fixture({ pieces: ['one ', 'two ', 'three'] });
     const handleLLMNewToken = vi.fn();

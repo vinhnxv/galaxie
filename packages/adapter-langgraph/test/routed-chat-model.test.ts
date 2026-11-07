@@ -119,6 +119,7 @@ function routed(
   const lease: ModelCall = {
     providerId: 'provider',
     destination: 'in-browser',
+    maxTokens: 64,
     end,
     fail,
     outputSafetyOutcome: 'unset',
@@ -143,23 +144,61 @@ function routed(
   };
 }
 
-test('Built-in AI streaming settles without usage so core charges the reservation', async () => {
-  const fake = new FakeLanguageModel();
-  const restore = installLanguageModel(fake);
-  const fixture = routed(
-    new BuiltInAIChatModel({ inputLanguages: ['en'], outputLanguages: ['en'] }),
-  );
-  try {
-    const chunks = [];
-    for await (const chunk of await fixture.model.stream('hello')) chunks.push(chunk);
-    expect(chunks.map((chunk) => chunk.content).join('')).toBe('hello world');
-    expect(fixture.end).toHaveBeenCalledExactlyOnceWith(undefined);
-    expect(fixture.fail).not.toHaveBeenCalled();
-    expect(fake.sessions[0]?.destroys).toBe(1);
-  } finally {
-    restore();
-  }
-});
+test.each(['invoke', 'stream'] as const)(
+  'Built-in AI %s ignores the lease limit and settles without usage',
+  async (mode) => {
+    const fake = new FakeLanguageModel();
+    const restore = installLanguageModel(fake);
+    const fixture = routed(
+      new BuiltInAIChatModel({ inputLanguages: ['en'], outputLanguages: ['en'] }),
+    );
+    try {
+      if (mode === 'invoke')
+        expect((await fixture.model.invoke('hello')).content).toBe('hello world');
+      else {
+        const chunks = [];
+        for await (const chunk of await fixture.model.stream('hello')) chunks.push(chunk);
+        expect(chunks.map((chunk) => chunk.content).join('')).toBe('hello world');
+      }
+      expect(fixture.end).toHaveBeenCalledExactlyOnceWith(undefined);
+      expect(fixture.fail).not.toHaveBeenCalled();
+      expect(fake.creates[0]).not.toHaveProperty('maxTokens');
+      expect(fake.sessions[0]?.prompts[0]?.options).not.toHaveProperty('maxTokens');
+      expect(fake.sessions[0]?.destroys).toBe(1);
+    } finally {
+      restore();
+    }
+  },
+);
+
+test.each(['invoke', 'stream', 'fallback'] as const)(
+  '%s forwards the lower caller or lease output limit, including tool-bound calls',
+  async (mode) => {
+    for (const bound of [false, true]) {
+      for (const maxTokens of [undefined, 16, 128]) {
+        const provider = new MockChatModel({ hello: { id: 'reply', text: 'hello world' } });
+        provider.disableStreaming = mode === 'fallback';
+        const fixture = routed(provider);
+        const model = bound
+          ? fixture.model.bindTools([
+              { type: 'function', function: { name: 'lookup', parameters: { type: 'object' } } },
+            ])
+          : fixture.model;
+        const options = { stop: ['END'], ...(maxTokens === undefined ? {} : { maxTokens }) };
+        if (mode === 'invoke')
+          expect((await model.invoke('hello', options)).text).toBe('hello world');
+        else {
+          let text = '';
+          for await (const chunk of await model.stream('hello', options)) text += chunk.text;
+          expect(text).toBe('hello world');
+        }
+        expect(provider.maxTokens).toEqual([maxTokens === 16 ? 16 : 64]);
+        expect(fixture.end).toHaveBeenCalledExactlyOnceWith(undefined);
+        expect(fixture.fail).not.toHaveBeenCalled();
+      }
+    }
+  },
+);
 
 test('WebLLM streaming settles reported usage exactly once through the routed model', async () => {
   const fake = createFakeWebLLM();
@@ -422,6 +461,7 @@ test('credential factories receive the per-call credential while callbacks only 
     async (): Promise<ModelCall> => ({
       providerId: 'remote',
       destination: 'host-server',
+      maxTokens: 64,
       credential,
       outputSafetyOutcome: 'unset',
       checkOutput: async () => {},
@@ -516,6 +556,7 @@ test('structured repair forwards the original messages, invalid reply and fixed 
     answer: 'yes',
   });
   expect(provider.calls).toBe(2);
+  expect(provider.maxTokens).toEqual([64, 64]);
   expect(generate.mock.calls[1]?.[0].map((message) => [message.type, message.content])).toEqual([
     ['human', 'hello'],
     ['ai', 'invalid-reply-canary'],
@@ -532,6 +573,34 @@ test('structured repair forwards the original messages, invalid reply and fixed 
   ]);
   expect(fixture.end).toHaveBeenCalledTimes(2);
 });
+test.each(['invoke', 'stream'] as const)(
+  'structured %s preserves the lower caller limit on the initial and repair calls',
+  async (mode) => {
+    for (const maxTokens of [undefined, 16, 128]) {
+      const provider = new MockChatModel({
+        hello: { id: 'invalid', text: 'not json' },
+        'The previous reply did not match the required JSON Schema. Reply again with only JSON that matches the schema.':
+          { id: 'valid', text: '{"answer":"yes"}' },
+      });
+      const fixture = routed(provider, 1);
+      const structured = fixture.model.withStructuredOutput(answerSchema);
+      const options = {
+        signal: new AbortController().signal,
+        ...(maxTokens === undefined ? {} : { maxTokens }),
+      };
+      if (mode === 'invoke')
+        expect(await structured.invoke('hello', options)).toEqual({ answer: 'yes' });
+      else {
+        const results = [];
+        for await (const result of await structured.stream('hello', options)) results.push(result);
+        expect(results).toEqual([{ answer: 'yes' }]);
+      }
+      const expected = maxTokens === 16 ? 16 : 64;
+      expect(provider.maxTokens).toEqual([expected, expected]);
+      expect(fixture.end).toHaveBeenCalledTimes(2);
+    }
+  },
+);
 test.each(['invoke', 'stream'] as const)(
   'caller abort during a structured %s repair rejects without another dispatch',
   async (mode) => {

@@ -42,6 +42,7 @@ import type { LangGraphTraceHandler } from './trace-handler.js';
 
 interface RoutedChatModelCallOptions extends BaseChatModelCallOptions {
   tools?: BindToolsInput[];
+  readonly maxTokens?: number;
   readonly jsonSchema?: Readonly<Record<string, unknown>>;
   readonly repairAttempt?: number;
 }
@@ -430,7 +431,11 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
     const call = await this.#take(options);
     try {
       if (runManager !== undefined) call.handler.setModelRoute(runManager.runId, call.lease);
-      const providerOptions = { ...options, [ROUTED_DESTINATION]: call.lease.destination };
+      const providerOptions = {
+        ...options,
+        maxTokens: Math.min(options.maxTokens ?? call.lease.maxTokens, call.lease.maxTokens),
+        [ROUTED_DESTINATION]: call.lease.destination,
+      };
       delete providerOptions.tools;
       const manager = filteredManager(runManager);
       const message =
@@ -479,7 +484,11 @@ export class RoutedChatModel extends BaseChatModel<RoutedChatModelCallOptions> {
       const argumentsText: string[] = [];
       const fragmentSlots = new Map<string, number>();
       const providerManager = filteredManager(runManager);
-      const providerOptions = { ...options, [ROUTED_DESTINATION]: call.lease.destination };
+      const providerOptions = {
+        ...options,
+        maxTokens: Math.min(options.maxTokens ?? call.lease.maxTokens, call.lease.maxTokens),
+        [ROUTED_DESTINATION]: call.lease.destination,
+      };
       delete providerOptions.tools;
       const chunks =
         call.bound !== undefined

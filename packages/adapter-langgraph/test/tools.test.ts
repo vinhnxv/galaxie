@@ -60,6 +60,7 @@ function fixture(provider: BaseChatModel = new MockChatModel(script)) {
   const begin = vi.fn<ModelPort['begin']>(async () => ({
     providerId: 'local',
     destination: 'in-browser',
+    maxTokens: 64,
     checkOutput,
     end,
     fail,

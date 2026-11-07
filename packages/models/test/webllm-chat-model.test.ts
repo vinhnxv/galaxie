@@ -22,6 +22,38 @@ async function fixture(options: FakeWebLLMOptions = {}) {
 }
 
 describe('WebLLM chat model', () => {
+  it.each([
+    { configured: 128, perCall: 32, expected: 32 },
+    { configured: 32, perCall: 128, expected: 32 },
+    { configured: 128, perCall: undefined, expected: 128 },
+    { configured: undefined, perCall: 64, expected: 64 },
+    { configured: undefined, perCall: 2048, expected: 1024 },
+    { configured: undefined, perCall: undefined, expected: 1024 },
+  ])(
+    'invoke and stream keep the lower output limit: %j',
+    async ({ configured, perCall, expected }) => {
+      const { fake, handle } = await fixture();
+      try {
+        const model = new WebLLMChatModel(
+          handle,
+          configured === undefined ? {} : { maxTokens: configured },
+        );
+        const options = perCall === undefined ? {} : { maxTokens: perCall };
+        await model.invoke('hello', options);
+        for await (const _chunk of await model.stream('hello', options)) {
+          /* drain */
+        }
+        expect(fake.engine.requests.map((request) => request.max_tokens)).toEqual([
+          expected,
+          expected,
+        ]);
+        fake.engine.assertClosed();
+      } finally {
+        await handle.dispose();
+      }
+    },
+  );
+
   it('maps full text history, streams deltas and reports usage only on the final chunk', async () => {
     const { fake, handle, model } = await fixture();
     const handleLLMNewToken = vi.fn();

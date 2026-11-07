@@ -51,7 +51,7 @@ export interface ModelDescriptor {
 export interface ModelRoute extends DestinationAllowlist {
   /** Only these providers may serve the role (ADR-0006). */
   readonly providers: readonly ModelProviderId[];
-  /** Per-call reservation, not a provider token cap (brief §9.4). */
+  /** Per-call reservation and output limit handed to providers that accept one (brief §9.4). */
   readonly maxTokens: number;
   /** Reservation required only when a listed provider has unknown pricing (ADR-0006). */
   readonly maxCost?: number;
@@ -158,6 +158,8 @@ export type OutputSafetyOutcome = 'allowed' | 'blocked' | 'failed' | 'unset';
 
 /** One reserved call; only this lease carries the credential (ADR-0006). */
 export interface ModelCall extends SelectedModelRoute {
+  /** Route reservation and per-call output limit for providers that accept one. */
+  readonly maxTokens: number;
   /** Ephemeral value for this call's provider factory (ADR-0006). */
   readonly credential?: string;
   /** Last check outcome, or unset when no hook is configured. */

@@ -21,6 +21,7 @@ import {
   fakeModels,
   fakeRun,
   type Reply,
+  wordChunks,
 } from './support/fixtures.js';
 
 type Contents = LlmRequest['contents'];
@@ -63,6 +64,45 @@ async function generate(llm: GalaxieLlm, input: LlmRequest): Promise<LlmResponse
   for await (const response of llm.generateContentAsync(input, false)) responses.push(response);
   return responses;
 }
+
+test.each([false, true])(
+  'the lower caller or lease output limit reaches every provider call (stream=%s)',
+  async (stream) => {
+    const model = new FakeChatModel(
+      () => new AIMessage({ content: 'hello' }),
+      undefined,
+      wordChunks,
+    );
+    const { port, leases } = fakeModels({ maxTokens: 64 });
+    const { run } = fakeRun(port, { steps: 28 });
+    const llm = new GalaxieLlm({
+      role: 'agent',
+      providers: { mock: model },
+      active: () => run,
+      trusted: () => false,
+    });
+    for (const tools of [undefined, declare('lookup')]) {
+      for (const maxOutputTokens of [undefined, 16, 128, 0, -5, 16.5, Number.NaN]) {
+        const input = request([user('hi')], {
+          stopSequences: ['END'],
+          ...(tools === undefined ? {} : { tools }),
+          ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+        });
+        const responses = [];
+        for await (const response of llm.generateContentAsync(input, stream))
+          responses.push(response);
+        expect(responses.at(-1)?.turnComplete).toBe(true);
+        expect(model.seen.at(-1)?.options).toMatchObject({
+          maxTokens: maxOutputTokens === 16 ? 16 : 64,
+          stop: ['END'],
+          signal: run.signal,
+        });
+      }
+    }
+    expect(model.seen).toHaveLength(14);
+    expect(leases.every((lease) => lease.ended.length === 1 && lease.failed === 0)).toBe(true);
+  },
+);
 
 test('a text reply becomes one text part with usage that adds up', async () => {
   const { llm, leases } = setup(
@@ -239,10 +279,12 @@ test('a response schema reaches the provider as structured output, alone and wit
     required: ['answer'],
   });
   expect(alone.leases[0]?.requires).toEqual(['structured-output']);
+  expect(alone.model.seen[0]?.options['maxTokens']).toBe(64);
   const together = setup(() => new AIMessage({ content: '{}' }));
   await generate(together.llm, request([user('go')], { responseSchema, tools: declare('lookup') }));
   expect(together.leases[0]?.requires).toEqual(['tool-calling', 'structured-output']);
   expect(together.model.seen[0]?.options['jsonSchema']).toBeDefined();
+  expect(together.model.seen[0]?.options['maxTokens']).toBe(64);
 });
 
 test('a tool outside the host registry fails unsupported before any lease', async () => {
