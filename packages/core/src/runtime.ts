@@ -15,7 +15,15 @@ import {
 } from './development.js';
 import { GalaxieError } from './errors.js';
 import type { ExecutorAdapter } from './executor.js';
-import type { AppId, EffectId, InstanceId, PrincipalScope, RunId, SessionId } from './ids.js';
+import {
+  type AppId,
+  type EffectId,
+  type InstanceId,
+  isValidScope,
+  type PrincipalScope,
+  type RunId,
+  type SessionId,
+} from './ids.js';
 import type { AgentInstance } from './instance.js';
 import { checkUiRequirements, normalizeUiBindings, type UiBindings } from './interactions.js';
 import type { ModelRouting, OutputSafetyHook } from './models.js';
@@ -139,7 +147,8 @@ export interface Runtime<
 export function createRuntime<const Adapters extends readonly ExecutorAdapter<unknown, unknown>[]>(
   options: RuntimeOptions<Adapters>,
 ): Runtime<Adapters> {
-  if (options.appId === '') throw new GalaxieError('invalid', 'An application ID is required.');
+  if (!isValidScope(options.appId))
+    throw new GalaxieError('invalid', 'The application ID is invalid.');
   const outputSafety = options.outputSafety;
   if (outputSafety !== undefined && typeof outputSafety !== 'function')
     throw new GalaxieError('invalid', 'The output safety hook must be a function.');
@@ -177,6 +186,8 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
   if (developmentWarnings !== undefined) checkPageDevelopmentWarnings(developmentWarnings);
   return {
     async create(definition, createOptions) {
+      if (!isValidScope(createOptions.principalScope))
+        throw new GalaxieError('invalid', 'The principal scope is invalid.');
       if (disposal !== undefined) throw new GalaxieError('invalid', 'The runtime was disposed.');
       if (
         createOptions.sessionId !== undefined &&

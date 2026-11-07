@@ -27,6 +27,13 @@ const runtime = createRuntime({
 await runtime.dispose();
 ```
 
+Choose `appId` and each instance's `principalScope` as strings of 1 to 128
+characters from `A-Z a-z 0-9 . _ : -`. Core checks `appId` in `createRuntime`
+and `principalScope` first in `runtime.create`, before creating instance state
+or calling hooks. Invalid values fail with fixed `invalid` errors. Ownership,
+invalidation and IndexedDB storage use the same rule. Derive the principal from
+trusted host session context and use the same pair for runtime and storage.
+
 The [adapter example](../adapter-langgraph/README.md) supplies a graph and an
 agent definition. Hosts bind capabilities and model routes explicitly; direct
 agent platform access bypasses those controls.

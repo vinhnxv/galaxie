@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { GalaxieError, toErrorInfo } from './errors.js';
+import { isValidScope } from './ids.js';
 
 export interface InvalidationOptions {
   readonly appId: string;
@@ -31,9 +32,7 @@ export function watchInvalidation(options: InvalidationOptions): InvalidationWat
   if (
     typeof options !== 'object' ||
     options === null ||
-    ![options.appId, options.principalScope].every(
-      (id) => typeof id === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(id),
-    )
+    ![options.appId, options.principalScope].every(isValidScope)
   )
     throw new GalaxieError('invalid', toErrorInfo('invalid').message);
   if (typeof globalThis.BroadcastChannel !== 'function')

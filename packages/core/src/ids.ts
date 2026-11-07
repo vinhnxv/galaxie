@@ -12,6 +12,11 @@ export type AppId = string;
 /** A user or an anonymous session. It is not a credential. */
 export type PrincipalScope = string;
 
+/** The shared app/principal identifier rule, matching IndexedDB storage. */
+export function isValidScope(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
+}
+
 /** An agent definition ID, for example `galaxie.examples/english-tutor`. */
 export type AgentId = string;
 
