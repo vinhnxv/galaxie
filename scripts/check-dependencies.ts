@@ -225,8 +225,15 @@ const core = JSON.parse(readFileSync('packages/core/package.json', 'utf8')) as {
   optionalDependencies?: unknown;
   peerDependencies?: Record<string, unknown>;
 };
-if (core.dependencies !== undefined)
-  problems.push('packages/core/package.json: core must not declare dependencies');
+if (
+  core.dependencies === null ||
+  typeof core.dependencies !== 'object' ||
+  Array.isArray(core.dependencies) ||
+  JSON.stringify(Object.keys(core.dependencies).sort()) !== JSON.stringify(['@galaxie/ui-protocol'])
+)
+  problems.push(
+    'packages/core/package.json: core dependencies must be exactly @galaxie/ui-protocol',
+  );
 if (core.optionalDependencies !== undefined)
   problems.push('packages/core/package.json: core must not declare optionalDependencies');
 if (
@@ -248,6 +255,7 @@ for (const file of files('packages/core/src', /\.[cm]?tsx?$/)) {
       specifier.startsWith('./') ||
       specifier.startsWith('../') ||
       specifier === '@opentelemetry/api' ||
+      specifier === '@galaxie/ui-protocol' ||
       (specifier === 'zod/v4/core' && typeOnly)
     )
       continue;

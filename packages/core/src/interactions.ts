@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import type { Catalog } from '@galaxie/ui-protocol';
 import { type ErrorInfo, GalaxieError } from './errors.js';
 import type { InstanceId, InteractionId, RunId, SurfaceId, ViewRevision } from './ids.js';
 import { containsPrivateEncoded } from './private-values.js';
 import { isStandardSchema, type StandardSchema } from './schema.js';
+import type { PendingSurface } from './surfaces.js';
 import { isHttpDestination } from './urls.js';
 
 /** A component catalog, for example `education/v1` (brief §11.2). */
@@ -27,6 +29,7 @@ export interface UiBindings {
     >
   >;
   readonly surfaces: readonly SurfaceId[];
+  readonly catalogs?: Readonly<Record<string, Catalog>>;
 }
 
 export function normalizeUiBindings(bindings: UiBindings): UiBindings {
@@ -73,9 +76,35 @@ export function normalizeUiBindings(bindings: UiBindings): UiBindings {
         return [id, Object.freeze({ actions: Object.freeze(actions) })];
       }),
     );
+    let catalogs: Readonly<Record<string, Catalog>> | undefined;
+    if (bindings.catalogs !== undefined) {
+      if (
+        bindings.catalogs === null ||
+        typeof bindings.catalogs !== 'object' ||
+        Array.isArray(bindings.catalogs) ||
+        Object.getPrototypeOf(bindings.catalogs) !== Object.prototype
+      )
+        invalid();
+      catalogs = Object.freeze(
+        Object.fromEntries(
+          Object.entries(bindings.catalogs).map(([id, catalog]) => {
+            if (
+              id.length === 0 ||
+              catalog === null ||
+              typeof catalog !== 'object' ||
+              Array.isArray(catalog) ||
+              catalog.id !== id
+            )
+              invalid();
+            return [id, Object.freeze({ ...catalog })];
+          }),
+        ),
+      );
+    }
     return Object.freeze({
       components: Object.freeze(components),
       surfaces: Object.freeze([...bindings.surfaces]),
+      ...(catalogs === undefined ? {} : { catalogs }),
     });
   } catch {
     return invalid();
@@ -249,6 +278,7 @@ export interface PendingInteraction {
   readonly component: ComponentId;
   /** Validated against the registry's props schema before rendering (ADR-0007). */
   readonly props: unknown;
+  readonly surface?: PendingSurface;
 }
 
 /** A user event. Every identity field is checked against the pending interrupt (brief §12.2). */
@@ -261,6 +291,11 @@ export interface UserInteractionEvent {
   /** A registered action name. Action labels and confirmation text come from the registry (ADR-0007). */
   readonly action: string;
   readonly payload: unknown;
+  readonly surfaceAction?: {
+    readonly revision: number;
+    readonly componentId: string;
+    readonly dataModel: Readonly<Record<string, unknown>>;
+  };
 }
 
 /** The answer to a dispatched event. M1 acceptance is in-memory only (ADR-0004). */

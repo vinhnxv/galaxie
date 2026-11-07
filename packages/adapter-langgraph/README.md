@@ -113,3 +113,16 @@ See [coding guidance](AGENTS.md), [explicit context rules and parity](../../test
 and [runtime contracts](../../docs/system-design.md#6-core-runtime-and-contracts).
 Parallel interrupts and static breakpoints remain unsupported.
 Code is Apache-2.0 (see [LICENSE](../../LICENSE)).
+
+## Materialized surface interrupts
+
+Use `requestSurface(record, config)` for a reduced `galaxie.surface/1` plain JSON
+record, built with core's `materializeSurface`. Pass node config explicitly, including
+after an await. The adapter reads this record from the checkpoint and core validates
+it against host-bound catalogs, regions, limits and URL/private-value policy before
+publication or restore. The resume value stays exactly `{ action, payload }`.
+
+One interrupt per node still applies. Advance a surface revision by resuming and
+reducing the next batch against the previous record in a later node, then interrupt
+with a new ID. Pending interrupts cannot be updated in place. `requestInteraction`
+and existing four-field checkpoints are unchanged.

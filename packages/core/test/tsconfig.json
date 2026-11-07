@@ -5,7 +5,8 @@
     "resolveJsonModule": true,
     "noEmit": true,
     "paths": {
-      "@galaxie/core/browser": ["../src/browser.ts"]
+      "@galaxie/core/browser": ["../src/browser.ts"],
+      "@galaxie/ui-protocol": ["../../ui-protocol/src/index.ts"]
     }
   },
   "include": ["."]

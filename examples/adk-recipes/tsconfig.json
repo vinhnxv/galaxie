@@ -9,6 +9,7 @@
       "@galaxie/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
       "@galaxie/core/browser": ["../../packages/core/src/browser.ts"],
       "@galaxie/core": ["../../packages/core/src/index.ts"],
+      "@galaxie/ui-protocol": ["../../packages/ui-protocol/src/index.ts"],
       "@galaxie/adapter-adk": ["../../packages/adapter-adk/src/index.ts"],
       "@galaxie/adapter-go": ["../../packages/adapter-go/src/index.ts"],
       "@galaxie/adapter-pyodide": ["../../packages/adapter-pyodide/src/index.ts"],

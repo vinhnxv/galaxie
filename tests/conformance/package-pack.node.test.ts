@@ -98,7 +98,7 @@ test.each(packages)('$directory packs only distribution files and includes every
 test.each(packages)('$directory packs resolved workspace dependencies', (pkg) => {
   expect(pkg.packedJson).not.toContain('workspace:');
   const manifest = JSON.parse(pkg.packedJson) as Manifest;
-  for (const dependency of ['@galaxie/core', '@galaxie/adapter-kit']) {
+  for (const dependency of ['@galaxie/core', '@galaxie/adapter-kit', '@galaxie/ui-protocol']) {
     if (pkg.source.dependencies?.[dependency] !== undefined)
       expect(manifest.dependencies?.[dependency]).toBe(coreVersion);
   }

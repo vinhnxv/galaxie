@@ -6,6 +6,10 @@ Own framework-neutral contracts and the host runtime: lifecycle, budgets,
 capability grants, model routing, interactions, recovery and filtered spans.
 See the [README](README.md) and [runtime contracts](../../docs/system-design.md#6-core-runtime-and-contracts).
 
+Core's only direct dependency is `@galaxie/ui-protocol`; import its public root only.
+Core owns catalog binding, publication/restore validation, revisions and private-user
+provenance for materialized pending surfaces. Legacy requests retain their old path.
+
 ## Entry points
 
 - `@galaxie/core` exports the runtime and contracts from [src/index.ts](src/index.ts),

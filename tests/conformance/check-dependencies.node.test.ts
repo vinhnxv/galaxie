@@ -53,6 +53,7 @@ const lockfile = (onnxRuntime: string): string =>
 
 const FILES: Record<string, string> = {
   'packages/core/package.json': JSON.stringify({
+    dependencies: { '@galaxie/ui-protocol': 'workspace:*' },
     peerDependencies: { '@opentelemetry/api': '1', zod: '4' },
   }),
   'packages/models/package.json': JSON.stringify({
@@ -774,7 +775,7 @@ test.each([
   expect(result.output).toContain('ui-protocol imports must use the public root');
 });
 
-test.each(['packages/core/src/a.ts', 'packages/react/src/a.ts'])(
+test.each(['packages/react/src/a.ts'])(
   'existing consumer allowlists do not yet permit ui-protocol: %s',
   (path) => {
     expect(run({ [path]: adk('@galaxie/ui-protocol') }).status).toBe(1);
@@ -789,3 +790,36 @@ test('the protocol public-root inventory preserves unrelated tooling import beha
   expect(result.status).toBe(1);
   expect(result.output).toContain('ui-protocol imports must use the public root');
 });
+
+test('core declares exactly the protocol dependency and may import its public root', () => {
+  expect(run({ 'packages/core/src/surface.ts': adk('@galaxie/ui-protocol') })).toMatchObject({
+    status: 0,
+    output: '',
+  });
+});
+
+test.each([{}, { 'left-pad': '1' }, { '@galaxie/ui-protocol': 'workspace:*', 'left-pad': '1' }])(
+  'core rejects a dependency set other than the protocol package: %j',
+  (dependencies) => {
+    const manifest = JSON.stringify({
+      dependencies,
+      peerDependencies: { '@opentelemetry/api': '1', zod: '4' },
+    });
+    const result = run({ 'packages/core/package.json': manifest });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('core dependencies must be exactly @galaxie/ui-protocol');
+  },
+);
+
+test.each(['@galaxie/ui-protocol/internal', '../../ui-protocol/src/index.js', 'left-pad'])(
+  'core rejects non-root protocol or other imports: %s',
+  (specifier) => {
+    const result = run({ 'packages/core/src/surface.ts': adk(specifier) });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain(
+      specifier === 'left-pad'
+        ? 'forbidden core import left-pad'
+        : 'ui-protocol imports must use the public root',
+    );
+  },
+);

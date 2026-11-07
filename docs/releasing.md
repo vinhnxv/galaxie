@@ -16,8 +16,8 @@ one version number and are released together, because `@galaxie/adapter-langgrap
 `@galaxie/adapter-kit` and `@galaxie/react` depend on the exact `@galaxie/core`
 version of the same release; the LangGraph adapter also depends on the kit.
 `@galaxie/ui-protocol` has no galaxie dependencies and no hand-written package-version
-constant. Its spec pin constants are not the package version. Core and the React
-package will depend on it in a later release.
+constant. Its spec pin constants are not the package version. Core depends on its
+exact release version after packing; the React package may consume it in a later release.
 The planned change to the public surface API is expected to land in a 0.x minor.
 
 ## Maintainer-only prerequisites

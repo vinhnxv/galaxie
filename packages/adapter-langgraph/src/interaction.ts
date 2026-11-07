@@ -5,6 +5,7 @@ import {
   GalaxieError,
   type InteractionRequest,
   parseInteractionRequest,
+  parseSurfaceRecord,
   type Submission,
 } from '@galaxie/core';
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
@@ -31,6 +32,16 @@ export class SynchronousContext {
   enterWith(store: unknown): void {
     this.store = store;
   }
+}
+
+/** Materialized records only; core independently validates the catalog and publication policy. */
+export function requestSurface(record: unknown, config: LangGraphRunnableConfig): Submission {
+  const surface = parseSurfaceRecord(record);
+  if (surface === undefined)
+    throw new GalaxieError('invalid', 'The interaction request is invalid.');
+  return AsyncLocalStorageProviderSingleton.runWithConfig(config, () =>
+    interrupt<unknown, Submission>(surface),
+  );
 }
 
 export function installContext(): void {

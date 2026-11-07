@@ -154,5 +154,12 @@ export {
 } from './runtime.js';
 export type { Infer, InferInput, Schema, StandardSchema } from './schema.js';
 export { isStandardSchema, validateSync } from './schema.js';
+export type { PendingSurface } from './surfaces.js';
+export {
+  materializeSurface,
+  parseSurfaceRecord,
+  pendingFromSurface,
+  surfaceFromRequest,
+} from './surfaces.js';
 export type { RunTrace, TraceHandle, TraceResult, TraceStep } from './trace.js';
 export { normalizeUrlAllowlist } from './urls.js';

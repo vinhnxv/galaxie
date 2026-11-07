@@ -192,10 +192,10 @@ Catalogs and policy callbacks are trusted host code. Schemas must be strict and
 synchronous. This package does not constrain arbitrary same-origin code or authorize
 server operations. An origin policy does not constrain paths or query parameters.
 
-Core and React do not consume this package yet. Core will own checkpoint commit and
-compare-and-set, labels and private-value registration, `viewRevision`, whole-surface
-private-value URL scanning (including data-only updates), and action data-model
-validation. A successful protocol result alone does not authorize publication or
+Core consumes this package for pending surfaces; React does not yet. Core owns labels
+and private-value registration, `viewRevision`, whole-surface private-value URL
+scanning and action data-model validation, and runs this validator before publication
+and restore. A successful protocol result alone does not authorize publication or
 checkpoint storage. Rendering, event dispatch, function execution/result validation,
 real user activation and local input state are also outside this package.
 
