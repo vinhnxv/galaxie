@@ -57,6 +57,7 @@
 - [ADK recipe example](examples/adk-recipes/README.md): a scripted JavaScript/Go financial advisor and Python auditor/loan picker, checked text, model destinations, durable approval and explicit finalization; synthetic fixtures, refused shapes and no real-model result.
 
 - [Local-only starter template](templates/local-only/README.md): copyable Vite + React app with its own agent, available Built-in AI or immediate mock, size-disclosed WebLLM opt-in and pending-question recovery; packages unpublished and template device behavior unverified.
+- [Hybrid gateway starter template](templates/hybrid-gateway/README.md): the same one-question agent with a same-origin Node model proxy, server-held prompts, quotas, scoped document search and idempotent note writes; demo authentication and in-memory state only.
 
 ## Verification
 
