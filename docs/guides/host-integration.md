@@ -86,6 +86,16 @@ than estimating bytes. See [model coding guidance](../../packages/models/AGENTS.
 
 ## Storage persistence and recovery
 
+Choose a content-free `appId` and derive `principalScope` from trusted host
+session context. Both must be strings of 1 to 128 characters from
+`A-Z a-z 0-9 . _ : -`; spaces, slashes, non-ASCII characters and non-strings
+are invalid. Use the same pair for runtime, storage and cross-tab APIs.
+`createRuntime` validates `appId` synchronously, and `runtime.create` rejects an
+invalid `principalScope` before instance state or hooks. Both report fixed
+`invalid` errors without echoing values. These checks match the existing
+storage rule, so stored scopes remain readable; see the
+[compatibility analysis](../system-design.md#6-core-runtime-and-contracts).
+
 The [download hook](../system-design.md#84-a-model-call) supplies optional
 `request.persist()` for `siteStorage: true`. Call it after user acceptance and
 before downloading. It shares one `navigator.storage.persist()` result per

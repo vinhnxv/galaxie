@@ -3,6 +3,7 @@
 
 import { deadlineTimer } from './budgets.js';
 import { type ErrorCode, GalaxieError, toErrorInfo } from './errors.js';
+import { isValidScope } from './ids.js';
 
 export type OwnershipLostReason = 'released' | 'handover' | 'stolen' | 'stale';
 export interface Ownership {
@@ -44,8 +45,7 @@ export async function acquireOwnership(options: OwnershipOptions): Promise<Owner
   if (
     typeof options !== 'object' ||
     options === null ||
-    typeof options.appId !== 'string' ||
-    !/^[A-Za-z0-9._:-]{1,128}$/.test(options.appId) ||
+    !isValidScope(options.appId) ||
     (options.takeover !== undefined && typeof options.takeover !== 'boolean') ||
     (options.handoverTimeoutMs !== undefined &&
       (!Number.isFinite(options.handoverTimeoutMs) || options.handoverTimeoutMs <= 0)) ||
