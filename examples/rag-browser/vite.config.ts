@@ -3,12 +3,13 @@
 
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type UserConfigExport } from 'vite';
+import { cspMeta } from './scripts/csp-meta.js';
 import { pythonAssets } from './scripts/python-assets.js';
 import { cspHeader } from './src/host/csp.js';
 
 const config: UserConfigExport = defineConfig(({ mode }) => ({
   root: fileURLToPath(new URL('.', import.meta.url)),
-  plugins: [pythonAssets()],
+  plugins: [pythonAssets(), ...(mode === 'mock' ? [cspMeta(mode)] : [])],
   resolve: {
     alias: {
       '@galaxie/storage-indexeddb': fileURLToPath(

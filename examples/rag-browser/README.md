@@ -20,6 +20,49 @@ pnpm --filter @galaxie/example-rag-browser dev:mock
 
 Mock mode indexes 12 synthetic passages on load and uses deterministic embeddings and chat replies. Try “capital of France”, then paste a paragraph and ask about it. Mock chat replies quote the first retrieved passage; pydantic-ai review and DSPy quote the supplied kept passages. These replies do not measure answer quality.
 
+## Hosted demo build
+
+The [demo workflow](../../.github/workflows/demo.yml) builds mock mode with
+`VITE_GALAXIE_DEMO=1` and uploads `examples/rag-browser/dist` as the `demo-dist`
+artifact for 14 days. It builds the same Python assets as `dev:mock` and deploys
+nothing. This artifact uses mock models and the synthetic corpus only. Real
+models need a local default-mode build, without the demo flag.
+
+The demo flag initially checks **Review passages before answering**; visitors can
+uncheck it. A fixed cue explains that reloading a paused review resumes it and
+**Start over** clears it. After reload, click **Prepare models** again to restore
+the pending review; a status line confirms restoration. Review selections reset
+on reload, and the existing device-storage and browser-eviction limits still apply.
+Without the flag, mock builds retain the usual unchecked review default and text.
+
+Mock builds put the CSP meta element first in the built page's `<head>`, before
+scripts and styles, so the page enforces its policy without a response header.
+The policy derives from the existing directives and omits `frame-ancestors`,
+which browsers ignore in a meta policy. The same build writes `dist/_headers` in
+Netlify / Cloudflare Pages format: a `/*` rule with the full
+`Content-Security-Policy` header, including `frame-ancestors 'none'`. Header-capable
+hosts should serve that full policy. Dev and preview keep their existing headers;
+default-mode build output is unchanged.
+
+Hosts that cannot send headers, such as GitHub Pages, use only the meta policy
+and have no `frame-ancestors` protection. This is a recorded limit of this
+mock-only demo that the maintainer must explicitly accept before deployment.
+The meta policy does not provide response headers for Worker scripts; this
+artifact demonstrates the same-origin mock flow, not default-mode model loading.
+No demo host or deployment is selected by this workflow.
+
+Build locally from the repository root after installing dependencies (build the
+[Python wheel cache](#optional-python-build) first to include Python):
+
+```sh
+VITE_GALAXIE_DEMO=1 pnpm --filter @galaxie/example-rag-browser exec vite build --mode mock
+pnpm --filter @galaxie/example-rag-browser exec vite preview --mode mock --host 127.0.0.1
+```
+
+A build without the wheel cache still runs the JavaScript demo. Preview supplies
+the full CSP header; the demo build test instead uses a plain static server with
+no CSP response header to check meta enforcement and paused-review reload.
+
 ### Passage review with mock models
 
 With the existing local Python wheel cache built, `dev:mock` builds and serves all four executors at **http://127.0.0.1:4173/**. It uses the committed synthetic corpus and mock models, makes no model download, and retains the strict CSP and Trusted Types policy. It is a build-and-preview command; restart it after source edits. The plain Vite `dev` command still omits Python.
