@@ -444,6 +444,49 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  templates/local-only:
+    dependencies:
+      '@galaxie/adapter-langgraph':
+        specifier: ^0.1.0
+        version: link:../../packages/adapter-langgraph
+      '@galaxie/core':
+        specifier: ^0.1.0
+        version: link:../../packages/core
+      '@galaxie/models':
+        specifier: ^0.1.0
+        version: link:../../packages/models
+      '@galaxie/react':
+        specifier: ^0.1.0
+        version: link:../../packages/react
+      '@galaxie/storage-indexeddb':
+        specifier: ^0.1.0
+        version: link:../../packages/storage-indexeddb
+      '@langchain/core':
+        specifier: 1.2.20
+        version: 1.2.20(@opentelemetry/api@1.10.0)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(openai@7.42.0(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+      '@langchain/langgraph':
+        specifier: 1.5.1
+        version: 1.5.1(@langchain/core@1.2.20(@opentelemetry/api@1.10.0)(@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0))(openai@7.42.0(google-auth-library@10.9.1)(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(zod@4.6.7)
+      '@mlc-ai/web-llm':
+        specifier: 0.2.86
+        version: 0.2.86
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      playwright:
+        specifier: 1.64.1
+        version: 1.64.1
+      vite:
+        specifier: 8.3.4
+        version: 8.3.4(@types/node@24.19.2)
+
   tests/conformance:
     dependencies:
       '@galaxie/adapter-kit':

@@ -2,6 +2,10 @@ packages:
   - packages/*
   - examples/*
   - tests/*
+  - templates/*
+
+# Link the template's registry-compatible ranges to matching local launch packages.
+linkWorkspacePackages: true
 
 # Resolve only versions published at least 7 days ago, to limit exposure to compromised releases.
 minimumReleaseAge: 10080

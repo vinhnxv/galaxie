@@ -18,6 +18,7 @@
 - **`packages/storage-indexeddb`:** a LangGraph checkpoint saver and structural recovery port, with scoped keys, versioned envelopes and transaction-completion barriers. Host-local supplies both for reload reconciliation; Node/Chromium fault tests cover inbox and journal crash windows, including IndexedDB reopen in Chromium. Retention and app-wide fencing are implemented; logout remains slice 6 work (§8.2).
 - **`examples/host-remote`:** the unchanged English tutor with a same-origin OpenAI-compatible quiz stub, HTTP capabilities, renewable demo tokens and host-rendered progress confirmation. Feedback stays in-browser; MemorySaver starts over after reload. Node and headless Chromium tests exercise request privacy, consent, confirmation, tokens and CSP. See [the host README](../examples/host-remote/README.md) for the stub and deployment limits.
 - **`examples/adk-recipes`:** a [separate scripted browser host](../examples/adk-recipes/README.md) for financial-advisor rewrites on ADK JavaScript and Go and auditor/loan rewrites on ADK Python, with one chosen executor per document, checked text, model destinations and scoped loan checkpoint/recovery storage; missing optional runtime assets disable their entries, and no real-model result is claimed.
+- **`templates/local-only`:** a [copyable Vite + React starter](../templates/local-only/README.md) with its own one-question LangGraph agent, available Built-in AI first, immediate scripted mock fallback, size-disclosed WebLLM opt-in, an exhaustive fixed-message model-state table and fenced IndexedDB checkpoint/recovery restore. Automated tests use injected probes and fake engine handles; real-device behavior for this template is unverified.
 - **`tests/conformance`:** twelve graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix, plus dual-lane policy, lifecycle, budget and tracing tests. The [conformance README](../tests/conformance/README.md) lists the explicit-config APIs.
 - **`spikes/`:** three throwaway spikes: B0 (a 1.7B model on WebGPU), the local English tutor (a LangGraph.js agent on that model in Chrome) and [Spike C](../spikes/c-ui-path/README.md) (typed interrupt UI and session-checkpoint reload). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
@@ -92,6 +93,8 @@ Trust rules:
 ```mermaid
 flowchart TD
     Host["Host apps: examples/host-local, examples/host-http"]
+    Starter["Template: templates/local-only, bundled one-question agent"]
+    Starter --> Adapter & Models & Storage & ReactPkg
     Tutor["Agent package: examples/english-tutor"]
     Host --> Tutor
     Host --> Adapter["adapter-langgraph"] & Models["models"] & Mcp["tools-mcp"] & Storage["storage-indexeddb"] & ReactPkg["react"]

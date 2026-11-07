@@ -479,7 +479,7 @@ function sourceFilesOutsideDependencies(directory: string, includeDist: boolean)
   });
 }
 
-for (const root of ['examples', 'tests', 'scripts', 'packages']) {
+for (const root of ['examples', 'templates', 'tests', 'scripts', 'packages']) {
   for (const file of sourceFilesOutsideDependencies(root, root === 'packages')) {
     if (EXEMPT_FROM_ADK_SCAN.has(file) || file.startsWith('packages/adapter-adk/')) continue;
     for (const match of readFileSync(file, 'utf8').matchAll(

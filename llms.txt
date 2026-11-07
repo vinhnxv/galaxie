@@ -56,6 +56,8 @@
 
 - [ADK recipe example](examples/adk-recipes/README.md): a scripted JavaScript/Go financial advisor and Python auditor/loan picker, checked text, model destinations, durable approval and explicit finalization; synthetic fixtures, refused shapes and no real-model result.
 
+- [Local-only starter template](templates/local-only/README.md): copyable Vite + React app with its own agent, available Built-in AI or immediate mock, size-disclosed WebLLM opt-in and pending-question recovery; packages unpublished and template device behavior unverified.
+
 ## Verification
 
 - [Conformance suite](tests/conformance/README.md): parity lanes, explicit-config rules and protected goldens.
