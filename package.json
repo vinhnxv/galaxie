@@ -10,10 +10,12 @@
   },
   "scripts": {
     "build": "tsc -p packages/ui-protocol/tsconfig.build.json && tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-kit/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json && tsc -p packages/adapter-pyodide/tsconfig.build.json && tsc -p packages/adapter-adk/tsconfig.build.json && tsc -p packages/adapter-go/tsconfig.build.json && tsc -p packages/models/tsconfig.build.json && tsc -p packages/react/tsconfig.build.json && tsc -p examples/english-tutor/tsconfig.build.json && node scripts/build-manifest.ts examples/english-tutor && node scripts/build-manifest.ts examples/english-tutor --verify && pnpm --filter @galaxie/example-host-local build && tsc -p packages/storage-indexeddb/tsconfig.build.json && tsc -p examples/mcp-server/tsconfig.build.json && tsc -p packages/tools-mcp/tsconfig.build.json && pnpm --filter @galaxie/example-host-remote build && tsc -p packages/eslint-plugin/tsconfig.build.json && pnpm --filter @galaxie/example-rag-browser build",
-    "check": "pnpm run check:license && pnpm run check:dependency-licenses && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run test:python && pnpm run test:go && pnpm run typecheck:python && pnpm run build && pnpm run check:deps && pnpm run check:docs",
+    "build:packages": "tsc -p packages/ui-protocol/tsconfig.build.json && tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-kit/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json && tsc -p packages/models/tsconfig.build.json && tsc -p packages/react/tsconfig.build.json && tsc -p packages/storage-indexeddb/tsconfig.build.json",
+    "check": "pnpm run check:license && pnpm run check:dependency-licenses && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run test:python && pnpm run test:go && pnpm run typecheck:python && pnpm run build && pnpm run check:deps && pnpm run check:docs && pnpm run check:size",
     "check:license": "node scripts/check-license.ts",
     "check:dependency-licenses": "node scripts/check-dependency-licenses.ts",
     "check:docs": "node scripts/check-docs.ts",
+    "check:size": "node scripts/check-size.ts",
     "format": "biome check --write .",
     "lint": "biome check .",
     "test": "vitest run",
@@ -34,6 +36,7 @@
     "playwright": "1.64.1",
     "pyright": "1.1.414",
     "typescript": "7.0.2",
+    "vite": "8.3.4",
     "vitest": "5.0.5"
   }
 }

@@ -72,6 +72,17 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm run check:dependency-licenses
 
+  size:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm run build:packages
+      - run: pnpm run check:size
+
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -156,7 +167,7 @@ jobs:
   # passes when jobs succeeded or were skipped, so a required check can name it alone.
   ci:
     if: always()
-    needs: [scope, static, dependency-licenses, build, test-general, test-python, python-checks, go]
+    needs: [scope, static, dependency-licenses, size, build, test-general, test-python, python-checks, go]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
