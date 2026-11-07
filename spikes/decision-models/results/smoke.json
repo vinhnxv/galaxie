@@ -1,0 +1,2145 @@
+{
+  "evidence": "mock-harness",
+  "examples": {
+    "Mock measurements and real availability-only paths": "passed",
+    "Injected failures affect only their own functional check": "passed",
+    "No confidence has no ECE number": "passed",
+    "Twenty measured trials provide nearest-rank p95": "passed",
+    "Report, reference import, manual input and downloadable export": "passed",
+    "Digest, statistics and strict schema boundaries": "passed",
+    "Committed questions regenerate byte-identically": "passed",
+    "No external requests, page errors or real session creation": "passed"
+  },
+  "externalRequests": 0,
+  "pageErrors": 0,
+  "promptCreates": 0,
+  "baseline": {
+    "schema": "galaxie.spike-decision-models.results/v1",
+    "createdAt": "2026-11-07T17:28:23.089Z",
+    "runs": 5,
+    "profile": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+      "browserVersion": "156.0.8078.4",
+      "deviceMemoryGiB": 16,
+      "hardwareConcurrency": 15,
+      "pageVersion": "1",
+      "ortVersion": "1.31.0-dev.20260914-8d85527a0",
+      "webgpu": {
+        "present": true,
+        "adapter": null,
+        "limits": {}
+      }
+    },
+    "inventory": [
+      {
+        "id": "d1-2b-onnx",
+        "name": "Liquid d1-2B ONNX",
+        "source": "https://huggingface.co/LiquidAI/d1-2B-ONNX",
+        "revision": "2fd61486312020c30a1e3aa5aa677424672b2b37",
+        "lastModified": "2026-11-05T19:38:24Z",
+        "license": {
+          "weights": "other: lfm1.0 (LFM Open License v1.0)",
+          "code": null
+        },
+        "runtime": "onnxruntime-web/webgpu; q4f16 decoder with external data; Python row packing and answer-slot decoding have no JavaScript port.",
+        "files": [
+          {
+            "path": "onnx/decoder_q4f16.onnx",
+            "bytes": 274492,
+            "digest": {
+              "kind": "sha256",
+              "value": "3ac6c50361b1f262b4bf1ac250459eee49bde2620f704b1785fa355cc68117ab"
+            },
+            "role": "graph",
+            "note": null
+          },
+          {
+            "path": "onnx/decoder_q4f16.onnx_data",
+            "bytes": 1567474688,
+            "digest": {
+              "kind": "sha256",
+              "value": "977616f1fcc543490a49c7e54aec98a6398566c7868e3adf0134688a9b701426"
+            },
+            "role": "external-data",
+            "note": null
+          },
+          {
+            "path": "onnx/vision_encoder_q8.onnx",
+            "bytes": 126353,
+            "digest": {
+              "kind": "sha256",
+              "value": "ea9421f2a7fa8bc401bee96b1077be522b8d448e82e46c9117f2bc90eb01caac"
+            },
+            "role": "vision-graph",
+            "note": "Listed for the ADR GPU pairing; text-only questions do not run this encoder."
+          },
+          {
+            "path": "onnx/vision_encoder_q8.onnx_data",
+            "bytes": 196153344,
+            "digest": {
+              "kind": "sha256",
+              "value": "baff3c8cf1dd0b4d8dd3108850558a7f26fafb55367be7bcf98d02739c162d1d"
+            },
+            "role": "vision-data",
+            "note": "Not needed for text-only questions."
+          },
+          {
+            "path": "tokenizer.json",
+            "bytes": 17908258,
+            "digest": {
+              "kind": "sha256",
+              "value": "a39eed58008cbcbc09e5b629b81338a654269c64cd13348aaa6090f4db75c7e7"
+            },
+            "role": "tokenizer",
+            "note": null
+          },
+          {
+            "path": "tokenizer_config.json",
+            "bytes": 623,
+            "digest": {
+              "kind": "git-blob-sha1",
+              "value": "42a71ec485fb54bdaa97a7088ed4c548029fbd5a"
+            },
+            "role": "tokenizer-config",
+            "note": null
+          },
+          {
+            "path": "config.json",
+            "bytes": 2903,
+            "digest": {
+              "kind": "git-blob-sha1",
+              "value": "b931aa74238ea7f53329de2852031348073b87c8"
+            },
+            "role": "config",
+            "note": null
+          },
+          {
+            "path": "chat_template.jinja",
+            "bytes": 12762,
+            "digest": {
+              "kind": "git-blob-sha1",
+              "value": "74edd710b81d679c974d07c25ae8a845e72a584a"
+            },
+            "role": "template",
+            "note": null
+          }
+        ],
+        "note": "Not Apache-2.0. See docs/adr/0028-decision-model-role.md, Host license review. Host-supplied fetch facts dated 2026-11-07; not re-verified by this implementation. A separate code license was not established by the supplied facts; the host must review it."
+      },
+      {
+        "id": "watersheep-0.1.0",
+        "name": "WaterSheep 0.1.0",
+        "source": "https://huggingface.co/samratduttaofficial/WaterSheep",
+        "revision": "236de6496b530d37e36a8ac63ff8412e92940f6e",
+        "lastModified": "2026-10-10T15:23:22Z",
+        "license": {
+          "weights": "apache-2.0",
+          "code": null
+        },
+        "runtime": "Quantized ONNX; browser packing and context contract unknown.",
+        "files": [
+          {
+            "path": "onnx/model_quantized.onnx",
+            "bytes": 158196995,
+            "digest": {
+              "kind": "sha256",
+              "value": "160ae91868f919ae0ddc6d1bd509b17d93194102aa33a466095469fbf04dc25b"
+            },
+            "role": "graph",
+            "note": null
+          },
+          {
+            "path": "tokenizer/tokenizer.json",
+            "bytes": 3583228,
+            "digest": {
+              "kind": "git-blob-sha1",
+              "value": "2f4d8583e507b7466d2490e2d6c045647a822698"
+            },
+            "role": "tokenizer",
+            "note": null
+          },
+          {
+            "path": "tokenizer/tokenizer_config.json",
+            "bytes": 397,
+            "digest": {
+              "kind": "git-blob-sha1",
+              "value": "0c304ef95c60943902362a2b8b67d37d27beec09"
+            },
+            "role": "tokenizer-config",
+            "note": null
+          },
+          {
+            "path": "config.json",
+            "bytes": 2768,
+            "digest": {
+              "kind": "git-blob-sha1",
+              "value": "1c58867a36ac68eb3eb99a895752eafc0a602747"
+            },
+            "role": "config",
+            "note": null
+          },
+          {
+            "path": "encoder/config.json",
+            "bytes": 1981,
+            "digest": {
+              "kind": "git-blob-sha1",
+              "value": "84e8a3325bc2c3d40a9019a59dac951e47ae40e2"
+            },
+            "role": "encoder-config",
+            "note": null
+          },
+          {
+            "path": "watersheep.json",
+            "bytes": 661,
+            "digest": {
+              "kind": "git-blob-sha1",
+              "value": "f53b04f01a018d197ec22d13afdbbdde9c382872"
+            },
+            "role": "decision-config",
+            "note": null
+          }
+        ],
+        "note": "Code license is not stated on the page. Discrepancy: ADR candidate table says watersheep.js exists, but this revision has NO watersheep.js. Complete file list: .gitattributes, LICENSE, NOTICE, README.md, config.json, encoder/config.json, handler.py, model.safetensors, modeling_watersheep.py, onnx/model_quantized.onnx, pipeline_watersheep.py, requirements.txt, tokenizer/tokenizer.json, tokenizer/tokenizer_config.json, watersheep.json. Browser packing is unresolved. Host-supplied fetch facts dated 2026-11-07; not re-verified."
+      },
+      {
+        "id": "laya-english-q4",
+        "name": "Laya English q4",
+        "source": "https://github.com/dockndevai/laya-models",
+        "revision": "70aa37224bb0aa778a5375bbc4dade43b0236fd4",
+        "lastModified": "2026-09-22T19:00:57Z",
+        "license": {
+          "weights": "Apache-2.0 (per README)",
+          "code": "Apache-2.0 (repository)"
+        },
+        "runtime": "onnxruntime-web/webgpu; 4-bit, fp16 embeddings; marker_pos, marker_mask and qtype semantics undocumented.",
+        "files": [
+          {
+            "path": "english/manifest.json",
+            "bytes": null,
+            "digest": null,
+            "role": "manifest",
+            "note": "Manifest size and file digest not fetched; embedded total and part hashes below are host-supplied."
+          },
+          {
+            "path": "english/model.q4.onnx.part00",
+            "bytes": 47185920,
+            "digest": {
+              "kind": "sha256",
+              "value": "ebeca032aeb4a160f70cc7acf6c8e8309bde32a249754443acfdb5999449dfbe"
+            },
+            "role": "model-part",
+            "note": null
+          },
+          {
+            "path": "english/model.q4.onnx.part01",
+            "bytes": 47185920,
+            "digest": {
+              "kind": "sha256",
+              "value": "09517bea48225ddde2fa10e6fccc7fdf68808674d6ab960c44ea4220abbc4043"
+            },
+            "role": "model-part",
+            "note": null
+          },
+          {
+            "path": "english/model.q4.onnx.part02",
+            "bytes": 47185920,
+            "digest": {
+              "kind": "sha256",
+              "value": "0e4a35cbe3b4eb476e65a802e230d4bc986427e16864c17d59d81be3acea7d07"
+            },
+            "role": "model-part",
+            "note": null
+          },
+          {
+            "path": "english/model.q4.onnx.part03",
+            "bytes": 47185920,
+            "digest": {
+              "kind": "sha256",
+              "value": "bffab95d29b44460601ddb06e4de69d4824d9107c6e6976e26f230816fa61d1b"
+            },
+            "role": "model-part",
+            "note": null
+          },
+          {
+            "path": "english/model.q4.onnx.part04",
+            "bytes": 47185920,
+            "digest": {
+              "kind": "sha256",
+              "value": "df8f69de7fa905521f15d037271f2bade06f6601bfdf4df128a4e57875afbd66"
+            },
+            "role": "model-part",
+            "note": null
+          },
+          {
+            "path": "english/model.q4.onnx.part05",
+            "bytes": 47185920,
+            "digest": {
+              "kind": "sha256",
+              "value": "c64ed99afc94f6a23347542d4f79d77dbfbd54b0e11e125db4012a0787496346"
+            },
+            "role": "model-part",
+            "note": null
+          },
+          {
+            "path": "english/model.q4.onnx.part06",
+            "bytes": 47185920,
+            "digest": {
+              "kind": "sha256",
+              "value": "5581e419b72fc970cf00ae775d45438a18c46dbe98f9093a1385009c4f32210d"
+            },
+            "role": "model-part",
+            "note": null
+          },
+          {
+            "path": "english/model.q4.onnx.part07",
+            "bytes": 6251182,
+            "digest": {
+              "kind": "sha256",
+              "value": "c7a6be79cf30fafafe342e9b5812cbca42e0f70e286fac0961031b1a9733427e"
+            },
+            "role": "model-part",
+            "note": null
+          },
+          {
+            "path": "english/config.json",
+            "bytes": null,
+            "digest": null,
+            "role": "config",
+            "note": "Size and digest not fetched; device run must record them before recommendation."
+          },
+          {
+            "path": "english/tokenizer.json",
+            "bytes": null,
+            "digest": null,
+            "role": "tokenizer",
+            "note": "Size and digest not fetched; device run must record them before recommendation."
+          },
+          {
+            "path": "english/tokenizer_config.json",
+            "bytes": null,
+            "digest": null,
+            "role": "tokenizer-config",
+            "note": "Size and digest not fetched; device run must record them before recommendation."
+          }
+        ],
+        "note": "Single commit: Laya English checkpoint, converted to ONNX for the browser (4-bit, fp16 embeddings). Manifest is english/manifest.json; raw HEAD/manifest.json returns 404. Config carries temperature (array of 3) and temperature_by_options keys choice:2, choice:3-5, choice:6-10, choice:11+, score:3-5, noul:2. Host-supplied fetch facts dated 2026-11-07; not re-verified.",
+        "assembly": {
+          "model": "english",
+          "total_bytes": 336552622,
+          "sha256": "7aee973740926ab665bec808f8b4939e7fd33e20229ec664f2d374338259f4c1"
+        }
+      },
+      {
+        "id": "builtin-ai",
+        "name": "Browser-managed LanguageModel",
+        "source": "https://developer.chrome.com/docs/ai/prompt-api",
+        "revision": null,
+        "lastModified": null,
+        "license": {
+          "weights": null,
+          "code": null
+        },
+        "runtime": "Browser Prompt API structured output; browser-managed identity and files cannot be pinned.",
+        "files": [],
+        "note": "Managed model identity cannot be pinned. Record browser version and availability. License terms are browser/host managed, not established here."
+      }
+    ],
+    "questionSet": {
+      "id": "galaxie.spike-decision-models.questions/v1",
+      "count": 200,
+      "calibrationCount": 100,
+      "evaluationCount": 100,
+      "eceBins": 10,
+      "minimumPerBin": 10,
+      "seed": 20261107
+    },
+    "armOrder": ["mock", "builtin-ai", "watersheep", "laya", "d1"],
+    "arms": [
+      {
+        "id": "mock",
+        "evidence": "mock-harness",
+        "profile": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+          "browserVersion": "156.0.8078.4",
+          "deviceMemoryGiB": 16,
+          "hardwareConcurrency": 15,
+          "pageVersion": "1",
+          "ortVersion": "1.31.0-dev.20260914-8d85527a0",
+          "webgpu": {
+            "present": true,
+            "adapter": null,
+            "limits": {}
+          }
+        },
+        "status": "completed",
+        "reason": null,
+        "availability": {
+          "status": "available",
+          "reason": null,
+          "raw": null
+        },
+        "inventory": null,
+        "download": {
+          "status": "not_measured",
+          "reason": "mock_no_download"
+        },
+        "loadWarm": {
+          "status": "measured",
+          "value": 0
+        },
+        "runtime": null,
+        "runtimeReason": "not_applicable",
+        "firstDecision": {
+          "status": "measured",
+          "value": [
+            {
+              "targetStateTokens": 200,
+              "questionCount": 10,
+              "packing": "explicit_caller_requests_max_16",
+              "warmup": {
+                "evidence": "mock-harness",
+                "requests": [
+                  {
+                    "questionCount": 10,
+                    "tokenizationMs": 0,
+                    "endToEndMs": 12.899999976158142,
+                    "stateTokens": 200,
+                    "inputTokens": 462,
+                    "tokenSource": "mock_approximation"
+                  }
+                ],
+                "aggregate": {
+                  "tokenizationMs": 0,
+                  "endToEndMs": 12.899999976158142
+                },
+                "repeatedState": {
+                  "processedTimes": 1,
+                  "extraPasses": 0,
+                  "extraTokens": 0
+                }
+              },
+              "runs": [
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 200,
+                      "inputTokens": 462,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.600000023841858
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.700000047683716,
+                      "stateTokens": 200,
+                      "inputTokens": 462,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.700000047683716
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.599999904632568,
+                      "stateTokens": 200,
+                      "inputTokens": 462,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.599999904632568
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.700000047683716,
+                      "stateTokens": 200,
+                      "inputTokens": 462,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.700000047683716
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 3.200000047683716,
+                      "stateTokens": 200,
+                      "inputTokens": 462,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 3.200000047683716
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                }
+              ],
+              "summary": {
+                "tokenizationMs": {
+                  "min": 0,
+                  "p50": 0,
+                  "p95": null,
+                  "max": 0,
+                  "p95Reason": "fewer_than_20_runs"
+                },
+                "endToEndMs": {
+                  "min": 3.200000047683716,
+                  "p50": 4.600000023841858,
+                  "p95": null,
+                  "max": 4.700000047683716,
+                  "p95Reason": "fewer_than_20_runs"
+                }
+              }
+            },
+            {
+              "targetStateTokens": 200,
+              "questionCount": 30,
+              "packing": "explicit_caller_requests_max_16",
+              "warmup": {
+                "evidence": "mock-harness",
+                "requests": [
+                  {
+                    "questionCount": 16,
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.699999928474426,
+                    "stateTokens": 200,
+                    "inputTokens": 615,
+                    "tokenSource": "mock_approximation"
+                  },
+                  {
+                    "questionCount": 14,
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.600000023841858,
+                    "stateTokens": 200,
+                    "inputTokens": 825,
+                    "tokenSource": "mock_approximation"
+                  }
+                ],
+                "aggregate": {
+                  "tokenizationMs": 0,
+                  "endToEndMs": 9.299999952316284
+                },
+                "repeatedState": {
+                  "processedTimes": 2,
+                  "extraPasses": 1,
+                  "extraTokens": 200
+                }
+              },
+              "runs": [
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.700000047683716,
+                      "stateTokens": 200,
+                      "inputTokens": 615,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.599999904632568,
+                      "stateTokens": 200,
+                      "inputTokens": 825,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.299999952316284
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 200
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.700000047683716,
+                      "stateTokens": 200,
+                      "inputTokens": 615,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 200,
+                      "inputTokens": 825,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.300000071525574
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 200
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 200,
+                      "inputTokens": 615,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.5,
+                      "stateTokens": 200,
+                      "inputTokens": 825,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.100000023841858
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 200
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.700000047683716,
+                      "stateTokens": 200,
+                      "inputTokens": 615,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.5,
+                      "stateTokens": 200,
+                      "inputTokens": 825,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.299999952316284
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 200
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.5,
+                      "stateTokens": 200,
+                      "inputTokens": 615,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.700000047683716,
+                      "stateTokens": 200,
+                      "inputTokens": 825,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.200000047683716
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 200
+                  }
+                }
+              ],
+              "summary": {
+                "tokenizationMs": {
+                  "min": 0,
+                  "p50": 0,
+                  "p95": null,
+                  "max": 0,
+                  "p95Reason": "fewer_than_20_runs"
+                },
+                "endToEndMs": {
+                  "min": 9.100000023841858,
+                  "p50": 9.299999952316284,
+                  "p95": null,
+                  "max": 9.300000071525574,
+                  "p95Reason": "fewer_than_20_runs"
+                }
+              }
+            },
+            {
+              "targetStateTokens": 1000,
+              "questionCount": 10,
+              "packing": "explicit_caller_requests_max_16",
+              "warmup": {
+                "evidence": "mock-harness",
+                "requests": [
+                  {
+                    "questionCount": 10,
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.599999904632568,
+                    "stateTokens": 1000,
+                    "inputTokens": 1262,
+                    "tokenSource": "mock_approximation"
+                  }
+                ],
+                "aggregate": {
+                  "tokenizationMs": 0,
+                  "endToEndMs": 4.599999904632568
+                },
+                "repeatedState": {
+                  "processedTimes": 1,
+                  "extraPasses": 0,
+                  "extraTokens": 0
+                }
+              },
+              "runs": [
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.800000071525574,
+                      "stateTokens": 1000,
+                      "inputTokens": 1262,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.800000071525574
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.5,
+                      "stateTokens": 1000,
+                      "inputTokens": 1262,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.5
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.699999928474426,
+                      "stateTokens": 1000,
+                      "inputTokens": 1262,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.699999928474426
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 1000,
+                      "inputTokens": 1262,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.600000023841858
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 10,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 1000,
+                      "inputTokens": 1262,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.600000023841858
+                  },
+                  "repeatedState": {
+                    "processedTimes": 1,
+                    "extraPasses": 0,
+                    "extraTokens": 0
+                  }
+                }
+              ],
+              "summary": {
+                "tokenizationMs": {
+                  "min": 0,
+                  "p50": 0,
+                  "p95": null,
+                  "max": 0,
+                  "p95Reason": "fewer_than_20_runs"
+                },
+                "endToEndMs": {
+                  "min": 4.5,
+                  "p50": 4.600000023841858,
+                  "p95": null,
+                  "max": 4.800000071525574,
+                  "p95Reason": "fewer_than_20_runs"
+                }
+              }
+            },
+            {
+              "targetStateTokens": 1000,
+              "questionCount": 30,
+              "packing": "explicit_caller_requests_max_16",
+              "warmup": {
+                "evidence": "mock-harness",
+                "requests": [
+                  {
+                    "questionCount": 16,
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.5,
+                    "stateTokens": 1000,
+                    "inputTokens": 1415,
+                    "tokenSource": "mock_approximation"
+                  },
+                  {
+                    "questionCount": 14,
+                    "tokenizationMs": 0,
+                    "endToEndMs": 4.600000023841858,
+                    "stateTokens": 1000,
+                    "inputTokens": 1625,
+                    "tokenSource": "mock_approximation"
+                  }
+                ],
+                "aggregate": {
+                  "tokenizationMs": 0,
+                  "endToEndMs": 9.100000023841858
+                },
+                "repeatedState": {
+                  "processedTimes": 2,
+                  "extraPasses": 1,
+                  "extraTokens": 1000
+                }
+              },
+              "runs": [
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.699999928474426,
+                      "stateTokens": 1000,
+                      "inputTokens": 1415,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 1000,
+                      "inputTokens": 1625,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.299999952316284
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 1000
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.800000071525574,
+                      "stateTokens": 1000,
+                      "inputTokens": 1415,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.799999952316284,
+                      "stateTokens": 1000,
+                      "inputTokens": 1625,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.600000023841858
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 1000
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 1000,
+                      "inputTokens": 1415,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 1000,
+                      "inputTokens": 1625,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.200000047683716
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 1000
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.599999904632568,
+                      "stateTokens": 1000,
+                      "inputTokens": 1415,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 1000,
+                      "inputTokens": 1625,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.199999928474426
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 1000
+                  }
+                },
+                {
+                  "evidence": "mock-harness",
+                  "requests": [
+                    {
+                      "questionCount": 16,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 1000,
+                      "inputTokens": 1415,
+                      "tokenSource": "mock_approximation"
+                    },
+                    {
+                      "questionCount": 14,
+                      "tokenizationMs": 0,
+                      "endToEndMs": 4.600000023841858,
+                      "stateTokens": 1000,
+                      "inputTokens": 1625,
+                      "tokenSource": "mock_approximation"
+                    }
+                  ],
+                  "aggregate": {
+                    "tokenizationMs": 0,
+                    "endToEndMs": 9.200000047683716
+                  },
+                  "repeatedState": {
+                    "processedTimes": 2,
+                    "extraPasses": 1,
+                    "extraTokens": 1000
+                  }
+                }
+              ],
+              "summary": {
+                "tokenizationMs": {
+                  "min": 0,
+                  "p50": 0,
+                  "p95": null,
+                  "max": 0,
+                  "p95Reason": "fewer_than_20_runs"
+                },
+                "endToEndMs": {
+                  "min": 9.199999928474426,
+                  "p50": 9.200000047683716,
+                  "p95": null,
+                  "max": 9.600000023841858,
+                  "p95Reason": "fewer_than_20_runs"
+                }
+              }
+            }
+          ]
+        },
+        "native30QuestionExperiment": {
+          "status": "not_measured",
+          "reason": "not_run"
+        },
+        "gpuMemory": {
+          "source": "manual",
+          "unit": "MiB",
+          "modelAlone": null,
+          "withChatModel": null,
+          "status": "not_measured",
+          "note": "Read OS or Chrome task manager; see README manual GPU procedure. Never estimated."
+        },
+        "accuracy": {
+          "status": "measured",
+          "value": [
+            {
+              "split": "calibration",
+              "overall": {
+                "count": 100,
+                "correct": 89,
+                "fraction": 0.89,
+                "wilson95": {
+                  "low": 0.8136870349691969,
+                  "high": 0.9374580364293543
+                }
+              },
+              "byDomain": [
+                {
+                  "domain": "tutor",
+                  "count": 25,
+                  "correct": 21,
+                  "fraction": 0.84,
+                  "wilson95": {
+                    "low": 0.6534637839282114,
+                    "high": 0.9359654854332355
+                  }
+                },
+                {
+                  "domain": "support",
+                  "count": 25,
+                  "correct": 22,
+                  "fraction": 0.88,
+                  "wilson95": {
+                    "low": 0.7004420607907267,
+                    "high": 0.9583318284955964
+                  }
+                },
+                {
+                  "domain": "write-confirmation",
+                  "count": 25,
+                  "correct": 23,
+                  "fraction": 0.92,
+                  "wilson95": {
+                    "low": 0.7503389104960468,
+                    "high": 0.9777795987151524
+                  }
+                },
+                {
+                  "domain": "privacy",
+                  "count": 25,
+                  "correct": 23,
+                  "fraction": 0.92,
+                  "wilson95": {
+                    "low": 0.7503389104960468,
+                    "high": 0.9777795987151524
+                  }
+                }
+              ],
+              "byType": [
+                {
+                  "type": "boolean",
+                  "count": 36,
+                  "correct": 32,
+                  "fraction": 0.8888888888888888,
+                  "wilson95": {
+                    "low": 0.7468519140963513,
+                    "high": 0.9559335969968435
+                  }
+                },
+                {
+                  "type": "choice",
+                  "count": 32,
+                  "correct": 28,
+                  "fraction": 0.875,
+                  "wilson95": {
+                    "low": 0.7193169451834978,
+                    "high": 0.9502986561251991
+                  }
+                },
+                {
+                  "type": "score",
+                  "count": 32,
+                  "correct": 29,
+                  "fraction": 0.90625,
+                  "wilson95": {
+                    "low": 0.7578184527161212,
+                    "high": 0.9675984487016337
+                  }
+                }
+              ]
+            },
+            {
+              "split": "evaluation",
+              "overall": {
+                "count": 100,
+                "correct": 81,
+                "fraction": 0.81,
+                "wilson95": {
+                  "low": 0.7222115462093562,
+                  "high": 0.8748524849023126
+                }
+              },
+              "byDomain": [
+                {
+                  "domain": "tutor",
+                  "count": 25,
+                  "correct": 20,
+                  "fraction": 0.8,
+                  "wilson95": {
+                    "low": 0.6086904963045967,
+                    "high": 0.9113941531319742
+                  }
+                },
+                {
+                  "domain": "support",
+                  "count": 25,
+                  "correct": 22,
+                  "fraction": 0.88,
+                  "wilson95": {
+                    "low": 0.7004420607907267,
+                    "high": 0.9583318284955964
+                  }
+                },
+                {
+                  "domain": "write-confirmation",
+                  "count": 25,
+                  "correct": 21,
+                  "fraction": 0.84,
+                  "wilson95": {
+                    "low": 0.6534637839282114,
+                    "high": 0.9359654854332355
+                  }
+                },
+                {
+                  "domain": "privacy",
+                  "count": 25,
+                  "correct": 18,
+                  "fraction": 0.72,
+                  "wilson95": {
+                    "low": 0.5242339480963842,
+                    "high": 0.8571614614904344
+                  }
+                }
+              ],
+              "byType": [
+                {
+                  "type": "boolean",
+                  "count": 36,
+                  "correct": 28,
+                  "fraction": 0.7777777777777778,
+                  "wilson95": {
+                    "low": 0.6191529705388181,
+                    "high": 0.8828366802420353
+                  }
+                },
+                {
+                  "type": "choice",
+                  "count": 32,
+                  "correct": 28,
+                  "fraction": 0.875,
+                  "wilson95": {
+                    "low": 0.7193169451834978,
+                    "high": 0.9502986561251991
+                  }
+                },
+                {
+                  "type": "score",
+                  "count": 32,
+                  "correct": 25,
+                  "fraction": 0.78125,
+                  "wilson95": {
+                    "low": 0.6124500635075647,
+                    "high": 0.8897616374739581
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "ece": {
+          "status": "measured",
+          "value": [
+            {
+              "split": "calibration",
+              "calibration": {
+                "status": "measured",
+                "value": 0.25870000000000004,
+                "binCount": 10,
+                "minimumPerBin": 10,
+                "missingConfidence": 0,
+                "total": 100,
+                "counted": 100,
+                "bins": [
+                  {
+                    "lower": 0,
+                    "upper": 0.1,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.1,
+                    "upper": 0.2,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.2,
+                    "upper": 0.3,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.3,
+                    "upper": 0.4,
+                    "count": 26,
+                    "meanConfidence": 0.34999999999999987,
+                    "accuracy": 0.8846153846153846,
+                    "belowMinimum": false
+                  },
+                  {
+                    "lower": 0.4,
+                    "upper": 0.5,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.5,
+                    "upper": 0.6,
+                    "count": 25,
+                    "meanConfidence": 0.5500000000000003,
+                    "accuracy": 0.84,
+                    "belowMinimum": false
+                  },
+                  {
+                    "lower": 0.6,
+                    "upper": 0.7,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.7,
+                    "upper": 0.8,
+                    "count": 24,
+                    "meanConfidence": 0.7200000000000002,
+                    "accuracy": 0.9166666666666666,
+                    "belowMinimum": false
+                  },
+                  {
+                    "lower": 0.8,
+                    "upper": 0.9,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.9,
+                    "upper": 1,
+                    "count": 25,
+                    "meanConfidence": 0.9200000000000006,
+                    "accuracy": 0.92,
+                    "belowMinimum": false
+                  }
+                ]
+              }
+            },
+            {
+              "split": "evaluation",
+              "calibration": {
+                "status": "measured",
+                "value": 0.2713000000000001,
+                "binCount": 10,
+                "minimumPerBin": 10,
+                "missingConfidence": 0,
+                "total": 100,
+                "counted": 100,
+                "bins": [
+                  {
+                    "lower": 0,
+                    "upper": 0.1,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.1,
+                    "upper": 0.2,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.2,
+                    "upper": 0.3,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.3,
+                    "upper": 0.4,
+                    "count": 24,
+                    "meanConfidence": 0.34999999999999987,
+                    "accuracy": 0.875,
+                    "belowMinimum": false
+                  },
+                  {
+                    "lower": 0.4,
+                    "upper": 0.5,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.5,
+                    "upper": 0.6,
+                    "count": 25,
+                    "meanConfidence": 0.5500000000000003,
+                    "accuracy": 0.84,
+                    "belowMinimum": false
+                  },
+                  {
+                    "lower": 0.6,
+                    "upper": 0.7,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.7,
+                    "upper": 0.8,
+                    "count": 26,
+                    "meanConfidence": 0.7200000000000001,
+                    "accuracy": 0.8076923076923077,
+                    "belowMinimum": false
+                  },
+                  {
+                    "lower": 0.8,
+                    "upper": 0.9,
+                    "count": 0,
+                    "meanConfidence": null,
+                    "accuracy": null,
+                    "belowMinimum": true
+                  },
+                  {
+                    "lower": 0.9,
+                    "upper": 1,
+                    "count": 25,
+                    "meanConfidence": 0.9200000000000006,
+                    "accuracy": 0.72,
+                    "belowMinimum": false
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "agreement": {
+          "status": "not_measured",
+          "reason": "reference_not_run"
+        },
+        "builtinAiBaseline": {
+          "status": "not_measured",
+          "reason": "not_applicable"
+        },
+        "functionalChecks": {
+          "loads": {
+            "status": "passed",
+            "reason": "observed"
+          },
+          "cancels": {
+            "status": "passed",
+            "reason": "observed"
+          },
+          "rejectsOversize": {
+            "status": "passed",
+            "reason": "observed"
+          },
+          "rejectsOverlength": {
+            "status": "passed",
+            "reason": "observed"
+          },
+          "answerTypes": {
+            "status": "passed",
+            "reason": "observed"
+          },
+          "packing0": {
+            "status": "passed",
+            "reason": "observed"
+          },
+          "packing1": {
+            "status": "passed",
+            "reason": "observed"
+          },
+          "packing16": {
+            "status": "passed",
+            "reason": "observed"
+          }
+        }
+      },
+      {
+        "id": "builtin-ai",
+        "evidence": "device-demonstration",
+        "profile": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+          "browserVersion": "156.0.8078.4",
+          "deviceMemoryGiB": 16,
+          "hardwareConcurrency": 15,
+          "pageVersion": "1",
+          "ortVersion": "1.31.0-dev.20260914-8d85527a0",
+          "webgpu": {
+            "present": true,
+            "adapter": null,
+            "limits": {}
+          }
+        },
+        "status": "not_run",
+        "reason": "not_selected",
+        "availability": {
+          "status": "downloadable",
+          "reason": null,
+          "raw": "downloadable"
+        },
+        "inventory": {
+          "id": "builtin-ai",
+          "revision": null,
+          "files": []
+        },
+        "download": {
+          "status": "not_measured",
+          "reason": "probe_only"
+        },
+        "loadWarm": {
+          "status": "not_measured",
+          "reason": "probe_only"
+        },
+        "runtime": null,
+        "runtimeReason": "not_run",
+        "firstDecision": {
+          "status": "not_measured",
+          "reason": "probe_only"
+        },
+        "native30QuestionExperiment": {
+          "status": "not_measured",
+          "reason": "not_run"
+        },
+        "gpuMemory": {
+          "source": "manual",
+          "unit": "MiB",
+          "modelAlone": null,
+          "withChatModel": null,
+          "status": "not_measured",
+          "note": "Read OS or Chrome task manager; see README manual GPU procedure. Never estimated."
+        },
+        "accuracy": {
+          "status": "not_measured",
+          "reason": "probe_only"
+        },
+        "ece": {
+          "status": "not_measured",
+          "reason": "probe_only"
+        },
+        "agreement": {
+          "status": "not_measured",
+          "reason": "reference_not_run"
+        },
+        "builtinAiBaseline": {
+          "status": "not_measured",
+          "reason": "not_selected"
+        },
+        "functionalChecks": {
+          "loads": {
+            "status": "not_run",
+            "reason": "probe_only"
+          },
+          "cancels": {
+            "status": "not_run",
+            "reason": "probe_only"
+          },
+          "rejectsOversize": {
+            "status": "not_run",
+            "reason": "probe_only"
+          },
+          "rejectsOverlength": {
+            "status": "not_run",
+            "reason": "probe_only"
+          },
+          "answerTypes": {
+            "status": "not_run",
+            "reason": "probe_only"
+          },
+          "packing0": {
+            "status": "not_run",
+            "reason": "probe_only"
+          },
+          "packing1": {
+            "status": "not_run",
+            "reason": "probe_only"
+          },
+          "packing16": {
+            "status": "not_run",
+            "reason": "probe_only"
+          }
+        }
+      },
+      {
+        "id": "watersheep",
+        "evidence": "device-demonstration",
+        "profile": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+          "browserVersion": "156.0.8078.4",
+          "deviceMemoryGiB": 16,
+          "hardwareConcurrency": 15,
+          "pageVersion": "1",
+          "ortVersion": "1.31.0-dev.20260914-8d85527a0",
+          "webgpu": {
+            "present": true,
+            "adapter": null,
+            "limits": {}
+          }
+        },
+        "status": "unavailable",
+        "reason": "no_webgpu_adapter",
+        "availability": {
+          "status": "unavailable",
+          "reason": "no_webgpu_adapter",
+          "raw": null
+        },
+        "inventory": {
+          "id": "watersheep-0.1.0",
+          "revision": "236de6496b530d37e36a8ac63ff8412e92940f6e",
+          "files": [
+            {
+              "path": "onnx/model_quantized.onnx",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "tokenizer/tokenizer.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "tokenizer/tokenizer_config.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "config.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "encoder/config.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "watersheep.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            }
+          ]
+        },
+        "download": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "loadWarm": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "runtime": null,
+        "runtimeReason": "not_run",
+        "firstDecision": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "native30QuestionExperiment": {
+          "status": "not_measured",
+          "reason": "not_run"
+        },
+        "gpuMemory": {
+          "source": "manual",
+          "unit": "MiB",
+          "modelAlone": null,
+          "withChatModel": null,
+          "status": "not_measured",
+          "note": "Read OS or Chrome task manager; see README manual GPU procedure. Never estimated."
+        },
+        "accuracy": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "ece": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "agreement": {
+          "status": "not_measured",
+          "reason": "reference_not_run"
+        },
+        "builtinAiBaseline": {
+          "status": "not_measured",
+          "reason": "not_applicable"
+        },
+        "functionalChecks": {
+          "loads": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "cancels": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "rejectsOversize": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "rejectsOverlength": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "answerTypes": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing0": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing1": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing16": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          }
+        }
+      },
+      {
+        "id": "laya",
+        "evidence": "device-demonstration",
+        "profile": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+          "browserVersion": "156.0.8078.4",
+          "deviceMemoryGiB": 16,
+          "hardwareConcurrency": 15,
+          "pageVersion": "1",
+          "ortVersion": "1.31.0-dev.20260914-8d85527a0",
+          "webgpu": {
+            "present": true,
+            "adapter": null,
+            "limits": {}
+          }
+        },
+        "status": "unavailable",
+        "reason": "no_webgpu_adapter",
+        "availability": {
+          "status": "unavailable",
+          "reason": "no_webgpu_adapter",
+          "raw": null
+        },
+        "inventory": {
+          "id": "laya-english-q4",
+          "revision": "70aa37224bb0aa778a5375bbc4dade43b0236fd4",
+          "files": [
+            {
+              "path": "english/manifest.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/model.q4.onnx.part00",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/model.q4.onnx.part01",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/model.q4.onnx.part02",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/model.q4.onnx.part03",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/model.q4.onnx.part04",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/model.q4.onnx.part05",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/model.q4.onnx.part06",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/model.q4.onnx.part07",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/config.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/tokenizer.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "english/tokenizer_config.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            }
+          ]
+        },
+        "download": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "loadWarm": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "runtime": null,
+        "runtimeReason": "not_run",
+        "firstDecision": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "native30QuestionExperiment": {
+          "status": "not_measured",
+          "reason": "not_run"
+        },
+        "gpuMemory": {
+          "source": "manual",
+          "unit": "MiB",
+          "modelAlone": null,
+          "withChatModel": null,
+          "status": "not_measured",
+          "note": "Read OS or Chrome task manager; see README manual GPU procedure. Never estimated."
+        },
+        "accuracy": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "ece": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "agreement": {
+          "status": "not_measured",
+          "reason": "reference_not_run"
+        },
+        "builtinAiBaseline": {
+          "status": "not_measured",
+          "reason": "not_applicable"
+        },
+        "functionalChecks": {
+          "loads": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "cancels": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "rejectsOversize": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "rejectsOverlength": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "answerTypes": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing0": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing1": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing16": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          }
+        }
+      },
+      {
+        "id": "d1",
+        "evidence": "device-demonstration",
+        "profile": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+          "browserVersion": "156.0.8078.4",
+          "deviceMemoryGiB": 16,
+          "hardwareConcurrency": 15,
+          "pageVersion": "1",
+          "ortVersion": "1.31.0-dev.20260914-8d85527a0",
+          "webgpu": {
+            "present": true,
+            "adapter": null,
+            "limits": {}
+          }
+        },
+        "status": "unavailable",
+        "reason": "no_webgpu_adapter",
+        "availability": {
+          "status": "unavailable",
+          "reason": "no_webgpu_adapter",
+          "raw": null
+        },
+        "inventory": {
+          "id": "d1-2b-onnx",
+          "revision": "2fd61486312020c30a1e3aa5aa677424672b2b37",
+          "files": [
+            {
+              "path": "onnx/decoder_q4f16.onnx",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "onnx/decoder_q4f16.onnx_data",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "onnx/vision_encoder_q8.onnx",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "onnx/vision_encoder_q8.onnx_data",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "tokenizer.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "tokenizer_config.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "config.json",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            },
+            {
+              "path": "chat_template.jinja",
+              "status": "not_run",
+              "actualBytes": null,
+              "computedDigest": null,
+              "downloaded": null
+            }
+          ]
+        },
+        "download": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "loadWarm": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "runtime": null,
+        "runtimeReason": "not_run",
+        "firstDecision": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "native30QuestionExperiment": {
+          "status": "not_measured",
+          "reason": "not_run"
+        },
+        "gpuMemory": {
+          "source": "manual",
+          "unit": "MiB",
+          "modelAlone": null,
+          "withChatModel": null,
+          "status": "not_measured",
+          "note": "Read OS or Chrome task manager; see README manual GPU procedure. Never estimated."
+        },
+        "accuracy": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "ece": {
+          "status": "not_measured",
+          "reason": "no_webgpu_adapter"
+        },
+        "agreement": {
+          "status": "not_measured",
+          "reason": "reference_not_run"
+        },
+        "builtinAiBaseline": {
+          "status": "not_measured",
+          "reason": "not_applicable"
+        },
+        "functionalChecks": {
+          "loads": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "cancels": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "rejectsOversize": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "rejectsOverlength": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "answerTypes": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing0": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing1": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          },
+          "packing16": {
+            "status": "not_run",
+            "reason": "arm_unavailable"
+          }
+        }
+      }
+    ]
+  }
+}
