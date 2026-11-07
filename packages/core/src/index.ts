@@ -23,6 +23,17 @@ export type {
   PendingConfirmation,
 } from './confirmations.js';
 export {
+  type DecisionAnswer,
+  type DecisionModel,
+  type DecisionModelOptions,
+  type DecisionProvider,
+  type DecisionQuestion,
+  type DecisionRequest,
+  type DecisionResult,
+  validateDecisionAnswers,
+  validateDecisionRequest,
+} from './decision.js';
+export {
   type AgentDefinition,
   type BindingsFor,
   defineAgentDefinition,

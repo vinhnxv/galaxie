@@ -11,8 +11,8 @@ export type ModelFeature = 'streaming' | 'structured-output' | 'tool-calling' | 
 
 /** What a role needs (brief §10.3, §13.2). The host maps each role to an ordered list of providers. */
 export interface ModelRoleRequirements {
-  /** Text only in the MVP; voice comes later (brief §4.4). */
-  readonly modality: 'text';
+  /** Text generation or bounded decisions; voice comes later (brief §4.4). */
+  readonly modality: 'text' | 'decision';
   readonly requires?: readonly ModelFeature[];
   /** BCP 47 tags of the languages the role reads and writes, for example `en` and `vi`. */
   readonly languages?: readonly string[];
@@ -35,8 +35,8 @@ export type ModelPricing =
 export interface ModelDescriptor {
   /** Final recipient, including when a proxy forwards the call (ADR-0006). */
   readonly destination: DestinationClass;
-  /** Text only in M1 (brief §10.5). */
-  readonly modality: 'text';
+  /** Must exactly match the role's modality. */
+  readonly modality: 'text' | 'decision';
   /** Features supported by this provider (brief §10.5). */
   readonly features: readonly ModelFeature[];
   /** Supported BCP 47 language tags (brief §10.5). */
@@ -190,6 +190,17 @@ export interface ModelPort {
 export interface ModelPreparation {
   /** Routed roles; omitted configuration means no roles (ADR-0006). */
   readonly roles: readonly ModelRoleName[];
+  /** Decision roles; absent means every role is text, preserving existing executors. */
+  readonly decisionRoles?: readonly ModelRoleName[];
   /** Routed provider IDs and whether a factory is required (ADR-0006). */
-  readonly providers: Readonly<Record<ModelProviderId, { readonly credential: boolean }>>;
+  readonly providers: Readonly<
+    Record<
+      ModelProviderId,
+      {
+        readonly credential: boolean;
+        /** Absent means text for compatibility with existing preparations. */
+        readonly modality?: ModelDescriptor['modality'];
+      }
+    >
+  >;
 }

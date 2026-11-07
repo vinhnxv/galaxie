@@ -58,6 +58,14 @@ export class LangGraphTraceHandler extends BaseCallbackHandler {
     return this.#chains.get(runId)?.handle;
   }
 
+  /** Decisions share the node's trace parent and live run labels; record no request text. */
+  startDecision(route: SelectedModelRoute, parentRunId?: string): TraceHandle {
+    return this.#trace.start(
+      { kind: 'model', route: { providerId: route.providerId, destination: route.destination } },
+      parentRunId === undefined ? undefined : this.#chains.get(parentRunId)?.handle,
+    );
+  }
+
   setModelRoute(runId: string, selected: SelectedModelRoute): void {
     if (this.#models.has(runId))
       this.#routes.set(runId, {

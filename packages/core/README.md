@@ -61,6 +61,35 @@ See [coding guidance](AGENTS.md), [runtime contracts](../../docs/system-design.m
 [conformance coverage](../../tests/conformance/README.md).
 Code is Apache-2.0 (see [LICENSE](../../LICENSE)).
 
+## Decision roles
+
+Declare a bounded role with `models: { triage: { modality: 'decision' } }`.
+Its host route lists only descriptors with `modality: 'decision'`; preparation
+rejects mixed modalities. Decisions reuse readiness, download and destination
+consent, per-call credentials, sticky run labels, reservations and settlement.
+Default `private-user` policy still permits only in-browser calls.
+
+Core exports `DecisionRequest`, `DecisionQuestion`, `DecisionAnswer`,
+`DecisionResult`, `DecisionModel`, `DecisionModelOptions` and `DecisionProvider`.
+`validateDecisionRequest` and `validateDecisionAnswers` return detached immutable
+values or fixed, content-free `invalid` errors. Requests contain JSON `state` and
+1–16 named boolean, choice (single or multiple), or integer score questions.
+Scores have 2–10 inclusive levels. Answers must match every question exactly;
+optional confidence and complete probability distributions are finite in [0, 1].
+Each categorical distribution sums to 1 within 0.000001, including each separate
+multi-select yes/no pair. No confidence is inferred from probabilities.
+
+The [LangGraph decision entry](../adapter-langgraph/README.md#decision-roles)
+uses the active run's `RunRequest.payload` boundary for the whole request and
+answer, retaining the existing `payloadBytes` limit and `budget_exceeded` outcome.
+Direct shape validators alone do not apply a run budget or destination policy.
+Decision providers receive `{ signal, maxTokens }` and return `{ answers, usage? }`;
+a dedicated forward pass reports input tokens and zero output tokens. Missing or
+invalid usage and failed calls charge the reservation. There is no new accounting unit.
+This implements the contracts and mock portion of
+[ADR-0028](../../docs/adr/0028-decision-model-role.md), without answer repair,
+structured-output decision providers, confidence gates or real decision models.
+
 ## Materialized pending surfaces
 
 Core depends on `@galaxie/ui-protocol` through its public root; its existing peers

@@ -65,6 +65,37 @@ limit behavior has been measured. `MockChatModel.maxTokens` records the received
 limits in call order, including `undefined` for calls without one, shared across
 tool-bound copies. This record does not change scripted replies or transcripts.
 
+## Mock decisions
+
+`@galaxie/models/mock` also exports `MockDecisionModel`, `MockDecisionReply`,
+`MockDecisionScriptEntry` and `MockDecisionCall`. Script entries run in call order:
+
+```ts
+import { MockDecisionModel } from '@galaxie/models/mock';
+
+const model = new MockDecisionModel([
+  {
+    answers: { route: { value: 'ask', probabilities: { ask: 0.75, answer: 0.25 }, confidence: 0.8 } },
+    usage: { inputTokens: 12, outputTokens: 0 },
+  },
+]);
+```
+
+Register this under `services.decisionModels` with a decision-modality descriptor
+and call `host.langchain.decide(role, request, config)` from the graph; see
+[decision roles](../adapter-langgraph/README.md#decision-roles). The mock fits
+core's provider contract structurally without depending on core or validating
+replies itself. It returns scripted boolean, single-choice, multiple-choice and
+score values with optional probabilities, confidence and usage. No inference,
+network call or real-model accuracy is involved.
+
+Entries can instead contain `{ invalid: unknown }` for rejection fixtures or
+`{ error: Error }`. Any entry can add `wait: createMockLatch()` for a cancellable
+wait. `calls` counts dispatches; `recordedCalls` returns the request, signal and
+`maxTokens` in dispatch order. Requests may contain private data: these records
+are test assertions, not telemetry. The host validates complete answers and
+applies output checks and settlement; the mock never retries a failed call.
+
 ## Transformers (ONNX models)
 
 `/transformers` runs an ONNX chat model through Transformers.js inside a host-owned

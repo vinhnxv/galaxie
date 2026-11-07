@@ -56,6 +56,8 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
             readonly capabilities: CapabilityPort;
             readonly models: ModelPort;
             readonly handler: LangGraphTraceHandler;
+            readonly signal: AbortSignal;
+            readonly payload?: (value: unknown) => string;
           }
         | undefined;
       let host: LangGraphHost | undefined = createHost(
@@ -124,7 +126,13 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           if (graph === undefined)
             throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');
           const handler = new LangGraphTraceHandler(request.trace);
-          active = { capabilities: request.capabilities, models: request.models, handler };
+          active = {
+            capabilities: request.capabilities,
+            models: request.models,
+            handler,
+            signal: request.signal,
+            ...(request.payload === undefined ? {} : { payload: request.payload }),
+          };
           let output: unknown;
           let interrupted = false;
           try {

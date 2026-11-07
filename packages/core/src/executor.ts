@@ -38,6 +38,8 @@ export interface RunRequest {
   readonly capabilities: CapabilityPort;
   /** Every model call is authorized and reserved through this run's router (ADR-0006). */
   readonly models: ModelPort;
+  /** Serialize through this run's payload budget. Decision adapters require this boundary. */
+  readonly payload?: (value: unknown) => string;
   /** Re-register checkpoint JSON as private before replay can reach a live outbound call.
    * Optional for hosts implementing RunRequest directly; adapters needing it must fail closed. */
   readonly registerRestoredData?: (value: unknown) => void;
