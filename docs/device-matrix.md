@@ -20,6 +20,11 @@ Configuration checked on 2026-10-30: [CI workflow](../.github/workflows/ci.yml),
 | Pyodide 314.0.7 on Node 24 and headless Chromium | Real dedicated Workers, hash-verified wheel installation, LangGraph graph execution and bridge lifecycle; Chromium boot also checks strict CSP/Trusted Types on every response | Real WASM interpreter and locked frameworks; deterministic JavaScript models and retrieval | [Python adapter](../packages/adapter-pyodide/README.md), [RAG example](../examples/rag-browser/README.md), configured 2026-10-30 |
 | Go 1.27.3 `js/wasm` module on Node 24 and headless Chromium | Real dedicated Workers, length and SHA-256 checked compilation of the ADK Go module (about 30 MB), the framed bridge, streaming, interactions and IndexedDB-backed restore; Chromium also checks strict CSP/Trusted Types and that compilation fails without `'wasm-unsafe-eval'` | Real WASM module and ADK Go runner; scripted JavaScript models and capabilities; Go ready after about 95 ms on the maintainer's machine, not a device measurement | [Go adapter](../packages/adapter-go/README.md), [conformance](../tests/conformance/README.md#google-adk-go-conversations), configured 2026-11-04 |
 
+CI measures every launch package export against [the size budget](../scripts/size-budget.json).
+Each entry is bundled and minified separately, with dependencies external, and
+reported as own-code minified bytes and gzip bytes. These numbers guard against
+regressions; they are not user-facing download sizes and imply no device claim.
+
 Playwright's Chromium is not the maintainer's Chrome 155. These lanes download
 no model weights, execute no real WebLLM engine and call no real `LanguageModel`
 global. Host-loop tests verify that the real WebLLM bundle is not requested.

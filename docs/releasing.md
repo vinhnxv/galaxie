@@ -21,6 +21,28 @@ exact release version after packing. The A2UI renderer is a breaking change to t
 launch React package's public surface API and must land in a 0.x minor release.
 Publish order remains protocol first, then core, then the dependent packages.
 
+## Size budgets
+
+CI and `pnpm check` measure every default JavaScript export of each public package
+against [scripts/size-budget.json](../scripts/size-budget.json). Each entry bundles
+only its own code, with bare imports external, and reports minified and level-9
+gzip bytes. Dependency growth and the final application download size are outside
+this regression guard.
+
+After reviewing deliberate package growth or a changed export inventory, regenerate
+the budget from a fresh build:
+
+```sh
+pnpm run build:packages && node scripts/check-size.ts --write
+```
+
+Generation preserves `marginPercent` (10 percent initially), adds that margin to
+each measurement and rounds each limit up to the next 100 bytes. Review deliberate
+growth in the diff of `scripts/size-budget.json` before committing it, and rerun
+`pnpm run check:size`. Do not regenerate the budget merely to clear a failed check.
+Use the pinned Vite version; changes to the bundler or platform can affect output
+and require reviewing the measurements again.
+
 ## Maintainer-only prerequisites
 
 The maintainer must provide an npm account with permission to publish under the
@@ -45,8 +67,8 @@ public. These are maintainer-only steps.
    packed manifest.
    The Node package-pack conformance test also reports minified and gzip bytes
    for the kit and the LangGraph consumer with the kit bundled in. Record both
-   measurements with the release evidence. No numerical release size limits are
-   currently recorded; these measurements do not establish a size saving.
+   measurements with the release evidence. These consumer-bundle demonstrations
+   differ from the own-code CI budgets above and do not establish a size saving.
 6. Publish `@galaxie/ui-protocol` first, then `@galaxie/core`, then `@galaxie/adapter-kit`,
    then the other four launch packages, running `pnpm publish --access public` in each
    package directory.

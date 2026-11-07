@@ -1,0 +1,61 @@
+{
+  "marginPercent": 10,
+  "entries": {
+    "@galaxie/adapter-kit/.": {
+      "minified": 6700,
+      "gzip": 2300
+    },
+    "@galaxie/adapter-langgraph/.": {
+      "minified": 23300,
+      "gzip": 7100
+    },
+    "@galaxie/core/.": {
+      "minified": 111700,
+      "gzip": 30100
+    },
+    "@galaxie/core/browser": {
+      "minified": 6700,
+      "gzip": 2500
+    },
+    "@galaxie/models/builtin-ai": {
+      "minified": 8400,
+      "gzip": 2800
+    },
+    "@galaxie/models/mock": {
+      "minified": 4200,
+      "gzip": 1800
+    },
+    "@galaxie/models/openai": {
+      "minified": 18400,
+      "gzip": 5500
+    },
+    "@galaxie/models/transformers": {
+      "minified": 30800,
+      "gzip": 9100
+    },
+    "@galaxie/models/transformers/worker": {
+      "minified": 21300,
+      "gzip": 7100
+    },
+    "@galaxie/models/webllm": {
+      "minified": 15900,
+      "gzip": 5600
+    },
+    "@galaxie/models/webllm/worker": {
+      "minified": 600,
+      "gzip": 400
+    },
+    "@galaxie/react/.": {
+      "minified": 30500,
+      "gzip": 8800
+    },
+    "@galaxie/storage-indexeddb/.": {
+      "minified": 42100,
+      "gzip": 11100
+    },
+    "@galaxie/ui-protocol/.": {
+      "minified": 23700,
+      "gzip": 6500
+    }
+  }
+}
