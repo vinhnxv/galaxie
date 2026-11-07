@@ -733,6 +733,7 @@ for (const entry of readdirSync('packages', { withFileTypes: true })) {
           specifier.startsWith('./') ||
           specifier.startsWith('../') ||
           specifier === '@galaxie/core' ||
+          specifier === '@galaxie/ui-protocol' ||
           react ||
           specifier === 'zod' ||
           (area === 'test' && (reactDom || specifier === 'vitest'))

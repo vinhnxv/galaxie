@@ -86,3 +86,15 @@ export function resolvePath(root: JsonValue, parts: readonly string[]): JsonValu
   }
   return current;
 }
+
+/** RFC 6901 lookup; relative paths are confined to the supplied template item. */
+export function resolveDataPath(
+  path: string,
+  model: JsonObject,
+  item?: JsonValue,
+): JsonValue | undefined {
+  const absolute = path === '' || path.startsWith('/');
+  const parts = pointerParts(path, !absolute && item !== undefined);
+  if (parts === undefined || (!absolute && item === undefined)) return undefined;
+  return resolvePath(absolute ? model : (item as JsonValue), parts);
+}

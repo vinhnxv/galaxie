@@ -9,6 +9,7 @@ export type {
   TrustedBinding,
 } from './envelope.js';
 export { PROTOCOL_ERROR_CATEGORY } from './envelope.js';
+export { resolveDataPath } from './json.js';
 export type {
   Component,
   CreateSurface,

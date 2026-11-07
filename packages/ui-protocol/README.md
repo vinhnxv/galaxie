@@ -12,6 +12,10 @@ The public root exports:
 - `parseMessage(value: unknown, extensions?: RegisteredExtensions): ParseResult`.
 - `reduceBatch(previous: MaterializedSurface | undefined, messages: readonly unknown[], context: SurfaceContext): SurfaceResult`.
 - `validateSurface(surface: unknown, context: SurfaceContext): SurfaceResult` for restore.
+- `resolveDataPath(path: string, model: JsonObject, item?: JsonValue): JsonValue | undefined`,
+  the pure lookup shared by validation and rendering. Absolute paths use the root;
+  relative paths require a template item. Invalid or missing paths return `undefined`;
+  lookup never traverses inherited properties and does not mutate data.
 - `A2UI_SPEC_VERSION`, `A2UI_SPEC_REVISION`, `PROTOCOL_ERROR_CATEGORY` and the
   message, JSON, catalog, context, binding, surface and result types.
 
@@ -192,7 +196,10 @@ Catalogs and policy callbacks are trusted host code. Schemas must be strict and
 synchronous. This package does not constrain arbitrary same-origin code or authorize
 server operations. An origin policy does not constrain paths or query parameters.
 
-Core consumes this package for pending surfaces; React does not yet. Core owns labels
+Core consumes this package for pending surfaces; React consumes its public root
+for catalog types and the shared data-path resolver. This React adoption is a
+breaking change to the launch renderer surface API, intended for a 0.x minor
+release under [the release policy](../../docs/releasing.md). Core owns labels
 and private-value registration, `viewRevision`, whole-surface private-value URL
 scanning and action data-model validation, and runs this validator before publication
 and restore. A successful protocol result alone does not authorize publication or

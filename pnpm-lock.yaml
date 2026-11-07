@@ -409,6 +409,9 @@ importers:
       '@galaxie/core':
         specifier: workspace:*
         version: link:../core
+      '@galaxie/ui-protocol':
+        specifier: workspace:*
+        version: link:../ui-protocol
     devDependencies:
       '@types/react':
         specifier: 19.3.0
