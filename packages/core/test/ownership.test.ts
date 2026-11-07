@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { acquireOwnership, type Ownership, type OwnershipOptions } from '@galaxie/core/browser';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { acquireOwnership, type Ownership, type OwnershipOptions } from '../src/index.js';
 
 const owners: Ownership[] = [];
 const channels: BroadcastChannel[] = [];

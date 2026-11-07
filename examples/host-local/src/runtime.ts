@@ -4,17 +4,16 @@
 import { createLangGraphAdapter, type LangGraphServices } from '@galaxie/adapter-langgraph';
 import {
   type AgentInstance,
-  acquireOwnership,
   type BindingsFor,
   createRuntime,
   GalaxieError,
   type ModelDescriptor,
   type ModelRouting,
   type OutputSafetyHook,
-  type OwnershipResult,
   type Runtime,
   type SessionId,
 } from '@galaxie/core';
+import { acquireOwnership, type OwnershipResult } from '@galaxie/core/browser';
 import {
   createTutorAgent,
   lessonFixture,

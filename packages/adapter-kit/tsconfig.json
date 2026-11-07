@@ -3,6 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
+      "@galaxie/core/browser": ["../core/src/browser.ts"],
       "@galaxie/core": ["../core/src/index.ts"]
     }
   },

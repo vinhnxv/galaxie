@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { pythonBuild } from 'virtual:rag-python';
-import { type RunId, watchInvalidation } from '@galaxie/core';
+import type { RunId } from '@galaxie/core';
+import { watchInvalidation } from '@galaxie/core/browser';
 import { AgentSurface, ModelRoutes } from '@galaxie/react';
 import { type ReactElement, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { type RagOutput, RagOutputSchema, type SearchMode } from '../agent/schemas.js';

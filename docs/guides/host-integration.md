@@ -173,6 +173,12 @@ behavior remain unmeasured.
 
 ## Ownership and logout
 
+Import both host lifecycle helpers from the opt-in browser entry:
+
+```ts
+import { acquireOwnership, watchInvalidation } from '@galaxie/core/browser';
+```
+
 Implement [ownership](../system-design.md#85-tab-ownership-and-takeover) before
 local state writes. Open a principal-scoped saver, then call
 `acquireOwnership({ appId, fence: saver.fencing, onHandoverRequest })`.

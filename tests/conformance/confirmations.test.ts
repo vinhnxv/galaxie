@@ -3,17 +3,15 @@
 
 import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
 import {
-  acquireOwnership,
   type CapabilityBinding,
   type CapabilityRequests,
   type ConfirmationOptions,
   createRuntime,
   type DiagnosticEvent,
-  type Ownership,
   type RecoveryStore,
   type SessionId,
-  watchInvalidation,
 } from '@galaxie/core';
+import { acquireOwnership, type Ownership, watchInvalidation } from '@galaxie/core/browser';
 import { defineConfirmations } from '@galaxie/react';
 import { Annotation, END, MemorySaver, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, onTestFinished, test, vi } from 'vitest';

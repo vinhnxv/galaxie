@@ -12,6 +12,24 @@ repository's root, use Node 24 and pnpm 11, run `pnpm install --frozen-lockfile`
 then `pnpm build`. Workspace consumers declare `@galaxie/core` as `workspace:*`.
 Peer requirements are in [package.json](package.json).
 
+## Entry points
+
+`@galaxie/core` exports runtime APIs and framework-neutral contracts. It uses no
+unguarded browser globals and can import and run without page APIs. Optional
+storage persistence and development page warnings keep their feature guards.
+
+`@galaxie/core/browser` exports `acquireOwnership`, `watchInvalidation`,
+`Ownership`, `OwnershipLostReason`, `OwnershipOptions`, `OwnershipResult`,
+`InvalidationOptions` and `InvalidationWatcher`. Ownership requires Web Locks and
+BroadcastChannel; invalidation requires BroadcastChannel and also works in a Worker.
+
+Moving these functions and types out of the main entry is a breaking change to
+the public API of this package, which has not been published. Update host imports:
+
+```ts
+import { acquireOwnership, watchInvalidation } from '@galaxie/core/browser';
+```
+
 ## Minimal host setup
 
 ```ts

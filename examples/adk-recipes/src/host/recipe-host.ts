@@ -1,13 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  type AgentInstance,
-  acquireOwnership,
-  createRuntime,
-  type Ownership,
-  type SessionId,
-} from '@galaxie/core';
+import { type AgentInstance, createRuntime, type SessionId } from '@galaxie/core';
+import { acquireOwnership, type Ownership } from '@galaxie/core/browser';
 import type { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import { createHostCapabilities } from './capabilities.js';
 import { loanConfirmations, loanRegistry } from './loan-approval.js';

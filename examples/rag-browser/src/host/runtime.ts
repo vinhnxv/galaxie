@@ -6,16 +6,15 @@ import { createLangGraphAdapter, type LangGraphServices } from '@galaxie/adapter
 import { createPyodideAdapter } from '@galaxie/adapter-pyodide';
 import {
   type AgentInstance,
-  acquireOwnership,
   type CapabilityBinding,
   createRuntime,
   type ModelDescriptor,
   type ModelRouting,
-  type Ownership,
   type RunId,
   type Runtime,
   type SessionId,
 } from '@galaxie/core';
+import { acquireOwnership, type Ownership } from '@galaxie/core/browser';
 import { BuiltInAIChatModel, checkBuiltInAI, prepareBuiltInAI } from '@galaxie/models/builtin-ai';
 import { loadWebLLMEngine, WebLLMChatModel } from '@galaxie/models/webllm';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';

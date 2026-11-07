@@ -14,6 +14,7 @@
       "@galaxie/models/builtin-ai": ["../../packages/models/src/builtin-ai/index.ts"],
       "@galaxie/models/openai": ["../../packages/models/src/openai/index.ts"],
       "@galaxie/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
+      "@galaxie/core/browser": ["../../packages/core/src/browser.ts"],
       "@galaxie/core": ["../../packages/core/src/index.ts"],
       "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
       "@galaxie/models/mock": ["../../packages/models/src/mock.ts"],

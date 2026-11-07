@@ -94,6 +94,101 @@ test('an empty skeleton passes', () => {
   expect(run({})).toMatchObject({ status: 0, output: '' });
 });
 
+test.each([
+  'export const page = navigator;',
+  'export const page = globalThis.navigator;',
+  "export const page = globalThis['navigator'];",
+  'export const page = globalThis.navigator?.storage;',
+  'export const page = document;',
+  'export const page = window;',
+  'export const page = BroadcastChannel;',
+  "export const page = typeof document === 'undefined';",
+])('core rejects a module-load browser reference: %s', (source) => {
+  const result = run({ 'packages/core/src/page.ts': source });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('packages/core/src/page.ts: browser global');
+  expect(result.output).toContain('must be guarded inside a function');
+});
+
+test.each([
+  "export function page() { return document.createElement('div'); }",
+  'export const page = () => navigator?.storage;',
+  "export const page = () => globalThis.document.createElement('div');",
+  "export function page() { document.createElement('div'); if (typeof document === 'undefined') return; }",
+  "function guard() { if (typeof document === 'undefined') return; } export const page = () => document.title;",
+  "export function page() { if (typeof document === 'undefined') return; return () => document.title; }",
+])('core rejects an unguarded function browser reference: %s', (source) => {
+  const result = run({ 'packages/core/src/page.ts': source });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('packages/core/src/page.ts: browser global');
+});
+
+test('core permits guarded router and development shapes', () => {
+  expect(
+    run({
+      'packages/core/src/model-router.ts':
+        'export const persist = () => Promise.resolve().then(() => globalThis.navigator?.storage?.persist?.());',
+      'packages/core/src/development.ts': [
+        'export function warn() {',
+        "  try { if (typeof document === 'undefined') return; } catch { return; }",
+        "  document.createElement('template');",
+        '  return [globalThis.localStorage, globalThis.sessionStorage];',
+        '}',
+      ].join('\n'),
+    }),
+  ).toMatchObject({ status: 0, output: '' });
+});
+
+test('core permits checked globals and ignores types and property names', () => {
+  expect(
+    run({
+      'packages/core/src/page.ts': [
+        'export interface Options { document?: Document; window?: Window }',
+        "export const options = { navigator: 'host', BroadcastChannel: 'host' };",
+        'export function page() {',
+        "  if (typeof navigator === 'undefined') return;",
+        '  return navigator.storage;',
+        '}',
+        'export function channel() {',
+        "  if (typeof BroadcastChannel !== 'undefined') return new BroadcastChannel('app');",
+        '}',
+      ].join('\n'),
+    }),
+  ).toMatchObject({ status: 0, output: '' });
+});
+
+test.each(['browser', 'ownership', 'invalidation'])(
+  'main-entry modules cannot import or re-export %s',
+  (module) => {
+    for (const source of [
+      `export * from './${module}.js';`,
+      `export type { Options } from './${module}.js';`,
+      `import './${module}.js';`,
+      `export const load = () => import('./${module}.js');`,
+    ]) {
+      const result = run({ 'packages/core/src/index.ts': source });
+      expect(result.status).toBe(1);
+      expect(result.output).toContain(
+        `packages/core/src/index.ts: main-entry modules must not import or re-export ./${module}.js`,
+      );
+    }
+    const indirect = run({
+      'packages/core/src/helper.ts': `export * from './${module}.js';`,
+    });
+    expect(indirect.status).toBe(1);
+    expect(indirect.output).toContain('packages/core/src/helper.ts: main-entry modules must not');
+  },
+);
+
+test('the browser entry composes ownership and invalidation modules', () => {
+  expect(
+    run({
+      'packages/core/src/browser.ts':
+        "export * from './ownership.js';\nexport * from './invalidation.js';",
+    }),
+  ).toMatchObject({ status: 0, output: '' });
+});
+
 test('the ADK adapter may import the root specifier, core, LangChain core and relative files', () => {
   const result = run({
     'packages/adapter-adk/src/a.ts': [

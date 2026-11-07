@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type InvalidationWatcher, watchInvalidation } from '@galaxie/core';
+import { type InvalidationWatcher, watchInvalidation } from '@galaxie/core/browser';
 import { type Corpus, parseCorpus, sha256 } from '../corpus.js';
 import { fingerprint, IndexCache } from './cache.js';
 import { chunkText } from './chunk.js';
