@@ -89,7 +89,7 @@ def test_a_capability_call_runs_once_with_a_scope_and_its_result_reaches_the_mod
     assert seen[0][1]['options']['tools'] == [{'type': 'function', 'function': {
         'name': 'math_double_1', 'description': 'Double an integer.', 'parameters': PARAMETERS,
     }}]
-    assert seen[1][1] == {'name': 'math.double@1', 'input': {'value': 21}, 'effectScope': 'adk-python/s1/root/0/0'}
+    assert seen[1][1] == {'name': 'math.double@1', 'input': {'value': 21}, 'effectScope': 'adk-python/s1/root/0/0', 'tool': True}
     messages = seen[2][1]['messages']
     assert messages[-2] == {
         'role': 'assistant', 'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}', 'galaxie-1')],

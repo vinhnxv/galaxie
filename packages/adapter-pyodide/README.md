@@ -353,6 +353,15 @@ require_confirmation=False, long_running=False)` for a tool that calls a bound c
 service or a credential; `interaction(requests)` turns a pause into one interaction and an optional
 `resume(requests, action, payload)` returns one decision per request.
 
+The tool helpers of every Python framework (`galaxie.adk`, `galaxie.dspy`,
+`galaxie.pydantic_ai`) mark their capability calls as model-chosen. The adapter then refuses a
+capability that is not a read unless it is bound with `approval: 'confirm'` and the runtime has
+host confirmation coverage for it, and it refuses a name with no binding. The refusal is the fixed
+`invalid` error and the capability does not run. The ADK helper returns it to the model as a
+fixed message; the DSPy and pydantic-ai helpers end the run with that error. A direct `galaxie.capabilities.call(...)` from
+agent code is not a model-chosen call and is unchanged. A tool you write yourself that calls
+`capabilities.call` without `tool=True` is outside this check.
+
 The conformance cases show these shapes with the same results as native ADK 2.12.0: a single
 `LlmAgent`, a `SequentialAgent`, a `ParallelAgent` (inside a sequence), a `LoopAgent`, and an
 `LlmAgent` with `sub_agents` that transfers with `transfer_to_agent`, each for run and stream, and a

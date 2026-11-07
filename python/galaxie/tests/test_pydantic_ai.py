@@ -318,7 +318,7 @@ def test_capability_tool_has_a_position_derived_scope_and_propagates_denial():
     with pytest.raises(GalaxieError) as error:
         asyncio.run(prepare_executor(agent).run({'prompt': 'question'}, 'session-fixed', 5))
     assert error.value.code == 'denied'
-    assert seen[-1]['payload'] == {'name': 'docs.search@1', 'input': {'query': 'x'}, 'effectScope': 'pydantic-ai/session-fixed/1/0'}
+    assert seen[-1]['payload'] == {'name': 'docs.search@1', 'input': {'query': 'x'}, 'effectScope': 'pydantic-ai/session-fixed/1/0', 'tool': True}
 
 
 def test_executor_custom_projection_and_instrumentation_refusal():

@@ -116,6 +116,7 @@ export interface CapabilityPayload {
   readonly name: string;
   readonly input: unknown;
   readonly effectScope?: string;
+  readonly tool?: boolean;
 }
 
 export class BridgeValidationError extends Error {
@@ -352,9 +353,10 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
       );
     case 'capability':
       return (
-        keys(value, ['name', 'input'], ['effectScope']) &&
+        keys(value, ['name', 'input'], ['effectScope', 'tool']) &&
         text(value['name']) &&
         json(value['input']) &&
+        (value['tool'] === undefined || typeof value['tool'] === 'boolean') &&
         (value['effectScope'] === undefined || text(value['effectScope']))
       );
     case 'abort':

@@ -28,6 +28,23 @@ const payloads = {
   checkpoint: { op: 'get', sessionId: 's', namespace: '' },
 };
 
+test('a capability request accepts a boolean tool flag and rejects any other value', () => {
+  const parse = (flag: unknown): ReturnType<typeof parseBridge> =>
+    parseBridge(
+      JSON.stringify({
+        v: version,
+        kind: 'request',
+        id: 'one',
+        op: 'capability',
+        payload: { name: 'docs.search@1', input: {}, tool: flag },
+      }),
+    );
+  expect(parse(true)).toMatchObject({ payload: { tool: true } });
+  expect(parse(false)).toMatchObject({ payload: { tool: false } });
+  for (const flag of ['yes', 1, null, {}, []])
+    expect(() => parse(flag)).toThrow('The request is invalid.');
+});
+
 test('validates each request and checked response using JSON only', () => {
   for (const [op, payload] of Object.entries(payloads)) {
     const request = parseBridge(

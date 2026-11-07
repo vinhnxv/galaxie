@@ -24,6 +24,7 @@ import {
   renumber,
   type Spec,
 } from './adk-python.js';
+import { autoApprove, confirmationsFor } from './auto-confirm.js';
 
 /** Golden cases whose pause survives a reload; each is compared with its one-lifetime golden. */
 export const adkPythonReloadCases = [
@@ -137,13 +138,15 @@ export async function executeAdkReloadStep(
     timeoutMs: 1000,
     concurrency: 1,
     grantScope: 'instance' as const,
-    approval: 'none' as const,
+    // A model-chosen write runs only behind a host confirmation, approved below as it appears.
+    approval: kind === 'write' ? ('confirm' as const) : ('none' as const),
     retry: 'none' as const,
     async invoke(input: { value: number }) {
       transcript.capabilities.push({ name, input });
       return { value: input.value * 2 };
     },
   });
+  let stopApproving = (): void => {};
   try {
     const instance = await runtime.create(
       defineAgentDefinition({
@@ -165,6 +168,9 @@ export async function executeAdkReloadStep(
         principalScope: 'fixture',
         agent,
         recovery: store.recovery,
+        ...(write
+          ? { confirmations: confirmationsFor(['math.double@1'], 'adk-python-restore-v1') }
+          : {}),
         ...(step.sessionId === undefined ? {} : { sessionId: step.sessionId as SessionId }),
         services: {
           chatModels: {
@@ -210,6 +216,7 @@ export async function executeAdkReloadStep(
       },
     );
     await instance.prepare();
+    if (write) stopApproving = autoApprove(instance);
     const run =
       step.sessionId === undefined
         ? await instance.start({ prompt: spec.prompt })
@@ -283,6 +290,7 @@ export async function executeAdkReloadStep(
       ...(pending === undefined ? {} : { pending }),
     };
   } finally {
+    stopApproving();
     latch.release();
     await runtime.dispose();
   }

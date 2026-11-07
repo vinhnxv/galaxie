@@ -243,7 +243,7 @@ async def _run_case(name, *, reload=False):
                 ], usage=RequestUsage(input_tokens=2, output_tokens=2), model_name='answer',
             )
 
-    async def call(capability, input, config=None, *, effect_scope=None):
+    async def call(capability, input, config=None, *, effect_scope=None, tool=False):
         attempt = {'name': capability, 'input': input}
         transcript['capabilities'].append(attempt)
         if name == 'capability-denial':

@@ -18,11 +18,16 @@ async def call(
     config: Mapping[str, Any] | None = None,
     *,
     effect_scope: str | None = None,
+    tool: bool = False,
 ) -> Any:
     try:
         if not isinstance(name, str) or not name:
             raise GalaxieError("invalid")
         payload = {"name": name, "input": input}
+        if type(tool) is not bool:
+            raise GalaxieError("invalid")
+        if tool:
+            payload["tool"] = True
         if effect_scope is not None:
             if not isinstance(effect_scope, str) or not effect_scope or config is not None:
                 raise GalaxieError("invalid")

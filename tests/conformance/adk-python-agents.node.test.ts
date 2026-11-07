@@ -19,6 +19,7 @@ import {
 } from '../../examples/rag-browser/test/support/python.node.js';
 import { createPyodideAdapter } from '../../packages/adapter-pyodide/src/adapter.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
+import { autoApprove, confirmationsFor } from './support/auto-confirm.js';
 import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
 
 const header = `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
@@ -284,11 +285,14 @@ test.skipIf(!pythonWheelsAvailable)(
       }
       return result;
     }
+    let stopApproving = (): void => {};
     try {
       const instance = await runtime.create(definition, {
         principalScope: 'fixture',
         agent: { ...fixture.agent, entry: 'parallel_writes' },
         recovery: store.recovery,
+        // A model-chosen write runs only behind a host confirmation, approved below as it appears.
+        confirmations: confirmationsFor(['store.put@1'], 'adk-python-agents-v1'),
         services: { chatModels: { mock: model }, checkpoints: store.checkpoints },
         models,
         bindings: {
@@ -298,7 +302,7 @@ test.skipIf(!pythonWheelsAvailable)(
             timeoutMs: 1000,
             concurrency: 2,
             grantScope: 'instance',
-            approval: 'none',
+            approval: 'confirm',
             retry: 'none',
             async invoke(input: { value: number }) {
               invoked.push(input.value);
@@ -308,6 +312,7 @@ test.skipIf(!pythonWheelsAvailable)(
         },
       });
       await instance.prepare();
+      stopApproving = autoApprove(instance);
       // Round one: left writes, then right writes, then the model fails after both receipts exist.
       model.next(1);
       // Match against the serialized error so a failure prints the whole error, message included.
@@ -334,6 +339,7 @@ test.skipIf(!pythonWheelsAvailable)(
       expect(store.recovery.journal.size).toBe(2);
       expect(fixture.workerErrors).toEqual([]);
     } finally {
+      stopApproving();
       await runtime.dispose();
       await fixture.cleanup();
     }

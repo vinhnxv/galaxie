@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { GalaxieError, type ModelPreparation, toErrorInfo } from '@galaxie/core';
+import {
+  capabilityBindingPolicy,
+  GalaxieError,
+  type ModelPreparation,
+  toErrorInfo,
+} from '@galaxie/core';
 import {
   type BaseAgent,
   type BaseLlm,
@@ -184,6 +189,13 @@ export function createHost(
               throw run.fail(error, 'invalid');
             }
             try {
+              const policy = capabilityBindingPolicy(run.capabilities, name);
+              if (
+                policy === undefined ||
+                (policy.kind !== 'read' &&
+                  (policy.approval !== 'confirm' || !policy.confirmationAvailable))
+              )
+                throw new GalaxieError('invalid', toErrorInfo('invalid').message);
               return await invoke(name, input, { effectScope });
             } catch (error) {
               // A denial or a validation failure is the model's to see, as a fixed message.

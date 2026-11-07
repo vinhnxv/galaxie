@@ -315,7 +315,7 @@ def capability_tool(
                 for part_index, part in enumerate(message.parts):
                     if isinstance(part, ToolCallPart) and part.tool_call_id == ctx.tool_call_id and part.tool_name == ctx.tool_name:
                         scope = f'pydantic-ai/{conversation}/{_positions.get() + response_index}/{part_index}'
-                        return await capabilities.call(capability, arguments, effect_scope=scope)
+                        return await capabilities.call(capability, arguments, effect_scope=scope, tool=True)
         raise GalaxieError('invalid')
 
     return Tool.from_schema(invoke, name=name, description=description, json_schema=parameters, takes_ctx=True)
