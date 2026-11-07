@@ -42,6 +42,7 @@ export function App({
   prepareModels,
   disposeModels,
 }: AppProps): ReactElement {
+  const demo = import.meta.env.MODE === 'mock' && import.meta.env.VITE_GALAXIE_DEMO === '1';
   const index = useSyncExternalStore(retrieval.subscribe, retrieval.getSnapshot);
   const [host, setHost] = useState<RagHost>();
   const [active, setActive] = useState<RagHost['instance']>();
@@ -59,8 +60,9 @@ export function App({
   const [running, setRunning] = useState(false);
   const [runStatus, setRunStatus] = useState('idle');
   const [runId, setRunId] = useState<RunId>();
-  const [review, setReview] = useState(false);
+  const [review, setReview] = useState(demo);
   const [reviewing, setReviewing] = useState(false);
+  const [restoredReview, setRestoredReview] = useState<RagHost['instance']>();
   const [reviewStatus, setReviewStatus] = useState<RagHost['reviewStatus']>('idle');
   const [reviewRestoreFailed, setReviewRestoreFailed] = useState(false);
   const [streamedAnswer, setStreamedAnswer] = useState('');
@@ -192,11 +194,23 @@ export function App({
       setError(failure);
     }
   };
+  const noteRestoredReview = (prepared: RagHost | undefined): void => {
+    if (
+      demo &&
+      prepared?.reviewing &&
+      !prepared.reviewRestoreFailed &&
+      prepared.reviewStatus === 'owner' &&
+      prepared.instance.getSnapshot().run?.status === 'waiting_input'
+    )
+      setRestoredReview(prepared.instance);
+  };
   const prepare = async (): Promise<void> => {
     setPreparing(true);
     setError(undefined);
     try {
-      setHost(await prepareModels());
+      const prepared = await prepareModels();
+      noteRestoredReview(prepared);
+      setHost(prepared);
     } catch {
       disposeModels();
       setError('The chat models could not be prepared.');
@@ -491,6 +505,9 @@ export function App({
           />
           Review passages before answering
         </label>
+        {demo && (
+          <p>Reload the page while a review is paused to resume it. Start over clears it.</p>
+        )}
         <p>
           Review sessions stay on this device until Start over, retention cleanup or browser
           eviction. Review selections reset on reload.
@@ -506,6 +523,7 @@ export function App({
                   setPreparing(true);
                   try {
                     await host?.restoreReview(true);
+                    noteRestoredReview(host);
                   } finally {
                     setPreparing(false);
                   }
@@ -522,6 +540,11 @@ export function App({
         {reviewRestoreFailed && (
           <p role="alert">The saved review could not be restored. Start over to delete it.</p>
         )}
+        {demo &&
+          reviewing &&
+          active === restoredReview &&
+          reviewStatus === 'owner' &&
+          runStatus === 'waiting_input' && <p role="status">The paused review was restored.</p>}
         {reviewing && active && (
           <>
             <AgentSurface instance={active} registry={reviewRegistry} surfaceId="rag-review" />
