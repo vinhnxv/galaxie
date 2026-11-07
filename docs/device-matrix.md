@@ -50,7 +50,7 @@ recorded slice, rather than overriding the current
 - M2 did not measure first-download size/time, time to first token, p50/p95,
   main-thread long tasks or memory. Worker network capture and browser-owned
   download traffic remain gaps in the real local-only demonstration.
-- The ONNX provider has no real-device row: no pinned model, no WebGPU or WASM run, no download size or time, no memory, no time to first token and no prefill abort latency. Its tests use a fake runtime on Node and headless Chromium, and a strict-CSP probe page that runs a one-node ONNX graph on the WASM execution provider ([ADR-0021](adr/0021-in-browser-onnx-chat-provider.md)).
+- The ONNX provider has one demonstration on one device ([record](adk-recipes-real-model-record.md)): Qwen3.5-0.8B q4 on WebGPU, a 666 MB first download and four recipe runs. It has no WASM run, no memory, no time to first token and no prefill abort latency. Its tests use a fake runtime on Node and headless Chromium, and a strict-CSP probe page that runs a one-node ONNX graph on the WASM execution provider ([ADR-0021](adr/0021-in-browser-onnx-chat-provider.md)).
 - WebLLM prefill abort latency, page/worker adapter agreement and the cost of
   resetting instead of reusing KV cache remain unmeasured. Built-in AI session
   creation cost and stable/beta smoke coverage remain open
