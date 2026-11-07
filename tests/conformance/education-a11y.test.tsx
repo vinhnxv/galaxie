@@ -100,6 +100,7 @@ const rejectedMessages: readonly (readonly [ErrorCode, string])[] = [
   ['cancelled', 'Your answer could not be sent. Try again.'],
   ['unrecoverable', 'Your answer could not be sent. Try again.'],
   ['outcome_unknown', 'Your answer could not be sent. Try again.'],
+  ['render_failed', 'Your answer could not be sent. Try again.'],
   ['executor_error', 'Your answer could not be sent. Try again.'],
 ];
 

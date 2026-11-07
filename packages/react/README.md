@@ -2,6 +2,55 @@
 
 Typed agent surfaces and a separate host confirmation prompt. Agent components receive only `props`, `actions` and `status`; the host owns instance creation, preparation and disposal.
 
+## Render outcomes and failures
+
+`AgentSurface` reports a successful component mount through
+`instance.recordRenderOutcome(outcome)` after commit. A class error boundary contains
+registered component render failures so the surrounding host tree remains mounted.
+Registry rejections report their fixed `unsupported`, `invalid` or `denied` code;
+a component that throws reports `render_failed` with `The step could not be shown.`.
+`onError(error)` receives that fixed `ErrorInfo` once per interaction and revision.
+The thrown error object, message and stack are never passed to core, callbacks,
+the DOM, events or spans. React itself may log caught errors in development.
+
+Failures keep the run paused in `waiting_input`. Resuming on a failed render is not
+supported yet. Hosts can supply `fallback(error, controls)`; the first argument is
+unchanged, so existing one-argument fallbacks still work. The exported
+`AgentSurfaceControls` exposes `cancel(): Promise<void>` for cancelling that run
+before a host-owned Start over flow. Cancellation rejection propagates to the caller;
+the host must handle it.
+
+```tsx
+<AgentSurface
+  instance={instance}
+  registry={registry}
+  surfaceId="lesson-main"
+  onError={(error) => showHostError(error.code)}
+  fallback={(error, controls) => (
+    <section>
+      <p role="alert">{error.message}</p>
+      <button type="button" onClick={() => { void controls.cancel().catch(showHostCancelError); }}>
+        Cancel run
+      </button>
+    </section>
+  )}
+/>
+```
+
+Without a host fallback, failures show only `This step could not be shown.` in a
+focusable `role="alert"` paragraph. Focus moves to it once, including under Strict
+Mode. A new instance, run, interaction or view revision resets the boundary.
+The surface owns no automatic retry, resume or instance lifecycle.
+
+The journaled `render` event contains only runtime event identity, interaction ID,
+view revision, status (`rendered` or `failed`) and a fixed failure code. It contains
+no props, model text or user content. Duplicate reports and stale identities are
+ignored by core; `rendered` may be followed by `failed`, after which reports for
+that interaction revision are ignored. Each recorded outcome also becomes a short
+`galaxie.render` span under the paused segment's run span, carrying only
+`galaxie.render.status` and, for failure, `galaxie.render.error.code`.
+See [tracing](../../docs/guides/tracing.md).
+
 ## Education components
 
 `educationComponents` includes headless `Quiz`, `WritingPrompt`, `Feedback` and `Progress` entries. Quiz uses native radio groups with fieldsets and legends; WritingPrompt uses a labelled textarea. Their named submit buttons work by keyboard. Inputs and submit buttons are disabled while submitting or accepted; Tab can still leave the form.

@@ -44,4 +44,4 @@ export {
   type SchemaInput,
   type SchemaOutput,
 } from './registry.js';
-export { AgentSurface, type AgentSurfaceProps } from './surface.js';
+export { AgentSurface, type AgentSurfaceControls, type AgentSurfaceProps } from './surface.js';

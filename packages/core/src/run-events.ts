@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ExecutorEvent, RunEvent } from './events.js';
+import type { ExecutorEvent, HostEvent, RunEvent } from './events.js';
 import type { EventId, RunId } from './ids.js';
 
 export class RunEvents {
@@ -15,7 +15,7 @@ export class RunEvents {
     this.runId = runId;
   }
 
-  append(event: ExecutorEvent | { readonly type: 'cancelled' }): void {
+  append(event: ExecutorEvent | HostEvent): void {
     const recorded = Object.freeze({
       ...event,
       eventId: globalThis.crypto.randomUUID() as EventId,

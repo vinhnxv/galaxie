@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ErrorInfo } from './errors.js';
-import type { EventId, RunId } from './ids.js';
+import type { ErrorCode, ErrorInfo } from './errors.js';
+import type { EventId, InteractionId, RunId, ViewRevision } from './ids.js';
 import type { PendingInteraction } from './interactions.js';
 
 /** What an executor reports during a run (brief §7.5). The runtime derives the run status from it. */
@@ -22,8 +22,19 @@ export type ExecutorEvent =
   // The graph failed: the run becomes `failed`.
   | { readonly type: 'error'; readonly error: ErrorInfo };
 
-/** An executor event as the runtime journals it, with host-created identity and order (brief §8.2, §12.1). */
-export type RunEvent = (ExecutorEvent | { readonly type: 'cancelled' }) & {
+/** Events recorded by the host rather than the executor. */
+export type HostEvent =
+  | { readonly type: 'cancelled' }
+  | {
+      readonly type: 'render';
+      readonly interactionId: InteractionId;
+      readonly viewRevision: ViewRevision;
+      readonly status: 'rendered' | 'failed';
+      readonly code?: ErrorCode;
+    };
+
+/** Run events with host-created identity and order (brief §8.2, §12.1). */
+export type RunEvent = (ExecutorEvent | HostEvent) & {
   readonly eventId: EventId;
   readonly runId: RunId;
   readonly sequence: number;

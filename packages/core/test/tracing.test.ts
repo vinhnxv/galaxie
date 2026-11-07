@@ -336,6 +336,8 @@ const codes: ErrorCode[] = [
   'fenced',
   'cancelled',
   'unrecoverable',
+  'outcome_unknown',
+  'render_failed',
   'executor_error',
 ];
 test.each(codes)('capability %s errors use fixed span types and statuses', (code) => {

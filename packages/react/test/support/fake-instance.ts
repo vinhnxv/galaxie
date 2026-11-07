@@ -44,6 +44,8 @@ export class FakeInstance implements AgentInstance<unknown, unknown> {
     status: 'cancelled' as const,
   }));
   readonly dispose: Mock<AgentInstance<unknown, unknown>['dispose']> = vi.fn(async () => {});
+  readonly recordRenderOutcome: Mock<AgentInstance<unknown, unknown>['recordRenderOutcome']> =
+    vi.fn(() => {});
   readonly respond: Mock<AgentInstance<unknown, unknown>['respond']> = vi.fn(() => ({
     status: 'stale',
   }));
@@ -60,8 +62,9 @@ export class FakeInstance implements AgentInstance<unknown, unknown> {
       event.interactionId !== pending.interactionId ||
       event.surfaceId !== pending.surfaceId ||
       event.viewRevision !== pending.viewRevision
-    )
+    ) {
       return { status: 'rejected', error: toErrorInfo('stale') };
+    }
     return { status: 'accepted', interactionId: pending.interactionId };
   });
   readonly getSnapshot: Mock<AgentInstance<unknown, unknown>['getSnapshot']> = vi.fn(

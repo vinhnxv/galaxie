@@ -49,6 +49,7 @@ interface RunRecord {
   readonly grants: ReadonlySet<string>;
   readonly budget: RunBudget;
   readonly inbox: Map<InteractionId, InboxEntry>;
+  readonly renderOutcomes: Map<string, 'rendered' | 'failed'>;
   submittedText?: boolean;
   dispatching?: InteractionId;
   segment?: SegmentRecord;
@@ -783,6 +784,7 @@ export function createAgentInstance(
           events: new RunEvents(runId),
           budget: new RunBudget(instrumentation.limits),
           inbox: new Map(),
+          renderOutcomes: new Map(),
           status: 'queued',
         };
         registerPrivate(broker.input.privateStrings(value), run.privateValues);
@@ -900,6 +902,7 @@ export function createAgentInstance(
             events: new RunEvents(runId),
             budget: new RunBudget(instrumentation.limits),
             inbox,
+            renderOutcomes: new Map(),
             status: 'waiting_input',
             pending,
           };
@@ -943,6 +946,32 @@ export function createAgentInstance(
         () => checkpointChecks.delete(restoring),
       );
       return restoring;
+    },
+    recordRenderOutcome(outcome): void {
+      const run = current;
+      if (disposing || run === undefined || outcome.runId !== run.runId) return;
+      const pending = run.pending;
+      if (
+        run.status !== 'waiting_input' ||
+        pending === undefined ||
+        outcome.interactionId !== pending.interactionId ||
+        outcome.viewRevision !== pending.viewRevision
+      )
+        return;
+      const key = JSON.stringify([outcome.interactionId, outcome.viewRevision]);
+      const previous = run.renderOutcomes.get(key);
+      if (previous === 'failed' || previous === outcome.status) return;
+      run.renderOutcomes.set(key, outcome.status);
+      const code = outcome.status === 'failed' ? outcome.code : undefined;
+      run.segment?.tracing?.recordRender(outcome.status, code);
+      run.events.append({
+        type: 'render',
+        interactionId: pending.interactionId,
+        viewRevision: pending.viewRevision,
+        status: outcome.status,
+        ...(code === undefined ? {} : { code }),
+      });
+      run.events.notify();
     },
     dispatch(event): Promise<DispatchReceipt> {
       try {
