@@ -87,7 +87,7 @@ const answers = await host.langchain.decide('triage', {
 }, config);
 ```
 
-Forward node `config` explicitly, including after an await. The call uses one
+Forward node `config` explicitly, including after an await. Each attempt uses one
 ordinary model lease with the active run's sticky labels, consent, cancellation
 and token/cost budgets. Preparation requires a decision implementation for each
 routed decision descriptor; `credential: true` requires a per-call factory
@@ -99,14 +99,22 @@ The request and every answer pass core's
 the run's payload budget. The complete answer JSON passes
 `checkOutput(json, { final: true })` before delivery; blocked or failed hooks
 prevent delivery, and an absent hook retains the text path's `unset` outcome.
-Successful calls settle reported usage once; failures charge the reservation
-once. Invalid answers fail with fixed `invalid` and are never repaired or sent to
-another provider. Custom executors supplying `RunRequest` directly must supply
+Completed calls with invalid answers settle reported usage once before any repair;
+attempts that throw charge the reservation once. Route `repairAttempts` defaults
+to zero. When enabled, invalid answers with a `raw` string can request a new lease
+with `repairAttempt: n`, consuming the shared run repair budget. The selected
+decision provider receives `repair: { attempt: n, reply: previousRaw }`; no validator
+text is included. Routing, labels, consent and budgets are rechecked for each lease,
+which may select another decision provider. Leases never overlap or fall back to
+text. Exhaustion fails with fixed `invalid`; missing raw text, malformed results,
+provider errors, cancellation, budget failures and blocked or failed output hooks
+stop the loop. Generated `raw` passes `checkOutput` before answer validation and
+is never returned or stored. Custom executors supplying `RunRequest` directly must supply
 its `payload` callback to use decisions; the adapter fails closed without it.
 
-Only the deterministic mock is supplied here. Structured-output decision
-providers, confidence gates, dedicated models, media, extraction and automatic
-batching remain outside this implementation.
+The [structured-output decision provider](../models/README.md#structured-output-decisions)
+reuses an available chat model without a nested text lease. Confidence gates,
+dedicated models, media, extraction and automatic batching remain outside this implementation.
 
 ## Model-chosen capability tools
 

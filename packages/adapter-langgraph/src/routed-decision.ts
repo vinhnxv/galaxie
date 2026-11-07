@@ -30,7 +30,11 @@ function failure(code: ErrorCode): GalaxieError {
 }
 
 /** Never read a provider accessor, including usage; malformed usage charges the reservation. */
-function result(value: unknown, request: DecisionRequest): DecisionResult {
+function result(value: unknown): {
+  readonly answers: unknown;
+  readonly usage?: ModelUsage;
+  readonly raw?: string;
+} {
   try {
     if (
       typeof value !== 'object' ||
@@ -38,12 +42,15 @@ function result(value: unknown, request: DecisionRequest): DecisionResult {
       Array.isArray(value) ||
       (Object.getPrototypeOf(value) !== Object.prototype &&
         Object.getPrototypeOf(value) !== null) ||
-      Reflect.ownKeys(value).some((key) => key !== 'answers' && key !== 'usage')
+      Reflect.ownKeys(value).some((key) => key !== 'answers' && key !== 'usage' && key !== 'raw')
     )
       throw failure('invalid');
     const answersField = Object.getOwnPropertyDescriptor(value, 'answers');
     if (answersField === undefined || !('value' in answersField)) throw failure('invalid');
-    const answers = validateDecisionAnswers(request, answersField.value);
+    const rawField = Object.getOwnPropertyDescriptor(value, 'raw');
+    if (rawField !== undefined && (!('value' in rawField) || typeof rawField.value !== 'string'))
+      throw failure('invalid');
+    const raw = rawField?.value as string | undefined;
     const field = Object.getOwnPropertyDescriptor(value, 'usage');
     let usage: ModelUsage | undefined;
     if (
@@ -66,7 +73,11 @@ function result(value: unknown, request: DecisionRequest): DecisionResult {
       )
         usage = { inputTokens: input, outputTokens: output };
     }
-    return { answers, ...(usage === undefined ? {} : { usage }) };
+    return {
+      answers: answersField.value,
+      ...(usage === undefined ? {} : { usage }),
+      ...(raw === undefined ? {} : { raw }),
+    };
   } catch {
     throw failure('invalid');
   }
@@ -108,65 +119,94 @@ export async function routedDecision(
   const request = validateDecisionRequest(input);
   if (run.payload === undefined) throw failure('unavailable');
   run.payload(request);
-  const lease = await run.models.begin(role, { signal });
-  let settled = false;
-  let successful = false;
-  let reported: ModelUsage | undefined;
-  let trace: TraceHandle | undefined;
-  try {
-    const callbacks = config?.callbacks;
-    const parent =
-      callbacks !== undefined &&
-      !Array.isArray(callbacks) &&
-      'getParentRunId' in callbacks &&
-      typeof callbacks.getParentRunId === 'function'
-        ? callbacks.getParentRunId()
-        : undefined;
-    trace = run.handler.startDecision(lease, parent);
+  let repair: { readonly attempt: number; readonly reply: string } | undefined;
+  for (;;) {
     assertActive();
-    const implementation = Object.hasOwn(providers, lease.providerId)
-      ? providers[lease.providerId]
-      : undefined;
-    if (implementation === undefined) throw failure('unavailable');
-    if (typeof implementation === 'function' && lease.credential === undefined)
-      throw failure('invalid');
-    const provider =
-      typeof implementation === 'function'
-        ? implementation({ credential: lease.credential as string })
-        : implementation;
-    assertActive();
-    const reply = await wait(
-      Promise.resolve().then(() => {
-        assertActive();
-        return provider.decide(request, { signal, maxTokens: lease.maxTokens });
-      }),
+    // begin rejects exhausted route allowances before reserving a shared repair or model call.
+    const lease = await run.models.begin(role, {
       signal,
-    );
-    assertActive();
-    const validated = result(reply, request);
-    const json = run.payload(validated.answers);
-    await lease.checkOutput(json, { final: true });
-    assertActive();
-    reported = validated.usage;
-    settled = true;
-    lease.end(reported);
-    assertActive();
-    successful = true;
-    return validated.answers;
-  } catch (error) {
-    const code = isGalaxieError(error) ? error.code : undefined;
-    throw failure(
-      code === 'budget_exceeded' ? code : signal.aborted ? 'cancelled' : (code ?? 'unavailable'),
-    );
-  } finally {
-    if (!settled) lease.fail();
-    trace?.end({
-      status: successful ? 'ok' : 'error',
-      route: { providerId: lease.providerId, destination: lease.destination },
-      ...(reported === undefined ? {} : { usage: reported }),
-      ...(lease.outputSafetyOutcome === undefined
-        ? {}
-        : { outputSafetyOutcome: lease.outputSafetyOutcome }),
+      ...(repair === undefined ? {} : { repairAttempt: repair.attempt }),
     });
+    let settled = false;
+    let successful = false;
+    let reported: ModelUsage | undefined;
+    let trace: TraceHandle | undefined;
+    try {
+      const callbacks = config?.callbacks;
+      const parent =
+        callbacks !== undefined &&
+        !Array.isArray(callbacks) &&
+        'getParentRunId' in callbacks &&
+        typeof callbacks.getParentRunId === 'function'
+          ? callbacks.getParentRunId()
+          : undefined;
+      trace = run.handler.startDecision(lease, parent);
+      assertActive();
+      const implementation = Object.hasOwn(providers, lease.providerId)
+        ? providers[lease.providerId]
+        : undefined;
+      if (implementation === undefined) throw failure('unavailable');
+      if (typeof implementation === 'function' && lease.credential === undefined)
+        throw failure('invalid');
+      const provider =
+        typeof implementation === 'function'
+          ? implementation({ credential: lease.credential as string })
+          : implementation;
+      assertActive();
+      const reply = await wait(
+        Promise.resolve().then(() => {
+          assertActive();
+          return provider.decide(request, {
+            signal,
+            maxTokens: lease.maxTokens,
+            ...(repair === undefined ? {} : { repair }),
+          });
+        }),
+        signal,
+      );
+      assertActive();
+      const received = result(reply);
+      if (received.raw !== undefined) {
+        await lease.checkOutput(received.raw, { final: true });
+        assertActive();
+      }
+      let answers: DecisionResult['answers'];
+      try {
+        answers = validateDecisionAnswers(request, received.answers);
+      } catch {
+        // The call completed: settle reported usage even when its answers are invalid.
+        reported = received.usage;
+        settled = true;
+        lease.end(reported);
+        assertActive();
+        if (received.raw === undefined) throw failure('invalid');
+        repair = { attempt: (repair?.attempt ?? 0) + 1, reply: received.raw };
+        continue;
+      }
+      const json = run.payload(answers);
+      await lease.checkOutput(json, { final: true });
+      assertActive();
+      reported = received.usage;
+      settled = true;
+      lease.end(reported);
+      assertActive();
+      successful = true;
+      return answers;
+    } catch (error) {
+      const code = isGalaxieError(error) ? error.code : undefined;
+      throw failure(
+        code === 'budget_exceeded' ? code : signal.aborted ? 'cancelled' : (code ?? 'unavailable'),
+      );
+    } finally {
+      if (!settled) lease.fail();
+      trace?.end({
+        status: successful ? 'ok' : 'error',
+        route: { providerId: lease.providerId, destination: lease.destination },
+        ...(reported === undefined ? {} : { usage: reported }),
+        ...(lease.outputSafetyOutcome === undefined
+          ? {}
+          : { outputSafetyOutcome: lease.outputSafetyOutcome }),
+      });
+    }
   }
 }

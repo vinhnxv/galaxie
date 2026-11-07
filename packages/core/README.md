@@ -83,12 +83,17 @@ The [LangGraph decision entry](../adapter-langgraph/README.md#decision-roles)
 uses the active run's `RunRequest.payload` boundary for the whole request and
 answer, retaining the existing `payloadBytes` limit and `budget_exceeded` outcome.
 Direct shape validators alone do not apply a run budget or destination policy.
-Decision providers receive `{ signal, maxTokens }` and return `{ answers, usage? }`;
+Decision providers receive `{ signal, maxTokens, repair? }` and return `{ answers, usage?, raw? }`;
 a dedicated forward pass reports input tokens and zero output tokens. Missing or
 invalid usage and failed calls charge the reservation. There is no new accounting unit.
-This implements the contracts and mock portion of
-[ADR-0028](../../docs/adr/0028-decision-model-role.md), without answer repair,
-structured-output decision providers, confidence gates or real decision models.
+`raw?: string` is unvalidated generated text used only for output checks and bounded
+repair; it is never returned to callers or stored. `repair?: { attempt, reply }`
+carries the one-based attempt and previous raw reply, without validator text.
+Each repair obtains a new ordinary lease under the route's `repairAttempts`
+(default zero) and shared run repair budget. Completed invalid answers settle
+reported usage; provider failures charge the reservation.
+See [ADR-0028](../../docs/adr/0028-decision-model-role.md). Confidence gates and
+dedicated decision models remain unimplemented.
 
 ## Materialized pending surfaces
 

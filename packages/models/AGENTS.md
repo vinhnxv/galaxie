@@ -10,6 +10,7 @@ See the [README](README.md) and [model flow](../../docs/system-design.md#84-a-mo
 
 - There is no `@galaxie/models` root export; use a declared subpath.
 - `/mock`: `MockChatModel`, `MockDecisionModel`, `MockModelError`, `createMockLatch` and script types.
+- `/decision`: `createStructuredDecisionModel` and structural request, result and option types.
 - `/webllm`: `loadWebLLMEngine`, `WebLLMChatModel`, `checkWebLLMModel`,
   `defaultWebLLMModel`, engine handles and record/options types.
 - `/webllm/worker`: `startWebLLMWorker` for a host-bundled worker.

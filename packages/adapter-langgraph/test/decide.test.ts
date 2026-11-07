@@ -212,8 +212,8 @@ test('an invalid reply fails once without repair or another provider dispatch', 
   });
   expect(provider.calls).toBe(1);
   expect(f.begin).toHaveBeenCalledTimes(1);
-  expect(f.end).not.toHaveBeenCalled();
-  expect(f.fail).toHaveBeenCalledTimes(1);
+  expect(f.end).toHaveBeenCalledExactlyOnceWith(undefined);
+  expect(f.fail).not.toHaveBeenCalled();
   expect(f.checkOutput).not.toHaveBeenCalled();
 });
 
