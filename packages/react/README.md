@@ -1,6 +1,79 @@
 # @galaxie/react
 
-Typed agent surfaces and a separate host confirmation prompt. Agent components receive only `props`, `actions` and `status`; the host owns instance creation, preparation and disposal.
+Typed agent surfaces and a separate host confirmation prompt. Agent components receive `props`, `actions`, `status` and optional rendered `children`; the host owns instance creation, preparation and disposal.
+
+## A2UI surfaces
+
+`AgentSurface` renders materialized A2UI surfaces through host-registered entries.
+`registry.catalogs()` groups entries by catalog ID; `registry.bindings({ surfaces })`
+includes those catalogs automatically. No host, tutor or template migration is needed
+for existing single-component requests: React calls core's `surfaceFromRequest` to
+normalize them to a one-component surface. Legacy actions retain their original
+identity and payload and omit `surfaceAction`. Legacy schema transforms and reserved
+prop names retain the registry's existing resolution behavior.
+
+This is a **breaking change to the launch package's surface API**, intended for a
+0.x minor release under [the release policy](../../docs/releasing.md). React now
+consumes `@galaxie/ui-protocol` through its public root. Existing registry factory,
+`resolve`, education entry IDs and legacy interaction behavior remain supported.
+
+```ts
+import { createRegistry, educationComponents, structuralComponents } from '@galaxie/react';
+
+const registry = createRegistry({
+  components: [...educationComponents, ...structuralComponents('education/v1')],
+});
+const catalogs = registry.catalogs();
+const ui = registry.bindings({ surfaces: ['lesson-main'] });
+```
+
+`educationComponents` remains exactly Quiz, WritingPrompt, Feedback and Progress.
+The separate structural export registers Column, Row, Text and Card in the supplied
+catalog. Column, Row and Card take `children`, an ordered array of component IDs or
+`{ componentId, path }` to expand an array from the data model. They render headless
+content groups; the host owns layout and styling. Text takes `text`, a literal
+string or `{ '@path': '/pointer' }`, and always renders a React text node.
+
+Entries can declare `child`, `children`, `bindable`, `urlProperties`,
+`allowedParents` and `allowedChildren`. Catalog schemas retain child-reference keys;
+components receive the already-rendered children separately. `urlProperties` becomes
+catalog `urls`; the existing `urls(props)` extractor is also enforced for every
+component, including entries without URL property names. Unknown components,
+invalid props, missing children and cycles reject the whole tree before mount.
+The renderer's component limit is core's default `uiElements` (50), including
+expanded templates; exceeding it fails with `denied`. Core still validates before
+publication and applies run-specific budgets and whole-surface URL/private-value
+policy. Renderer checks do not replace those controls.
+
+Bindings use RFC 6901 pointers in the current revision's data model. Absolute paths
+use the root; relative paths within a template stay inside its item. Missing targets
+omit the property and its schema determines validity. The renderer never writes the
+data model. Native actions attach `{ revision, componentId, dataModel }` as
+`surfaceAction`, with the owning component ID and stored model unchanged. The local
+submission guard is shared by all components in the interaction. No catalog
+functions are registered or evaluated, including `@call` and `functionCall`.
+
+Native trees retain their mounted identity across interactions with the same
+instance, run, host region and A2UI surface ID. Component drafts and focus survive
+compatible revisions, including the same-run gap while core resumes. Terminal runs
+and another region clear the retained tree. Submission state, guards and outcome reporting reset for each
+interaction and view revision. Legacy interactions still remount on identity changes.
+Drafts disappear on remount or reload. Material changes compare the entire components
+map structurally, ignoring object key order but preserving array order. This coarse
+rule shows `This step changed.` once per changed revision in one visible polite
+`role="status"`, `aria-live="polite"`, `aria-atomic` region. The region is mounted empty
+on every successful surface render; first render and data-model-only changes do not
+announce. It never moves focus or echoes model/user text. Failure views retain their
+existing single-alert DOM, without the successful tree's live region.
+
+An explicit component `accessibility` object adds a minimal wrapper: `label` maps
+to `aria-label` on a group, `description` to hidden text referenced by
+`aria-describedby`, `live` to `aria-live`, and `hidden` to both `aria-hidden` and
+`hidden`. Without that object there is no accessibility wrapper. Domain fieldsets,
+labels, native controls and trusted action text remain intact. Continue-only entries
+also receive the fixed rejection alert and transition-only focus behavior used by
+Quiz and WritingPrompt. Automated Chromium checks are supplied; they are not an
+assistive-technology audit.
 
 ## Render outcomes and failures
 

@@ -104,6 +104,13 @@ test.each(packages)('$directory packs resolved workspace dependencies', (pkg) =>
   }
 });
 
+test('React packs its protocol dependency at the shared release version', () => {
+  const react = packages.find((pkg) => pkg.directory === 'react');
+  expect(react?.source.dependencies?.['@galaxie/ui-protocol']).toBe('workspace:*');
+  const manifest = JSON.parse(react?.packedJson ?? '{}') as Manifest;
+  expect(manifest.dependencies?.['@galaxie/ui-protocol']).toBe(coreVersion);
+});
+
 test.each(packages)('$directory has public metadata and the root license files', (pkg) => {
   const packed = JSON.parse(pkg.packedJson) as Manifest;
   expect(pkg.source).not.toHaveProperty('private');

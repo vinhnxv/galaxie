@@ -21,15 +21,12 @@ import {
   useRef,
   useState,
 } from 'react';
+import { SurfaceChanges } from './a2ui/changes.js';
+import { type PreparedComponent, prepareSurface } from './a2ui/prepare.js';
+import { SurfaceTree } from './a2ui/tree.js';
 import { useAlertFocus } from './components/alert-focus.js';
 import { useAgentSnapshot } from './hooks.js';
-import type {
-  ActionDefinitions,
-  BoundActions,
-  ComponentEntry,
-  InteractionStatus,
-  Registry,
-} from './registry.js';
+import type { ActionDefinitions, BoundActions, InteractionStatus, Registry } from './registry.js';
 
 export interface AgentSurfaceControls {
   /** Cancels this run; a rejected cancel is returned to the host. */
@@ -83,17 +80,28 @@ class RenderBoundary extends Component<{
   readonly failed: () => void;
   readonly fallback: AgentSurfaceProps['fallback'];
   readonly controls: AgentSurfaceControls;
+  readonly identity: string;
 }> {
-  override state: { readonly failed: boolean } = { failed: false };
-  private reported: boolean = false;
+  override state: { readonly failed: boolean; readonly identity: string | undefined } = {
+    failed: false,
+    identity: undefined,
+  };
+  private reported: string | undefined;
+
+  static getDerivedStateFromProps(
+    props: { readonly identity: string },
+    state: { readonly identity: string | undefined },
+  ): { readonly failed: boolean; readonly identity: string } | null {
+    return props.identity === state.identity ? null : { failed: false, identity: props.identity };
+  }
 
   static getDerivedStateFromError(): { readonly failed: boolean } {
     return { failed: true };
   }
 
   override componentDidCatch(): void {
-    if (this.reported) return;
-    this.reported = true;
+    if (this.reported === this.props.identity) return;
+    this.reported = this.props.identity;
     this.props.failed();
   }
 
@@ -110,10 +118,11 @@ function RenderCommit<Input, View>({
   pending,
   children,
 }: InteractionIdentity<Input, View> & { readonly children: ReactNode }): ReactNode {
-  const reported = useRef(false);
+  const reported = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (reported.current) return;
-    reported.current = true;
+    const identity = JSON.stringify([pending.interactionId, pending.viewRevision]);
+    if (reported.current === identity) return;
+    reported.current = identity;
     instance.recordRenderOutcome({
       runId,
       interactionId: pending.interactionId,
@@ -160,62 +169,84 @@ function RenderedInteraction<Input, View>({
   instance,
   runId,
   pending,
-  entry,
-  props,
+  root,
   fallback,
   onError,
 }: InteractionIdentity<Input, View> & {
-  readonly entry: ComponentEntry;
-  readonly props: unknown;
+  readonly root: PreparedComponent;
   readonly fallback: AgentSurfaceProps['fallback'];
   readonly onError: AgentSurfaceProps['onError'];
 }): ReactElement | null {
-  const [status, setStatus] = useState<InteractionStatus>('idle');
-  const guard = useRef<'idle' | 'submitting' | 'accepted'>('idle');
-  const actions = useMemo<BoundActions<ActionDefinitions>>(
-    () =>
-      Object.fromEntries(
-        Object.entries(entry.actions).map(([name, action]) => [
-          name,
-          {
-            label: action.label,
-            async submit(payload: unknown): Promise<DispatchReceipt> {
-              if (instance.getSnapshot().run?.runId === runId && guard.current !== 'idle')
-                return rejected('duplicate');
-              if (!validateSync(action.payload, payload).ok) {
-                setStatus({ rejected: 'invalid' });
-                return rejected('invalid');
-              }
-              guard.current = 'submitting';
-              setStatus('submitting');
-              let receipt: DispatchReceipt;
-              try {
-                receipt = await instance.dispatch({
-                  instanceId: instance.instanceId,
-                  runId,
-                  interactionId: pending.interactionId,
-                  surfaceId: pending.surfaceId,
-                  viewRevision: pending.viewRevision,
-                  action: name,
-                  payload,
-                });
-              } catch {
-                receipt = rejected('executor_error');
-              }
-              guard.current = receipt.status === 'accepted' ? 'accepted' : 'idle';
-              setStatus(
-                receipt.status === 'accepted' ? 'accepted' : { rejected: receipt.error.code },
-              );
-              return receipt;
-            },
+  const identity = JSON.stringify([pending.interactionId, pending.viewRevision]);
+  const [current, setCurrent] = useState(() => ({
+    identity,
+    status: 'idle' as InteractionStatus,
+    rejectionOwner: undefined as string | undefined,
+    guard: { current: 'idle' },
+  }));
+  let state = current;
+  if (state.identity !== identity) {
+    state = { identity, status: 'idle', rejectionOwner: undefined, guard: { current: 'idle' } };
+    setCurrent(state);
+  }
+  const updateStatus = (status: InteractionStatus, owner?: string): void => {
+    setCurrent((latest) =>
+      latest.identity === identity
+        ? { ...latest, status, rejectionOwner: typeof status === 'object' ? owner : undefined }
+        : latest,
+    );
+  };
+  const actions = (node: PreparedComponent): BoundActions<ActionDefinitions> =>
+    Object.fromEntries(
+      Object.entries(node.entry.actions).map(([name, action]) => [
+        name,
+        {
+          label: action.label,
+          async submit(payload: unknown): Promise<DispatchReceipt> {
+            if (instance.getSnapshot().run?.runId === runId && state.guard.current !== 'idle')
+              return rejected('duplicate');
+            if (!validateSync(action.payload, payload).ok) {
+              updateStatus({ rejected: 'invalid' }, node.id);
+              return rejected('invalid');
+            }
+            state.guard.current = 'submitting';
+            updateStatus('submitting');
+            let receipt: DispatchReceipt;
+            try {
+              receipt = await instance.dispatch({
+                instanceId: instance.instanceId,
+                runId,
+                interactionId: pending.interactionId,
+                surfaceId: pending.surfaceId,
+                viewRevision: pending.viewRevision,
+                action: name,
+                payload,
+                ...(pending.surface === undefined
+                  ? {}
+                  : {
+                      surfaceAction: {
+                        revision: pending.surface.revision,
+                        componentId: node.id,
+                        dataModel: pending.surface.dataModel,
+                      },
+                    }),
+              });
+            } catch {
+              receipt = rejected('executor_error');
+            }
+            state.guard.current = receipt.status === 'accepted' ? 'accepted' : 'idle';
+            updateStatus(
+              receipt.status === 'accepted' ? 'accepted' : { rejected: receipt.error.code },
+              node.id,
+            );
+            return receipt;
           },
-        ]),
-      ),
-    [entry, instance, pending, runId],
-  );
-  const RegisteredComponent = entry.component;
+        },
+      ]),
+    );
   return (
     <RenderBoundary
+      identity={identity}
       fallback={fallback}
       controls={cancelControls(instance, runId)}
       failed={() => {
@@ -230,7 +261,13 @@ function RenderedInteraction<Input, View>({
       }}
     >
       <RenderCommit instance={instance} runId={runId} pending={pending}>
-        <RegisteredComponent props={props} actions={actions} status={status} />
+        <SurfaceTree
+          node={root}
+          actions={actions}
+          status={state.status}
+          rejectionOwner={state.rejectionOwner}
+        />
+        <SurfaceChanges surface={pending.surface} />
       </RenderCommit>
     </RenderBoundary>
   );
@@ -246,22 +283,52 @@ export function AgentSurface<Input, View>({
 }: AgentSurfaceProps<Input, View>): ReactElement | null {
   const snapshot = useAgentSnapshot(instance);
   const run = snapshot.run;
-  const pending = run?.pending?.surfaceId === surfaceId ? run.pending : undefined;
+  const [retained, setRetained] = useState<InteractionIdentity<Input, View>>();
+  const observed = run?.pending?.surfaceId === surfaceId ? run.pending : undefined;
+  // Core clears pending while resuming. Keep the native tree mounted until the next
+  // interaction, so reconciliation can preserve drafts across a real executor gap.
+  const pending =
+    observed ??
+    (run?.status === 'running' &&
+    run.pending === undefined &&
+    retained !== undefined &&
+    retained.instance === instance &&
+    retained.runId === run.runId &&
+    retained.pending.surfaceId === surfaceId
+      ? retained.pending
+      : undefined);
+  if (
+    pending?.surface !== undefined &&
+    run !== undefined &&
+    (run.status === 'running' || run.status === 'waiting_input')
+  ) {
+    if (
+      retained === undefined ||
+      retained.instance !== instance ||
+      retained.runId !== run.runId ||
+      retained.pending !== pending
+    )
+      setRetained({ instance, runId: run.runId, pending });
+  } else if (retained !== undefined) {
+    setRetained(undefined);
+  }
   const resolved = useMemo(
-    () => (pending === undefined ? undefined : registry.resolve(pending)),
+    () => (pending === undefined ? undefined : prepareSurface(pending, registry)),
     [pending, registry],
   );
   if (pending === undefined || run === undefined || resolved === undefined) return null;
   const key = JSON.stringify([
     snapshot.instanceId,
     run.runId,
-    pending.interactionId,
-    pending.viewRevision,
+    pending.surfaceId,
+    ...(pending.surface === undefined
+      ? [pending.interactionId, pending.viewRevision]
+      : [pending.surface.a2uiSurfaceId]),
   ]);
   if (!resolved.ok) {
     return (
       <RejectedInteraction
-        key={key}
+        key={JSON.stringify([key, pending.interactionId, pending.viewRevision])}
         instance={instance}
         runId={run.runId}
         pending={pending}
@@ -277,8 +344,7 @@ export function AgentSurface<Input, View>({
       instance={instance}
       runId={run.runId}
       pending={pending}
-      entry={resolved.entry}
-      props={resolved.props}
+      root={resolved.root}
       fallback={fallback}
       onError={onError}
     />

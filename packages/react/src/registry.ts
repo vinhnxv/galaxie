@@ -18,7 +18,9 @@ import {
   type UiBindings,
   validateSync,
 } from '@galaxie/core';
-import type { ReactElement } from 'react';
+import type { Catalog } from '@galaxie/ui-protocol';
+import type { ReactElement, ReactNode } from 'react';
+import { buildCatalogs, type ComponentStructure } from './a2ui/catalog.js';
 
 export interface ActionDefinition<Payload = unknown, PayloadInput = Payload> {
   readonly label: string;
@@ -53,13 +55,14 @@ export interface ComponentProps<Props, Actions extends ActionDefinitions> {
   readonly props: Props;
   readonly actions: BoundActions<Actions>;
   readonly status: InteractionStatus;
+  readonly children?: ReactNode;
 }
 
 export interface ComponentEntry<
   Props = unknown,
   Actions extends ActionDefinitions = ActionDefinitions,
   Id extends ComponentId = ComponentId,
-> {
+> extends ComponentStructure {
   readonly id: Id;
   readonly props: StandardSchema<Props>;
   readonly actions: Actions;
@@ -69,7 +72,7 @@ export interface ComponentEntry<
 }
 
 /** Collection shape; callbacks are callable only after the entry's own schema has validated. */
-export interface RegistryComponent {
+export interface RegistryComponent extends ComponentStructure {
   readonly id: ComponentId;
   readonly props: StandardSchema;
   readonly actions: ActionDefinitions;
@@ -82,6 +85,7 @@ export type ResolvedInteraction =
   | { readonly ok: false; readonly error: ErrorInfo };
 
 export interface Registry {
+  catalogs(): Readonly<Record<string, Catalog>>;
   resolve(pending: PendingInteraction): ResolvedInteraction;
   bindings(options: { readonly surfaces: readonly SurfaceId[] }): UiBindings;
 }
@@ -139,6 +143,21 @@ export function createRegistry(options: {
         actions: Object.freeze(actions),
         component: entry.component,
         ...(entry.urls === undefined ? {} : { urls: entry.urls }),
+        ...Object.fromEntries(
+          [
+            'child',
+            'children',
+            'bindable',
+            'urlProperties',
+            'allowedParents',
+            'allowedChildren',
+          ].flatMap((key) => {
+            const value = entry[key as keyof ComponentStructure];
+            if (value === undefined) return [];
+            if (!Array.isArray(value) || value.some((name) => typeof name !== 'string')) invalid();
+            return [[key, Object.freeze([...value])]];
+          }),
+        ),
       }) as unknown as ComponentEntry;
       entries.set(entry.id, stored);
     }
@@ -162,7 +181,9 @@ export function createRegistry(options: {
       ]),
     ),
   );
+  const catalogs = buildCatalogs([...entries.values()]);
   return Object.freeze({
+    catalogs: () => catalogs,
     resolve(pending: PendingInteraction): ResolvedInteraction {
       const entry = entries.get(pending.component);
       if (entry === undefined) return { ok: false, error: toErrorInfo('unsupported') };
@@ -177,13 +198,21 @@ export function createRegistry(options: {
           )
         )
           return { ok: false, error: toErrorInfo('denied') };
+        for (const key of entry.urlProperties ?? []) {
+          const url = (validated.value as Record<string, unknown>)[key];
+          if (
+            url !== undefined &&
+            (typeof url !== 'string' || /[\t\n\v\f\r ]/.test(url) || !isAllowedUrl(url, allowlist))
+          )
+            return { ok: false, error: toErrorInfo('denied') };
+        }
       } catch {
         return { ok: false, error: toErrorInfo('invalid') };
       }
       return { ok: true, entry, props: validated.value };
     },
     bindings({ surfaces }: { readonly surfaces: readonly SurfaceId[] }): UiBindings {
-      return Object.freeze({ components, surfaces: Object.freeze([...surfaces]) });
+      return Object.freeze({ components, catalogs, surfaces: Object.freeze([...surfaces]) });
     },
   });
 }

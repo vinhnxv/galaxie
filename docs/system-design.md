@@ -105,7 +105,7 @@ flowchart TD
     Adapter --> Kit["adapter-kit"]
     Protocol["ui-protocol: A2UI validation and reduction"]
     Adapter & Kit & Mcp & ReactPkg --> Core
-    Core --> Protocol
+    Core & ReactPkg --> Protocol
 ```
 
 Proposed rules; M1 confirms them:
@@ -117,13 +117,61 @@ Proposed rules; M1 confirms them:
 5. `tools-mcp` source and build imports are limited to `@galaxie/core`, SDK client subpaths, SDK shared `types.js` and relative files. It imports no SDK server entry or Node module. `examples/mcp-server` uses SDK server/shared subpaths, `node:*`, `zod` and relative files. No package source or build imports examples; tests use source aliases without new dependencies. Hosts may import `@galaxie/tools-mcp`. `check:deps` enforces these rules.
 6. Fewer packages are fine while these boundaries hold (brief §15).
 
-`@galaxie/ui-protocol` is a dependency-free launch package for pinned A2UI messages, catalog validation and pure surface reduction ([ADR-0027](adr/0027-a2ui-surfaces.md), Proposed). Its public root is the only supported entry. It imports no galaxie, React or platform modules and uses no DOM/Worker globals. Core imports it for pending surfaces (§6.3); React does not yet, so rendering remains later work, and there is no executor checkpoint-commit method. See its [API and validation order](../packages/ui-protocol/README.md).
+`@galaxie/ui-protocol` is a dependency-free launch package for pinned A2UI messages, catalog validation and pure surface reduction ([ADR-0027](adr/0027-a2ui-surfaces.md), Proposed). Its public root is the only supported entry. It imports no galaxie, React or platform modules and uses no DOM/Worker globals. Core imports it for pending surfaces (§6.3); React imports its public root for catalog types and the shared pure data-path resolver. There is no executor checkpoint-commit method. See its [API and validation order](../packages/ui-protocol/README.md).
 
 `@galaxie/adapter-kit` now exists as a non-adapter launch package sharing the release version ([ADR-0026](adr/0026-adapter-kit-package.md), Proposed). Executor adapters import only its public root for common tool-call text extraction, selected-provider/credential resolution and pure bridge framing/validators. Prepare-time service validation and error helpers remain deferred. The kit imports no framework runtime and touches no DOM/Worker globals at import time. Framework execution, lifecycle, restore/checkpoints, loaders and Python/Go glue remain per-adapter. Dependency checks enforce these boundaries; all other limits remain unchanged.
 
 `@galaxie/storage-indexeddb` exports `IndexedDBSaver.open({ appId, principalScope, databaseName?, serde? })` and `StorageError`. It implements `BaseCheckpointSaver` 1.2.0 and exposes the structural `saver.recovery` port on the same connection, without importing core. The host derives the principal from its authenticated session; every session-data key includes app and principal. One app-wide epoch key is shared across principals (§8.5). Database version 1 contains indexed `checkpoints` and `writes`, scoped schema/insertion-order `meta`, and the recovery `inbox` and `journal` stores. Serializer tags and bytes are retained in versioned checkpoint envelopes; recovery envelopes hold validated JSON. Writes request strict durability where supported and resolve on transaction completion; malformed records and decode failures reject with fixed `corrupt` errors. The package emits no diagnostics or spans and retains no host error text or error cause. See its [usage and limits](../packages/storage-indexeddb/README.md); core reconciles submissions and write receipts during restore (§8.2–§8.3). Retention and app-wide fencing are implemented; logout remains slice 6 work.
 
-`@galaxie/react` exports `defineComponent`, `createRegistry`, `useAgentSnapshot`, `AgentSurface`, the individual `Quiz`, `WritingPrompt`, `Feedback` and `Progress` entries, and `educationComponents`. An entry declares its versioned ID, synchronous Standard Schema props and action payloads, trusted action labels, optional `urls(props)` extractor and trusted React component. Zod 4 reference schemas bound strings, IDs and collection sizes. Components receive `{ props, actions, status }`; bound actions expose their host label and `submit(payload)`. Model-produced strings render only as React text children.
+`@galaxie/react` exports `defineComponent`, `createRegistry`, `useAgentSnapshot`, `AgentSurface`, the individual `Quiz`, `WritingPrompt`, `Feedback` and `Progress` entries, and `educationComponents`. An entry declares its versioned ID, synchronous Standard Schema props and action payloads, trusted action labels, optional `urls(props)` extractor and trusted React component. Zod 4 reference schemas bound strings, IDs and collection sizes. Components receive `{ props, actions, status }` and optional already-rendered `children`; bound actions expose their host label and `submit(payload)`. Model-produced strings render only as React text children.
+
+The A2UI renderer is a **breaking change to the launch React package's surface API**,
+intended for a 0.x minor release ([release policy](releasing.md)). `Registry.catalogs()`
+builds catalogs from registered IDs and schemas, and `bindings({ surfaces })` includes
+them for core. Optional entry fields `child`, `children`, `bindable`, `urlProperties`,
+`allowedParents` and `allowedChildren` describe composition; catalog URL names and the
+existing `urls(props)` extractor both apply. No renderer functions are registered or
+evaluated. React's new protocol dependency uses only its public root.
+
+`AgentSurface` normalizes legacy requests through core's `surfaceFromRequest` to a
+one-component surface, preserving registry validation/transforms, original event
+identity and the absence of `surfaceAction`. The same tree renderer handles native
+surfaces. Native actions add the originating component ID, numeric revision and
+unchanged stored data model. One local guard disables the interaction's actions after
+acceptance; rejection permits retry. The renderer validates all components before
+mounting, rejecting unknown names, invalid props, missing references, cycles and URL
+violations. Its cap is core's default 50 UI elements, including template expansion;
+cap violations fail `denied`. Core remains the publication and policy boundary.
+
+`structuralComponents(catalogId)` separately supplies headless Column, Row, Text and
+Card entries; `educationComponents` remains the same four domain entries. Groups
+accept ordered child-ID arrays or templates `{ componentId, path }`. Text supports
+literal text and read-only `{ '@path': '/pointer' }` bindings and renders React text
+only. RFC 6901 lookup is shared with protocol validation: absolute paths use the
+current revision's root model, relative paths stay within template items. Unresolved
+bindings omit the property and its schema decides validity. Child-reference keys
+remain in schema props, with rendered children passed separately.
+
+Native trees key by instance, run, host region and A2UI surface ID; compatible new
+interactions update in place, preserving component-local drafts and focus across the
+same-run gap while core resumes. Terminal runs and another region clear the retained
+tree. Legacy
+interactions remount on interaction/view revision changes. Submission state, guards
+and outcome reports reset per interaction/view revision for both paths. Material
+change detection compares entire component maps structurally, ignoring object key
+order and preserving array order. One visible fixed `This step changed.` notice uses
+one polite, atomic `role="status"` region mounted empty on successful renders.
+First render and data-model-only revisions do not announce; notices never move focus
+or echo model/user text. Failure views preserve their existing single-alert DOM.
+
+Explicit A2UI `accessibility` adds a minimal wrapper: label becomes `aria-label` on
+a group; description becomes hidden text referenced by `aria-describedby`; live
+becomes `aria-live`; hidden becomes both `aria-hidden` and `hidden`. Without these
+attributes domain components have no extra wrapper. Fieldsets, labels, native
+controls and trusted action text remain intact. Continue-only entries use the same
+fixed rejection alert and transition-only focus as Quiz/WritingPrompt. Drafts remain
+local and disappear on remount/reload; writable bindings, catalog manifest export and
+example-agent composition are deferred.
 
 `WritingPrompt` collects a component-local sentence with a labelled textarea and a trusted `Submit sentence` action. Props bound prompt text to 2000 characters, title and placeholder to 200, and `maxLength` to an integer from 1 to 500 (default 500). The submit schema trims and bounds the sentence to 1–500 characters and annotates it `private-user` free text. Empty trimmed drafts and submitting or accepted actions disable submission. All strings remain React text.
 
@@ -133,7 +181,7 @@ Raw `stream` events still contain graph state and the answer key and must never 
 
 The registry's `resolve(pending)` returns validated props or a fixed `ErrorInfo`. Unknown components are `unsupported`, invalid or asynchronous validation is `invalid`, and disallowed URLs are `denied`. Schemas must validate synchronously: with Zod 4.6.7 a rejecting async refinement still yields `invalid`, but Zod drops that refinement's Promise, so its rejection, carrying the refinement's own error text, surfaces as an unhandled rejection. Hosts must not use async refinements in UI schemas. `submit` takes the payload schema's input type and dispatches the input unchanged, so core validates the same value again. `AgentSurface` renders only its assigned surface, reports resolution errors from an effect, and supports a host fallback. It subscribes through `useSyncExternalStore`; the host owns creation, preparation, start and disposal outside the surface.
 
-`AgentSurface` contains registered components in a class error boundary. After commit, a successful mount reports `rendered`; registry rejections report `failed` with the registry's fixed code, and a caught component error reports `failed` with `render_failed`. The thrown object, message and stack never enter core, `onError`, events, spans or the DOM. `onError(error)` is called once per interaction revision. The host can provide `fallback(error, controls)`, where exported `AgentSurfaceControls.cancel(): Promise<void>` cancels the render-time run and propagates rejection. Existing one-argument fallbacks remain compatible. Without a host fallback, a fixed `role="alert"` paragraph says `This step could not be shown.` and receives focus once. New instance/run/interaction/revision identity remounts the boundary. Render failures leave the run paused in `waiting_input`; resuming on a failed render is not supported yet. The host owns cancellation and Start over.
+`AgentSurface` contains registered components in a class error boundary. After commit, a successful mount reports `rendered`; registry rejections report `failed` with the registry's fixed code, and a caught component error reports `failed` with `render_failed`. The thrown object, message and stack never enter core, `onError`, events, spans or the DOM. `onError(error)` is called once per interaction revision. The host can provide `fallback(error, controls)`, where exported `AgentSurfaceControls.cancel(): Promise<void>` cancels the render-time run and propagates rejection. Existing one-argument fallbacks remain compatible. Without a host fallback, a fixed `role="alert"` paragraph says `This step could not be shown.` and receives focus once. New interaction/view revision identity resets the boundary while native surface trees retain their mounted identity across compatible revisions. Render failures leave the run paused in `waiting_input`; resuming on a failed render is not supported yet. The host owns cancellation and Start over.
 
 Host wiring (the runtime, definition, graph factory and input are host-owned):
 

@@ -29,7 +29,8 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@galaxie/core": "workspace:*"
+    "@galaxie/core": "workspace:*",
+    "@galaxie/ui-protocol": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.2.0",

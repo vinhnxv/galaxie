@@ -1,6 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+export type { ComponentStructure } from './a2ui/catalog.js';
+export type { AccessibilityAttributes } from './a2ui/prepare.js';
+export {
+  type ChildList,
+  type GroupProps,
+  structuralComponents,
+  type TextProps,
+} from './a2ui/structural.js';
 export {
   educationComponents,
   Feedback,

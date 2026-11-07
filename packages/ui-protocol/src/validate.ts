@@ -7,7 +7,7 @@ import type {
   ProtocolFailure,
   TrustedBinding,
 } from './envelope.js';
-import { isObject, jsonBytes, pointerParts, resolvePath, setOwn } from './json.js';
+import { isObject, jsonBytes, pointerParts, resolveDataPath, setOwn } from './json.js';
 import type {
   Component,
   JsonObject,
@@ -153,10 +153,7 @@ function reservedData(value: JsonValue): boolean {
 }
 
 function dataAt(path: string, model: JsonObject, instance: Instance): JsonValue | undefined {
-  const absolute = path.startsWith('/') || path === '';
-  const parts = pointerParts(path, !absolute && instance.index !== undefined);
-  if (parts === undefined || (!absolute && instance.index === undefined)) return undefined;
-  return resolvePath(absolute ? model : (instance.item as JsonValue), parts);
+  return resolveDataPath(path, model, instance.index === undefined ? undefined : instance.item);
 }
 
 /** Whole-candidate checks; the reducer owns parsing, wire-order operations and revisions. */

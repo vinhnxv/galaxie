@@ -776,9 +776,10 @@ test.each([
 });
 
 test.each(['packages/react/src/a.ts'])(
-  'existing consumer allowlists do not yet permit ui-protocol: %s',
+  'React permits the protocol public root and rejects deep imports: %s',
   (path) => {
-    expect(run({ [path]: adk('@galaxie/ui-protocol') }).status).toBe(1);
+    expect(run({ [path]: adk('@galaxie/ui-protocol') }).status).toBe(0);
+    expect(run({ [path]: adk('@galaxie/ui-protocol/internal') }).status).toBe(1);
   },
 );
 
