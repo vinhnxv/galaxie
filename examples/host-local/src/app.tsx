@@ -1,15 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  type AgentInstance,
-  type InvalidationWatcher,
-  isGalaxieError,
-  type Ownership,
-  type RunId,
-  type SessionId,
-  watchInvalidation,
-} from '@galaxie/core';
+import { type AgentInstance, isGalaxieError, type RunId, type SessionId } from '@galaxie/core';
+import { type InvalidationWatcher, type Ownership, watchInvalidation } from '@galaxie/core/browser';
 import {
   lessonFixture,
   ProgressInputSchema,

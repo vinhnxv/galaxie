@@ -87,11 +87,6 @@ export {
   parseInteractionRequest,
 } from './interactions.js';
 export {
-  type InvalidationOptions,
-  type InvalidationWatcher,
-  watchInvalidation,
-} from './invalidation.js';
-export {
   INSTANCE_TRANSITIONS,
   type InstanceState,
   RUN_TRANSITIONS,
@@ -125,13 +120,6 @@ export type {
   PublishedModelRoute,
   SelectedModelRoute,
 } from './models.js';
-export {
-  acquireOwnership,
-  type Ownership,
-  type OwnershipLostReason,
-  type OwnershipOptions,
-  type OwnershipResult,
-} from './ownership.js';
 export type {
   ArgumentShape,
   BudgetLimits,

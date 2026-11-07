@@ -4,14 +4,13 @@
 import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
 import {
   type AgentInstance,
-  acquireOwnership,
   type CapabilityBinding,
   type CapabilityContext,
   createRuntime,
-  type Ownership,
   type SessionId,
   type UserInteractionEvent,
 } from '@galaxie/core';
+import { acquireOwnership, type Ownership } from '@galaxie/core/browser';
 import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { afterEach, describe, expect, test, vi } from 'vitest';

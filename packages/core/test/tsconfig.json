@@ -3,7 +3,10 @@
   "compilerOptions": {
     "types": ["node"],
     "resolveJsonModule": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@galaxie/core/browser": ["../src/browser.ts"]
+    }
   },
   "include": ["."]
 }

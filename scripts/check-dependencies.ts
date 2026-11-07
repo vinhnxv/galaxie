@@ -100,6 +100,115 @@ function imports(file: string): ImportReference[] {
   return references;
 }
 
+const browserModules = new Set(
+  ['browser', 'ownership', 'invalidation'].map((name) => resolve(`packages/core/src/${name}.js`)),
+);
+const browserGlobals = new Set(['navigator', 'document', 'window', 'BroadcastChannel']);
+
+/**
+ * A guarded reference is inside a function body and either follows a same-function
+ * `typeof <global> ===/!== 'undefined'` check or reads a globalThis property without
+ * dereferencing/calling a missing value (optional chaining permits that next step).
+ * This is a lexical check, not control-flow analysis; nested functions start fresh.
+ * Type positions and declaration/property names are not runtime references.
+ */
+function checkCoreGlobals(file: string): void {
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const globalName = (node: ts.Node): string | undefined => {
+    if (ts.isIdentifier(node) && browserGlobals.has(node.text)) return node.text;
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'globalThis' &&
+      browserGlobals.has(node.name.text)
+    )
+      return node.name.text;
+    if (
+      ts.isElementAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'globalThis' &&
+      ts.isStringLiteral(node.argumentExpression) &&
+      browserGlobals.has(node.argumentExpression.text)
+    )
+      return node.argumentExpression.text;
+    return undefined;
+  };
+  const visit = (node: ts.Node, guards?: Set<string>): void => {
+    if (
+      ts.isTypeNode(node) ||
+      ts.isInterfaceDeclaration(node) ||
+      ts.isImportDeclaration(node) ||
+      ts.isExportDeclaration(node)
+    )
+      return;
+    if (
+      ts.isFunctionDeclaration(node) ||
+      ts.isFunctionExpression(node) ||
+      ts.isArrowFunction(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isConstructorDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node) ||
+      ts.isSetAccessorDeclaration(node)
+    ) {
+      ts.forEachChild(node, (child) => visit(child, child === node.body ? new Set() : guards));
+      return;
+    }
+    const parent = node.parent;
+    const name = globalName(node);
+    const namedDeclaration =
+      ts.isIdentifier(node) &&
+      'name' in parent &&
+      parent.name === node &&
+      !ts.isShorthandPropertyAssignment(parent);
+    if (name !== undefined && !namedDeclaration) {
+      let reference = node;
+      while (ts.isParenthesizedExpression(reference.parent)) reference = reference.parent;
+      const use = reference.parent;
+      const dereferenced =
+        ((ts.isPropertyAccessExpression(use) ||
+          ts.isElementAccessExpression(use) ||
+          ts.isCallExpression(use)) &&
+          use.expression === reference &&
+          use.questionDotToken === undefined) ||
+        (ts.isNewExpression(use) && use.expression === reference);
+      if (
+        guards === undefined ||
+        (!guards.has(name) &&
+          !ts.isTypeOfExpression(use) &&
+          (ts.isIdentifier(node) || dereferenced))
+      )
+        problems.push(`${file}: browser global ${name} must be guarded inside a function`);
+    }
+    ts.forEachChild(node, (child) => visit(child, guards));
+    if (
+      guards !== undefined &&
+      ts.isBinaryExpression(node) &&
+      (node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+        node.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken)
+    ) {
+      for (const [check, value] of [
+        [node.left, node.right],
+        [node.right, node.left],
+      ] as const) {
+        if (
+          ts.isTypeOfExpression(check) &&
+          ts.isStringLiteral(value) &&
+          value.text === 'undefined'
+        ) {
+          const checked = globalName(check.expression);
+          if (checked !== undefined) guards.add(checked);
+        }
+      }
+    }
+  };
+  visit(source);
+}
+
 const core = JSON.parse(readFileSync('packages/core/package.json', 'utf8')) as {
   dependencies?: unknown;
   optionalDependencies?: unknown;
@@ -118,8 +227,12 @@ if (
   );
 
 for (const file of files('packages/core/src', /\.[cm]?tsx?$/)) {
+  const mainEntry = !browserModules.has(resolve(file).replace(/\.ts$/, '.js'));
+  if (mainEntry) checkCoreGlobals(file);
   for (const reference of imports(file)) {
     const { specifier, typeOnly } = reference;
+    if (mainEntry && browserModules.has(resolve(dirname(file), specifier).replace(/\.ts$/, '.js')))
+      problems.push(`${file}: main-entry modules must not import or re-export ${specifier}`);
     if (
       specifier.startsWith('./') ||
       specifier.startsWith('../') ||
@@ -598,6 +711,7 @@ for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
     if (
       specifier.startsWith('./') ||
       specifier === '@galaxie/core' ||
+      specifier === '@galaxie/core/browser' ||
       specifier === '@galaxie/tools-mcp' ||
       specifier === '@galaxie/storage-indexeddb' ||
       specifier === '@galaxie/adapter-langgraph' ||
@@ -662,6 +776,7 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
       (relative && target.startsWith(`${resolve('examples/rag-browser')}/`)) ||
       [
         '@galaxie/core',
+        '@galaxie/core/browser',
         '@galaxie/adapter-langgraph',
         '@galaxie/adapter-pyodide',
         '@galaxie/adapter-pyodide/worker',

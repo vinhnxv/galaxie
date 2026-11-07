@@ -5,6 +5,7 @@
     "types": ["node"],
     "paths": {
       "@galaxie/adapter-kit": ["../../adapter-kit/src/index.ts"],
+      "@galaxie/core/browser": ["../../core/src/browser.ts"],
       "@galaxie/core": ["../../core/src/index.ts"]
     }
   },

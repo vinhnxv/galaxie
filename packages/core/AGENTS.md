@@ -8,11 +8,15 @@ See the [README](README.md) and [runtime contracts](../../docs/system-design.md#
 
 ## Entry points
 
-- `@galaxie/core` is the only package entry; inspect [src/index.ts](src/index.ts).
+- `@galaxie/core` exports the runtime and contracts from [src/index.ts](src/index.ts),
+  with no unguarded browser globals.
+- `@galaxie/core/browser` opts into ownership and invalidation helpers and their
+  types from [src/browser.ts](src/browser.ts).
 - `createRuntime`, `defineAgentDefinition` and `createManifest` construct runtime,
   definition and build-time manifest data respectively.
-- `httpCapability`, `galaxieField`, `acquireOwnership` and `watchInvalidation`
-  support host bindings, schema annotations and host lifecycle wiring.
+- `httpCapability` and `galaxieField` support host bindings and schema annotations
+  through the main entry. Import `acquireOwnership` and `watchInvalidation` from
+  `@galaxie/core/browser` for host lifecycle wiring.
 - `RuntimeOptions`, `CreateOptions`, `AgentInstance`, `RecoveryStore` and
   `DiagnosticEvent` are exported contracts; internal modules are not subpaths.
 

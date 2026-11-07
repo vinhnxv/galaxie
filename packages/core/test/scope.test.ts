@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { acquireOwnership, watchInvalidation } from '@galaxie/core/browser';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { isValidScope } from '../src/ids.js';
-import { acquireOwnership, createRuntime, watchInvalidation } from '../src/index.js';
+import { createRuntime } from '../src/index.js';
 import { definition, FakeExecutor } from './fake-executor.js';
 
 const cases: ReadonlyArray<{

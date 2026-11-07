@@ -30,6 +30,9 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
       '@galaxie/adapter-kit': fileURLToPath(
         new URL('../../packages/adapter-kit/src/index.ts', import.meta.url),
       ),
+      '@galaxie/core/browser': fileURLToPath(
+        new URL('../../packages/core/src/browser.ts', import.meta.url),
+      ),
       '@galaxie/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
       '@galaxie/storage-indexeddb': fileURLToPath(
         new URL('../../packages/storage-indexeddb/src/index.ts', import.meta.url),

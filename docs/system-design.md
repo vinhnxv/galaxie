@@ -81,7 +81,7 @@ Trust rules:
 | Capability broker | Grants, schema validation, argument shapes, confirmations, attribution header, effect journal | `core` | brief §9.2, [ADR-0012](adr/0012-security-baseline.md), ADR-0014 |
 | MCP client | Streamable HTTP, tools only, allowlist, `mcp.<server>.<tool>` names, definition pinning | `tools-mcp` | [ADR-0011](adr/0011-mcp-via-controlled-servers.md) |
 | Storage | Implemented: checkpoint saver, pending writes, recovery inbox/journal, scoped versioned envelopes and durability barrier; later M3: retention, host records, migrations, epoch checks and logout deletion | `storage-indexeddb` | [ADR-0004](adr/0004-interrupt-as-pending-interaction-source.md), [ADR-0005](adr/0005-indexeddb-checkpoint-saver.md) |
-| Ownership | One owner tab per app, handover, takeover, logout generation | `core` | [ADR-0009](adr/0009-multi-tab-ownership.md) |
+| Ownership | One owner tab per app, handover, takeover, logout generation | `core/browser` | [ADR-0009](adr/0009-multi-tab-ownership.md) |
 | UI | Hooks, surfaces, typed registry, headless reference components | `react` | [ADR-0007](adr/0007-typed-ui-registry-for-mvp.md) |
 | Agent linting | Implemented: five ESTree rules for direct network, storage, DOM/HTML sinks, eval and model-provider access; scope-aware, without type information or runtime enforcement | `eslint-plugin` | [ADR-0002](adr/0002-trusted-first-execution.md), [ADR-0012](adr/0012-security-baseline.md), [ADR-0013](adr/0013-typescript-first-implementation.md) |
 | Agent definitions | Code-first definitions; a build script generates the manifest | `core` (types) | [ADR-0008](adr/0008-code-first-agent-definition.md) |
@@ -102,7 +102,7 @@ flowchart TD
 
 Proposed rules; M1 confirms them:
 
-1. `core` has no `dependencies`; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Only the OpenTelemetry API is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries.
+1. `core` has no `dependencies`; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Only the OpenTelemetry API is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries. It also rejects module-load references to `navigator`, `document`, `window` and `BroadcastChannel` in main-entry modules and unguarded references inside functions. Guarded means a preceding same-function `typeof <global> ===/!== 'undefined'` check, or a `globalThis` property read with optional chaining before dereferencing a potentially missing value. This lexical check ignores types and property names; it does not prove control flow. Main-entry modules cannot import or re-export `browser.ts`, `ownership.ts` or `invalidation.ts`.
 2. The `models` package imports `@langchain/core/*` subpaths and relative files, plus the exact optional peer `@mlc-ai/web-llm` 0.2.86 only in its WebLLM engine, cache probe and worker files, and the exact optional peers `@huggingface/transformers` and `@huggingface/transformers-structured-output` 4.3.2 only as dynamic, type-free imports in `transformers/runtime.ts`; it has no `core` dependency. WebLLM types are local structural types because its declaration re-exports do not resolve under NodeNext. `storage-indexeddb` also has no `core` dependency: its peers are `@langchain/langgraph-checkpoint` `~1.2.0` and type-only `@langchain/core` `~1.2.20`, tested at 1.2.0 and 1.2.20. Integration packages depend on core and their own libraries, with the existing models/storage exceptions. Executor adapters may additionally import `@galaxie/adapter-kit`. No adapter imports another adapter. The kit imports only core public exports, erased `@langchain/core` types and its own relative files; it imports no adapter. The host app wires the integration packages together through `createRuntime`.
 3. Agent packages depend on `core` and their engine, never on a host package. The private `@galaxie/example-english-tutor` workspace package also uses `adapter-langgraph` for its host and interrupt contracts; its source and build import allowlist admits only those two galaxie packages, `@langchain/langgraph/web`, `@langchain/core/*`, `zod` and relative files. It imports neither React nor model implementations. The M4 ESLint plugin flags direct network, storage, DOM/HTML sinks, eval and model-provider access (brief §9.7 C). It is a linting aid with no runtime enforcement; aliases and dependency-provided values can escape detection. See [usage and limits](../packages/eslint-plugin/README.md). Its source imports only relative modules and type-only `eslint`; `check:deps` enforces that boundary.
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
@@ -188,7 +188,9 @@ Spike code is throwaway. Keep it out of `packages/` and never promote it to pack
 
 ## 6. Core runtime and contracts
 
-Modules in `packages/core/src`; `index.ts` exports the public contracts and runtime API:
+Core has two entry points. `@galaxie/core` (`index.ts`) exports the public contracts and runtime API with no unguarded browser globals. Optional storage persistence in the model router and page development warnings remain guarded in that main entry. `@galaxie/core/browser` (`browser.ts`) opts into ownership and invalidation helpers and all their public types. Moving those functions and types out of the main entry is a breaking change to the public API of a package that has not been published.
+
+Modules in `packages/core/src`:
 
 | Module | Contents | Source |
 | --- | --- | --- |
@@ -211,8 +213,9 @@ Modules in `packages/core/src`; `index.ts` exports the public contracts and runt
 | `executor.ts` | Executor adapter contract and feature flags | brief §7.5; ADR-0001 |
 | `definition.ts` | `AgentDefinition`, `defineAgentDefinition`, `BindingsFor`, `InputOf` | brief §13.2; ADR-0008 |
 | `instance.ts` | `AgentInstance`, snapshots, cancel receipt | brief §14.1 |
-| `invalidation.ts` | `watchInvalidation`, same-origin per-principal logout signals | ADR-0012 A10 |
-| `ownership.ts` | `acquireOwnership`, Web Lock handover/takeover, lost signals and bfcache verification | ADR-0009 |
+| `browser.ts` | `@galaxie/core/browser` entry for `acquireOwnership`, `watchInvalidation` and their public types | ADR-0009, ADR-0012 A10 |
+| `invalidation.ts` | `watchInvalidation` implementation, same-origin per-principal logout signals | ADR-0012 A10 |
+| `ownership.ts` | `acquireOwnership` implementation, Web Lock handover/takeover, lost signals and bfcache verification | ADR-0009 |
 | `runtime.ts`, `agent-instance.ts` | `createRuntime`, instance identity and lifecycle, validation, run slots, cancellation and bounded disposal | brief §8, §14 |
 | `run-events.ts` | Per-run replay and live iteration with independent consumers | brief §8.2 |
 | `trace.ts`, `tracing.ts`, `version.ts` | Data-only executor instrumentation and core-owned, allowlisted OpenTelemetry spans | ADR-0016 |
@@ -666,6 +669,10 @@ The provider and routed integration tests use injected in-memory JSON/SSE respon
 
 ### 8.5. Tab ownership and takeover
 
+```ts
+import { acquireOwnership } from '@galaxie/core/browser';
+```
+
 `acquireOwnership({ appId, takeover?, handoverTimeoutMs?, onHandoverRequest, fence? })` resolves `{ status: 'busy' }` or `{ status: 'owner', ownership }`. It stays outside `AgentInstance`; hosts compose it with the saver and runtime. `appId` matches `/^[A-Za-z0-9._:-]{1,128}$/`; takeover defaults to false and the finite positive timeout defaults to 5000 ms. Invalid options reject `invalid`; missing Web Locks or `BroadcastChannel` rejects `unsupported`. Node hosts need both globals.
 
 Acquisition first requests `galaxie:<appId>:runtime` with `ifAvailable`. For takeover, a busy caller posts exactly `{ v: 1, type: 'handover' }` on the channel of the same name, waits for a normal lock request and aborts that wait at the timeout before using `steal`. Malformed messages are ignored. The owner runs its handover hook once for concurrent requests and then releases, even if the hook rejects; hook failures are swallowed without host text. Once granted, acquisition awaits `fence.claim()` before publishing ownership. Claim failure releases the lock and rejects fixed `unavailable` text.
@@ -700,6 +707,10 @@ sequenceDiagram
 Every local write checks the epoch in the same IndexedDB transaction, so at most one owner commits local state. A remote request the old owner already sent may still complete; the journal records `outcome_unknown` and a retry reuses its persisted effect ID as the idempotency key. A `retry: none` call fails `outcome_unknown` without invocation. A fenced late journal result fails `fenced`; it cannot become a successful receipt. Backend epoch checks are an option for hosts, but this slice sends no epoch headers. Chromium AT-18 verifies cooperative and forced mid-run takeover, one committed remote effect under idempotent replay, rejected late writes and bfcache loss (ADR-0009).
 
 ### 8.6. Logout
+
+```ts
+import { watchInvalidation } from '@galaxie/core/browser';
+```
 
 `watchInvalidation({ appId, principalScope })` is a separate host-composed core API returning `{ signal, announce(), close() }`. Both IDs use `/^[A-Za-z0-9._:-]{1,128}$/`; invalid options throw fixed `invalid` and missing `BroadcastChannel` throws `unsupported`. The same-origin channel is `galaxie:<appId>:invalidation`. `announce()` posts exactly `{ v: 1, type: 'invalidated', principalScope }` and aborts its own signal with `'invalidated'`. A matching valid peer notice does the same; malformed notices and other principals are ignored. `close()` is idempotent, stops listening and closes the channel. Hosts use trusted, content-free principal identifiers and close the watcher on teardown.
 
@@ -815,7 +826,7 @@ The conformance files in both test columns run on Node and Chromium. Node packag
 | --- | --- |
 | `pnpm check` | Everything CI runs, in the same order |
 | `pnpm check:license` | SPDX headers and package license fields (ADR-0024) |
-| `pnpm check:deps` | Core and models peers/imports, WebLLM imports limited to engine/worker value imports, adapter web imports and Node-free built packages; run after build |
+| `pnpm check:deps` | Core and models peers/imports, guarded browser globals and browser-entry isolation, WebLLM imports limited to engine/worker value imports, adapter web imports and Node-free built packages; run after build |
 | `pnpm lint` | Biome lint and format check |
 | `pnpm format` | Biome formatting and safe fixes, written to disk |
 | `pnpm typecheck` | TypeScript 7 |
