@@ -5,7 +5,257 @@ and runtime teardown. galaxie constrains SDK-controlled paths; reviewed agents,
 XSS and other same-origin code can bypass those paths. Read the
 [mandatory baseline](../adr/0012-security-baseline.md),
 [security review](../security-review.md) and [package guidance](../../llms.txt)
-alongside these integration steps. Packages are currently private workspace packages.
+alongside these integration steps. The five launch packages (`@galaxie/core`,
+`@galaxie/adapter-langgraph`, `@galaxie/models`, `@galaxie/storage-indexeddb`
+and `@galaxie/react`) are versioned 0.1.0 and not published to a registry yet.
+The other packages remain private workspace packages.
+
+## Layer map
+
+| Layer | What you gain | What you still own |
+| --- | --- | --- |
+| [0: run an agent in the page](#layer-0-run-an-agent-in-the-page) | A graph, model router and interactive surface with memory checkpoints | Host lifecycle and application policy; nothing survives reload |
+| [1: persist, recover, own](#layer-1-persist-recover-own) | Scoped checkpoints, recovery and tab ownership | Trusted principal identity, session pointers and cleanup |
+| [2: harden](#layer-2-harden) | Deployment controls, invalidation, confirmations and output/export controls | Deployment configuration, backend authority and the documented limits |
+
+These layers are a learning order. The mandatory baseline still applies before
+deployment; the detailed topic sections below remain the integration reference.
+
+## Layer 0: run an agent in the page
+
+Start from a copy of the [local-only template](../../templates/local-only/README.md),
+keeping its Vite + React setup. In the copy, use the two snippets below as
+`src/agent.ts` and `src/main.tsx`. The agent is verbatim from
+[`templates/local-only/src/agent.ts`](../../templates/local-only/src/agent.ts);
+the host wiring reduces
+[`templates/local-only/src/runtime.ts`](../../templates/local-only/src/runtime.ts)
+and its [entry point](../../templates/local-only/src/main.tsx) to a memory-only
+host, so you can diff the snippets against those files.
+
+To try it inside this repository, copy the template to a new directory under
+`templates/`, give the copy's `package.json` a new name, replace the two files,
+and run the following from the repository root (use your copy's package name):
+
+```sh
+pnpm install
+pnpm build
+pnpm --filter <your-package-name> dev
+```
+
+The packages are unpublished, so a standalone registry install is not available
+yet. The mock needs no GPU, model download, provider key or agent backend. The
+snippets were built and run in Chromium on the mock during review of this guide;
+that is a check of this page's code, not a result for any real model or device.
+
+`src/agent.ts`:
+
+```ts
+// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+// SPDX-License-Identifier: Apache-2.0
+
+import { type LangGraphAgent, requestInteraction } from '@galaxie/adapter-langgraph';
+import { type AgentDefinition, defineAgentDefinition } from '@galaxie/core';
+import type { QuizSubmission } from '@galaxie/react';
+import { HumanMessage } from '@langchain/core/messages';
+import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
+import { z } from 'zod';
+
+const inputSchema: z.ZodType<Record<string, never>, Record<string, never>> = z.strictObject({});
+
+interface TemplateDefinition extends AgentDefinition {
+  readonly input: typeof inputSchema;
+}
+
+export const templateDefinition: TemplateDefinition = defineAgentDefinition({
+  id: 'local-only.starter',
+  version: '0.0.0',
+  executor: 'langgraph-js',
+  input: inputSchema,
+  models: {
+    comment: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' },
+  },
+  ui: { catalog: 'education/v1', components: ['Quiz'], surfaces: ['question'] },
+});
+
+export const commentPrompt = 'Give one short encouraging sentence about practicing.';
+
+const state = Annotation.Root({ result: Annotation<string> });
+
+/** The interrupt precedes the model call, so restoring the question repeats no inference. */
+export function createTemplateAgent(): LangGraphAgent {
+  return (host) =>
+    new StateGraph(state)
+      .addNode('question', async (_state, config) => {
+        const submission = requestInteraction(
+          {
+            surfaceId: 'question',
+            component: 'education.Quiz/v1',
+            viewRevision: 'question-v1',
+            props: {
+              title: 'A tiny local agent',
+              questions: [
+                {
+                  id: 'sum',
+                  prompt: 'What is 2 + 2?',
+                  options: [
+                    { id: 'four', label: '4' },
+                    { id: 'five', label: '5' },
+                  ],
+                },
+              ],
+            },
+          },
+          config,
+        );
+        const { answers } = submission.payload as QuizSubmission;
+        const reply = await host.langchain
+          .chatModel('comment')
+          .invoke([new HumanMessage(commentPrompt)], config);
+        const grade = answers['sum'] === 'four' ? 'Correct.' : 'The answer is 4.';
+        return { result: `${grade} ${reply.text}` };
+      })
+      .addEdge(START, 'question')
+      .addEdge('question', END)
+      .compile({ checkpointer: host.langchain.checkpointer() });
+}
+```
+
+`src/main.tsx`:
+
+```tsx
+import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createRuntime, type ModelDescriptor } from '@galaxie/core';
+import { MockChatModel } from '@galaxie/models/mock';
+import { AgentSurface, createRegistry, ModelRoutes, Quiz } from '@galaxie/react';
+import { createRoot } from 'react-dom/client';
+import { commentPrompt, createTemplateAgent, templateDefinition } from './agent.js';
+
+const appId = 'local-only-template';
+const principalScope = 'local-demo-principal';
+const descriptor: ModelDescriptor = {
+  destination: 'in-browser',
+  modality: 'text',
+  languages: ['en'],
+  features: ['streaming', 'cancellation'],
+  pricing: { inputPerToken: 0, outputPerToken: 0 },
+};
+const mock = new MockChatModel({
+  [commentPrompt]: { id: 'practice-comment', text: 'Keep practicing one small step at a time.' },
+});
+const registry = createRegistry({ components: [Quiz] });
+const runtime = createRuntime({ appId, executors: [createLangGraphAdapter()] });
+const instance = await runtime.create(templateDefinition, {
+  principalScope,
+  agent: createTemplateAgent(),
+  // Omitting services.checkpointer selects the adapter's in-memory checkpointer.
+  services: { chatModels: { mock } },
+  models: {
+    providers: { mock: descriptor },
+    roles: {
+      comment: { providers: ['mock'], allow: ['in-browser'], maxTokens: 48 },
+    },
+    availability: async () => ({ status: 'available' }),
+  },
+  bindings: {},
+  ui: registry.bindings({ surfaces: ['question'] }),
+});
+const container = document.getElementById('root');
+if (container === null) throw new Error('The application root is missing.');
+const root = createRoot(container);
+addEventListener('pagehide', () => { void runtime.dispose(); }, { once: true });
+
+await instance.prepare();
+const { runId } = await instance.start({});
+root.render(
+  <main>
+    <p>Scripted mock; inference stays in this browser.</p>
+    <ModelRoutes instance={instance} labels={{ providers: { mock: 'Mock' } }} />
+    <AgentSurface instance={instance} registry={registry} surfaceId="question" />
+  </main>,
+);
+
+for await (const event of instance.events(runId)) {
+  if (event.type !== 'output' || typeof event.output !== 'object' || event.output === null)
+    continue;
+  const result = (event.output as Record<string, unknown>)['result'];
+  if (typeof result === 'string') root.render(<main><p role="status">{result}</p></main>);
+}
+```
+
+You gain a runnable question: choose **4**, submit, and see
+`Correct. Keep practicing one small step at a time.` The graph pauses before the
+model call; the surface dispatches the answer, and the router uses the scripted
+mock. The template's [runtime tests](../../templates/local-only/test/runtime.node.test.ts)
+and [app tests](../../templates/local-only/test/app.test.ts) cover mock completion
+and the template's model states; they exercise the full template host.
+
+Nothing survives a reload. There is no tab ownership and no application policy
+beyond the fixed in-browser route. Core validation, destination controls and
+finite budgets still apply. The host remains responsible for reviewed code,
+lifecycle and deployment controls; replace the demo principal with trusted host
+identity before adding user data. Add the next layers for persistence and the
+host controls described in the reference.
+
+## Layer 1: persist, recover, own
+
+You gain durable pending interactions and accepted submissions by opening
+`IndexedDBSaver` with the host's `appId` and trusted `principalScope`, then passing
+both `services.checkpointer: saver` and `recovery: saver.recovery`. Keep the session
+pointer under that same scope; after reload, prepare the instance with its saved
+`sessionId` and call `instance.restore()`. Acquire tab ownership with the saver's
+fencing port before restoring or writing, and dispose the runtime when ownership
+is lost.
+
+Follow [Storage persistence and recovery](#storage-persistence-and-recovery) and
+[Ownership and logout](#ownership-and-logout), with the template's
+[`src/runtime.ts`](../../templates/local-only/src/runtime.ts) and
+[`src/app.tsx`](../../templates/local-only/src/app.tsx) as the wiring reference.
+The [built-app reload test](../../templates/local-only/test/reload.node.test.ts),
+[reopened IndexedDB app test](../../templates/local-only/test/app.test.ts) and
+[ownership tests](../../tests/conformance/ownership.test.ts) cover those paths.
+The host still owns trusted identity, session pointers, teardown and backend
+reconciliation of unknown effects. Browser eviction can erase checkpoints;
+unsubmitted drafts reset on reload, and ownership cannot stop an already-sent
+remote request.
+
+## Layer 2: harden
+
+You gain controls for deployment, principal changes and significant actions.
+Apply each control at its host boundary and keep its documented limits:
+
+- [CSP and Trusted Types](#csp-and-trusted-types): restrict resource destinations
+  and script sinks with response headers and reviewed policies; see the
+  [CSP directive tests](../../examples/host-local/test/csp.test.ts) and
+  [host-local CSP loop test](../../examples/host-local/test/loop.node.test.ts).
+- [Cross-origin isolation](#cross-origin-isolation): enable COOP/COEP when the
+  selected WASM multi-threaded path needs `SharedArrayBuffer`; the host must
+  check that engine and its embeds, since the shipped WebGPU worker does not
+  universally require isolation.
+- [Model hosting and integrity](#model-hosting-and-integrity): pin reviewed assets
+  and load after consent, respecting the weight-shard integrity limit; see the
+  [fake WebLLM lifecycle tests](../../tests/conformance/webllm-provider.test.ts)
+  and [ONNX file integrity tests](../../tests/conformance/transformers-model-files.test.ts).
+- [Ownership and logout](#ownership-and-logout): wipe the principal before
+  announcing invalidation and fence stale storage writes; see the
+  [invalidation tests](../../tests/conformance/invalidation.test.ts) and
+  [ownership tests](../../tests/conformance/ownership.test.ts).
+- [Host confirmations](#host-confirmations): bind significant writes to
+  single-use approvals of the exact parameters; see the
+  [confirmation tests](../../tests/conformance/confirmations.test.ts).
+- [Output safety and display](#output-safety-and-display): check routed model
+  output and render trusted projections as text; see the
+  [output safety tests](../../tests/conformance/output-safety.test.ts).
+- [Session export](#storage-persistence-and-recovery): require an explicit host
+  action and confirmation for personal content, then recheck ownership and logout;
+  see the [storage export tests](../../packages/storage-indexeddb/test/export.test.ts)
+  and [host-local download and failure tests](../../examples/host-local/test/loop.node.test.ts).
+
+The host still deploys the headers, checks its chosen engines, authorizes backend
+requests and enforces idempotency and spending limits. Same-origin code can bypass
+SDK paths; output checks cannot retract earlier allowed chunks, and logout cannot
+revoke a downloaded export. These linked tests use mocks, fakes and local browser
+flows; they do not establish real-device model behavior or universal cross-origin
+isolation. Keep the baseline and the limits in the reference sections below.
 
 ## CSP and Trusted Types
 
