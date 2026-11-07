@@ -18,6 +18,7 @@ export interface HttpRequestRecord {
   readonly origin: string | undefined;
   readonly agent: string | undefined;
   readonly run: string | undefined;
+  readonly idempotencyKey: string | undefined;
   readonly requestedMethod: string | undefined;
   readonly requestedHeaders: string | undefined;
   readonly status: number;

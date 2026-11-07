@@ -141,6 +141,26 @@ No real user endpoint or LNA prompt was exercised by this slice; the provider
 maps status-less connection/CORS failures to fixed `unavailable/network` errors,
 without determining the browser's exact cause. It does not silently fall back.
 
+For `httpCapability`, a cross-origin server must allow `X-Galaxie-Agent` and
+`X-Galaxie-Run` in `Access-Control-Allow-Headers`, plus `Idempotency-Key` when
+the binding declares `retry: 'idempotency-key'`. Headers never authorize.
+galaxie sets the key to `CapabilityContext.effectId` after the host's
+`headers(context)` callback and attribution headers, overriding a host-supplied
+key for that retry policy. Other retry policies leave host-supplied keys alone
+and add none themselves.
+
+For write bindings, the key stays stable across a replay only with recovery
+and deterministic call order within each executor task. Without recovery,
+each call receives a random effect ID. A successful receipt replays without
+invoking the binding or sending a request. The backend must implement
+deduplication; sending the header does not guarantee that the backend honors it.
+A failed CORS preflight produces fixed `unreachable` for `user-device` or
+loopback/private-address `user-endpoint`, and fixed `unavailable` for
+`host-server`, `third-party` or public `user-endpoint`, without determining the
+network failure's exact cause. Header evidence is injected-fetch and
+Node/Chromium loopback only; real backend deduplication and real LNA permission
+behavior remain unmeasured.
+
 ## Ownership and logout
 
 Implement [ownership](../system-design.md#85-tab-ownership-and-takeover) before

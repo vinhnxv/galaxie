@@ -113,7 +113,7 @@ async function call(
   let error: unknown;
   const fixture = await brokerFixture({
     input: z.string().meta(galaxieField({ label: 'public' })),
-    requests: { 'http@1': { input: schema, output: z.unknown(), kind: 'read' } },
+    requests: { 'http@1': { input: schema, output: z.unknown(), kind: bound.kind } },
     bindings: { 'http@1': bound },
     ...(payloadBytes === undefined ? {} : { budgets: { payloadBytes } }),
     scripts: [
@@ -176,6 +176,64 @@ test('AE4 encodes path values and overwrites attribution headers after host cred
   });
   expect(result.publicFields).not.toContain('canary-credential-7f3a');
 });
+test.each(['POST', 'PUT', 'PATCH', 'DELETE', 'GET'] as const)(
+  '%s sends the write effect ID as Idempotency-Key after host headers',
+  async (method) => {
+    for (const hostKey of [undefined, 'host-key']) {
+      let context: CapabilityContext | undefined;
+      const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ ok: true }));
+      const result = await call(
+        httpCapability(
+          options({
+            kind: 'write',
+            method,
+            retry: 'idempotency-key',
+            fetch,
+            headers: async (ctx) => {
+              context = ctx;
+              return new Headers(hostKey === undefined ? [] : [['iDeMpOtEnCy-KeY', hostKey]]);
+            },
+          }),
+        ),
+        inputSchema,
+        { id: 'a/b' },
+      );
+      expect(result.error).toBeUndefined();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(context?.effectId).toMatch(/^[0-9a-f-]{36}$/);
+      const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      expect(headers.get('Idempotency-Key')).toBe(context?.effectId);
+      expect(headers.get('x-galaxie-agent')).toBe('tests/agent@1.0.0');
+      expect(headers.get('x-galaxie-run')).toBe(context?.runId);
+    }
+  },
+);
+test.each(['none', 'idempotent'] as const)(
+  'retry %s leaves Idempotency-Key absent or exactly as the host supplied it',
+  async (retry) => {
+    for (const hostKey of [undefined, 'host-key']) {
+      const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(null));
+      const result = await call(
+        httpCapability(
+          options({
+            kind: 'write',
+            method: 'POST',
+            retry,
+            fetch,
+            headers: () => new Headers(hostKey === undefined ? [] : [['Idempotency-Key', hostKey]]),
+          }),
+        ),
+        inputSchema,
+        { id: 'a/b' },
+      );
+      expect(result.error).toBeUndefined();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('Idempotency-Key')).toBe(
+        hostKey ?? null,
+      );
+    }
+  },
+);
 test.each(values)('path injection value remains encoded or is denied: %j', async (id) => {
   const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(null));
   const result = await call(httpCapability(options({ fetch })), inputSchema, { id });

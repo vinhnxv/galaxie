@@ -48,7 +48,9 @@ export async function createHttpFixture(): Promise<HttpControl> {
           'Access-Control-Allow-Headers',
           path === '/v1/chat/completions'
             ? 'content-type, authorization, x-stainless-lang, x-stainless-package-version, x-stainless-os, x-stainless-arch, x-stainless-runtime, x-stainless-runtime-version, x-stainless-retry-count, x-stainless-timeout, x-stainless-helper-method'
-            : 'content-type, authorization, x-galaxie-agent, x-galaxie-run',
+            : path === '/auth/required'
+              ? 'content-type, authorization, x-galaxie-agent, x-galaxie-run, idempotency-key'
+              : 'content-type, authorization, x-galaxie-agent, x-galaxie-run',
         );
       }
       const method = request.method ?? '';
@@ -153,6 +155,7 @@ export async function createHttpFixture(): Promise<HttpControl> {
         origin: request.headers.origin,
         agent: typeof agent === 'string' ? agent : undefined,
         run: request.headers['x-galaxie-run'] as string | undefined,
+        idempotencyKey: request.headers['idempotency-key'] as string | undefined,
         requestedMethod: request.headers['access-control-request-method'],
         requestedHeaders: request.headers['access-control-request-headers'],
         status,

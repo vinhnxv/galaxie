@@ -1,26 +1,29 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
 import {
   type CapabilityBinding,
+  type CapabilityContext,
   createRuntime,
   type DiagnosticEvent,
   defineAgentDefinition,
   GalaxieError,
   type HttpCapabilityOptions,
   httpCapability,
+  type SessionId,
 } from '@galaxie/core';
 import { MockChatModel } from '@galaxie/models/mock';
-import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
+import { Annotation, END, MemorySaver, START, StateGraph } from '@langchain/langgraph/web';
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
   TracerProvider,
 } from '@opentelemetry/sdk-trace';
-import { afterAll, beforeAll, beforeEach, expect, inject, test } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, inject, onTestFinished, test, vi } from 'vitest';
 import { z } from 'zod';
 import { binding, collect } from '../../packages/core/test/fake-executor.js';
+import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import {
   HTTP_ERROR_BODY,
   HTTP_ORIGIN,
@@ -172,9 +175,17 @@ async function run(name: keyof typeof requests, bound: CapabilityBinding, input:
   }
 }
 
-function expectFailure(result: Awaited<ReturnType<typeof run>>, code: 'denied' | 'unavailable') {
-  const message =
-    code === 'denied' ? 'Policy denied the request.' : 'The requested service is unavailable.';
+function expectFailure(
+  result: Awaited<ReturnType<typeof run>>,
+  code: 'denied' | 'unavailable' | 'unreachable',
+) {
+  const messages = {
+    denied: 'Policy denied the request.',
+    unavailable: 'The requested service is unavailable.',
+    unreachable:
+      'The endpoint did not answer. Local Network Access may be denied, CORS may not allow this app origin (for example OLLAMA_ORIGINS), or the server may be stopped.',
+  };
+  const message = messages[code];
   expect(result.answer).toBeUndefined();
   expect(result.error).toBeInstanceOf(GalaxieError);
   expect(result.error).toMatchObject({ code, message });
@@ -309,6 +320,201 @@ test('AT-16 reports a real 401 and accepts a host-supplied bearer token', async 
   expect(auth.map((request) => request.run)).toEqual([denied.runId, allowed.runId]);
   expect(auth.every((request) => request.agent === 'conformance/http@1.0.0')).toBe(true);
 });
+
+test('a loopback server allowing Idempotency-Key receives the write binding effect ID', async () => {
+  let context: CapabilityContext | undefined;
+  const result = await run(
+    'account.update@1',
+    http('/auth/required', {
+      kind: 'write',
+      retry: 'idempotency-key',
+      headers: (ctx) => {
+        context = ctx;
+        return { authorization: 'Bearer fixture-token', 'Idempotency-Key': 'host-key' };
+      },
+    }),
+    {},
+  );
+  expect(result.error).toBeUndefined();
+  expect(result.answer).toEqual({ ok: true });
+  expect(context?.effectId).toMatch(/^[0-9a-f-]{36}$/);
+  const requests = (await recorded()).requests;
+  expect(requests.filter((request) => request.method === 'GET')).toEqual([
+    expect.objectContaining({
+      server: 'cors',
+      path: '/auth/required',
+      run: result.runId,
+      idempotencyKey: context?.effectId,
+      status: 200,
+    }),
+  ]);
+});
+
+test.each([false, true])(
+  'recovery reuses a write key or replays its successful receipt (receipt stored=%s)',
+  async (receiptStored) => {
+    const recovery = new MemoryRecoveryStore();
+    const saver = new MemorySaver();
+    const held = Promise.withResolvers<void>();
+    const entered = Promise.withResolvers<void>();
+    const contexts: CapabilityContext[] = [];
+    const outputs: unknown[] = [];
+    const runtimes: Array<{ dispose(): Promise<void> }> = [];
+    onTestFinished(async () => {
+      held.resolve();
+      await Promise.all(runtimes.map((runtime) => runtime.dispose()));
+    });
+    const persist = recovery.recordEffect.bind(recovery);
+    const recordEffect = vi.spyOn(recovery, 'recordEffect');
+    if (!receiptStored)
+      recordEffect.mockImplementation(async (sessionId, effectId, record) => {
+        // Simulate losing the receipt commit after a real HTTP response arrived.
+        if (record.status === 'succeeded') throw new Error('The receipt commit was lost.');
+        await persist(sessionId, effectId, record);
+      });
+
+    async function create(first: boolean, sessionId?: SessionId) {
+      const runtime = createRuntime({
+        appId: 'http-recovery-conformance',
+        executors: [createLangGraphAdapter()],
+      });
+      runtimes.push(runtime);
+      const instance = await runtime.create(
+        defineAgentDefinition({
+          id: 'conformance/http-recovery',
+          version: '1.0.0',
+          executor: 'langgraph-js',
+          input: z.object({}),
+          capabilities: { required: { 'account.update@1': requests['account.update@1'] } },
+        }),
+        {
+          principalScope: 'fixture',
+          recovery,
+          ...(sessionId === undefined ? {} : { sessionId }),
+          services: { checkpointer: saver, chatModels: {} },
+          bindings: {
+            // Reuse the successful GET route; the write kind selects journal behavior.
+            'account.update@1': http('/auth/required', {
+              kind: 'write',
+              retry: 'idempotency-key',
+              headers: (context) => {
+                contexts.push(context);
+                return { authorization: 'Bearer fixture-token' };
+              },
+            }) as CapabilityBinding<Record<string, never>, { ok: boolean }>,
+          },
+          agent: (host) =>
+            new StateGraph(Annotation.Root({ done: Annotation<boolean> }))
+              .addNode('write', async (_state, config) => {
+                requestInteraction(
+                  {
+                    surfaceId: 'main',
+                    viewRevision: 'r1',
+                    component: 'conformance.Question/v1',
+                    props: { question: 'Continue?' },
+                  },
+                  config,
+                );
+                outputs.push(await host.capabilities.call('account.update@1', {}, config));
+                if (first) {
+                  entered.resolve();
+                  await held.promise;
+                  if (config.signal?.aborted) throw new Error('The simulated page closed.');
+                }
+                return { done: true };
+              })
+              .addEdge(START, 'write')
+              .addEdge('write', END)
+              .compile({ checkpointer: host.langchain.checkpointer() })
+              .withConfig({ durability: 'sync' }),
+        },
+      );
+      await instance.prepare();
+      return { runtime, instance };
+    }
+
+    const first = await create(true);
+    const { runId } = await first.instance.start({});
+    await expect.poll(() => first.instance.getSnapshot().run?.status).toBe('waiting_input');
+    const pending = first.instance.getSnapshot().run?.pending;
+    if (pending === undefined) throw new Error('Expected the write interaction.');
+    expect(
+      await first.instance.dispatch({
+        instanceId: first.instance.instanceId,
+        runId,
+        ...pending,
+        action: 'submit',
+        payload: {},
+      }),
+    ).toMatchObject({ status: 'accepted' });
+    await entered.promise;
+    expect(contexts).toHaveLength(1);
+    expect([...recovery.journal.values()].map((record) => record.status)).toEqual([
+      receiptStored ? 'succeeded' : 'dispatched',
+    ]);
+    const before = (await recorded()).requests;
+    expect(before.filter((request) => request.method === 'GET')).toHaveLength(1);
+    const disposal = first.runtime.dispose();
+    held.resolve();
+    await disposal;
+    recordEffect.mockRestore();
+
+    const restored = await create(false, first.instance.sessionId);
+    const resumed = await restored.instance.restore();
+    expect(resumed).toBeDefined();
+    if (resumed === undefined) throw new Error('Expected the recovered HTTP write run.');
+    const events = await collect(restored.instance.events(resumed.runId));
+    expect(restored.instance.getSnapshot().run?.status).toBe('succeeded');
+    expect(events.at(-1)).toMatchObject({ type: 'output', output: { done: true } });
+    expect(outputs).toEqual([{ ok: true }, { ok: true }]);
+    const after = (await recorded()).requests;
+    const writes = after.filter((request) => request.method === 'GET');
+    expect(contexts).toHaveLength(receiptStored ? 1 : 2);
+    expect(writes.map((request) => request.idempotencyKey)).toEqual(
+      Array.from({ length: receiptStored ? 1 : 2 }, () => contexts[0]?.effectId),
+    );
+    if (receiptStored) expect(after).toEqual(before);
+    else expect(contexts[1]?.effectId).toBe(contexts[0]?.effectId);
+    expect([...recovery.journal.values()].map((record) => record.status)).toEqual(['succeeded']);
+    expect((await recovery.submissions(first.instance.sessionId))[0]?.status).toBe('consumed');
+  },
+);
+
+test.skipIf(typeof window === 'undefined').each([
+  ['host-server', 'unavailable'],
+  ['user-device', 'unreachable'],
+  ['user-endpoint', 'unreachable'],
+] as const)(
+  'a missing Idempotency-Key CORS allowance fails %s with fixed %s',
+  async (destination, code) => {
+    const result = await run(
+      'account.update@1',
+      http('/sensitive/account', {
+        kind: 'write',
+        method: 'POST',
+        retry: 'idempotency-key',
+        destination,
+      }),
+      {},
+    );
+    expectFailure(result, code);
+    const requests = (await recorded()).requests;
+    expect(requests).toEqual([
+      expect.objectContaining({
+        server: 'cors',
+        method: 'OPTIONS',
+        path: '/sensitive/account',
+        origin: HTTP_ORIGIN,
+        requestedMethod: 'POST',
+        status: 204,
+      }),
+    ]);
+    expect(requests[0]?.requestedHeaders?.split(',').map((header) => header.trim())).toContain(
+      'idempotency-key',
+    );
+    expect(requests.some((request) => request.method === 'POST')).toBe(false);
+  },
+);
 
 test.skipIf(typeof window === 'undefined')(
   'AT-16 allows a cross-origin HTTP binding after the custom-header preflight',
