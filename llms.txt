@@ -17,7 +17,7 @@
 
 - [MVP exit record](docs/mvp-exit-record.md): AT-01 through AT-36 evidence, gaps and decision inputs; the maintainer's Go decision (2026-10-30) is recorded with its open items still open.
 - [Unsupported features](docs/unsupported.md): current exclusions, implementation limits and unverified paths.
-- [Host integration](docs/guides/host-integration.md): CSP, models, persistence, ownership, logout, approvals and host proxies.
+- [Host integration](docs/guides/host-integration.md): Layer 0 runs an agent in memory; Layer 1 adds persistence, recovery and ownership; Layer 2 adds hardening, with detailed host references.
 - [Development tracing](docs/guides/tracing.md): filtered spans and a host-run collector; no tracing secrets in the browser.
 - [Device matrix](docs/device-matrix.md): automated mock/fake coverage and limited real-device demonstrations.
 - [M2 exit record](docs/m2-exit-record.md): real local models on one Apple M5 Pro with Chrome 155.
