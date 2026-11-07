@@ -60,3 +60,26 @@ See [coding guidance](AGENTS.md), [runtime contracts](../../docs/system-design.m
 [the mandatory baseline](../../docs/adr/0012-security-baseline.md) and
 [conformance coverage](../../tests/conformance/README.md).
 Code is Apache-2.0 (see [LICENSE](../../LICENSE)).
+
+## Materialized pending surfaces
+
+Core depends on `@galaxie/ui-protocol` through its public root; its existing peers
+remain unchanged. Hosts can bind `ui.catalogs` by catalog ID alongside `ui.surfaces`
+and registered component actions. Core validates materialized interrupt records
+before publication and again on restore, using the run's payload and UI-element
+limits and the whole-surface URL/private-value policy. Missing bindings fail closed.
+
+`materializeSurface({ binding, catalog, previous?, messages, limits, isAllowedUrl })`
+wraps the protocol reducer for trusted node code. `parseSurfaceRecord` checks the
+plain JSON record shape, and `pendingFromSurface` creates a detached, frozen legacy
+projection plus `surface`. These helpers do not authorize publication.
+`surfaceFromRequest(request, catalogId)` maps a representable legacy request to a
+single `root` component; props containing `id` or `component` return `undefined`.
+Legacy requests still follow their original validation path.
+
+Surface events additionally supply `surfaceAction: { revision, componentId, dataModel }`.
+Core checks the committed revision, registered action and payload, and changes only
+to paths related to a component's data binding. Changed string leaves receive
+`private-user` before inbox acceptance. Only `{ action, payload }` resumes the node.
+See [the runtime contract](../../docs/system-design.md#6-core-runtime-and-contracts)
+for checkpoint, restore and replay limits.

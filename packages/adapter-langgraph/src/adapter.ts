@@ -11,6 +11,8 @@ import {
   type ModelPort,
   type PendingInteraction,
   parseInteractionRequest,
+  parseSurfaceRecord,
+  pendingFromSurface,
   toErrorInfo,
 } from '@galaxie/core';
 import { Command, GraphRecursionError, isGraphInterrupt } from '@langchain/langgraph/web';
@@ -109,8 +111,12 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
         if (ids.size !== 1 || interrupt === undefined || !interrupt.id)
           throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
         const request = parseInteractionRequest(interrupt.value);
-        if (request === undefined)
+        if (request === undefined) {
+          const surface = parseSurfaceRecord(interrupt.value);
+          if (surface !== undefined)
+            return pendingFromSurface(interrupt.id as InteractionId, surface);
           throw new GalaxieError('invalid', 'The interaction request is invalid.');
+        }
         return { interactionId: interrupt.id as InteractionId, ...request };
       };
       return {

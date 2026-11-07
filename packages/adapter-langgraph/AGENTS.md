@@ -9,7 +9,7 @@ See the [README](README.md) and [contracts](../../docs/system-design.md#6-core-r
 ## Entry points
 
 - `@galaxie/adapter-langgraph` exports `createLangGraphAdapter`, `STREAM_MODES`
-  and `requestInteraction` from [src/index.ts](src/index.ts).
+  and `requestInteraction`/`requestSurface` from [src/index.ts](src/index.ts).
 - Exported types include `LangGraphAgent`, `LangGraphHost`, `LangGraphGraph`,
   `LangGraphServices` and `LangGraphChatModel`; there are no public subpaths.
 - The adapter uses `@langchain/langgraph/web`; keep Node context imports out.
@@ -29,7 +29,8 @@ async function reply(host: LangGraphHost, config: LangGraphRunnableConfig) {
 
 The role and provider must already be declared and bound by the host.
 
-- Pass `config` to `requestInteraction(request, config)`, including after an await.
+- Pass `config` to `requestInteraction(request, config)` or `requestSurface(record, config)`, including after an await. Surface records are reduced plain JSON; core revalidates them.
+- Keep one interrupt per node. New surface revisions use a later node and a new interrupt ID, never an in-place pending update.
 - Compile graphs with `host.langchain.checkpointer()` and call tools through
   `host.capabilities.call(name, input, config)`.
 - Pass node `config` to every capability call: its full checkpoint task namespace

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import type { ProtocolErrorCode } from '@galaxie/ui-protocol';
 import { type TracerProvider, trace } from '@opentelemetry/api';
 import { createAgentInstance } from './agent-instance.js';
 import { budgetLimits } from './budgets.js';
@@ -62,6 +63,8 @@ export interface DiagnosticEvent {
     | 'output_safety_unset';
   readonly instanceId: InstanceId;
   readonly runId?: RunId;
+  /** Fixed protocol code only; never wire data or validator messages. */
+  readonly protocolCode?: ProtocolErrorCode;
   /** Identifier only, for host reconciliation of an earlier write with an unknown outcome. */
   readonly effectId?: EffectId;
   /** Host-only evidence, possibly including binding-supplied private content. Never forward it

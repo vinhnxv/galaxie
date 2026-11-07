@@ -103,20 +103,21 @@ flowchart TD
     Host --> Adapter["adapter-langgraph"] & Models["models"] & Mcp["tools-mcp"] & Storage["storage-indexeddb"] & ReactPkg["react"]
     Tutor --> Core["core"] & Adapter
     Adapter --> Kit["adapter-kit"]
-    Protocol["ui-protocol: standalone A2UI validation; no consumers yet"]
+    Protocol["ui-protocol: A2UI validation and reduction"]
     Adapter & Kit & Mcp & ReactPkg --> Core
+    Core --> Protocol
 ```
 
 Proposed rules; M1 confirms them:
 
-1. `core` has no `dependencies`; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Only the OpenTelemetry API is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries. It also rejects module-load references to `navigator`, `document`, `window` and `BroadcastChannel` in main-entry modules and unguarded references inside functions. Guarded means a preceding same-function `typeof <global> ===/!== 'undefined'` check, or a `globalThis` property read with optional chaining before dereferencing a potentially missing value. This lexical check ignores types and property names; it does not prove control flow. Main-entry modules cannot import or re-export `browser.ts`, `ownership.ts` or `invalidation.ts`.
+1. `core` depends only on `@galaxie/ui-protocol` through its public root; its only peers are `@opentelemetry/api` (`^1.9.0`) and `zod` (`^4.6.0`). Alongside the protocol package, only the OpenTelemetry API peer is imported at runtime; its calls do nothing until the host registers an SDK (ADR-0016). Input validation uses Standard Schema and Zod is imported for types only. Tests pin API 1.10.0 and SDK 3.0.0; an SDK 2.x host check remains deferred. Core imports no agent framework (ADR-0017) and touches no engine, UI framework or browser API when imported (`sideEffects: false`). `check:deps` enforces the source and build boundaries. It also rejects module-load references to `navigator`, `document`, `window` and `BroadcastChannel` in main-entry modules and unguarded references inside functions. Guarded means a preceding same-function `typeof <global> ===/!== 'undefined'` check, or a `globalThis` property read with optional chaining before dereferencing a potentially missing value. This lexical check ignores types and property names; it does not prove control flow. Main-entry modules cannot import or re-export `browser.ts`, `ownership.ts` or `invalidation.ts`.
 2. The `models` package imports `@langchain/core/*` subpaths and relative files, plus the exact optional peer `@mlc-ai/web-llm` 0.2.86 only in its WebLLM engine, cache probe and worker files, and the exact optional peers `@huggingface/transformers` and `@huggingface/transformers-structured-output` 4.3.2 only as dynamic, type-free imports in `transformers/runtime.ts`; it has no `core` dependency. WebLLM types are local structural types because its declaration re-exports do not resolve under NodeNext. `storage-indexeddb` also has no `core` dependency: its peers are `@langchain/langgraph-checkpoint` `~1.2.0` and type-only `@langchain/core` `~1.2.20`, tested at 1.2.0 and 1.2.20. Integration packages depend on core and their own libraries, with the existing models/storage exceptions. Executor adapters may additionally import `@galaxie/adapter-kit`. No adapter imports another adapter. The kit imports only core public exports, erased `@langchain/core` types and its own relative files; it imports no adapter. The host app wires the integration packages together through `createRuntime`.
 3. Agent packages depend on `core` and their engine, never on a host package. The private `@galaxie/example-english-tutor` workspace package also uses `adapter-langgraph` for its host and interrupt contracts; its source and build import allowlist admits only those two galaxie packages, `@langchain/langgraph/web`, `@langchain/core/*`, `zod` and relative files. It imports neither React nor model implementations. The M4 ESLint plugin flags direct network, storage, DOM/HTML sinks, eval and model-provider access (brief §9.7 C). It is a linting aid with no runtime enforcement; aliases and dependency-provided values can escape detection. See [usage and limits](../packages/eslint-plugin/README.md). Its source imports only relative modules and type-only `eslint`; `check:deps` enforces that boundary.
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
 5. `tools-mcp` source and build imports are limited to `@galaxie/core`, SDK client subpaths, SDK shared `types.js` and relative files. It imports no SDK server entry or Node module. `examples/mcp-server` uses SDK server/shared subpaths, `node:*`, `zod` and relative files. No package source or build imports examples; tests use source aliases without new dependencies. Hosts may import `@galaxie/tools-mcp`. `check:deps` enforces these rules.
 6. Fewer packages are fine while these boundaries hold (brief §15).
 
-`@galaxie/ui-protocol` is a dependency-free launch package for pinned A2UI messages, catalog validation and pure surface reduction ([ADR-0027](adr/0027-a2ui-surfaces.md), Proposed). Its public root is the only supported entry. It imports no galaxie, React or platform modules and uses no DOM/Worker globals. Core and React do not import it yet; checkpoint commits, labels, private-value URL scanning, actions and rendering remain later integration work. See its [API and validation order](../packages/ui-protocol/README.md).
+`@galaxie/ui-protocol` is a dependency-free launch package for pinned A2UI messages, catalog validation and pure surface reduction ([ADR-0027](adr/0027-a2ui-surfaces.md), Proposed). Its public root is the only supported entry. It imports no galaxie, React or platform modules and uses no DOM/Worker globals. Core imports it for pending surfaces (§6.3); React does not yet, so rendering remains later work, and there is no executor checkpoint-commit method. See its [API and validation order](../packages/ui-protocol/README.md).
 
 `@galaxie/adapter-kit` now exists as a non-adapter launch package sharing the release version ([ADR-0026](adr/0026-adapter-kit-package.md), Proposed). Executor adapters import only its public root for common tool-call text extraction, selected-provider/credential resolution and pure bridge framing/validators. Prepare-time service validation and error helpers remain deferred. The kit imports no framework runtime and touches no DOM/Worker globals at import time. Framework execution, lifecycle, restore/checkpoints, loaders and Python/Go glue remain per-adapter. Dependency checks enforce these boundaries; all other limits remain unchanged.
 
@@ -318,6 +319,54 @@ The root build runs both commands immediately after compiling the tutor. The Nod
 The script appends `integrity.entry`, `integrity.files` and `integrity.lockfile`, all SHA-256 digests encoded as `sha256-<base64>`. The sorted file inventory covers `package.json`, every file beneath the package's `files` entries except the generated output, and every declared skill file. Entry and skill files must exist outside the output directory; filesystem identity checks also reject case aliases inside it. The lockfile digest covers the nearest ancestor `pnpm-lock.yaml`. Exclusive file creation rejects schema filenames that alias on the destination filesystem. Verification uses the same inventory and regenerates schemas and manifest bytes, rejecting missing, added or changed shipped files, digest mismatches and any missing, added or changed output file. It compares exact filenames and raw bytes, without UTF-8 replacement decoding. It writes nothing; failures contain fixed messages or paths, never file or schema contents or underlying error text.
 
 Digests prove only that a package matches the manifest being checked. A host must obtain that manifest, or pin its digest, from a source it trusts, such as its own lockfile-resolved build output or a reviewed commit. Without signing, an attacker who replaces both package and manifest passes verification. A hash identifies provenance and integrity, not safe behavior (brief §9). This is neither a sandbox nor a security guarantee. Signing, runtime loading by manifest and browser-side verification APIs are outside this slice; hosts verify at build or deploy time, or use Subresource Integrity with the listed digests.
+
+### 6.3. Surface-bearing interactions
+
+A surface-bearing interaction uses the engine interrupt as its only durable anchor.
+The interrupt value is the reduced `galaxie.surface/1` record: region, A2UI identity,
+catalog, revision, pinned spec version and revision, status, components and data model.
+It contains neither core labels nor `viewRevision`. Core derives the opaque token
+`a2uiSurfaceId + '#' + revision` solely from those two fields and computes labels
+from the run, ignoring any adapter-supplied labels or token. The published surface
+is a detached frozen copy. No message log or second durable projection is added.
+
+Core builds the validator context from host-bound `ui.catalogs` and `ui.surfaces`,
+the run's `payloadBytes` and `uiElements` limits, and the host URL allowlist. It
+validates before publication and restore and scans both components and the entire
+data model for URL/private-value policy violations, retaining the private-user
+third-party exception. Protocol diagnostics carry only fixed codes. A per-run map
+requires creation at revision 1 and subsequent live revisions exactly one higher.
+Restore seeds that map from the stored revision and selects its validator by the
+exact `(specVersion, specRevision)` pin; unknown pins fail `unsupported`.
+
+LangGraph cannot replace a pending interrupt's value in place. The node resumes,
+reduces the next batch against the previous record and yields a new interrupt in
+a later node. Revisions therefore advance per interaction; in-place updates while
+waiting are out of scope, and there is no executor surface-commit method. The
+checkpoint is written before core sees the interrupt, so rejection prevents public
+interaction state but cannot erase raw checkpoint/stream data.
+
+For today's renderer the pending projection uses the region as `surfaceId`, the
+derived token as `viewRevision`, the root's catalog/name as the legacy component ID
+(`education/v1` plus `Quiz` becomes `education.Quiz/v1`), and root domain props
+without component identity, accessibility or metadata fields. The exported
+`surfaceFromRequest` converts representable four-field requests to a single `root`
+component, revision 1 and an empty model. Props with `id` or `component` cannot be
+represented. Legacy requests remain on their existing parser and validation path.
+
+Surface actions check both revision and derived token against committed pending
+state and validate the originating component's registered action/payload. Changed
+or added model paths must relate to an `@path` binding as an ancestor or descendant;
+this is coarser than per-property writable declarations. Changed string leaves are
+registered private and add sticky `private-user` before acceptance or inbox storage.
+The submitted model never enters the resume payload. Labels are not persisted in
+the interrupt; restore applies the conservative public/app/private-user superset
+and registers surface strings and recovered payload strings before policy checks.
+
+Recovery submissions retain only action and domain payload, with no component ID.
+Replay accepts when at least one registered action on a surface component validates
+that payload; it cannot recover the originating component. Render outcomes continue
+to use interaction ID and view token, so each new revision has a new outcome key.
 
 ## 7. Runtime topology
 
