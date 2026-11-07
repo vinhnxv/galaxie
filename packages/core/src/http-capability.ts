@@ -155,7 +155,9 @@ async function readBody(response: Response, cap: number): Promise<string> {
 }
 
 /** Host-literal HTTP binding. Cross-origin servers must allow both X-Galaxie attribution headers
- * in Access-Control-Allow-Headers; a failed preflight follows the destination's network error rule.
+ * in Access-Control-Allow-Headers, plus Idempotency-Key when retry is 'idempotency-key'. A failed
+ * preflight fails with unreachable for user-device or local/private user-endpoint destinations,
+ * and with unavailable for other destinations, following the existing network error rule.
  * Headers never authorize. */
 export function httpCapability<Input = unknown, Output = unknown>(
   supplied: HttpCapabilityOptions,
@@ -198,6 +200,7 @@ export function httpCapability<Input = unknown, Output = unknown>(
       if (hasBody) headers.set('content-type', 'application/json');
       for (const [key, value] of Object.entries(attributionHeaders(context)))
         headers.set(key, value);
+      if (options.retry === 'idempotency-key') headers.set('Idempotency-Key', context.effectId);
       if (context.signal.aborted) fail('cancelled');
       let response: Response;
       try {
