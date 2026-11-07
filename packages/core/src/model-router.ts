@@ -623,6 +623,7 @@ export class ModelRouter {
             };
             const call: ModelCall = Object.freeze({
               ...selected,
+              maxTokens: route.maxTokens,
               ...(credential === undefined ? {} : { credential }),
               get outputSafetyOutcome() {
                 return outputSafetyOutcome;

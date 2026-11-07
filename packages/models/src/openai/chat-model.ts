@@ -106,7 +106,29 @@ export interface OpenAICompatibleOptions {
 }
 
 export interface OpenAICompatibleCallOptions extends BaseChatModelCallOptions {
+  readonly maxTokens?: number;
   readonly jsonSchema?: Readonly<Record<string, unknown>>;
+}
+
+/** The SDK reads token limits from instance fields; keep per-call limits out of shared state. */
+class LimitedChatOpenAI extends ChatOpenAICompletions<
+  ChatOpenAICompletions['ParsedCallOptions'] & { readonly maxTokens?: number }
+> {
+  override invocationParams(
+    options?: this['ParsedCallOptions'],
+    extra?: { streaming?: boolean },
+  ): ReturnType<ChatOpenAICompletions['invocationParams']> {
+    const params = super.invocationParams(options, extra);
+    if (options?.maxTokens !== undefined) {
+      if ('max_completion_tokens' in params)
+        params.max_completion_tokens = Math.min(
+          options.maxTokens,
+          params.max_completion_tokens ?? options.maxTokens,
+        );
+      else params.max_tokens = Math.min(options.maxTokens, params.max_tokens ?? options.maxTokens);
+    }
+    return params;
+  }
 }
 
 function validateOptions(options: OpenAICompatibleOptions): OpenAICompatibleOptions {
@@ -155,10 +177,16 @@ function callOptions(
   options: OpenAICompatibleCallOptions,
   tools: ToolDeclaration[] | undefined,
   choice: ToolChoice,
-): ChatOpenAICompletions['ParsedCallOptions'] {
+): LimitedChatOpenAI['ParsedCallOptions'] {
+  if (
+    options.maxTokens !== undefined &&
+    (!Number.isSafeInteger(options.maxTokens) || options.maxTokens <= 0)
+  )
+    throw new ModelError('invalid');
   if (options.jsonSchema !== undefined && tools !== undefined) throw new ModelError('unsupported');
   return {
     ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
     ...(tools === undefined ? {} : { tools }),
     ...(choice === undefined ? {} : { tool_choice: choice }),
     ...(options.jsonSchema === undefined
@@ -269,7 +297,7 @@ function providerFailure(
 
 /** One wrapper and one SDK model per router credential lease. Never retains credentials across leases. */
 export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCallOptions> {
-  readonly #inner: ChatOpenAICompletions;
+  readonly #inner: LimitedChatOpenAI;
   readonly #endpoint: OpenAICompatibleOptions;
   #tools: ToolDeclaration[] | undefined;
   #choice: ToolChoice;
@@ -288,7 +316,7 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
     if (typeof credential !== 'string' || credential.trim().length === 0)
       throw new ModelError('invalid');
     try {
-      this.#inner = new ChatOpenAICompletions({
+      this.#inner = new LimitedChatOpenAI({
         apiKey: credential,
         model: valid.model,
         ...(valid.maxTokens === undefined ? {} : { maxTokens: valid.maxTokens }),
@@ -344,7 +372,7 @@ export class OpenAICompatibleChatModel extends BaseChatModel<OpenAICompatibleCal
     options: OpenAICompatibleCallOptions,
   ): {
     messages: BaseMessage[];
-    options: ChatOpenAICompletions['ParsedCallOptions'];
+    options: LimitedChatOpenAI['ParsedCallOptions'];
     tools: ToolDeclaration[] | undefined;
   } {
     const choice = toolChoice(

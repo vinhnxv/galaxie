@@ -158,6 +158,73 @@ function fixture(options: ConstructorParameters<typeof FakeOpenAIFetch>[0] = {})
 
 describe('OpenAI-compatible chat model', () => {
   it.each([
+    { modelName: 'fake', field: 'max_tokens' },
+    { modelName: 'gpt-5.6', field: 'max_completion_tokens' },
+  ])('invoke and stream keep the lower output limit in $field', async ({ modelName, field }) => {
+    for (const { configured, perCall, expected } of [
+      { configured: 128, perCall: 32, expected: 32 },
+      { configured: 32, perCall: 128, expected: 32 },
+      { configured: 128, perCall: undefined, expected: 128 },
+      { configured: undefined, perCall: 64, expected: 64 },
+      { configured: undefined, perCall: undefined, expected: undefined },
+    ]) {
+      const fake = new FakeOpenAIFetch();
+      const model = openAICompatible({
+        baseURL,
+        model: modelName,
+        fetch: fake.fetch,
+        ...(configured === undefined ? {} : { maxTokens: configured }),
+      })({ credential });
+      const options = perCall === undefined ? {} : { maxTokens: perCall };
+      await model.invoke('hello', options);
+      for await (const _chunk of await model.stream('hello', options)) {
+        /* drain */
+      }
+      expect(fake.requests).toHaveLength(2);
+      expect(fake.requests.map((request) => request.body[field])).toEqual([expected, expected]);
+      const otherField = field === 'max_tokens' ? 'max_completion_tokens' : 'max_tokens';
+      expect(fake.requests.every((request) => !(otherField in request.body))).toBe(true);
+      if (expected === undefined)
+        expect(fake.requests.every((request) => !(field in request.body))).toBe(true);
+    }
+  });
+
+  it('keeps concurrent limits isolated on tool-bound copies sharing one SDK model', async () => {
+    const { fake, model } = fixture();
+    const bound = model.bindTools([]);
+    await Promise.all([
+      model.invoke('hello', { maxTokens: 16 }),
+      (async () => {
+        for await (const _chunk of await bound.stream('hello', { maxTokens: 64 })) {
+          /* drain */
+        }
+      })(),
+    ]);
+    await model.invoke('hello');
+    expect(
+      fake.requests
+        .slice(0, 2)
+        .map((request) => request.body['max_tokens'])
+        .sort((a, b) => Number(a) - Number(b)),
+    ).toEqual([16, 64]);
+    expect(fake.requests[2]?.body).not.toHaveProperty('max_tokens');
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects an invalid per-call output limit before invoke or stream dispatch: %s',
+    async (maxTokens) => {
+      const { fake, model } = fixture();
+      await expect(model.invoke('hello', { maxTokens })).rejects.toMatchObject({ code: 'invalid' });
+      await expect(async () => {
+        for await (const _chunk of await model.stream('hello', { maxTokens })) {
+          /* drain */
+        }
+      }).rejects.toMatchObject({ code: 'invalid' });
+      expect(fake.requests).toEqual([]);
+    },
+  );
+
+  it.each([
     [undefined, 'unreachable'],
     ['user-device', 'unreachable'],
     ['user-endpoint', 'unreachable'],

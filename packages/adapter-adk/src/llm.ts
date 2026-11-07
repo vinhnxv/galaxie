@@ -321,8 +321,14 @@ export class GalaxieLlm extends BaseLlm {
     const bound = tools.length > 0 ? provider.bindTools?.([...tools]) : provider;
     if (bound === undefined) throw failure('unsupported');
     const stop = request.config?.stopSequences;
+    // Only a positive integer from the caller can lower the route's limit; anything else is ignored.
+    const requested = request.config?.maxOutputTokens;
     const options = {
       signal,
+      maxTokens:
+        requested !== undefined && Number.isSafeInteger(requested) && requested > 0
+          ? Math.min(requested, lease.maxTokens)
+          : lease.maxTokens,
       ...(stop === undefined || stop.length === 0 ? {} : { stop: [...stop] }),
       ...(jsonSchema === undefined ? {} : { jsonSchema }),
       [DESTINATION]: lease.destination,

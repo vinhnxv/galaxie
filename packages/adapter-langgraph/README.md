@@ -42,6 +42,14 @@ and `instance.getSnapshot()`; keep the runtime alive until host teardown, then
 the node's explicit config. After an await, interactions use
 `requestInteraction(request, config)`.
 
+Routed invoke and stream calls forward the lease's `maxTokens` output limit,
+including tool-bound calls, structured output and repairs. A lower caller
+`maxTokens` wins; other call options are preserved. Supported providers retain any
+lower constructor limit. Built-in AI has no output-token limit and ignores this
+value. Actual usage may still differ from the reservation. Coverage uses mocks,
+fake engines and injected fetch only; no real provider limit behavior is measured.
+See [provider limits](../models/README.md#output-token-limits).
+
 ## Model-chosen capability tools
 
 `host.langchain.capabilityTool(name: string, spec: CapabilityToolSpec)` returns a

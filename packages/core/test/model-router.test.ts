@@ -222,6 +222,29 @@ test('reservations are atomic across concurrent calls and tokens are checked fir
   first.end({ inputTokens: 1, outputTokens: 1 });
   expect(await router.port(run).begin('assistant')).toMatchObject({ providerId: 'local' });
 });
+test('the frozen lease carries the route limit without changing reservation charges', async () => {
+  const { router, run } = fixture(
+    configuration(
+      { local: { ...local, pricing: { inputPerToken: 1, outputPerToken: 1 } } },
+      {
+        roles: { assistant: { providers: ['local'], allow: ['in-browser'], maxTokens: 64 } },
+      },
+    ),
+    { tokens: 128, cost: 128 },
+  );
+  const reserve = vi.spyOn(run.budget, 'reserveModel');
+  const first = await router.port(run).begin('assistant');
+  expect(first.maxTokens).toBe(64);
+  expect(Object.isFrozen(first)).toBe(true);
+  expect(reserve).toHaveBeenCalledExactlyOnceWith(64, 64);
+  first.end();
+  const second = await router.port(run).begin('assistant');
+  expect(second.maxTokens).toBe(64);
+  second.fail();
+  await expect(router.port(run).begin('assistant')).rejects.toMatchObject({
+    budget: 'tokens',
+  });
+});
 test.each(['known', 'unknown'] as const)(
   '%s pricing reserves cost before dispatch',
   async (kind) => {

@@ -6,6 +6,23 @@ import { expect, test } from 'vitest';
 import { createMockLatch, MockChatModel, MockModelError, type MockScript } from '../src/mock.js';
 
 const usage = { input_tokens: 2, output_tokens: 3, total_tokens: 5 };
+test('records per-call limits across invoke, stream and bound copies without changing replies', async () => {
+  const model = new MockChatModel({ hello: { id: 'reply', text: 'hello world', usage } });
+  const bound = model.bindTools([]);
+  const first = await model.invoke('hello', { maxTokens: 64 });
+  expect(first.content).toBe('hello world');
+  expect(first.usage_metadata).toEqual(usage);
+  const chunks = [];
+  for await (const chunk of await bound.stream('hello', { maxTokens: 16 })) chunks.push(chunk);
+  expect(chunks.map((chunk) => chunk.content)).toEqual(['hello ', 'world']);
+  expect(chunks.at(-1)?.usage_metadata).toEqual(usage);
+  await bound.invoke('hello');
+  expect(model.maxTokens).toEqual([64, 16, undefined]);
+  expect(bound.maxTokens).toEqual(model.maxTokens);
+  expect(model.calls).toBe(3);
+  expect(first.response_metadata).toEqual({});
+});
+
 test('invoke returns scripted text and usage and counts calls', async () => {
   const model = new MockChatModel({ hello: { id: 'reply', text: 'hello world', usage } });
   const reply = await model.invoke([new HumanMessage('hello')]);

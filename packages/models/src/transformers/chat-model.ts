@@ -154,7 +154,7 @@ export class TransformersChatModel extends BaseChatModel<TransformersCallOptions
         this.#handle.toolFormat === undefined ? mapMessages(messages) : mapToolMessages(messages),
       ...(tools === undefined ? {} : { tools }),
       ...(options.jsonSchema === undefined ? {} : { jsonSchema: options.jsonSchema as JsonObject }),
-      maxTokens: options.maxTokens ?? this.#maxTokens,
+      maxTokens: Math.min(options.maxTokens ?? this.#maxTokens, this.#maxTokens),
       temperature: options.temperature ?? this.#temperature,
     };
     // Tool markup is parsed only when tools were offered; otherwise the reply is plain text.

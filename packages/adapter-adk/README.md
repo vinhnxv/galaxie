@@ -43,6 +43,14 @@ const agent: AdkAgent = (host) =>
 
 ## Streaming
 
+Provider invoke and stream calls receive `maxTokens` from the router lease,
+lowered by ADK's `maxOutputTokens` when it is a positive integer (other values are ignored). Tool-bound and schema calls use
+the same limit. Supported providers retain any lower constructor limit; Built-in
+AI has no output-token limit and ignores the value. Actual usage may still differ
+from the reservation. Coverage uses mocks and injected provider fakes only; no
+real provider limit behavior is measured. See
+[provider limits](../models/README.md#output-token-limits).
+
 The adapter always runs ADK in SSE mode, so a run emits `stream` events with `executor: 'adk-js'` and
 an empty `path`:
 

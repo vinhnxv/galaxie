@@ -133,6 +133,7 @@ export interface FakeModelsOptions {
   /** Reject `begin` with this error. */
   readonly beginError?: GalaxieError;
   readonly providerId?: string;
+  readonly maxTokens?: number;
 }
 
 export function fakeModels(options: FakeModelsOptions = {}): {
@@ -157,6 +158,7 @@ export function fakeModels(options: FakeModelsOptions = {}): {
         return {
           providerId: options.providerId ?? 'mock',
           destination: options.destination ?? 'in-browser',
+          maxTokens: options.maxTokens ?? 64,
           get outputSafetyOutcome() {
             return outcome;
           },

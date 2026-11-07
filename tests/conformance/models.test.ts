@@ -142,6 +142,36 @@ async function run(options: {
   }
 }
 
+test.each([undefined, 16, 128])(
+  'a route reservation of 64 limits invoke and stream with caller limit %s',
+  async (maxTokens) => {
+    const provider = mock();
+    const result = await run({
+      models: routing({ local }, { ...localRoute, maxTokens: 64 }),
+      chatModels: { local: provider },
+      budgets: { tokens: 128 },
+      agent: (host) => {
+        const model = host.langchain.chatModel(ROLE);
+        return new StateGraph(state)
+          .addNode('respond', async ({ text }, config) => {
+            const options = { ...config, ...(maxTokens === undefined ? {} : { maxTokens }) };
+            const reply = await model.invoke(text, options);
+            let streamed = '';
+            for await (const chunk of await model.stream(text, options)) streamed += chunk.text;
+            expect(streamed).toBe(reply.text);
+            return { answer: streamed };
+          })
+          .addEdge(START, 'respond')
+          .addEdge('respond', END)
+          .compile();
+      },
+    });
+    const expected = maxTokens === 16 ? 16 : 64;
+    expect(provider.maxTokens).toEqual([expected, expected]);
+    expect(result.snapshot.run).toMatchObject({ status: 'succeeded' });
+  },
+);
+
 test('AE1 and AE2 consent selects the first remote provider, then a capability label narrows the route to local', async () => {
   const remoteModel = mock('remote response');
   const localModel = mock('local response');
