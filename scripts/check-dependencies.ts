@@ -22,7 +22,7 @@ function files(directory: string, extension: RegExp): string[] {
     .map((entry) => join(entry.parentPath, entry.name));
 }
 
-function imports(file: string): ImportReference[] {
+function imports(file: string, strict = true): ImportReference[] {
   const source = ts.createSourceFile(
     file,
     readFileSync(file, 'utf8'),
@@ -39,7 +39,7 @@ function imports(file: string): ImportReference[] {
   ): void => {
     if (ts.isStringLiteralLike(node))
       references.push({ specifier: node.text, typeOnly, hasTypes, dynamic, erased });
-    else problems.push(`${file}: import specifiers must be string literals`);
+    else if (strict) problems.push(`${file}: import specifiers must be string literals`);
   };
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node)) {
@@ -83,8 +83,9 @@ function imports(file: string): ImportReference[] {
       add(node.argument.literal, true, true, false, true);
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const argument = node.arguments[0];
-      if (argument === undefined) problems.push(`${file}: dynamic imports require a specifier`);
-      else add(argument, false, false, true);
+      if (argument === undefined) {
+        if (strict) problems.push(`${file}: dynamic imports require a specifier`);
+      } else add(argument, false, false, true);
     } else if (
       (ts.isCallExpression(node) &&
         ts.isIdentifier(node.expression) &&
@@ -92,7 +93,17 @@ function imports(file: string): ImportReference[] {
       (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference))
     ) {
       // Packages are ES modules; a CommonJS load would bypass the specifier rules above.
-      problems.push(`${file}: CommonJS loads are not allowed`);
+      if (strict) problems.push(`${file}: CommonJS loads are not allowed`);
+      else if (ts.isCallExpression(node)) {
+        const argument = node.arguments[0];
+        if (argument !== undefined) add(argument, false);
+      } else if (
+        ts.isImportEqualsDeclaration(node) &&
+        ts.isExternalModuleReference(node.moduleReference)
+      ) {
+        const expression = node.moduleReference.expression;
+        if (expression !== undefined) add(expression, false);
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -322,6 +333,71 @@ for (const area of ['src', 'dist', 'test']) {
       }
       problems.push(`${file}: forbidden adapter-kit import ${specifier}`);
     }
+  }
+}
+
+// Protocol validation is independent of every framework, host and platform service.
+for (const area of ['src', 'dist', 'test']) {
+  const directory = join('packages/ui-protocol', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        const target = resolve(dirname(file), specifier);
+        if (
+          target.startsWith(`${resolve('packages/ui-protocol')}/`) &&
+          !target.split(/[\\/]/).includes('node_modules')
+        )
+          continue;
+      } else if (
+        area === 'test' &&
+        (specifier === 'vitest' ||
+          (file.endsWith('.node.test.ts') &&
+            ['node:fs', 'node:path', 'node:url'].includes(specifier)))
+      )
+        continue;
+      problems.push(`${file}: forbidden ui-protocol import ${specifier}`);
+    }
+    if (area === 'test') continue;
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const forbidden = new Set([
+      'document',
+      'window',
+      'Worker',
+      'SharedWorker',
+      'navigator',
+      'BroadcastChannel',
+      'localStorage',
+      'sessionStorage',
+      'indexedDB',
+      'fetch',
+      'XMLHttpRequest',
+      'WebSocket',
+      'setTimeout',
+      'setInterval',
+      'requestAnimationFrame',
+      'process',
+      'Buffer',
+    ]);
+    const visit = (node: ts.Node): void => {
+      if (
+        (ts.isIdentifier(node) && forbidden.has(node.text)) ||
+        (ts.isElementAccessExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === 'globalThis' &&
+          ts.isStringLiteral(node.argumentExpression) &&
+          forbidden.has(node.argumentExpression.text))
+      ) {
+        problems.push(`${file}: ui-protocol must not use platform globals`);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
   }
 }
 
@@ -835,6 +911,7 @@ for (const area of ['src', 'server', 'test']) {
 
 for (const directory of [
   'packages/core/dist',
+  'packages/ui-protocol/dist',
   'packages/adapter-kit/dist',
   'packages/adapter-langgraph/dist',
   'packages/adapter-pyodide/dist',
@@ -857,6 +934,24 @@ for (const directory of [
         )
       )
         problems.push(`${file}: built packages must not import ${specifier}`);
+    }
+  }
+}
+
+for (const root of ['packages', 'examples', 'templates', 'tests', 'scripts']) {
+  for (const file of sourceFilesOutsideDependencies(root, true)) {
+    // This inventory checks one public boundary, not unrelated host/tool import syntax.
+    for (const { specifier } of imports(file, false)) {
+      const target = resolve(dirname(file), specifier);
+      if (
+        specifier.startsWith('@galaxie/ui-protocol/') ||
+        (!file.startsWith('packages/ui-protocol/') &&
+          (specifier.startsWith('.') || specifier.startsWith('/')) &&
+          (target === resolve('packages/ui-protocol') ||
+            target.startsWith(`${resolve('packages/ui-protocol')}/`)))
+      ) {
+        problems.push(`${file}: ui-protocol imports must use the public root @galaxie/ui-protocol`);
+      }
     }
   }
 }

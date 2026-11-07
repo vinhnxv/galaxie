@@ -444,6 +444,8 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  packages/ui-protocol: {}
+
   templates/hybrid-gateway:
     dependencies:
       '@galaxie/adapter-langgraph':

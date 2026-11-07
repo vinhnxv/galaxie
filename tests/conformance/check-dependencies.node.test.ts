@@ -27,6 +27,7 @@ const UNCONDITIONALLY_READ_DIRECTORIES = [
   ...[
     'core',
     'adapter-kit',
+    'ui-protocol',
     'adapter-langgraph',
     'adapter-pyodide',
     'adapter-adk',
@@ -704,4 +705,87 @@ test('the built adapter-kit rejects Node imports and async_hooks', () => {
   const hooks = run({ 'packages/adapter-kit/dist/a.js': '// async_hooks\n' });
   expect(hooks.status).toBe(1);
   expect(hooks.output).toContain('built packages must not contain async_hooks');
+});
+
+test.each(['src/a.ts', 'dist/a.js', 'test/a.test.ts'])(
+  'ui-protocol %s permits only its own relative files and test tooling',
+  (path) => {
+    const source = adk('../src/local.js') + (path.startsWith('test/') ? adk('vitest') : '');
+    expect(run({ [`packages/ui-protocol/${path}`]: source })).toMatchObject({
+      status: 0,
+      output: '',
+    });
+  },
+);
+
+test.each([
+  '@galaxie/core',
+  '@galaxie/react',
+  '@galaxie/adapter-kit',
+  'react',
+  'react-dom',
+  'node:fs',
+  'fs',
+  'path',
+  'left-pad',
+  '../../core/src/index.js',
+  '../node_modules/a.js',
+  '../../../../outside.js',
+])('ui-protocol rejects dependency %s in source, output and browser tests', (specifier) => {
+  for (const path of ['src/a.ts', 'dist/a.js', 'test/a.test.ts']) {
+    const result = run({ [`packages/ui-protocol/${path}`]: adk(specifier) });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain(`packages/ui-protocol/${path}: forbidden ui-protocol import`);
+  }
+});
+
+test('ui-protocol fixture inspection is Node-test-only', () => {
+  expect(run({ 'packages/ui-protocol/test/a.node.test.ts': adk('node:fs') })).toMatchObject({
+    status: 0,
+    output: '',
+  });
+});
+
+test.each([
+  'document.title',
+  'window.location',
+  'new Worker("a")',
+  'globalThis.document',
+  'globalThis["Worker"]',
+  'navigator',
+  'setTimeout(() => {}, 1)',
+])('ui-protocol source and output reject platform access: %s', (source) => {
+  for (const path of ['src/a.ts', 'dist/a.js']) {
+    const result = run({ [`packages/ui-protocol/${path}`]: `export const value = ${source};` });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('ui-protocol must not use platform globals');
+  }
+});
+
+test.each([
+  '@galaxie/ui-protocol/internal',
+  '@galaxie/ui-protocol/src/index.js',
+  '@galaxie/ui-protocol/dist/index.js',
+  '../../ui-protocol/src/index.js',
+  '../../ui-protocol/dist/index.js',
+])('consumers must use the ui-protocol public root: %s', (specifier) => {
+  const result = run({ 'packages/adapter-langgraph/src/protocol.ts': adk(specifier) });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('ui-protocol imports must use the public root');
+});
+
+test.each(['packages/core/src/a.ts', 'packages/react/src/a.ts'])(
+  'existing consumer allowlists do not yet permit ui-protocol: %s',
+  (path) => {
+    expect(run({ [path]: adk('@galaxie/ui-protocol') }).status).toBe(1);
+  },
+);
+
+test('the protocol public-root inventory preserves unrelated tooling import behavior', () => {
+  expect(
+    run({ 'scripts/manifest.ts': "const moduleName = 'host'; await import(moduleName);" }),
+  ).toMatchObject({ status: 0, output: '' });
+  const result = run({ 'scripts/protocol.ts': adk('@galaxie/ui-protocol/src/index.js') });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('ui-protocol imports must use the public root');
 });

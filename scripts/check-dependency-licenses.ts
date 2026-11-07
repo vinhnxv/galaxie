@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const launchPackages = [
+  'packages/ui-protocol',
   'packages/core',
   'packages/adapter-kit',
   'packages/adapter-langgraph',

@@ -103,6 +103,7 @@ flowchart TD
     Host --> Adapter["adapter-langgraph"] & Models["models"] & Mcp["tools-mcp"] & Storage["storage-indexeddb"] & ReactPkg["react"]
     Tutor --> Core["core"] & Adapter
     Adapter --> Kit["adapter-kit"]
+    Protocol["ui-protocol: standalone A2UI validation; no consumers yet"]
     Adapter & Kit & Mcp & ReactPkg --> Core
 ```
 
@@ -114,6 +115,8 @@ Proposed rules; M1 confirms them:
 4. React lives only in `react`. A Vue binding would be a sibling package; `core` never imports a UI framework (brief §14.3).
 5. `tools-mcp` source and build imports are limited to `@galaxie/core`, SDK client subpaths, SDK shared `types.js` and relative files. It imports no SDK server entry or Node module. `examples/mcp-server` uses SDK server/shared subpaths, `node:*`, `zod` and relative files. No package source or build imports examples; tests use source aliases without new dependencies. Hosts may import `@galaxie/tools-mcp`. `check:deps` enforces these rules.
 6. Fewer packages are fine while these boundaries hold (brief §15).
+
+`@galaxie/ui-protocol` is a dependency-free launch package for pinned A2UI messages, catalog validation and pure surface reduction ([ADR-0027](adr/0027-a2ui-surfaces.md), Proposed). Its public root is the only supported entry. It imports no galaxie, React or platform modules and uses no DOM/Worker globals. Core and React do not import it yet; checkpoint commits, labels, private-value URL scanning, actions and rendering remain later integration work. See its [API and validation order](../packages/ui-protocol/README.md).
 
 `@galaxie/adapter-kit` now exists as a non-adapter launch package sharing the release version ([ADR-0026](adr/0026-adapter-kit-package.md), Proposed). Executor adapters import only its public root for common tool-call text extraction, selected-provider/credential resolution and pure bridge framing/validators. Prepare-time service validation and error helpers remain deferred. The kit imports no framework runtime and touches no DOM/Worker globals at import time. Framework execution, lifecycle, restore/checkpoints, loaders and Python/Go glue remain per-adapter. Dependency checks enforce these boundaries; all other limits remain unchanged.
 

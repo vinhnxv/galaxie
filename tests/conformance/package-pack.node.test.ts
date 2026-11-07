@@ -23,6 +23,7 @@ interface Manifest {
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const launchPackages = [
+  'ui-protocol',
   'core',
   'adapter-kit',
   'adapter-langgraph',

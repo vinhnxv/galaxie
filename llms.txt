@@ -26,6 +26,7 @@
 ## Package introductions
 
 - [Core README](packages/core/README.md): framework-neutral contracts and host runtime setup.
+- [UI protocol README](packages/ui-protocol/README.md): pure A2UI parsing, catalog validation and surface reduction; no core/React integration yet.
 - [Adapter kit README](packages/adapter-kit/README.md): shared internal adapter helpers, public-root imports and no standalone API stability promise.
 - [LangGraph adapter README](packages/adapter-langgraph/README.md): a minimal graph and explicit config.
 - [Python adapter README](packages/adapter-pyodide/README.md): trusted LangGraph Python/pydantic-ai/DSPy Workers, checked bridge, durable interactions, deterministic DSPy replay and JavaScript policy.
@@ -41,6 +42,7 @@
 ## Package coding guidance
 
 - [Core AGENTS](packages/core/AGENTS.md): lifecycle, policy and content-free instrumentation rules.
+- [UI protocol AGENTS](packages/ui-protocol/AGENTS.md): pinned protocol, atomic candidates and dependency-free validation.
 - [Adapter kit AGENTS](packages/adapter-kit/AGENTS.md): pure shared helpers, erased framework types and preserved adapter boundaries.
 - [LangGraph adapter AGENTS](packages/adapter-langgraph/AGENTS.md): native semantics, config and unsupported interrupts.
 - [Python adapter AGENTS](packages/adapter-pyodide/AGENTS.md): Worker lifecycle, compiled wheel hashes, CSP and Python trust limits.

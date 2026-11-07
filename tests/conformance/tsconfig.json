@@ -7,6 +7,7 @@
     "types": ["node"],
     "resolveJsonModule": true,
     "paths": {
+      "@galaxie/ui-protocol": ["../../packages/ui-protocol/src/index.ts"],
       "eslint": ["../../packages/eslint-plugin/node_modules/eslint/lib/types/index.d.ts"],
       "@galaxie/eslint-plugin": ["../../packages/eslint-plugin/src/index.ts"],
       "@galaxie/storage-indexeddb": ["../../packages/storage-indexeddb/src/index.ts"],
