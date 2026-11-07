@@ -503,7 +503,7 @@ class _CapabilityTool(BaseTool):
             except GalaxieError as error:
                 raise run.fail(error) from None
             try:
-                result = await capabilities.call(self._capability, _json(args), effect_scope=scope)
+                result = await capabilities.call(self._capability, _json(args), effect_scope=scope, tool=True)
             except GalaxieError as error:
                 # A denial or a validation failure is the model's to see, as a fixed message.
                 if error.code in _MODEL_VISIBLE:

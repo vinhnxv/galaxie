@@ -145,7 +145,7 @@ def test_terminal_capability_errors_escape_both_react_loops(kind, code):
         asyncio.run(Executor(module).run({'question': 'q'}, 'conversation', 5))
     assert error.value.code == code
     assert [message['op'] for message in seen] == ['model', 'capability']
-    assert seen[-1]['payload'] == {'name': 'lookup@1', 'input': {'query': 'France'}, 'effectScope': 'dspy/conversation/1/0'}
+    assert seen[-1]['payload'] == {'name': 'lookup@1', 'input': {'query': 'France'}, 'effectScope': 'dspy/conversation/1/0', 'tool': True}
 
 
 def test_concurrent_capability_positions_follow_call_start_order():

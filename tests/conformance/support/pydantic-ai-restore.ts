@@ -18,6 +18,7 @@ import {
   type PyodideAgent,
 } from '../../../packages/adapter-pyodide/src/adapter.js';
 import specs from '../cases-pydantic-ai/fixtures.json' with { type: 'json' };
+import { autoApprove, confirmationsFor } from './auto-confirm.js';
 import { type PydanticTranscript, RecordingModel } from './pydantic-ai.js';
 
 export const pydanticReloadCases = [
@@ -126,6 +127,7 @@ export async function executePydanticReloadStep(
   let pending: PendingInteraction | undefined;
   let restored: PendingInteraction | undefined;
   let crashed = false;
+  let stopApproving = (): void => {};
   try {
     const instance = await runtime.create(
       defineAgentDefinition({
@@ -148,6 +150,10 @@ export async function executePydanticReloadStep(
         principalScope: 'fixture',
         agent,
         recovery: store.recovery,
+        // A model-chosen write runs only behind a host confirmation, approved here as it appears.
+        ...(write
+          ? { confirmations: confirmationsFor(['math.double@1'], 'pydantic-restore-v1') }
+          : {}),
         ...(step.sessionId === undefined ? {} : { sessionId: step.sessionId as SessionId }),
         services: {
           chatModels: { mock: new RecordingModel(script, transcript) },
@@ -173,7 +179,7 @@ export async function executePydanticReloadStep(
             timeoutMs: 1000,
             concurrency: 1,
             grantScope: 'instance',
-            approval: 'none',
+            approval: write ? 'confirm' : 'none',
             retry: 'none',
             async invoke(input: { value: number }) {
               transcript.capabilities.push({ name: 'math.double@1', input });
@@ -196,6 +202,7 @@ export async function executePydanticReloadStep(
       },
     );
     await instance.prepare();
+    if (write) stopApproving = autoApprove(instance);
     const run =
       step.sessionId === undefined
         ? await instance.start({ prompt: spec.prompt })
@@ -269,6 +276,7 @@ export async function executePydanticReloadStep(
       ...(pending === undefined ? {} : { pending }),
     };
   } finally {
+    stopApproving();
     latch.release();
     await runtime.dispose();
   }

@@ -29,6 +29,11 @@ const agent: AdkAgent = (host) =>
   flagged by `galaxie/no-direct-model`.
 - `host.adk.capabilityTool(name, spec)` calls a bound capability through the broker. A `denied` or
   `invalid` result returns a fixed message to the model; every other failure ends the run.
+  The model chooses when it runs, so a capability that is not a read runs through this helper only
+  when it is bound with `approval: 'confirm'` and the runtime has host confirmation coverage for it
+  (`confirmations` on `runtime.create`). Otherwise the call is refused with the fixed `invalid`
+  message before it reaches the capability. A capability name with no binding is refused the same
+  way. A tool you write yourself, outside this helper, is not covered by this check.
 - Prepare accepts only `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent`, with models
   and tools created by the host. Anything else fails closed.
 - The adapter creates the `Runner`, an in-memory event log and one tool-call integrity plugin, and

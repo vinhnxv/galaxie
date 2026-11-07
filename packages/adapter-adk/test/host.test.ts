@@ -2,13 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import './support/adk-env.js';
-import { type CapabilityPort, GalaxieError } from '@galaxie/core';
+import { type CapabilityBindingPolicy, type CapabilityPort, GalaxieError } from '@galaxie/core';
 import { InMemoryRunner, LlmAgent, ParallelAgent, type SequentialAgent } from '@google/adk';
 import { AIMessage, type ToolMessage } from '@langchain/core/messages';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { createHost, validServices } from '../src/host.js';
 import { FakeChatModel, fakeModels, fakeRun, type Reply } from './support/fixtures.js';
+
+const readPolicy: CapabilityBindingPolicy = {
+  kind: 'read',
+  approval: 'none',
+  confirmationAvailable: false,
+};
+const policy = vi.hoisted<{ current: CapabilityBindingPolicy | undefined }>(() => ({
+  current: undefined,
+}));
+vi.mock('@galaxie/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@galaxie/core')>()),
+  capabilityBindingPolicy: vi.fn(() => policy.current),
+}));
 
 interface CapabilityCall {
   readonly name: string;
@@ -33,6 +46,7 @@ function capabilities(
 }
 
 function build(reply: Reply, port: CapabilityPort) {
+  policy.current = readPolicy;
   const model = new FakeChatModel(reply);
   const { port: models } = fakeModels();
   const { run } = fakeRun(models, { capabilities: port });
@@ -174,6 +188,57 @@ test('sub-agents on parallel branches get distinct scopes', async () => {
   expect(scopes.every((scope) => scope?.startsWith('adk/conv-1/'))).toBe(true);
   expect(scopes.some((scope) => scope?.includes('left'))).toBe(true);
   expect(scopes.some((scope) => scope?.includes('right'))).toBe(true);
+});
+
+test.each([
+  { name: 'no broker policy', current: undefined },
+  { name: 'a write without approval', current: { ...readPolicy, kind: 'write' as const } },
+  {
+    name: 'a device capability without approval',
+    current: { ...readPolicy, kind: 'device' as const },
+  },
+  {
+    name: 'a write that needs a confirmation but has none configured',
+    current: { kind: 'write' as const, approval: 'confirm' as const, confirmationAvailable: false },
+  },
+])(
+  'the helper refuses $name with the fixed error and never calls the capability',
+  async (entry) => {
+    const { port, calls } = capabilities();
+    const { host, search, model, run } = build(
+      callThenAnswer({ name: 'docs_search_1', args: { q: 'private-canary-argument' } }),
+      port,
+    );
+    policy.current = entry.current;
+    const agent = new LlmAgent({
+      name: 'agent',
+      model: host.adk.llm('agent'),
+      instruction: 'x',
+      tools: [search],
+    });
+    expect(await drive(agent)).toContain('answer');
+    expect(calls).toHaveLength(0);
+    const reply = model.seen
+      .at(-1)
+      ?.messages.find((message) => message.type === 'tool') as ToolMessage;
+    expect(reply.content).toBe('{"error":"The request is invalid."}');
+    expect(reply.content).not.toContain('docs');
+    expect(run.failure).toBeUndefined();
+  },
+);
+
+test('a confirmed write with a configured confirmation reaches the broker once', async () => {
+  const { port, calls } = capabilities();
+  const { host, search } = build(callThenAnswer({ name: 'docs_search_1', args: { q: 'a' } }), port);
+  policy.current = { kind: 'write', approval: 'confirm', confirmationAvailable: true };
+  const agent = new LlmAgent({
+    name: 'agent',
+    model: host.adk.llm('agent'),
+    instruction: 'x',
+    tools: [search],
+  });
+  expect(await drive(agent)).toContain('answer');
+  expect(calls.map((call) => call.input)).toEqual([{ q: 'a' }]);
 });
 
 test('host.capabilities.call forwards the run signal and records fatal errors', async () => {

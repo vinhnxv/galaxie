@@ -19,6 +19,7 @@ import {
 } from '../../../packages/adapter-pyodide/src/adapter.js';
 import { createMockLatch } from '../../../packages/models/src/mock.js';
 import fixtures from '../cases-dspy/fixtures.json' with { type: 'json' };
+import { autoApprove, confirmationsFor } from './auto-confirm.js';
 
 export const dspyCases: readonly string[] = Object.keys(fixtures);
 interface Spec {
@@ -193,6 +194,9 @@ export async function executeDspyCase(
     outputSafety: ({ text }) => (text.includes('BLOCKED_') ? 'block' : 'allow'),
   });
   const kind = name.endsWith('outcome-unknown') || pauses ? 'write' : 'read';
+  // A model-chosen write runs only behind a host confirmation, approved here as it appears.
+  const approval = kind === 'write' ? 'confirm' : 'none';
+  let stopApproving = (): void => {};
   try {
     const instance = await runtime.create(
       defineAgentDefinition({
@@ -215,6 +219,9 @@ export async function executeDspyCase(
         principalScope: 'fixture',
         agent,
         services: { chatModels: { mock: model } },
+        ...(kind === 'write'
+          ? { confirmations: confirmationsFor(['docs.lookup@1'], 'dspy-conformance-v1') }
+          : {}),
         ui: {
           surfaces: ['main'],
           components: {
@@ -228,7 +235,7 @@ export async function executeDspyCase(
             timeoutMs: 1000,
             concurrency: 1,
             grantScope: 'instance',
-            approval: 'none',
+            approval,
             retry: 'none',
             async invoke(input: { query: string }) {
               transcript.capabilities.push({ name: 'docs.lookup@1', input });
@@ -255,6 +262,7 @@ export async function executeDspyCase(
       },
     );
     await instance.prepare();
+    if (kind === 'write') stopApproving = autoApprove(instance);
     const ids = new Set<string>();
     let answerIndex = 0;
     for (let round = 0; round < (spec?.runs ?? 1); round++) {
@@ -359,6 +367,7 @@ export async function executeDspyCase(
   } catch (error) {
     transcript.error = toErrorInfo(error instanceof GalaxieError ? error.code : 'executor_error');
   } finally {
+    stopApproving();
     latch.release();
     await runtime.dispose();
   }

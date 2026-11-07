@@ -164,6 +164,8 @@ async function life(
     principalScope: 'user',
     ...(options.sessionId === undefined ? {} : { sessionId: options.sessionId }),
     ...(options.recovery === false ? {} : { recovery: store.recovery }),
+    // The tool helper offers a write only behind a configured host confirmation.
+    confirmations: { capabilities: ['docs.save@1'], policyRevision: () => 'adk-restore-v1' },
     agent: options.factory ?? agent,
     services: { chatModels: { mock: model }, checkpoints: store.checkpoints },
     bindings: {
@@ -173,7 +175,7 @@ async function life(
         timeoutMs: 1000,
         concurrency: 1,
         grantScope: 'instance',
-        approval: 'none',
+        approval: 'confirm',
         retry: 'none',
         async invoke(input: { q: string }) {
           writes.push(input);
@@ -184,6 +186,13 @@ async function life(
     models: routing,
   });
   await instance.prepare();
+  // These tests exercise the pause and the restore, so the broker's confirmation is approved
+  // as soon as it appears.
+  const timer = setInterval(() => {
+    for (const pending of instance.getSnapshot().confirmations ?? [])
+      instance.respond(pending.id, 'approve');
+  }, 5);
+  closers.push(() => clearInterval(timer));
   return { runtime, instance, model, writes, sessionId: instance.sessionId };
 }
 

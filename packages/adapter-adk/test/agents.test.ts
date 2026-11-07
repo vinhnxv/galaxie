@@ -349,6 +349,8 @@ test('parallel branches that write get their own scopes, so a re-dispatch replay
   const instance = await runtime.create(definition, {
     principalScope: 'user',
     recovery: new MemoryRecoveryStore(),
+    // The tool helper offers a write only behind a configured host confirmation.
+    confirmations: { capabilities: ['docs.save@1'], policyRevision: () => 'adk-agents-v1' },
     agent: (host: AdkHost) =>
       new ParallelAgent({
         name: 'fan',
@@ -387,7 +389,7 @@ test('parallel branches that write get their own scopes, so a re-dispatch replay
         timeoutMs: 1000,
         concurrency: 2,
         grantScope: 'instance',
-        approval: 'none',
+        approval: 'confirm',
         retry: 'none',
         async invoke(input: { q: string }) {
           writes.push(input);
@@ -398,6 +400,11 @@ test('parallel branches that write get their own scopes, so a re-dispatch replay
     models: routing,
   });
   await instance.prepare();
+  // This test is about receipts, so the broker's confirmation is approved as it appears.
+  const approver = setInterval(() => {
+    for (const pending of instance.getSnapshot().confirmations ?? [])
+      instance.respond(pending.id, 'approve');
+  }, 5);
   const first = await instance.start({ prompt: 'go' });
   const firstEvents: RunEvent[] = [];
   for await (const event of instance.events(first.runId)) firstEvents.push(event);
@@ -409,6 +416,7 @@ test('parallel branches that write get their own scopes, so a re-dispatch replay
   for await (const event of instance.events(second.runId)) secondEvents.push(event);
   expect(secondEvents.at(-1)?.type).toBe('output');
   expect(writes.map((write) => write.q).sort()).toEqual(['L', 'R']);
+  clearInterval(approver);
   await runtime.dispose();
 });
 

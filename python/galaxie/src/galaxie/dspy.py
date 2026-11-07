@@ -520,7 +520,7 @@ def capability_tool(name: str, description: str, args_schema: dict[str, Any], *,
         run.check()
         token = _tool_name.set(tool_name or name)
         try:
-            return await capabilities.call(name, arguments)
+            return await capabilities.call(name, arguments, tool=True)
         except GalaxieError as error:
             # Every capability failure ends the run: `invalid` may follow a dispatched write.
             raise _Termination(error.code) from None

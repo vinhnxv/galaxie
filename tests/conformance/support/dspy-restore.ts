@@ -18,6 +18,7 @@ import {
   type PyodideAdapterOptions,
   type PyodideAgent,
 } from '../../../packages/adapter-pyodide/src/adapter.js';
+import { autoApprove, confirmationsFor } from './auto-confirm.js';
 
 export const dspyReloadCases = [
   'durable-module',
@@ -114,6 +115,7 @@ export async function executeDspyReloadStep(
   let output: unknown;
   let error: unknown;
   let crashed = false;
+  let stopApproving = (): void => {};
   try {
     const instance = await runtime.create(
       defineAgentDefinition({
@@ -143,6 +145,8 @@ export async function executeDspyReloadStep(
         principalScope: 'fixture',
         agent,
         recovery: store.recovery,
+        // A model-chosen write runs only behind a host confirmation, approved below as it appears.
+        confirmations: confirmationsFor(['docs.lookup@1'], 'dspy-restore-v1'),
         ...(step.sessionId === undefined ? {} : { sessionId: step.sessionId as SessionId }),
         services: {
           checkpoints: store.checkpoints,
@@ -161,7 +165,7 @@ export async function executeDspyReloadStep(
             timeoutMs: 10000,
             concurrency: 1,
             grantScope: 'instance',
-            approval: 'none',
+            approval: 'confirm',
             retry: 'none',
             async invoke(input: { query: string }) {
               calls.push(input.query);
@@ -199,6 +203,7 @@ export async function executeDspyReloadStep(
       },
     );
     await instance.prepare();
+    stopApproving = autoApprove(instance);
     const run =
       step.sessionId === undefined
         ? await instance.start({ question: 'RESTORED_INPUT_SECRET' })
@@ -258,6 +263,7 @@ export async function executeDspyReloadStep(
       ...(error === undefined ? {} : { error }),
     };
   } finally {
+    stopApproving();
     latch.release();
     await runtime.dispose();
   }

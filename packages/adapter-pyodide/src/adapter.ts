@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  capabilityBindingPolicy,
   type ErrorCode,
   type ExecutorAdapter,
   type ExecutorEvent,
@@ -460,6 +461,15 @@ export function createPyodideAdapter(
             let payload: unknown;
             if (message.op === 'capability') {
               const input = message.payload as CapabilityPayload;
+              if (input.tool === true) {
+                const policy = capabilityBindingPolicy(run.request.capabilities, input.name);
+                if (
+                  policy === undefined ||
+                  (policy.kind !== 'read' &&
+                    (policy.approval !== 'confirm' || !policy.confirmationAvailable))
+                )
+                  throw adapterFailure('invalid');
+              }
               payload = await run.request.capabilities.call(input.name, input.input, {
                 signal: run.request.signal,
                 ...(input.effectScope === undefined ? {} : { effectScope: input.effectScope }),
