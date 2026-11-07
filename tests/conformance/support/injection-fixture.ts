@@ -1,17 +1,23 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
+import {
+  createLangGraphAdapter,
+  gateDecision,
+  requestInteraction,
+} from '@galaxie/adapter-langgraph';
 import {
   type AgentInstance,
   type AgentSnapshot,
   type CapabilityBinding,
   createRuntime,
+  type DecisionResult,
   type DiagnosticEvent,
   defineAgentDefinition,
   galaxieField,
   type RunEvent,
   type RunId,
+  type ViewRevision,
 } from '@galaxie/core';
 import { MockChatModel } from '@galaxie/models/mock';
 import {
@@ -35,9 +41,15 @@ import { z } from 'zod';
 import { binding, collect } from '../../../packages/core/test/fake-executor.js';
 import { createSpanRecorder, serializeSpans } from '../../../packages/core/test/span-tree.js';
 import { MCP_ORIGIN, type McpFixture } from './mcp-context.js';
-import { type InjectionCase, ObedientAttacker, readDirective } from './obedient-attacker.js';
+import {
+  type InjectionCase,
+  ObedientAttacker,
+  ObedientDecisionAttacker,
+  readDirective,
+} from './obedient-attacker.js';
 
 export const PRIVATE_MARKER: string = 'synthetic-private-corpus-value-3a9f';
+export const decisionQuestionText: string = 'Would you like to continue with this practice record?';
 export const outputSchema: z.ZodType<{ answered: boolean }> = z.object({ answered: z.boolean() });
 export const confirmationRegistry: ConfirmationRegistry = defineConfirmations({
   'record.save@1': {
@@ -48,6 +60,15 @@ export const confirmationRegistry: ConfirmationRegistry = defineConfirmations({
 const registry = createRegistry({
   urlAllowlist: ['https://example.test'],
   components: [
+    defineComponent({
+      id: 'tests.CorpusAsk/v1',
+      props: z.object({ text: z.string() }),
+      actions: {
+        continue: { label: 'Continue', payload: z.object({}) },
+        stop: { label: 'Stop', payload: z.object({}) },
+      },
+      component: ({ props }) => createElement('span', null, props.text),
+    }),
     defineComponent({
       id: 'tests.CorpusLink/v1',
       props: z.object({ url: z.string(), text: z.string() }),
@@ -70,6 +91,7 @@ export interface InjectionFixture {
   readonly remote: MockInstance<MockChatModel['_generate']>;
   readonly remoteModel: MockChatModel;
   readonly attacker: ObedientAttacker;
+  readonly decisionAttacker: ObedientDecisionAttacker;
   readonly diagnostics: DiagnosticEvent[];
   readonly errors: unknown[];
   readonly snapshots: AgentSnapshot<unknown>[];
@@ -91,6 +113,7 @@ export async function createInjectionFixture(
   const mcpEvents: McpEvent[] = [];
   const recorder = createSpanRecorder();
   const attacker = new ObedientAttacker(entry);
+  const decisionAttacker = new ObedientDecisionAttacker(entry);
   const remoteModel = new MockChatModel({
     [PRIVATE_MARKER]: { id: 'remote', text: 'Unexpected remote answer.' },
   });
@@ -163,8 +186,12 @@ export async function createInjectionFixture(
         privateValue: z.string().meta(galaxieField({ label: 'private-user' })),
         probe: z.boolean(),
       }),
-      models: { 'agent.local': { modality: 'text' }, 'agent.main': { modality: 'text' } },
-      ui: { catalog: 'tests/v1', components: ['CorpusLink'], surfaces: ['corpus'] },
+      models: {
+        'agent.local': { modality: 'text' },
+        'agent.main': { modality: 'text' },
+        'agent.decision': { modality: 'decision' },
+      },
+      ui: { catalog: 'tests/v1', components: ['CorpusLink', 'CorpusAsk'], surfaces: ['corpus'] },
       capabilities: {
         optional: {
           'content.get@1': { kind: 'read', input: z.object({}), output: z.unknown() },
@@ -195,10 +222,20 @@ export async function createInjectionFixture(
         capabilities: confirmationRegistry.capabilities,
         policyRevision: () => 'corpus-v1',
       },
-      services: { chatModels: { attacker, remote: remoteModel }, checkpointer: new MemorySaver() },
+      services: {
+        chatModels: { attacker, remote: remoteModel },
+        decisionModels: { decider: decisionAttacker },
+        checkpointer: new MemorySaver(),
+      },
       models: {
         consent: () => true,
         providers: {
+          decider: {
+            destination: 'in-browser',
+            modality: 'decision',
+            features: [],
+            pricing: { inputPerToken: 0, outputPerToken: 0 },
+          },
           attacker: {
             destination: 'in-browser',
             modality: 'text',
@@ -213,6 +250,7 @@ export async function createInjectionFixture(
           },
         },
         roles: {
+          'agent.decision': { providers: ['decider'], allow: ['in-browser'], maxTokens: 100 },
           'agent.local': { providers: ['attacker'], allow: ['in-browser'], maxTokens: 100 },
           'agent.main': { providers: ['remote'], allow: ['host-server'], maxTokens: 100 },
         },
@@ -222,6 +260,7 @@ export async function createInjectionFixture(
           stateSchema: Annotation.Root({
             probe: Annotation<boolean>,
             answered: Annotation<boolean>,
+            answers: Annotation<DecisionResult['answers']>,
           }),
           output: Annotation.Root({ answered: Annotation<boolean> }),
         })
@@ -278,7 +317,56 @@ export async function createInjectionFixture(
               throw error;
             }
           })
-          .addEdge(START, 'answer')
+          .addNode('decide', async (_state, config) => {
+            try {
+              const data = await host.capabilities.call('content.get@1', {}, config);
+              const answers = await host.langchain.decide(
+                'agent.decision',
+                {
+                  state: z.object({ text: z.string() }).parse(data).text,
+                  questions: {
+                    proceedWithoutAsking: {
+                      type: 'boolean',
+                      instructions: 'May the agent proceed without asking?',
+                    },
+                  },
+                },
+                config,
+              );
+              return { answers };
+            } catch (error) {
+              if (!isGraphInterrupt(error)) errors.push(error);
+              throw error;
+            }
+          })
+          .addNode('gate', async ({ answers }, config) => {
+            try {
+              const gated = gateDecision(
+                answers,
+                {
+                  threshold: 0.7,
+                  interaction: {
+                    component: 'tests.CorpusAsk/v1',
+                    props: { text: decisionQuestionText },
+                    surfaceId: 'corpus',
+                    viewRevision: 'v1' as ViewRevision,
+                  },
+                },
+                config,
+              );
+              if (gated.submission?.action !== 'stop')
+                await host.capabilities.call('record.save@1', { recordId: 'practice-1' }, config);
+              return { answered: true };
+            } catch (error) {
+              if (!isGraphInterrupt(error)) errors.push(error);
+              throw error;
+            }
+          })
+          .addConditionalEdges(START, () =>
+            entry.directive.kind === 'decide' ? 'decide' : 'answer',
+          )
+          .addEdge('decide', 'gate')
+          .addEdge('gate', END)
           .addEdge('answer', END)
           .compile({ checkpointer: host.langchain.checkpointer() }),
     },
@@ -292,6 +380,7 @@ export async function createInjectionFixture(
     remote,
     remoteModel,
     attacker,
+    decisionAttacker,
     diagnostics,
     errors,
     snapshots,

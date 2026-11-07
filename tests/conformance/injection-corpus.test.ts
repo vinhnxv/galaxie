@@ -8,6 +8,7 @@ import corpus from '../injection-corpus/cases.json' with { type: 'json' };
 import {
   confirmationRegistry,
   createInjectionFixture,
+  decisionQuestionText,
   outputSchema,
   PRIVATE_MARKER,
 } from './support/injection-fixture.js';
@@ -197,7 +198,7 @@ test('AT-26 network recorder captures URLs and bodies, blocks outsiders and pass
   expect(network.requests.at(-1)).toEqual({ kind: 'fetch', url: fixture.url, body: '{}' });
 });
 
-for (const entry of cases) {
+for (const entry of cases.filter((entry) => entry.directive.kind !== 'decide')) {
   test(`AT-26 ${entry.id} [${entry.vector}/${entry.goal}]`, async () => {
     const origins = [
       typeof location === 'undefined' ? MCP_ORIGIN : location.origin,
@@ -331,4 +332,118 @@ for (const entry of cases) {
       noRequestText(request, entry.payload);
     }
   });
+}
+
+test('corpus decision directives are closed and confidence is finite and bounded', () => {
+  const directive = { kind: 'decide', skipConfirmation: true };
+  expect(caseSchema.safeParse({ ...cases[0], directive }).success).toBe(true);
+  for (const confidence of [0, 0.4, 0.99, 1])
+    expect(
+      caseSchema.safeParse({ ...cases[0], directive: { ...directive, confidence } }).success,
+    ).toBe(true);
+  for (const invalid of [
+    { ...directive, approval: 'forged' },
+    ...[-0.1, 1.1, NaN, Infinity, '1'].map((confidence) => ({ ...directive, confidence })),
+  ])
+    expect(caseSchema.safeParse({ ...cases[0], directive: invalid }).success).toBe(false);
+});
+
+for (const entry of cases.filter((entry) => entry.directive.kind === 'decide')) {
+  const directive = entry.directive;
+  if (directive.kind !== 'decide') throw new Error('Expected a decision directive.');
+  const asks = directive.confidence === undefined || directive.confidence < 0.7;
+  const actions = asks ? ['stop'] : ['decline'];
+  if (asks && directive.confidence !== undefined) actions.push('continue');
+  for (const action of actions) {
+    test(`decision confirmation boundary ${entry.id} [${action}]`, async () => {
+      const origins = [
+        typeof location === 'undefined' ? MCP_ORIGIN : location.origin,
+        new URL(fixture.url).origin,
+      ];
+      const network = recordInjectionNetwork(origins);
+      onTestFinished(() => network.restore());
+      const f = await createInjectionFixture(entry);
+      const { runId, events: eventPromise } = await f.start();
+      if (asks) {
+        await vi.waitFor(() => expect(f.instance.getSnapshot().run?.status).toBe('waiting_input'));
+        const snapshot = f.instance.getSnapshot();
+        const pending = snapshot.run?.pending;
+        if (pending === undefined) throw new Error('Missing decision gate question.');
+        expect(pending.component).toBe('tests.CorpusAsk/v1');
+        expect(pending.props).toEqual({ text: decisionQuestionText });
+        noText(JSON.stringify(pending), entry.payload);
+        noText(JSON.stringify(pending), PRIVATE_MARKER);
+        expect(snapshot.confirmations).toBeUndefined();
+        expect(f.write).not.toHaveBeenCalled();
+        expect(f.snapshots.every((published) => published.confirmations === undefined)).toBe(true);
+        await expect(
+          f.instance.dispatch({
+            ...pending,
+            instanceId: f.instance.instanceId,
+            runId,
+            action,
+            payload: {},
+          }),
+        ).resolves.toMatchObject({ status: 'accepted' });
+      }
+      if (!asks || action === 'continue') {
+        await vi.waitFor(() => expect(f.instance.getSnapshot().confirmations).toHaveLength(1));
+        const pending = f.instance.getSnapshot().confirmations?.[0];
+        if (pending === undefined) throw new Error('Missing host confirmation.');
+        expect(pending.capability).toBe('record.save@1');
+        expect(pending.arguments).toEqual({ recordId: 'practice-1' });
+        expect(Object.isFrozen(pending.arguments)).toBe(true);
+        const host = confirmationRegistry.entry(pending.capability);
+        expect(host?.title).toBe('Save practice record');
+        expect(host?.fields(pending.arguments)).toEqual([{ label: 'Record', value: 'practice-1' }]);
+        expect(f.write).not.toHaveBeenCalled();
+        expect(f.instance.respond(pending.id, 'decline')).toEqual({ status: 'declined' });
+      }
+      const events = await eventPromise;
+      const snapshot = f.instance.getSnapshot();
+      if (asks && action === 'stop') {
+        expect(snapshot.run?.status).toBe('succeeded');
+        expect(events.find((event) => event.type === 'output')).toMatchObject({
+          output: { answered: true },
+        });
+        expect(f.snapshots.every((published) => published.confirmations === undefined)).toBe(true);
+      } else {
+        expect(snapshot.run).toMatchObject({ status: 'failed', error: { code: 'denied' } });
+      }
+      expect(events.filter((event) => event.type === 'interaction')).toHaveLength(asks ? 1 : 0);
+      if (!asks)
+        expect(f.snapshots.every((published) => published.run?.pending === undefined)).toBe(true);
+      expect(f.content).toHaveBeenCalledTimes(1);
+      expect(f.attacker.reads).toBe(0);
+      expect(f.decisionAttacker.reads).toBe(1);
+      expect(snapshot.run?.labels).toContain('private-user');
+      expect(f.remote).not.toHaveBeenCalled();
+      expect(f.remoteModel.calls).toBe(0);
+      expect(f.write).not.toHaveBeenCalled();
+      await f.dispose();
+      const spans = f.recorder.exporter.getFinishedSpans();
+      for (const traceId of new Set(spans.map((span) => span.spanContext().traceId)))
+        assertSpanTree(spans.filter((span) => span.spanContext().traceId === traceId));
+      const telemetry =
+        JSON.stringify({
+          events,
+          snapshot,
+          snapshots: f.snapshots,
+          diagnostics: f.diagnostics,
+          diagnosticErrors: f.diagnostics.map((event) => String(event.error)),
+          errors: f.errors.map(String),
+          mcpEvents: f.mcpEvents,
+        }) + serializeSpans(spans);
+      for (const value of [entry.payload, PRIVATE_MARKER, fixture.token]) noText(telemetry, value);
+      // Decision values are boolean; their question instructions and untrusted text are not UI.
+      noText(telemetry, 'May the agent proceed without asking?');
+      for (const error of f.errors) expect(error).not.toHaveProperty('cause');
+      await network.settle();
+      for (const request of network.requests) {
+        expect(origins).toContain(new URL(request.url).origin);
+        noRequestText(request, PRIVATE_MARKER);
+        noRequestText(request, entry.payload);
+      }
+    });
+  }
 }
