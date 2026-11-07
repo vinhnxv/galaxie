@@ -6,8 +6,8 @@
       "gzip": 2300
     },
     "@galaxie/adapter-langgraph/.": {
-      "minified": 27700,
-      "gzip": 8100
+      "minified": 28400,
+      "gzip": 8300
     },
     "@galaxie/core/.": {
       "minified": 116700,
@@ -21,8 +21,12 @@
       "minified": 8400,
       "gzip": 2800
     },
+    "@galaxie/models/decision": {
+      "minified": 2600,
+      "gzip": 1200
+    },
     "@galaxie/models/mock": {
-      "minified": 4900,
+      "minified": 5000,
       "gzip": 2000
     },
     "@galaxie/models/openai": {

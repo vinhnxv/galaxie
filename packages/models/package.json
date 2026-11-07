@@ -42,6 +42,10 @@
       "types": "./dist/transformers/worker.d.ts",
       "default": "./dist/transformers/worker.js"
     },
+    "./decision": {
+      "types": "./dist/decision/structured.d.ts",
+      "default": "./dist/decision/structured.js"
+    },
     "./mock": {
       "types": "./dist/mock.d.ts",
       "default": "./dist/mock.js"

@@ -38,11 +38,14 @@ export interface DecisionAnswer {
 export interface DecisionResult {
   readonly answers: Readonly<Record<string, DecisionAnswer>>;
   readonly usage?: ModelUsage;
+  /** Unvalidated generated text for output checks and repair only; never publish or store. */
+  readonly raw?: string;
 }
 
 export interface DecisionModelOptions {
   readonly signal: AbortSignal;
   readonly maxTokens: number;
+  readonly repair?: { readonly attempt: number; readonly reply: string };
 }
 
 /** Framework-neutral inference; one call uses the route's existing lease and reservation. */

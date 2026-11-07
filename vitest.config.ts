@@ -94,6 +94,9 @@ const alias = {
     new URL('./packages/models/src/webllm/index.ts', import.meta.url),
   ),
   '@galaxie/models/mock': fileURLToPath(new URL('./packages/models/src/mock.ts', import.meta.url)),
+  '@galaxie/models/decision': fileURLToPath(
+    new URL('./packages/models/src/decision/structured.ts', import.meta.url),
+  ),
   '@galaxie/core/browser': fileURLToPath(
     new URL('./packages/core/src/browser.ts', import.meta.url),
   ),

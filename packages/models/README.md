@@ -91,10 +91,52 @@ network call or real-model accuracy is involved.
 
 Entries can instead contain `{ invalid: unknown }` for rejection fixtures or
 `{ error: Error }`. Any entry can add `wait: createMockLatch()` for a cancellable
-wait. `calls` counts dispatches; `recordedCalls` returns the request, signal and
-`maxTokens` in dispatch order. Requests may contain private data: these records
+wait. Replies and invalid entries may add `raw` for repair fixtures. `calls` counts
+dispatches; `recordedCalls` returns the request, signal, `maxTokens` and optional
+`repair` in dispatch order. Requests may contain private data: these records
 are test assertions, not telemetry. The host validates complete answers and
 applies output checks and settlement; the mock never retries a failed call.
+
+## Structured-output decisions
+
+`@galaxie/models/decision` exports `createStructuredDecisionModel(chat)`. It wraps
+an already available chat model that supports the `jsonSchema` call constraint,
+including WebLLM, Built-in AI, Transformers.js, OpenAI-compatible models and the
+scripted mock. One closed JSON Schema covers every boolean, choice and score
+question in one generation; multiple choices use unique arrays of enum keys.
+No additional model download or nested text lease is needed.
+
+The wrapper reports actual input and generated output tokens when the chat reply
+supplies valid usage; otherwise routing charges the reservation. It returns values
+only, never confidence or probabilities, even if generated text volunteers them.
+Every confidence gate over these answers therefore asks. The gate itself remains
+unimplemented. Core validates values and the adapter owns bounded repair.
+
+```ts
+import { createStructuredDecisionModel } from '@galaxie/models/decision';
+import { MockChatModel } from '@galaxie/models/mock';
+
+const request = {
+  state: 'Example message',
+  questions: { ask: { type: 'boolean' as const, instructions: 'Ask a follow-up?' } },
+};
+const prompt = `<state>\n${JSON.stringify(request.state)}\n</state>\n<questions>\n${JSON.stringify(request.questions)}\n</questions>`;
+const chat = new MockChatModel({
+  [prompt]: { id: 'decision', text: '{"ask":true}' },
+});
+const model = createStructuredDecisionModel(chat);
+const result = await model.decide(request, {
+  signal: new AbortController().signal, maxTokens: 64,
+});
+```
+
+For routed calls, register the wrapper in `services.decisionModels` under an
+explicit decision descriptor preserving the source model's destination, languages,
+pricing, credentials and readiness/download requirements. Use
+`host.langchain.decide(role, request, config)` so policy and accounting apply.
+The provider returns generated `raw` text only for output checks and repair;
+the adapter never publishes or stores it. A repair receives the previous raw
+reply and a fixed instruction, with no validator diagnostics.
 
 ## Transformers (ONNX models)
 

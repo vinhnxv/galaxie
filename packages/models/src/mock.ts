@@ -69,6 +69,7 @@ export type MockScript = Readonly<Record<string, MockScriptEntry | readonly Mock
 
 /** Structural decision contract: the models package has no dependency on core. */
 export interface MockDecisionReply {
+  readonly raw?: string;
   readonly answers: Readonly<
     Record<
       string,
@@ -86,7 +87,7 @@ export interface MockDecisionReply {
 
 export type MockDecisionScriptEntry = (
   | MockDecisionReply
-  | { readonly invalid: unknown }
+  | { readonly invalid: unknown; readonly raw?: string }
   | { readonly error: Error }
 ) & { readonly wait?: MockLatch };
 
@@ -94,6 +95,7 @@ export interface MockDecisionCall {
   readonly request: unknown;
   readonly signal: AbortSignal;
   readonly maxTokens: number;
+  readonly repair?: { readonly attempt: number; readonly reply: string };
 }
 
 /** Call-ordered fixtures only: no inference, validation, repair or network activity. */
@@ -115,7 +117,11 @@ export class MockDecisionModel {
 
   async decide(
     request: unknown,
-    options: { readonly signal: AbortSignal; readonly maxTokens: number },
+    options: {
+      readonly signal: AbortSignal;
+      readonly maxTokens: number;
+      readonly repair?: { readonly attempt: number; readonly reply: string };
+    },
   ): Promise<MockDecisionReply> {
     const entry = this.#script[this.#calls.length];
     this.#calls.push({ request, ...options });
@@ -125,9 +131,18 @@ export class MockDecisionModel {
     await entry.wait?.wait(options.signal);
     options.signal.throwIfAborted();
     if ('error' in entry) throw entry.error;
-    if ('invalid' in entry) return entry.invalid as MockDecisionReply;
-    const { answers, usage } = entry;
-    return { answers, ...(usage === undefined ? {} : { usage }) };
+    if ('invalid' in entry)
+      return (
+        entry.raw === undefined
+          ? entry.invalid
+          : { ...(entry.invalid as MockDecisionReply), raw: entry.raw }
+      ) as MockDecisionReply;
+    const { answers, usage, raw } = entry;
+    return {
+      answers,
+      ...(usage === undefined ? {} : { usage }),
+      ...(raw === undefined ? {} : { raw }),
+    };
   }
 }
 
