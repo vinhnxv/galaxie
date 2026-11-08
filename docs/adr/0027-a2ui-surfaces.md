@@ -1,8 +1,10 @@
 # ADR-0027: A2UI surfaces with host-owned catalogs and policy
 
-- **Status:** Proposed
+- **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-07
 - **Related:** brief §5.2, §9.2, §11, §12; ADR-0004, ADR-0007, ADR-0010, ADR-0012, ADR-0014
+- **Revisions:**
+  - 2026-11-08: accepted after the protocol package, core pending surfaces and the React renderer merged. The cost named under Consequences stays open: galaxie owns validation of a young specification, and a commit pin only limits drift, not the maintenance effort.
 
 ## Context
 

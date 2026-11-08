@@ -6,7 +6,7 @@ The Google ADK (JavaScript) executor adapter (executor id `adk-js`). It pins ADK
 browser bundle under galaxie's strict CSP and Trusted Types, and hosts agents through galaxie's
 router, broker and budgets, with checked streaming, pauses for confirmations and long-running
 tools, and durable sessions. See
-[ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md) (Proposed).
+[ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md) (Accepted).
 
 ## Adapter
 

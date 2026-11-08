@@ -1,6 +1,6 @@
 # ADR-0006: Model providers, destination classes and per-role routing
 
-- **Status:** Accepted (the in-browser engine to ship is chosen by Spike B, before M2)
+- **Status:** Accepted (the in-browser engine is WebLLM behind a thin galaxie adapter, approved by the maintainer on 2026-11-08 from Spike B)
 - **Date:** 2026-10-28
 - **Related:** brief §3, §10, §14.2, §16.2; ADR-0012, ADR-0014, ADR-0016
 - **Revisions:**
@@ -10,6 +10,12 @@
     - data labels layered on top;
     - spending limits on the host proxy.
   - 2026-10-28, with brief 0.3 (ADR-0016): Spike B runs before M2, judges engines on functional checks and records its numbers as demonstrations; onnxruntime-web with galaxie's own decoding loop joins the candidates; providers enforce a JSON Schema while decoding where they can; Built-in AI no longer needs a role eval.
+  - 2026-11-08, from the [Spike B report](../../spikes/b-local-inference/README.md#proposed-adr-0006-update) (the maintainer approved it):
+    - **WebLLM is the in-browser engine**, behind a thin galaxie adapter that calls the worker engine's OpenAI-style API directly. `ChatWebLLM` is not used: with a worker engine it needs an unsupported field overwrite and drops temperature, the schema and the abort signal, so it fails the condition in decision 3. WebLLM was the only engine that passed loads, streams, cancellation, worker execution and schema enforcement while decoding on the measured device. It enforces a JSON Schema through XGrammar.
+    - The adapter keeps conversation history per session and resets the engine before each request, because the engine's own reset check could not confirm its positive control.
+    - onnxruntime-web with galaxie's own decoding loop passed every check except schema coverage and stays the fallback. Transformers.js at the 4.3.1 pin did not qualify on that device. The Prompt API stays the Built-in AI provider (decision 2); it reported Vietnamese unavailable.
+    - Costs: models must be MLC-compiled, so the model list follows the MLC catalog; the WebGPU model library is fetched from a URL the adapter pins by commit; the evidence is one Mac and one Chrome version, and numbers are demonstrations, not rankings, because each arm ran a different model except the Qwen pair.
+    - [ADR-0021](0021-in-browser-onnx-chat-provider.md) (Proposed) later adds an ONNX chat provider next to WebLLM. This ADR's choice of one engine for the MVP is unchanged by it.
 
 ## Context
 

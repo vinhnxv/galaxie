@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-28
 - **Related:** brief §5, §16; ADR-0006, ADR-0011, ADR-0016, ADR-0017
-- **Revisions:** 2026-10-28, with brief 0.3: trace spans and the parity conformance suite join the MVP (ADR-0016); the published CLI stays cut; adapters for other frameworks are cut (ADR-0017); the executor worker row states the MVP exception from ADR-0003. 2026-11-07: [ADR-0027](0027-a2ui-surfaces.md) proposes to supersede the registry-format decision and lift the A2UI deferral; this ADR's status is unchanged until ADR-0027 is accepted.
+- **Revisions:** 2026-10-28, with brief 0.3: trace spans and the parity conformance suite join the MVP (ADR-0016); the published CLI stays cut; adapters for other frameworks are cut (ADR-0017); the executor worker row states the MVP exception from ADR-0003. 2026-11-07: [ADR-0027](0027-a2ui-surfaces.md) proposes to supersede the registry-format decision and lift the A2UI deferral; this ADR's status is unchanged until ADR-0027 is accepted. 2026-11-08: ADR-0027 is accepted, so the A2UI renderer deferral is lifted for the one A2UI v1.0 surface format that ADR describes; every other cut in this ADR stands.
 
 ## Context
 

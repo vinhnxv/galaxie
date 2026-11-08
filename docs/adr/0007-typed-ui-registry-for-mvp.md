@@ -7,6 +7,7 @@
   - 2026-10-28, with brief 0.3: Spike C runs before M2 instead of in M0.
   - 2026-10-29: recorded Spike C browser evidence; status remains Proposed.
   - 2026-11-07: [ADR-0027](0027-a2ui-surfaces.md) proposes to supersede the registry-format decision and lift the A2UI deferral; this ADR's status is unchanged until ADR-0027 is accepted.
+  - 2026-11-08: ADR-0027 is accepted, so it supersedes this ADR's registry-format decision. The headless reference components and the existing single-component input stay, as the compatibility input that ADR-0027 names.
 
 ## Context
 

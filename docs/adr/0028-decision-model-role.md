@@ -1,8 +1,10 @@
 # ADR-0028: Decision model roles through the model router
 
-- **Status:** Proposed
+- **Status:** Accepted (maintainer decision, 2026-11-08), for the request and answer contract, the structured-output provider and the confidence gate. No dedicated decision model is chosen or recommended.
 - **Date:** 2026-11-07
 - **Related:** brief §3.3, §9.4, §9.7, §10.3–§10.6, §18; ADR-0006, ADR-0012, ADR-0014, ADR-0016, ADR-0017, ADR-0021
+- **Revisions:**
+  - 2026-11-08: accepted after the modality, mock, structured-output provider and gate merged. Everything below about dedicated models stays a proposal: the measurement spike has only run with a mock, and real-model confidence is unmeasured.
 
 ## Context
 
