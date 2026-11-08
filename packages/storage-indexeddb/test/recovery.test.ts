@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { RecoveryStore } from '../../core/src/recovery.js';
-import { IndexedDBSaver, StorageError } from '../src/index.js';
+import { IndexedDBSaver, StorageError, type StorageErrorCode } from '../src/index.js';
 import { openDatabase, requestResult, transact } from '../src/schema.js';
 
 const inputDigest = 'a'.repeat(64);
@@ -20,9 +20,15 @@ async function open(
   databaseName = `galaxie-recovery-${crypto.randomUUID()}`,
   appId = 'app',
   principalScope = 'user',
+  onError?: (code: StorageErrorCode) => void,
 ): Promise<IndexedDBSaver> {
   if (!databases.includes(databaseName)) databases.push(databaseName);
-  const saver = await IndexedDBSaver.open({ databaseName, appId, principalScope });
+  const saver = await IndexedDBSaver.open({
+    databaseName,
+    appId,
+    principalScope,
+    ...(onError === undefined ? {} : { onError }),
+  });
   savers.push(saver);
   return saver;
 }
@@ -72,6 +78,7 @@ describe.skipIf(typeof indexedDB === 'undefined')('IndexedDB recovery', () => {
     { v: 1, value: { agentId: 'a', agentVersion: '1', executorId: 'python', extra: true } },
     { v: 1, value: { agentId: 'a', agentVersion: '1', executorId: '' } },
     { v: 1, value: { agentId: 'a', agentVersion: '1', executorId: 1 } },
+    { v: 1, value: { agentId: 'a', agentVersion: '1', formatVersion: 1 } },
     { v: 99, value: { agentId: 'tests/agent', executorId: 'langgraph-js', agentVersion: '1.0.0' } },
     { v: 1, value: { agentId: 'tests/agent', executorId: 'langgraph-js', agentVersion: 1 } },
   ])('refuses corrupt session envelopes without replacing them: %#', async (record) => {
@@ -130,6 +137,219 @@ describe.skipIf(typeof indexedDB === 'undefined')('IndexedDB recovery', () => {
     expect(db.version).toBe(1);
     db.close();
   });
+
+  test('reads unstamped recovery records without rewriting them', async () => {
+    const name = `galaxie-unstamped-${crypto.randomUUID()}`;
+    const saver = await open(name);
+    const db = await openDatabase(name, 'app', 'user');
+    const identity = { agentId: 'tests/agent', agentVersion: '1', executorId: 'langgraph-js' };
+    const entries = [
+      { interactionId: 'accepted', action: 'submit', payload: true, status: 'accepted' },
+      { interactionId: 'consumed', action: 'submit', payload: null, status: 'consumed' },
+    ];
+    const effects = [
+      { status: 'planned', inputDigest },
+      { status: 'dispatched', inputDigest },
+      { status: 'succeeded', inputDigest, output: { receipt: true } },
+      { status: 'failed', inputDigest },
+      { status: 'outcome_unknown', inputDigest },
+    ];
+    try {
+      await transact(db, ['meta', 'inbox', 'journal'], 'readwrite', async (tx) => {
+        await requestResult(
+          tx.objectStore('meta').put(
+            { v: 1, value: identity },
+            ['app', 'user', 'session', 'session'],
+          ),
+        );
+        for (const entry of entries)
+          await requestResult(
+            tx
+              .objectStore('inbox')
+              .put({ v: 1, value: entry }, ['app', 'user', 'session', entry.interactionId]),
+          );
+        for (const record of effects)
+          await requestResult(
+            tx
+              .objectStore('journal')
+              .put({ v: 1, value: record }, ['app', 'user', 'session', record.status]),
+          );
+      });
+      expect(await saver.recovery.session('session')).toStrictEqual(identity);
+      expect(await saver.recovery.submissions('session')).toStrictEqual(entries);
+      for (const record of effects)
+        expect(await saver.recovery.effect('session', record.status)).toStrictEqual(record);
+      await transact(db, ['meta', 'inbox', 'journal'], 'readonly', async (tx) => {
+        expect(
+          await requestResult(tx.objectStore('meta').get(['app', 'user', 'session', 'session'])),
+        ).toStrictEqual({ v: 1, value: identity });
+        for (const entry of entries)
+          expect(
+            await requestResult(
+              tx.objectStore('inbox').get(['app', 'user', 'session', entry.interactionId]),
+            ),
+          ).toStrictEqual({ v: 1, value: entry });
+        for (const record of effects)
+          expect(
+            await requestResult(
+              tx.objectStore('journal').get(['app', 'user', 'session', record.status]),
+            ),
+          ).toStrictEqual({ v: 1, value: record });
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  test('persists format stamps on identities, submissions and all effect statuses', async () => {
+    const saver = await open();
+    const identity = {
+      formatVersion: 1,
+      agentId: 'tests/agent',
+      agentVersion: '1',
+      executorId: 'langgraph-js',
+    };
+    expect(await saver.recovery.recordSession('session', identity)).toEqual(identity);
+    expect(await saver.recovery.session('session')).toEqual(identity);
+    const entry = { ...answer, formatVersion: 1 };
+    expect(await saver.recovery.acceptSubmission('session', entry)).toBe('accepted');
+    expect(await saver.recovery.submissions('session')).toEqual([{ ...entry, status: 'accepted' }]);
+    for (const status of [
+      'planned',
+      'dispatched',
+      'succeeded',
+      'failed',
+      'outcome_unknown',
+    ] as const) {
+      const record =
+        status === 'succeeded'
+          ? { formatVersion: 1, status, inputDigest, output: { receipt: true } }
+          : { formatVersion: 1, status, inputDigest };
+      await saver.recovery.recordEffect('session', status, record);
+      expect(await saver.recovery.effect('session', status)).toEqual(record);
+    }
+  });
+
+  test.each([false, true])('preserves the submission stamp when consuming: %s', async (stamped) => {
+    const name = `galaxie-consume-stamp-${crypto.randomUUID()}`;
+    const saver = await open(name);
+    const db = await openDatabase(name, 'app', 'user');
+    const key = ['app', 'user', 'session', 'question'];
+    const entry = {
+      interactionId: 'question',
+      action: 'submit',
+      payload: { answer: true },
+      status: 'accepted',
+      ...(stamped ? { formatVersion: 1 } : {}),
+    };
+    try {
+      await transact(db, ['inbox'], 'readwrite', (tx) =>
+        requestResult(tx.objectStore('inbox').put({ v: 1, value: entry }, key)),
+      );
+      await saver.recovery.consumeSubmission('session', 'question');
+      await saver.recovery.consumeSubmission('session', 'question');
+      expect(await saver.recovery.submissions('session')).toStrictEqual([
+        { ...entry, status: 'consumed' },
+      ]);
+      expect(
+        await transact(db, ['inbox'], 'readonly', (tx) =>
+          requestResult(tx.objectStore('inbox').get(key)),
+        ),
+      ).toStrictEqual({ v: 1, value: { ...entry, status: 'consumed' } });
+    } finally {
+      db.close();
+    }
+  });
+
+  test.each([
+    { formatVersion: 2, code: 'newer_record' },
+    { formatVersion: 999, code: 'newer_record' },
+    { formatVersion: 0, code: 'corrupt' },
+    { formatVersion: -1, code: 'corrupt' },
+    { formatVersion: 1.5, code: 'corrupt' },
+    { formatVersion: '1', code: 'corrupt' },
+    { formatVersion: null, code: 'corrupt' },
+    { formatVersion: true, code: 'corrupt' },
+  ] as const)(
+    'refuses unsupported record versions without replacing stored data: %#',
+    async ({ formatVersion, code }) => {
+      const name = `galaxie-record-version-${crypto.randomUUID()}`;
+      const onError = vi.fn();
+      const saver = await open(name, 'app', 'user', onError);
+      const db = await openDatabase(name, 'app', 'user');
+      const identity = { agentId: 'tests/agent', agentVersion: '1', executorId: 'langgraph-js' };
+      const session = { v: 1, value: { ...identity, formatVersion } };
+      const entry = {
+        v: 1,
+        value: {
+          interactionId: 'question',
+          action: 'submit',
+          payload: 'private answer',
+          status: 'accepted',
+          formatVersion,
+        },
+      };
+      const planned = { v: 1, value: { status: 'planned', inputDigest, formatVersion } };
+      const succeeded = {
+        v: 1,
+        value: { status: 'succeeded', inputDigest, output: 'private receipt', formatVersion },
+      };
+      try {
+        await transact(db, ['meta', 'inbox', 'journal'], 'readwrite', async (tx) => {
+          await requestResult(
+            tx.objectStore('meta').put(session, ['app', 'user', 'session', 'session']),
+          );
+          await requestResult(
+            tx.objectStore('inbox').put(entry, ['app', 'user', 'session', 'question']),
+          );
+          await requestResult(
+            tx.objectStore('journal').put(planned, ['app', 'user', 'session', 'planned']),
+          );
+          await requestResult(
+            tx.objectStore('journal').put(succeeded, ['app', 'user', 'session', 'succeeded']),
+          );
+        });
+        const operations = [
+          () => saver.recovery.session('session'),
+          () => saver.recovery.recordSession('session', identity),
+          () => saver.recovery.submissions('session'),
+          () => saver.recovery.acceptSubmission('session', answer),
+          () => saver.recovery.consumeSubmission('session', 'question'),
+          () => saver.recovery.effect('session', 'planned'),
+          () => saver.recovery.effect('session', 'succeeded'),
+          () =>
+            saver.recovery.recordEffect('session', 'planned', { status: 'planned', inputDigest }),
+          () =>
+            saver.recovery.recordEffect('session', 'succeeded', { status: 'planned', inputDigest }),
+        ];
+        for (const operation of operations)
+          await expect(operation()).rejects.toEqual(new StorageError(code));
+        expect(onError.mock.calls).toEqual(operations.map(() => [code]));
+        await transact(db, ['meta', 'inbox', 'journal'], 'readonly', async (tx) => {
+          expect(
+            await requestResult(tx.objectStore('meta').get(['app', 'user', 'session', 'session'])),
+          ).toEqual(session);
+          expect(
+            await requestResult(
+              tx.objectStore('inbox').get(['app', 'user', 'session', 'question']),
+            ),
+          ).toEqual(entry);
+          expect(
+            await requestResult(
+              tx.objectStore('journal').get(['app', 'user', 'session', 'planned']),
+            ),
+          ).toEqual(planned);
+          expect(
+            await requestResult(
+              tx.objectStore('journal').get(['app', 'user', 'session', 'succeeded']),
+            ),
+          ).toEqual(succeeded);
+        });
+      } finally {
+        db.close();
+      }
+    },
+  );
 
   test('accepts once across connections and keeps consumed entries as duplicate receipts', async () => {
     const name = `galaxie-recovery-atomic-${crypto.randomUUID()}`;

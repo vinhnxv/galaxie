@@ -7,8 +7,8 @@ import {
   type SerializerProtocol,
 } from '@langchain/langgraph-checkpoint';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { IndexedDBSaver } from '../src/index.js';
-import { requestResult } from '../src/schema.js';
+import { IndexedDBSaver, StorageError } from '../src/index.js';
+import { openDatabase, requestResult, transact } from '../src/schema.js';
 
 const savers: IndexedDBSaver[] = [];
 const databases = new Set<string>();
@@ -96,6 +96,117 @@ afterEach(async () => {
 });
 
 describe.skipIf(typeof indexedDB === 'undefined')('session export', () => {
+  test('exports identical metadata for stamped and unstamped recovery records', async () => {
+    const name = `galaxie-export-stamps-${crypto.randomUUID()}`;
+    const saver = await open(name);
+    const db = await openDatabase(name, 'app', 'user');
+    try {
+      await transact(db, ['meta', 'inbox', 'journal'], 'readwrite', async (tx) => {
+        for (const stamped of [false, true]) {
+          const sessionId = stamped ? 'stamped' : 'unstamped';
+          const stamp = stamped ? { formatVersion: 1 } : {};
+          await requestResult(
+            tx.objectStore('meta').put(
+              { v: 1, value: { ...identity, ...stamp } },
+              ['app', 'user', 'session', sessionId],
+            ),
+          );
+          for (const status of ['accepted', 'consumed'])
+            await requestResult(
+              tx.objectStore('inbox').put(
+                {
+                  v: 1,
+                  value: {
+                    interactionId: status,
+                    action: 'submit',
+                    payload: sentence,
+                    status,
+                    ...stamp,
+                  },
+                },
+                ['app', 'user', sessionId, status],
+              ),
+            );
+          await requestResult(
+            tx.objectStore('journal').put(
+              {
+                v: 1,
+                value: {
+                  status: 'succeeded',
+                  inputDigest: 'a'.repeat(64),
+                  output: sentence,
+                  ...stamp,
+                },
+              },
+              ['app', 'user', sessionId, 'receipt'],
+            ),
+          );
+        }
+      });
+      const unstamped = await saver.exportSession('unstamped');
+      const stamped = await saver.exportSession('stamped');
+      expect(stamped.format).toBe('galaxie.session-export/1');
+      expect(stamped.metadata).toEqual(unstamped.metadata);
+      expect(stamped.metadata.agent).toEqual(identity);
+      expect(Object.keys(stamped.metadata.agent ?? {}).sort()).toEqual([
+        'agentId',
+        'agentVersion',
+        'executorId',
+      ]);
+      expect(Object.isFrozen(stamped.metadata.agent)).toBe(true);
+      expect(JSON.stringify(stamped)).not.toContain('formatVersion');
+    } finally {
+      db.close();
+    }
+  });
+
+  test.each(['meta', 'inbox', 'journal'] as const)(
+    'refuses exports containing a newer recovery record in %s',
+    async (store) => {
+      const name = `galaxie-export-newer-${crypto.randomUUID()}`;
+      const saver = await open(name);
+      const db = await openDatabase(name, 'app', 'user');
+      const records = {
+        meta: {
+          key: ['app', 'user', 'session', 'session'],
+          value: { ...identity, formatVersion: 2 },
+        },
+        inbox: {
+          key: ['app', 'user', 'session', 'question'],
+          value: {
+            interactionId: 'question',
+            action: 'submit',
+            payload: sentence,
+            status: 'accepted',
+            formatVersion: 2,
+          },
+        },
+        journal: {
+          key: ['app', 'user', 'session', 'receipt'],
+          value: {
+            status: 'succeeded',
+            inputDigest: 'a'.repeat(64),
+            output: sentence,
+            formatVersion: 2,
+          },
+        },
+      };
+      try {
+        await transact(db, [store], 'readwrite', (tx) =>
+          requestResult(
+            tx.objectStore(store).put({ v: 1, value: records[store].value }, records[store].key),
+          ),
+        );
+        for (const personalContent of [false, true])
+          await expect(saver.exportSession('session', { personalContent })).rejects.toEqual(
+            new StorageError('newer_record'),
+          );
+      } finally {
+        db.close();
+      }
+    },
+  );
+
   test('defaults to frozen content-free metadata, with recovery status counts only', async () => {
     const saver = await open();
     await save(saver);
