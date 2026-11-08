@@ -42,14 +42,11 @@ The [hosted RAG demo](../examples/rag-browser/README.md#hosted-demo-build) is a 
 
 The `test-browser-engines` CI job runs the Vitest browser project on Playwright 1.64.1 Firefox and WebKit builds on `ubuntu-24.04`. It runs the `general` group: every browser case except the Pyodide and Go WebAssembly groups, so those Worker and WebAssembly paths have no Firefox or WebKit evidence yet. The cases use scripted models, a fake `LanguageModel` and loopback fixtures, with no GPU and no model weights. Chromium in `test-general` stays the engine that gates a change; the engine job fails only on a case that is not in [the known-failure list](../tests/browser-engines-known-failures.json). No CSP or Trusted Types setting is relaxed for these runs.
 
-This is mock-model evidence from Playwright's builds, not device evidence. Playwright's WebKit is not Safari, and its Firefox is not a release build. Each run reports every case in the CI log; the cases that do not pass on either engine are:
+This is mock-model evidence from Playwright's builds, not device evidence. Playwright's WebKit is not Safari, and its Firefox is not a release build. Each run reports every case in the CI log, and no case of the group is a known failure now.
 
-| Case | Firefox | WebKit | Note |
-| --- | --- | --- | --- |
-| `openai-provider`: a routed OpenAI-compatible loopback model completes a capability tool loop (invoke and stream) | fails | fails | The run ends with an error event instead of the output. Chromium passes. The cause is not diagnosed. |
-| `openai-provider`: AT-24 a CORS-allowed loopback user-device model endpoint succeeds (invoke and stream) | fails | fails | The call returns an empty answer instead of the loopback reply. Chromium passes. The cause is not diagnosed. |
+Two OpenAI-compatible loopback cases (a routed capability tool loop and the CORS-allowed user-device endpoint, each in invoke and stream form) failed on both engines until the test fixture's preflight answer allowed the `User-Agent` request header that the OpenAI client sets. The preflight succeeded but the browser then sent no request, so the call returned an empty answer or an unreachable error. The cause was in the fixture, not in the provider or the page policy. A WebKit run listed `user-agent` among the preflight headers; Chromium passed with the old fixture. A real endpoint must allow the same headers ([host guide](guides/host-integration.md)).
 
-All other cases of the group pass on both engines, apart from four skipped cases. A WebKit run on a developer Mac also failed three more cases (two education accessibility cases and one HTTP integration timeout case) that passed on Linux, so the Linux CI run is the record.
+Every case of the group passes on both engines, apart from four skipped cases. A WebKit run on a developer Mac also failed three more cases (two education accessibility cases and one HTTP integration timeout case) that passed on Linux, so the Linux CI run is the record.
 
 ## Real-device demonstrations
 

@@ -461,6 +461,11 @@ router permission, live-label permission and consent.
 records Chrome's Local Network Access prompt from Chrome 142 for public-site
 requests to loopback/LAN addresses. The endpoint also needs CORS for the exact
 app origin; set `OLLAMA_ORIGINS` to that origin, never `*`, when using Ollama.
+The preflight also lists the request headers the client sends, and the endpoint
+must allow each one: `Authorization`, `Content-Type`, `User-Agent` and the
+OpenAI client's `x-stainless-*` headers (a WebKit run listed all of them). A
+preflight that refuses one header stops the request before it is sent and the
+provider reports the generic unreachable error.
 LAN permission does not replace the provider's URL validation or backend auth.
 No real user endpoint or LNA prompt was exercised by this slice; the provider
 maps status-less connection/CORS failures to fixed `unavailable/network` errors,
