@@ -10,17 +10,35 @@ import { GO_EXECUTOR_ID } from './protocol.js';
 import { fragmentsOf } from './tool-calls.js';
 
 export const MAX_DELTA_LENGTH = 4096;
+const MAX_QUEUED_EVENTS = 256;
 
 export interface StreamSink {
   readonly events: ExecutorEvent[];
   wake?: () => void;
+  room?: { readonly promise: Promise<void>; readonly resolve: () => void };
   position: number;
   cancelled: boolean;
 }
 
-function push(sink: StreamSink, mode: 'messages' | 'updates', data: unknown): void {
-  if (sink.cancelled) return;
-  sink.events.push({ type: 'stream', executor: GO_EXECUTOR_ID, path: [], mode, data });
+/** Releases any producer waiting for room when the run ends. */
+export function closeStream(sink: StreamSink): void {
+  sink.cancelled = true;
+  sink.room?.resolve();
+}
+
+async function push(
+  sink: StreamSink,
+  mode: 'messages' | 'updates',
+  data: () => unknown,
+): Promise<void> {
+  while (!sink.cancelled && sink.events.length >= MAX_QUEUED_EVENTS) {
+    const room = sink.room ?? Promise.withResolvers<void>();
+    sink.room = room;
+    await room.promise;
+    if (sink.room === room) delete sink.room;
+  }
+  if (sink.cancelled) throw adapterFailure('cancelled');
+  sink.events.push({ type: 'stream', executor: GO_EXECUTOR_ID, path: [], mode, data: data() });
   sink.wake?.();
 }
 
@@ -29,17 +47,25 @@ export function emitMarker(
   sink: StreamSink,
   step: 'tool_call' | 'tool_result',
   tool: string,
-): void {
-  push(sink, 'updates', { step, tool, index: sink.position++ });
+): Promise<void> {
+  return push(sink, 'updates', () => ({ step, tool, index: sink.position++ }));
 }
 
 /** The marker for a run that stops to wait for the user; it names no tool and holds no content. */
 export function emitPaused(sink: StreamSink): void {
-  push(sink, 'updates', { step: 'paused', index: sink.position++ });
+  if (sink.cancelled) return;
+  sink.events.push({
+    type: 'stream',
+    executor: GO_EXECUTOR_ID,
+    path: [],
+    mode: 'updates',
+    data: { step: 'paused', index: sink.position++ },
+  });
+  sink.wake?.();
 }
 
-export function emitDelta(sink: StreamSink, author: string, text: string): void {
-  push(sink, 'messages', { author, text });
+export function emitDelta(sink: StreamSink, author: string, text: string): Promise<void> {
+  return push(sink, 'messages', () => ({ author, text }));
 }
 
 const isHigh = (code: number): boolean => code >= 0xd800 && code <= 0xdbff;

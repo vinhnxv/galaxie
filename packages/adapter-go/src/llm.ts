@@ -169,7 +169,8 @@ async function streamReply(
       throw adapterFailure('unsupported');
     await lease.checkOutput(growingText(joiner.append(chunk)), { final: false });
     if (aborted(run)) throw adapterFailure('cancelled');
-    for (const piece of splitter.feed(chunk.content)) emitDelta(run, author, piece);
+    for (const piece of splitter.feed(chunk.content)) await emitDelta(run, author, piece);
+    if (aborted(run)) throw adapterFailure('cancelled');
   }
   return joiner.finish();
 }
@@ -273,7 +274,9 @@ export async function serveModel(
       ...(usage === undefined ? {} : { usage }),
     };
     const encoded = encodeReply(result);
-    if (run.streaming) for (const item of calls) emitMarker(run, 'tool_call', item.function.name);
+    if (run.streaming)
+      for (const item of calls) await emitMarker(run, 'tool_call', item.function.name);
+    if (aborted(run)) throw adapterFailure('cancelled');
     finish(
       run,
       call,
@@ -297,6 +300,7 @@ export async function serveCapability(run: ActiveRun, text: string): Promise<str
   });
   if (aborted(run)) throw adapterFailure('cancelled');
   const encoded = encodeReply(result === undefined ? null : result);
-  if (run.streaming) emitMarker(run, 'tool_result', input.name);
+  if (run.streaming) await emitMarker(run, 'tool_result', input.name);
+  if (aborted(run)) throw adapterFailure('cancelled');
   return encoded;
 }
