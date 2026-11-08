@@ -28,6 +28,7 @@ import { containsPrivateEncoded, registerPrivate } from './private-values.js';
 import {
   copyRecoveryJson,
   type EffectRecord,
+  RECOVERY_FORMAT_VERSION,
   type RecoveryJson,
   type RecoveryStore,
   validateEffectRecord,
@@ -172,6 +173,7 @@ class WriteJournal {
   }
 
   #write(record: EffectRecord, tolerateFailure: boolean): Promise<void> {
+    const stamped = { ...record, formatVersion: RECOVERY_FORMAT_VERSION };
     const next = this.#tail.then(async () => {
       if (this.#record?.status === 'succeeded') return;
       if (
@@ -184,8 +186,8 @@ class WriteJournal {
       if (record.status === 'succeeded') this.#successStarted = true;
       if (record.status === 'dispatched') this.#dispatched = true;
       try {
-        await this.#store.recordEffect(this.#sessionId, this.effectId, record);
-        this.#record = record;
+        await this.#store.recordEffect(this.#sessionId, this.effectId, stamped);
+        this.#record = stamped;
       } catch (error) {
         this.#storeFailed = true;
         this.#reportFailure();
