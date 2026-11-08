@@ -110,17 +110,20 @@ async function seed(
       );
       if (submission !== undefined)
         await requestResult(
-          tx.objectStore('inbox').put(
-            { v: 1, value: submission },
-            [appId, principalScope, sessionId, submission.interactionId],
-          ),
+          tx
+            .objectStore('inbox')
+            .put({ v: 1, value: submission }, [
+              appId,
+              principalScope,
+              sessionId,
+              submission.interactionId,
+            ]),
         );
       if (receipt !== undefined)
         await requestResult(
-          tx.objectStore('journal').put(
-            { v: 1, value: receipt.record },
-            [appId, principalScope, sessionId, receipt.id],
-          ),
+          tx
+            .objectStore('journal')
+            .put({ v: 1, value: receipt.record }, [appId, principalScope, sessionId, receipt.id]),
         );
     });
   } finally {
@@ -354,40 +357,37 @@ for (const kind of ['memory', 'indexeddb'] as const) {
         expect(current.writes).toHaveLength(1);
       });
 
-      test(
-        'refuses a newer session without changing checkpoints or invoking the host',
-        async () => {
-          const store = await storage(kind);
-          const first = await fixture(store);
-          await paused(first);
-          await first.runtime.dispose();
-          const sessionId = first.instance.sessionId;
-          await seed(store, sessionId, { ...identity, formatVersion: 2 });
-          const reopened = await reopen(store);
-          const before = await checkpoints(reopened.saver, sessionId);
-          expect(before.length).toBeGreaterThan(0);
-          const saved = await records(reopened);
-          const restored = await fixture(reopened, sessionId);
-          const error: unknown = await restored.instance.restore().catch((error: unknown) => error);
-          expect(error).toMatchObject({ code: 'unrecoverable' });
-          if (reopened.kind === 'memory') {
-            expect(error).toMatchObject({
-              message: 'The saved session uses an unsupported recovery format.',
-            });
-          } else {
-            await expect(reopened.recovery.session(sessionId)).rejects.toMatchObject({
-              code: 'newer_record',
-              message: 'The recovery record format is newer than this package supports.',
-              unrecoverable: true,
-            });
-          }
-          expect(restored.instance.getSnapshot().run).toBeUndefined();
-          expect(first.writes).toHaveLength(0);
-          expect(restored.writes).toHaveLength(0);
-          expect(await checkpoints(reopened.saver, sessionId)).toEqual(before);
-          expect(await records(reopened)).toEqual(saved);
-        },
-      );
+      test('refuses a newer session without changing checkpoints or invoking the host', async () => {
+        const store = await storage(kind);
+        const first = await fixture(store);
+        await paused(first);
+        await first.runtime.dispose();
+        const sessionId = first.instance.sessionId;
+        await seed(store, sessionId, { ...identity, formatVersion: 2 });
+        const reopened = await reopen(store);
+        const before = await checkpoints(reopened.saver, sessionId);
+        expect(before.length).toBeGreaterThan(0);
+        const saved = await records(reopened);
+        const restored = await fixture(reopened, sessionId);
+        const error: unknown = await restored.instance.restore().catch((error: unknown) => error);
+        expect(error).toMatchObject({ code: 'unrecoverable' });
+        if (reopened.kind === 'memory') {
+          expect(error).toMatchObject({
+            message: 'The saved session uses an unsupported recovery format.',
+          });
+        } else {
+          await expect(reopened.recovery.session(sessionId)).rejects.toMatchObject({
+            code: 'newer_record',
+            message: 'The recovery record format is newer than this package supports.',
+            unrecoverable: true,
+          });
+        }
+        expect(restored.instance.getSnapshot().run).toBeUndefined();
+        expect(first.writes).toHaveLength(0);
+        expect(restored.writes).toHaveLength(0);
+        expect(await checkpoints(reopened.saver, sessionId)).toEqual(before);
+        expect(await records(reopened)).toEqual(saved);
+      });
     },
   );
 }
