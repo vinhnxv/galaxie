@@ -16,6 +16,11 @@ TypeScript 7 and 6, Node and Chromium tests, Python and Go tests, Python type
 checking, builds, dependency boundaries and documentation links. Run it before
 opening a pull request. `pnpm format` applies formatting and safe fixes.
 
+The Pyodide tests load the galaxie Python wheel from the git-ignored
+`.cache/python-wheels/`. CI rebuilds it; on your machine run
+`node scripts/build-python-wheels.ts` after you change `python/galaxie` or pull
+such a change. `pnpm check` stops early when that wheel is older than its source.
+
 ## Language and source headers
 
 Everything committed is English: code, comments, docs, commit messages, issues
