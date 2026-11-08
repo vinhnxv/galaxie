@@ -105,9 +105,17 @@ export async function loadGoWasm(
       redirect: 'error',
     });
     if (!response.ok) throw new Error('unavailable');
-    // A declared length that disagrees with the reviewed one is refused before the body is read.
+    // An uncompressed response whose declared length disagrees with the reviewed one is refused
+    // before the body is read. A compressed response declares its encoded length, so it is checked
+    // by the decoded length and the digest below.
     const declared = response.headers.get('content-length');
-    if (declared !== null && declared !== String(reference.bytes)) throw new Error('unavailable');
+    const encoded = response.headers.get('content-encoding');
+    if (
+      declared !== null &&
+      (encoded === null || encoded === 'identity') &&
+      declared !== String(reference.bytes)
+    )
+      throw new Error('unavailable');
     bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength !== reference.bytes) throw new Error('unavailable');
     if (hex(await environment.digest(bytes)) !== reference.sha256) throw new Error('unavailable');

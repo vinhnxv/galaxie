@@ -30,7 +30,12 @@ interface Harness {
 /** A fake runtime; `ready` decides whether the program reports ready after it starts. */
 function harness(
   bytes: Uint8Array = module,
-  options: { ready?: boolean; status?: number; contentLength?: number } = {},
+  options: {
+    ready?: boolean;
+    status?: number;
+    contentLength?: number;
+    contentEncoding?: string;
+  } = {},
 ): Harness {
   const log: string[] = [];
   const scope: Record<string, unknown> = {
@@ -43,7 +48,14 @@ function harness(
       status: options.status ?? 200,
       ...(options.contentLength === undefined
         ? {}
-        : { headers: { 'content-length': String(options.contentLength) } }),
+        : {
+            headers: {
+              'content-length': String(options.contentLength),
+              ...(options.contentEncoding === undefined
+                ? {}
+                : { 'content-encoding': options.contentEncoding }),
+            },
+          }),
     });
   });
   const compile = vi.fn(async () => {
@@ -96,6 +108,13 @@ test('a verified module is compiled once, after the egress stubs are in place', 
     expect(() => (test_.environment.scope[name] as () => void)(), name).toThrow(TypeError);
   }
   expect(loaded.egressAttempts()).toBe(egressSurfaces.length);
+});
+
+test('a compressed response is verified by its decoded length and digest', async () => {
+  // A compressed response declares the encoded length, which differs from the reviewed one.
+  const test_ = harness(module, { contentLength: module.byteLength - 4, contentEncoding: 'gzip' });
+  await loadGoWasm(reference, test_.environment);
+  expect(test_.compile).toHaveBeenCalledTimes(1);
 });
 
 test('Go standard output and error are discarded', async () => {
