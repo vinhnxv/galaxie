@@ -9,6 +9,7 @@ import {
   type CapabilityContext,
   createRuntime,
   type DiagnosticEvent,
+  type EffectRecord,
   galaxieField,
   type InteractionId,
   isGalaxieError,
@@ -19,6 +20,7 @@ import {
   toErrorInfo,
   type ViewRevision,
 } from '../src/index.js';
+import { validateEffectRecord } from '../src/recovery.js';
 import { binding, collect, deferred, definition, FakeExecutor, flush } from './fake-executor.js';
 import { MemoryRecoveryStore } from './support/memory-recovery-store.js';
 
@@ -223,6 +225,7 @@ test('a succeeded write receipt survives a crash before the resume checkpoint', 
   await gotResult.promise;
   expect([...store.journal.values()]).toEqual([
     {
+      formatVersion: 1,
       status: 'succeeded',
       inputDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
       output: { receipt: 'stored receipt' },
@@ -564,6 +567,179 @@ test('malformed stored journal records fail unrecoverable without invoking', asy
   expect(invoke).not.toHaveBeenCalled();
   expect(store.journal.size).toBe(0);
 });
+
+function legacyStore(): MemoryRecoveryStore {
+  const store = new MemoryRecoveryStore();
+  store.sessions.set(sessionId, {
+    agentId: 'tests/agent',
+    agentVersion: '1.0.0',
+    executorId: 'fake',
+  });
+  store.inbox.set(JSON.stringify([sessionId, 'journal-answer']), {
+    interactionId: 'journal-answer',
+    action: 'submit',
+    payload: { answer: 'private learner answer' },
+    status: 'accepted',
+  });
+  store.inbox.set(JSON.stringify([sessionId, 'previous-answer']), {
+    interactionId: 'previous-answer',
+    action: 'submit',
+    payload: { answer: 'previous private answer' },
+    status: 'consumed',
+  });
+  const inputDigest = 'de5f2cbf4c10a0d146f2a671aac363e8640fefc469ad42ac25364f19e4bc194f';
+  for (const record of [
+    { status: 'planned', inputDigest },
+    { status: 'dispatched', inputDigest },
+    { status: 'failed', inputDigest },
+    { status: 'outcome_unknown', inputDigest },
+  ] as const) {
+    store.journal.set(JSON.stringify([sessionId, record.status]), record);
+  }
+  store.journal.set(JSON.stringify([sessionId, 'dcf563fc-4b26-5536-89ac-8dd2a1673e89']), {
+    status: 'succeeded',
+    inputDigest,
+    output: { receipt: 'literal saved receipt' },
+  });
+  return store;
+}
+
+test.each([false, true])(
+  'literal legacy sessions restore and replay receipts without rewriting them (stamped receipts: %s)',
+  async (stamped) => {
+    const store = legacyStore();
+    if (stamped) {
+      for (const [key, record] of store.journal) {
+        store.journal.set(key, { ...record, formatVersion: 1 });
+      }
+    }
+    for (const record of store.journal.values())
+      expect(validateEffectRecord(record)).toEqual(record);
+    const before = JSON.stringify([[...store.sessions], [...store.journal]]);
+    const previous = structuredClone(
+      store.inbox.get(JSON.stringify([sessionId, 'previous-answer'])),
+    );
+    const invoke = vi.fn();
+    const fixture = await resume(store, invoke);
+    await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('succeeded'));
+    expect(fixture.executor.requests[0]?.command).toEqual({
+      type: 'resume',
+      interactionId: 'journal-answer',
+      action: 'submit',
+      payload: { answer: 'private learner answer' },
+    });
+    const runId = fixture.instance.getSnapshot().run?.runId;
+    if (runId === undefined) throw new Error('Expected the restored run.');
+    expect(await collect(fixture.instance.events(runId))).toContainEqual(
+      expect.objectContaining({ type: 'output', output: { receipt: 'literal saved receipt' } }),
+    );
+    expect(invoke).not.toHaveBeenCalled();
+    expect(JSON.stringify([[...store.sessions], [...store.journal]])).toBe(before);
+    expect(await store.submissions(sessionId)).toEqual([
+      {
+        interactionId: 'journal-answer',
+        action: 'submit',
+        payload: { answer: 'private learner answer' },
+        status: 'consumed',
+      },
+      previous,
+    ]);
+  },
+);
+
+test.each([2, 0, -1, 1.5, '1', null, true])(
+  'effect format %s fails closed without replay, invocation or journal writes',
+  async (formatVersion) => {
+    const statuses = ['planned', 'dispatched', 'succeeded', 'failed', 'outcome_unknown'] as const;
+    for (const status of statuses) {
+      const store = legacyStore();
+      const key = JSON.stringify([sessionId, 'dcf563fc-4b26-5536-89ac-8dd2a1673e89']);
+      store.journal.set(key, {
+        status,
+        inputDigest: 'de5f2cbf4c10a0d146f2a671aac363e8640fefc469ad42ac25364f19e4bc194f',
+        ...(status === 'succeeded' ? { output: { receipt: 'private stored receipt' } } : {}),
+        formatVersion,
+      } as never);
+      const before = JSON.stringify([...store.journal]);
+      const write = vi.spyOn(store, 'recordEffect');
+      const invoke = vi.fn();
+      const fixture = await resume(store, invoke);
+      await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('failed'));
+      expect(fixture.errors[0]).toMatchObject({
+        code: 'unrecoverable',
+        message: 'Stored state cannot be recovered.',
+      });
+      expect(fixture.errors[0]).not.toHaveProperty('cause');
+      expect(invoke).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+      expect(JSON.stringify([...store.journal])).toBe(before);
+      expect(JSON.stringify(fixture.diagnostics)).not.toContain('private stored');
+      expect(JSON.stringify(fixture.instance.getSnapshot())).not.toContain('private stored');
+      await fixture.runtime.dispose();
+    }
+  },
+);
+
+test('a store-thrown unrecoverable marker retains the unavailable journal mapping', async () => {
+  const store = legacyStore();
+  const before = JSON.stringify([...store.journal]);
+  store.effect = async () => {
+    throw Object.assign(new Error('private storage failure'), { unrecoverable: true });
+  };
+  const write = vi.spyOn(store, 'recordEffect');
+  const invoke = vi.fn();
+  const fixture = await resume(store, invoke);
+  await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('failed'));
+  expect(fixture.errors[0]).toMatchObject({
+    code: 'unavailable',
+    message: 'The requested service is unavailable.',
+  });
+  expect(fixture.errors[0]).not.toHaveProperty('cause');
+  expect(invoke).not.toHaveBeenCalled();
+  expect(write).not.toHaveBeenCalled();
+  expect(JSON.stringify([...store.journal])).toBe(before);
+  expect(JSON.stringify(fixture.diagnostics)).not.toContain('private storage failure');
+});
+
+test.each(['succeeded', 'failed', 'outcome_unknown'] as const)(
+  'every journal transition through %s is stamped',
+  async (terminal) => {
+    const store = await acceptedStore();
+    const records: EffectRecord[] = [];
+    const planned = deferred<void>();
+    const release = deferred<void>();
+    const write = store.recordEffect.bind(store);
+    store.recordEffect = async (...args) => {
+      await write(...args);
+      records.push(structuredClone(args[2]));
+      if (terminal === 'failed' && args[2].status === 'planned') {
+        planned.resolve();
+        await release.promise;
+      }
+    };
+    const invoke = vi.fn(async () => {
+      if (terminal === 'outcome_unknown') throw new Error('private host failure');
+      return { receipt: 'new receipt' };
+    });
+    const fixture = await resume(store, invoke);
+    if (terminal === 'failed') {
+      await planned.promise;
+      const runId = fixture.instance.getSnapshot().run?.runId;
+      if (runId === undefined) throw new Error('Expected the restored run.');
+      await fixture.instance.cancel(runId);
+      release.resolve();
+    }
+    await vi.waitFor(() => expect(records.at(-1)?.status).toBe(terminal));
+    expect(records.map(({ status }) => status)).toEqual(
+      terminal === 'failed' ? ['planned', 'failed'] : ['planned', 'dispatched', terminal],
+    );
+    expect(records.every((record) => Object.hasOwn(record, 'formatVersion'))).toBe(true);
+    expect(records).toEqual(records.map((record) => ({ ...record, formatVersion: 1 })));
+    expect(await store.effect(sessionId, 'dcf563fc-4b26-5536-89ac-8dd2a1673e89' as never)).toEqual(
+      records.at(-1),
+    );
+  },
+);
 
 test.each(['read', 'planned', 'dispatched', 'succeeded'] as const)(
   'maps a fenced journal %s failure with no cause or host text',

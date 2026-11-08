@@ -8,6 +8,8 @@ import { touchSession } from './retention.js';
 import { requestResult, storageOperation, transact } from './schema.js';
 import type { SessionExport } from './session-export.js';
 
+const RECOVERY_FORMAT_VERSION = 1;
+
 export type RecoveryValue =
   | null
   | boolean
@@ -17,12 +19,14 @@ export type RecoveryValue =
   | { [key: string]: RecoveryValue };
 
 export interface StoredSession {
+  readonly formatVersion?: number;
   readonly agentId: string;
   readonly agentVersion: string;
   readonly executorId: string;
 }
 
 export interface StoredSubmission {
+  readonly formatVersion?: number;
   readonly interactionId: string;
   readonly action: string;
   readonly payload: RecoveryValue;
@@ -31,10 +35,16 @@ export interface StoredSubmission {
 
 export type StoredEffect =
   | {
+      readonly formatVersion?: number;
       readonly status: 'planned' | 'dispatched' | 'failed' | 'outcome_unknown';
       readonly inputDigest: string;
     }
-  | { readonly status: 'succeeded'; readonly inputDigest: string; readonly output: RecoveryValue };
+  | {
+      readonly formatVersion?: number;
+      readonly status: 'succeeded';
+      readonly inputDigest: string;
+      readonly output: RecoveryValue;
+    };
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -80,6 +90,17 @@ function envelope(value: unknown): unknown {
   return value['value'];
 }
 
+function versionCheckedKeys(record: Record<string, unknown>): string[] {
+  if (Object.hasOwn(record, 'formatVersion')) {
+    const version = record['formatVersion'];
+    if (typeof version !== 'number' || !Number.isInteger(version))
+      throw new StorageError('corrupt');
+    if (version > RECOVERY_FORMAT_VERSION) throw new StorageError('newer_record');
+    if (version !== RECOVERY_FORMAT_VERSION) throw new StorageError('corrupt');
+  }
+  return Object.keys(record).filter((key) => key !== 'formatVersion');
+}
+
 function sessionRecord(value: unknown, legacy = false): StoredSession {
   const copy = copyJson(value);
   if (
@@ -92,7 +113,7 @@ function sessionRecord(value: unknown, legacy = false): StoredSession {
     return sessionRecord({ ...copy, executorId: 'langgraph-js' });
   if (
     !object(copy) ||
-    Object.keys(copy).length !== 3 ||
+    versionCheckedKeys(copy).length !== 3 ||
     typeof copy['agentId'] !== 'string' ||
     copy['agentId'].length === 0 ||
     typeof copy['agentVersion'] !== 'string' ||
@@ -107,7 +128,7 @@ function sessionRecord(value: unknown, legacy = false): StoredSession {
 function submission(value: unknown, interactionId: string): StoredSubmission {
   if (
     !object(value) ||
-    Object.keys(value).length !== 4 ||
+    versionCheckedKeys(value).length !== 4 ||
     value['interactionId'] !== interactionId ||
     typeof value['action'] !== 'string' ||
     value['action'].length === 0 ||
@@ -119,13 +140,14 @@ function submission(value: unknown, interactionId: string): StoredSubmission {
 }
 
 function effect(value: unknown): StoredEffect {
+  if (!object(value)) throw new StorageError('corrupt');
+  const keys = versionCheckedKeys(value);
   if (
-    !object(value) ||
     typeof value['inputDigest'] !== 'string' ||
     !/^[0-9a-f]{64}$/.test(value['inputDigest']) ||
     (value['status'] === 'succeeded'
-      ? Object.keys(value).length !== 3 || !('output' in value)
-      : Object.keys(value).length !== 2 ||
+      ? keys.length !== 3 || !('output' in value)
+      : keys.length !== 2 ||
         !['planned', 'dispatched', 'failed', 'outcome_unknown'].includes(value['status'] as string))
   )
     throw new StorageError('corrupt');
@@ -140,7 +162,15 @@ export async function readSessionSummary(
   const stored: unknown = await requestResult(
     tx.objectStore('meta').get([...scope, 'session', sessionId]),
   );
-  const agent = stored === undefined ? null : Object.freeze(sessionRecord(envelope(stored), true));
+  const identity = stored === undefined ? null : sessionRecord(envelope(stored), true);
+  const agent =
+    identity === null
+      ? null
+      : Object.freeze({
+          agentId: identity.agentId,
+          agentVersion: identity.agentVersion,
+          executorId: identity.executorId,
+        });
   const submissions = { count: 0, accepted: 0, consumed: 0 };
   const effects = {
     count: 0,

@@ -4,6 +4,14 @@
 import { GalaxieError, toErrorInfo } from './errors.js';
 import type { EffectId, InteractionId, SessionId } from './ids.js';
 
+export const RECOVERY_FORMAT_VERSION = 1;
+
+export class UnsupportedRecoveryFormatError extends GalaxieError {
+  constructor() {
+    super('unrecoverable', 'The saved session uses an unsupported recovery format.');
+  }
+}
+
 /** Structured-clone-safe JSON; recovery data stays on the principal's device. */
 export type RecoveryJson =
   | null
@@ -15,6 +23,7 @@ export type RecoveryJson =
 
 /** The agent code that created a durable session. Returned identifiers are plain strings. */
 export interface RecoverySession {
+  readonly formatVersion?: number;
   readonly agentId: string;
   readonly agentVersion: string;
   readonly executorId: string;
@@ -22,6 +31,7 @@ export interface RecoverySession {
 
 /** An answer and its durable receipt. Returned identifiers deliberately carry no core brand. */
 export interface RecoverySubmission {
+  readonly formatVersion?: number;
   readonly interactionId: string;
   readonly action: string;
   readonly payload: RecoveryJson;
@@ -35,10 +45,16 @@ export interface RecoverySubmission {
  */
 export type EffectRecord =
   | {
+      readonly formatVersion?: number;
       readonly status: 'planned' | 'dispatched' | 'failed' | 'outcome_unknown';
       readonly inputDigest: string;
     }
-  | { readonly status: 'succeeded'; readonly inputDigest: string; readonly output: RecoveryJson };
+  | {
+      readonly formatVersion?: number;
+      readonly status: 'succeeded';
+      readonly inputDigest: string;
+      readonly output: RecoveryJson;
+    };
 
 /**
  * Host-provided durable recovery, scoped to the same app and principal as the checkpointer.
@@ -48,6 +64,7 @@ export type EffectRecord =
  * Pass through CreateOptions.recovery. Without it, the inbox stays in memory and effect IDs are
  * random, with no journal. Returned IDs are plain strings; core validates and brands records,
  * rejecting malformed data as unrecoverable. Implementations must preserve succeeded receipts.
+ * Persist and return formatVersion unchanged on every record; absence means version 1.
  * Use one tab and one active owner/instance per session until epoch fencing ships; journal
  * serialization is per call. This port supplies no retention or logout deletion.
  */
@@ -60,12 +77,16 @@ export interface RecoveryStore {
   acceptSubmission(
     sessionId: SessionId,
     entry: {
+      readonly formatVersion?: number;
       readonly interactionId: InteractionId;
       readonly action: string;
       readonly payload: RecoveryJson;
     },
   ): Promise<'accepted' | 'duplicate'>;
-  /** Mark consumed only after a checkpoint-confirmed output or new interaction, or reconciliation. */
+  /**
+   * Mark consumed only after a checkpoint-confirmed output or new interaction, or reconciliation.
+   * Preserve the stored formatVersion, including its absence.
+   */
   consumeSubmission(sessionId: SessionId, interactionId: InteractionId): Promise<void>;
   /** Return accepted answers and consumed receipts for reconciliation before run publication. */
   submissions(sessionId: SessionId): Promise<readonly RecoverySubmission[]>;
@@ -77,6 +98,16 @@ export interface RecoveryStore {
 
 function corrupt(): never {
   throw new GalaxieError('unrecoverable', toErrorInfo('unrecoverable').message);
+}
+
+function versionCheckedKeys(record: { [key: string]: RecoveryJson }): string[] {
+  if (Object.hasOwn(record, 'formatVersion')) {
+    const version = record['formatVersion'];
+    if (typeof version !== 'number' || !Number.isInteger(version)) return corrupt();
+    if (version > RECOVERY_FORMAT_VERSION) throw new UnsupportedRecoveryFormatError();
+    if (version !== RECOVERY_FORMAT_VERSION) return corrupt();
+  }
+  return Object.keys(record).filter((key) => key !== 'formatVersion');
 }
 
 function json(value: unknown, ancestors: Set<object>): value is RecoveryJson {
@@ -121,7 +152,7 @@ export function validateSession(value: unknown): RecoverySession | undefined {
     copy === null ||
     Array.isArray(copy) ||
     typeof copy !== 'object' ||
-    Object.keys(copy).length !== 3 ||
+    versionCheckedKeys(copy).length !== 3 ||
     typeof copy['agentId'] !== 'string' ||
     copy['agentId'].length === 0 ||
     typeof copy['agentVersion'] !== 'string' ||
@@ -144,7 +175,7 @@ export function validateSubmissions(
       entry === null ||
       Array.isArray(entry) ||
       typeof entry !== 'object' ||
-      Object.keys(entry).length !== 4 ||
+      versionCheckedKeys(entry).length !== 4 ||
       typeof entry['interactionId'] !== 'string' ||
       entry['interactionId'].length === 0 ||
       typeof entry['action'] !== 'string' ||
@@ -162,23 +193,15 @@ export function validateSubmissions(
 export function validateEffectRecord(value: unknown): EffectRecord | undefined {
   if (value === undefined) return undefined;
   const copy = copyRecoveryJson(value);
-  if (
-    copy === null ||
-    Array.isArray(copy) ||
-    typeof copy !== 'object' ||
-    typeof copy['inputDigest'] !== 'string' ||
-    !/^[0-9a-f]{64}$/.test(copy['inputDigest'])
-  )
+  if (copy === null || Array.isArray(copy) || typeof copy !== 'object') return corrupt();
+  const keys = versionCheckedKeys(copy);
+  if (typeof copy['inputDigest'] !== 'string' || !/^[0-9a-f]{64}$/.test(copy['inputDigest']))
     return corrupt();
-  if (
-    copy['status'] === 'succeeded' &&
-    Object.keys(copy).length === 3 &&
-    Object.hasOwn(copy, 'output')
-  )
+  if (copy['status'] === 'succeeded' && keys.length === 3 && Object.hasOwn(copy, 'output'))
     return copy as unknown as EffectRecord;
   if (
     ['planned', 'dispatched', 'failed', 'outcome_unknown'].includes(copy['status'] as string) &&
-    Object.keys(copy).length === 2
+    keys.length === 2
   )
     return copy as unknown as EffectRecord;
   return corrupt();

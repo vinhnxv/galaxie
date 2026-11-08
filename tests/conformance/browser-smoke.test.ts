@@ -10,9 +10,10 @@ import {
 import { expect, test } from 'vitest';
 
 test('loads the web graph and tracing SDK without Node polyfills', async ({ task }) => {
-  if (task.file.projectName === 'browser (chromium)') {
+  if (task.file.projectName?.startsWith('browser')) {
     expect(typeof window).toBe('object');
-    expect(navigator.userAgent).toContain('HeadlessChrome/');
+    if (task.file.projectName === 'browser (chromium)')
+      expect(navigator.userAgent).toContain('HeadlessChrome/');
   } else {
     expect(task.file.projectName).toBe('node');
     expect(typeof window).toBe('undefined');

@@ -1,7 +1,8 @@
 # Unsupported features and unverified paths
 
-Revised on 2026-11-07 for the model output limit, ONNX record, A2UI, HTTP write
-retry and ADK recipe entries; the other entries were last checked against the
+Revised on 2026-11-08 for the first npm release (recovery data entry) and on
+2026-11-07 for the model output limit, ONNX record, A2UI, HTTP write retry and
+ADK recipe entries; the other entries were last checked against the
 implementation on 2026-10-31. The [MVP exit record](mvp-exit-record.md) maps acceptance requirements to existing
 evidence, with the maintainer's Go decision (2026-10-30) recorded and its open items still open.
 
@@ -72,7 +73,7 @@ evidence, with the maintainer's Go decision (2026-10-30) recorded and its open i
 ## Storage and recovery
 
 - There is no unknown-outcome reconciliation API: an unknown `retry: 'none'` write remains blocked on restore, and the host must reconcile with its backend by effect ID before starting a potentially repeating operation. For an `httpCapability` declared `retry: 'idempotency-key'`, the effect ID is sent as the `Idempotency-Key` header, so a backend that deduplicates on it makes a repeat safe; galaxie does not guarantee the backend does, and the evidence is injected-fetch and loopback only ([effect recovery](system-design.md#83-a-capability-call)).
-- Recovery data is not migrated across builds. Write receipts recorded before task-scoped effect IDs are keyed by run segment, and a newer build cannot find them, so resuming such a session on a newer build can repeat a write, including a `retry: 'none'` write. No package has been released yet. Hosts must resume a session with the build that created it, or Start over and reconcile with the backend by effect ID before upgrading ([recovery contract](system-design.md#82-reload-and-crash-recovery)).
+- Recovery data is not migrated across builds. Session, submission and effect records carry `formatVersion` (current value `1`); records without it, including the 0.1.0 shape, read as version 1. A newer version fails closed with a clear error (`newer_record` from IndexedDB, mapped to `unrecoverable` on restore). The stamp cannot distinguish unstamped receipts keyed by run segment from task-scoped ones. Write receipts recorded before task-scoped effect IDs are keyed by run segment, and a newer build cannot find them, so resuming such a session on a newer build can repeat a write, including a `retry: 'none'` write. No migration exists. Hosts must resume with the build that created it, or Start over and reconcile with the backend by effect ID before upgrading. A 0.1.0 build reads stamped records as corrupt because it enforces strict key counts, so hosts must not roll back across this change while sessions are pending. A host that talks to the IndexedDB saver directly must not offer "Start over" for a `newer_record` failure; retain the data and resume with a build that supports its format. `restore()` reports a newer IndexedDB record as the same generic `unrecoverable` error as a corrupt one, so a host that only sees the restore error cannot tell them apart yet, and the host-local example offers Start over for both ([recovery contract](system-design.md#82-reload-and-crash-recovery)).
 - Reload recovery cannot finish an arbitrary intermediate checkpoint with no pending interrupt or replay later writes from that point ([recovery limits](system-design.md#82-reload-and-crash-recovery)).
 - The checkpoint saver's `exportSession` supplies content-free metadata by default and personal checkpoint content only with exact `personalContent: true`, which hosts must bind to an explicit user action. Host-local wires a metadata-summary download and a host-confirmed personal-content download; host-remote has no export UI. Export is lossy and supplies no import, sync, cross-device recovery or durable runtime-event history ([export semantics](../packages/storage-indexeddb/README.md#explicit-session-export), [scope](galaxie-project-brief.md#52-outside-the-mvp)).
 - IndexedDB storage is not encrypted by the package and browser persistence is not permanence, so eviction can return a fresh start ([storage limits](../packages/storage-indexeddb/AGENTS.md#limits)).
@@ -109,7 +110,7 @@ The loan's displayed decision comes only from its pending confirmation or finali
 
 ## Platforms and evidence
 
-- Firefox, Safari, mobile devices, other GPUs and other OS/device combinations have no real-device evidence in the published matrix ([untested configurations](device-matrix.md#untested-or-unmeasured)).
+- Firefox, Safari, mobile devices, other GPUs and other OS/device combinations have no real-device evidence in the published matrix ([untested configurations](device-matrix.md#untested-or-unmeasured)). Firefox and WebKit have mock-model CI runs only, and two loopback model cases fail on both ([results](device-matrix.md#mock-model-runs-on-firefox-and-webkit)).
 - Real inference evidence is limited to the recorded Apple M5 Pro/Chrome 155 demonstrations, while automated Node and Chromium tests use fake models and engines ([device matrix](device-matrix.md)).
 - Real worker-network capture, first downloads, latency distributions, main-thread long tasks, memory and the listed recovery/device measurements remain unmeasured ([MVP open items](mvp-exit-record.md#open-items-for-the-maintainers-decision)).
 - The external developer trials and the pre-release legal review have no completed result in these records; they remain open items under the maintainer's Go decision of 2026-10-30 ([MVP open items](mvp-exit-record.md#open-items-for-the-maintainers-decision)).

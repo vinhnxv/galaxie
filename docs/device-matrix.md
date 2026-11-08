@@ -38,6 +38,19 @@ The [ADK recipe example](../examples/adk-recipes/README.md) adds scripted Node a
 
 The [hosted RAG demo](../examples/rag-browser/README.md#hosted-demo-build) is a mock-only build artifact and carries no device or model measurements.
 
+## Mock-model runs on Firefox and WebKit
+
+The `test-browser-engines` CI job runs the Vitest browser project on Playwright 1.64.1 Firefox and WebKit builds on `ubuntu-24.04`. It runs the `general` group: every browser case except the Pyodide and Go WebAssembly groups, so those Worker and WebAssembly paths have no Firefox or WebKit evidence yet. The cases use scripted models, a fake `LanguageModel` and loopback fixtures, with no GPU and no model weights. Chromium in `test-general` stays the engine that gates a change; the engine job fails only on a case that is not in [the known-failure list](../tests/browser-engines-known-failures.json). No CSP or Trusted Types setting is relaxed for these runs.
+
+This is mock-model evidence from Playwright's builds, not device evidence. Playwright's WebKit is not Safari, and its Firefox is not a release build. Each run reports every case in the CI log; the cases that do not pass on either engine are:
+
+| Case | Firefox | WebKit | Note |
+| --- | --- | --- | --- |
+| `openai-provider`: a routed OpenAI-compatible loopback model completes a capability tool loop (invoke and stream) | fails | fails | The run ends with an error event instead of the output. Chromium passes. The cause is not diagnosed. |
+| `openai-provider`: AT-24 a CORS-allowed loopback user-device model endpoint succeeds (invoke and stream) | fails | fails | The call returns an empty answer instead of the loopback reply. Chromium passes. The cause is not diagnosed. |
+
+All other cases of the group pass on both engines, apart from four skipped cases. A WebKit run on a developer Mac also failed three more cases (two education accessibility cases and one HTTP integration timeout case) that passed on Linux, so the Linux CI run is the record.
+
 ## Real-device demonstrations
 
 | Device and browser | Date and record | What was real | Limits |
@@ -54,7 +67,8 @@ recorded slice, rather than overriding the current
 ## Untested or unmeasured
 
 - Other browsers, Firefox, Safari, mobile devices, other GPUs and other operating
-  system/device combinations have no real-device evidence in these records.
+  system/device combinations have no real-device evidence in these records. Firefox
+  and WebKit have [mock-model runs](#mock-model-runs-on-firefox-and-webkit) only.
 - M2 did not measure first-download size/time, time to first token, p50/p95,
   main-thread long tasks or memory. Worker network capture and browser-owned
   download traffic remain gaps in the real local-only demonstration.

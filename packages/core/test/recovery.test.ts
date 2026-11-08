@@ -16,7 +16,12 @@ import {
   type UserInteractionEvent,
   type ViewRevision,
 } from '../src/index.js';
-import { copyRecoveryJson, validateEffectRecord, validateSubmissions } from '../src/recovery.js';
+import {
+  copyRecoveryJson,
+  validateEffectRecord,
+  validateSession,
+  validateSubmissions,
+} from '../src/recovery.js';
 import {
   binding,
   deferred,
@@ -89,6 +94,7 @@ test('dispatch waits for durable acceptance before returning or resuming', async
   const sessionId = fixture.executor.requests[0]?.sessionId as SessionId;
   expect(await store.submissions(sessionId)).toEqual([
     {
+      formatVersion: 1,
       interactionId: interaction.interactionId,
       action: 'submit',
       payload: fixture.event.payload,
@@ -377,6 +383,196 @@ async function restoreFixture(
   await instance.prepare();
   return { runtime, instance, executor, diagnostics };
 }
+
+test('start and dispatch stamp session and accepted and consumed submission records', async () => {
+  const store = new MemoryRecoveryStore();
+  const gate = deferred<void>();
+  const fixture = await waiting(store, [
+    { wait: gate.promise },
+    { type: 'output', output: 'done' },
+  ]);
+  try {
+    expect(await store.session(fixture.instance.sessionId)).toEqual({
+      formatVersion: 1,
+      agentId: definition.id,
+      agentVersion: definition.version,
+      executorId: 'fake',
+    });
+    expect(await fixture.instance.dispatch(fixture.event)).toMatchObject({ status: 'accepted' });
+    expect(await store.submissions(fixture.instance.sessionId)).toEqual([
+      {
+        formatVersion: 1,
+        interactionId: interaction.interactionId,
+        action: 'submit',
+        payload: fixture.event.payload,
+        status: 'accepted',
+      },
+    ]);
+    gate.resolve();
+    await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('succeeded'));
+    expect((await store.submissions(fixture.instance.sessionId))[0]).toMatchObject({
+      formatVersion: 1,
+      status: 'consumed',
+    });
+  } finally {
+    gate.resolve();
+    await fixture.runtime.dispose();
+  }
+});
+
+test.each([2, 0, -1, 1.5, '1', null, true])(
+  'restore refuses session format %s before reading checkpoints or reconciling',
+  async (formatVersion) => {
+    const store = new MemoryRecoveryStore();
+    const sessionId = crypto.randomUUID() as SessionId;
+    store.sessions.set(sessionId, {
+      agentId: 'private stored agent',
+      agentVersion: 'private stored version',
+      executorId: 'fake',
+      formatVersion,
+    } as never);
+    store.inbox.set(JSON.stringify([sessionId, 'resolved']), {
+      interactionId: 'resolved',
+      action: 'submit',
+      payload: 'private stored answer',
+      status: 'accepted',
+    });
+    const fixture = await restoreFixture(store, sessionId);
+    const before = JSON.stringify([[...store.sessions], [...store.inbox], [...store.journal]]);
+    const pending = vi.spyOn(fixture.executor.agent, 'pending');
+    const submissions = vi.spyOn(store, 'submissions');
+    const consume = vi.spyOn(store, 'consumeSubmission');
+    const published = vi.fn();
+    fixture.instance.subscribe(published);
+    try {
+      const error = await fixture.instance.restore().catch((error: unknown) => error);
+      expect(error).toMatchObject({
+        code: 'unrecoverable',
+        message:
+          formatVersion === 2
+            ? 'The saved session uses an unsupported recovery format.'
+            : 'Stored state cannot be recovered.',
+      });
+      expect(error).not.toHaveProperty('cause');
+      expect(pending).not.toHaveBeenCalled();
+      expect(submissions).not.toHaveBeenCalled();
+      expect(consume).not.toHaveBeenCalled();
+      expect(published).not.toHaveBeenCalled();
+      expect(fixture.instance.getSnapshot().run).toBeUndefined();
+      expect(JSON.stringify([[...store.sessions], [...store.inbox], [...store.journal]])).toBe(
+        before,
+      );
+      const diagnostic = fixture.diagnostics.find((event) => event.kind === 'restore_failed');
+      expect(diagnostic).toMatchObject({ error });
+      if (formatVersion === 2) expect(diagnostic?.error).toBe(error);
+      expect(JSON.stringify(fixture.diagnostics)).not.toContain('private stored');
+    } finally {
+      await fixture.runtime.dispose();
+    }
+  },
+);
+
+test.each([2, 0, -1, 1.5, '1', null, true])(
+  'restore refuses submission format %s without consuming any answers',
+  async (formatVersion) => {
+    const store = new MemoryRecoveryStore();
+    const sessionId = crypto.randomUUID() as SessionId;
+    for (const interactionId of ['resolved', interaction.interactionId]) {
+      store.inbox.set(JSON.stringify([sessionId, interactionId]), {
+        interactionId,
+        action: 'submit',
+        payload: 'private stored answer',
+        status: 'accepted',
+        ...(interactionId === interaction.interactionId ? { formatVersion } : {}),
+      } as never);
+    }
+    const fixture = await restoreFixture(store, sessionId);
+    const before = JSON.stringify([...store.inbox]);
+    const consume = vi.spyOn(store, 'consumeSubmission');
+    try {
+      const error = await fixture.instance.restore().catch((error: unknown) => error);
+      expect(error).toMatchObject({
+        code: 'unrecoverable',
+        message:
+          formatVersion === 2
+            ? 'The saved session uses an unsupported recovery format.'
+            : 'Stored state cannot be recovered.',
+      });
+      expect(error).not.toHaveProperty('cause');
+      expect(consume).not.toHaveBeenCalled();
+      expect(JSON.stringify([...store.inbox])).toBe(before);
+      expect(fixture.instance.getSnapshot().run).toBeUndefined();
+      expect(fixture.executor.requests).toHaveLength(0);
+      const diagnostic = fixture.diagnostics.find((event) => event.kind === 'restore_failed');
+      expect(diagnostic).toMatchObject({ error });
+      if (formatVersion === 2) expect(diagnostic?.error).toBe(error);
+      expect(JSON.stringify(fixture.diagnostics)).not.toContain('private stored');
+    } finally {
+      await fixture.runtime.dispose();
+    }
+  },
+);
+
+test('start rejects an existing newer session without replacing it', async () => {
+  const store = new MemoryRecoveryStore();
+  const executor = new FakeExecutor();
+  const runtime = createRuntime({ appId: 'recovery-tests', executors: [executor] });
+  const instance = await runtime.create(definition, {
+    principalScope: 'user',
+    agent: {},
+    recovery: store,
+  });
+  const record = {
+    formatVersion: 2,
+    agentId: definition.id,
+    agentVersion: definition.version,
+    executorId: 'fake',
+  };
+  store.sessions.set(instance.sessionId, record);
+  const before = JSON.stringify([...store.sessions]);
+  try {
+    await instance.prepare();
+    await expect(instance.start('input')).rejects.toMatchObject({
+      code: 'unavailable',
+      message: 'The requested service is unavailable.',
+    });
+    expect(JSON.stringify([...store.sessions])).toBe(before);
+    expect(executor.requests).toHaveLength(0);
+    expect(instance.getSnapshot().run).toBeUndefined();
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+test.each([undefined, 1])('format %s retains strict recovery record shapes', (formatVersion) => {
+  const stamp = formatVersion === undefined ? {} : { formatVersion };
+  const session = { ...stamp, agentId: 'agent', agentVersion: '1', executorId: 'fake' };
+  const submission = {
+    ...stamp,
+    interactionId: 'answer',
+    action: 'submit',
+    payload: null,
+    status: 'accepted',
+  };
+  const effect = { ...stamp, status: 'succeeded', inputDigest: '0'.repeat(64), output: null };
+  expect(validateSession(session)).toEqual(session);
+  expect(validateSubmissions([submission])).toEqual([submission]);
+  expect(validateEffectRecord(effect)).toEqual(effect);
+  for (const validate of [
+    () => validateSession({ ...session, extra: true }),
+    () => validateSubmissions([{ ...submission, extra: true }]),
+    () => validateEffectRecord({ ...effect, extra: true }),
+    () => validateEffectRecord({ ...effect, inputDigest: 'A'.repeat(64) }),
+    () => validateEffectRecord({ ...effect, inputDigest: '0'.repeat(63) }),
+  ]) {
+    expect(validate).toThrow(
+      expect.objectContaining({
+        code: 'unrecoverable',
+        message: 'Stored state cannot be recovered.',
+      }),
+    );
+  }
+});
 
 test('restore automatically resumes an accepted answer without publishing its pending UI', async () => {
   const store = new MemoryRecoveryStore();

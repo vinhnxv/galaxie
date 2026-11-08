@@ -111,6 +111,35 @@ jobs:
           browser: "true"
       - run: CI=true GALAXIE_TEST_GROUP=general pnpm test
 
+  # Runs the browser cases that use scripted models on Firefox and WebKit. It gathers mock-model
+  # evidence only: the job fails on a case that is not in the known-failure list, never on a
+  # listed one. Chromium in test-general stays the engine that gates every change.
+  test-browser-engines:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [firefox, webkit]
+    name: test-browser-engines (${{ matrix.engine }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          go: "true"
+          engine: ${{ matrix.engine }}
+      - name: Run the browser cases on ${{ matrix.engine }}
+        run: |
+          pnpm exec vitest run --project browser --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/report.json" || true
+          node scripts/check-browser-engine.ts "$RUNNER_TEMP/report.json" "$ENGINE" tests/browser-engines-known-failures.json
+        env:
+          CI: "true"
+          GALAXIE_TEST_GROUP: general
+          GALAXIE_BROWSER: ${{ matrix.engine }}
+          ENGINE: ${{ matrix.engine }}
+
   test-python:
     needs: scope
     if: needs.scope.outputs.python == 'true'
@@ -181,7 +210,19 @@ jobs:
   ci:
     if: always()
     needs:
-      [scope, static, dependency-licenses, size, build, test-general, test-python, python-checks, go, case-insensitive-fs]
+      [
+        scope,
+        static,
+        dependency-licenses,
+        size,
+        build,
+        test-general,
+        test-browser-engines,
+        test-python,
+        python-checks,
+        go,
+        case-insensitive-fs,
+      ]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
