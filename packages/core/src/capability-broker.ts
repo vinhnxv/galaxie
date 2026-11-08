@@ -344,6 +344,8 @@ export class CapabilityBroker {
           !['app', 'principal', 'instance', 'run'].includes(binding.grantScope) ||
           !['none', 'confirm'].includes(binding.approval) ||
           !['none', 'idempotent', 'idempotency-key'].includes(binding.retry) ||
+          (binding.reconcile !== undefined &&
+            (typeof binding.reconcile !== 'function' || binding.retry !== 'none')) ||
           typeof binding.invoke !== 'function')
       )
         throw failure('invalid');

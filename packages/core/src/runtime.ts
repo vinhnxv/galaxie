@@ -53,6 +53,8 @@ export interface DiagnosticEvent {
     | 'late_result'
     | 'capability_failed'
     | 'effect_outcome_unknown'
+    | 'effect_reconciled_applied'
+    | 'effect_reconciled_not_applied'
     | 'confirmation_requested'
     | 'confirmation_declined'
     | 'confirmation_expired'

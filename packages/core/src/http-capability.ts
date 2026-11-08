@@ -160,7 +160,7 @@ async function readBody(response: Response, cap: number): Promise<string> {
  * and with unavailable for other destinations, following the existing network error rule.
  * Headers never authorize. */
 export function httpCapability<Input = unknown, Output = unknown>(
-  supplied: HttpCapabilityOptions,
+  supplied: HttpCapabilityOptions<Output>,
 ): CapabilityBinding<Input, Output> {
   const options = Object.freeze({ ...supplied });
   const compiled = template(options.url);
@@ -249,6 +249,7 @@ export function httpCapability<Input = unknown, Output = unknown>(
     grantScope: options.grantScope,
     approval: options.approval,
     retry: options.retry,
+    ...(options.reconcile === undefined ? {} : { reconcile: options.reconcile }),
     invoke: async (input: Input, context: CapabilityContext): Promise<Output> =>
       (await descriptor.invoke(
         input,
