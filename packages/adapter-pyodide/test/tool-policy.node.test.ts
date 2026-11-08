@@ -159,7 +159,10 @@ test.skipIf(!pythonWheelsAvailable)(
   async () => {
     const read = await toolRun('none', 'read-tool');
     // Show the error event in the failure message, so a rare failure carries its own cause.
-    expect(read.events.at(-1), JSON.stringify(read.events.filter((e) => e.type === 'error'))).toMatchObject({
+    expect(
+      read.events.at(-1),
+      JSON.stringify(read.events.filter((e) => e.type === 'error')),
+    ).toMatchObject({
       type: 'output',
     });
     expect(read.searched).toBe(1);
