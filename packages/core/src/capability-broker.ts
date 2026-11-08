@@ -528,11 +528,14 @@ export class CapabilityBroker {
                   });
                   let answer: unknown;
                   try {
+                    let execution: Promise<unknown>;
                     try {
-                      answer = await Promise.race([
-                        Promise.resolve(binding.reconcile(effectId, context)),
-                        consultAbort,
-                      ]);
+                      execution = Promise.resolve(binding.reconcile(effectId, context));
+                    } catch (error) {
+                      execution = Promise.reject(error);
+                    }
+                    try {
+                      answer = await Promise.race([execution, consultAbort]);
                     } catch (error) {
                       assertActive();
                       this.#report({ kind: 'capability_failed', runId: run.runId, error });

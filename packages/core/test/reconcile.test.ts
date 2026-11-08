@@ -116,6 +116,7 @@ async function resumeWrite(
     requests?: CapabilityRequests;
     bindings?: Readonly<Record<string, CapabilityBinding>>;
     execute?: (request: RunRequest) => Promise<unknown>;
+    cancelOnFailure?: boolean;
   } = {},
 ) {
   const execute =
@@ -139,10 +140,14 @@ async function resumeWrite(
   Object.assign(executor.features, { resume: true, checkpoints: true });
   executor.agent.pending = async () => interaction;
   const diagnostics: DiagnosticEvent[] = [];
+  let cancelRun: (() => void) | undefined;
   const runtime = createRuntime({
     appId: 'reconcile-tests',
     executors: [executor],
-    diagnostics: (event) => diagnostics.push(event),
+    diagnostics: (event) => {
+      diagnostics.push(event);
+      if (options.cancelOnFailure === true && event.kind === 'capability_failed') cancelRun?.();
+    },
     ...(options.budgets === undefined ? {} : { budgets: options.budgets }),
   });
   runtimes.push(runtime);
@@ -175,6 +180,7 @@ async function resumeWrite(
   await instance.prepare();
   const restored = await instance.restore();
   if (restored === undefined) throw new Error('Expected a restored run.');
+  cancelRun = () => void instance.cancel(restored.runId).catch(() => undefined);
   return {
     runtime,
     instance,
@@ -548,6 +554,35 @@ describe('unresolved write reconciliation', () => {
       ).toBe(false);
     },
   );
+
+  test('leaves no rejection unhandled when a diagnostic cancels after the hook throws synchronously', async () => {
+    const { store, effectId } = await seededWrite();
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const hook = vi.fn((): Promise<ReconcileResult> => {
+        throw new Error('Synchronous hook failure');
+      });
+      const invoke = vi.fn(async () => 'unused');
+      const fixture = await resumeWrite(store, binding({ kind: 'write', reconcile: hook, invoke }), {
+        cancelOnFailure: true,
+      });
+      expect(await fixture.result).toMatchObject({
+        status: 'rejected',
+        reason: { code: 'cancelled' },
+      });
+      await fixture.events;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(unhandled).toEqual([]);
+      expect(invoke).not.toHaveBeenCalled();
+      expect((await store.effect(sessionId, effectId))?.status).toBe('outcome_unknown');
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
 
   test('consults once on each of two restores of the same unresolved write', async () => {
     const { store, effectId } = await seededWrite();
