@@ -15,6 +15,7 @@ export function createSession(origin: string, now: () => number = Date.now): () 
           credentials: 'omit',
           redirect: 'error',
           cache: 'no-store',
+          signal: AbortSignal.timeout(10_000),
         });
         if (!response.ok) throw new Error();
         const value: unknown = await response.json();
