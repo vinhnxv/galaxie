@@ -624,13 +624,15 @@ describe('reconciliation bypass guards', () => {
     await fixture.events;
     expect(invoke).not.toHaveBeenCalled();
     expect(writes.mock.calls.map(([, , record]) => record.status)).toEqual(['outcome_unknown']);
-    expect(fixture.diagnostics).toEqual([
-      {
-        instanceId: fixture.instance.instanceId,
-        kind: 'effect_outcome_unknown',
-        runId: fixture.runId,
-        effectId,
-      },
+    expect(fixture.diagnostics.map((event) => event.kind)).toEqual([
+      'effect_outcome_unknown',
+      'run_failed',
     ]);
+    expect(fixture.diagnostics[0]).toEqual({
+      instanceId: fixture.instance.instanceId,
+      kind: 'effect_outcome_unknown',
+      runId: fixture.runId,
+      effectId,
+    });
   });
 });
