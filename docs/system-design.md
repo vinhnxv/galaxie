@@ -93,7 +93,7 @@ Trust rules:
 
 ```mermaid
 flowchart TD
-    Host["Host apps: examples/host-local, examples/host-http"]
+    Host["Host apps: examples/host-local, examples/host-remote"]
     Starter["Template: templates/local-only, bundled one-question agent"]
     Starter --> Adapter & Models & Storage & ReactPkg
     HybridStarter["Template: templates/hybrid-gateway, same agent and Node gateway"]
@@ -241,10 +241,9 @@ Target (brief §15), with the milestone that first needs each path:
 | `packages/tools-mcp/` | M4 |
 | `packages/eslint-plugin/` | M4 |
 | `examples/english-tutor/` | M2 |
-| `examples/host-local/`, `examples/host-http/` | M2 (first host, CSP), M4 (second host, host proxy, MCP) |
+| `examples/host-local/`, `examples/host-remote/` | M2 (first host, CSP), M4 (second host, host proxy, MCP) |
 | `examples/mcp-server/` | M4 |
 | `tests/conformance/` | M1 |
-| `tests/fixtures/` | M1 |
 | `tests/injection-corpus/` | M4 |
 
 Spike code is throwaway. Keep it out of `packages/` and never promote it to package code (brief §16.2).
