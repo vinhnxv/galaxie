@@ -7,21 +7,49 @@ import type { AIMessage, AIMessageChunk } from '@langchain/core/messages';
 import { concat } from '@langchain/core/utils/stream';
 import { adapterFailure } from './errors.js';
 import { GO_EXECUTOR_ID } from './protocol.js';
-import { fragmentsOf } from './tool-calls.js';
+import { fragmentsOf, growingText } from './tool-calls.js';
 
 export const MAX_DELTA_LENGTH = 4096;
+const MAX_QUEUED_EVENTS = 256;
 
 export interface StreamSink {
   readonly events: ExecutorEvent[];
   wake?: () => void;
+  room?: { readonly promise: Promise<void>; readonly resolve: () => void };
   position: number;
   cancelled: boolean;
 }
 
-function push(sink: StreamSink, mode: 'messages' | 'updates', data: unknown): void {
-  if (sink.cancelled) return;
+export function closeStream(sink: StreamSink): void {
+  sink.cancelled = true;
+  sink.room?.resolve();
+}
+
+/** Empties the queue and releases a producer that was waiting for room. */
+export function drainEvents(sink: StreamSink): ExecutorEvent[] {
+  const events = sink.events.splice(0);
+  sink.room?.resolve();
+  return events;
+}
+
+function enqueue(sink: StreamSink, mode: 'messages' | 'updates', data: unknown): void {
   sink.events.push({ type: 'stream', executor: GO_EXECUTOR_ID, path: [], mode, data });
   sink.wake?.();
+}
+
+async function push(
+  sink: StreamSink,
+  mode: 'messages' | 'updates',
+  data: () => unknown,
+): Promise<void> {
+  while (!sink.cancelled && sink.events.length >= MAX_QUEUED_EVENTS) {
+    const room = sink.room ?? Promise.withResolvers<void>();
+    sink.room = room;
+    await room.promise;
+    if (sink.room === room) delete sink.room;
+  }
+  if (sink.cancelled) throw adapterFailure('cancelled');
+  enqueue(sink, mode, data());
 }
 
 /** A content-free step marker: the offered function or capability name and a run-wide position. */
@@ -29,17 +57,18 @@ export function emitMarker(
   sink: StreamSink,
   step: 'tool_call' | 'tool_result',
   tool: string,
-): void {
-  push(sink, 'updates', { step, tool, index: sink.position++ });
+): Promise<void> {
+  return push(sink, 'updates', () => ({ step, tool, index: sink.position++ }));
 }
 
 /** The marker for a run that stops to wait for the user; it names no tool and holds no content. */
 export function emitPaused(sink: StreamSink): void {
-  push(sink, 'updates', { step: 'paused', index: sink.position++ });
+  if (sink.cancelled) return;
+  enqueue(sink, 'updates', { step: 'paused', index: sink.position++ });
 }
 
-export function emitDelta(sink: StreamSink, author: string, text: string): void {
-  push(sink, 'messages', { author, text });
+export function emitDelta(sink: StreamSink, author: string, text: string): Promise<void> {
+  return push(sink, 'messages', () => ({ author, text }));
 }
 
 const isHigh = (code: number): boolean => code >= 0xd800 && code <= 0xdbff;
@@ -91,6 +120,12 @@ export class StreamJoiner {
   readonly #slots = new Map<string, number>();
   readonly #raw: string[] = [];
   #complete = 0;
+  #hasCalls = false;
+  #checkText = '';
+
+  get checkText(): string {
+    return this.#checkText;
+  }
 
   /**
    * Adds one streamed piece. A provider without native streaming yields its whole reply as one
@@ -123,6 +158,9 @@ export class StreamJoiner {
       this.#joined === undefined
         ? chunk
         : concat(this.#joined as AIMessageChunk, chunk as AIMessageChunk);
+    this.#hasCalls ||= carriesCalls(chunk);
+    // Parsed arguments can change earlier text, so only a reply without calls is append-only.
+    this.#checkText = this.#hasCalls ? growingText(this.#joined) : this.#checkText + chunk.text;
     return this.#joined;
   }
 

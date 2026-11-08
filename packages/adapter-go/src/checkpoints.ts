@@ -79,8 +79,14 @@ export async function saveConversation(
   position: number,
   pendingId: string | undefined,
 ): Promise<number> {
-  const { checkpoint, metadata } = await encodeStored(sessionId, record, position, key);
   const location = { executor: EXECUTOR, sessionId, namespace: '', id: revisionId(previous + 1) };
+  const { checkpoint, metadata } = await encodeStored(
+    sessionId,
+    location.id,
+    record,
+    position,
+    key,
+  );
   try {
     await port.request({
       op: 'put-writes',

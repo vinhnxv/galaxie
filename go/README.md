@@ -24,7 +24,7 @@ BSD-2-Clause ones; `wasm.lock` has the license of each. Build with the command i
 
 Install Go 1.27.3 (CI uses the version in `go.mod`). From the repository root:
 
-- `pnpm run test:go` runs `go vet` for the native and wasm targets, `go test ./...` and `go mod verify`.
+- `pnpm run test:go` runs `go vet` for the native and wasm targets, `go test ./...`, `go test -race ./...` (with cgo enabled) and `go mod verify`.
 - `GALAXIE_RECORD_ADK_GO=1 go test -count=1 ./conformance/` (from `go/`) re-records the native goldens; without the variable the test compares against them.
 - `node scripts/build-go-wasm.ts ./gate` builds a main package to `.cache/go-wasm/` with the locked flags and prints its size and SHA-256. Two builds are byte-identical.
 - `node scripts/fetch-go-glue.ts` copies the toolchain's `wasm_exec.js` into `.cache/go-wasm/` after its digest matches `wasm.lock`.

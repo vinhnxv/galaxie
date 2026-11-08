@@ -78,17 +78,20 @@ function hex(bytes: Uint8Array): string {
 }
 
 /**
- * The integrity tag of a checkpoint: HMAC-SHA-256 over the session, the stream position and the
- * record bytes. The key sits beside the record, so the tag detects a corrupt, truncated, spliced
- * or half-edited record; it does not stop an attacker who can rewrite both.
+ * HMAC-SHA-256 over the session, revision, stream position and checkpoint bytes detects corruption,
+ * truncation, splicing between sessions and accidental or blind misplacement between revision
+ * slots. The key is stored beside the record and returned on every read, so anyone who can read and
+ * write the store can recompute the tag. Restoring an earlier valid revision after newer ones were
+ * removed is not detected.
  */
 async function tagOf(
   key: Uint8Array,
   sessionId: string,
+  revision: string,
   position: number,
   checkpoint: Uint8Array,
 ): Promise<string> {
-  const head = encoder.encode(`adk-go|${sessionId}|${position}|`);
+  const head = encoder.encode(`${JSON.stringify(['adk-go', sessionId, revision, position])}\n`);
   const message = new Uint8Array(head.byteLength + checkpoint.byteLength);
   message.set(head, 0);
   message.set(checkpoint, head.byteLength);
@@ -108,6 +111,7 @@ export function newKey(): Uint8Array {
 
 export async function encodeStored(
   sessionId: string,
+  revision: string,
   record: ConversationRecord,
   position: number,
   key: Uint8Array,
@@ -119,7 +123,7 @@ export async function encodeStored(
       v: 1,
       key: base64(key),
       position,
-      mac: await tagOf(key, sessionId, position, checkpoint),
+      mac: await tagOf(key, sessionId, revision, position, checkpoint),
     }),
   );
   return { checkpoint, metadata };
@@ -187,7 +191,7 @@ export async function decodeStored(
   const bytes = checkpoint.bytes;
   const body = parse(bytes);
   const position = state['position'] as number;
-  if (state['mac'] !== (await tagOf(key, sessionId, position, bytes as Uint8Array)))
+  if (state['mac'] !== (await tagOf(key, sessionId, id, position, bytes as Uint8Array)))
     throw adapterFailure('unrecoverable');
   if (
     !plain(body) ||

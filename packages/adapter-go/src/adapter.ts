@@ -39,7 +39,7 @@ import {
   type WorkerMessage,
   withinBridgeLimit,
 } from './protocol.js';
-import { emitPaused } from './stream.js';
+import { closeStream, drainEvents, emitPaused } from './stream.js';
 
 /** The Go agent a host prepares: the reviewed module and the entry it serves. */
 export interface GoAgent {
@@ -171,6 +171,10 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
       };
       const markDead = (): void => {
         dead = true;
+        if (active) {
+          closeStream(active);
+          for (const call of active.leases) finish(active, call);
+        }
         // Without a store the paused session lived in the Worker; with one, the record holds it.
         if (store === undefined) {
           for (const sessionId of pauses.keys()) lost.add(sessionId);
@@ -423,7 +427,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
             });
             cancel = (): void => {
               if (current.cancelled) return;
-              current.cancelled = true;
+              closeStream(current);
               for (const call of current.leases) finish(current, call);
               cancellation = new Promise<void>((resolve) => {
                 const timeout = setTimeout(() => {
@@ -459,8 +463,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               wake.resolve();
             });
             for (;;) {
-              for (const event of current.events.splice(0))
-                if (!request.signal.aborted) yield event;
+              for (const event of drainEvents(current)) if (!request.signal.aborted) yield event;
               // Events queued while a yield was suspended still precede the outcome.
               if (current.events.length > 0) continue;
               if (text !== undefined) break;
@@ -513,7 +516,9 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
                 await commit(interaction);
                 pauses.set(request.sessionId, { interaction, position: current.position });
                 if (stillOpen()) {
-                  if (current.streaming) for (const event of current.events.splice(0)) yield event;
+                  if (current.streaming) {
+                    for (const event of drainEvents(current)) yield event;
+                  }
                   yield { type: 'interaction', interaction };
                 }
               } else if (outcome.ok) {
@@ -534,6 +539,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               if (!settled) cancel();
               request.signal.removeEventListener('abort', cancel);
             }
+            if (run) closeStream(run);
             if (cancellation) await cancellation;
             if (run) for (const call of run.leases) finish(run, call);
             if (active === run) active = undefined;
@@ -545,6 +551,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
         },
         dispose: async () => {
           disposed = true;
+          if (active) closeStream(active);
           stored.clear();
           known.clear();
           loading.clear();

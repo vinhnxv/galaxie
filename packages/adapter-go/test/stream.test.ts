@@ -1,11 +1,24 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { AIMessage, AIMessageChunk } from '@langchain/core/messages';
-import { expect, test } from 'vitest';
+import type { ModelCall } from '@galaxie-ai/core';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { AIMessage, AIMessageChunk, BaseMessage } from '@langchain/core/messages';
+import { expect, test, vi } from 'vitest';
 import { toolCallChecks } from '../../../tests/conformance/support/tool-call-checks.js';
 import { parseModelPayload, validAuthor } from '../src/bridge.js';
-import { carriesCalls, DeltaSplitter, MAX_DELTA_LENGTH, StreamJoiner } from '../src/stream.js';
+import { type ActiveRun, serveModel } from '../src/llm.js';
+import {
+  carriesCalls,
+  closeStream,
+  DeltaSplitter,
+  emitDelta,
+  emitMarker,
+  emitPaused,
+  MAX_DELTA_LENGTH,
+  StreamJoiner,
+  type StreamSink,
+} from '../src/stream.js';
 import { growingText, outputText, replyCalls } from '../src/tool-calls.js';
 
 const base = {
@@ -44,6 +57,83 @@ test('author validation accepts only bounded printable text', () => {
   expect(validAuthor('')).toBe(false);
   expect(validAuthor(undefined)).toBe(false);
   expect(validAuthor('tab\there')).toBe(false);
+});
+
+test('10 000 deltas wait at the queue bound and drain without loss or reordering', async () => {
+  const sink: StreamSink = { events: [], position: 0, cancelled: false };
+  const texts = Array.from({ length: 10_000 }, (_, index) => String(index));
+  let finished = false;
+  const producing = (async () => {
+    for (const text of texts) await emitDelta(sink, 'writer', text);
+    finished = true;
+  })();
+  const turn = (): Promise<void> => new Promise<void>((resolve) => setTimeout(resolve, 0));
+  await turn();
+  expect(sink.events).toHaveLength(256);
+  expect(finished).toBe(false);
+  const received: StreamSink['events'] = [];
+  while (received.length < texts.length) {
+    expect(sink.events.length).toBeLessThanOrEqual(256);
+    received.push(...sink.events.splice(0));
+    sink.room?.resolve();
+    await turn();
+  }
+  await producing;
+  expect(received.map((event) => (event.type === 'stream' ? event.data : undefined))).toEqual(
+    texts.map((text) => ({ author: 'writer', text })),
+  );
+});
+
+test.each(['delta', 'marker'] as const)(
+  'closing a full sink releases a waiting %s without pushing it',
+  async (kind) => {
+    const sink: StreamSink = { events: [], position: 0, cancelled: false };
+    for (let index = 0; index < 256; index += 1) await emitDelta(sink, 'writer', 'safe');
+    const pending =
+      kind === 'delta'
+        ? emitDelta(sink, 'writer', 'late')
+        : emitMarker(sink, 'tool_call', 'search');
+    const stopped = expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+    expect(sink.room).toBeDefined();
+    closeStream(sink);
+    await stopped;
+    expect(sink.cancelled).toBe(true);
+    expect(sink.events).toHaveLength(256);
+    expect(sink.position).toBe(0);
+  },
+);
+
+test('markers wait for room and keep their indices before the exempt paused marker', async () => {
+  const sink: StreamSink = { events: [], position: 7, cancelled: false };
+  for (let index = 0; index < 256; index += 1) await emitMarker(sink, 'tool_call', 'search');
+  let emitted = false;
+  const pending = emitMarker(sink, 'tool_result', 'docs.search@1').then(() => {
+    emitted = true;
+  });
+  await Promise.resolve();
+  expect(sink.events).toHaveLength(256);
+  expect(emitted).toBe(false);
+  const received = sink.events.splice(0);
+  sink.room?.resolve();
+  await pending;
+  for (let index = 0; index < 255; index += 1) await emitMarker(sink, 'tool_call', 'search');
+  emitPaused(sink);
+  expect(sink.events).toHaveLength(257);
+  received.push(...sink.events);
+  expect(received.map((event) => (event.type === 'stream' ? event.data : undefined))).toEqual([
+    ...Array.from({ length: 256 }, (_, index) => ({
+      step: 'tool_call',
+      tool: 'search',
+      index: index + 7,
+    })),
+    { step: 'tool_result', tool: 'docs.search@1', index: 263 },
+    ...Array.from({ length: 255 }, (_, index) => ({
+      step: 'tool_call',
+      tool: 'search',
+      index: index + 264,
+    })),
+    { step: 'paused', index: 519 },
+  ]);
 });
 
 test('the splitter passes short text through and drops nothing', () => {
@@ -117,6 +207,225 @@ function join(chunks: (AIMessage | AIMessageChunk)[]): AIMessage | AIMessageChun
   for (const chunk of chunks) joiner.append(chunk);
   return joiner.finish();
 }
+
+async function checkStream(
+  chunks: readonly (AIMessage | AIMessageChunk)[],
+  checkOutput: ModelCall['checkOutput'],
+): Promise<string> {
+  const lease: ModelCall = {
+    providerId: 'mock',
+    destination: 'in-browser',
+    maxTokens: 100,
+    outputSafetyOutcome: 'unset',
+    checkOutput,
+    end() {},
+    fail() {},
+  };
+  const run: ActiveRun = {
+    id: 'stream-check',
+    request: {
+      runId: 'stream-check' as ActiveRun['request']['runId'],
+      sessionId: 'stream-session' as ActiveRun['request']['sessionId'],
+      command: { type: 'start', input: {} },
+      signal: new AbortController().signal,
+      trace: { recordsText: false, start: () => ({ end() {} }) },
+      capabilities: { call: async () => undefined },
+      models: { begin: async () => lease },
+      limits: { steps: 10 },
+    },
+    seen: new Set(),
+    leases: new Set(),
+    streaming: true,
+    modelCalls: 0,
+    events: [],
+    position: 0,
+    cancelled: false,
+  };
+  const model = {
+    bindTools: () => model,
+    async *stream() {
+      for (const chunk of chunks) {
+        run.events.splice(0);
+        yield chunk;
+      }
+    },
+  } as unknown as BaseChatModel;
+  return serveModel(
+    run,
+    { chatModels: { mock: model } },
+    payload(
+      { author: 'writer' },
+      {
+        stream: true,
+        tools: [
+          {
+            type: 'function',
+            function: { name: 'lookup', parameters: { type: 'object', properties: {} } },
+          },
+        ],
+      },
+    ),
+  );
+}
+
+test.each<{ name: string; chunks: (AIMessage | AIMessageChunk)[] }>([
+  {
+    name: 'text only',
+    chunks: [new AIMessageChunk({ content: 'one ' }), new AIMessageChunk({ content: 'two' })],
+  },
+  {
+    name: 'an empty chunk',
+    chunks: [
+      new AIMessageChunk({ content: 'one' }),
+      new AIMessageChunk({ content: '' }),
+      new AIMessageChunk({ content: 'two' }),
+    ],
+  },
+  {
+    name: 'a split surrogate pair',
+    chunks: [
+      new AIMessageChunk({ content: 'a\ud83d' }),
+      new AIMessageChunk({ content: '\ude00b' }),
+    ],
+  },
+  {
+    name: 'text then indexed fragments',
+    chunks: [
+      new AIMessageChunk({ content: 'looking' }),
+      fragment('{"q":', { id: 'indexed', name: 'lookup' }),
+      fragment('"abc"}'),
+    ],
+  },
+  {
+    name: 'fragments keyed by id',
+    chunks: [
+      fragment('{"q":1}', { index: undefined, id: 'one', name: 'lookup' }),
+      fragment('{"q":2}', { index: undefined, id: 'two', name: 'lookup' }),
+    ],
+  },
+  {
+    name: 'position-keyed fragments kept as separate unindexed entries by concatenation',
+    chunks: [
+      fragment('{"q":', { index: undefined, name: 'lookup' }),
+      fragment('"abc"}', { index: undefined }),
+    ],
+  },
+  {
+    name: 'a complete call',
+    chunks: [
+      new AIMessageChunk({ content: 'looking' }),
+      new AIMessageChunk({
+        content: '',
+        tool_calls: [{ id: 'complete', name: 'lookup', args: { q: 'abc' } }],
+      }),
+      new AIMessageChunk({ content: ' done' }),
+    ],
+  },
+  {
+    name: 'an additional kwargs call mirror',
+    chunks: [
+      new AIMessageChunk({ content: 'looking' }),
+      new AIMessageChunk({
+        content: '',
+        additional_kwargs: {
+          tool_calls: [
+            {
+              id: 'mirror',
+              type: 'function',
+              function: { name: 'lookup', arguments: '{ "q": "abc" }' },
+            },
+          ],
+        },
+      }),
+      new AIMessageChunk({ content: ' done' }),
+    ],
+  },
+  {
+    name: 'an empty call mirror',
+    chunks: [
+      new AIMessageChunk({ content: 'one', additional_kwargs: { tool_calls: [] } }),
+      new AIMessageChunk({ content: 'two' }),
+    ],
+  },
+  {
+    name: 'a repaired argument whose escape sequence completes later',
+    chunks: [fragment('{"q":"line\\', { id: 'escape', name: 'lookup' }), fragment('nnext"}')],
+  },
+  {
+    name: 'a provider-reported invalid call',
+    chunks: [
+      new AIMessageChunk({ content: 'before' }),
+      new AIMessage({
+        content: '',
+        invalid_tool_calls: [
+          { name: 'lookup', args: '{', error: 'bad', type: 'invalid_tool_call' },
+        ],
+      }),
+      new AIMessageChunk({ content: 'after' }),
+    ],
+  },
+  {
+    name: 'text after a fragment',
+    chunks: [
+      fragment('{"q":"abc"}', { id: 'before-text', name: 'lookup' }),
+      new AIMessageChunk({ content: 'done' }),
+    ],
+  },
+  {
+    name: 'a complete call beside fragments',
+    chunks: [
+      new AIMessageChunk({
+        content: '',
+        tool_calls: [{ id: 'complete', name: 'lookup', args: { q: 'one' } }],
+      }),
+      fragment('{"q":"two"}', { id: 'fragment', name: 'lookup' }),
+    ],
+  },
+])('the output hook matches the reference on every chunk: $name', async ({ chunks }) => {
+  const reference = new StreamJoiner();
+  const expected: [string, { final: boolean }][] = [];
+  let failure: unknown;
+  try {
+    for (const chunk of chunks)
+      expected.push([growingText(reference.append(chunk)), { final: false }]);
+    reference.finish();
+  } catch (error) {
+    failure = error;
+  }
+  const checkOutput = vi.fn<ModelCall['checkOutput']>(async () => {});
+  const result = checkStream(chunks, checkOutput);
+  if (failure === undefined) await expect(result).resolves.toEqual(expect.any(String));
+  else await expect(result).rejects.toMatchObject({ code: Reflect.get(failure as object, 'code') });
+  expect(checkOutput.mock.calls.filter(([, options]) => !options.final)).toEqual(expected);
+});
+
+test('the check-text builder reads only each chunk for 8 000 text-only chunks', async () => {
+  const chunks = Array.from(
+    { length: 8000 },
+    (_, index) => new AIMessageChunk({ content: `${index % 10} ` }),
+  );
+  const readText = Object.getOwnPropertyDescriptor(BaseMessage.prototype, 'text')?.get;
+  if (readText === undefined) throw new Error('The message text getter is missing');
+  let characters = 0;
+  const work: number[] = [];
+  const text = vi.spyOn(BaseMessage.prototype, 'text', 'get').mockImplementation(function (
+    this: BaseMessage,
+  ): string {
+    const value: string = readText.call(this);
+    characters += value.length;
+    return value;
+  });
+  try {
+    await checkStream(chunks, async (_checked, { final }) => {
+      if (final) return;
+      work.push(characters);
+      characters = 0;
+    });
+    expect(work).toEqual(chunks.map((chunk) => (chunk.content as string).length));
+  } finally {
+    text.mockRestore();
+  }
+});
 
 test('text chunks join to the full text', () => {
   const joined = join([

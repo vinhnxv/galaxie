@@ -30,7 +30,6 @@ import {
   StreamJoiner,
   type StreamSink,
 } from './stream.js';
-import { growingText } from './tool-calls.js';
 
 export type GoChatModel =
   | BaseChatModel
@@ -167,9 +166,11 @@ async function streamReply(
     if (aborted(run)) throw adapterFailure('cancelled');
     if (typeof chunk.content !== 'string' || (!offered && carriesCalls(chunk)))
       throw adapterFailure('unsupported');
-    await lease.checkOutput(growingText(joiner.append(chunk)), { final: false });
+    joiner.append(chunk);
+    await lease.checkOutput(joiner.checkText, { final: false });
     if (aborted(run)) throw adapterFailure('cancelled');
-    for (const piece of splitter.feed(chunk.content)) emitDelta(run, author, piece);
+    for (const piece of splitter.feed(chunk.content)) await emitDelta(run, author, piece);
+    if (aborted(run)) throw adapterFailure('cancelled');
   }
   return joiner.finish();
 }
@@ -232,6 +233,7 @@ export async function serveModel(
     });
     const callOptions = {
       signal: run.request.signal,
+      maxTokens: lease.maxTokens,
       ...(input.options.stop === undefined ? {} : { stop: [...input.options.stop] }),
       ...(input.options.jsonSchema === undefined ? {} : { jsonSchema: input.options.jsonSchema }),
       [Symbol.for('galaxie.model.destination')]: lease.destination,
@@ -272,7 +274,9 @@ export async function serveModel(
       ...(usage === undefined ? {} : { usage }),
     };
     const encoded = encodeReply(result);
-    if (run.streaming) for (const item of calls) emitMarker(run, 'tool_call', item.function.name);
+    if (run.streaming)
+      for (const item of calls) await emitMarker(run, 'tool_call', item.function.name);
+    if (aborted(run)) throw adapterFailure('cancelled');
     finish(
       run,
       call,
@@ -296,6 +300,7 @@ export async function serveCapability(run: ActiveRun, text: string): Promise<str
   });
   if (aborted(run)) throw adapterFailure('cancelled');
   const encoded = encodeReply(result === undefined ? null : result);
-  if (run.streaming) emitMarker(run, 'tool_result', input.name);
+  if (run.streaming) await emitMarker(run, 'tool_result', input.name);
+  if (aborted(run)) throw adapterFailure('cancelled');
   return encoded;
 }
