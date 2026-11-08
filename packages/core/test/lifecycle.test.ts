@@ -215,6 +215,7 @@ describe('session agent version', () => {
     gate.resolve();
     await start;
     expect(await store.session(fixture.instance.sessionId)).toEqual({
+      formatVersion: 1,
       agentId: definition.id,
       agentVersion: definition.version,
       executorId: fixture.executor.id,

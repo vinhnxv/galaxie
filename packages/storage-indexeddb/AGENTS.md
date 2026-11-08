@@ -31,6 +31,7 @@ The literal principal is for a local example; an authenticated host derives it
 from its own verified session.
 
 - Supply both `services.checkpointer: saver` and `recovery: saver.recovery`.
+- Custom recovery stores must round-trip `formatVersion` unchanged; never offer Start over for `newer_record`.
 - Acquire app ownership with `fence: saver.fencing` before state writes or sweeps.
 - Dispose the runtime before releasing ownership and closing the saver.
 - Await `invalidatePrincipal()` before broadcasting logout; reopen afterward.

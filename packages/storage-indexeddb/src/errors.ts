@@ -7,6 +7,7 @@ export type StorageErrorCode =
   | 'invalid'
   | 'corrupt'
   | 'newer_schema'
+  | 'newer_record'
   | 'superseded'
   | 'blocked'
   | 'quota'
@@ -19,6 +20,7 @@ const messages: Record<StorageErrorCode, string> = {
   invalid: 'The storage request is invalid.',
   corrupt: 'Stored checkpoint data is corrupt.',
   newer_schema: 'The storage schema is newer than this package supports.',
+  newer_record: 'The recovery record format is newer than this package supports.',
   blocked: 'The storage upgrade is blocked.',
   superseded: 'Another version of the app upgraded the storage.',
   quota: 'The storage quota was exceeded.',
@@ -39,7 +41,11 @@ export class StorageError extends Error {
     Object.defineProperty(this, 'invalidated', { value: code === 'invalidated', enumerable: true });
     Object.defineProperty(this, 'fenced', { value: code === 'fenced', enumerable: true });
     Object.defineProperty(this, 'unrecoverable', {
-      value: code === 'corrupt' || code === 'newer_schema' || code === 'superseded',
+      value:
+        code === 'corrupt' ||
+        code === 'newer_schema' ||
+        code === 'newer_record' ||
+        code === 'superseded',
       enumerable: true,
     });
   }

@@ -132,6 +132,7 @@ describe.skipIf(typeof indexedDB === 'undefined')('storage lifecycle', () => {
     for (const code of [
       'corrupt',
       'newer_schema',
+      'newer_record',
       'superseded',
       'invalid',
       'quota',
@@ -141,11 +142,18 @@ describe.skipIf(typeof indexedDB === 'undefined')('storage lifecycle', () => {
     ] as const) {
       const error = new StorageError(code);
       expect(Object.getOwnPropertyDescriptor(error, 'unrecoverable')).toMatchObject({
-        value: ['corrupt', 'newer_schema', 'superseded'].includes(code),
+        value: ['corrupt', 'newer_schema', 'newer_record', 'superseded'].includes(code),
         writable: false,
       });
       expect(error).not.toHaveProperty('cause');
     }
+    const newerRecord = new StorageError('newer_record');
+    expect(newerRecord).toMatchObject({
+      message: 'The recovery record format is newer than this package supports.',
+      unrecoverable: true,
+      fenced: false,
+      invalidated: false,
+    });
   });
 
   test('observes a newer schema refusal while keeping scoped schema validation', async () => {

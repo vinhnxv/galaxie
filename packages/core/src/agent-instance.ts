@@ -37,7 +37,13 @@ import { ModelRouter } from './model-router.js';
 import type { OutputSafetyHook, PublishedModelRoute, SelectedModelRoute } from './models.js';
 import type { BudgetLimits, DataLabel, DestinationAllowlist, DestinationClass } from './policy.js';
 import { registerPrivate } from './private-values.js';
-import { copyRecoveryJson, validateSession, validateSubmissions } from './recovery.js';
+import {
+  copyRecoveryJson,
+  RECOVERY_FORMAT_VERSION,
+  UnsupportedRecoveryFormatError,
+  validateSession,
+  validateSubmissions,
+} from './recovery.js';
 import { RunEvents } from './run-events.js';
 import type { CreateOptions, DiagnosticEvent } from './runtime.js';
 import { type StandardSchema, validateSync } from './schema.js';
@@ -902,6 +908,7 @@ export function createAgentInstance(
           try {
             assertUsable();
             const recording = options.recovery.recordSession(sessionId, {
+              formatVersion: RECOVERY_FORMAT_VERSION,
               agentId: definition.id,
               agentVersion: definition.version,
               executorId: adapter.id,
@@ -983,6 +990,7 @@ export function createAgentInstance(
             } catch (error) {
               if (disposing) assertUsable();
               report({ kind: 'restore_failed', error });
+              if (error instanceof UnsupportedRecoveryFormatError) throw error;
               const code = failureCode(error, 'unavailable');
               throw new GalaxieError(code, toErrorInfo(code).message);
             }
@@ -1035,6 +1043,7 @@ export function createAgentInstance(
             } catch (error) {
               if (disposing) assertUsable();
               report({ kind: 'restore_failed', error });
+              if (error instanceof UnsupportedRecoveryFormatError) throw error;
               const code = failureCode(error, 'unavailable');
               throw new GalaxieError(code, toErrorInfo(code).message);
             }
@@ -1269,6 +1278,7 @@ export function createAgentInstance(
           if (options.recovery !== undefined) {
             try {
               const accepted = await options.recovery.acceptSubmission(sessionId, {
+                formatVersion: RECOVERY_FORMAT_VERSION,
                 interactionId,
                 action,
                 payload: copyRecoveryJson(payload),

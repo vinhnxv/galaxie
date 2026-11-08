@@ -19,7 +19,7 @@ export interface SessionExport {
   readonly exportedAt: string;
   readonly personalContent: boolean;
   readonly metadata: {
-    readonly agent: Readonly<StoredSession> | null;
+    readonly agent: Readonly<Pick<StoredSession, 'agentId' | 'agentVersion' | 'executorId'>> | null;
     readonly checkpointCount: number;
     readonly firstTimestamp: string | null;
     readonly lastTimestamp: string | null;
