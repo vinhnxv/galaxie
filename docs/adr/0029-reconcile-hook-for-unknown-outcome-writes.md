@@ -6,6 +6,7 @@
 - **Revisions:**
   - 2026-11-08: initial proposal.
   - 2026-11-09: the hook is implemented in core and covered by the tests listed under Verification. The status stays Proposed until the unmeasured paths below are confirmed.
+  - 2026-11-09: the finality obligation now separates earlier requests from the replay, which reuses the effect ID.
 
 ## Context
 
@@ -66,7 +67,7 @@ Every failure below leaves the receipt `outcome_unknown`, so a later restore con
 
 ### Host obligations
 
-- **A sound `not-applied` answer is final.** It must mean the backend will never apply that effect ID later, for example because the backend has installed a tombstone that refuses it. In [ADR-0009](0009-multi-tab-ownership.md), the **Remote effects** case states: "A request the old owner already sent may still complete." An absence check alone cannot exclude that late request. Core cannot verify whether the host's answer is sound.
+- **A sound `not-applied` answer is final for earlier requests.** It must mean that no request sent before the answer can still apply that effect ID. The replay that core sends next carries the same effect ID, so the backend must tell it apart from earlier requests, for example by refusing requests from earlier owner generations while admitting the replay's generation. In [ADR-0009](0009-multi-tab-ownership.md), the **Remote effects** case states: "A request the old owner already sent may still complete." An absence check alone cannot exclude that late request, and a tombstone that refuses the effect ID outright would refuse the replay too. Core cannot verify whether the host's answer is sound.
 - **An `applied` output matches the capability's output schema.** The broker validates and bounds it before settling the receipt or returning it.
 - **The hook is idempotent and safe to call again.** A failed or interrupted consult leaves the receipt unresolved; a later restore may consult it again.
 - **Labels still apply.** The hook receives no labelled input, and an `applied` output carries the capability's output labels and registers private values under [ADR-0014](0014-data-labels-and-argument-shapes.md), just as an invoke result does.

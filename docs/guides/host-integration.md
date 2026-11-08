@@ -381,8 +381,11 @@ reconciles outside the framework. Recovery cannot finish arbitrary intermediate
 checkpoints without a pending interrupt.
 
 This binding uses a host-provided, authenticated backend lookup. The backend
-stores the effect ID supplied by the write and returns either its output or a
-tombstone that refuses any later application of that ID:
+stores the effect ID supplied by the write. The lookup returns the output when
+the effect applied. Otherwise it fences the effect and reports `fenced: true`,
+which means the backend now refuses every request for that ID sent before the
+lookup (for example by checking the sender's owner generation) and still admits
+the replay that core sends next under the same ID:
 
 ```ts
 import { httpCapability, type ReconcileResult } from '@galaxie-ai/core';
@@ -391,7 +394,7 @@ type SaveOutput = { saved: boolean };
 declare function lookupBackendEffect(
   effectId: string,
   signal: AbortSignal,
-): Promise<{ output?: SaveOutput; tombstoned: boolean }>;
+): Promise<{ output?: SaveOutput; fenced: boolean }>;
 
 const save = httpCapability<{ lessonId: string }, SaveOutput>({
   url: 'https://api.example.test/progress',
@@ -407,7 +410,7 @@ const save = httpCapability<{ lessonId: string }, SaveOutput>({
   reconcile: async (effectId, context): Promise<ReconcileResult<SaveOutput>> => {
     const receipt = await lookupBackendEffect(effectId, context.signal);
     if (receipt.output !== undefined) return { outcome: 'applied', output: receipt.output };
-    if (receipt.tombstoned) return { outcome: 'not-applied' };
+    if (receipt.fenced) return { outcome: 'not-applied' };
     return { outcome: 'unknown' };
   },
 });
@@ -415,10 +418,12 @@ const save = httpCapability<{ lessonId: string }, SaveOutput>({
 
 Bind this alongside the matching capability schemas and host confirmations;
 the hook is valid only with `retry: 'none'` ([ADR-0029](../adr/0029-reconcile-hook-for-unknown-outcome-writes.md), Proposed).
-The host's `not-applied` answer must mean the backend will never apply that effect
-ID later: an absence check cannot exclude a former owner's late request
-([ADR-0009](../adr/0009-multi-tab-ownership.md)), core cannot verify finality and a
-false answer can repeat a write.
+The host's `not-applied` answer must mean no request sent before the answer can
+still apply that effect ID, while the replay is admitted: an absence check cannot
+exclude a former owner's late request
+([ADR-0009](../adr/0009-multi-tab-ownership.md)), a tombstone that refuses the ID
+outright would refuse the replay too, core cannot verify finality and a false
+answer can repeat a write.
 The [unit tests](../../packages/core/test/reconcile.test.ts) cover the broker controls;
 [LangGraph conformance](../../tests/conformance/reconcile.test.ts) uses an in-test mock
 backend on Node with memory storage and Chromium with reopened IndexedDB. The hook is

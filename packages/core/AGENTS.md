@@ -72,9 +72,10 @@ a different provider for repair. Direct provider calls do not inherit repair.
 Recovery can consult an optional `reconcile(effectId, context)` hook for
 `retry: 'none'` writes ([ADR-0029](../../docs/adr/0029-reconcile-hook-for-unknown-outcome-writes.md)).
 Without a hook, unknown writes stay blocked and the host reconciles outside the
-framework. The host's `not-applied` answer must mean the backend will never apply
-that effect ID later; an absence check cannot exclude a former owner's late request.
-Core cannot verify this finality, and a false answer can repeat a write.
+framework. The host's `not-applied` answer must mean no request sent before the answer
+can still apply that effect ID, while the replay core sends next is admitted; an absence
+check cannot exclude a former owner's late request.
+Core cannot verify this, and a false answer can repeat a write.
 Span text is off by default; the development opt-in follows live labels and
 the declared final destination. See [the baseline](../../docs/adr/0012-security-baseline.md).
 
