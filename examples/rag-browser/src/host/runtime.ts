@@ -193,8 +193,17 @@ export async function createRagHost(
   const readSavedReview = (): SavedReview | undefined => {
     const value = localStorage.getItem(reviewKey);
     if (value === null) return undefined;
-    const parsed = savedReviewSchema.safeParse(JSON.parse(value));
-    if (!parsed.success) throw new Error('The saved review reference is invalid.');
+    let parsed: ReturnType<typeof savedReviewSchema.safeParse> | undefined;
+    try {
+      parsed = savedReviewSchema.safeParse(JSON.parse(value));
+    } catch {
+      parsed = undefined;
+    }
+    if (parsed?.success !== true) {
+      // A reference that cannot be read names no session, so nothing else can reach or clear it.
+      localStorage.removeItem(reviewKey);
+      return undefined;
+    }
     return parsed.data;
   };
   const dispose = async (): Promise<void> => {

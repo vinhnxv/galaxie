@@ -1042,6 +1042,31 @@ test('a Python-disabled build can delete a saved Python review reference and use
   }
 }, 15000);
 
+test.each([
+  ['text that is not JSON', '{not json'],
+  ['JSON that is not a review reference', JSON.stringify({ executor: 'removed', sessionId: 'x' })],
+])(
+  'a saved review reference with %s is cleared and preparation succeeds',
+  async (_name, value) => {
+    const { page, errors } = await observe(mockOrigin);
+    try {
+      await page.evaluate(
+        (stored) => localStorage.setItem('galaxie.rag-browser.review', stored),
+        value,
+      );
+      await preparePythonHost(page);
+      expect(await page.getByText('The chat models could not be prepared.').count()).toBe(0);
+      expect(
+        await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')),
+      ).toBeNull();
+      expect(errors).toEqual([]);
+    } finally {
+      await page.context().close();
+    }
+  },
+  30000,
+);
+
 test('review takeover remains usable after the former owner has completed its review', async () => {
   const { page, errors } = await observe(mockOrigin);
   try {
