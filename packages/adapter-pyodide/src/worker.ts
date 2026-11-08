@@ -59,6 +59,9 @@ async function boot(input: BootPayload): Promise<number> {
   // copy of the verified bytes in a private temporary directory removed after installation.
   const fs = node ? await import('node:fs') : undefined;
   const cache = fs?.mkdtempSync(`${(await import('node:os')).tmpdir()}/galaxie-pyodide-`);
+  const removeCache = (): void => {
+    if (cache !== undefined) fs?.rmSync(cache, { recursive: true, force: true });
+  };
   const packages = Object.fromEntries(
     all.map((file) => [
       file.name.replaceAll('_', '-').toLowerCase(),
@@ -91,6 +94,9 @@ async function boot(input: BootPayload): Promise<number> {
     stdout: () => {},
     stderr: () => {},
     env: { LANGSMITH_TRACING: 'false', LANGCHAIN_TRACING_V2: 'false' },
+  }).catch((error: unknown) => {
+    removeCache();
+    throw error;
   });
   const originalFetch = globalThis.fetch;
   try {
@@ -109,7 +115,7 @@ async function boot(input: BootPayload): Promise<number> {
     });
   } finally {
     globalThis.fetch = originalFetch;
-    if (cache !== undefined) fs?.rmSync(cache, { recursive: true, force: true });
+    removeCache();
   }
   await py.runPythonAsync(
     framework === 'adk'
