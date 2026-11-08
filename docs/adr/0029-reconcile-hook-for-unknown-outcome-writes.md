@@ -4,7 +4,8 @@
 - **Date:** 2026-11-08
 - **Related:** brief §12.3; ADR-0009, ADR-0012, ADR-0014
 - **Revisions:**
-  - 2026-11-08: initial proposal; this record adds no runtime behavior.
+  - 2026-11-08: initial proposal.
+  - 2026-11-09: the hook is implemented in core and covered by the tests listed under Verification. The status stays Proposed until the unmeasured paths below are confirmed.
 
 ## Context
 
@@ -88,11 +89,11 @@ Every failure below leaves the receipt `outcome_unknown`, so a later restore con
 
 ## Verification
 
-Implementation is future work. The following new tests will verify the contract by behavior; these paths are not present yet:
+The following tests verify the contract by behavior:
 
 - `packages/core/test/reconcile.test.ts`: binding validation; consulting once before approval for both unresolved receipt states; validated and bounded `applied` output settling through the success path without invoke or approval and registering labels and private values; `not-applied` replay under the same effect ID with fresh approval; the failure modes above, including timeout in both approval modes, cancellation, disposal and repeated consultation after a later restore; content-free diagnostics; and unchanged behavior without a hook.
-- `tests/conformance/reconcile.test.ts` on Node and Chromium: restored LangGraph writes through the real broker and recovery store, proving `applied` returns without another write, `not-applied` invokes once under the original effect ID, and unresolved answers remain blocked. Chromium will exercise IndexedDB reopen; Node will use memory storage.
+- `tests/conformance/reconcile.test.ts` on Node and Chromium: restored LangGraph writes through the real broker and recovery store, proving `applied` returns without another write, `not-applied` invokes once under the original effect ID, and unresolved answers remain blocked. Chromium exercises IndexedDB reopen; Node uses memory storage.
 
-Unmeasured: the ADK JavaScript, Python and Go and Pyodide executors with a hook; DSPy, which keeps its own Python-side replay journal; Firefox and WebKit; any real backend; and whether a host's `not-applied` answer is sound, which core cannot check. Future mock and conformance results will not establish backend finality.
+Unmeasured: the ADK JavaScript, Python and Go and Pyodide executors with a hook; DSPy, which keeps its own Python-side replay journal; Firefox and WebKit; any real backend; and whether a host's `not-applied` answer is sound, which core cannot check. The mock-backend results do not establish backend finality.
 
-For this documentation-only proposal, the host runs `pnpm run check:docs` to verify Markdown links and heading anchors. That check does not verify the ADR index; read back the new row in [the index](README.md#index) separately. No runtime tests are added by this record.
+`pnpm run check:docs` verifies Markdown links and heading anchors. It does not verify the ADR index; read back the row in [the index](README.md#index) separately.
