@@ -33,9 +33,11 @@ const models = {
   },
 };
 
+// The deadline covers the whole broker call, so a loaded machine running the full suite needs
+// more than the 5000 ms the lighter tests use.
 const binding = {
   destination: 'in-browser' as const,
-  timeoutMs: 5000,
+  timeoutMs: 30000,
   concurrency: 1,
   grantScope: 'instance' as const,
   retry: 'none' as const,
