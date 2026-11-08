@@ -4,8 +4,9 @@
 import type { ExecutorAgent, ExecutorEvent } from '@galaxie-ai/core';
 import { expect, test, vi } from 'vitest';
 import { MemoryByteCheckpoints } from '../../../tests/conformance/support/memory-byte-checkpoints.js';
+import { loadConversation, saveConversation } from '../src/checkpoints.js';
 import { createGoAdapter, type GoAgent } from '../src/index.js';
-import { decodeStored, encodeStored, restoredContent } from '../src/persist.js';
+import { decodeStored, encodeStored, restoredContent, revisionId } from '../src/persist.js';
 import type { WorkerMessage } from '../src/protocol.js';
 import { approvalRequest, FakeGoWorker, failResult, type Program } from './support-go.js';
 
@@ -293,17 +294,23 @@ test('a program that returns a record to a host with no store fails invalid', as
 });
 
 async function tampered(
-  edit: (stored: { checkpoint: Uint8Array; metadata: Uint8Array }) => Promise<void> | void,
+  edit: (stored: {
+    id: string;
+    checkpoint: Uint8Array;
+    metadata: Uint8Array;
+  }) => Promise<void> | void,
 ): Promise<unknown> {
   const store = new MemoryByteCheckpoints();
-  const first = await open(pausing, store);
-  await drain(first, start);
+  const body = record(1, digest('1'));
+  await saveConversation(store, 's', 0, new Uint8Array(32).fill(7), body, 0, digest('1'));
+  await expect(loadConversation(store, 's')).resolves.toMatchObject({ record: body, revision: 1 });
   const [row] = [...store.rows.values()];
   if (row === undefined) throw new Error('No record was stored.');
-  const bytes = { checkpoint: row.checkpoint.bytes, metadata: row.metadata.bytes };
+  const bytes = { id: row.id, checkpoint: row.checkpoint.bytes, metadata: row.metadata.bytes };
   await edit(bytes);
-  store.rows.set(JSON.stringify(['s', '', row.id]), {
+  store.rows.set(JSON.stringify(['s', '', bytes.id]), {
     ...row,
+    id: bytes.id,
     checkpoint: { ...row.checkpoint, bytes: bytes.checkpoint },
     metadata: { ...row.metadata, bytes: bytes.metadata },
   });
@@ -328,6 +335,14 @@ test('a record edited without the key fails the integrity tag', async () => {
   ).rejects.toMatchObject({ code: 'unrecoverable' });
 });
 
+test('a saved record copied to the next revision fails unrecoverable', async () => {
+  await expect(
+    tampered((stored) => {
+      stored.id = revisionId(2);
+    }),
+  ).rejects.toMatchObject({ code: 'unrecoverable' });
+});
+
 test('a record stored under another session fails the integrity tag', async () => {
   const store = new MemoryByteCheckpoints();
   const first = await open(pausing, store);
@@ -344,7 +359,7 @@ test('a record stored under another session fails the integrity tag', async () =
 test('a record with unknown keys fails even under a valid tag', async () => {
   const key = new Uint8Array(32).fill(7);
   const body = { ...record(1, digest('1')), extra: true };
-  const { checkpoint, metadata } = await encodeStored('s', body as never, 0, key);
+  const { checkpoint, metadata } = await encodeStored('s', revisionId(1), body as never, 0, key);
   await expect(
     decodeStored('s', {
       id: '00000000000000000001',
@@ -473,22 +488,28 @@ test('a new prompt over a stored pause replaces it and a failing one keeps it', 
 });
 
 async function decodeEdited(
-  edit: (parts: { body: Record<string, unknown>; state: Record<string, unknown> }) => void,
+  edit: (parts: {
+    id: string;
+    body: Record<string, unknown>;
+    state: Record<string, unknown>;
+  }) => void,
   options: { key?: Uint8Array; position?: number } = {},
 ): Promise<unknown> {
   const key = options.key ?? new Uint8Array(32).fill(7);
   const body = record(1, digest('1'));
   const state: Record<string, unknown> = {};
-  edit({ body, state });
+  const parts = { id: revisionId(1), body, state };
+  edit(parts);
   const { checkpoint, metadata } = await encodeStored(
     's',
+    revisionId(1),
     body as never,
     options.position ?? 0,
     key,
   );
   const merged = { ...JSON.parse(new TextDecoder().decode(metadata)), ...state };
   return decodeStored('s', {
-    id: '00000000000000000001',
+    id: parts.id,
     checkpoint: { type: 'adk-go.session/v1', bytes: checkpoint },
     metadata: {
       type: 'galaxie.adk-go-state/v1',
@@ -498,6 +519,7 @@ async function decodeEdited(
 }
 
 test.each([
+  ['a different revision id', (parts) => (parts.id = revisionId(2))],
   ['a malformed tag', ({ state }) => (state['mac'] = 'zz')],
   ['a key of the wrong length', ({ state }) => (state['key'] = btoa('short'))],
   ['a key that is not base64', ({ state }) => (state['key'] = '***')],
@@ -508,7 +530,10 @@ test.each([
   ['a pause id that is not a digest', ({ body }) => ((body['pause'] as { id: string }).id = 'abc')],
   ['too many events', ({ body }) => (body['events'] = Array.from({ length: 10_001 }, () => ({})))],
 ] as Array<
-  [string, (parts: { body: Record<string, unknown>; state: Record<string, unknown> }) => void]
+  [
+    string,
+    (parts: { id: string; body: Record<string, unknown>; state: Record<string, unknown> }) => void,
+  ]
 >)('a stored record with %s fails unrecoverable', async (_name, edit) => {
   await expect(decodeEdited(edit)).rejects.toMatchObject({ code: 'unrecoverable' });
 });
@@ -516,7 +541,13 @@ test.each([
 test('a stored record under a valid tag decodes, and a wrong type string does not', async () => {
   await expect(decodeEdited(() => {})).resolves.toMatchObject({ conversation: 'g1', revision: 1 });
   const key = new Uint8Array(32).fill(7);
-  const { checkpoint, metadata } = await encodeStored('s', record(1) as never, 0, key);
+  const { checkpoint, metadata } = await encodeStored(
+    's',
+    revisionId(1),
+    record(1) as never,
+    0,
+    key,
+  );
   await expect(
     decodeStored('s', {
       id: '00000000000000000001',
@@ -524,6 +555,43 @@ test('a stored record under a valid tag decodes, and a wrong type string does no
       metadata: { type: 'galaxie.adk-go-state/v1', bytes: metadata },
     }),
   ).rejects.toMatchObject({ code: 'unrecoverable' });
+});
+
+test('the tag input separates the session, revision, position and checkpoint bytes', async () => {
+  const encoder = new TextEncoder();
+  // The old layout let checkpoint bytes shift across the head's final delimiter.
+  const oldTagged = (sessionId: string, position: number, checkpoint: string): Uint8Array =>
+    encoder.encode(`adk-go|${sessionId}|${position}|${checkpoint}`);
+  expect(oldTagged('s|1', 2, 'C')).toEqual(oldTagged('s', 1, '2|C'));
+
+  const firstCheckpoint = encoder.encode('C');
+  const secondCheckpoint = encoder.encode('2|C');
+  const key = new Uint8Array(32).fill(7);
+  const revision = revisionId(1);
+  const encoding = vi.spyOn(TextEncoder.prototype, 'encode');
+  const signing = vi.spyOn(crypto.subtle, 'sign');
+  try {
+    // Supply raw checkpoint fixtures while exercising the real tag calculation.
+    encoding.mockReturnValueOnce(firstCheckpoint);
+    const first = await encodeStored('s|1', revision, record(0), 2, key);
+    encoding.mockReturnValueOnce(secondCheckpoint);
+    const second = await encodeStored('s', revision, record(0), 1, key);
+    const messages = signing.mock.calls.map((call) => call[2]);
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toEqual(
+      encoder.encode(`${JSON.stringify(['adk-go', 's|1', revision, 2])}\nC`),
+    );
+    expect(messages[1]).toEqual(
+      encoder.encode(`${JSON.stringify(['adk-go', 's', revision, 1])}\n2|C`),
+    );
+    expect(messages[0]).not.toEqual(messages[1]);
+    const firstState = JSON.parse(new TextDecoder().decode(first.metadata));
+    const secondState = JSON.parse(new TextDecoder().decode(second.metadata));
+    expect(firstState.mac).not.toBe(secondState.mac);
+  } finally {
+    encoding.mockRestore();
+    signing.mockRestore();
+  }
 });
 
 test('restored content lists every text-bearing value and nothing else', () => {

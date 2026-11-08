@@ -104,7 +104,7 @@ async function restamp(
     unknown
   >;
   edit(body);
-  const forged = await encodeStored(row.sessionId, body as never, metadata.position, key);
+  const forged = await encodeStored(row.sessionId, row.id, body as never, metadata.position, key);
   bytes.rows.set(JSON.stringify([row.sessionId, row.namespace, row.id]), {
     ...row,
     checkpoint: { ...row.checkpoint, bytes: forged.checkpoint },
