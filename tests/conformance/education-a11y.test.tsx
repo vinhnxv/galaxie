@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type DispatchReceipt, type ErrorCode, toErrorInfo } from '@galaxie/core';
+import { type DispatchReceipt, type ErrorCode, toErrorInfo } from '@galaxie-ai/core';
 import {
   AgentSurface,
   createRegistry,
@@ -9,7 +9,7 @@ import {
   type InteractionStatus,
   Quiz,
   WritingPrompt,
-} from '@galaxie/react';
+} from '@galaxie-ai/react';
 import { act, type ReactElement, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, test, vi } from 'vitest';

@@ -71,7 +71,7 @@ Every gateway response sends `cache-control: no-store`. JSON request bodies are 
 The starter agent has no capabilities; these routes and bindings are examples for a host adding narrow capabilities to its own definition. This copy-pasteable wiring uses the same fields and retry policy as the gateway tests. The host provides its renewable `token()` function and trusted origin, binds these under `bindings`, declares matching input/output schemas, and configures a host-rendered confirmation for writes. Directly invoking a binding in tests does not exercise the broker's confirmation gate.
 
 ```ts
-import { httpCapability } from '@galaxie/core';
+import { httpCapability } from '@galaxie-ai/core';
 
 function gatewayBindings(origin: string, token: () => Promise<string>) {
   const policy = {

@@ -7,7 +7,7 @@ import {
   parseInteractionRequest,
   parseSurfaceRecord,
   type Submission,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
 import { interrupt, type LangGraphRunnableConfig } from '@langchain/langgraph/web';
 

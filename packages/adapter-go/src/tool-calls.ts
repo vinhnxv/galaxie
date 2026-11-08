@@ -7,7 +7,7 @@ import {
   type ReplyCall,
   outputText as sharedOutputText,
   replyCalls as sharedReplyCalls,
-} from '@galaxie/adapter-kit';
+} from '@galaxie-ai/adapter-kit';
 import {
   type AIMessage,
   type AIMessageChunk,

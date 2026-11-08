@@ -1,17 +1,17 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter, requestInteraction } from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentSnapshot,
   createManifest,
   createRuntime,
   type DevelopmentWarning,
   type DiagnosticEvent,
-} from '@galaxie/core';
-import { tutorDefinition } from '@galaxie/example-english-tutor';
-import { openAICompatible } from '@galaxie/models/openai';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+} from '@galaxie-ai/core';
+import { tutorDefinition } from '@galaxie-ai/example-english-tutor';
+import { openAICompatible } from '@galaxie-ai/models/openai';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { Annotation, END, MemorySaver, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, onTestFinished, test, vi } from 'vitest';
 import { z } from 'zod';

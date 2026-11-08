@@ -40,7 +40,7 @@ jobs:
         with:
           python: "true"
       - name: Build the mock demo
-        run: pnpm --filter @galaxie/example-rag-browser exec vite build --mode mock
+        run: pnpm --filter @galaxie-ai/example-rag-browser exec vite build --mode mock
         env:
           VITE_GALAXIE_DEMO: "1"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

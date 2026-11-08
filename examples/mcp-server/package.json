@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/example-mcp-server",
+  "name": "@galaxie-ai/example-mcp-server",
   "version": "0.0.0",
   "private": true,
   "description": "Reference MCP server over Streamable HTTP for galaxie development and tests, following the brief's MCP server profile.",

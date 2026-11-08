@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { InteractionId, PendingInteraction, ViewRevision } from '@galaxie/core';
+import type { InteractionId, PendingInteraction, ViewRevision } from '@galaxie-ai/core';
 import type { ReactElement } from 'react';
 import { expect, expectTypeOf, test } from 'vitest';
 import { z } from 'zod';

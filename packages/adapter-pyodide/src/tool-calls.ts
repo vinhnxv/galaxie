@@ -8,7 +8,7 @@ import {
   rawArgumentChunks,
   argumentChunks as sharedArgumentChunks,
   outputText as sharedOutputText,
-} from '@galaxie/adapter-kit';
+} from '@galaxie-ai/adapter-kit';
 import {
   type AIMessageChunk,
   type BaseMessage,

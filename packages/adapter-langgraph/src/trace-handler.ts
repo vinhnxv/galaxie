@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { OutputSafetyOutcome, RunTrace, SelectedModelRoute, TraceHandle } from '@galaxie/core';
+import type {
+  OutputSafetyOutcome,
+  RunTrace,
+  SelectedModelRoute,
+  TraceHandle,
+} from '@galaxie-ai/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { LLMResult } from '@langchain/core/outputs';

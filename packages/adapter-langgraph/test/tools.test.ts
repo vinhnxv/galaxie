@@ -8,7 +8,7 @@ import {
   type ModelCall,
   type ModelPort,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   BaseChatModel,
   type BaseChatModelCallOptions,
@@ -33,8 +33,8 @@ const readPolicy: CapabilityBindingPolicy = {
 const policy = vi.hoisted<{ current: CapabilityBindingPolicy | undefined }>(() => ({
   current: undefined,
 }));
-vi.mock('@galaxie/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@galaxie/core')>()),
+vi.mock('@galaxie-ai/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@galaxie-ai/core')>()),
   capabilityBindingPolicy: vi.fn(() => policy.current),
 }));
 

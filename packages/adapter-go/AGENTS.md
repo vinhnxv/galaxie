@@ -1,4 +1,4 @@
-# @galaxie/adapter-go: coding guidance
+# @galaxie-ai/adapter-go: coding guidance
 
 ## Purpose
 

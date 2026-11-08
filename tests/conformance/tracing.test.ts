@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter, requestInteraction } from '@galaxie-ai/adapter-langgraph';
 import {
   createRuntime,
   type DataLabel,
@@ -12,8 +12,8 @@ import {
   galaxieField,
   type InteractionId,
   type ViewRevision,
-} from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import type { BaseChatModel, LangSmithParams } from '@langchain/core/language_models/chat_models';
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import * as web from '@langchain/langgraph/web';

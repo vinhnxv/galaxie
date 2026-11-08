@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentInstance,
   createRuntime,
@@ -9,8 +9,8 @@ import {
   galaxieField,
   type RunEvent,
   type UiBindings,
-} from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import { expect } from 'vitest';
 import { z } from 'zod';
 import { createSpanRecorder } from '../../../packages/core/test/span-tree.js';

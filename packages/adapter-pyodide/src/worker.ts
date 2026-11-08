@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ErrorCode } from '@galaxie/core';
+import type { ErrorCode } from '@galaxie-ai/core';
 import { adkDriver, adkImportProbe } from './adk-python-driver.js';
 import {
   type BootPayload,

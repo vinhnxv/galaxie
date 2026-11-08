@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
-import { createRuntime, defineAgentDefinition, type Runtime } from '@galaxie/core';
-import { BuiltInAIChatModel } from '@galaxie/models/builtin-ai';
-import { WebLLMChatModel } from '@galaxie/models/webllm';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
+import { createRuntime, defineAgentDefinition, type Runtime } from '@galaxie-ai/core';
+import { BuiltInAIChatModel } from '@galaxie-ai/models/builtin-ai';
+import { WebLLMChatModel } from '@galaxie-ai/models/webllm';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';

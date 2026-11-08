@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { GalaxieError, type UiBindings } from '@galaxie/core';
+import { GalaxieError, type UiBindings } from '@galaxie-ai/core';
 import { z } from 'zod';
 import businessData from '../../../fixtures/business-data.json' with { type: 'json' };
 import { capabilityRequests, type DecisionRecord } from '../../host/capabilities.js';

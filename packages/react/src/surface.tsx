@@ -11,7 +11,7 @@ import {
   type SurfaceId,
   toErrorInfo,
   validateSync,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   Component,
   type ReactElement,

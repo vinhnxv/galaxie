@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createPyodideAdapter } from '@galaxie/adapter-pyodide';
-import { createRuntime, type RunEvent } from '@galaxie/core';
-import { MockChatModel, type MockScriptEntry } from '@galaxie/models/mock';
+import { createPyodideAdapter } from '@galaxie-ai/adapter-pyodide';
+import { createRuntime, type RunEvent } from '@galaxie-ai/core';
+import { MockChatModel, type MockScriptEntry } from '@galaxie-ai/models/mock';
 import type { BindToolsInput } from '@langchain/core/language_models/chat_models';
 import { expect, test } from 'vitest';
 import { pydanticAiRagDefinition } from '../src/agent/definition-pydantic-ai.js';

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type LangGraphAgent, requestInteraction } from '@galaxie/adapter-langgraph';
+import { type LangGraphAgent, requestInteraction } from '@galaxie-ai/adapter-langgraph';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { citeAnswer } from './citations.js';

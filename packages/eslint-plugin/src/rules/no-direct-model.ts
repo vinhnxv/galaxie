@@ -16,7 +16,7 @@ const sources = [
   '@google/genai',
   'openai',
   '@anthropic-ai/sdk',
-  '@galaxie/models',
+  '@galaxie-ai/models',
 ];
 
 /** ADK exports that build a model outside the host router; the rest of `@google/adk` is allowed. */

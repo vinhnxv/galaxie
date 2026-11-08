@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie/react';
+import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useState, useSyncExternalStore } from 'react';
 import { type GatewayState, gatewayStates } from './gateway-state.js';
 import type { HybridHost, HybridInstance } from './runtime.js';

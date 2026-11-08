@@ -14,8 +14,8 @@ import {
   validChatMessage,
   validModelOption,
   withinBridgeLimit,
-} from '@galaxie/adapter-kit';
-import { type ErrorCode, toErrorInfo } from '@galaxie/core';
+} from '@galaxie-ai/adapter-kit';
+import { type ErrorCode, toErrorInfo } from '@galaxie-ai/core';
 import { validCheckpointReply, validCheckpointRequest } from './checkpoints.js';
 import type { LockedWheel, PythonFramework } from './runtime-files.js';
 

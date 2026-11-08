@@ -51,7 +51,7 @@ async function runInChromium(
     // The page reads the storage package from source, so the lane never depends on a stale build.
     resolve: {
       alias: {
-        '@galaxie/storage-indexeddb': fileURLToPath(
+        '@galaxie-ai/storage-indexeddb': fileURLToPath(
           new URL('../../../packages/storage-indexeddb/src/index.ts', import.meta.url),
         ),
       },

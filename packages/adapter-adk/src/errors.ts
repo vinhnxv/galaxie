@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type ErrorCode, type ErrorInfo, GalaxieError, toErrorInfo } from '@galaxie/core';
+import { type ErrorCode, type ErrorInfo, GalaxieError, toErrorInfo } from '@galaxie-ai/core';
 
 /** A galaxie error with the fixed message of its code; no content or cause text is added. */
 export function failure(code: ErrorCode): GalaxieError {

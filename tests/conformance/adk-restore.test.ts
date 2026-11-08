@@ -11,8 +11,8 @@ import {
   type RecoveryStore,
   type SessionId,
   type UserInteractionEvent,
-} from '@galaxie/core';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+} from '@galaxie-ai/core';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { LlmAgent, SequentialAgent } from '@google/adk';
 import { AIMessage } from '@langchain/core/messages';
 import { afterEach, expect, test, vi } from 'vitest';

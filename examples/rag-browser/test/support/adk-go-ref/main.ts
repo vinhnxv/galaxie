@@ -3,7 +3,7 @@
 
 // Hosts configure zod before anything validates: its JIT probe is a Trusted Types sink.
 import '../../../src/host/zod-config.js';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import type { GoWorkerPort } from '../../../../../packages/adapter-go/src/index.js';
 import workerUrl from '../go-gate/adapter-worker.ts?worker&url';
 import { type Durability, type Observed, runCase, type Script } from './run.js';

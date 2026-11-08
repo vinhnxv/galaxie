@@ -7,8 +7,8 @@ import {
   type PendingInteraction,
   type RecoveryStore,
   type SessionId,
-} from '@galaxie/core';
-import { createMockLatch } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { createMockLatch } from '@galaxie-ai/models/mock';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, type BaseMessage } from '@langchain/core/messages';
 import type { ChatResult } from '@langchain/core/outputs';

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { pythonBuild } from 'virtual:rag-python';
-import { createLangGraphAdapter, type LangGraphServices } from '@galaxie/adapter-langgraph';
-import { createPyodideAdapter } from '@galaxie/adapter-pyodide';
+import { createLangGraphAdapter, type LangGraphServices } from '@galaxie-ai/adapter-langgraph';
+import { createPyodideAdapter } from '@galaxie-ai/adapter-pyodide';
 import {
   type AgentInstance,
   type CapabilityBinding,
@@ -13,11 +13,15 @@ import {
   type RunId,
   type Runtime,
   type SessionId,
-} from '@galaxie/core';
-import { acquireOwnership, type Ownership } from '@galaxie/core/browser';
-import { BuiltInAIChatModel, checkBuiltInAI, prepareBuiltInAI } from '@galaxie/models/builtin-ai';
-import { loadWebLLMEngine, WebLLMChatModel } from '@galaxie/models/webllm';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+} from '@galaxie-ai/core';
+import { acquireOwnership, type Ownership } from '@galaxie-ai/core/browser';
+import {
+  BuiltInAIChatModel,
+  checkBuiltInAI,
+  prepareBuiltInAI,
+} from '@galaxie-ai/models/builtin-ai';
+import { loadWebLLMEngine, WebLLMChatModel } from '@galaxie-ai/models/webllm';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { z } from 'zod';
 import { ragDefinition } from '../agent/definition.js';
 import { dspyRagDefinition } from '../agent/definition-dspy.js';

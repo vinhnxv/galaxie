@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/ui-protocol",
+  "name": "@galaxie-ai/ui-protocol",
   "version": "0.1.0",
   "description": "Pure A2UI message parsing, catalog validation and surface reduction for galaxie.",
   "license": "Apache-2.0",

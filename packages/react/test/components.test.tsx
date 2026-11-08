@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type DispatchReceipt, readAnnotations, validateSync } from '@galaxie/core';
+import { type DispatchReceipt, readAnnotations, validateSync } from '@galaxie-ai/core';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, test } from 'vitest';

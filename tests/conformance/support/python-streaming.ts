@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createRuntime, defineAgentDefinition, type RunEvent } from '@galaxie/core';
-import { createMockLatch, MockChatModel } from '@galaxie/models/mock';
+import { createRuntime, defineAgentDefinition, type RunEvent } from '@galaxie-ai/core';
+import { createMockLatch, MockChatModel } from '@galaxie-ai/models/mock';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { ChatGenerationChunk } from '@langchain/core/outputs';
 import { z } from 'zod';

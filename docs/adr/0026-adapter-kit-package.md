@@ -10,7 +10,7 @@
 
 System design §4, rule 2 says: "Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2)." Integration packages depend on core and their own libraries. Adapters cannot import one another. Consequently, the LangGraph.js, Pyodide, ADK JavaScript and Go adapters carry copies of common adapter logic. Core owns framework-neutral policy; these copies translate its ports into model and bridge operations.
 
-`scripts/check-dependencies.ts` has explicit import allowlists for Pyodide, ADK JavaScript and Go. The latter two reject `@galaxie/adapter-*` imports and relative paths into sibling adapter directories. LangGraph's dedicated check currently restricts LangGraph imports to `@langchain/langgraph/web`; it does not enforce the full adapter-to-adapter prohibition. The extraction must close that enforcement gap, rather than treating it as permission to share through LangGraph.
+`scripts/check-dependencies.ts` has explicit import allowlists for Pyodide, ADK JavaScript and Go. The latter two reject `@galaxie-ai/adapter-*` imports and relative paths into sibling adapter directories. LangGraph's dedicated check currently restricts LangGraph imports to `@langchain/langgraph/web`; it does not enforce the full adapter-to-adapter prohibition. The extraction must close that enforcement gap, rather than treating it as permission to share through LangGraph.
 
 ### Verified duplication and extraction baselines
 
@@ -90,19 +90,19 @@ The envelopes are different protocols: Pyodide uses `galaxie.bridge/v2` with req
 
 ## Decision
 
-Create `@galaxie/adapter-kit` in `packages/adapter-kit` as a **non-adapter package** for the five verified categories above, restricted to their common parts. It registers no executor. Adapters may depend on it and must still never import one another. No package or code moves with this Proposed record; today's enforced dependency rules remain in force until extraction lands.
+Create `@galaxie-ai/adapter-kit` in `packages/adapter-kit` as a **non-adapter package** for the five verified categories above, restricted to their common parts. It registers no executor. Adapters may depend on it and must still never import one another. No package or code moves with this Proposed record; today's enforced dependency rules remain in force until extraction lands.
 
 ### Import and publication contract
 
 The kit's production source and build have exactly this import/re-export allowlist:
 
-- `@galaxie/core`, through its public root exports only, for values and types; no deep imports or relative access to core internals.
+- `@galaxie-ai/core`, through its public root exports only, for values and types; no deep imports or relative access to core internals.
 - `@langchain/core` and `@langchain/core/*`, **erased type-only references only** (`import type`, `export type` or import types). No value imports, side-effect imports or dynamic runtime imports from LangChain.
 - Relative files resolving inside `packages/adapter-kit`; no relative escape into another package or `node_modules`.
 
 It imports no adapter, framework runtime, Pyodide, Go/WASM glue, model implementation, UI framework or Node-only module. LangChain runtime predicates (`isAIMessage`, `isAIMessageChunk`), message construction, native concatenation and `BaseChatModel` inheritance remain in the adapters; only the pure parts of their helpers move. This type-only dependency does not put LangChain into core or make core's contracts framework-specific.
 
-Choose **pure bridge helpers with no Worker subpath**. The root export is `@galaxie/adapter-kit`; this extraction adds no other public subpath. Importing any kit module must not read or create DOM/Worker globals, start a Worker, install listeners or modify `globalThis`. Bridge helpers consume and return ordinary values/text. Platform-neutral UTF-8 encoding occurs when a helper is called, not at import time. Worker ports, message handlers and startup stay in each adapter, so no exception to the kit's allowlist is needed.
+Choose **pure bridge helpers with no Worker subpath**. The root export is `@galaxie-ai/adapter-kit`; this extraction adds no other public subpath. Importing any kit module must not read or create DOM/Worker globals, start a Worker, install listeners or modify `globalThis`. Bridge helpers consume and return ordinary values/text. Platform-neutral UTF-8 encoding occurs when a helper is called, not at import time. Worker ports, message handlers and startup stay in each adapter, so no exception to the kit's allowlist is needed.
 
 The kit is a **launch package**, published and packable together with the existing launch packages because launch package `adapter-langgraph` will depend on it. It shares their release version, including core's release version; it has no independent release cadence. The extraction adds it to the launch inventories in `tests/conformance/package-pack.node.test.ts` and `scripts/check-dependency-licenses.ts`, including resolved workspace dependencies, public metadata, exports, README, LICENSE and NOTICE. The pack test must also check that packed adapter dependencies resolve the kit's release version. The kit and its contribution to the LangGraph consumer bundle are covered by the release size budget; extraction must establish that coverage and record the result, without hiding bytes in a new package or relaxing existing limits. This record claims no measured size saving.
 
@@ -124,12 +124,12 @@ Introduce the kit and its build/release/dependency gates, then migrate **one ada
 
 System design §4, rule 2's sentence "Other integration packages depend on `core` and on their own library: LangGraph.js, LangChain, the MCP SDK or React." gains the adapter-kit dependency for executor adapters. Replace "Packages do not import each other; the host app wires them together through `createRuntime` (brief §14.2)." with:
 
-> Integration packages depend on core and their own libraries, with the existing models/storage exceptions. Executor adapters may additionally import `@galaxie/adapter-kit`. No adapter imports another adapter. The kit imports only core public exports, erased `@langchain/core` types and its own relative files; it imports no adapter. The host app wires the integration packages together through `createRuntime`.
+> Integration packages depend on core and their own libraries, with the existing models/storage exceptions. Executor adapters may additionally import `@galaxie-ai/adapter-kit`. No adapter imports another adapter. The kit imports only core public exports, erased `@langchain/core` types and its own relative files; it imports no adapter. The host app wires the integration packages together through `createRuntime`.
 
 All other §4 boundaries remain unchanged. `scripts/check-dependencies.ts` will implement that text as follows:
 
-- Add exact `@galaxie/adapter-kit` to adapter import allowlists. Apply the adapter-to-adapter prohibition to LangGraph source/build/tests as well as the three other adapters, preserving existing framework-specific restrictions and test-only dependencies.
-- Go and ADK currently reject `specifier.startsWith('@galaxie/adapter-')` and relative targets whose directory starts with `adapter-`. Explicitly classify `adapter-kit` as the non-adapter exception before those checks; reject all actual sibling adapters, including their subpaths and relative paths. Pyodide's explicit executor exclusions and allowlist gain the same complete prohibition and kit exception. Only the kit's public root is allowed; deep/undeclared kit subpaths and relative access to kit internals are not an alternative import path.
+- Add exact `@galaxie-ai/adapter-kit` to adapter import allowlists. Apply the adapter-to-adapter prohibition to LangGraph source/build/tests as well as the three other adapters, preserving existing framework-specific restrictions and test-only dependencies.
+- Go and ADK currently reject `specifier.startsWith('@galaxie-ai/adapter-')` and relative targets whose directory starts with `adapter-`. Explicitly classify `adapter-kit` as the non-adapter exception before those checks; reject all actual sibling adapters, including their subpaths and relative paths. Pyodide's explicit executor exclusions and allowlist gain the same complete prohibition and kit exception. Only the kit's public root is allowed; deep/undeclared kit subpaths and relative access to kit internals are not an alternative import path.
 - Add a dedicated kit source/build import check for the exact allowlist above, including erased LangChain references in declarations and no runtime LangChain import in emitted JavaScript. Reject adapter imports, core deep imports, relative escapes and other dependencies. Kit tests may use test tooling under a test-only rule; that does not widen production imports or permit kit-to-adapter imports.
 - Include kit distribution files in the existing built-package checks against `async_hooks` and Node imports. Add import-side-effect coverage for absent DOM/Worker globals. Preserve every existing adapter restriction, including ADK bundle boundaries and Pyodide's Worker-only runtime imports.
 
@@ -137,12 +137,12 @@ These are requirements for the later extraction. `scripts/check-dependencies.ts`
 
 ### Amendment of the Go package rationale
 
-This decision amends only [ADR-0023](0023-google-adk-go-through-a-wasm-worker.md), decision 1's premise that Go's Worker, bridge and loader "share nothing with Pyodide." The executor remains the separate `@galaxie/adapter-go` package. Its loader, glue and protocol-specific behavior remain local, while pure common bridge and adapter helpers may be shared through the kit once extraction changes the rules. Adapters still cannot import each other.
+This decision amends only [ADR-0023](0023-google-adk-go-through-a-wasm-worker.md), decision 1's premise that Go's Worker, bridge and loader "share nothing with Pyodide." The executor remains the separate `@galaxie-ai/adapter-go` package. Its loader, glue and protocol-specific behavior remain local, while pure common bridge and adapter helpers may be shared through the kit once extraction changes the rules. Adapters still cannot import each other.
 
 ## Alternatives considered
 
 - **Keep copying.** Avoids a package, but each model-output or bridge-validation correction must be repeated across four adapters, with drift in the controls documented above.
-- **Put the helpers in `@galaxie/core`.** Would make the framework-neutral runtime own LangChain message shapes and worker transport details. Core's existing ports already own policy; adapter translation belongs outside it (ADR-0017).
+- **Put the helpers in `@galaxie-ai/core`.** Would make the framework-neutral runtime own LangChain message shapes and worker transport details. Core's existing ports already own policy; adapter translation belongs outside it (ADR-0017).
 - **Let adapters import one designated adapter.** Couples unrelated frameworks to that adapter's runtime dependencies and lifecycle, and defeats the independent-adapter rule. A non-adapter package exposes only the common helpers.
 - **Extract before the Go adapter exists.** Would infer the fourth instance's framing, lifecycle and validation requirements. Wait for its actual model/tool bridge and preserve all four real behaviors instead.
 - **Unify the Worker protocols or add a Worker runtime service.** Changes established wire formats and ownership rather than moving common logic. Pure framing/validation helpers need neither a new protocol nor a Worker startup abstraction.

@@ -8,7 +8,7 @@ import {
   type RecoveryJson,
   type RecoveryStore,
   type SessionId,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { z } from 'zod';
 import {
   createPyodideAdapter,

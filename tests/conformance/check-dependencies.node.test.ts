@@ -53,7 +53,7 @@ const lockfile = (onnxRuntime: string): string =>
 
 const FILES: Record<string, string> = {
   'packages/core/package.json': JSON.stringify({
-    dependencies: { '@galaxie/ui-protocol': 'workspace:*' },
+    dependencies: { '@galaxie-ai/ui-protocol': 'workspace:*' },
     peerDependencies: { '@opentelemetry/api': '1', zod: '4' },
   }),
   'packages/models/package.json': JSON.stringify({
@@ -196,7 +196,7 @@ test('the ADK adapter may import the root specifier, core, LangChain core and re
   const result = run({
     'packages/adapter-adk/src/a.ts': [
       adk('@google/adk'),
-      adk('@galaxie/core'),
+      adk('@galaxie-ai/core'),
       adk('@langchain/core/messages'),
       adk('./b.js'),
       adk('zod'),
@@ -246,14 +246,15 @@ test.each(['../../adapter-langgraph/src/index.js', '../node_modules/@google/adk/
   },
 );
 
-test.each(['@galaxie/adapter-langgraph', '@galaxie/adapter-pyodide', '@langchain/langgraph/web'])(
-  'the ADK adapter importing %s fails',
-  (specifier) => {
-    const result = run({ 'packages/adapter-adk/src/a.ts': adk(specifier) });
-    expect(result.status).toBe(1);
-    expect(result.output).toContain('must not depend on another executor adapter');
-  },
-);
+test.each([
+  '@galaxie-ai/adapter-langgraph',
+  '@galaxie-ai/adapter-pyodide',
+  '@langchain/langgraph/web',
+])('the ADK adapter importing %s fails', (specifier) => {
+  const result = run({ 'packages/adapter-adk/src/a.ts': adk(specifier) });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('must not depend on another executor adapter');
+});
 
 test('the ADK adapter rejects an unlisted package', () => {
   const result = run({ 'packages/adapter-adk/src/a.ts': adk('left-pad') });
@@ -454,7 +455,7 @@ test.each([
 test('the Go adapter may import core, LangChain core and relative files', () => {
   const result = run({
     'packages/adapter-go/src/a.ts': [
-      adk('@galaxie/core'),
+      adk('@galaxie-ai/core'),
       adk('@langchain/core/messages'),
       adk('./b.js'),
     ].join(''),
@@ -463,9 +464,9 @@ test('the Go adapter may import core, LangChain core and relative files', () => 
 });
 
 test.each([
-  '@galaxie/adapter-langgraph',
-  '@galaxie/adapter-pyodide',
-  '@galaxie/adapter-adk',
+  '@galaxie-ai/adapter-langgraph',
+  '@galaxie-ai/adapter-pyodide',
+  '@galaxie-ai/adapter-adk',
   '@langchain/langgraph/web',
   '@google/adk',
   'pyodide',
@@ -547,7 +548,7 @@ test.each(EXECUTOR_ADAPTERS)(
     const extra = Object.fromEntries(
       ADAPTER_AREAS.map((area) => [
         `packages/${adapter}/${area}/kit.${area === 'dist' ? 'js' : 'ts'}`,
-        adk('@galaxie/adapter-kit'),
+        adk('@galaxie-ai/adapter-kit'),
       ]),
     );
     expect(run(extra)).toMatchObject({ status: 0, output: '' });
@@ -559,7 +560,9 @@ test.each(EXECUTOR_ADAPTERS.flatMap((adapter) => ADAPTER_AREAS.map((area) => [ad
   (adapter, area) => {
     const extension = area === 'dist' ? 'js' : 'ts';
     const extra = {
-      [`packages/${adapter}/${area}/subpath.${extension}`]: adk('@galaxie/adapter-kit/tool-calls'),
+      [`packages/${adapter}/${area}/subpath.${extension}`]: adk(
+        '@galaxie-ai/adapter-kit/tool-calls',
+      ),
       [`packages/${adapter}/${area}/relative.${extension}`]: adk('../../adapter-kit/src/index.js'),
       [`packages/${adapter}/${area}/relative-dist.${extension}`]: adk(
         '../../adapter-kit/dist/index.js',
@@ -581,8 +584,8 @@ test.each(
 )('%s/%s may not import %s by package, subpath or relative path', (adapter, area, other) => {
   const extension = area === 'dist' ? 'js' : 'ts';
   const extra = {
-    [`packages/${adapter}/${area}/package.${extension}`]: adk(`@galaxie/${other}`),
-    [`packages/${adapter}/${area}/subpath.${extension}`]: adk(`@galaxie/${other}/internal`),
+    [`packages/${adapter}/${area}/package.${extension}`]: adk(`@galaxie-ai/${other}`),
+    [`packages/${adapter}/${area}/subpath.${extension}`]: adk(`@galaxie-ai/${other}/internal`),
     [`packages/${adapter}/${area}/relative.${extension}`]: adk(`../../${other}/src/index.js`),
   };
   const result = run(extra);
@@ -598,7 +601,7 @@ test.each(['src/allowed.ts', 'dist/allowed.d.ts'])(
     expect(
       run({
         [`packages/adapter-kit/${path}`]: [
-          adk('@galaxie/core'),
+          adk('@galaxie-ai/core'),
           adk('@langchain/core', 'type'),
           adk('@langchain/core/messages', 'type'),
           "export type { BaseMessage } from '@langchain/core/messages';\n",
@@ -614,10 +617,10 @@ test.each(ADAPTER_AREAS)('adapter-kit %s may never import an executor adapter', 
   const extension = area === 'dist' ? 'js' : 'ts';
   const extra = Object.fromEntries(
     EXECUTOR_ADAPTERS.flatMap((adapter) => [
-      [`packages/adapter-kit/${area}/${adapter}.${extension}`, adk(`@galaxie/${adapter}`)],
+      [`packages/adapter-kit/${area}/${adapter}.${extension}`, adk(`@galaxie-ai/${adapter}`)],
       [
         `packages/adapter-kit/${area}/${adapter}-subpath.${extension}`,
-        adk(`@galaxie/${adapter}/internal`),
+        adk(`@galaxie-ai/${adapter}/internal`),
       ],
       [
         `packages/adapter-kit/${area}/${adapter}-relative.${extension}`,
@@ -632,7 +635,7 @@ test.each(ADAPTER_AREAS)('adapter-kit %s may never import an executor adapter', 
 });
 
 test.each([
-  '@galaxie/core/internal',
+  '@galaxie-ai/core/internal',
   '../../core/src/index.js',
   '../../core/dist/index.js',
   '../../models/src/mock.js',
@@ -720,9 +723,9 @@ test.each(['src/a.ts', 'dist/a.js', 'test/a.test.ts'])(
 );
 
 test.each([
-  '@galaxie/core',
-  '@galaxie/react',
-  '@galaxie/adapter-kit',
+  '@galaxie-ai/core',
+  '@galaxie-ai/react',
+  '@galaxie-ai/adapter-kit',
   'react',
   'react-dom',
   'node:fs',
@@ -764,9 +767,9 @@ test.each([
 });
 
 test.each([
-  '@galaxie/ui-protocol/internal',
-  '@galaxie/ui-protocol/src/index.js',
-  '@galaxie/ui-protocol/dist/index.js',
+  '@galaxie-ai/ui-protocol/internal',
+  '@galaxie-ai/ui-protocol/src/index.js',
+  '@galaxie-ai/ui-protocol/dist/index.js',
   '../../ui-protocol/src/index.js',
   '../../ui-protocol/dist/index.js',
 ])('consumers must use the ui-protocol public root: %s', (specifier) => {
@@ -778,8 +781,8 @@ test.each([
 test.each(['packages/react/src/a.ts'])(
   'React permits the protocol public root and rejects deep imports: %s',
   (path) => {
-    expect(run({ [path]: adk('@galaxie/ui-protocol') }).status).toBe(0);
-    expect(run({ [path]: adk('@galaxie/ui-protocol/internal') }).status).toBe(1);
+    expect(run({ [path]: adk('@galaxie-ai/ui-protocol') }).status).toBe(0);
+    expect(run({ [path]: adk('@galaxie-ai/ui-protocol/internal') }).status).toBe(1);
   },
 );
 
@@ -787,19 +790,19 @@ test('the protocol public-root inventory preserves unrelated tooling import beha
   expect(
     run({ 'scripts/manifest.ts': "const moduleName = 'host'; await import(moduleName);" }),
   ).toMatchObject({ status: 0, output: '' });
-  const result = run({ 'scripts/protocol.ts': adk('@galaxie/ui-protocol/src/index.js') });
+  const result = run({ 'scripts/protocol.ts': adk('@galaxie-ai/ui-protocol/src/index.js') });
   expect(result.status).toBe(1);
   expect(result.output).toContain('ui-protocol imports must use the public root');
 });
 
 test('core declares exactly the protocol dependency and may import its public root', () => {
-  expect(run({ 'packages/core/src/surface.ts': adk('@galaxie/ui-protocol') })).toMatchObject({
+  expect(run({ 'packages/core/src/surface.ts': adk('@galaxie-ai/ui-protocol') })).toMatchObject({
     status: 0,
     output: '',
   });
 });
 
-test.each([{}, { 'left-pad': '1' }, { '@galaxie/ui-protocol': 'workspace:*', 'left-pad': '1' }])(
+test.each([{}, { 'left-pad': '1' }, { '@galaxie-ai/ui-protocol': 'workspace:*', 'left-pad': '1' }])(
   'core rejects a dependency set other than the protocol package: %j',
   (dependencies) => {
     const manifest = JSON.stringify({
@@ -808,11 +811,11 @@ test.each([{}, { 'left-pad': '1' }, { '@galaxie/ui-protocol': 'workspace:*', 'le
     });
     const result = run({ 'packages/core/package.json': manifest });
     expect(result.status).toBe(1);
-    expect(result.output).toContain('core dependencies must be exactly @galaxie/ui-protocol');
+    expect(result.output).toContain('core dependencies must be exactly @galaxie-ai/ui-protocol');
   },
 );
 
-test.each(['@galaxie/ui-protocol/internal', '../../ui-protocol/src/index.js', 'left-pad'])(
+test.each(['@galaxie-ai/ui-protocol/internal', '../../ui-protocol/src/index.js', 'left-pad'])(
   'core rejects non-root protocol or other imports: %s',
   (specifier) => {
     const result = run({ 'packages/core/src/surface.ts': adk(specifier) });

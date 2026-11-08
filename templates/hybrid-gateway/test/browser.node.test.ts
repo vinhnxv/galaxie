@@ -42,7 +42,7 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
     await readFile(new URL('../tsconfig.workspace.json', import.meta.url), 'utf8'),
   ) as { compilerOptions: { paths: Record<string, string[]> } };
   const alias = Object.entries(workspace.compilerOptions.paths)
-    .filter(([name]) => name.startsWith('@galaxie/'))
+    .filter(([name]) => name.startsWith('@galaxie-ai/'))
     .sort(([a], [b]) => b.length - a.length)
     .map(([find, paths]) => {
       const path = paths[0];

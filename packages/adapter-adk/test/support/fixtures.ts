@@ -11,7 +11,7 @@ import {
   type ModelUsage,
   type RunTrace,
   type TraceResult,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   BaseChatModel,
   type BindToolsInput,

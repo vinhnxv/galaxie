@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type ErrorCode, GalaxieError, toErrorInfo } from '@galaxie/core';
+import { type ErrorCode, GalaxieError, toErrorInfo } from '@galaxie-ai/core';
 
 export type McpEventCode =
   | 'mcp_pin_mismatch'

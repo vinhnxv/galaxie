@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
-import { type CapabilityContext, createRuntime, type SessionId } from '@galaxie/core';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import { createLangGraphAdapter, requestInteraction } from '@galaxie-ai/adapter-langgraph';
+import { type CapabilityContext, createRuntime, type SessionId } from '@galaxie-ai/core';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import {
   Annotation,
   type BaseCheckpointSaver,

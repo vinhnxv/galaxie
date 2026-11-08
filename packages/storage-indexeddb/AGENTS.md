@@ -1,4 +1,4 @@
-# @galaxie/storage-indexeddb: coding guidance
+# @galaxie-ai/storage-indexeddb: coding guidance
 
 ## Purpose
 
@@ -8,7 +8,7 @@ See the [README](README.md) and [recovery flow](../../docs/system-design.md#82-r
 
 ## Entry points
 
-- `@galaxie/storage-indexeddb` exports `IndexedDBSaver`, `IndexedDBSaverOptions`,
+- `@galaxie-ai/storage-indexeddb` exports `IndexedDBSaver`, `IndexedDBSaverOptions`,
   `StorageError`, `StorageErrorCode`, `IndexedDBRecovery`, `SessionExport` and
   `SessionExportValue`.
 - The supported surface is [src/index.ts](src/index.ts); there are no subpaths.
@@ -20,7 +20,7 @@ See the [README](README.md) and [recovery flow](../../docs/system-design.md#82-r
 Derive the principal in trusted host code before opening storage:
 
 ```ts
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 
 const saver = await IndexedDBSaver.open({
   appId: 'lesson-app', principalScope: 'demo-learner',

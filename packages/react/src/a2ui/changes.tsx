@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PendingSurface } from '@galaxie/core';
+import type { PendingSurface } from '@galaxie-ai/core';
 import { type ReactElement, useEffect, useState } from 'react';
 
 /** Object order is immaterial; array order and every component property are material. */

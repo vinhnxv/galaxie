@@ -1,4 +1,4 @@
-# @galaxie/react: coding guidance
+# @galaxie-ai/react: coding guidance
 
 ## Purpose
 
@@ -8,7 +8,7 @@ See [usage and confirmation wiring](README.md).
 
 ## Entry points
 
-- `@galaxie/react` is the only entry; inspect [src/index.ts](src/index.ts).
+- `@galaxie-ai/react` is the only entry; inspect [src/index.ts](src/index.ts).
 - `createRegistry`, `defineComponent`, `useAgentSnapshot` and `AgentSurface`
   bind and render agent interactions.
 - `structuralComponents(catalogId)` supplies Column, Row, Text and Card separately.
@@ -24,7 +24,7 @@ See [usage and confirmation wiring](README.md).
 Build the trusted registry and pass its bindings when creating the instance:
 
 ```ts
-import { createRegistry, educationComponents } from '@galaxie/react';
+import { createRegistry, educationComponents } from '@galaxie-ai/react';
 
 const registry = createRegistry({ components: educationComponents });
 const ui = registry.bindings({ surfaces: ['lesson-main'] });

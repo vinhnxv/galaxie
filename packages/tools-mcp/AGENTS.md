@@ -1,4 +1,4 @@
-# @galaxie/tools-mcp: coding guidance
+# @galaxie-ai/tools-mcp: coding guidance
 
 ## Purpose
 
@@ -8,7 +8,7 @@ gateways are supported. See the [README](README.md).
 
 ## Entry points
 
-- `@galaxie/tools-mcp` exports `createMcpServer`, `toolPin`, server/binding/limit
+- `@galaxie-ai/tools-mcp` exports `createMcpServer`, `toolPin`, server/binding/limit
   types and content-free `McpEvent` types from [src/index.ts](src/index.ts).
 - There are no public subpaths; do not import the internal session implementation.
 
@@ -17,7 +17,7 @@ gateways are supported. See the [README](README.md).
 Compute a definition pin in a trusted review workflow:
 
 ```ts
-import { toolPin } from '@galaxie/tools-mcp';
+import { toolPin } from '@galaxie-ai/tools-mcp';
 
 const pin = await toolPin({
   name: 'lesson.lookup', inputSchema: { type: 'object' },

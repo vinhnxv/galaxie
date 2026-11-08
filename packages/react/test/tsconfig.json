@@ -5,9 +5,9 @@
     "jsx": "react-jsx",
     "types": ["node"],
     "paths": {
-      "@galaxie/core/browser": ["../../core/src/browser.ts"],
-      "@galaxie/core": ["../../core/src/index.ts"],
-      "@galaxie/ui-protocol": ["../../ui-protocol/src/index.ts"]
+      "@galaxie-ai/core/browser": ["../../core/src/browser.ts"],
+      "@galaxie-ai/core": ["../../core/src/index.ts"],
+      "@galaxie-ai/ui-protocol": ["../../ui-protocol/src/index.ts"]
     }
   },
   "include": [".", "../src"]

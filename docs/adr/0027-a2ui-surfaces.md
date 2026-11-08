@@ -171,7 +171,7 @@ On restore, re-register the stored surface's private strings before any policy c
 
 ### Implementation ownership and renderer choice
 
-Build a galaxie-owned protocol package for message types, strict catalog validation and a pure reducer, plus a thin A2UI renderer in `@galaxie/react`. The protocol package is framework-neutral and imports neither core nor React; core supplies trusted catalogs, limits and the mandatory URL/private-value policy predicates, owns identity/provenance and commits pending surfaces. React maps validated catalog names to host registrations and owns only local input state, accessibility and render outcomes. Core may depend on the protocol package; the package must not depend back on core. The later package work must update the dependency/build inventories for that boundary. The package name is an implementation choice; its wire constants are the pin above.
+Build a galaxie-owned protocol package for message types, strict catalog validation and a pure reducer, plus a thin A2UI renderer in `@galaxie-ai/react`. The protocol package is framework-neutral and imports neither core nor React; core supplies trusted catalogs, limits and the mandatory URL/private-value policy predicates, owns identity/provenance and commits pending surfaces. React maps validated catalog names to host registrations and owns only local input state, accessibility and render outcomes. Core may depend on the protocol package; the package must not depend back on core. The later package work must update the dependency/build inventories for that boundary. The package name is an implementation choice; its wire constants are the pin above.
 
 Take **no runtime dependency on any `@a2ui/*` package**. The npm registry showed this on 2026-11-07:
 

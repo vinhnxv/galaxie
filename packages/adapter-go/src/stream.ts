@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { sameJson } from '@galaxie/adapter-kit';
-import type { ExecutorEvent } from '@galaxie/core';
+import { sameJson } from '@galaxie-ai/adapter-kit';
+import type { ExecutorEvent } from '@galaxie-ai/core';
 import type { AIMessage, AIMessageChunk } from '@langchain/core/messages';
 import { concat } from '@langchain/core/utils/stream';
 import { adapterFailure } from './errors.js';

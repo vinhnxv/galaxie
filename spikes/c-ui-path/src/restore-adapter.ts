@@ -6,8 +6,8 @@ import {
   createLangGraphAdapter,
   type LangGraphAgent,
   type LangGraphServices,
-} from '@galaxie/adapter-langgraph';
-import type { ExecutorAdapter, ExecutorEvent, SessionId } from '@galaxie/core';
+} from '@galaxie-ai/adapter-langgraph';
+import type { ExecutorAdapter, ExecutorEvent, SessionId } from '@galaxie-ai/core';
 import { THREAD_KEY } from './session-saver.js';
 
 export function restoreAdapter(): ExecutorAdapter<LangGraphAgent, LangGraphServices> {

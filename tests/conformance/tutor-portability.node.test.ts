@@ -5,13 +5,13 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createManifest } from '@galaxie/core';
-import { tutorDefinition } from '@galaxie/example-english-tutor';
+import { createManifest } from '@galaxie-ai/core';
+import { tutorDefinition } from '@galaxie-ai/example-english-tutor';
 import ts from '@typescript/typescript6';
 import { expect, test } from 'vitest';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const tutorPackage = '@galaxie/example-english-tutor';
+const tutorPackage = '@galaxie-ai/example-english-tutor';
 const tutorDir = resolve(root, 'examples/english-tutor');
 
 function source(path: string): ts.SourceFile {

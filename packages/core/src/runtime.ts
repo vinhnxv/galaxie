@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ProtocolErrorCode } from '@galaxie/ui-protocol';
+import type { ProtocolErrorCode } from '@galaxie-ai/ui-protocol';
 import { type TracerProvider, trace } from '@opentelemetry/api';
 import { createAgentInstance } from './agent-instance.js';
 import { budgetLimits } from './budgets.js';
@@ -178,7 +178,7 @@ export function createRuntime<const Adapters extends readonly ExecutorAdapter<un
   }
   const instances = new Set<AgentInstance<unknown, unknown>>();
   const tracer = (options.tracerProvider ?? trace.getTracerProvider()).getTracer(
-    '@galaxie/core',
+    '@galaxie-ai/core',
     VERSION,
   );
   let disposal: Promise<void> | undefined;

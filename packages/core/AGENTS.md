@@ -1,4 +1,4 @@
-# @galaxie/core: coding guidance
+# @galaxie-ai/core: coding guidance
 
 ## Purpose
 
@@ -6,21 +6,21 @@ Own framework-neutral contracts and the host runtime: lifecycle, budgets,
 capability grants, model routing, interactions, recovery and filtered spans.
 See the [README](README.md) and [runtime contracts](../../docs/system-design.md#6-core-runtime-and-contracts).
 
-Core's only direct dependency is `@galaxie/ui-protocol`; import its public root only.
+Core's only direct dependency is `@galaxie-ai/ui-protocol`; import its public root only.
 Core owns catalog binding, publication/restore validation, revisions and private-user
 provenance for materialized pending surfaces. Legacy requests retain their old path.
 
 ## Entry points
 
-- `@galaxie/core` exports the runtime and contracts from [src/index.ts](src/index.ts),
+- `@galaxie-ai/core` exports the runtime and contracts from [src/index.ts](src/index.ts),
   with no unguarded browser globals.
-- `@galaxie/core/browser` opts into ownership and invalidation helpers and their
+- `@galaxie-ai/core/browser` opts into ownership and invalidation helpers and their
   types from [src/browser.ts](src/browser.ts).
 - `createRuntime`, `defineAgentDefinition` and `createManifest` construct runtime,
   definition and build-time manifest data respectively.
 - `httpCapability` and `galaxieField` support host bindings and schema annotations
   through the main entry. Import `acquireOwnership` and `watchInvalidation` from
-  `@galaxie/core/browser` for host lifecycle wiring.
+  `@galaxie-ai/core/browser` for host lifecycle wiring.
 - `RuntimeOptions`, `CreateOptions`, `AgentInstance`, `RecoveryStore` and
   `DiagnosticEvent` are exported contracts; internal modules are not subpaths.
 
@@ -29,8 +29,8 @@ provenance for materialized pending surfaces. Legacy requests retain their old p
 Create the runtime in trusted host code and register a real adapter:
 
 ```ts
-import { createRuntime } from '@galaxie/core';
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createRuntime } from '@galaxie-ai/core';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 
 const runtime = createRuntime({
   appId: 'lesson-app',

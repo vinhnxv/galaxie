@@ -7,7 +7,7 @@ import {
   outputText,
   rawArgumentChunks,
   resolveProvider,
-} from '@galaxie/adapter-kit';
+} from '@galaxie-ai/adapter-kit';
 import {
   GalaxieError,
   type ModelCall,
@@ -16,7 +16,7 @@ import {
   type ModelUsage,
   type SelectedModelRoute,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import type { CallbackManagerForLLMRun, Callbacks } from '@langchain/core/callbacks/manager';
 import type {
   BaseLanguageModelInput,

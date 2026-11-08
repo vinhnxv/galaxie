@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/adapter-go",
+  "name": "@galaxie-ai/adapter-go",
   "version": "0.0.0",
   "private": true,
   "description": "Google ADK (Go) executor for galaxie: Go compiled to WebAssembly in a Worker, with policy kept in JavaScript.",
@@ -23,8 +23,8 @@
     "dist"
   ],
   "dependencies": {
-    "@galaxie/core": "workspace:*",
-    "@galaxie/adapter-kit": "workspace:*"
+    "@galaxie-ai/core": "workspace:*",
+    "@galaxie-ai/adapter-kit": "workspace:*"
   },
   "peerDependencies": {
     "@langchain/core": "~1.2.20"

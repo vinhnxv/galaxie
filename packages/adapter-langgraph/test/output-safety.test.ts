@@ -6,7 +6,7 @@ import {
   type ModelCall,
   type ModelPort,
   type OutputSafetyHook,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createManifest } from '@galaxie/core';
-import { tutorDefinition } from '@galaxie/example-english-tutor';
+import { createManifest } from '@galaxie-ai/core';
+import { tutorDefinition } from '@galaxie-ai/example-english-tutor';
 import { expect, test } from 'vitest';
 
 test('generates the tutor manifest from its unchanged definition', () => {

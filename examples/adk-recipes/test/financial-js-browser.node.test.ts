@@ -26,7 +26,7 @@ test('financial scenarios run in Chromium with the strict policy and only same-o
       logLevel: 'silent',
       resolve: {
         alias: {
-          '@galaxie/adapter-adk': fileURLToPath(
+          '@galaxie-ai/adapter-adk': fileURLToPath(
             new URL('../../../packages/adapter-adk/src/index.ts', import.meta.url),
           ),
         },

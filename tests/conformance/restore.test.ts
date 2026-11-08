@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { SessionId } from '@galaxie/core';
+import type { SessionId } from '@galaxie-ai/core';
 import { MemorySaver } from '@langchain/langgraph/web';
 import { expect, test } from 'vitest';
 import { cases } from './cases/index.js';

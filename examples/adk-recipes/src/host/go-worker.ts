@@ -2,4 +2,4 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'virtual:adk-recipes-go-glue';
-import '@galaxie/adapter-go/worker';
+import '@galaxie-ai/adapter-go/worker';

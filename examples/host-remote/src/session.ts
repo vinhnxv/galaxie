@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { GalaxieError } from '@galaxie/core';
+import { GalaxieError } from '@galaxie-ai/core';
 
 export function createSession(origin: string, now: () => number = Date.now): () => Promise<string> {
   let session: { token: string; expiresAt: number } | undefined;

@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/core",
+  "name": "@galaxie-ai/core",
   "version": "0.1.0",
   "description": "Runtime and framework-neutral contracts for browser agents.",
   "license": "Apache-2.0",
@@ -42,6 +42,6 @@
     "@opentelemetry/sdk-trace": "3.0.0"
   },
   "dependencies": {
-    "@galaxie/ui-protocol": "workspace:*"
+    "@galaxie-ai/ui-protocol": "workspace:*"
   }
 }

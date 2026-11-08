@@ -322,7 +322,9 @@ if (import.meta.main) {
     )
       throw new ManifestBuildError('Usage: node scripts/build-manifest.ts <packageDir> [--verify]');
     const pkg = metadata(packageDir);
-    const corePath = createRequire(join(pkg.packageDir, 'package.json')).resolve('@galaxie/core');
+    const corePath = createRequire(join(pkg.packageDir, 'package.json')).resolve(
+      '@galaxie-ai/core',
+    );
     const core = (await import(pathToFileURL(corePath).href)) as {
       createManifest: ManifestOptions<unknown>['createManifest'];
     };

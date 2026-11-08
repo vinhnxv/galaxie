@@ -7,7 +7,7 @@ import {
   GalaxieError,
   type PendingConfirmation,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import type { ReactElement } from 'react';
 import { useAgentSnapshot } from './hooks.js';
 

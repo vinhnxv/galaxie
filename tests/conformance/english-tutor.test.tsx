@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { lessonFixture } from '@galaxie/example-english-tutor';
-import { createRegistry, educationComponents, WritingPrompt } from '@galaxie/react';
+import { lessonFixture } from '@galaxie-ai/example-english-tutor';
+import { createRegistry, educationComponents, WritingPrompt } from '@galaxie-ai/react';
 import { expect, test } from 'vitest';
 import { sentence, tutorFixture } from '../../examples/english-tutor/test/support.js';
 

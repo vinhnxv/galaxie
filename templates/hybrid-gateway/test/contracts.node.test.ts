@@ -10,7 +10,12 @@ import { cspDirectives } from '../src/csp.js';
 import { gatewayStateForStatus, gatewayStates } from '../src/gateway-state.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const launch = ['@galaxie/core', '@galaxie/adapter-langgraph', '@galaxie/models', '@galaxie/react'];
+const launch = [
+  '@galaxie-ai/core',
+  '@galaxie-ai/adapter-langgraph',
+  '@galaxie-ai/models',
+  '@galaxie-ai/react',
+];
 const original = new URL('../../local-only/src/agent.ts', import.meta.url);
 
 it.skipIf(!existsSync(original))(
@@ -40,7 +45,7 @@ it('declares exactly four launch packages, registry ranges and the existing thir
   const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
   expect(
     Object.keys(dependencies)
-      .filter((name) => name.startsWith('@galaxie/'))
+      .filter((name) => name.startsWith('@galaxie-ai/'))
       .sort(),
   ).toEqual([...launch].sort());
   for (const name of launch) expect(dependencies[name]).toBe('^0.1.0');
@@ -56,7 +61,7 @@ it('declares exactly four launch packages, registry ranges and the existing thir
   };
   expect(
     Object.fromEntries(
-      Object.entries(dependencies).filter(([name]) => !name.startsWith('@galaxie/')),
+      Object.entries(dependencies).filter(([name]) => !name.startsWith('@galaxie-ai/')),
     ),
   ).toEqual(thirdParties);
   for (const version of Object.values(dependencies)) expect(version).not.toContain('workspace:');
@@ -89,7 +94,7 @@ it('keeps executable imports within the copied template or launch packages', asy
     for (const match of source.matchAll(/(?:from\s*|import\s*\(\s*|import\s*)['"]([^'"]+)['"]/g)) {
       const specifier = match[1];
       if (specifier === undefined) throw new Error('The import has no specifier.');
-      if (specifier.startsWith('@galaxie/')) {
+      if (specifier.startsWith('@galaxie-ai/')) {
         expect(launch).toContain(specifier.split('/').slice(0, 2).join('/'));
       }
       if (specifier.startsWith('.')) {

@@ -7,7 +7,7 @@ import {
   MAX_BRIDGE_BYTES,
   parseJsonText,
   withinBridgeLimit,
-} from '@galaxie/adapter-kit';
+} from '@galaxie-ai/adapter-kit';
 
 export { isRecord, MAX_BRIDGE_BYTES, withinBridgeLimit };
 

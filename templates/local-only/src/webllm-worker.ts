@@ -9,7 +9,7 @@ const buffer = (event: MessageEvent): void => {
 };
 self.addEventListener('message', buffer);
 await first.promise;
-const { startWebLLMWorker } = await import('@galaxie/models/webllm/worker');
+const { startWebLLMWorker } = await import('@galaxie-ai/models/webllm/worker');
 self.removeEventListener('message', buffer);
 startWebLLMWorker();
 for (const event of messages.splice(0)) self.dispatchEvent(event);

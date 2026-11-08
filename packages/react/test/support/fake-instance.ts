@@ -13,7 +13,7 @@ import {
   type SessionId,
   toErrorInfo,
   type ViewRevision,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { type Mock, vi } from 'vitest';
 
 export function interaction(overrides: Partial<PendingInteraction> = {}): PendingInteraction {

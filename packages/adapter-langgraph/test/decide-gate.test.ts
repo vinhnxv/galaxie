@@ -9,7 +9,7 @@ import {
   type DecisionResult,
   defineAgentDefinition,
   type ViewRevision,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   Annotation,
   END,

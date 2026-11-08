@@ -6,7 +6,7 @@ import {
   defineAgentDefinition,
   type SessionId,
   type UserInteractionEvent,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import {

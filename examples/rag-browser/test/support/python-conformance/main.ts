@@ -4,7 +4,7 @@
 /// <reference types="vite/client" />
 
 import '../../../src/host/zod-config.js';
-import type { PyodideAdapterOptions } from '@galaxie/adapter-pyodide';
+import type { PyodideAdapterOptions } from '@galaxie-ai/adapter-pyodide';
 import { IndexedDBSaver } from '../../../../../packages/storage-indexeddb/src/index.js';
 import {
   executePythonRestore,

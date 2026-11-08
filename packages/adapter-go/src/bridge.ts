@@ -11,8 +11,8 @@ import {
   validCapabilityRequest,
   validChatMessage,
   validModelOption,
-} from '@galaxie/adapter-kit';
-import { type InteractionRequest, parseInteractionRequest } from '@galaxie/core';
+} from '@galaxie-ai/adapter-kit';
+import { type InteractionRequest, parseInteractionRequest } from '@galaxie-ai/core';
 import { adapterFailure } from './errors.js';
 import { isRecord, withinBridgeLimit } from './protocol.js';
 

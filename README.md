@@ -56,14 +56,14 @@ You need Node.js 24 and pnpm 11 (through Corepack).
 
 ```sh
 pnpm install
-pnpm --filter @galaxie/example-host-local exec vite build --mode mock
-pnpm --filter @galaxie/example-host-local exec vite preview --mode mock --host 127.0.0.1
+pnpm --filter @galaxie-ai/example-host-local exec vite build --mode mock
+pnpm --filter @galaxie-ai/example-host-local exec vite preview --mode mock --host 127.0.0.1
 ```
 
 This serves a local English-tutor host with a scripted mock model, so nothing is downloaded: a lesson, a quiz, a writing prompt and feedback, with reload recovery. Without `--mode mock` the host asks the user to download a real model, which needs a WebGPU device. The other examples:
 
 - [`examples/host-remote`](examples/host-remote/README.md): the same tutor with a remote quiz model and confirmed saves.
-- [`examples/rag-browser`](examples/rag-browser/README.md): retrieval built in the browser, with cited answers. `pnpm --filter @galaxie/example-rag-browser dev:mock` serves it with mock models.
+- [`examples/rag-browser`](examples/rag-browser/README.md): retrieval built in the browser, with cited answers. `pnpm --filter @galaxie-ai/example-rag-browser dev:mock` serves it with mock models.
 - [`examples/mcp-server`](examples/mcp-server/README.md): a reference MCP server used by the tests.
 
 `pnpm check` runs every check that CI runs, including the Go and Python lanes, so it also needs a Go toolchain and Python with `uv`. The [toolchain section](docs/system-design.md#10-toolchain) describes the TypeScript tooling.
@@ -74,18 +74,18 @@ The [local-only starter template](templates/local-only/README.md) has its own ti
 
 | Package | Purpose |
 | --- | --- |
-| [`@galaxie/core`](packages/core/README.md) | Runtime, lifecycle, capability broker, model router, budgets, tracing |
-| [`@galaxie/models`](packages/models/README.md) | Model providers |
-| [`@galaxie/react`](packages/react/README.md) | Typed component registry, snapshot hook and headless components |
-| [`@galaxie/storage-indexeddb`](packages/storage-indexeddb/README.md) | Checkpoints, recovery journal and session export in IndexedDB |
-| [`@galaxie/tools-mcp`](packages/tools-mcp/README.md) | MCP client that binds allowlisted tools as capabilities |
-| [`@galaxie/ui-protocol`](packages/ui-protocol/README.md) | Pure A2UI parser, catalog validator and surface reducer; core carries its surfaces in pending interactions and `@galaxie/react` renders them |
-| [`@galaxie/adapter-kit`](packages/adapter-kit/README.md) | Shared internal adapter translation and bridge helpers |
-| [`@galaxie/adapter-langgraph`](packages/adapter-langgraph/README.md) | LangGraph.js adapter |
-| [`@galaxie/adapter-pyodide`](packages/adapter-pyodide/README.md) | Python frameworks through Pyodide |
-| [`@galaxie/adapter-adk`](packages/adapter-adk/README.md) | Google ADK (JavaScript) adapter |
-| [`@galaxie/adapter-go`](packages/adapter-go/README.md) | Google ADK (Go) through WebAssembly |
-| [`@galaxie/eslint-plugin`](packages/eslint-plugin/README.md) | Lint rules that flag direct platform access in agent code |
+| [`@galaxie-ai/core`](packages/core/README.md) | Runtime, lifecycle, capability broker, model router, budgets, tracing |
+| [`@galaxie-ai/models`](packages/models/README.md) | Model providers |
+| [`@galaxie-ai/react`](packages/react/README.md) | Typed component registry, snapshot hook and headless components |
+| [`@galaxie-ai/storage-indexeddb`](packages/storage-indexeddb/README.md) | Checkpoints, recovery journal and session export in IndexedDB |
+| [`@galaxie-ai/tools-mcp`](packages/tools-mcp/README.md) | MCP client that binds allowlisted tools as capabilities |
+| [`@galaxie-ai/ui-protocol`](packages/ui-protocol/README.md) | Pure A2UI parser, catalog validator and surface reducer; core carries its surfaces in pending interactions and `@galaxie-ai/react` renders them |
+| [`@galaxie-ai/adapter-kit`](packages/adapter-kit/README.md) | Shared internal adapter translation and bridge helpers |
+| [`@galaxie-ai/adapter-langgraph`](packages/adapter-langgraph/README.md) | LangGraph.js adapter |
+| [`@galaxie-ai/adapter-pyodide`](packages/adapter-pyodide/README.md) | Python frameworks through Pyodide |
+| [`@galaxie-ai/adapter-adk`](packages/adapter-adk/README.md) | Google ADK (JavaScript) adapter |
+| [`@galaxie-ai/adapter-go`](packages/adapter-go/README.md) | Google ADK (Go) through WebAssembly |
+| [`@galaxie-ai/eslint-plugin`](packages/eslint-plugin/README.md) | Lint rules that flag direct platform access in agent code |
 | [`templates/local-only`](templates/local-only/README.md) | Copyable local-only Vite + React starter with mock fallback and pending-question recovery |
 | [`templates/hybrid-gateway`](templates/hybrid-gateway/README.md) | Copyable browser agent with a Node model proxy, private prompts and scoped HTTP capabilities |
 

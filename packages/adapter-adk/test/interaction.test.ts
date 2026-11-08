@@ -11,7 +11,7 @@ import {
   type PendingInteraction,
   parseInteractionRequest,
   type RunEvent,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   BaseLlm,
   LlmAgent,

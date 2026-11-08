@@ -1,11 +1,11 @@
-# @galaxie/eslint-plugin
+# @galaxie-ai/eslint-plugin
 
 > This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
 
 ESLint 10 flat-config rules for reviewed, bundled agent packages. The plugin has zero runtime dependencies, uses ESTree and scope analysis without type information, and never executes the code it lints. Every recommended rule is an error; none has an autofix.
 
 ```js
-import galaxie from '@galaxie/eslint-plugin';
+import galaxie from '@galaxie-ai/eslint-plugin';
 
 export default [galaxie.configs.recommended];
 ```
@@ -26,7 +26,7 @@ Global checks respect local variables, parameters and imports that shadow platfo
 
 HTML sinks include assignments to `innerHTML`, `outerHTML` and `srcdoc`, calls to `insertAdjacentHTML` and `createContextualFragment` on any receiver, global `document.write` and `document.writeln`, and the JSX attribute `dangerouslySetInnerHTML`. Render model output as text through trusted catalog components.
 
-`no-direct-model` matches these sources and their subpaths: `@langchain/openai`, `@langchain/anthropic`, `@langchain/google-genai`, `@langchain/ollama`, `@langchain/mistralai`, `@langchain/groq`, `@langchain/community`, `@mlc-ai/web-llm`, `@google/genai`, `openai`, `@anthropic-ai/sdk` and `@galaxie/models`. It matches only the model classes of `@google/adk` listed above, as named imports, re-exports and member access on a namespace import (`adk.Gemini`); the rest of that package is allowed because ADK agents and tools are validated at prepare. Its optional object has `allow?: string[]` and `extraSources?: string[]`. Each item is an exact package or subpath prefix, without wildcards or a trailing slash: `openai` matches `openai` and `openai/subpath`, but not `openai-other`. `extraSources` adds prefixes; `allow` exempts a matching source and its subpaths, including extra sources. An exemption permits direct construction to bypass the router, so review it explicitly. These options do not exempt the global `LanguageModel`.
+`no-direct-model` matches these sources and their subpaths: `@langchain/openai`, `@langchain/anthropic`, `@langchain/google-genai`, `@langchain/ollama`, `@langchain/mistralai`, `@langchain/groq`, `@langchain/community`, `@mlc-ai/web-llm`, `@google/genai`, `openai`, `@anthropic-ai/sdk` and `@galaxie-ai/models`. It matches only the model classes of `@google/adk` listed above, as named imports, re-exports and member access on a namespace import (`adk.Gemini`); the rest of that package is allowed because ADK agents and tools are validated at prepare. Its optional object has `allow?: string[]` and `extraSources?: string[]`. Each item is an exact package or subpath prefix, without wildcards or a trailing slash: `openai` matches `openai` and `openai/subpath`, but not `openai-other`. `extraSources` adds prefixes; `allow` exempts a matching source and its subpaths, including extra sources. An exemption permits direct construction to bypass the router, so review it explicitly. These options do not exempt the global `LanguageModel`.
 
 Reports contain only matched API names or configured source prefixes, never call arguments, string contents or full source text.
 

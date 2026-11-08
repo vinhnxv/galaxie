@@ -1,4 +1,4 @@
-# @galaxie/adapter-langgraph: coding guidance
+# @galaxie-ai/adapter-langgraph: coding guidance
 
 ## Purpose
 
@@ -8,7 +8,7 @@ See the [README](README.md) and [contracts](../../docs/system-design.md#6-core-r
 
 ## Entry points
 
-- `@galaxie/adapter-langgraph` exports `createLangGraphAdapter`, `STREAM_MODES`
+- `@galaxie-ai/adapter-langgraph` exports `createLangGraphAdapter`, `STREAM_MODES`
   and `requestInteraction`/`requestSurface`/`gateDecision` from [src/index.ts](src/index.ts).
 - Exported types include `LangGraphAgent`, `LangGraphHost`, `LangGraphGraph`,
   `LangGraphServices`, `LangGraphChatModel`, `DecisionGate` and `GatedDecision`;
@@ -20,7 +20,7 @@ See the [README](README.md) and [contracts](../../docs/system-design.md#6-core-r
 Use the host's routed model and forward the node config explicitly:
 
 ```ts
-import type { LangGraphHost } from '@galaxie/adapter-langgraph';
+import type { LangGraphHost } from '@galaxie-ai/adapter-langgraph';
 import type { LangGraphRunnableConfig } from '@langchain/langgraph/web';
 
 async function reply(host: LangGraphHost, config: LangGraphRunnableConfig) {

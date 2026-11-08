@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type AgentInstance, createRuntime, type SessionId } from '@galaxie/core';
-import { acquireOwnership, type Ownership } from '@galaxie/core/browser';
-import type { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import { type AgentInstance, createRuntime, type SessionId } from '@galaxie-ai/core';
+import { acquireOwnership, type Ownership } from '@galaxie-ai/core/browser';
+import type { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { createHostCapabilities } from './capabilities.js';
 import { loanConfirmations, loanRegistry } from './loan-approval.js';
 import { createOnnxModels, pinnedModelRecord } from './models.js';
@@ -17,7 +17,7 @@ async function openLoanStore(onHandoverRequest: () => Promise<void>): Promise<{
   saver: IndexedDBSaver;
   ownership: Ownership;
 }> {
-  const { IndexedDBSaver } = await import('@galaxie/storage-indexeddb');
+  const { IndexedDBSaver } = await import('@galaxie-ai/storage-indexeddb');
   const saver = await IndexedDBSaver.open({
     databaseName: 'adk-recipes',
     appId,

@@ -1,4 +1,4 @@
-# @galaxie/adapter-pyodide
+# @galaxie-ai/adapter-pyodide
 
 > This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
 

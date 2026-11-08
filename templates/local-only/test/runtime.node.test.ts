@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { ModelError, type ModelUnavailableReason } from '@galaxie/models/builtin-ai';
-import type { WebLLMEngineHandle } from '@galaxie/models/webllm';
+import { ModelError, type ModelUnavailableReason } from '@galaxie-ai/models/builtin-ai';
+import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createTemplateHost, type TemplateInstance } from '../src/runtime.js';
 

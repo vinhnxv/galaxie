@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ProtocolErrorCode } from '@galaxie/ui-protocol';
+import type { ProtocolErrorCode } from '@galaxie-ai/ui-protocol';
 import { type Context, context, type Tracer } from '@opentelemetry/api';
 import { type Annotations, readAnnotations } from './annotations.js';
 import { BudgetExceeded, deadlineTimer, RunBudget } from './budgets.js';
