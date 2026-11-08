@@ -567,9 +567,13 @@ describe('unresolved write reconciliation', () => {
         throw new Error('Synchronous hook failure');
       });
       const invoke = vi.fn(async () => 'unused');
-      const fixture = await resumeWrite(store, binding({ kind: 'write', reconcile: hook, invoke }), {
-        cancelOnFailure: true,
-      });
+      const fixture = await resumeWrite(
+        store,
+        binding({ kind: 'write', reconcile: hook, invoke }),
+        {
+          cancelOnFailure: true,
+        },
+      );
       expect(await fixture.result).toMatchObject({
         status: 'rejected',
         reason: { code: 'cancelled' },
