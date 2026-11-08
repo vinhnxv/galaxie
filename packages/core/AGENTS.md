@@ -46,6 +46,7 @@ const runtime = createRuntime({
   per-scope call order. Keep call order within each task deterministic; a later
   task receives new IDs. Calls without a task scope retain segment-based IDs,
   so repeated unscoped starts require a fresh session for a new operation.
+- Custom recovery stores must round-trip `formatVersion` unchanged; never offer Start over for `newer_record`.
 - Dispose instances on logout and ownership loss; compose ownership explicitly.
 - Keep errors fixed and content-free; keep raw `DiagnosticEvent.error` host-only
   and never forward it where `private-user` data may not go.
