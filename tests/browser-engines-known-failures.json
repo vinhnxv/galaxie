@@ -1,14 +1,4 @@
 {
-  "firefox": [
-    "tests/conformance/openai-provider.test.ts | AT-24 a CORS-allowed loopback user-device model endpoint succeeds: invoke",
-    "tests/conformance/openai-provider.test.ts | AT-24 a CORS-allowed loopback user-device model endpoint succeeds: stream",
-    "tests/conformance/openai-provider.test.ts | a routed OpenAI-compatible loopback model completes a capability tool loop: invoke",
-    "tests/conformance/openai-provider.test.ts | a routed OpenAI-compatible loopback model completes a capability tool loop: stream"
-  ],
-  "webkit": [
-    "tests/conformance/openai-provider.test.ts | AT-24 a CORS-allowed loopback user-device model endpoint succeeds: invoke",
-    "tests/conformance/openai-provider.test.ts | AT-24 a CORS-allowed loopback user-device model endpoint succeeds: stream",
-    "tests/conformance/openai-provider.test.ts | a routed OpenAI-compatible loopback model completes a capability tool loop: invoke",
-    "tests/conformance/openai-provider.test.ts | a routed OpenAI-compatible loopback model completes a capability tool loop: stream"
-  ]
+  "firefox": [],
+  "webkit": []
 }

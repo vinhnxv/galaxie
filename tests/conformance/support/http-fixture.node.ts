@@ -47,7 +47,7 @@ export async function createHttpFixture(): Promise<HttpControl> {
         response.setHeader(
           'Access-Control-Allow-Headers',
           path === '/v1/chat/completions'
-            ? 'content-type, authorization, x-stainless-lang, x-stainless-package-version, x-stainless-os, x-stainless-arch, x-stainless-runtime, x-stainless-runtime-version, x-stainless-retry-count, x-stainless-timeout, x-stainless-helper-method'
+            ? 'content-type, authorization, user-agent, x-stainless-lang, x-stainless-package-version, x-stainless-os, x-stainless-arch, x-stainless-runtime, x-stainless-runtime-version, x-stainless-retry-count, x-stainless-timeout, x-stainless-helper-method'
             : path === '/auth/required'
               ? 'content-type, authorization, x-galaxie-agent, x-galaxie-run, idempotency-key'
               : 'content-type, authorization, x-galaxie-agent, x-galaxie-run',
