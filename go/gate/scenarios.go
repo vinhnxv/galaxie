@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
@@ -139,10 +140,9 @@ type valueOut struct {
 
 // counter makes identifiers deterministic, so native and browser runs produce equal events.
 func deterministic(ctx context.Context) context.Context {
-	next := 0
+	var next atomic.Int64
 	return platform.WithUUIDProvider(ctx, func() string {
-		next++
-		return fmt.Sprintf("uuid-%d", next)
+		return fmt.Sprintf("uuid-%d", next.Add(1))
 	})
 }
 

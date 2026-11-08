@@ -9,6 +9,7 @@ const commands: ReadonlyArray<{ args: string[]; env: NodeJS.ProcessEnv }> = [
   { args: ['vet', './...'], env: {} },
   { args: ['vet', './...'], env: { GOOS: 'js', GOARCH: 'wasm' } },
   { args: ['test', './...'], env: {} },
+  { args: ['test', '-race', './...'], env: { CGO_ENABLED: '1' } },
   { args: ['mod', 'verify'], env: {} },
 ];
 
