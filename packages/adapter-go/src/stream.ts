@@ -20,10 +20,21 @@ export interface StreamSink {
   cancelled: boolean;
 }
 
-/** Releases any producer waiting for room when the run ends. */
 export function closeStream(sink: StreamSink): void {
   sink.cancelled = true;
   sink.room?.resolve();
+}
+
+/** Empties the queue and releases a producer that was waiting for room. */
+export function drainEvents(sink: StreamSink): ExecutorEvent[] {
+  const events = sink.events.splice(0);
+  sink.room?.resolve();
+  return events;
+}
+
+function enqueue(sink: StreamSink, mode: 'messages' | 'updates', data: unknown): void {
+  sink.events.push({ type: 'stream', executor: GO_EXECUTOR_ID, path: [], mode, data });
+  sink.wake?.();
 }
 
 async function push(
@@ -38,8 +49,7 @@ async function push(
     if (sink.room === room) delete sink.room;
   }
   if (sink.cancelled) throw adapterFailure('cancelled');
-  sink.events.push({ type: 'stream', executor: GO_EXECUTOR_ID, path: [], mode, data: data() });
-  sink.wake?.();
+  enqueue(sink, mode, data());
 }
 
 /** A content-free step marker: the offered function or capability name and a run-wide position. */
@@ -54,14 +64,7 @@ export function emitMarker(
 /** The marker for a run that stops to wait for the user; it names no tool and holds no content. */
 export function emitPaused(sink: StreamSink): void {
   if (sink.cancelled) return;
-  sink.events.push({
-    type: 'stream',
-    executor: GO_EXECUTOR_ID,
-    path: [],
-    mode: 'updates',
-    data: { step: 'paused', index: sink.position++ },
-  });
-  sink.wake?.();
+  enqueue(sink, 'updates', { step: 'paused', index: sink.position++ });
 }
 
 export function emitDelta(sink: StreamSink, author: string, text: string): Promise<void> {
@@ -120,7 +123,6 @@ export class StreamJoiner {
   #hasCalls = false;
   #checkText = '';
 
-  /** Cumulative text for the output hook, including repaired arguments once calls appear. */
   get checkText(): string {
     return this.#checkText;
   }

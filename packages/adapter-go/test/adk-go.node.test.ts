@@ -340,7 +340,6 @@ test.each(['cancel', 'abort', 'exit', 'error', 'dispose'] as const)(
   async (ending) => {
     const fixture = await queuedRun();
     const { iterator, controller, worker, prepared, progress, checkOutput, end, fail } = fixture;
-    // One delta has left the queue, 256 are queued and the next checked delta waits for room.
     await vi.waitFor(() => expect(checkOutput).toHaveBeenCalledTimes(258));
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     const produced = progress.produced;
@@ -352,7 +351,6 @@ test.each(['cancel', 'abort', 'exit', 'error', 'dispose'] as const)(
     else if (ending === 'exit') worker.emit({ v: 1, kind: 'exit', code: 2 });
     else if (ending === 'error') worker.fail();
     else await prepared.dispose();
-    // Keep the consumer suspended: closing must release the producer without another drain.
     await vi.waitFor(() => expect(progress.closed).toBe(true));
     expect(progress.produced).toBe(produced);
     expect(checkOutput).toHaveBeenCalledTimes(258);

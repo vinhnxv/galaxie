@@ -559,7 +559,6 @@ test('a stored record under a valid tag decodes, and a wrong type string does no
 
 test('the tag input separates the session, revision, position and checkpoint bytes', async () => {
   const encoder = new TextEncoder();
-  // The old layout let checkpoint bytes shift across the head's final delimiter.
   const oldTagged = (sessionId: string, position: number, checkpoint: string): Uint8Array =>
     encoder.encode(`adk-go|${sessionId}|${position}|${checkpoint}`);
   expect(oldTagged('s|1', 2, 'C')).toEqual(oldTagged('s', 1, '2|C'));
@@ -571,7 +570,6 @@ test('the tag input separates the session, revision, position and checkpoint byt
   const encoding = vi.spyOn(TextEncoder.prototype, 'encode');
   const signing = vi.spyOn(crypto.subtle, 'sign');
   try {
-    // Supply raw checkpoint fixtures while exercising the real tag calculation.
     encoding.mockReturnValueOnce(firstCheckpoint);
     const first = await encodeStored('s|1', revision, record(0), 2, key);
     encoding.mockReturnValueOnce(secondCheckpoint);

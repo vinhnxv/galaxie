@@ -39,7 +39,7 @@ import {
   type WorkerMessage,
   withinBridgeLimit,
 } from './protocol.js';
-import { closeStream, emitPaused } from './stream.js';
+import { closeStream, drainEvents, emitPaused } from './stream.js';
 
 /** The Go agent a host prepares: the reviewed module and the entry it serves. */
 export interface GoAgent {
@@ -463,9 +463,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
               wake.resolve();
             });
             for (;;) {
-              const events = current.events.splice(0);
-              current.room?.resolve();
-              for (const event of events) if (!request.signal.aborted) yield event;
+              for (const event of drainEvents(current)) if (!request.signal.aborted) yield event;
               // Events queued while a yield was suspended still precede the outcome.
               if (current.events.length > 0) continue;
               if (text !== undefined) break;
@@ -519,9 +517,7 @@ export function createGoAdapter(options: GoAdapterOptions): ExecutorAdapter<GoAg
                 pauses.set(request.sessionId, { interaction, position: current.position });
                 if (stillOpen()) {
                   if (current.streaming) {
-                    const events = current.events.splice(0);
-                    current.room?.resolve();
-                    for (const event of events) yield event;
+                    for (const event of drainEvents(current)) yield event;
                   }
                   yield { type: 'interaction', interaction };
                 }

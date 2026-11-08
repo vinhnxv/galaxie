@@ -245,7 +245,6 @@ async function checkStream(
     bindTools: () => model,
     async *stream() {
       for (const chunk of chunks) {
-        // Consume each preceding delta so this fixture also exercises the bounded stream sink.
         run.events.splice(0);
         yield chunk;
       }
