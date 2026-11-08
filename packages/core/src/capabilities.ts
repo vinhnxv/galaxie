@@ -62,7 +62,7 @@ export interface CapabilityContext {
 }
 
 /** The host's answer about whether an earlier effect applied (ADR-0029). */
-export type ReconcileResult<Output> =
+export type ReconcileResult<Output = unknown> =
   | { outcome: 'applied'; output: Output }
   | { outcome: 'not-applied' }
   | { outcome: 'unknown' };
@@ -87,12 +87,10 @@ export interface CapabilityBinding<Input = unknown, Output = unknown> {
   readonly invoke: (input: Input, context: CapabilityContext) => Promise<Output>;
   /**
    * Receives the effect ID and usual call context, never the call input. Valid only with
-   * `retry: 'none'`; consulted once per restored call (ADR-0029).
+   * `retry: 'none'`; consulted once per restored call (ADR-0029). An `applied` output is host data:
+   * the broker validates it against the capability's output schema, so the result is untyped here.
    */
-  readonly reconcile?: (
-    effectId: string,
-    context: CapabilityContext,
-  ) => Promise<ReconcileResult<Output>>;
+  readonly reconcile?: (effectId: string, context: CapabilityContext) => Promise<ReconcileResult>;
 }
 
 /** Framework-neutral access to the current run's broker. */
@@ -109,8 +107,7 @@ export interface CapabilityPort {
   ): Promise<unknown>;
 }
 
-export interface HttpCapabilityOptions<Output = unknown>
-  extends Omit<CapabilityBinding<unknown, Output>, 'invoke'> {
+export interface HttpCapabilityOptions extends Omit<CapabilityBinding, 'invoke'> {
   readonly url: string;
   readonly method: 'GET' | 'DELETE' | 'POST' | 'PUT' | 'PATCH';
   readonly headers?: (context: CapabilityContext) => HeadersInit | Promise<HeadersInit>;

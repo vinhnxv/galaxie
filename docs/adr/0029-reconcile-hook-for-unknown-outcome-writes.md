@@ -19,20 +19,19 @@ The capability broker owns the effect journal and every executor's brokered writ
 Add an optional property to `CapabilityBinding<Input, Output>`:
 
 ```ts
-readonly reconcile?: (
-  effectId: string,
-  context: CapabilityContext,
-) => Promise<ReconcileResult<Output>>;
+readonly reconcile?: (effectId: string, context: CapabilityContext) => Promise<ReconcileResult>;
 ```
 
 Its result is:
 
 ```ts
-type ReconcileResult<Output> =
+type ReconcileResult<Output = unknown> =
   | { outcome: 'applied'; output: Output }
   | { outcome: 'not-applied' }
   | { outcome: 'unknown' };
 ```
+
+The binding property uses the untyped result because an `applied` output is host data that the broker validates against the capability's output schema before it is trusted. A host may still annotate its own function with `ReconcileResult<MyOutput>`.
 
 The hook receives the effect ID and the usual `CapabilityContext`, including the abort signal, run ID, principal scope and agent attribution. It never receives the call input. The hook is valid only with `retry: 'none'`. A supplied non-function hook, or a hook on an `idempotent` or `idempotency-key` binding, fails creation with the constructor's existing `invalid` error.
 
@@ -92,7 +91,7 @@ Every failure below leaves the receipt `outcome_unknown`, so a later restore con
 Implementation is future work. The following new tests will verify the contract by behavior; these paths are not present yet:
 
 - `packages/core/test/reconcile.test.ts`: binding validation; consulting once before approval for both unresolved receipt states; validated and bounded `applied` output settling through the success path without invoke or approval and registering labels and private values; `not-applied` replay under the same effect ID with fresh approval; the failure modes above, including timeout in both approval modes, cancellation, disposal and repeated consultation after a later restore; content-free diagnostics; and unchanged behavior without a hook.
-- `tests/conformance/reconcile.test.ts` on Node and Chromium: restored LangGraph writes through the real broker and recovery store, proving `applied` returns without another write, `not-applied` requires fresh approval and invokes under the original effect ID, and unresolved answers remain blocked. Chromium will exercise IndexedDB reopen; Node will use memory storage.
+- `tests/conformance/reconcile.test.ts` on Node and Chromium: restored LangGraph writes through the real broker and recovery store, proving `applied` returns without another write, `not-applied` invokes once under the original effect ID, and unresolved answers remain blocked. Chromium will exercise IndexedDB reopen; Node will use memory storage.
 
 Unmeasured: the ADK JavaScript, Python and Go and Pyodide executors with a hook; DSPy, which keeps its own Python-side replay journal; Firefox and WebKit; any real backend; and whether a host's `not-applied` answer is sound, which core cannot check. Future mock and conformance results will not establish backend finality.
 
