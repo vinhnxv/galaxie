@@ -7,7 +7,7 @@ import type { AIMessage, AIMessageChunk } from '@langchain/core/messages';
 import { concat } from '@langchain/core/utils/stream';
 import { adapterFailure } from './errors.js';
 import { GO_EXECUTOR_ID } from './protocol.js';
-import { fragmentsOf } from './tool-calls.js';
+import { fragmentsOf, growingText } from './tool-calls.js';
 
 export const MAX_DELTA_LENGTH = 4096;
 const MAX_QUEUED_EVENTS = 256;
@@ -117,6 +117,13 @@ export class StreamJoiner {
   readonly #slots = new Map<string, number>();
   readonly #raw: string[] = [];
   #complete = 0;
+  #hasCalls = false;
+  #checkText = '';
+
+  /** Cumulative text for the output hook, including repaired arguments once calls appear. */
+  get checkText(): string {
+    return this.#checkText;
+  }
 
   /**
    * Adds one streamed piece. A provider without native streaming yields its whole reply as one
@@ -149,6 +156,9 @@ export class StreamJoiner {
       this.#joined === undefined
         ? chunk
         : concat(this.#joined as AIMessageChunk, chunk as AIMessageChunk);
+    this.#hasCalls ||= carriesCalls(chunk);
+    // Parsed arguments can change earlier text, so only a reply without calls is append-only.
+    this.#checkText = this.#hasCalls ? growingText(this.#joined) : this.#checkText + chunk.text;
     return this.#joined;
   }
 

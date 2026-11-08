@@ -30,7 +30,6 @@ import {
   StreamJoiner,
   type StreamSink,
 } from './stream.js';
-import { growingText } from './tool-calls.js';
 
 export type GoChatModel =
   | BaseChatModel
@@ -167,7 +166,8 @@ async function streamReply(
     if (aborted(run)) throw adapterFailure('cancelled');
     if (typeof chunk.content !== 'string' || (!offered && carriesCalls(chunk)))
       throw adapterFailure('unsupported');
-    await lease.checkOutput(growingText(joiner.append(chunk)), { final: false });
+    joiner.append(chunk);
+    await lease.checkOutput(joiner.checkText, { final: false });
     if (aborted(run)) throw adapterFailure('cancelled');
     for (const piece of splitter.feed(chunk.content)) await emitDelta(run, author, piece);
     if (aborted(run)) throw adapterFailure('cancelled');
