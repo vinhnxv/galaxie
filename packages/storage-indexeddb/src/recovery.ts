@@ -90,7 +90,7 @@ function envelope(value: unknown): unknown {
   return value['value'];
 }
 
-function recordKeys(record: Record<string, unknown>): string[] {
+function versionCheckedKeys(record: Record<string, unknown>): string[] {
   if (Object.hasOwn(record, 'formatVersion')) {
     const version = record['formatVersion'];
     if (typeof version !== 'number' || !Number.isInteger(version))
@@ -113,7 +113,7 @@ function sessionRecord(value: unknown, legacy = false): StoredSession {
     return sessionRecord({ ...copy, executorId: 'langgraph-js' });
   if (
     !object(copy) ||
-    recordKeys(copy).length !== 3 ||
+    versionCheckedKeys(copy).length !== 3 ||
     typeof copy['agentId'] !== 'string' ||
     copy['agentId'].length === 0 ||
     typeof copy['agentVersion'] !== 'string' ||
@@ -128,7 +128,7 @@ function sessionRecord(value: unknown, legacy = false): StoredSession {
 function submission(value: unknown, interactionId: string): StoredSubmission {
   if (
     !object(value) ||
-    recordKeys(value).length !== 4 ||
+    versionCheckedKeys(value).length !== 4 ||
     value['interactionId'] !== interactionId ||
     typeof value['action'] !== 'string' ||
     value['action'].length === 0 ||
@@ -141,7 +141,7 @@ function submission(value: unknown, interactionId: string): StoredSubmission {
 
 function effect(value: unknown): StoredEffect {
   if (!object(value)) throw new StorageError('corrupt');
-  const keys = recordKeys(value);
+  const keys = versionCheckedKeys(value);
   if (
     typeof value['inputDigest'] !== 'string' ||
     !/^[0-9a-f]{64}$/.test(value['inputDigest']) ||

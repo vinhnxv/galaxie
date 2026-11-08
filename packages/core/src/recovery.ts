@@ -6,7 +6,6 @@ import type { EffectId, InteractionId, SessionId } from './ids.js';
 
 export const RECOVERY_FORMAT_VERSION = 1;
 
-/** Internal distinction for restore; never carries stored content. */
 export class UnsupportedRecoveryFormatError extends GalaxieError {
   constructor() {
     super('unrecoverable', 'The saved session uses an unsupported recovery format.');
@@ -101,7 +100,7 @@ function corrupt(): never {
   throw new GalaxieError('unrecoverable', toErrorInfo('unrecoverable').message);
 }
 
-function recordKeys(record: { [key: string]: RecoveryJson }): string[] {
+function versionCheckedKeys(record: { [key: string]: RecoveryJson }): string[] {
   if (Object.hasOwn(record, 'formatVersion')) {
     const version = record['formatVersion'];
     if (typeof version !== 'number' || !Number.isInteger(version)) return corrupt();
@@ -153,7 +152,7 @@ export function validateSession(value: unknown): RecoverySession | undefined {
     copy === null ||
     Array.isArray(copy) ||
     typeof copy !== 'object' ||
-    recordKeys(copy).length !== 3 ||
+    versionCheckedKeys(copy).length !== 3 ||
     typeof copy['agentId'] !== 'string' ||
     copy['agentId'].length === 0 ||
     typeof copy['agentVersion'] !== 'string' ||
@@ -176,7 +175,7 @@ export function validateSubmissions(
       entry === null ||
       Array.isArray(entry) ||
       typeof entry !== 'object' ||
-      recordKeys(entry).length !== 4 ||
+      versionCheckedKeys(entry).length !== 4 ||
       typeof entry['interactionId'] !== 'string' ||
       entry['interactionId'].length === 0 ||
       typeof entry['action'] !== 'string' ||
@@ -195,7 +194,7 @@ export function validateEffectRecord(value: unknown): EffectRecord | undefined {
   if (value === undefined) return undefined;
   const copy = copyRecoveryJson(value);
   if (copy === null || Array.isArray(copy) || typeof copy !== 'object') return corrupt();
-  const keys = recordKeys(copy);
+  const keys = versionCheckedKeys(copy);
   if (typeof copy['inputDigest'] !== 'string' || !/^[0-9a-f]{64}$/.test(copy['inputDigest']))
     return corrupt();
   if (copy['status'] === 'succeeded' && keys.length === 3 && Object.hasOwn(copy, 'output'))
