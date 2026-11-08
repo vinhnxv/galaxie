@@ -24,6 +24,7 @@ passes the output-safety hook before its text leaves as a `messages` event `{ au
 fails the call `denied`: the blocked text is never forwarded, and deltas already delivered are not
 retracted. Tool turns emit content-free `updates` markers `{ step, tool, index }` with the offered name
 and a run-wide position, never a call ID, argument or result. An abort stops further events.
+The stream queue holds at most 256 events and applies backpressure.
 
 Go still receives one aggregated reply per model call, so ADK runs in its server-sent-events mode but
 sees no partial response: the page checks and forwards the text, and nothing unchecked reaches Go. Without
@@ -77,10 +78,13 @@ paused call matches the stored events and the request derived from them, and tha
 matches the digest of the conversation, ordinal and request.
 
 - One checkpoint per revision holds the record; the key, the stream position and an HMAC-SHA-256 tag
-  over session, position and record sit in its metadata. The marker (`__interrupt__`) is written first
+  over session, revision, position and record sit in its metadata. The marker (`__interrupt__`) is written first
   and the checkpoint commits it, so a crash between the two leaves the previous revision current. The
-  tag detects corruption, truncation, splicing between sessions and an edit made without the key; the
-  key lives beside the record, so it does not stop someone who can rewrite both.
+  tag detects corruption, truncation, splicing between sessions and accidental or blind misplacement
+  of a record between revision slots. The key lives beside the record, so anyone who can read and
+  write the store can recompute the tag. Restoring an earlier valid revision after newer ones were
+  removed is not detected. The format is not published, so no migration was needed; an earlier
+  development record restores as `unrecoverable`.
 - The page keeps memory and store equal: a pause is published only after its record is stored, and a
   run that fails, is cancelled or is refused leaves the stored pause answerable. A Worker that dies
   after Go finished, but before the page recorded the result, still publishes and stores the pause.
