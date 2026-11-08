@@ -1,0 +1,13 @@
+{
+  "webkit": [
+    "tests/conformance/browser-smoke.test.ts | loads the web graph and tracing SDK without Node polyfills",
+    "tests/conformance/education-a11y.test.tsx | Quiz supports keyboard completion, rejection and retry",
+    "tests/conformance/education-a11y.test.tsx | WritingPrompt supports keyboard completion, rejection and retry",
+    "tests/conformance/http-integration.test.ts | AT-24 a host fetch timeout stays unavailable while the broker signal is active",
+    "tests/conformance/openai-provider.test.ts | AT-24 a CORS-allowed loopback user-device model endpoint succeeds: invoke",
+    "tests/conformance/openai-provider.test.ts | AT-24 a CORS-allowed loopback user-device model endpoint succeeds: stream",
+    "tests/conformance/openai-provider.test.ts | a routed OpenAI-compatible loopback model completes a capability tool loop: invoke",
+    "tests/conformance/openai-provider.test.ts | a routed OpenAI-compatible loopback model completes a capability tool loop: stream"
+  ],
+  "firefox": []
+}

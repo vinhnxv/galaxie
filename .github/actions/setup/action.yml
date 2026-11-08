@@ -11,6 +11,9 @@ inputs:
   browser:
     description: Install the Chromium build the browser tests drive.
     default: "false"
+  engine:
+    description: Install this other Playwright engine (firefox or webkit) instead of Chromium.
+    default: ""
 
 runs:
   using: composite
@@ -47,3 +50,8 @@ runs:
     - if: inputs.browser == 'true'
       run: pnpm exec playwright install --with-deps --only-shell chromium
       shell: bash
+    - if: inputs.engine != ''
+      run: pnpm exec playwright install --with-deps "$ENGINE"
+      shell: bash
+      env:
+        ENGINE: ${{ inputs.engine }}
