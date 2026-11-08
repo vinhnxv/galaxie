@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync } from 'node:fs';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +10,7 @@ import { build, loadConfigFromFile, type PreviewServer, preview } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { pythonAssets } from '../scripts/python-assets.js';
 import { cspHeader } from '../src/host/csp.js';
+import { pythonWheelsAvailable } from './support/python.node.js';
 
 const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
 const servers: PreviewServer[] = [];
@@ -20,9 +20,6 @@ let mockOrigin: string;
 let defaultOrigin: string;
 let noPythonOrigin: string;
 let noToolsOrigin: string;
-const pythonAvailable = existsSync(
-  fileURLToPath(new URL('../../../.cache/python-wheels/local-wheels.json', import.meta.url)),
-);
 const pasted = 'Cobalt observatories count seven violet comets.';
 async function serve(mode: string, includePython = true, toolCalling = true): Promise<string> {
   const outDir = join(
@@ -552,7 +549,7 @@ async function selectPython(page: Page): Promise<void> {
     })
     .toBe(1);
 }
-const pythonTest = test.skipIf(!pythonAvailable);
+const pythonTest = test.skipIf(!pythonWheelsAvailable);
 
 pythonTest(
   'pydantic-ai is offered lazily with the mock tool-calling provider',
@@ -1042,6 +1039,31 @@ test('a Python-disabled build can delete a saved Python review reference and use
   }
 }, 15000);
 
+test.each([
+  ['text that is not JSON', '{not json'],
+  ['JSON that is not a review reference', JSON.stringify({ executor: 'removed', sessionId: 'x' })],
+])(
+  'a saved review reference with %s is cleared and preparation succeeds',
+  async (_name, value) => {
+    const { page, errors } = await observe(mockOrigin);
+    try {
+      await page.evaluate(
+        (stored) => localStorage.setItem('galaxie.rag-browser.review', stored),
+        value,
+      );
+      await preparePythonHost(page);
+      expect(await page.getByText('The chat models could not be prepared.').count()).toBe(0);
+      expect(
+        await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')),
+      ).toBeNull();
+      expect(errors).toEqual([]);
+    } finally {
+      await page.context().close();
+    }
+  },
+  30000,
+);
+
 test('review takeover remains usable after the former owner has completed its review', async () => {
   const { page, errors } = await observe(mockOrigin);
   try {
@@ -1113,7 +1135,7 @@ pythonTest(
 );
 
 for (const executor of ['javascript', 'python'] as const) {
-  test.skipIf(executor === 'python' && !pythonAvailable)(
+  test.skipIf(executor === 'python' && !pythonWheelsAvailable)(
     `review drops a passage and streams a cited answer: ${executor}`,
     async () => {
       const { page, requests, errors } = await observe(mockOrigin);
@@ -1163,7 +1185,7 @@ for (const executor of ['javascript', 'python'] as const) {
     60000,
   );
 
-  test.skipIf(executor === 'python' && !pythonAvailable)(
+  test.skipIf(executor === 'python' && !pythonWheelsAvailable)(
     `review reload restores, resumes and deletes its session: ${executor}`,
     async () => {
       const { page, requests, errors } = await observe(mockOrigin);

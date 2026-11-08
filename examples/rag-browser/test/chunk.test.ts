@@ -19,3 +19,12 @@ test('splits long paragraphs into at most 1000 characters at sentence ends', () 
   expect(passages.every((passage) => passage.length <= 1000)).toBe(true);
   expect(passages.join(' ')).toBe(text);
 });
+
+test('never splits a surrogate pair at a hard cut', () => {
+  const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  const text = `${'a'.repeat(999)}\u{1F600}${'b'.repeat(50)}`;
+  const passages = chunkText(text);
+  expect(passages.every((passage) => passage.length <= 1000)).toBe(true);
+  expect(passages.some((passage) => lone.test(passage))).toBe(false);
+  expect(passages.join('')).toBe(text);
+});

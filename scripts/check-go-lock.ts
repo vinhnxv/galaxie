@@ -36,6 +36,7 @@ async function sumdbRecord(path: string, version: string): Promise<number> {
 /** The record number of the first version the public module index lists at or after the cutoff. */
 async function cutoffRecord(): Promise<number> {
   const response = await fetch(`https://index.golang.org/index?since=${cutoff}&limit=1`);
+  if (!response.ok) throw new Error('The module index could not be read.');
   const entry = JSON.parse((await response.text()).split('\n')[0] ?? '') as {
     Path: string;
     Version: string;

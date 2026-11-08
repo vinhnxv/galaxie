@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { storageMarkerCode } from '@galaxie-ai/adapter-kit';
 import {
   type CapabilityPort,
   type ErrorCode,
@@ -82,11 +83,8 @@ export function toGalaxieError(
   signal?: AbortSignal,
 ): GalaxieError {
   if (isGalaxieError(error)) return error;
-  if (typeof error === 'object' && error !== null) {
-    if ('invalidated' in error && error.invalidated === true) return failure('stale');
-    if ('fenced' in error && error.fenced === true) return failure('fenced');
-    if ('unrecoverable' in error && error.unrecoverable === true) return failure('unrecoverable');
-  }
+  const marked = storageMarkerCode(error);
+  if (marked !== undefined) return failure(marked);
   // ADK refuses forged or altered history and mismatched confirmations by name; neither is retryable.
   for (let cause: unknown = error, depth = 0; cause instanceof Error && depth < 4; depth++) {
     if (cause.name === 'IntentMismatchError' || cause.name === 'ToolCallIntegrityError')

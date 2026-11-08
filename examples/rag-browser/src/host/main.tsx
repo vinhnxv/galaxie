@@ -42,6 +42,8 @@ if (import.meta.env.MODE === 'mock') {
     const response = await fetch('/data/squad-dev.json', {
       credentials: 'omit',
       headers: { Accept: 'application/json' },
+      // A stalled response must not hold the first render back.
+      signal: AbortSignal.timeout(15000),
     });
     if (response.ok) corpus = parseCorpus(await response.json());
   } catch {}

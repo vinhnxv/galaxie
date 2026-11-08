@@ -9,6 +9,7 @@ export {
   withinBridgeLimit,
 } from './framing.js';
 export { resolveProvider } from './providers.js';
+export { storageMarkerCode } from './storage-markers.js';
 export {
   type ArgumentChunk,
   argumentChunks,

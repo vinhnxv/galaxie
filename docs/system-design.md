@@ -9,7 +9,7 @@
 
 ## 1. What exists today
 
-- **MVP evidence:** the [exit record](mvp-exit-record.md) maps AT-01 through AT-36 to existing evidence and gaps, and [unsupported features](unsupported.md) lists current limits and unverified paths; the maintainer's Go/Revise decision is pending.
+- **MVP evidence:** the [exit record](mvp-exit-record.md) maps AT-01 through AT-36 to existing evidence and gaps, and [unsupported features](unsupported.md) lists current limits and unverified paths; the maintainer decided Go on 2026-10-30, with the open items still open.
 - **Toolchain:** a pnpm workspace with TypeScript 7 and 6 side by side, Biome, Vitest and CI (§10).
 - **`packages/core`:** framework-neutral contracts and four M1 runtime slices: lifecycle, identity, cancellation, replayable in-memory events, a capability broker, model routing with consent and per-call credentials, sticky labels, argument shapes, finite budgets, interrupt dispatch and resume, and allowlisted OpenTelemetry spans. M3 adds an optional durable recovery port, inbox reconciliation and a write-effect journal (§6, §8.1–§8.3). The M1 exit controls add interaction URL policy and development trace text filtered by live labels and destination (§6, §9).
 - **`packages/adapter-langgraph`:** native LangGraph execution, host-injected models and checkpointers, run-bound capability access, native step limits and callback-based tracing.
@@ -93,7 +93,7 @@ Trust rules:
 
 ```mermaid
 flowchart TD
-    Host["Host apps: examples/host-local, examples/host-http"]
+    Host["Host apps: examples/host-local, examples/host-remote"]
     Starter["Template: templates/local-only, bundled one-question agent"]
     Starter --> Adapter & Models & Storage & ReactPkg
     HybridStarter["Template: templates/hybrid-gateway, same agent and Node gateway"]
@@ -241,10 +241,9 @@ Target (brief §15), with the milestone that first needs each path:
 | `packages/tools-mcp/` | M4 |
 | `packages/eslint-plugin/` | M4 |
 | `examples/english-tutor/` | M2 |
-| `examples/host-local/`, `examples/host-http/` | M2 (first host, CSP), M4 (second host, host proxy, MCP) |
+| `examples/host-local/`, `examples/host-remote/` | M2 (first host, CSP), M4 (second host, host proxy, MCP) |
 | `examples/mcp-server/` | M4 |
 | `tests/conformance/` | M1 |
-| `tests/fixtures/` | M1 |
 | `tests/injection-corpus/` | M4 |
 
 Spike code is throwaway. Keep it out of `packages/` and never promote it to package code (brief §16.2).

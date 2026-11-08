@@ -107,6 +107,7 @@ class WriteJournal {
   #tail: Promise<void> = Promise.resolve();
   #record: EffectRecord | undefined;
   #loaded = false;
+  /** True once a dispatch may have happened: a loaded dispatched record, or the binding was invoked. */
   #dispatched = false;
   #successStarted = false;
   #failureRequested = false;
@@ -147,6 +148,11 @@ class WriteJournal {
     return this.#write({ status, inputDigest: this.#inputDigest }, false);
   }
 
+  /** Called immediately before the binding is invoked; a failure after this point is unknown. */
+  markInvoked(): void {
+    this.#dispatched = true;
+  }
+
   succeed(output: unknown): Promise<void> {
     return this.#write(
       { status: 'succeeded', inputDigest: this.#inputDigest, output: copyRecoveryJson(output) },
@@ -184,7 +190,6 @@ class WriteJournal {
       )
         return;
       if (record.status === 'succeeded') this.#successStarted = true;
-      if (record.status === 'dispatched') this.#dispatched = true;
       try {
         await this.#store.recordEffect(this.#sessionId, this.effectId, stamped);
         this.#record = stamped;
@@ -555,6 +560,7 @@ export class CapabilityBroker {
               let execution: Promise<unknown>;
               try {
                 invoked = true;
+                journal?.markInvoked();
                 execution = Promise.resolve(
                   compiled.http === undefined
                     ? binding.invoke(value, context)

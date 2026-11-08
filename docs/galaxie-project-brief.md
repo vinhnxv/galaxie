@@ -1312,10 +1312,9 @@ TypeScript strict; pnpm workspaces. Pin the toolchain and versions after checkin
 | `packages/eslint-plugin/` | Rules for agent packages (no direct `fetch`, storage, DOM, `eval`); created in M4 |
 | `examples/english-tutor/` | Agent definition with no hardcoded host backend |
 | `examples/host-local/` | Local lesson/progress bindings, in-browser models only |
-| `examples/host-http/` | Existing-API bindings, host-proxy LLM, MCP connection |
+| `examples/host-remote/` | Existing-API bindings, host-proxy LLM, MCP connection |
 | `examples/mcp-server/` | Minimal Streamable HTTP MCP server with CORS, standing in for a gateway |
 | `tests/conformance/` | The parity suite: the same graphs with a deterministic fake chat model on Node and in Chrome; its results feed the compatibility matrix (M1) |
-| `tests/fixtures/` | Mock model, deterministic tools, malformed UI, crash scenarios |
 | `tests/injection-corpus/` | Prompt injection cases for lessons, tool output and MCP descriptions |
 | `docs/adr/` | Architecture decisions, alternatives and evidence |
 
