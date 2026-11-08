@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync } from 'node:fs';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +10,7 @@ import { build, loadConfigFromFile, type PreviewServer, preview } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { pythonAssets } from '../scripts/python-assets.js';
 import { cspHeader } from '../src/host/csp.js';
+import { pythonWheelsAvailable } from './support/python.node.js';
 
 const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
 const servers: PreviewServer[] = [];
@@ -20,9 +20,6 @@ let mockOrigin: string;
 let defaultOrigin: string;
 let noPythonOrigin: string;
 let noToolsOrigin: string;
-const pythonAvailable = existsSync(
-  fileURLToPath(new URL('../../../.cache/python-wheels/local-wheels.json', import.meta.url)),
-);
 const pasted = 'Cobalt observatories count seven violet comets.';
 async function serve(mode: string, includePython = true, toolCalling = true): Promise<string> {
   const outDir = join(
@@ -552,7 +549,7 @@ async function selectPython(page: Page): Promise<void> {
     })
     .toBe(1);
 }
-const pythonTest = test.skipIf(!pythonAvailable);
+const pythonTest = test.skipIf(!pythonWheelsAvailable);
 
 pythonTest(
   'pydantic-ai is offered lazily with the mock tool-calling provider',
@@ -1138,7 +1135,7 @@ pythonTest(
 );
 
 for (const executor of ['javascript', 'python'] as const) {
-  test.skipIf(executor === 'python' && !pythonAvailable)(
+  test.skipIf(executor === 'python' && !pythonWheelsAvailable)(
     `review drops a passage and streams a cited answer: ${executor}`,
     async () => {
       const { page, requests, errors } = await observe(mockOrigin);
@@ -1188,7 +1185,7 @@ for (const executor of ['javascript', 'python'] as const) {
     60000,
   );
 
-  test.skipIf(executor === 'python' && !pythonAvailable)(
+  test.skipIf(executor === 'python' && !pythonWheelsAvailable)(
     `review reload restores, resumes and deletes its session: ${executor}`,
     async () => {
       const { page, requests, errors } = await observe(mockOrigin);
