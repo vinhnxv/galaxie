@@ -1,7 +1,8 @@
 # Unsupported features and unverified paths
 
-Revised on 2026-11-07 for the model output limit, ONNX record, A2UI, HTTP write
-retry and ADK recipe entries; the other entries were last checked against the
+Revised on 2026-11-08 for the first npm release (recovery data entry) and on
+2026-11-07 for the model output limit, ONNX record, A2UI, HTTP write retry and
+ADK recipe entries; the other entries were last checked against the
 implementation on 2026-10-31. The [MVP exit record](mvp-exit-record.md) maps acceptance requirements to existing
 evidence, with the maintainer's decision pending.
 
@@ -72,7 +73,7 @@ evidence, with the maintainer's decision pending.
 ## Storage and recovery
 
 - There is no unknown-outcome reconciliation API: an unknown `retry: 'none'` write remains blocked on restore, and the host must reconcile with its backend by effect ID before starting a potentially repeating operation. For an `httpCapability` declared `retry: 'idempotency-key'`, the effect ID is sent as the `Idempotency-Key` header, so a backend that deduplicates on it makes a repeat safe; galaxie does not guarantee the backend does, and the evidence is injected-fetch and loopback only ([effect recovery](system-design.md#83-a-capability-call)).
-- Recovery data is not migrated across builds. Write receipts recorded before task-scoped effect IDs are keyed by run segment, and a newer build cannot find them, so resuming such a session on a newer build can repeat a write, including a `retry: 'none'` write. No package has been released yet. Hosts must resume a session with the build that created it, or Start over and reconcile with the backend by effect ID before upgrading ([recovery contract](system-design.md#82-reload-and-crash-recovery)).
+- Recovery data is not migrated across builds. Write receipts recorded before task-scoped effect IDs are keyed by run segment, and a newer build cannot find them, so resuming such a session on a newer build can repeat a write, including a `retry: 'none'` write. The seven launch packages are on npm at 0.1.0 and recovery data carries no format version, so a record written by 0.1.0 is the oldest format that a later build would have to read. Hosts must resume a session with the build that created it, or Start over and reconcile with the backend by effect ID before upgrading ([recovery contract](system-design.md#82-reload-and-crash-recovery)).
 - Reload recovery cannot finish an arbitrary intermediate checkpoint with no pending interrupt or replay later writes from that point ([recovery limits](system-design.md#82-reload-and-crash-recovery)).
 - The checkpoint saver's `exportSession` supplies content-free metadata by default and personal checkpoint content only with exact `personalContent: true`, which hosts must bind to an explicit user action. Host-local wires a metadata-summary download and a host-confirmed personal-content download; host-remote has no export UI. Export is lossy and supplies no import, sync, cross-device recovery or durable runtime-event history ([export semantics](../packages/storage-indexeddb/README.md#explicit-session-export), [scope](galaxie-project-brief.md#52-outside-the-mvp)).
 - IndexedDB storage is not encrypted by the package and browser persistence is not permanence, so eviction can return a fresh start ([storage limits](../packages/storage-indexeddb/AGENTS.md#limits)).
