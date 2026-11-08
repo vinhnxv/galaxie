@@ -158,7 +158,10 @@ test.skipIf(!pythonWheelsAvailable)(
     : missingPythonWheels,
   async () => {
     const read = await toolRun('none', 'read-tool');
-    expect(read.events.at(-1)).toMatchObject({ type: 'output' });
+    // Show the error event in the failure message, so a rare failure carries its own cause.
+    expect(read.events.at(-1), JSON.stringify(read.events.filter((e) => e.type === 'error'))).toMatchObject({
+      type: 'output',
+    });
     expect(read.searched).toBe(1);
 
     // The same write is refused as a model-chosen tool call, before it reaches the capability.
