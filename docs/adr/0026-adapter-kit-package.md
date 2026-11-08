@@ -1,8 +1,10 @@
 # ADR-0026: Shared adapter helpers in a non-adapter package
 
-- **Status:** Proposed
+- **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-07
 - **Related:** brief §7.6, §14.2; system design §4; ADR-0012, ADR-0017, ADR-0018, ADR-0020, ADR-0023
+- **Revisions:**
+  - 2026-11-08: accepted after the extraction merged and its dependency, pack and conformance checks ran in CI. The "Proposed record" wording below describes the text as first written.
 
 ## Context
 

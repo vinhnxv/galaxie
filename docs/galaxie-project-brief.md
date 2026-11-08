@@ -316,7 +316,7 @@ See ADR-0010 for the cuts and the reasons, and §16 for when each item comes bac
 - A published CLI, json-render and a multi-model pool. A dedicated executor worker too, unless its measured trigger fires during the MVP (§6.2). (Trace export is the host's OpenTelemetry exporter from M1, §14.4.)
 - LLM-composed UI (§11.2) and LLM-chosen tool calls with small local models (§10.6).
 
-A2UI surfaces are proposed in [ADR-0027](adr/0027-a2ui-surfaces.md); the existing deferral remains until that proposal is accepted.
+A2UI surfaces are accepted in [ADR-0027](adr/0027-a2ui-surfaces.md), which lifts the deferral for the one A2UI v1.0 surface format; LLM-composed UI stays deferred.
 
 ### 5.3. Initial target platform [PROPOSED]
 
@@ -900,7 +900,7 @@ flowchart TB
 
 ### 11.2. Catalog, registry and surfaces
 
-A2UI surfaces are proposed in [ADR-0027](adr/0027-a2ui-surfaces.md), retaining host-owned catalogs and regions.
+A2UI surfaces are accepted in [ADR-0027](adr/0027-a2ui-surfaces.md), retaining host-owned catalogs and regions.
 
 - The catalog defines component types, props schemas and allowed events/actions.
 - The registry maps the catalog to the host's actual React, Vue or Web Components. Each catalog ships headless reference components. [ADR-0007]
@@ -1351,7 +1351,7 @@ The compatibility matrix holds **observed** results, not results inferred from R
 - ADR-0008 (manifest generation) and ADR-0010 (scope) in M4;
 - ADR-0014 (data labels) in M1 with unit tests and AT-36, in M2 with AT-04, and in M4 with AT-32.
 
-ADR-0006 is Accepted, but it names the in-browser engine only after Spike B.
+ADR-0006 is Accepted and names WebLLM, behind a thin galaxie adapter, as the in-browser engine (Spike B, approved 2026-11-08).
 
 ### 16.3. M1 — Headless host, adapter, broker and security skeleton
 
@@ -1661,7 +1661,7 @@ This is a product hypothesis. The milestones in §16 exist to prove it.
 | [ADR-0003] | Executor on the main thread in the MVP | Proposed |
 | [ADR-0004] | Checkpoint interrupt is the source of truth for pending interactions | Proposed |
 | [ADR-0005] | IndexedDB checkpoint saver for LangGraph.js | Proposed |
-| [ADR-0006] | Model providers, destination classes and per-role routing | Accepted (in-browser engine chosen by Spike B, before M2) |
+| [ADR-0006] | Model providers, destination classes and per-role routing | Accepted (in-browser engine: WebLLM behind a thin adapter, from Spike B) |
 | [ADR-0007] | Typed UI registry with headless reference components for the MVP | Proposed |
 | [ADR-0008] | Code-first agent definition, generated manifest | Proposed |
 | [ADR-0009] | Multi-tab ownership with Web Locks and a fencing epoch | Proposed |

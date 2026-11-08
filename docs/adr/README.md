@@ -40,15 +40,15 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0017](0017-framework-neutral-contracts.md) | Framework-neutral contracts, with an adapter per framework | Accepted |
 | [0018](0018-python-agents-through-pyodide.md) | Python agents through Pyodide in a worker, with policy kept in JavaScript | Proposed |
 | [0019](0019-in-browser-retrieval.md) | Browser-built retrieval in a maintained example | Proposed |
-| [0020](0020-google-adk-through-an-adapter.md) | Google ADK (JavaScript) through an executor adapter that owns the Runner | Proposed |
+| [0020](0020-google-adk-through-an-adapter.md) | Google ADK (JavaScript) through an executor adapter that owns the Runner | Accepted |
 | [0021](0021-in-browser-onnx-chat-provider.md) | In-browser ONNX chat models through a Transformers.js provider with a Worker-side runtime seam | Proposed |
 | [0022](0022-google-adk-python-through-the-pyodide-adapter.md) | Google ADK (Python) through the Pyodide adapter, with an explicit wheel list | Proposed |
 | [0023](0023-google-adk-go-through-a-wasm-worker.md) | Google ADK (Go) through a WebAssembly Worker, with policy kept in JavaScript | Proposed |
 | [0024](0024-apache-2-0-license-and-dco.md) | License: Apache-2.0, with the Developer Certificate of Origin | Accepted |
 | [0025](0025-adk-recipes-demo.md) | ADK recipe demonstrations through a separate browser host | Proposed |
-| [0026](0026-adapter-kit-package.md) | Shared adapter helpers in a non-adapter package | Proposed |
-| [0027](0027-a2ui-surfaces.md) | A2UI surfaces with host-owned catalogs and policy | Proposed |
-| [0028](0028-decision-model-role.md) | Decision model roles through the model router | Proposed |
+| [0026](0026-adapter-kit-package.md) | Shared adapter helpers in a non-adapter package | Accepted |
+| [0027](0027-a2ui-surfaces.md) | A2UI surfaces with host-owned catalogs and policy | Accepted |
+| [0028](0028-decision-model-role.md) | Decision model roles through the model router | Accepted |
 
 ## Template
 

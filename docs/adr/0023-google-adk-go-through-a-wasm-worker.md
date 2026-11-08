@@ -28,7 +28,7 @@ A feasibility run on 2026-11-04 (a throwaway probe, not committed) found:
 7. **Executor features turn on only with their evidence.** The adapter first registers `adk-go` with every feature false and a run failing `unsupported` when its event stream is first read. Later stages add the model and tool bridge, streaming, interactions, durable sessions and agent shapes, each turning its flag on in the same change that adds its evidence, as in ADR-0022. No stage changes the goldens or matrices of another executor.
 8. **No CSP, Trusted Types or ADR-0012 relaxation.** The module Worker is loaded the same way as the other Workers, and `'wasm-unsafe-eval'` is already in the strict policy.
 
-**Amendment (2026-11-07):** [Proposed ADR-0026](0026-adapter-kit-package.md) amends decision 1's premise that the Go Worker, bridge and loader share nothing with Pyodide: pure common adapter and bridge helpers may move to the non-adapter `@galaxie/adapter-kit` package. The separate Go adapter decision stands; its loader, WASM glue and framework-specific behavior stay local. Adapter-to-adapter imports remain forbidden, and today's dependency rules stay in force until the extraction lands.
+**Amendment (2026-11-07):** [ADR-0026](0026-adapter-kit-package.md) amends decision 1's premise that the Go Worker, bridge and loader share nothing with Pyodide: pure common adapter and bridge helpers may move to the non-adapter `@galaxie/adapter-kit` package. The separate Go adapter decision stands; its loader, WASM glue and framework-specific behavior stay local. Adapter-to-adapter imports remain forbidden, and today's dependency rules stay in force until the extraction lands.
 
 ## Alternatives considered
 
