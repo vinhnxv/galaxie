@@ -11,10 +11,11 @@
   "scripts": {
     "build": "tsc -p packages/ui-protocol/tsconfig.build.json && tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-kit/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json && tsc -p packages/adapter-pyodide/tsconfig.build.json && tsc -p packages/adapter-adk/tsconfig.build.json && tsc -p packages/adapter-go/tsconfig.build.json && tsc -p packages/models/tsconfig.build.json && tsc -p packages/react/tsconfig.build.json && tsc -p examples/english-tutor/tsconfig.build.json && node scripts/build-manifest.ts examples/english-tutor && node scripts/build-manifest.ts examples/english-tutor --verify && pnpm --filter @galaxie-ai/example-host-local build && tsc -p packages/storage-indexeddb/tsconfig.build.json && tsc -p examples/mcp-server/tsconfig.build.json && tsc -p packages/tools-mcp/tsconfig.build.json && pnpm --filter @galaxie-ai/example-host-remote build && tsc -p packages/eslint-plugin/tsconfig.build.json && pnpm --filter @galaxie-ai/example-rag-browser build",
     "build:packages": "tsc -p packages/ui-protocol/tsconfig.build.json && tsc -p packages/core/tsconfig.build.json && tsc -p packages/adapter-kit/tsconfig.build.json && tsc -p packages/adapter-langgraph/tsconfig.build.json && tsc -p packages/models/tsconfig.build.json && tsc -p packages/react/tsconfig.build.json && tsc -p packages/storage-indexeddb/tsconfig.build.json",
-    "check": "pnpm run check:license && pnpm run check:dependency-licenses && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run test:python && pnpm run test:go && pnpm run typecheck:python && pnpm run build && pnpm run check:deps && pnpm run check:docs && pnpm run check:size",
+    "check": "pnpm run check:license && pnpm run check:dependency-licenses && pnpm run check:python-wheels && pnpm run lint && pnpm run typecheck && pnpm run typecheck:ts6 && pnpm run test && pnpm run test:python && pnpm run test:go && pnpm run typecheck:python && pnpm run build && pnpm run check:deps && pnpm run check:docs && pnpm run check:size",
     "check:license": "node scripts/check-license.ts",
     "check:dependency-licenses": "node scripts/check-dependency-licenses.ts",
     "check:docs": "node scripts/check-docs.ts",
+    "check:python-wheels": "node scripts/check-python-wheels.ts",
     "check:size": "node scripts/check-size.ts",
     "format": "biome check --write .",
     "lint": "biome check .",
