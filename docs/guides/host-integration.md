@@ -215,7 +215,11 @@ The [built-app reload test](../../templates/local-only/test/reload.node.test.ts)
 [reopened IndexedDB app test](../../templates/local-only/test/app.test.ts) and
 [ownership tests](../../tests/conformance/ownership.test.ts) cover those paths.
 The host still owns trusted identity, session pointers, teardown and backend
-reconciliation of unknown effects. Browser eviction can erase checkpoints;
+reconciliation of unknown effects, optionally through a binding's
+`reconcile(effectId, context)` hook for `retry: 'none'` writes
+([ADR-0029](../adr/0029-reconcile-hook-for-unknown-outcome-writes.md)).
+Without a hook, unknown writes stay blocked and reconciliation remains outside
+the framework. Browser eviction can erase checkpoints;
 unsubmitted drafts reset on reload, and ownership cannot stop an already-sent
 remote request.
 
@@ -363,9 +367,64 @@ they hold private answers and tool outputs. Follow the
 [recovery flow](../system-design.md#82-reload-and-crash-recovery) and
 [storage README](../../packages/storage-indexeddb/README.md) for retention,
 session deletion and compatible agent identity. Drafts remain local to components
-and reset on reload. Unknown remote outcomes require backend reconciliation by
-effect ID; recovery cannot finish arbitrary intermediate checkpoints without a
-pending interrupt.
+and reset on reload. A `retry: 'none'` write can bind `reconcile(effectId, context)`
+to ask the backend about a restored `dispatched` or `outcome_unknown` receipt.
+Core consults it once per restored call, before approval, with the abort signal
+but no call input. `applied` with output settles the receipt through the usual
+schema validation, payload bound and labels, without invoking or approval.
+`not-applied` replays under the same effect ID with fresh approval where required.
+`unknown`, a throw, a rejection or a malformed answer fails `outcome_unknown`;
+timeout fails `timeout` in both approval modes, and cancellation or disposal fails
+`cancelled`. These failures leave the receipt `outcome_unknown`.
+Without a hook, behavior is unchanged: the write stays blocked and the host
+reconciles outside the framework. Recovery cannot finish arbitrary intermediate
+checkpoints without a pending interrupt.
+
+This binding uses a host-provided, authenticated backend lookup. The backend
+stores the effect ID supplied by the write and returns either its output or a
+tombstone that refuses any later application of that ID:
+
+```ts
+import { httpCapability, type ReconcileResult } from '@galaxie-ai/core';
+
+type SaveOutput = { saved: boolean };
+declare function lookupBackendEffect(
+  effectId: string,
+  signal: AbortSignal,
+): Promise<{ output?: SaveOutput; tombstoned: boolean }>;
+
+const save = httpCapability<{ lessonId: string }, SaveOutput>({
+  url: 'https://api.example.test/progress',
+  method: 'POST',
+  kind: 'write',
+  destination: 'host-server',
+  timeoutMs: 10000,
+  concurrency: 1,
+  grantScope: 'instance',
+  approval: 'confirm',
+  retry: 'none',
+  headers: (context) => ({ 'Idempotency-Key': context.effectId }),
+  reconcile: async (effectId, context): Promise<ReconcileResult<SaveOutput>> => {
+    const receipt = await lookupBackendEffect(effectId, context.signal);
+    if (receipt.output !== undefined) return { outcome: 'applied', output: receipt.output };
+    if (receipt.tombstoned) return { outcome: 'not-applied' };
+    return { outcome: 'unknown' };
+  },
+});
+```
+
+Bind this alongside the matching capability schemas and host confirmations;
+the hook is valid only with `retry: 'none'` ([ADR-0029](../adr/0029-reconcile-hook-for-unknown-outcome-writes.md), Proposed).
+The host's `not-applied` answer must mean the backend will never apply that effect
+ID later: an absence check cannot exclude a former owner's late request
+([ADR-0009](../adr/0009-multi-tab-ownership.md)), core cannot verify finality and a
+false answer can repeat a write.
+The [unit tests](../../packages/core/test/reconcile.test.ts) cover the broker controls;
+[LangGraph conformance](../../tests/conformance/reconcile.test.ts) uses an in-test mock
+backend on Node with memory storage and Chromium with reopened IndexedDB. The hook is
+unmeasured through ADK JavaScript, ADK Python, ADK Go, Pyodide and DSPy (which keeps
+its own Python-side replay journal), Firefox/WebKit, real backends including HTTP,
+and host answer soundness; see [current limits](../unsupported.md#storage-and-recovery).
 
 Bind `saver.exportSession(sessionId)` to an explicit metadata-summary action.
 Call `saver.exportSession(sessionId, { personalContent: true })` only after the
