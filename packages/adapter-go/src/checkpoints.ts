@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { storageMarkerCode } from '@galaxie-ai/adapter-kit';
 import { type ErrorCode, isGalaxieError } from '@galaxie-ai/core';
 import type { ConversationRecord } from './bridge.js';
 import { adapterFailure } from './errors.js';
@@ -28,12 +29,7 @@ export function validCheckpointPort(value: unknown): value is CheckpointPort {
 
 /** Storage reports why a write or read was refused through marker fields; keep that reason. */
 function storageCode(error: unknown): ErrorCode {
-  if (typeof error === 'object' && error !== null) {
-    if ('invalidated' in error && error.invalidated === true) return 'stale';
-    if ('fenced' in error && error.fenced === true) return 'fenced';
-    if ('unrecoverable' in error && error.unrecoverable === true) return 'unrecoverable';
-  }
-  return 'unavailable';
+  return storageMarkerCode(error) ?? 'unavailable';
 }
 
 function unavailable(error: unknown): never {
