@@ -232,6 +232,7 @@ export async function serveModel(
     });
     const callOptions = {
       signal: run.request.signal,
+      maxTokens: lease.maxTokens,
       ...(input.options.stop === undefined ? {} : { stop: [...input.options.stop] }),
       ...(input.options.jsonSchema === undefined ? {} : { jsonSchema: input.options.jsonSchema }),
       [Symbol.for('galaxie.model.destination')]: lease.destination,

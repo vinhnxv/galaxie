@@ -27,7 +27,10 @@ const definition = defineAgentDefinition({
       },
     },
   },
-  models: { answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
+  models: {
+    answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' },
+    summary: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' },
+  },
 });
 const provider = {
   destination: 'in-browser' as const,
@@ -91,7 +94,10 @@ async function harness(
     services: { chatModels: { mock: model } },
     models: {
       providers: { mock: provider },
-      roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
+      roles: {
+        answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 },
+        summary: { providers: ['mock'], allow: ['in-browser'], maxTokens: 37 },
+      },
     },
     bindings: {
       'docs.search@1': {
@@ -107,12 +113,12 @@ async function harness(
     },
   });
   await instance.prepare();
-  return { worker, runtime, instance, capability };
+  return { worker, runtime, instance, capability, model };
 }
 const last = (events: RunEvent[]): RunEvent | undefined => events.at(-1);
 
 test('a run serves a model request through the router and returns the final text', async () => {
-  const { instance, runtime, worker } = await harness(
+  const { instance, runtime, worker, model } = await harness(
     async (api) => {
       const reply = JSON.parse(await api.call('model', modelPayload('hello'))) as {
         content: string;
@@ -133,13 +139,14 @@ test('a run serves a model request through the router and returns the final text
     output: 'hello:hi there',
   });
   expect(worker.received.map((message) => message.kind)).toEqual(['run', 'reply']);
+  expect(model.maxTokens).toEqual([100]);
   await runtime.dispose();
   expect(worker.terminated).toBe(true);
 });
 
 test('model tool calls and capability calls round-trip with an effect scope', async () => {
   const seen: unknown[] = [];
-  const { instance, runtime, capability } = await harness(
+  const { instance, runtime, capability, model } = await harness(
     async (api) => {
       const tools = [
         {
@@ -180,6 +187,34 @@ test('model tool calls and capability calls round-trip with an effect scope', as
     { hits: 2 },
   ]);
   expect(capability).toHaveBeenCalledTimes(1);
+  expect(model.maxTokens).toEqual([100]);
+  await runtime.dispose();
+});
+
+test('model calls for different roles receive their own route output limits', async () => {
+  const { instance, runtime, model } = await harness(
+    async (api) => {
+      await api.call('model', modelPayload('hello'));
+      const reply = JSON.parse(
+        await api.call('model', {
+          role: 'summary',
+          messages: userMessage('summarize'),
+          options: {},
+        }),
+      ) as { content: string };
+      return okResult(reply.content);
+    },
+    {
+      hello: { id: 'answer', text: 'hello world' },
+      summarize: { id: 'summary', text: 'hello' },
+    },
+  );
+  const { runId } = await instance.start({ prompt: 'hello' });
+  expect(last(await collect(instance.events(runId)))).toMatchObject({
+    type: 'output',
+    output: 'hello',
+  });
+  expect(model.maxTokens).toEqual([100, 37]);
   await runtime.dispose();
 });
 
@@ -218,7 +253,7 @@ const streamRequest = (content: string, options: object = {}): unknown => ({
 
 test('a streaming run emits checked text deltas in order and the program gets one final reply', async () => {
   const replies: string[] = [];
-  const { instance, runtime } = await harness(
+  const { instance, runtime, model } = await harness(
     async (api) => {
       const reply = JSON.parse(await api.call('model', streamRequest('hello'))) as {
         content: string;
@@ -240,6 +275,7 @@ test('a streaming run emits checked text deltas in order and the program gets on
     { author: 'writer', text: 'gamma' },
   ]);
   expect(replies).toEqual(['alpha beta gamma']);
+  expect(model.maxTokens).toEqual([100]);
   expect(last(events)).toMatchObject({ type: 'output', output: 'alpha beta gamma' });
   expect(
     events.every(
