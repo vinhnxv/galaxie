@@ -160,6 +160,19 @@ const forGroup = (
   return term === undefined ? { include, exclude } : { include: named(term), exclude };
 };
 
+/**
+ * The browser project drives Chromium unless `GALAXIE_BROWSER` names another engine. The Firefox
+ * and WebKit runs reuse the same cases to collect mock-model evidence; the Chromium run stays the
+ * one that gates every change.
+ */
+const browsers = ['chromium', 'firefox', 'webkit'] as const;
+const requestedBrowser = process.env['GALAXIE_BROWSER'] ?? 'chromium';
+const browserName = browsers.find((name) => name === requestedBrowser);
+if (browserName === undefined)
+  throw new Error(
+    `GALAXIE_BROWSER must be one of ${browsers.join(', ')}, not "${requestedBrowser}".`,
+  );
+
 const config: ViteUserConfig = defineConfig({
   server: { host: '127.0.0.1' },
   test: {
@@ -261,7 +274,7 @@ const config: ViteUserConfig = defineConfig({
             commands: { mcpAdmin: mcpAdminCommand, mcpCorpusAdmin: mcpCorpusAdminCommand },
             provider: playwright(),
             headless: true,
-            instances: [{ browser: 'chromium', name: 'browser (chromium)' }],
+            instances: [{ browser: browserName, name: `browser (${browserName})` }],
           },
         },
       },
