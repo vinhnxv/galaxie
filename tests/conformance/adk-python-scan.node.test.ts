@@ -8,8 +8,8 @@ import {
   type DiagnosticEvent,
   defineAgentDefinition,
   type RunEvent,
-} from '@galaxie/core';
-import { openAICompatible } from '@galaxie/models/openai';
+} from '@galaxie-ai/core';
+import { openAICompatible } from '@galaxie-ai/models/openai';
 import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import {

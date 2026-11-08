@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/example-adk-recipes",
+  "name": "@galaxie-ai/example-adk-recipes",
   "version": "0.0.0",
   "private": true,
   "description": "Scripted browser demonstrations of rewritten ADK recipes.",
@@ -13,13 +13,13 @@
     "test": "vitest run --root ../.. examples/adk-recipes"
   },
   "dependencies": {
-    "@galaxie/adapter-adk": "workspace:*",
-    "@galaxie/adapter-go": "workspace:*",
-    "@galaxie/adapter-pyodide": "workspace:*",
-    "@galaxie/core": "workspace:*",
-    "@galaxie/models": "workspace:*",
-    "@galaxie/react": "workspace:*",
-    "@galaxie/storage-indexeddb": "workspace:*",
+    "@galaxie-ai/adapter-adk": "workspace:*",
+    "@galaxie-ai/adapter-go": "workspace:*",
+    "@galaxie-ai/adapter-pyodide": "workspace:*",
+    "@galaxie-ai/core": "workspace:*",
+    "@galaxie-ai/models": "workspace:*",
+    "@galaxie-ai/react": "workspace:*",
+    "@galaxie-ai/storage-indexeddb": "workspace:*",
     "@google/adk": "2.3.0",
     "@huggingface/transformers": "4.3.2",
     "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",

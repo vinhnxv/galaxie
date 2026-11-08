@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type ErrorCode, isGalaxieError } from '@galaxie/core';
+import { type ErrorCode, isGalaxieError } from '@galaxie-ai/core';
 import type { ConversationRecord } from './bridge.js';
 import { adapterFailure } from './errors.js';
 import {

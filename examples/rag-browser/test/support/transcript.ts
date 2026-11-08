@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
-import { createRuntime } from '@galaxie/core';
-import { MockChatModel, type MockScript } from '@galaxie/models/mock';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
+import { createRuntime } from '@galaxie-ai/core';
+import { MockChatModel, type MockScript } from '@galaxie-ai/models/mock';
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';

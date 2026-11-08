@@ -9,7 +9,7 @@ import {
   defineAgentDefinition,
   GalaxieError,
   galaxieField,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test } from 'vitest';
 import { z } from 'zod';

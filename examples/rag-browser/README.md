@@ -6,8 +6,8 @@ From the repository root:
 
 ```sh
 pnpm install
-pnpm --filter @galaxie/example-rag-browser corpus
-pnpm --filter @galaxie/example-rag-browser dev
+pnpm --filter @galaxie-ai/example-rag-browser corpus
+pnpm --filter @galaxie-ai/example-rag-browser dev
 ```
 
 The corpus command is an explicit network operation, never part of tests or CI. It verifies the official SQuAD v1.1 validation source at `https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v1.1.json`: 4,854,279 bytes, SHA-256 `95aa6a52d5d6a735563366753ca50492a658031da74f301ac5238b03966972c9`. An optional URL argument may supply the same bytes from another location. It writes the git-ignored `public/data/squad-dev.json`, deduplicating contexts in source order while preserving question and answer order. The reviewed source inventory is 48 articles, 2,067 distinct contexts and 10,570 questions. Corpus generation was not run during this implementation. Without this file, the page explains the command and still supports pasted text after embedding preparation.
@@ -15,7 +15,7 @@ The corpus command is an explicit network operation, never part of tests or CI. 
 For a download-free demonstration with the committed, original synthetic fixture:
 
 ```sh
-pnpm --filter @galaxie/example-rag-browser dev:mock
+pnpm --filter @galaxie-ai/example-rag-browser dev:mock
 ```
 
 Mock mode indexes 12 synthetic passages on load and uses deterministic embeddings and chat replies. Try “capital of France”, then paste a paragraph and ask about it. Mock chat replies quote the first retrieved passage; pydantic-ai review and DSPy quote the supplied kept passages. These replies do not measure answer quality.
@@ -55,8 +55,8 @@ Build locally from the repository root after installing dependencies (build the
 [Python wheel cache](#optional-python-build) first to include Python):
 
 ```sh
-VITE_GALAXIE_DEMO=1 pnpm --filter @galaxie/example-rag-browser exec vite build --mode mock
-pnpm --filter @galaxie/example-rag-browser exec vite preview --mode mock --host 127.0.0.1
+VITE_GALAXIE_DEMO=1 pnpm --filter @galaxie-ai/example-rag-browser exec vite build --mode mock
+pnpm --filter @galaxie-ai/example-rag-browser exec vite preview --mode mock --host 127.0.0.1
 ```
 
 A build without the wheel cache still runs the JavaScript demo. Preview supplies
@@ -87,8 +87,8 @@ uv sync --project python --locked
 node scripts/fetch-python-wheels.ts
 node scripts/build-python-wheels.ts
 pnpm test:python
-pnpm --filter @galaxie/example-rag-browser build
-pnpm --filter @galaxie/example-rag-browser preview
+pnpm --filter @galaxie-ai/example-rag-browser build
+pnpm --filter @galaxie-ai/example-rag-browser preview
 ```
 
 For the synthetic Python demonstration, use `build --mode mock` followed by `preview --mode mock` instead. It needs no model or corpus download.
@@ -127,9 +127,9 @@ The separate IndexedDB database `galaxie-rag:<encoded-appId>:<encoded-principalS
 
 Retry indexing reloads the page to create a fresh retrieval Worker. A persisted history return also reloads, restoring the saved index and requiring chat preparation again. Unsaved drafts and answers reset on either path. Tests exercise the persisted lifecycle events; real bfcache navigation remains unmeasured.
 
-Writes and clear share a Web Lock. Clear bumps this scope's epoch, deletes its content database and broadcasts cache invalidation to its other tabs and Workers. A separate content-free epoch database, `galaxie-rag:epochs`, fences stale writers even before another Worker receives the notice. Only generation counters remain there, keyed by the scoped cache name. The retrieval service imports `watchInvalidation` from `@galaxie/core/browser` and watches `watchInvalidation({ appId, principalScope })` directly in the retrieval Worker: BroadcastChannel and AbortSignal work there, and the service already owns the cache and in-memory index, so no forwarding protocol is needed. A matching principal-invalidation notice runs the same clear operation, dropping the in-memory index and pasted passages and resetting the snapshot. Notices for another app or principal do nothing. Core's signal is one-shot; the service closes it and opens a fresh watcher after each wipe, and closes the watcher on reinitialization or disposal (Worker termination also releases it). Missing BroadcastChannel or Web Locks uses the cache-unavailable failure path. **Clear data** waits for its local retrieval wipe, then uses a temporary core watcher to announce the same principal invalidation to peers and closes it. Core also aborts the announcer's signal; the temporary host watcher has no cleanup listener. Clear data also clears this page's drafts and answer and disposes its chat runtime. It keeps downloaded model files. **Remove downloaded model** removes the embedding model Cache Storage; it does not remove WebLLM or browser-managed chat downloads.
+Writes and clear share a Web Lock. Clear bumps this scope's epoch, deletes its content database and broadcasts cache invalidation to its other tabs and Workers. A separate content-free epoch database, `galaxie-rag:epochs`, fences stale writers even before another Worker receives the notice. Only generation counters remain there, keyed by the scoped cache name. The retrieval service imports `watchInvalidation` from `@galaxie-ai/core/browser` and watches `watchInvalidation({ appId, principalScope })` directly in the retrieval Worker: BroadcastChannel and AbortSignal work there, and the service already owns the cache and in-memory index, so no forwarding protocol is needed. A matching principal-invalidation notice runs the same clear operation, dropping the in-memory index and pasted passages and resetting the snapshot. Notices for another app or principal do nothing. Core's signal is one-shot; the service closes it and opens a fresh watcher after each wipe, and closes the watcher on reinitialization or disposal (Worker termination also releases it). Missing BroadcastChannel or Web Locks uses the cache-unavailable failure path. **Clear data** waits for its local retrieval wipe, then uses a temporary core watcher to announce the same principal invalidation to peers and closes it. Core also aborts the announcer's signal; the temporary host watcher has no cleanup listener. Clear data also clears this page's drafts and answer and disposes its chat runtime. It keeps downloaded model files. **Remove downloaded model** removes the embedding model Cache Storage; it does not remove WebLLM or browser-managed chat downloads.
 
-The retrieval cache remains outside `@galaxie/storage-indexeddb`, but is scoped by app and principal and wiped by the principal-invalidation signal and Clear data. It has no retention sweep. This example has no login or host-side principal logout wipe: every visitor uses the constant `visitor` principal. A real host must derive its principal from the authenticated session, commit its principal wipe, then announce core's invalidation; this example does not demonstrate end-to-end logout. Pasted text persists until either wipe trigger or browser eviction; there is no individual-passage removal. A cache database left by an earlier build, which was named by app only, is neither restored nor migrated; Clear data deletes it. Use one tab at a time when building: concurrent builds replace whole records and can duplicate work or replace one another's additions. Clear is coordinated across tabs. Each question is one run. The retrieval index and pending review sessions restore after reload; default questions and answer displays do not. Browser eviction can lose both databases.
+The retrieval cache remains outside `@galaxie-ai/storage-indexeddb`, but is scoped by app and principal and wiped by the principal-invalidation signal and Clear data. It has no retention sweep. This example has no login or host-side principal logout wipe: every visitor uses the constant `visitor` principal. A real host must derive its principal from the authenticated session, commit its principal wipe, then announce core's invalidation; this example does not demonstrate end-to-end logout. Pasted text persists until either wipe trigger or browser eviction; there is no individual-passage removal. A cache database left by an earlier build, which was named by app only, is neither restored nor migrated; Clear data deletes it. Use one tab at a time when building: concurrent builds replace whole records and can duplicate work or replace one another's additions. Clear is coordinated across tabs. Each question is one run. The retrieval index and pending review sessions restore after reload; default questions and answer displays do not. Browser eviction can lose both databases.
 
 The shared [prompt-injection corpus](../../tests/injection-corpus/README.md) covers retrieval-shaped data through its `tool-output` vector. This example additionally runs the obedient-attacker mock through the real runtime, router and broker. Its LangGraph URL/tool/interaction directives produce no outbound request or pending interaction. The fixed graphs ignore those directives before any capability dispatch; an unlisted run grant is rejected as `invalid`. The pydantic-ai fixtures reject an unoffered tool or unrequested review, and the pydantic-ai and DSPy Chromium pasted-passage cases prove the demonstration output hook blocks the fixed canary without adding an interaction or request. Pasted untrusted text can still mislead a real model into a wrong but well-formed cited answer. Plain-text URLs can appear in model prose; the host does not turn them into links. Trusted bundled code and same-origin dependencies remain outside these containment claims.
 

@@ -19,7 +19,7 @@ test('protocol source has no framework, galaxie, Node imports or DOM globals', (
   for (const filename of readdirSync(directory).filter((name) => name.endsWith('.ts'))) {
     const source = readFileSync(new URL(filename, directory), 'utf8');
     expect(source).not.toMatch(
-      /(?:from\s*|import\s*\()['"](?:react(?:-dom)?(?:\/|['"])|@galaxie\/|node:)/,
+      /(?:from\s*|import\s*\()['"](?:react(?:-dom)?(?:\/|['"])|@galaxie-ai\/|node:)/,
     );
     expect(source).not.toMatch(/\b(?:document|window|Worker)\b/);
   }

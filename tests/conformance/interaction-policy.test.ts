@@ -5,7 +5,7 @@ import {
   createLangGraphAdapter,
   type LangGraphGraph,
   requestInteraction,
-} from '@galaxie/adapter-langgraph';
+} from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentSnapshot,
   createRuntime,
@@ -15,7 +15,7 @@ import {
   type PendingInteraction,
   type UiBindings,
   type ViewRevision,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   Annotation,
   END,

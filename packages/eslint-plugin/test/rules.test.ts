@@ -66,7 +66,7 @@ tester.run('global resolution', probe, {
 it('keeps plugin metadata and the recommended config aligned', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   expect(galaxie.meta.version).toBe(manifest.version);
-  expect(galaxie.meta.name).toBe('@galaxie/eslint-plugin');
+  expect(galaxie.meta.name).toBe('@galaxie-ai/eslint-plugin');
   expect(galaxie.configs.recommended.plugins?.['galaxie']).toBe(galaxie);
   expect(galaxie.configs.recommended.rules).toEqual(
     Object.fromEntries(Object.keys(galaxie.rules).map((name) => [`galaxie/${name}`, 'error'])),
@@ -245,14 +245,14 @@ const modelSources = [
   '@google/genai',
   'openai',
   '@anthropic-ai/sdk',
-  '@galaxie/models',
+  '@galaxie-ai/models',
 ];
 const adkModels = ['Gemini', 'ApigeeLlm', 'ChromeBuiltInLlm', 'LLMRegistry', 'RoutedLlm'];
 tester.run('no-direct-model', rule('no-direct-model'), {
   valid: [
     'import { x } from "@langchain/core/messages";',
-    'import { x } from "@galaxie/core";',
-    'import "openai-other"; import "@galaxie/models-other";',
+    'import { x } from "@galaxie-ai/core";',
+    'import "openai-other"; import "@galaxie-ai/models-other";',
     'const LanguageModel = {}; LanguageModel.create();',
     'import { LanguageModel } from "allowed"; LanguageModel.create();',
     'function run(globalThis) { globalThis.LanguageModel.create(); }',

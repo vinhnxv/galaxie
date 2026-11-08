@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, type LangGraphServices } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter, type LangGraphServices } from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentInstance,
   type BindingsFor,
@@ -12,19 +12,27 @@ import {
   type OutputSafetyHook,
   type Runtime,
   type SessionId,
-} from '@galaxie/core';
-import { acquireOwnership, type OwnershipResult } from '@galaxie/core/browser';
+} from '@galaxie-ai/core';
+import { acquireOwnership, type OwnershipResult } from '@galaxie-ai/core/browser';
 import {
   createTutorAgent,
   lessonFixture,
   type ProgressInput,
   type TutorInput,
   tutorDefinition,
-} from '@galaxie/example-english-tutor';
-import { BuiltInAIChatModel, checkBuiltInAI, prepareBuiltInAI } from '@galaxie/models/builtin-ai';
-import { loadWebLLMEngine, WebLLMChatModel, type WebLLMEngineHandle } from '@galaxie/models/webllm';
-import { createRegistry, educationComponents, type Registry } from '@galaxie/react';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+} from '@galaxie-ai/example-english-tutor';
+import {
+  BuiltInAIChatModel,
+  checkBuiltInAI,
+  prepareBuiltInAI,
+} from '@galaxie-ai/models/builtin-ai';
+import {
+  loadWebLLMEngine,
+  WebLLMChatModel,
+  type WebLLMEngineHandle,
+} from '@galaxie-ai/models/webllm';
+import { createRegistry, educationComponents, type Registry } from '@galaxie-ai/react';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { hostAppId, hostLearnerId, invalidateLocalPrincipal } from './session.js';
 import { allowWorkerScript } from './trusted-types.js';
 

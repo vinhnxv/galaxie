@@ -5,7 +5,7 @@ import {
   createLangGraphAdapter,
   type LangGraphAgent,
   requestInteraction,
-} from '@galaxie/adapter-langgraph';
+} from '@galaxie-ai/adapter-langgraph';
 import {
   createRuntime,
   type DevelopmentWarning,
@@ -13,8 +13,8 @@ import {
   defineAgentDefinition,
   type ModelAvailability,
   type ModelAvailabilityRequest,
-} from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import { HumanMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { afterEach, expect, test, vi } from 'vitest';

@@ -16,7 +16,7 @@ pnpm --filter local-only-template dev
 
 The root build produces the local packages' distribution files. The template's Vite config uses package exports, with no aliases into this checkout. `linkWorkspacePackages: true` in the root workspace configuration links its `^0.1.0` ranges to matching local packages. Both TypeScript compiler chains use `tsconfig.workspace.json` and `test/tsconfig.json` to resolve workspace source before a build; `tsconfig.json` is standalone and keeps the repository's strict compiler options.
 
-Copy this entire directory for a new app. Outside this repository the five `@galaxie/*` dependencies come from the npm registry at 0.1.0. **A standalone registry install of this template has not been verified**: the repository's checks link the local workspace packages. In the copy, use `pnpm install` and `pnpm dev`. The repository-only source mappings and test tooling are for galaxie's checks; they are not needed to serve a copied app.
+Copy this entire directory for a new app. Outside this repository the five `@galaxie-ai/*` dependencies come from the npm registry at 0.1.0. **A standalone registry install of this template has not been verified**: the repository's checks link the local workspace packages. In the copy, use `pnpm install` and `pnpm dev`. The repository-only source mappings and test tooling are for galaxie's checks; they are not needed to serve a copied app.
 
 ## Route order and consent
 

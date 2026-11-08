@@ -7,7 +7,7 @@ import type {
   RunId,
   StandardSchema,
   ViewRevision,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { act, type ReactElement, StrictMode, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, test, vi } from 'vitest';

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ModelDescriptor } from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+import type { ModelDescriptor } from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 
 export function hostModels(mode: string): {
   readonly providers: Readonly<Record<string, ModelDescriptor>>;

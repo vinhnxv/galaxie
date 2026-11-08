@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { request } from 'node:http';
-import { lessonFixture, ProgressInputSchema } from '@galaxie/example-english-tutor';
+import { lessonFixture, ProgressInputSchema } from '@galaxie-ai/example-english-tutor';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterEach, expect, it } from 'vitest';
 import { backend } from '../server/backend.js';

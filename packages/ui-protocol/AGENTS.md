@@ -1,4 +1,4 @@
-# @galaxie/ui-protocol: coding guidance
+# @galaxie-ai/ui-protocol: coding guidance
 
 ## Purpose
 

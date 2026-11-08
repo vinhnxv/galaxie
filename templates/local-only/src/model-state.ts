@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ModelUnavailableReason } from '@galaxie/models/builtin-ai';
+import type { ModelUnavailableReason } from '@galaxie-ai/models/builtin-ai';
 
 export type WebLLMPhase = 'offer' | 'downloading' | 'failed' | 'declined' | 'ready' | 'no_webgpu';
 export type ModelState = ModelUnavailableReason | WebLLMPhase;

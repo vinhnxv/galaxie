@@ -10,9 +10,9 @@
     "declaration": false,
     "isolatedDeclarations": false,
     "paths": {
-      "@galaxie/core/browser": ["../../packages/core/src/browser.ts"],
-      "@galaxie/core": ["../../packages/core/src/index.ts"],
-      "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"]
+      "@galaxie-ai/core/browser": ["../../packages/core/src/browser.ts"],
+      "@galaxie-ai/core": ["../../packages/core/src/index.ts"],
+      "@galaxie-ai/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts", "scripts"]

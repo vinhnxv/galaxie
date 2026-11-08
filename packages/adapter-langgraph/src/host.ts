@@ -12,7 +12,7 @@ import {
   type ModelPort,
   type ModelPreparation,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { DynamicStructuredTool, type StructuredToolInterface } from '@langchain/core/tools';
 import type { InteropZodObject } from '@langchain/core/utils/types';

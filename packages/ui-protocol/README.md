@@ -1,4 +1,4 @@
-# @galaxie/ui-protocol
+# @galaxie-ai/ui-protocol
 
 Pure A2UI v1.0 message parsing, catalog validation and atomic surface reduction.
 The package has no dependencies and imports no galaxie package or platform service.
@@ -35,7 +35,7 @@ messages can repeat identity but cannot change it. A catalog ID is an identifier
 never a resource to download.
 
 ```ts
-import { reduceBatch, type Catalog } from '@galaxie/ui-protocol';
+import { reduceBatch, type Catalog } from '@galaxie-ai/ui-protocol';
 
 const catalog: Catalog = {
   id: 'example/v1',

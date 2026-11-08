@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentSnapshot } from '@galaxie/core';
+import type { AgentSnapshot } from '@galaxie-ai/core';
 import { act, type ReactElement, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, test } from 'vitest';

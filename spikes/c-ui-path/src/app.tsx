@@ -6,7 +6,7 @@ import {
   type PendingInteraction,
   type RunEvent,
   type UserInteractionEvent,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { type ReactElement, useSyncExternalStore } from 'react';
 import { definition, GENERATION_KEY, quizGraph } from './graph.js';
 import { renderInteraction, submit } from './registry.js';

@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter, requestInteraction } from '@galaxie-ai/adapter-langgraph';
 import {
   createRuntime,
   defineAgentDefinition,
   type RunEvent,
   type ViewRevision,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   AgentSurface,
   type AgentSurfaceControls,
@@ -17,7 +17,7 @@ import {
   Quiz,
   type QuizActions,
   type QuizSubmission,
-} from '@galaxie/react';
+} from '@galaxie-ai/react';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { act, type ReactElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

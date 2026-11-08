@@ -23,7 +23,7 @@ beforeAll(async () => {
     compilerOptions: { paths: Record<string, string[]> };
   };
   const alias = Object.entries(workspace.compilerOptions.paths)
-    .filter(([name]) => name.startsWith('@galaxie/'))
+    .filter(([name]) => name.startsWith('@galaxie-ai/'))
     .sort(([a], [b]) => b.length - a.length)
     .map(([find, paths]) => {
       const path = paths[0];

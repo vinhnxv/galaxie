@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { SessionId } from '@galaxie/core';
-import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie/react';
+import type { SessionId } from '@galaxie-ai/core';
+import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useState, useSyncExternalStore } from 'react';
 import { controlLabels, type ModelState, modelStates } from './model-state.js';
 import { sessionKey, type TemplateHost, type TemplateInstance } from './runtime.js';

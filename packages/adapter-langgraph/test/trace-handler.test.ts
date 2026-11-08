@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { RunTrace, TraceHandle, TraceResult, TraceStep } from '@galaxie/core';
+import type { RunTrace, TraceHandle, TraceResult, TraceStep } from '@galaxie-ai/core';
 import { AIMessage, HumanMessage, type StandardMessageStructure } from '@langchain/core/messages';
 import type { ChatGeneration } from '@langchain/core/outputs';
 import { expect, test } from 'vitest';

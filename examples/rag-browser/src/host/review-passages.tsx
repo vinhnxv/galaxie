@@ -8,7 +8,7 @@ import {
   createRegistry,
   defineComponent,
   type Registry,
-} from '@galaxie/react';
+} from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import {
   type ReviewPassagesProps,

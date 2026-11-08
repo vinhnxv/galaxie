@@ -6,7 +6,7 @@ import {
   type LangGraphAgent,
   type LangGraphHost,
   type LangGraphServices,
-} from '@galaxie/adapter-langgraph';
+} from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentSnapshot,
   type BudgetLimits,
@@ -18,8 +18,8 @@ import {
   type ModelFeature,
   type ModelRoute,
   type ModelRouting,
-} from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import { HumanMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test } from 'vitest';

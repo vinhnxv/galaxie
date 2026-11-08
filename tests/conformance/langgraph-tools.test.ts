@@ -5,7 +5,7 @@ import {
   createLangGraphAdapter,
   type LangGraphHost,
   requestInteraction,
-} from '@galaxie/adapter-langgraph';
+} from '@galaxie-ai/adapter-langgraph';
 import {
   type CapabilityBinding,
   type CapabilityContext,
@@ -16,9 +16,9 @@ import {
   type OutputSafetyHook,
   type RunEvent,
   toErrorInfo,
-} from '@galaxie/core';
-import { MockChatModel, type MockScript } from '@galaxie/models/mock';
-import { defineConfirmations } from '@galaxie/react';
+} from '@galaxie-ai/core';
+import { MockChatModel, type MockScript } from '@galaxie-ai/models/mock';
+import { defineConfirmations } from '@galaxie-ai/react';
 import {
   AIMessage,
   type BaseMessage,

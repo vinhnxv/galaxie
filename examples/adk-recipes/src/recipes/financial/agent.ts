@@ -22,7 +22,7 @@
 // {data_analyst,trading_analyst,execution_analyst,risk_analyst}/agent.ts
 // google/adk-recipes commit 1e5ed1a5713b739ff8ba58b39454c02bf8bad118.
 
-import type { AdkHost } from '@galaxie/adapter-adk';
+import type { AdkHost } from '@galaxie-ai/adapter-adk';
 import { LlmAgent, SequentialAgent } from '@google/adk';
 import { marketSearchInput } from '../../host/capabilities.js';
 import {

@@ -1,4 +1,4 @@
-# @galaxie/react
+# @galaxie-ai/react
 
 Typed agent surfaces and a separate host confirmation prompt. Agent components receive `props`, `actions`, `status` and optional rendered `children`; the host owns instance creation, preparation and disposal.
 
@@ -20,11 +20,11 @@ prop names retain the registry's existing resolution behavior.
 
 This is a **breaking change to the launch package's surface API**, intended for a
 0.x minor release under [the release policy](../../docs/releasing.md). React now
-consumes `@galaxie/ui-protocol` through its public root. Existing registry factory,
+consumes `@galaxie-ai/ui-protocol` through its public root. Existing registry factory,
 `resolve`, education entry IDs and legacy interaction behavior remain supported.
 
 ```ts
-import { createRegistry, educationComponents, structuralComponents } from '@galaxie/react';
+import { createRegistry, educationComponents, structuralComponents } from '@galaxie-ai/react';
 
 const registry = createRegistry({
   components: [...educationComponents, ...structuralComponents('education/v1')],
@@ -152,7 +152,7 @@ Hosts may wrap these reference components to provide their own language or prese
 Mount the headless `ModelRoutes` beside the host's run status:
 
 ```tsx
-import { ModelRoutes } from '@galaxie/react';
+import { ModelRoutes } from '@galaxie-ai/react';
 
 <ModelRoutes
   instance={instance}
@@ -173,7 +173,7 @@ The `aria-live="polite"` container stays mounted before the first selection; the
 Register fixed host text and derive rows from the capability's validated arguments. Mount `ConfirmationPrompt` in the host tree, outside `AgentSurface` and the agent component registry.
 
 ```tsx
-import { AgentSurface, ConfirmationPrompt, defineConfirmations } from '@galaxie/react';
+import { AgentSurface, ConfirmationPrompt, defineConfirmations } from '@galaxie-ai/react';
 
 const confirmations = defineConfirmations({
   'progress.save@1': {

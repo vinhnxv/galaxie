@@ -8,7 +8,7 @@ import {
   type LangGraphServices,
   requestInteraction,
   STREAM_MODES,
-} from '@galaxie/adapter-langgraph';
+} from '@galaxie-ai/adapter-langgraph';
 import {
   createRuntime,
   type DiagnosticEvent,
@@ -16,8 +16,8 @@ import {
   type ExecutorAdapter,
   type ExecutorAgent,
   type SessionId,
-} from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import { LlmAgent } from '@google/adk';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';

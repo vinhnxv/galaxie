@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentInstance, CapabilityContext, OutputSafetyCheck } from '@galaxie/core';
-import { lessonFixture, type TutorInput } from '@galaxie/example-english-tutor';
-import type { WebLLMEngineHandle } from '@galaxie/models/webllm';
+import type { AgentInstance, CapabilityContext, OutputSafetyCheck } from '@galaxie-ai/core';
+import { lessonFixture, type TutorInput } from '@galaxie-ai/example-english-tutor';
+import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
 import { describe, expect, it, vi } from 'vitest';
 import { recordNetwork } from '../../../packages/core/test/network-recorder.js';
 import {

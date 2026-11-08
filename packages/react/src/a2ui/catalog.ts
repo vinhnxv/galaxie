@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ComponentId } from '@galaxie/core';
-import type { Catalog, CatalogComponent } from '@galaxie/ui-protocol';
+import type { ComponentId } from '@galaxie-ai/core';
+import type { Catalog, CatalogComponent } from '@galaxie-ai/ui-protocol';
 import type { RegistryComponent } from '../registry.js';
 
 /** Catalog-local names of properties and permitted parent/child components. */

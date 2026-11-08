@@ -7,7 +7,7 @@ import {
   type ModelPort,
   type ModelUsage,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {

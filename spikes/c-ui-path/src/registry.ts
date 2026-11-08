@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentInstance, DispatchReceipt, PendingInteraction } from '@galaxie/core';
+import type { AgentInstance, DispatchReceipt, PendingInteraction } from '@galaxie-ai/core';
 import { createElement, type ReactElement } from 'react';
 import { z } from 'zod';
 import { Quiz } from './quiz.js';

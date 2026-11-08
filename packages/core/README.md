@@ -1,4 +1,4 @@
-# @galaxie/core
+# @galaxie-ai/core
 
 Framework-neutral contracts and the host runtime for reviewed, bundled browser
 agents. Core owns lifecycle, policy, budgets, interactions, capability dispatch,
@@ -8,20 +8,20 @@ API; the host registers the SDK and exporter.
 ## Install
 
 ```sh
-pnpm add @galaxie/core zod @opentelemetry/api
+pnpm add @galaxie-ai/core zod @opentelemetry/api
 ```
 
 Peer requirements are in [package.json](package.json). To work on this package, use
 Node 24 and pnpm 11 at the repository root: run `pnpm install --frozen-lockfile`,
-then `pnpm build`. Workspace consumers declare `@galaxie/core` as `workspace:*`.
+then `pnpm build`. Workspace consumers declare `@galaxie-ai/core` as `workspace:*`.
 
 ## Entry points
 
-`@galaxie/core` exports runtime APIs and framework-neutral contracts. It uses no
+`@galaxie-ai/core` exports runtime APIs and framework-neutral contracts. It uses no
 unguarded browser globals and can import and run without page APIs. Optional
 storage persistence and development page warnings keep their feature guards.
 
-`@galaxie/core/browser` exports `acquireOwnership`, `watchInvalidation`,
+`@galaxie-ai/core/browser` exports `acquireOwnership`, `watchInvalidation`,
 `Ownership`, `OwnershipLostReason`, `OwnershipOptions`, `OwnershipResult`,
 `InvalidationOptions` and `InvalidationWatcher`. Ownership requires Web Locks and
 BroadcastChannel; invalidation requires BroadcastChannel and also works in a Worker.
@@ -30,14 +30,14 @@ Moving these functions and types out of the main entry was a breaking change to
 the public API, made before the first release. Update host imports:
 
 ```ts
-import { acquireOwnership, watchInvalidation } from '@galaxie/core/browser';
+import { acquireOwnership, watchInvalidation } from '@galaxie-ai/core/browser';
 ```
 
 ## Minimal host setup
 
 ```ts
-import { createRuntime } from '@galaxie/core';
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createRuntime } from '@galaxie-ai/core';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 
 const runtime = createRuntime({
   appId: 'lesson-app',
@@ -100,7 +100,7 @@ dedicated decision models remain unimplemented.
 
 ## Materialized pending surfaces
 
-Core depends on `@galaxie/ui-protocol` through its public root; its existing peers
+Core depends on `@galaxie-ai/ui-protocol` through its public root; its existing peers
 remain unchanged. Hosts can bind `ui.catalogs` by catalog ID alongside `ui.surfaces`
 and registered component actions. Core validates materialized interrupt records
 before publication and again on restore, using the run's payload and UI-element

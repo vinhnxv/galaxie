@@ -1,25 +1,25 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, type LangGraphServices } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter, type LangGraphServices } from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentInstance,
   createRuntime,
   GalaxieError,
   type ModelDescriptor,
   type SessionId,
-} from '@galaxie/core';
-import { acquireOwnership, type Ownership } from '@galaxie/core/browser';
+} from '@galaxie-ai/core';
+import { acquireOwnership, type Ownership } from '@galaxie-ai/core/browser';
 import {
   BuiltInAIChatModel,
   checkBuiltInAI,
   ModelError,
   type ModelUnavailableReason,
-} from '@galaxie/models/builtin-ai';
-import { MockChatModel } from '@galaxie/models/mock';
-import type { WebLLMEngineHandle, WebLLMProgress } from '@galaxie/models/webllm';
-import { createRegistry, Quiz, type Registry } from '@galaxie/react';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+} from '@galaxie-ai/models/builtin-ai';
+import { MockChatModel } from '@galaxie-ai/models/mock';
+import type { WebLLMEngineHandle, WebLLMProgress } from '@galaxie-ai/models/webllm';
+import { createRegistry, Quiz, type Registry } from '@galaxie-ai/react';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { commentPrompt, createTemplateAgent, templateDefinition } from './agent.js';
 import type { WebLLMPhase } from './model-state.js';
 
@@ -209,7 +209,7 @@ export async function createTemplateHost(options: TemplateHostOptions = {}): Pro
           await loaded.dispose();
           return;
         }
-        const { WebLLMChatModel } = await import('@galaxie/models/webllm');
+        const { WebLLMChatModel } = await import('@galaxie-ai/models/webllm');
         if (attempt.signal.aborted) {
           await loaded.dispose();
           return;

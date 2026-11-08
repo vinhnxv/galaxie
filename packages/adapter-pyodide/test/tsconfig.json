@@ -5,10 +5,10 @@
     "resolveJsonModule": true,
     "types": ["node"],
     "paths": {
-      "@galaxie/adapter-kit": ["../../adapter-kit/src/index.ts"],
-      "@galaxie/core/browser": ["../../core/src/browser.ts"],
-      "@galaxie/core": ["../../core/src/index.ts"],
-      "@galaxie/ui-protocol": ["../../ui-protocol/src/index.ts"]
+      "@galaxie-ai/adapter-kit": ["../../adapter-kit/src/index.ts"],
+      "@galaxie-ai/core/browser": ["../../core/src/browser.ts"],
+      "@galaxie-ai/core": ["../../core/src/index.ts"],
+      "@galaxie-ai/ui-protocol": ["../../ui-protocol/src/index.ts"]
     }
   },
   "include": ["."]

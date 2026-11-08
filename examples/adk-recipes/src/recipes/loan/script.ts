@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ModelRouting } from '@galaxie/core';
-import { MockChatModel, type MockLatch, type MockScriptEntry } from '@galaxie/models/mock';
+import type { ModelRouting } from '@galaxie-ai/core';
+import { MockChatModel, type MockLatch, type MockScriptEntry } from '@galaxie-ai/models/mock';
 import { hostModels } from '../../host/runtime.js';
 
 export const LOAN_SAMPLE_PROMPT =

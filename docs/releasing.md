@@ -2,9 +2,9 @@
 
 The first release is 0.1.0. Publishing is a manual maintainer step.
 
-The seven launch packages are `@galaxie/ui-protocol`, `@galaxie/core`,
-`@galaxie/adapter-kit`, `@galaxie/adapter-langgraph`,
-`@galaxie/models`, `@galaxie/storage-indexeddb` and `@galaxie/react`. All other
+The seven launch packages are `@galaxie-ai/ui-protocol`, `@galaxie-ai/core`,
+`@galaxie-ai/adapter-kit`, `@galaxie-ai/adapter-langgraph`,
+`@galaxie-ai/models`, `@galaxie-ai/storage-indexeddb` and `@galaxie-ai/react`. All other
 packages stay private and unpublished.
 
 ## Versioning
@@ -12,10 +12,10 @@ packages stay private and unpublished.
 Versions are `0.MINOR.PATCH`. While the major version is 0, a breaking change to a
 public API may land in a minor release and must be called out in the release
 notes. A patch release does not break a public API. The seven launch packages share
-one version number and are released together, because `@galaxie/adapter-langgraph`,
-`@galaxie/adapter-kit` and `@galaxie/react` depend on the exact `@galaxie/core`
+one version number and are released together, because `@galaxie-ai/adapter-langgraph`,
+`@galaxie-ai/adapter-kit` and `@galaxie-ai/react` depend on the exact `@galaxie-ai/core`
 version of the same release; the LangGraph adapter also depends on the kit.
-`@galaxie/ui-protocol` has no galaxie dependencies and no hand-written package-version
+`@galaxie-ai/ui-protocol` has no galaxie dependencies and no hand-written package-version
 constant. Its spec pin constants are not the package version. Core and React depend on its
 exact release version after packing. The A2UI renderer is a breaking change to the
 launch React package's public surface API and must land in a 0.x minor release.
@@ -46,7 +46,7 @@ and require reviewing the measurements again.
 ## Maintainer-only prerequisites
 
 The maintainer must provide an npm account with permission to publish under the
-`@galaxie` scope, with two-factor authentication enabled. The repository is already
+`@galaxie-ai` scope, with two-factor authentication enabled. The repository is already
 public. These are maintainer-only steps.
 
 ## Manual publish steps
@@ -69,7 +69,7 @@ public. These are maintainer-only steps.
    for the kit and the LangGraph consumer with the kit bundled in. Record both
    measurements with the release evidence. These consumer-bundle demonstrations
    differ from the own-code CI budgets above and do not establish a size saving.
-6. Publish `@galaxie/ui-protocol` first, then `@galaxie/core`, then `@galaxie/adapter-kit`,
+6. Publish `@galaxie-ai/ui-protocol` first, then `@galaxie-ai/core`, then `@galaxie-ai/adapter-kit`,
    then the other four launch packages, running `pnpm publish --access public` in each
    package directory.
    pnpm rewrites each `workspace:` reference to the exact dependency version when

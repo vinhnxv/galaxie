@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { defaultWebLLMModel } from '@galaxie/models/webllm';
+import { defaultWebLLMModel } from '@galaxie-ai/models/webllm';
 import { describe, expect, it } from 'vitest';
 import { cspDirectives, cspHeader } from '../src/csp.js';
 

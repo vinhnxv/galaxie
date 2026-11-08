@@ -6,7 +6,7 @@ import type {
   CapabilityContext,
   CapabilityName,
   DestinationClass,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { failure, type McpEvent } from './events.js';
 import { PrincipalSession } from './session.js';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/storage-indexeddb",
+  "name": "@galaxie-ai/storage-indexeddb",
   "version": "0.1.0",
   "description": "IndexedDB LangGraph checkpoint saver for galaxie.",
   "license": "Apache-2.0",

@@ -5,9 +5,9 @@ and runtime teardown. galaxie constrains SDK-controlled paths; reviewed agents,
 XSS and other same-origin code can bypass those paths. Read the
 [mandatory baseline](../adr/0012-security-baseline.md),
 [security review](../security-review.md) and [package guidance](../../llms.txt)
-alongside these integration steps. The seven launch packages (`@galaxie/ui-protocol`,
-`@galaxie/core`, `@galaxie/adapter-kit`, `@galaxie/adapter-langgraph`, `@galaxie/models`,
-`@galaxie/storage-indexeddb` and `@galaxie/react`) are versioned 0.1.0 and published
+alongside these integration steps. The seven launch packages (`@galaxie-ai/ui-protocol`,
+`@galaxie-ai/core`, `@galaxie-ai/adapter-kit`, `@galaxie-ai/adapter-langgraph`, `@galaxie-ai/models`,
+`@galaxie-ai/storage-indexeddb` and `@galaxie-ai/react`) are versioned 0.1.0 and published
 to npm.
 The other packages remain private workspace packages.
 
@@ -54,9 +54,9 @@ that is a check of this page's code, not a result for any real model or device.
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type LangGraphAgent, requestInteraction } from '@galaxie/adapter-langgraph';
-import { type AgentDefinition, defineAgentDefinition } from '@galaxie/core';
-import type { QuizSubmission } from '@galaxie/react';
+import { type LangGraphAgent, requestInteraction } from '@galaxie-ai/adapter-langgraph';
+import { type AgentDefinition, defineAgentDefinition } from '@galaxie-ai/core';
+import type { QuizSubmission } from '@galaxie-ai/react';
 import { HumanMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { z } from 'zod';
@@ -124,10 +124,10 @@ export function createTemplateAgent(): LangGraphAgent {
 `src/main.tsx`:
 
 ```tsx
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
-import { createRuntime, type ModelDescriptor } from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
-import { AgentSurface, createRegistry, ModelRoutes, Quiz } from '@galaxie/react';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
+import { createRuntime, type ModelDescriptor } from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
+import { AgentSurface, createRegistry, ModelRoutes, Quiz } from '@galaxie-ai/react';
 import { createRoot } from 'react-dom/client';
 import { commentPrompt, createTemplateAgent, templateDefinition } from './agent.js';
 
@@ -298,7 +298,7 @@ claiming cross-origin isolation for every engine.
 ## Model hosting and integrity
 
 Follow [the provider contract](../system-design.md#84-a-model-call): host-bundle
-a module worker that calls `startWebLLMWorker` from `@galaxie/models/webllm/worker`,
+a module worker that calls `startWebLLMWorker` from `@galaxie-ai/models/webllm/worker`,
 create it on the page and pass it to `loadWebLLMEngine`. Use one handle and worker
 per runtime, dispose them on teardown, and load only after host-managed consent.
 The library loads lazily; constructing the example's worker alone is inert.
@@ -319,7 +319,7 @@ hosts; do not broaden them for unrelated integrations.
 ONNX models through Transformers.js follow the same shape with a pinned record:
 host-bundle a module worker that imports the ONNX Runtime WASM files as same-origin
 asset URLs and calls `startTransformersWorker({ ort })` from
-`@galaxie/models/transformers/worker`, create it through your Trusted Types worker
+`@galaxie-ai/models/transformers/worker`, create it through your Trusted Types worker
 policy, and pass it with a `TransformersModelRecord` to `loadTransformersEngine`
 after consent. Wire `checkTransformersModel` as the `availability` hook and have the
 `download` hook load the engine with downloads allowed. Every file is checked
@@ -427,7 +427,7 @@ behavior remain unmeasured.
 Import both host lifecycle helpers from the opt-in browser entry:
 
 ```ts
-import { acquireOwnership, watchInvalidation } from '@galaxie/core/browser';
+import { acquireOwnership, watchInvalidation } from '@galaxie-ai/core/browser';
 ```
 
 Implement [ownership](../system-design.md#85-tab-ownership-and-takeover) before
@@ -519,17 +519,17 @@ the [tracing guide](tracing.md).
 An app that offers `adk-js` agents owns three things in its entry code, because the adapter package cannot (a bundler drops side-effect-only imports from a package marked side-effect free):
 
 - Put zod in jitless mode (`config({ jitless: true })` from `zod`) before the ADK bundle module is evaluated. Without it the bundle's own zod probes `new Function` and trips Trusted Types.
-- Define `process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS` as `"false"` in the build, so ADK's own spans never carry prompts, replies, arguments or results. In dev servers and test browsers that do not replace `process.env`, call `ensureAdkRuntimeEnv()` from `@galaxie/adapter-adk` first.
+- Define `process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS` as `"false"` in the build, so ADK's own spans never carry prompts, replies, arguments or results. In dev servers and test browsers that do not replace `process.env`, call `ensureAdkRuntimeEnv()` from `@galaxie-ai/adapter-adk` first.
 - To keep a conversation across reloads, pass `services.checkpoints` (the `byteRecords` port of `IndexedDBSaver`) with a recovery store, and compose ownership as for the other executors. The record holds the conversation and a per-session integrity key; session export never includes the key.
 
 The bundle needs `crypto.subtle`, and ships under Apache-2.0 with inlined lodash (MIT) and `@google/genai` (Apache-2.0). See the [adapter README](../../packages/adapter-adk/README.md) and [unsupported list](../unsupported.md#google-adk-javascript).
 
 ## Remote models through a host proxy
 
-Use the call-scoped factory exported by `@galaxie/models/openai`:
+Use the call-scoped factory exported by `@galaxie-ai/models/openai`:
 
 ```ts
-import { openAICompatible } from '@galaxie/models/openai';
+import { openAICompatible } from '@galaxie-ai/models/openai';
 
 const chatModels = {
   proxy: openAICompatible({

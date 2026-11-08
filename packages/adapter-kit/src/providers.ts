@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { GalaxieError, type ModelCall, toErrorInfo } from '@galaxie/core';
+import { GalaxieError, type ModelCall, toErrorInfo } from '@galaxie-ai/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 /** Resolve an already selected lease. Credentials enter only the call-scoped factory. */

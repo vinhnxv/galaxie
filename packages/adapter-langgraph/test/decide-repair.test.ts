@@ -8,7 +8,7 @@ import type {
   ModelPort,
   ModelRouting,
   OutputSafetyHook,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { expect, test, vi } from 'vitest';
 import { BudgetExceeded, budgetLimits, RunBudget } from '../../core/src/budgets.js';
 import { ModelRouter, type ModelRun } from '../../core/src/model-router.js';

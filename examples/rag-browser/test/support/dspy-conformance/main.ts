@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import '../../../src/host/zod-config.js';
-import type { PyodideAdapterOptions } from '@galaxie/adapter-pyodide';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import type { PyodideAdapterOptions } from '@galaxie-ai/adapter-pyodide';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import {
   type DspyTranscript,
   dspyCases,

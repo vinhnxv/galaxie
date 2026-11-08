@@ -1,4 +1,4 @@
-# @galaxie/adapter-kit
+# @galaxie-ai/adapter-kit
 
 Shared text extraction, selected-provider resolution and pure Worker bridge
 framing/validation helpers for galaxie executor adapters. This package registers
@@ -7,15 +7,15 @@ promise. It shares the launch packages' release version.
 
 ## Install
 
-`@galaxie/adapter-langgraph` installs it as a dependency. Install it directly only to
+`@galaxie-ai/adapter-langgraph` installs it as a dependency. Install it directly only to
 write your own adapter:
 
 ```sh
-pnpm add @galaxie/adapter-kit @langchain/core@~1.2.20
+pnpm add @galaxie-ai/adapter-kit @langchain/core@~1.2.20
 ```
 
-Only the public root, `@galaxie/adapter-kit`, is importable. Production imports
-are limited to `@galaxie/core` public exports, erased type-only references to
+Only the public root, `@galaxie-ai/adapter-kit`, is importable. Production imports
+are limited to `@galaxie-ai/core` public exports, erased type-only references to
 `@langchain/core` and its subpaths, and relative files inside this package.
 No adapter, framework runtime, Node-only dependency or Worker startup belongs here.
 Importing the kit reads no DOM or Worker globals. UTF-8 encoding happens on call.

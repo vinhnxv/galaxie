@@ -1,4 +1,4 @@
-# @galaxie/adapter-go
+# @galaxie-ai/adapter-go
 
 > This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
 
@@ -62,7 +62,7 @@ record with one.
 
 ## Durable sessions
 
-Pass the byte-record port of `@galaxie/storage-indexeddb` as `services.checkpoints` (for example
+Pass the byte-record port of `@galaxie-ai/storage-indexeddb` as `services.checkpoints` (for example
 `saver.byteRecords`) and a pause or a finished conversation survives a reload, a lost Worker and a
 cancelled or failed resume.
 
@@ -161,7 +161,7 @@ await adapter.prepare(
 - Build the module with `GOOS=js GOARCH=wasm CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -buildid="`
   and publish its SHA-256. The Worker fetches same-origin bytes, checks length and digest, and only then
   compiles; any mismatch fails `unavailable` with a fixed message.
-- The host's Worker entry imports `wasm_exec.js` first, then `@galaxie/adapter-go/worker`. Fetch the file
+- The host's Worker entry imports `wasm_exec.js` first, then `@galaxie-ai/adapter-go/worker`. Fetch the file
   with `scripts/fetch-go-glue.ts`, which checks the copied source file against the digest in
   `go/wasm.lock`, and let the bundler include it; the Worker never loads script text at run time. The
   digest covers that source file only: a bundler may minify or re-wrap it, so the shipped bytes are

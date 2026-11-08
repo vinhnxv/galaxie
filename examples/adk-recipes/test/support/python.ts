@@ -7,7 +7,7 @@ import {
   createPyodideAdapter,
   type PyodideAdapterOptions,
   type PyodideAgent,
-} from '@galaxie/adapter-pyodide';
+} from '@galaxie-ai/adapter-pyodide';
 import {
   type AgentInstance,
   type CapabilityBinding,
@@ -18,8 +18,8 @@ import {
   type RunEvent,
   type RunId,
   type SessionId,
-} from '@galaxie/core';
-import type { MockLatch } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import type { MockLatch } from '@galaxie-ai/models/mock';
 import { createHostCapabilities } from '../../src/host/capabilities.js';
 import { auditorDefinition } from '../../src/recipes/llm-auditor/definition.js';
 import {

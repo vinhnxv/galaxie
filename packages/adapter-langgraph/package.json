@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/adapter-langgraph",
+  "name": "@galaxie-ai/adapter-langgraph",
   "version": "0.1.0",
   "description": "LangGraph.js executor adapter for galaxie.",
   "license": "Apache-2.0",
@@ -29,8 +29,8 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@galaxie/core": "workspace:*",
-    "@galaxie/adapter-kit": "workspace:*"
+    "@galaxie-ai/core": "workspace:*",
+    "@galaxie-ai/adapter-kit": "workspace:*"
   },
   "peerDependencies": {
     "@langchain/core": "~1.2.20",

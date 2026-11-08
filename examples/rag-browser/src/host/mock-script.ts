@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { MockChatModel, type MockScriptEntry } from '@galaxie/models/mock';
+import { MockChatModel, type MockScriptEntry } from '@galaxie-ai/models/mock';
 import type { BindToolsInput } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';

@@ -1,4 +1,4 @@
-# @galaxie/adapter-langgraph
+# @galaxie-ai/adapter-langgraph
 
 A native LangGraph executor adapter for galaxie, using the browser `/web` entry,
 checkpoint-backed pending interactions and interrupt-ID resume.
@@ -6,18 +6,18 @@ checkpoint-backed pending interactions and interrupt-ID resume.
 ## Install
 
 ```sh
-pnpm add @galaxie/adapter-langgraph @langchain/core@~1.2.20 @langchain/langgraph@~1.5.1
+pnpm add @galaxie-ai/adapter-langgraph @langchain/core@~1.2.20 @langchain/langgraph@~1.5.1
 ```
 
 [package.json](package.json) records the LangChain and LangGraph peers. To work on this
 package, use Node 24 and pnpm 11: run `pnpm install --frozen-lockfile` and `pnpm build`
-at the repository root. Workspace consumers use `@galaxie/adapter-langgraph: workspace:*`.
+at the repository root. Workspace consumers use `@galaxie-ai/adapter-langgraph: workspace:*`.
 
 ## Minimal model-free graph
 
 ```ts
-import { createLangGraphAdapter, type LangGraphAgent } from '@galaxie/adapter-langgraph';
-import { createRuntime, defineAgentDefinition } from '@galaxie/core';
+import { createLangGraphAdapter, type LangGraphAgent } from '@galaxie-ai/adapter-langgraph';
+import { createRuntime, defineAgentDefinition } from '@galaxie-ai/core';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { z } from 'zod';
 
@@ -60,9 +60,9 @@ The host supplies a decision descriptor and route through `CreateOptions.models`
 and registers its implementation by provider ID in `services.decisionModels`:
 
 ```ts
-import type { LangGraphServices } from '@galaxie/adapter-langgraph';
-import type { ModelRouting } from '@galaxie/core';
-import { MockDecisionModel } from '@galaxie/models/mock';
+import type { LangGraphServices } from '@galaxie-ai/adapter-langgraph';
+import type { ModelRouting } from '@galaxie-ai/core';
+import { MockDecisionModel } from '@galaxie-ai/models/mock';
 
 const services: LangGraphServices = {
   chatModels: {},
@@ -142,8 +142,8 @@ combining inference and the gate in one node leases the model again. This helper
 does not work around native node re-execution.
 
 ```ts
-import { gateDecision } from '@galaxie/adapter-langgraph';
-import type { DecisionResult, ViewRevision } from '@galaxie/core';
+import { gateDecision } from '@galaxie-ai/adapter-langgraph';
+import type { DecisionResult, ViewRevision } from '@galaxie-ai/core';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 
 const state = Annotation.Root({

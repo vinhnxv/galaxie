@@ -15,10 +15,10 @@ From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm --filter @galaxie/example-adk-recipes dev:mock
-pnpm --filter @galaxie/example-adk-recipes exec vite build --mode mock
-pnpm --filter @galaxie/example-adk-recipes build
-pnpm --filter @galaxie/example-adk-recipes preview
+pnpm --filter @galaxie-ai/example-adk-recipes dev:mock
+pnpm --filter @galaxie-ai/example-adk-recipes exec vite build --mode mock
+pnpm --filter @galaxie-ai/example-adk-recipes build
+pnpm --filter @galaxie-ai/example-adk-recipes preview
 pnpm exec vitest run examples/adk-recipes
 ```
 
@@ -50,7 +50,7 @@ Collections contain at most five items and at most 4096 UTF-8 bytes including th
 
 Pricing is authored synthetic fixture logic. Upstream pricing was inspected only for licenses and notices, so no claim is made that these tiers reproduce its implementation.
 
-The financial recipe exports `financialDefinition` and `financialAgent` from `src/recipes/financial/agent.ts`. Register `createAdkAdapter()` from `@galaxie/adapter-adk`, bind `market.search@1` from `createHostCapabilities`, and pass the agent factory to `runtime.create`. Before evaluating ADK's browser bundle, run the host's `adk-env.ts` setup. `createFinancialMockModels()` in `src/recipes/financial/script.ts` supplies scripted providers and routes for two sample prompts, with all preferences in the initial prompt. The four specialists write `market_data_analysis_output`, `proposed_trading_strategies_output`, `execution_plan_output` and `final_risk_assessment_output`; the last value is the run output. Trading, execution and risk prompts request the verbatim disclaimer, and every successful scripted final reply ends with it. Arbitrary model output is not verified here.
+The financial recipe exports `financialDefinition` and `financialAgent` from `src/recipes/financial/agent.ts`. Register `createAdkAdapter()` from `@galaxie-ai/adapter-adk`, bind `market.search@1` from `createHostCapabilities`, and pass the agent factory to `runtime.create`. Before evaluating ADK's browser bundle, run the host's `adk-env.ts` setup. `createFinancialMockModels()` in `src/recipes/financial/script.ts` supplies scripted providers and routes for two sample prompts, with all preferences in the initial prompt. The four specialists write `market_data_analysis_output`, `proposed_trading_strategies_output`, `execution_plan_output` and `final_risk_assessment_output`; the last value is the run output. Trading, execution and risk prompts request the verbatim disclaimer, and every successful scripted final reply ends with it. Arbitrary model output is not verified here.
 
 The financial tests cover state interpolation, ordered checked `messages` chunks, search `updates`, empty fixture results, a blocked output chunk, a step budget of one and an instruction-bearing search result through the real broker, on Node and headless Chromium. Chromium uses the unchanged strict CSP and Trusted Types policy, records policy violations and rejects external requests. These are scripted orchestration checks with no real model; they do not establish financial quality or model resistance to prompt injection. See the [rewrite deltas](ATTRIBUTION.md#financial-advisor-rewrite-deltas) for what was preserved and dropped.
 
@@ -60,7 +60,7 @@ The Python Vite plugin selects only ADK wheels from the existing inventory and t
 
 The [Go recipe](../../go/recipes/financial/agent.go) uses `galaxie.Model`, `galaxie.LlmAgent`, `galaxie.SequentialAgent` and `galaxie.CapabilityTool`. Its `main/main.go` registers the `financial` entry with `galaxie.ServeWith`. The upstream conversational coordinator and its `AgentTool` specialists become the same fixed data, trading, execution and risk sequence as JavaScript; the same output keys carry state between specialists. Google Search becomes the host's bounded synthetic `market.search@1` capability. Prompts are Go string constants with the exact condensed JavaScript text and verbatim disclaimer; the financial rewrite deltas in [attribution](ATTRIBUTION.md#financial-advisor-rewrite-deltas) apply to both versions. No cloud model, environment setup, web launcher or deployment configuration is retained.
 
-Build the wasm from the repository root with `node scripts/build-go-wasm.ts ./recipes/financial/main`. Register `createGoAdapter()` from `@galaxie/adapter-go` with a host-owned Worker that imports the verified `wasm_exec.js` before the adapter Worker entry. Pass its same-origin wasm descriptor to `financialGoAgent(wasm)` and use `financialGoDefinition` from `src/recipes/financial-go/definition.ts`, the shared fixture binding and `createFinancialMockModels()`. The definition shares the JavaScript input, roles and capability contract without loading its ADK agent factory. See the [adapter guide](../../packages/adapter-go/README.md#hosting) for Worker wiring and limits.
+Build the wasm from the repository root with `node scripts/build-go-wasm.ts ./recipes/financial/main`. Register `createGoAdapter()` from `@galaxie-ai/adapter-go` with a host-owned Worker that imports the verified `wasm_exec.js` before the adapter Worker entry. Pass its same-origin wasm descriptor to `financialGoAgent(wasm)` and use `financialGoDefinition` from `src/recipes/financial-go/definition.ts`, the shared fixture binding and `createFinancialMockModels()`. The definition shares the JavaScript input, roles and capability contract without loading its ADK agent factory. See the [adapter guide](../../packages/adapter-go/README.md#hosting) for Worker wiring and limits.
 
 Native Go tests check specialist order, routed roles, interpolated state and offered tools. The Node test runs the actual wasm and compares the final reply and all four output-key values with JavaScript for fixture-backed and empty searches, checks growing streamed output through the safety hook, and enforces the reference module's 48 MiB raw wasm ceiling. It uses the existing Go gate message when the toolchain is absent. These are scripted orchestration checks with no real model or device performance claim; the picker runs the same Go recipe in a dedicated Worker. The Go dependency lock is unchanged.
 

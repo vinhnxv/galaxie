@@ -5,7 +5,7 @@ import { globSync, readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import galaxie from '@galaxie/eslint-plugin';
+import galaxie from '@galaxie-ai/eslint-plugin';
 import { ESLint } from 'eslint';
 import { expect, test } from 'vitest';
 

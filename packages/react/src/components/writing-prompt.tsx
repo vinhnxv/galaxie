@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { galaxieField } from '@galaxie/core';
+import { galaxieField } from '@galaxie-ai/core';
 import { type ReactElement, useId, useState } from 'react';
 import { z } from 'zod';
 import {

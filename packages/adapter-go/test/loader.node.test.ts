@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createHash } from 'node:crypto';
-import { toErrorInfo } from '@galaxie/core';
+import { toErrorInfo } from '@galaxie-ai/core';
 import { expect, test, vi } from 'vitest';
 import {
   egressSurfaces,

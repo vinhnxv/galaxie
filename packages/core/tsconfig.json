@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@galaxie/ui-protocol": ["../ui-protocol/src/index.ts"]
+      "@galaxie-ai/ui-protocol": ["../ui-protocol/src/index.ts"]
     }
   },
   "include": ["src"]

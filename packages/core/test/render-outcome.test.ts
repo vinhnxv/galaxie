@@ -254,7 +254,7 @@ test('an outcome recorded after the paused segment closed reaches the journal an
 test('tracing records each outcome as a child span, also after the root closes', () => {
   const { exporter, provider } = createSpanRecorder();
   const instrumentation = startRunTrace(
-    provider.getTracer('@galaxie/core', VERSION),
+    provider.getTracer('@galaxie-ai/core', VERSION),
     ROOT_CONTEXT,
     {
       appId: 'test',

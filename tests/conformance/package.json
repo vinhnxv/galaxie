@@ -1,22 +1,22 @@
 {
-  "name": "@galaxie/conformance",
+  "name": "@galaxie-ai/conformance",
   "version": "0.0.0",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
   "dependencies": {
-    "@galaxie/react": "workspace:*",
-    "@galaxie/core": "workspace:*",
-    "@galaxie/adapter-langgraph": "workspace:*",
+    "@galaxie-ai/react": "workspace:*",
+    "@galaxie-ai/core": "workspace:*",
+    "@galaxie-ai/adapter-langgraph": "workspace:*",
     "@langchain/core": "1.2.20",
     "@langchain/langgraph": "1.5.1",
     "@opentelemetry/api": "1.10.0",
     "@opentelemetry/sdk-trace": "3.0.0",
-    "@galaxie/models": "workspace:*",
-    "@galaxie/example-english-tutor": "workspace:*",
-    "@galaxie/storage-indexeddb": "workspace:*",
+    "@galaxie-ai/models": "workspace:*",
+    "@galaxie-ai/example-english-tutor": "workspace:*",
+    "@galaxie-ai/storage-indexeddb": "workspace:*",
     "@langchain/langgraph-checkpoint": "1.2.0",
-    "@galaxie/adapter-kit": "workspace:*"
+    "@galaxie-ai/adapter-kit": "workspace:*"
   },
   "devDependencies": {
     "react": "19.3.1",

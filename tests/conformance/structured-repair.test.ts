@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentSnapshot,
   type BudgetLimits,
@@ -10,8 +10,8 @@ import {
   defineAgentDefinition,
   galaxieField,
   toErrorInfo,
-} from '@galaxie/core';
-import { createMockLatch, MockChatModel, type MockScriptEntry } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { createMockLatch, MockChatModel, type MockScriptEntry } from '@galaxie-ai/models/mock';
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { type BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';

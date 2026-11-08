@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import '../../packages/adapter-adk/test/support/adk-env.js';
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 import {
   createRuntime,
   type DiagnosticEvent,
@@ -13,15 +13,15 @@ import {
   type OutputSafetyHook,
   type RunEvent,
   type Runtime,
-} from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import {
   checkTransformersModel,
   loadTransformersEngine,
   type TransformersChatEngine,
   TransformersChatModel,
   type TransformersEngineHandle,
-} from '@galaxie/models/transformers';
+} from '@galaxie-ai/models/transformers';
 import { LlmAgent } from '@google/adk';
 import { HumanMessage } from '@langchain/core/messages';
 import { toJsonSchema } from '@langchain/core/utils/json_schema';

@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/adapter-adk-bundle-csp-page",
+  "name": "@galaxie-ai/adapter-adk-bundle-csp-page",
   "private": true,
   "license": "Apache-2.0",
   "type": "module"

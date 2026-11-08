@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/tools-mcp",
+  "name": "@galaxie-ai/tools-mcp",
   "version": "0.0.0",
   "private": true,
   "description": "MCP client over Streamable HTTP that binds allowlisted, pinned tools as galaxie capabilities.",
@@ -16,7 +16,7 @@
     "dist"
   ],
   "dependencies": {
-    "@galaxie/core": "workspace:*",
+    "@galaxie-ai/core": "workspace:*",
     "@modelcontextprotocol/sdk": "1.32.1"
   },
   "peerDependencies": {

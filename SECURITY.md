@@ -22,9 +22,9 @@ release branches yet.
 
 ## Scope
 
-In scope are the packages `@galaxie/ui-protocol`, `@galaxie/core`, `@galaxie/adapter-kit`,
-`@galaxie/adapter-langgraph`, `@galaxie/models`, `@galaxie/storage-indexeddb` and
-`@galaxie/react` in this repository, and their documented controls. They are published
+In scope are the packages `@galaxie-ai/ui-protocol`, `@galaxie-ai/core`, `@galaxie-ai/adapter-kit`,
+`@galaxie-ai/adapter-langgraph`, `@galaxie-ai/models`, `@galaxie-ai/storage-indexeddb` and
+`@galaxie-ai/react` in this repository, and their documented controls. They are published
 to npm as 0.1.0 releases.
 
 Out of scope:

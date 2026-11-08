@@ -1,4 +1,4 @@
-# @galaxie/models
+# @galaxie-ai/models
 
 LangChain chat providers for galaxie hosts: deterministic mocks, WebLLM worker
 inference, ONNX models through Transformers.js, Chrome Built-in AI and call-scoped
@@ -8,22 +8,22 @@ There is no root export; select a [package subpath](package.json).
 ## Install
 
 ```sh
-pnpm add @galaxie/models @langchain/core@~1.2.20
+pnpm add @galaxie-ai/models @langchain/core@~1.2.20
 ```
 
-There is no root export: import a provider subpath (`@galaxie/models/openai`,
+There is no root export: import a provider subpath (`@galaxie-ai/models/openai`,
 `/builtin-ai`, `/webllm`, `/transformers`, `/decision` or `/mock`). Each provider's
 library is an optional peer, so install only the ones you use: `@mlc-ai/web-llm@0.2.86`,
 `@huggingface/transformers@4.3.2` with `@huggingface/transformers-structured-output@4.3.2`,
 or `@langchain/openai@1.6.3`. Peer requirements are listed in [package.json](package.json).
 To work on this package, use Node 24 and pnpm 11 at the repository root: run
 `pnpm install --frozen-lockfile`, then `pnpm build`. Workspace consumers declare
-`@galaxie/models` as `workspace:*`.
+`@galaxie-ai/models` as `workspace:*`.
 
 ## Minimal mock
 
 ```ts
-import { MockChatModel } from '@galaxie/models/mock';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 
 const model = new MockChatModel({
   Hello: { id: 'reply-1', text: 'Hello learner' },
@@ -75,11 +75,11 @@ tool-bound copies. This record does not change scripted replies or transcripts.
 
 ## Mock decisions
 
-`@galaxie/models/mock` also exports `MockDecisionModel`, `MockDecisionReply`,
+`@galaxie-ai/models/mock` also exports `MockDecisionModel`, `MockDecisionReply`,
 `MockDecisionScriptEntry` and `MockDecisionCall`. Script entries run in call order:
 
 ```ts
-import { MockDecisionModel } from '@galaxie/models/mock';
+import { MockDecisionModel } from '@galaxie-ai/models/mock';
 
 const model = new MockDecisionModel([
   {
@@ -107,7 +107,7 @@ applies output checks and settlement; the mock never retries a failed call.
 
 ## Structured-output decisions
 
-`@galaxie/models/decision` exports `createStructuredDecisionModel(chat)`. It wraps
+`@galaxie-ai/models/decision` exports `createStructuredDecisionModel(chat)`. It wraps
 an already available chat model that supports the `jsonSchema` call constraint,
 including WebLLM, Built-in AI, Transformers.js, OpenAI-compatible models and the
 scripted mock. One closed JSON Schema covers every boolean, choice and score
@@ -121,8 +121,8 @@ Every confidence gate over these answers therefore asks. The gate itself remains
 unimplemented. Core validates values and the adapter owns bounded repair.
 
 ```ts
-import { createStructuredDecisionModel } from '@galaxie/models/decision';
-import { MockChatModel } from '@galaxie/models/mock';
+import { createStructuredDecisionModel } from '@galaxie-ai/models/decision';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 
 const request = {
   state: 'Example message',
@@ -167,7 +167,7 @@ record's maintainer must read and record; Gemma terms differ from Apache-2.0.
 // worker.ts: bundled by the host as a module worker
 import ortMjs from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url';
 import ortWasm from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url';
-import { startTransformersWorker } from '@galaxie/models/transformers/worker';
+import { startTransformersWorker } from '@galaxie-ai/models/transformers/worker';
 
 startTransformersWorker({ ort: { mjs: ortMjs, wasm: ortWasm } });
 
@@ -178,7 +178,7 @@ import {
   loadTransformersEngine,
   TransformersChatModel,
   type TransformersChatEngine,
-} from '@galaxie/models/transformers';
+} from '@galaxie-ai/models/transformers';
 
 // `??=` keeps the first result: a rejected load stays rejected for this handle, so recovery
 // needs a new handle, as for WebLLM.

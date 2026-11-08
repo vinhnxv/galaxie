@@ -1,4 +1,4 @@
-# @galaxie/adapter-kit: coding guidance
+# @galaxie-ai/adapter-kit: coding guidance
 
 ## Purpose
 

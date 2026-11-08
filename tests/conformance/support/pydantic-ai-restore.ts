@@ -8,8 +8,8 @@ import {
   type RecoveryJson,
   type RecoveryStore,
   type SessionId,
-} from '@galaxie/core';
-import { createMockLatch, type MockScript } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { createMockLatch, type MockScript } from '@galaxie-ai/models/mock';
 import type { ToolCall } from '@langchain/core/messages';
 import { z } from 'zod';
 import {

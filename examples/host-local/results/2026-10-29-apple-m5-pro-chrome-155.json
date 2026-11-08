@@ -8,7 +8,7 @@
     "webgpuAdapter": "apple metal-3"
   },
   "build": {
-    "package": "@galaxie/example-host-local",
+    "package": "@galaxie-ai/example-host-local",
     "mode": "default",
     "origin": "http://127.0.0.1:4173",
     "server": "vite preview"

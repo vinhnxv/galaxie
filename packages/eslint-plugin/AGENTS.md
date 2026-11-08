@@ -1,4 +1,4 @@
-# @galaxie/eslint-plugin: coding guidance
+# @galaxie-ai/eslint-plugin: coding guidance
 
 ## Purpose
 
@@ -8,7 +8,7 @@ See [usage and limits](README.md).
 
 ## Entry points
 
-- `@galaxie/eslint-plugin` exports a default plugin from [src/index.ts](src/index.ts).
+- `@galaxie-ai/eslint-plugin` exports a default plugin from [src/index.ts](src/index.ts).
 - `configs.recommended` is an ESLint 10 flat config enabling every rule as an error.
 - `rules` contains `no-direct-network`, `no-direct-storage`, `no-dom`, `no-eval`
   and `no-direct-model`; there are no public subpaths.
@@ -18,7 +18,7 @@ See [usage and limits](README.md).
 Apply the recommended config to agent sources:
 
 ```ts
-import galaxie from '@galaxie/eslint-plugin';
+import galaxie from '@galaxie-ai/eslint-plugin';
 
 export default [galaxie.configs.recommended];
 ```

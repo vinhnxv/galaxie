@@ -1,13 +1,13 @@
 # Local English tutor host
 
-`@galaxie/example-host-local` is a private Vite example that runs the reusable English tutor in the page, with local capability bindings, the education component registry and an output safety hook. It has no agent backend, remote endpoint, provider key or tracing exporter.
+`@galaxie-ai/example-host-local` is a private Vite example that runs the reusable English tutor in the page, with local capability bindings, the education component registry and an output safety hook. It has no agent backend, remote endpoint, provider key or tracing exporter.
 
 Use Node.js 24 and pnpm 11 from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm --filter @galaxie/example-host-local exec vite build --mode mock
-pnpm --filter @galaxie/example-host-local exec vite preview --mode mock --host 127.0.0.1
+pnpm --filter @galaxie-ai/example-host-local exec vite build --mode mock
+pnpm --filter @galaxie-ai/example-host-local exec vite preview --mode mock --host 127.0.0.1
 ```
 
 Open the printed local URL, select **Start**, answer the three questions, submit a sentence and continue through Feedback and Progress. Mock mode recognizes this exact sentence for its scripted review:
@@ -19,8 +19,8 @@ Galaxie sentinel 7f3e she walk to school
 For default mode, rebuild and serve with the same mode:
 
 ```sh
-pnpm --filter @galaxie/example-host-local exec vite build
-pnpm --filter @galaxie/example-host-local exec vite preview --host 127.0.0.1
+pnpm --filter @galaxie-ai/example-host-local exec vite build
+pnpm --filter @galaxie-ai/example-host-local exec vite preview --host 127.0.0.1
 ```
 
 Default mode contains no mock script. **Prepare models** is the intentional download click; Start stays disabled until WebLLM is loaded and the host exists. Preparation attempts Built-in AI and then loads WebLLM in a bundled module worker. A missing Built-in AI API permits the WebLLM route. Both roles prefer available Built-in AI, then WebLLM, through the router's availability and download hooks. A failed preparation shows a fixed message and permits another preparation attempt. WebLLM needs a suitable WebGPU device; this path has not been verified with real models or devices.

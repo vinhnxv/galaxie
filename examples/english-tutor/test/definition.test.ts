@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type BindingsFor, readAnnotations } from '@galaxie/core';
+import { type BindingsFor, readAnnotations } from '@galaxie-ai/core';
 import { expect, test } from 'vitest';
 import { tutorDefinition } from '../src/definition.js';
 import { lessonFixture } from '../src/lesson-fixture.js';

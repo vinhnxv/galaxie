@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { WebLLMEngineHandle } from '@galaxie/models/webllm';
+import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
 import type { DownloadOptions } from './runtime.js';
 import workerUrl from './webllm-worker.ts?worker&url';
 
@@ -13,7 +13,7 @@ let installed = false;
 
 /** Imported only after consent; the policy permits only this bundled worker. */
 export async function downloadWebLLM(options: DownloadOptions): Promise<WebLLMEngineHandle> {
-  const { loadWebLLMEngine } = await import('@galaxie/models/webllm');
+  const { loadWebLLMEngine } = await import('@galaxie-ai/models/webllm');
   options.signal.throwIfAborted();
   const factory = (globalThis as typeof globalThis & { trustedTypes?: TrustedTypesFactory })
     .trustedTypes;

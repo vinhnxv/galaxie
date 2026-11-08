@@ -1,4 +1,4 @@
-# @galaxie/models: coding guidance
+# @galaxie-ai/models: coding guidance
 
 ## Purpose
 
@@ -8,7 +8,7 @@ See the [README](README.md) and [model flow](../../docs/system-design.md#84-a-mo
 
 ## Entry points
 
-- There is no `@galaxie/models` root export; use a declared subpath.
+- There is no `@galaxie-ai/models` root export; use a declared subpath.
 - `/mock`: `MockChatModel`, `MockDecisionModel`, `MockModelError`, `createMockLatch` and script types.
 - `/decision`: `createStructuredDecisionModel` and structural request, result and option types.
 - `/webllm`: `loadWebLLMEngine`, `WebLLMChatModel`, `checkWebLLMModel`,
@@ -24,7 +24,7 @@ See the [README](README.md) and [model flow](../../docs/system-design.md#84-a-mo
 Use a scripted model in tests, without loading a real provider:
 
 ```ts
-import { MockChatModel } from '@galaxie/models/mock';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 
 const model = new MockChatModel({
   Hello: { id: 'reply-1', text: 'Hello learner' },

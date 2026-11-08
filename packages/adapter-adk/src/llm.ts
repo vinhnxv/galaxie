@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { resolveProvider, sameJson } from '@galaxie/adapter-kit';
-import type { ModelCall, ModelFeature } from '@galaxie/core';
+import { resolveProvider, sameJson } from '@galaxie-ai/adapter-kit';
+import type { ModelCall, ModelFeature } from '@galaxie-ai/core';
 import { BaseLlm, type LlmRequest, type LlmResponse } from '@google/adk';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {

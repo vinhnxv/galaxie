@@ -76,7 +76,7 @@ export function assertSpanTree(
     0,
   );
   for (const span of spans) {
-    expect(span.instrumentationScope.name).toBe('@galaxie/core');
+    expect(span.instrumentationScope.name).toBe('@galaxie-ai/core');
     expect(span.instrumentationScope.version).toBe(metadata.version);
     expect(span.events).toEqual([]);
     expect(span.links).toEqual([]);

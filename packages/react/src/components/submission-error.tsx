@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ErrorCode } from '@galaxie/core';
+import type { ErrorCode } from '@galaxie-ai/core';
 import type { ReactElement } from 'react';
 import type { InteractionStatus } from '../registry.js';
 import { useAlertFocus } from './alert-focus.js';

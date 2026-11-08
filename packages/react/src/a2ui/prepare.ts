@@ -7,7 +7,7 @@ import {
   type PendingInteraction,
   surfaceFromRequest,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   type CatalogComponent,
   type Component,
@@ -15,7 +15,7 @@ import {
   type JsonValue,
   type MaterializedSurface,
   resolveDataPath,
-} from '@galaxie/ui-protocol';
+} from '@galaxie-ai/ui-protocol';
 import type { ComponentEntry, Registry } from '../registry.js';
 import { hasBinding, object, resolveBindings } from './bindings.js';
 import { catalogComponentId, catalogLocation } from './catalog.js';

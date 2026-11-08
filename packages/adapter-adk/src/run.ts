@@ -9,7 +9,7 @@ import {
   type ModelPort,
   type RunTrace,
   type TraceHandle,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { failure } from './errors.js';
 
 /** The pieces of one run that models and tools reach through the host. */
