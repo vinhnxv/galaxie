@@ -3,7 +3,7 @@
 Revised on 2026-11-07 for the model output limit, ONNX record, A2UI, HTTP write
 retry and ADK recipe entries; the other entries were last checked against the
 implementation on 2026-10-31. The [MVP exit record](mvp-exit-record.md) maps acceptance requirements to existing
-evidence, with the maintainer's decision pending.
+evidence, with the maintainer's Go decision (2026-10-30) recorded and its open items still open.
 
 ## Execution and LangGraph
 
@@ -112,4 +112,4 @@ The loan's displayed decision comes only from its pending confirmation or finali
 - Firefox, Safari, mobile devices, other GPUs and other OS/device combinations have no real-device evidence in the published matrix ([untested configurations](device-matrix.md#untested-or-unmeasured)).
 - Real inference evidence is limited to the recorded Apple M5 Pro/Chrome 155 demonstrations, while automated Node and Chromium tests use fake models and engines ([device matrix](device-matrix.md)).
 - Real worker-network capture, first downloads, latency distributions, main-thread long tasks, memory and the listed recovery/device measurements remain unmeasured ([MVP open items](mvp-exit-record.md#open-items-for-the-maintainers-decision)).
-- The external developer trials and the pre-release legal review have no completed result in these records, and the maintainer's decision is pending ([MVP open items](mvp-exit-record.md#open-items-for-the-maintainers-decision)).
+- The external developer trials and the pre-release legal review have no completed result in these records; they remain open items under the maintainer's Go decision of 2026-10-30 ([MVP open items](mvp-exit-record.md#open-items-for-the-maintainers-decision)).
