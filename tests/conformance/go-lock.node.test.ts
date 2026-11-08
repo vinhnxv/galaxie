@@ -6,9 +6,9 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { buildGoWasm } from '../../scripts/build-go-wasm.ts';
-import { classifyLicense, goPackages } from '../../scripts/check-go-lock.ts';
-import { fetchGoGlue, invalidGlue } from '../../scripts/fetch-go-glue.ts';
+import { buildGoWasm } from '../../scripts/build-go-wasm.js';
+import { classifyLicense, goPackages } from '../../scripts/check-go-lock.js';
+import { fetchGoGlue, invalidGlue } from '../../scripts/fetch-go-glue.js';
 import {
   allowedLicenses,
   goDirectory,
@@ -17,7 +17,7 @@ import {
   readGoWasmLock,
   runGo,
   wasmModules,
-} from '../../scripts/go-wasm-lock.ts';
+} from '../../scripts/go-wasm-lock.js';
 
 const missingGo = 'The Go toolchain is not installed; install Go to run the Go lock checks.';
 

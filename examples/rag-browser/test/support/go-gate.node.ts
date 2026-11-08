@@ -5,9 +5,9 @@ import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildGoWasm } from '../../../../scripts/build-go-wasm.ts';
-import { fetchGoGlue } from '../../../../scripts/fetch-go-glue.ts';
-import { goInstalled } from '../../../../scripts/go-wasm-lock.ts';
+import { buildGoWasm } from '../../../../scripts/build-go-wasm.js';
+import { fetchGoGlue } from '../../../../scripts/fetch-go-glue.js';
+import { goInstalled } from '../../../../scripts/go-wasm-lock.js';
 
 export const goAvailable: boolean = goInstalled();
 export const missingGo: string =
