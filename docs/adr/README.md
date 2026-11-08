@@ -49,6 +49,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0026](0026-adapter-kit-package.md) | Shared adapter helpers in a non-adapter package | Accepted |
 | [0027](0027-a2ui-surfaces.md) | A2UI surfaces with host-owned catalogs and policy | Accepted |
 | [0028](0028-decision-model-role.md) | Decision model roles through the model router | Accepted |
+| [0029](0029-reconcile-hook-for-unknown-outcome-writes.md) | Optional reconcile hook for unknown-outcome writes | Proposed |
 
 ## Template
 
