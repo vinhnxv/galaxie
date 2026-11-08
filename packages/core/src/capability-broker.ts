@@ -344,6 +344,8 @@ export class CapabilityBroker {
           !['app', 'principal', 'instance', 'run'].includes(binding.grantScope) ||
           !['none', 'confirm'].includes(binding.approval) ||
           !['none', 'idempotent', 'idempotency-key'].includes(binding.retry) ||
+          (binding.reconcile !== undefined &&
+            (typeof binding.reconcile !== 'function' || binding.retry !== 'none')) ||
           typeof binding.invoke !== 'function')
       )
         throw failure('invalid');
@@ -438,6 +440,12 @@ export class CapabilityBroker {
           if (compiled === undefined || binding === undefined || compiled.slots === undefined)
             throw failure('denied');
           const slots = compiled.slots;
+          const settle = (output: unknown): unknown => {
+            for (const label of compiled.output.labels) run.labels.add(label);
+            registerPrivate(compiled.output.privateStrings(output), run.privateValues);
+            run.labelsChanged();
+            return output;
+          };
           if (binding.grantScope === 'run' && !run.grants.has(name)) throw failure('denied');
           if (binding.approval === 'confirm' && this.#confirmations === undefined)
             throw failure('unsupported');
@@ -488,16 +496,97 @@ export class CapabilityBroker {
               assertActive();
               if (record?.status === 'succeeded') {
                 run.budget.payload(record.output);
-                const output = record.output;
-                for (const label of compiled.output.labels) run.labels.add(label);
-                registerPrivate(compiled.output.privateStrings(output), run.privateValues);
-                run.labelsChanged();
-                return output;
+                return settle(record.output);
               }
               if (record?.status === 'dispatched' || record?.status === 'outcome_unknown') {
                 await journal.write('outcome_unknown');
                 assertActive();
-                if (binding.retry === 'none') {
+                if (binding.retry === 'none' && binding.reconcile !== undefined) {
+                  checkPolicy(value);
+                  const consultController = new AbortController();
+                  const abortConsult = (): void => consultController.abort();
+                  controller.signal.addEventListener('abort', abortConsult, { once: true });
+                  let consultAborted: (() => void) | undefined;
+                  const consultAbort = new Promise<never>((_resolve, reject) => {
+                    consultAborted = () => reject(failure(abortCode));
+                    consultController.signal.addEventListener('abort', consultAborted, {
+                      once: true,
+                    });
+                  });
+                  const context: CapabilityContext = {
+                    signal: consultController.signal,
+                    effectId,
+                    runId: run.runId,
+                    principalScope: this.#principal,
+                    agent: this.#agent,
+                  };
+                  const clearConsultTimer = deadlineTimer(binding.timeoutMs, () => {
+                    if (!controller.signal.aborted) {
+                      abortCode = 'timeout';
+                      controller.abort();
+                    }
+                  });
+                  let answer: unknown;
+                  try {
+                    let execution: Promise<unknown>;
+                    try {
+                      execution = Promise.resolve(binding.reconcile(effectId, context));
+                    } catch (error) {
+                      execution = Promise.reject(error);
+                    }
+                    try {
+                      answer = await Promise.race([execution, consultAbort]);
+                    } catch (error) {
+                      assertActive();
+                      this.#report({ kind: 'capability_failed', runId: run.runId, error });
+                    }
+                    assertActive();
+                  } finally {
+                    clearConsultTimer();
+                    controller.signal.removeEventListener('abort', abortConsult);
+                    if (consultAborted !== undefined)
+                      consultController.signal.removeEventListener('abort', consultAborted);
+                  }
+                  if (
+                    typeof answer === 'object' &&
+                    answer !== null &&
+                    'outcome' in answer &&
+                    answer.outcome === 'applied' &&
+                    'output' in answer
+                  ) {
+                    run.budget.payload(answer.output);
+                    const output = await validate(compiled.request.output, answer.output);
+                    await journal.succeed(output);
+                    assertActive();
+                    const result = settle(output);
+                    this.#report({ kind: 'effect_reconciled_applied', runId: run.runId, effectId });
+                    return result;
+                  }
+                  if (
+                    typeof answer !== 'object' ||
+                    answer === null ||
+                    !('outcome' in answer) ||
+                    answer.outcome !== 'not-applied'
+                  ) {
+                    this.#report({
+                      kind: 'effect_outcome_unknown',
+                      runId: run.runId,
+                      effectId,
+                    });
+                    throw failure('outcome_unknown');
+                  }
+                  assertActive();
+                  checkPolicy(value);
+                  this.#report({
+                    kind: 'effect_reconciled_not_applied',
+                    runId: run.runId,
+                    effectId,
+                  });
+                  if (binding.approval !== 'confirm') {
+                    clearTimer?.();
+                    startDeadline();
+                  }
+                } else if (binding.retry === 'none') {
                   this.#report({
                     kind: 'effect_outcome_unknown',
                     runId: run.runId,
@@ -608,10 +697,7 @@ export class CapabilityBroker {
                 await journal.succeed(output);
                 assertActive();
               }
-              for (const label of compiled.output.labels) run.labels.add(label);
-              registerPrivate(compiled.output.privateStrings(output), run.privateValues);
-              run.labelsChanged();
-              return output;
+              return settle(output);
             } finally {
               if (!invoked || hostSettled) release();
             }

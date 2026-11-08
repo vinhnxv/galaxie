@@ -69,7 +69,13 @@ Token limits are reservations; actual overruns are detected after a call.
 Repair calls also reserve tokens and cost and recheck labels, consent and output
 safety; they charge neither graph steps nor capability calls. A route may reselect
 a different provider for repair. Direct provider calls do not inherit repair.
-Recovery cannot reconcile an unknown remote outcome automatically.
+Recovery can consult an optional `reconcile(effectId, context)` hook for
+`retry: 'none'` writes ([ADR-0029](../../docs/adr/0029-reconcile-hook-for-unknown-outcome-writes.md)).
+Without a hook, unknown writes stay blocked and the host reconciles outside the
+framework. The host's `not-applied` answer must mean no request sent before the answer
+can still apply that effect ID, while the replay core sends next is admitted; an absence
+check cannot exclude a former owner's late request.
+Core cannot verify this, and a false answer can repeat a write.
 Span text is off by default; the development opt-in follows live labels and
 the declared final destination. See [the baseline](../../docs/adr/0012-security-baseline.md).
 

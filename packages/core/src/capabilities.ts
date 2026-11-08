@@ -30,14 +30,15 @@ export type GrantScope = 'app' | 'principal' | 'instance' | 'run';
  * Retry semantics that the host declares, never inferred from the name or the HTTP method (brief
  * §9.2, §12.3):
  *
- * - `none`: an unknown outcome fails with `outcome_unknown` and never re-invokes the binding;
+ * - `none`: an unknown outcome blocks replay unless the optional `reconcile` hook resolves it;
  * - `idempotent`: repeating the call has no further effect;
  * - `idempotency-key`: the server dedupes calls by effect ID.
  *
  * With a recovery store, these policies govern replay of dispatched or unknown writes, not an
  * immediate retry loop. A succeeded receipt is reused without invoking the binding. Without a
- * store, core does not retry. No host reconciliation API exists yet: reconcile an unknown write
- * with the backend before a new session could repeat it; new sessions derive new effect IDs.
+ * store, core does not retry. Only `none` supports the optional host reconciliation hook
+ * (ADR-0029). Without a hook, an unknown write stays blocked: reconcile it with the backend
+ * before a new session could repeat it; new sessions derive new effect IDs.
  */
 export type RetryPolicy = 'none' | 'idempotent' | 'idempotency-key';
 
@@ -60,6 +61,12 @@ export interface CapabilityContext {
   readonly agent: AgentRef;
 }
 
+/** The host's answer about whether an earlier effect applied (ADR-0029). */
+export type ReconcileResult<Output = unknown> =
+  | { outcome: 'applied'; output: Output }
+  | { outcome: 'not-applied' }
+  | { outcome: 'unknown' };
+
 /**
  * A host binding: the host's implementation of one capability, with its policy (brief §9.2). The
  * broker validates the input before `invoke` and the output after it.
@@ -78,6 +85,12 @@ export interface CapabilityBinding<Input = unknown, Output = unknown> {
   readonly retry: RetryPolicy;
   /** A property, not a method, so a binding that needs more input than the schema gives fails to compile. */
   readonly invoke: (input: Input, context: CapabilityContext) => Promise<Output>;
+  /**
+   * Receives the effect ID and usual call context, never the call input. Valid only with
+   * `retry: 'none'`; consulted once per restored call (ADR-0029). An `applied` output is host data:
+   * the broker validates it against the capability's output schema, so the result is untyped here.
+   */
+  readonly reconcile?: (effectId: string, context: CapabilityContext) => Promise<ReconcileResult>;
 }
 
 /** Framework-neutral access to the current run's broker. */

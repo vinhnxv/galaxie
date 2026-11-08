@@ -249,6 +249,7 @@ export function httpCapability<Input = unknown, Output = unknown>(
     grantScope: options.grantScope,
     approval: options.approval,
     retry: options.retry,
+    ...(options.reconcile === undefined ? {} : { reconcile: options.reconcile }),
     invoke: async (input: Input, context: CapabilityContext): Promise<Output> =>
       (await descriptor.invoke(
         input,

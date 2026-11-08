@@ -12,6 +12,7 @@ export type {
   CapabilityRequests,
   GrantScope,
   HttpCapabilityOptions,
+  ReconcileResult,
   RetryPolicy,
 } from './capabilities.js';
 export { attributionHeaders } from './capabilities.js';
