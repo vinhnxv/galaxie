@@ -513,6 +513,30 @@ test('cancellation while planned records failed without dispatching the write', 
   expect(invoke).not.toHaveBeenCalled();
 });
 
+test('cancellation after the dispatched marker but before invoking records failed', async () => {
+  const store = await acceptedStore();
+  const dispatched = deferred<void>();
+  const release = deferred<void>();
+  const write = store.recordEffect.bind(store);
+  store.recordEffect = async (...args) => {
+    await write(...args);
+    if (args[2].status === 'dispatched') {
+      dispatched.resolve();
+      await release.promise;
+    }
+  };
+  const invoke = vi.fn(async () => ({ receipt: 'unused' }));
+  const fixture = await resume(store, invoke);
+  await dispatched.promise;
+  const runId = fixture.instance.getSnapshot().run?.runId;
+  if (runId === undefined) throw new Error('Missing run');
+  await fixture.instance.cancel(runId);
+  release.resolve();
+  await fixture.runtime.dispose();
+  expect([...store.journal.values()][0]?.status).toBe('failed');
+  expect(invoke).not.toHaveBeenCalled();
+});
+
 test.each(['reject', 'invalid-output'] as const)(
   'a host %s after dispatch leaves outcome_unknown',
   async (mode) => {
