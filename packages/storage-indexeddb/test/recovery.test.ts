@@ -157,10 +157,9 @@ describe.skipIf(typeof indexedDB === 'undefined')('IndexedDB recovery', () => {
     try {
       await transact(db, ['meta', 'inbox', 'journal'], 'readwrite', async (tx) => {
         await requestResult(
-          tx.objectStore('meta').put(
-            { v: 1, value: identity },
-            ['app', 'user', 'session', 'session'],
-          ),
+          tx
+            .objectStore('meta')
+            .put({ v: 1, value: identity }, ['app', 'user', 'session', 'session']),
         );
         for (const entry of entries)
           await requestResult(

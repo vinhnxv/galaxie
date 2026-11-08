@@ -106,10 +106,14 @@ describe.skipIf(typeof indexedDB === 'undefined')('session export', () => {
           const sessionId = stamped ? 'stamped' : 'unstamped';
           const stamp = stamped ? { formatVersion: 1 } : {};
           await requestResult(
-            tx.objectStore('meta').put(
-              { v: 1, value: { ...identity, ...stamp } },
-              ['app', 'user', 'session', sessionId],
-            ),
+            tx
+              .objectStore('meta')
+              .put({ v: 1, value: { ...identity, ...stamp } }, [
+                'app',
+                'user',
+                'session',
+                sessionId,
+              ]),
           );
           for (const status of ['accepted', 'consumed'])
             await requestResult(
