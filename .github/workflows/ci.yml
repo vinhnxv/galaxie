@@ -196,7 +196,7 @@ jobs:
   # passes when jobs succeeded or were skipped, so a required check can name it alone.
   ci:
     if: always()
-    needs: [scope, static, dependency-licenses, size, build, test-general, test-python, python-checks, go]
+    needs: [scope, static, dependency-licenses, size, build, test-general, test-browser-engines, test-python, python-checks, go]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

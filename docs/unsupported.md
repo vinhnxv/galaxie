@@ -110,7 +110,7 @@ The loan's displayed decision comes only from its pending confirmation or finali
 
 ## Platforms and evidence
 
-- Firefox, Safari, mobile devices, other GPUs and other OS/device combinations have no real-device evidence in the published matrix ([untested configurations](device-matrix.md#untested-or-unmeasured)).
+- Firefox, Safari, mobile devices, other GPUs and other OS/device combinations have no real-device evidence in the published matrix ([untested configurations](device-matrix.md#untested-or-unmeasured)). Firefox and WebKit have mock-model CI runs only, and two loopback model cases fail on both ([results](device-matrix.md#mock-model-runs-on-firefox-and-webkit)).
 - Real inference evidence is limited to the recorded Apple M5 Pro/Chrome 155 demonstrations, while automated Node and Chromium tests use fake models and engines ([device matrix](device-matrix.md)).
 - Real worker-network capture, first downloads, latency distributions, main-thread long tasks, memory and the listed recovery/device measurements remain unmeasured ([MVP open items](mvp-exit-record.md#open-items-for-the-maintainers-decision)).
 - The external developer trials and the pre-release legal review have no completed result in these records, and the maintainer's decision is pending ([MVP open items](mvp-exit-record.md#open-items-for-the-maintainers-decision)).
