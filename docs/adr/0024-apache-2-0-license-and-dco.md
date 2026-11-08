@@ -4,6 +4,7 @@
 - **Date:** 2026-11-04
 - **Revisions:**
   - 2026-11-04: the maintainer decided to publish galaxie without monetization, and chose Apache-2.0 over MIT.
+  - 2026-11-08: the repository is public and the legal review of learner data did not happen, because the project has no legal counsel. The consequence note on that review is corrected below.
 - **Related:** brief §16.9; framework overview §5.3, §7, §8; ADR-0015
 
 This ADR records an engineering and project position. It is not legal advice.
@@ -53,7 +54,7 @@ Facts that shape the choice:
 - The maintainer gives up the option to sell a commercial license for the code written so far. Rights already granted under the AGPL to anyone who received the code before the relicense are not withdrawn; the AGPL text stays in the git history.
 - ADR-0015 is kept for history. Its link to `COMMERCIAL-LICENSE.md` becomes plain text because the file is removed.
 - A license change is one pull request over the whole tree (plan unit U2). Until it merges, statements that say AGPL are still true of the tree, and statements that say Apache-2.0 describe the decision.
-- The lawyer review deferred by ADR-0015 for the CLA, the commercial agreement and section 7 terms is no longer needed. The legal review of learner data (`galaxie-f0k`) is unaffected and still gates making the repository public.
+- The lawyer review deferred by ADR-0015 for the CLA, the commercial agreement and section 7 terms is no longer needed. The legal review of learner data was planned to gate making the repository public. The repository was made public without it, so no legal review of learner data, minors, consent or retention has taken place. The [README](../../README.md#intended-use-and-disclaimer) and [brief §9.8](../galaxie-project-brief.md#98-content-safety-and-learner-data) say that this review is the responsibility of whoever deploys galaxie to learners.
 - Coding assistants copy code freely. `AGENTS.md`, `llms.txt` and the README state the license and the DCO rule in plain words once U2 and U7 land.
 
 ## Verification

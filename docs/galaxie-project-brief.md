@@ -784,7 +784,7 @@ These hold on SDK-controlled paths: the model router, the capability broker, the
 
 - The tutor audience may include minors. The host provides an output safety hook that runs on generated text before display. In the MVP this can be a host-supplied function. After the MVP it can be a small classifier running on Transformers.js.
 - Learner sentences in step 9 stay `in-browser` by default. Any role that sends learner content to a remote class must say so in the UI and get consent.
-- A legal review of applicable data protection rules (minors, consent, retention) is a human task before any public release. It is not something the runtime can guarantee.
+- A legal review of applicable data protection rules (minors, consent, retention) is a human task. It has not been done for this project, which has no legal counsel and was made public without it ([ADR-0024](adr/0024-apache-2-0-license-and-dco.md)). It is the responsibility of any host that deploys the tutor to learners, and it is not something the runtime can guarantee.
 
 ### 9.9. Limits to state plainly
 

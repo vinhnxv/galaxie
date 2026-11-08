@@ -114,6 +114,8 @@ galaxie is not designed, tested or certified for high-risk or regulated uses, in
 
 If you use galaxie in such a context, you do so at your own risk. You are responsible for your own security review and for compliance with the rules of your sector.
 
+Learner and personal data: by default the tutor examples keep learner sentences on the device, and galaxie provides routing and consent controls for any role that sends content elsewhere. No legal review of minors, consent or retention rules has been done, because the project has no legal counsel. galaxie does not encrypt browser storage, and the saver never deletes on its own: the host decides when to sweep or delete sessions. If your app serves children or handles personal data, you are responsible for your own review of the rules that apply to you.
+
 Language models make mistakes. galaxie validates the shape of their output, not whether it is true, so keep a person in the loop for decisions that matter.
 
 No test suite or review proves that software is secure. The known limits are listed in [brief §9.9](docs/galaxie-project-brief.md#99-limits-to-state-plainly) and [ADR-0012](docs/adr/0012-security-baseline.md).
