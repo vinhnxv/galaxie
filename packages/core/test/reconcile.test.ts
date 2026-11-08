@@ -237,10 +237,12 @@ describe('applied write reconciliation', () => {
     'settles a %s receipt without invoking or opening a confirmation',
     async (status) => {
       const { store, effectId } = await seededWrite(status);
-      const hook = vi.fn(async (): Promise<ReconcileResult> => ({
-        outcome: 'applied',
-        output: 'reconciled receipt',
-      }));
+      const hook = vi.fn(
+        async (): Promise<ReconcileResult> => ({
+          outcome: 'applied',
+          output: 'reconciled receipt',
+        }),
+      );
       const invoke = vi.fn(async () => 'unused');
       const fixture = await resumeWrite(
         store,
