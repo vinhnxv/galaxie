@@ -98,7 +98,11 @@ test.each(packages)('$directory packs only distribution files and includes every
 test.each(packages)('$directory packs resolved workspace dependencies', (pkg) => {
   expect(pkg.packedJson).not.toContain('workspace:');
   const manifest = JSON.parse(pkg.packedJson) as Manifest;
-  for (const dependency of ['@galaxie/core', '@galaxie/adapter-kit', '@galaxie/ui-protocol']) {
+  for (const dependency of [
+    '@galaxie-ai/core',
+    '@galaxie-ai/adapter-kit',
+    '@galaxie-ai/ui-protocol',
+  ]) {
     if (pkg.source.dependencies?.[dependency] !== undefined)
       expect(manifest.dependencies?.[dependency]).toBe(coreVersion);
   }
@@ -106,9 +110,9 @@ test.each(packages)('$directory packs resolved workspace dependencies', (pkg) =>
 
 test('React packs its protocol dependency at the shared release version', () => {
   const react = packages.find((pkg) => pkg.directory === 'react');
-  expect(react?.source.dependencies?.['@galaxie/ui-protocol']).toBe('workspace:*');
+  expect(react?.source.dependencies?.['@galaxie-ai/ui-protocol']).toBe('workspace:*');
   const manifest = JSON.parse(react?.packedJson ?? '{}') as Manifest;
-  expect(manifest.dependencies?.['@galaxie/ui-protocol']).toBe(coreVersion);
+  expect(manifest.dependencies?.['@galaxie-ai/ui-protocol']).toBe(coreVersion);
 });
 
 test.each(packages)('$directory has public metadata and the root license files', (pkg) => {
@@ -158,7 +162,7 @@ test('release size measurements include the kit and its LangGraph consumer bundl
       modules.some((module) => module.replaceAll('\\', '/').includes('/adapter-kit/dist/')),
     ).toBe(true);
     const text = code.join('\n');
-    expect(text).not.toContain('@galaxie/adapter-kit');
+    expect(text).not.toContain('@galaxie-ai/adapter-kit');
     expect(text.length).toBeGreaterThan(0);
     console.info(
       `${directory} release bundle: ${Buffer.byteLength(text)} bytes, ${gzipSync(text).byteLength} gzip bytes (includes adapter-kit).`,

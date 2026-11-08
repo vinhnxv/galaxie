@@ -7,7 +7,7 @@ import {
   type InteractionId,
   materializeSurface,
   pendingFromSurface,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   AgentSurface,
   type BoundActions,
@@ -16,7 +16,7 @@ import {
   Quiz,
   type QuizActions,
   structuralComponents,
-} from '@galaxie/react';
+} from '@galaxie-ai/react';
 import { act, type ReactElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, test, vi } from 'vitest';

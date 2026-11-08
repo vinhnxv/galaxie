@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/adapter-kit",
+  "name": "@galaxie-ai/adapter-kit",
   "version": "0.1.0",
   "description": "Shared internal building blocks for galaxie executor adapters.",
   "license": "Apache-2.0",
@@ -29,7 +29,7 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@galaxie/core": "workspace:*"
+    "@galaxie-ai/core": "workspace:*"
   },
   "peerDependencies": {
     "@langchain/core": "~1.2.20"

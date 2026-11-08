@@ -14,7 +14,7 @@ import {
   parseSurfaceRecord,
   pendingFromSurface,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { Command, GraphRecursionError, isGraphInterrupt } from '@langchain/langgraph/web';
 import { adapterError } from './errors.js';
 import {

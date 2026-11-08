@@ -17,7 +17,7 @@ interface GalaxiePlugin {
 }
 
 const galaxie: GalaxiePlugin = {
-  meta: { name: '@galaxie/eslint-plugin', version },
+  meta: { name: '@galaxie-ai/eslint-plugin', version },
   rules: {
     'no-direct-network': noDirectNetwork,
     'no-direct-storage': noDirectStorage,

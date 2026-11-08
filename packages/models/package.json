@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/models",
+  "name": "@galaxie-ai/models",
   "version": "0.1.0",
   "description": "Mock, WebLLM, Transformers.js ONNX, Chrome Built-in AI and OpenAI-compatible model providers for galaxie.",
   "license": "Apache-2.0",

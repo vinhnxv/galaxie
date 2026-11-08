@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { lessonFixture, type QuizDraft, type Review } from '@galaxie/example-english-tutor';
-import { MockChatModel } from '@galaxie/models/mock';
+import { lessonFixture, type QuizDraft, type Review } from '@galaxie-ai/example-english-tutor';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import { type LocalModels, localDescriptor } from './runtime.js';
 
 export const sentinelSentence = 'Galaxie sentinel 7f3e she walk to school';

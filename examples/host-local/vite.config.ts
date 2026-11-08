@@ -9,35 +9,37 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
   root: fileURLToPath(new URL('.', import.meta.url)),
   resolve: {
     alias: {
-      '@galaxie/example-english-tutor': fileURLToPath(
+      '@galaxie-ai/example-english-tutor': fileURLToPath(
         new URL('../../examples/english-tutor/src/index.ts', import.meta.url),
       ),
-      '@galaxie/react': fileURLToPath(
+      '@galaxie-ai/react': fileURLToPath(
         new URL('../../packages/react/src/index.ts', import.meta.url),
       ),
-      '@galaxie/models/builtin-ai': fileURLToPath(
+      '@galaxie-ai/models/builtin-ai': fileURLToPath(
         new URL('../../packages/models/src/builtin-ai/index.ts', import.meta.url),
       ),
-      '@galaxie/models/webllm/worker': fileURLToPath(
+      '@galaxie-ai/models/webllm/worker': fileURLToPath(
         new URL('../../packages/models/src/webllm/worker.ts', import.meta.url),
       ),
-      '@galaxie/models/webllm': fileURLToPath(
+      '@galaxie-ai/models/webllm': fileURLToPath(
         new URL('../../packages/models/src/webllm/index.ts', import.meta.url),
       ),
-      '@galaxie/models/mock': fileURLToPath(
+      '@galaxie-ai/models/mock': fileURLToPath(
         new URL('../../packages/models/src/mock.ts', import.meta.url),
       ),
-      '@galaxie/adapter-kit': fileURLToPath(
+      '@galaxie-ai/adapter-kit': fileURLToPath(
         new URL('../../packages/adapter-kit/src/index.ts', import.meta.url),
       ),
-      '@galaxie/core/browser': fileURLToPath(
+      '@galaxie-ai/core/browser': fileURLToPath(
         new URL('../../packages/core/src/browser.ts', import.meta.url),
       ),
-      '@galaxie/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
-      '@galaxie/storage-indexeddb': fileURLToPath(
+      '@galaxie-ai/core': fileURLToPath(
+        new URL('../../packages/core/src/index.ts', import.meta.url),
+      ),
+      '@galaxie-ai/storage-indexeddb': fileURLToPath(
         new URL('../../packages/storage-indexeddb/src/index.ts', import.meta.url),
       ),
-      '@galaxie/adapter-langgraph': fileURLToPath(
+      '@galaxie-ai/adapter-langgraph': fileURLToPath(
         new URL('../../packages/adapter-langgraph/src/index.ts', import.meta.url),
       ),
     },

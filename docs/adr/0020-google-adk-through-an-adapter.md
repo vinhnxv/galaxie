@@ -11,14 +11,14 @@ Agent authors ask for Google's Agent Development Kit. ADK 2.x for JavaScript shi
 
 - A model given as a string resolves through ADK's registry to the `Gemini` class and Google endpoints with an API key.
 - Built-in tools (`GoogleSearchTool`, `LoadWebPageTool`, OpenAPI and REST toolsets), `RemoteAgent` and `AgentTool` reach the network or start a second `Runner`.
-- Sessions live in ADK's own services, outside the app/principal scoping, fencing and retention rules of `@galaxie/storage-indexeddb`.
+- Sessions live in ADK's own services, outside the app/principal scoping, fencing and retention rules of `@galaxie-ai/storage-indexeddb`.
 - Pauses (tool confirmations, long-running tools) surface only as ADK events.
 
 ADR-0017 asks each framework to arrive as its own executor adapter without a core change. `adapter-langgraph` and `adapter-pyodide` are the precedents. ADK shares nothing with the Pyodide bridge or LangGraph state.
 
 ## Decision
 
-1. **A new package.** `@galaxie/adapter-adk` implements `ExecutorAdapter` with id `adk-js`. Core keys executors by id and records `executorId` in `RecoverySession`, so core needs no change and never names ADK.
+1. **A new package.** `@galaxie-ai/adapter-adk` implements `ExecutorAdapter` with id `adk-js`. Core keys executors by id and records `executorId` in `RecoverySession`, so core needs no change and never names ADK.
 2. **One bundle, one specifier.** The adapter imports `@google/adk` only. The `browser` export condition resolves it to `dist/web/index_web.js`. No `@google/adk/...` subpath is imported at runtime (`a2a`, `tools/mcp`, `tools/webmcp`, `sessions/database`, `artifacts/gcs`, `telemetry/gcp`, `agents/agent-engine`), and `@google/genai` is imported only as a type, because the bundle inlines its own copy. `scripts/check-dependencies.ts` enforces both rules. The peer and development dependency is exactly `@google/adk` 2.3.0, the newest release that satisfies the workspace `minimumReleaseAge` on the day this ADR was written. A bump is separate work that re-runs the symbol-presence and bundle-hash tests and the conformance lane.
 3. **The adapter owns the Runner.** The agent factory receives a host object with `capabilities.call` and ADK helpers: a router-backed model (`GalaxieLlm extends BaseLlm`) and capability-backed tools. The adapter builds the `Runner`, a session service, no-op artifact, memory and credential services, one `ToolCallIntegrityPlugin` and the `RunConfig`. Authors never see the Runner and cannot supply plugins, services or a `RunConfig`.
 4. **Fail-closed tree validation.** At prepare the adapter walks the agent tree against a closed allow-list of agent classes (`LlmAgent`, `SequentialAgent`, `ParallelAgent`, `LoopAgent`). Every model and tool must be a member of a module-private registry the host fills when it creates them. ADK's brand guards test a forgeable `Symbol.for` brand and are not used for trust. `RemoteAgent`, `LangGraphAgent`, `RoutedAgent`, `Workflow`, `AgentTool`, author `BaseAgent` subclasses, toolsets, code executors and string or `Gemini` models fail `unsupported`.

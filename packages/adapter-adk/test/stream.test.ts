@@ -8,7 +8,7 @@ import {
   type ExecutorAdapter,
   type ModelRouting,
   type RunEvent,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { LlmAgent, type LlmRequest, type LlmResponse } from '@google/adk';
 import { AIMessage, AIMessageChunk } from '@langchain/core/messages';
 import { expect, test } from 'vitest';

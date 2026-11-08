@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/example-host-remote",
+  "name": "@galaxie-ai/example-host-remote",
   "version": "0.0.0",
   "private": true,
   "description": "An English tutor host with a remote quiz model, HTTP bindings and confirmed saves.",
@@ -11,11 +11,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@galaxie/core": "workspace:*",
-    "@galaxie/adapter-langgraph": "workspace:*",
-    "@galaxie/models": "workspace:*",
-    "@galaxie/react": "workspace:*",
-    "@galaxie/example-english-tutor": "workspace:*",
+    "@galaxie-ai/core": "workspace:*",
+    "@galaxie-ai/adapter-langgraph": "workspace:*",
+    "@galaxie-ai/models": "workspace:*",
+    "@galaxie-ai/react": "workspace:*",
+    "@galaxie-ai/example-english-tutor": "workspace:*",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "@langchain/core": "1.2.20",

@@ -6,7 +6,7 @@ import {
   createRegistry,
   defineComponent,
   defineConfirmations,
-} from '@galaxie/react';
+} from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useRef } from 'react';
 import {
   LOAN_APPROVAL_COMPONENT,

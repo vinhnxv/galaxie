@@ -8,7 +8,7 @@ import {
   type MaterializedSurface,
   type SyncSchema,
   validateSurface,
-} from '@galaxie/ui-protocol';
+} from '@galaxie-ai/ui-protocol';
 import { trace } from '@opentelemetry/api';
 import { afterEach, expect, test, vi } from 'vitest';
 import { z } from 'zod';

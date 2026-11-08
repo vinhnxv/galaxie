@@ -6,7 +6,7 @@ import {
   type ReplyCall,
   outputText as sharedOutputText,
   replyCalls as sharedReplyCalls,
-} from '@galaxie/adapter-kit';
+} from '@galaxie-ai/adapter-kit';
 import { type BaseMessage, isAIMessage } from '@langchain/core/messages';
 
 export type { ReplyCall };

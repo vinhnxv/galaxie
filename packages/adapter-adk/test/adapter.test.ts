@@ -10,7 +10,7 @@ import {
   GalaxieError,
   type ModelRouting,
   type RunEvent,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { LlmAgent, SequentialAgent } from '@google/adk';
 import { AIMessage } from '@langchain/core/messages';
 import { afterAll, afterEach, expect, test, vi } from 'vitest';

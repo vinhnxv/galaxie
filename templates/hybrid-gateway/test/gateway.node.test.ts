@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { request } from 'node:http';
-import { type CapabilityContext, type EffectId, httpCapability, type RunId } from '@galaxie/core';
+import {
+  type CapabilityContext,
+  type EffectId,
+  httpCapability,
+  type RunId,
+} from '@galaxie-ai/core';
 import { expect, it } from 'vitest';
 import { createHybridHost } from '../src/runtime.js';
 import { createSession } from '../src/session.js';

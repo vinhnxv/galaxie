@@ -9,7 +9,7 @@ import {
   type PendingInteraction,
   parseInteractionRequest,
   type SessionId,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   type BaseAgent,
   createEvent,

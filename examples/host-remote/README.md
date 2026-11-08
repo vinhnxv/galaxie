@@ -1,11 +1,11 @@
 # Remote quiz host
 
-This second host runs the unchanged [`@galaxie/example-english-tutor`](../english-tutor) package. The graph runs in the browser. The quiz uses `@galaxie/models/openai` through a same-origin backend stub; sentence feedback stays in-browser. Lessons and progress use HTTP capabilities, and saving waits for a separate host-rendered confirmation.
+This second host runs the unchanged [`@galaxie-ai/example-english-tutor`](../english-tutor) package. The graph runs in the browser. The quiz uses `@galaxie-ai/models/openai` through a same-origin backend stub; sentence feedback stays in-browser. Lessons and progress use HTTP capabilities, and saving waits for a separate host-rendered confirmation.
 
 From the repository root, with the installed workspace dependencies:
 
 ```sh
-pnpm --filter @galaxie/example-host-remote dev --mode test
+pnpm --filter @galaxie-ai/example-host-remote dev --mode test
 ```
 
 Open the printed `http://127.0.0.1:<port>` URL. Click Start, then Allow to send the public lesson text to the quiz service. In test mode, feedback uses `MockChatModel` with this exact scripted sentence:
@@ -19,7 +19,7 @@ Answer the quiz, submit that sentence, continue through Feedback, then choose Sa
 Default mode requires Chrome Built-in AI already reporting `available` for English:
 
 ```sh
-pnpm --filter @galaxie/example-host-remote dev
+pnpm --filter @galaxie-ai/example-host-remote dev
 ```
 
 The app checks availability after Start. If feedback is unavailable, it shows a fixed message and does not start the lesson. It never initiates a model download or falls back to remote feedback. This example uses no WebLLM worker or bundle.
@@ -27,8 +27,8 @@ The app checks availability after Start. If feedback is unavailable, it shows a 
 Build and preview either mode with the same mode on both commands:
 
 ```sh
-pnpm --filter @galaxie/example-host-remote build --mode test
-pnpm --filter @galaxie/example-host-remote preview --mode test
+pnpm --filter @galaxie-ai/example-host-remote build --mode test
+pnpm --filter @galaxie-ai/example-host-remote preview --mode test
 ```
 
 Both Vite servers bind to `127.0.0.1`; the middleware checks Host against the actual listening port and rejects any supplied foreign Origin. The CSP uses `connect-src 'self'` and `trusted-types 'none'` in every mode. Model-produced props render only as React text through the education registry.

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { isAllowedUrl, normalizeUrlAllowlist } from '@galaxie/core';
-import type { Catalog, SurfaceContext } from '@galaxie/ui-protocol';
-import { reduceBatch } from '@galaxie/ui-protocol';
+import { isAllowedUrl, normalizeUrlAllowlist } from '@galaxie-ai/core';
+import type { Catalog, SurfaceContext } from '@galaxie-ai/ui-protocol';
+import { reduceBatch } from '@galaxie-ai/ui-protocol';
 import { expect, test } from 'vitest';
 
 const allowlist = normalizeUrlAllowlist([

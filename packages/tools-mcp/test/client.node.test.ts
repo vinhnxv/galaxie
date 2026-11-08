@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { CapabilityBinding, CapabilityContext } from '@galaxie/core';
+import type { CapabilityBinding, CapabilityContext } from '@galaxie-ai/core';
 import { afterEach, expect, test } from 'vitest';
 import { startMcpServer } from '../../../examples/mcp-server/src/index.js';
 import { createMcpServer, type McpEvent, toolPin } from '../src/index.js';

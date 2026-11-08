@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { pythonBuild } from 'virtual:rag-python';
-import type { RunId } from '@galaxie/core';
-import { watchInvalidation } from '@galaxie/core/browser';
-import { AgentSurface, ModelRoutes } from '@galaxie/react';
+import type { RunId } from '@galaxie-ai/core';
+import { watchInvalidation } from '@galaxie-ai/core/browser';
+import { AgentSurface, ModelRoutes } from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { type RagOutput, RagOutputSchema, type SearchMode } from '../agent/schemas.js';
 import { attribution, type Corpus } from '../corpus.js';
@@ -337,7 +337,7 @@ export function App({
         {index.corpusMissing && (
           <p>
             No corpus file is present. Run{' '}
-            <code>pnpm --filter @galaxie/example-rag-browser corpus</code> to build it, or index
+            <code>pnpm --filter @galaxie-ai/example-rag-browser corpus</code> to build it, or index
             pasted text below.
           </p>
         )}

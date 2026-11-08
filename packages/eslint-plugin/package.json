@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/eslint-plugin",
+  "name": "@galaxie-ai/eslint-plugin",
   "version": "0.0.0",
   "private": true,
   "description": "ESLint rules that flag direct platform access in galaxie agent packages.",

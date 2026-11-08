@@ -9,7 +9,7 @@ import {
   galaxieField,
   type InteractionId,
   type PendingInteraction,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { expect, onTestFinished, test } from 'vitest';
 import { z } from 'zod';
 import { collect, definition, FakeExecutor } from '../../packages/core/test/fake-executor.js';

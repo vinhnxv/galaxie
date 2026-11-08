@@ -1,4 +1,4 @@
-# @galaxie/storage-indexeddb
+# @galaxie-ai/storage-indexeddb
 
 An IndexedDB checkpoint saver for LangGraph checkpoint 1.2.0, with per-app and per-principal keys, versioned envelopes and transaction-completion barriers. Its `recovery` port adds a durable submission inbox, write-effect journal and agent identity record. Hosts control retention and session deletion, and observe typed storage failures and upgrade handover. This is a private workspace package.
 
@@ -7,8 +7,8 @@ An IndexedDB checkpoint saver for LangGraph checkpoint 1.2.0, with per-app and p
 The host derives `principalScope` from its authenticated session, never from user-controlled input. Both `appId` and `principalScope` must match `/^[A-Za-z0-9._:-]{1,128}$/`. These identifiers partition records within the database; they do not authorize access by other code on the same origin.
 
 ```ts
-import { acquireOwnership } from '@galaxie/core/browser';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import { acquireOwnership } from '@galaxie-ai/core/browser';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 
 const saver = await IndexedDBSaver.open({
   appId: 'lesson-app',
@@ -161,7 +161,7 @@ Each saver holds the principal generation read at open. The versioned `{ v: 1, g
 
 `saver.invalidatePrincipal()` needs no ownership or epoch claim: a non-owner tab can log out. One transaction increments the current generation and deletes the principal's entire range in `checkpoints`, `writes`, `inbox` and `journal`, plus all scoped `meta` records except schema and generation. It preserves other principals, the app-wide epoch and shared model assets. On failure the whole wipe rolls back. The initiating saver is invalidated too; open a new saver to continue. No state write from an earlier saver can commit after the logout transaction.
 
-Import `watchInvalidation` from `@galaxie/core/browser` and create one `watchInvalidation({ appId, principalScope })` per page. Await `saver.invalidatePrincipal()` before calling the watcher's `announce()`. Its own signal and matching peer signals abort with `'invalidated'`. The host must then disable input, clear its session key, dispose its instance/runtime and release ownership through one idempotent cleanup. Close the watcher on page teardown. If the wipe fails, show a fixed failure and do not announce. Host-local's Sign out is available before model preparation and after losing ownership; it opens a short-lived saver when no usable saver remains, then requires reload to continue.
+Import `watchInvalidation` from `@galaxie-ai/core/browser` and create one `watchInvalidation({ appId, principalScope })` per page. Await `saver.invalidatePrincipal()` before calling the watcher's `announce()`. Its own signal and matching peer signals abort with `'invalidated'`. The host must then disable input, clear its session key, dispose its instance/runtime and release ownership through one idempotent cleanup. Close the watcher on page teardown. If the wipe fails, show a fixed failure and do not announce. Host-local's Sign out is available before model preparation and after losing ownership; it opens a short-lived saver when no usable saver remains, then requires reload to continue.
 
 Broadcast delivery notifies peer tabs when delivered; a missed notice is caught by the next write or a persisted `pageshow` ownership check. A remote request already sent may complete. Confirmation/approval invalidation remains M4 work. Hosts must also clear their own non-galaxie storage and tokens. Logout supplies no authentication and keeps shared model assets; there is no local trace store to delete.
 

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
-import { createRuntime, type RunEvent } from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
+import { createRuntime, type RunEvent } from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import { expect, test, vi } from 'vitest';
 import { ragDefinition } from '../src/agent/definition.js';
 import { createRagAgent } from '../src/agent/graph.js';

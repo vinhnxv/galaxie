@@ -10,7 +10,7 @@ and [ADR-0016](../adr/0016-parity-demonstrations-and-otel-traces.md).
 
 [tracing.ts](../../packages/core/src/tracing.ts) owns span construction and
 the attribute allowlist. [runtime.ts](../../packages/core/src/runtime.ts) obtains
-the `@galaxie/core` tracer from `RuntimeOptions.tracerProvider`, or from the
+the `@galaxie-ai/core` tracer from `RuntimeOptions.tracerProvider`, or from the
 global OpenTelemetry provider. Parenting uses explicit contexts.
 
 ```text
@@ -98,8 +98,8 @@ This documentation adds no dependency.
 import { WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { createRuntime } from '@galaxie/core';
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createRuntime } from '@galaxie-ai/core';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 
 const exporter = new OTLPTraceExporter({
   url: new URL('/otel/v1/traces', location.origin).href,

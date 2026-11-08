@@ -9,7 +9,7 @@ import {
   type ExecutorAdapter,
   type ModelRouting,
   type RunEvent,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   type BaseAgent,
   BaseLlm,

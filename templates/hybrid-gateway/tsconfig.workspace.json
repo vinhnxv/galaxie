@@ -2,15 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@galaxie/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
-      "@galaxie/core": ["../../packages/core/src/index.ts"],
-      "@galaxie/ui-protocol": ["../../packages/ui-protocol/src/index.ts"],
-      "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
-      "@galaxie/react": ["../../packages/react/src/index.ts"],
+      "@galaxie-ai/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
+      "@galaxie-ai/core": ["../../packages/core/src/index.ts"],
+      "@galaxie-ai/ui-protocol": ["../../packages/ui-protocol/src/index.ts"],
+      "@galaxie-ai/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
+      "@galaxie-ai/react": ["../../packages/react/src/index.ts"],
       "react": ["../../packages/react/node_modules/@types/react/index.d.ts"],
       "react/*": ["../../packages/react/node_modules/@types/react/*.d.ts"],
       "react-dom/*": ["../../packages/react/node_modules/@types/react-dom/*.d.ts"],
-      "@galaxie/models/openai": ["../../packages/models/src/openai/index.ts"]
+      "@galaxie-ai/models/openai": ["../../packages/models/src/openai/index.ts"]
     }
   },
   "include": ["src", "server", "vite.config.ts"]

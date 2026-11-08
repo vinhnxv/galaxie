@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/example-english-tutor",
+  "name": "@galaxie-ai/example-english-tutor",
   "version": "0.0.0",
   "private": true,
   "description": "A reusable English practice tutor agent for galaxie.",
@@ -21,8 +21,8 @@
     "out": "./dist/galaxie"
   },
   "dependencies": {
-    "@galaxie/core": "workspace:*",
-    "@galaxie/adapter-langgraph": "workspace:*"
+    "@galaxie-ai/core": "workspace:*",
+    "@galaxie-ai/adapter-langgraph": "workspace:*"
   },
   "peerDependencies": {
     "@langchain/core": "~1.2.20",
@@ -33,6 +33,6 @@
     "@langchain/core": "1.2.20",
     "@langchain/langgraph": "1.5.1",
     "zod": "4.6.7",
-    "@galaxie/models": "workspace:*"
+    "@galaxie-ai/models": "workspace:*"
   }
 }

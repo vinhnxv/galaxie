@@ -1,14 +1,18 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type AgentInstance, isGalaxieError, type RunId, type SessionId } from '@galaxie/core';
-import { type InvalidationWatcher, type Ownership, watchInvalidation } from '@galaxie/core/browser';
+import { type AgentInstance, isGalaxieError, type RunId, type SessionId } from '@galaxie-ai/core';
+import {
+  type InvalidationWatcher,
+  type Ownership,
+  watchInvalidation,
+} from '@galaxie-ai/core/browser';
 import {
   lessonFixture,
   ProgressInputSchema,
   type TutorInput,
-} from '@galaxie/example-english-tutor';
-import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie/react';
+} from '@galaxie-ai/example-english-tutor';
+import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie-ai/react';
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { LocalHost, StorageStatus } from './runtime.js';
 import {

@@ -1,15 +1,20 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 import {
   type CapabilityBinding,
   type CapabilityRequests,
   createRuntime,
   type DiagnosticEvent,
   defineAgentDefinition,
-} from '@galaxie/core';
-import { createMcpServer, type McpEvent, type McpLimits, type McpServer } from '@galaxie/tools-mcp';
+} from '@galaxie-ai/core';
+import {
+  createMcpServer,
+  type McpEvent,
+  type McpLimits,
+  type McpServer,
+} from '@galaxie-ai/tools-mcp';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import {
   InMemorySpanExporter,

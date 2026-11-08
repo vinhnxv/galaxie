@@ -6,7 +6,7 @@ import {
   GalaxieError,
   type ModelPreparation,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   type BaseAgent,
   type BaseLlm,
@@ -26,7 +26,7 @@ export interface AdkServices {
   /** Provider IDs, rather than role names (ADR-0006). */
   readonly chatModels: Readonly<Record<string, AdkChatModel>>;
   /**
-   * The byte-record checkpoint port of `@galaxie/storage-indexeddb`. With it, a pause and each
+   * The byte-record checkpoint port of `@galaxie-ai/storage-indexeddb`. With it, a pause and each
    * completed conversation are stored so that a reload restores them; without it, sessions live in
    * memory only.
    */

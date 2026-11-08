@@ -11,10 +11,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@galaxie/core": "^0.1.0",
-    "@galaxie/adapter-langgraph": "^0.1.0",
-    "@galaxie/models": "^0.1.0",
-    "@galaxie/react": "^0.1.0",
+    "@galaxie-ai/core": "^0.1.0",
+    "@galaxie-ai/adapter-langgraph": "^0.1.0",
+    "@galaxie-ai/models": "^0.1.0",
+    "@galaxie-ai/react": "^0.1.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "@langchain/core": "1.2.20",

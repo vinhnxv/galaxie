@@ -6,7 +6,7 @@ import {
   type CapabilityContext,
   GalaxieError,
   galaxieField,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { z } from 'zod';
 import businessData from '../../fixtures/business-data.json' with { type: 'json' };
 import loanDocuments from '../../fixtures/loan-documents.json' with { type: 'json' };

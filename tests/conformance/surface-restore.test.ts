@@ -5,7 +5,7 @@ import {
   createLangGraphAdapter,
   requestInteraction,
   requestSurface,
-} from '@galaxie/adapter-langgraph';
+} from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentInstance,
   createRuntime,
@@ -14,15 +14,15 @@ import {
   type RecoveryStore,
   type SessionId,
   type UserInteractionEvent,
-} from '@galaxie/core';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+} from '@galaxie-ai/core';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import {
   A2UI_SPEC_REVISION,
   A2UI_SPEC_VERSION,
   type Catalog,
   type MaterializedSurface,
   type SyncSchema,
-} from '@galaxie/ui-protocol';
+} from '@galaxie-ai/ui-protocol';
 import {
   Annotation,
   type BaseCheckpointSaver,

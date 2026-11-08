@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { writeFile } from 'node:fs/promises';
-import { createRuntime, type RunEvent } from '@galaxie/core';
+import { createRuntime, type RunEvent } from '@galaxie-ai/core';
 import { expect, test, vi } from 'vitest';
 import { pythonRagDefinition } from '../../../examples/rag-browser/src/agent/definition-python.js';
 import { userPrompt } from '../../../examples/rag-browser/src/agent/prompt.js';

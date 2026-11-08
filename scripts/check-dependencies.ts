@@ -229,10 +229,11 @@ if (
   core.dependencies === null ||
   typeof core.dependencies !== 'object' ||
   Array.isArray(core.dependencies) ||
-  JSON.stringify(Object.keys(core.dependencies).sort()) !== JSON.stringify(['@galaxie/ui-protocol'])
+  JSON.stringify(Object.keys(core.dependencies).sort()) !==
+    JSON.stringify(['@galaxie-ai/ui-protocol'])
 )
   problems.push(
-    'packages/core/package.json: core dependencies must be exactly @galaxie/ui-protocol',
+    'packages/core/package.json: core dependencies must be exactly @galaxie-ai/ui-protocol',
   );
 if (core.optionalDependencies !== undefined)
   problems.push('packages/core/package.json: core must not declare optionalDependencies');
@@ -255,7 +256,7 @@ for (const file of files('packages/core/src', /\.[cm]?tsx?$/)) {
       specifier.startsWith('./') ||
       specifier.startsWith('../') ||
       specifier === '@opentelemetry/api' ||
-      specifier === '@galaxie/ui-protocol' ||
+      specifier === '@galaxie-ai/ui-protocol' ||
       (specifier === 'zod/v4/core' && typeOnly)
     )
       continue;
@@ -265,9 +266,9 @@ for (const file of files('packages/core/src', /\.[cm]?tsx?$/)) {
 
 /** The kit is not an executor, and adapters reach it only through its public root. */
 function kitImport(file: string, specifier: string): boolean {
-  if (specifier === '@galaxie/adapter-kit') return true;
-  if (specifier.startsWith('@galaxie/adapter-kit/')) {
-    problems.push(`${file}: adapter-kit imports must use the public root @galaxie/adapter-kit`);
+  if (specifier === '@galaxie-ai/adapter-kit') return true;
+  if (specifier.startsWith('@galaxie-ai/adapter-kit/')) {
+    problems.push(`${file}: adapter-kit imports must use the public root @galaxie-ai/adapter-kit`);
     return true;
   }
   if (specifier.startsWith('./') || specifier.startsWith('../')) {
@@ -276,7 +277,9 @@ function kitImport(file: string, specifier: string): boolean {
       target === resolve('packages/adapter-kit') ||
       target.startsWith(`${resolve('packages/adapter-kit')}/`)
     ) {
-      problems.push(`${file}: adapter-kit imports must use the public root @galaxie/adapter-kit`);
+      problems.push(
+        `${file}: adapter-kit imports must use the public root @galaxie-ai/adapter-kit`,
+      );
       return true;
     }
   }
@@ -304,7 +307,7 @@ for (const area of ['src', 'dist', 'test']) {
   for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
     for (const { specifier } of imports(file)) {
       if (kitImport(file, specifier)) continue;
-      if (specifier.startsWith('@galaxie/adapter-')) {
+      if (specifier.startsWith('@galaxie-ai/adapter-')) {
         problems.push(`${file}: the LangGraph adapter must not depend on another executor adapter`);
         continue;
       }
@@ -331,7 +334,7 @@ for (const area of ['src', 'dist', 'test']) {
             (area === 'test' && target.startsWith(`${resolve('tests/conformance/support')}/`)))
         )
           continue;
-      } else if (specifier === '@galaxie/core') {
+      } else if (specifier === '@galaxie-ai/core') {
         continue;
       } else if (specifier === '@langchain/core' || specifier.startsWith('@langchain/core/')) {
         if (area === 'test' || (erased && (area !== 'dist' || /\.d\.[cm]?ts$/.test(file))))
@@ -415,7 +418,10 @@ for (const area of ['src', 'dist', 'test']) {
   for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
     for (const { specifier } of imports(file)) {
       if (kitImport(file, specifier)) continue;
-      if (specifier.startsWith('@langchain/langgraph') || specifier.startsWith('@galaxie/adapter-'))
+      if (
+        specifier.startsWith('@langchain/langgraph') ||
+        specifier.startsWith('@galaxie-ai/adapter-')
+      )
         problems.push(`${file}: the Python adapter must not depend on another executor`);
       if (specifier.startsWith('./') || specifier.startsWith('../')) {
         relativeAdapterImport(file, specifier, 'adapter-pyodide');
@@ -423,12 +429,12 @@ for (const area of ['src', 'dist', 'test']) {
       }
       const worker = file === `${directory}/worker.${area === 'dist' ? 'js' : 'ts'}`;
       if (
-        specifier === '@galaxie/core' ||
+        specifier === '@galaxie-ai/core' ||
         specifier.startsWith('@langchain/core/') ||
         (worker && ['pyodide', 'node:worker_threads', 'node:fs', 'node:os'].includes(specifier)) ||
         (area === 'test' &&
           (specifier.startsWith('node:') ||
-            ['vitest', 'zod', '@galaxie/models/mock'].includes(specifier)))
+            ['vitest', 'zod', '@galaxie-ai/models/mock'].includes(specifier)))
       )
         continue;
       problems.push(`${file}: forbidden Python adapter import ${specifier}`);
@@ -444,7 +450,7 @@ for (const area of ['src', 'dist', 'test']) {
       if (kitImport(file, specifier)) continue;
       if (
         specifier.startsWith('@langchain/langgraph') ||
-        specifier.startsWith('@galaxie/adapter-') ||
+        specifier.startsWith('@galaxie-ai/adapter-') ||
         specifier === 'pyodide' ||
         specifier === '@google/adk' ||
         specifier.startsWith('@google/adk/')
@@ -453,11 +459,11 @@ for (const area of ['src', 'dist', 'test']) {
       else if (specifier.startsWith('./') || specifier.startsWith('../')) {
         relativeAdapterImport(file, specifier, 'adapter-go');
       } else if (
-        specifier === '@galaxie/core' ||
+        specifier === '@galaxie-ai/core' ||
         specifier.startsWith('@langchain/core/') ||
         (area === 'test' &&
           (specifier.startsWith('node:') ||
-            ['vitest', 'zod', '@galaxie/models/mock'].includes(specifier)))
+            ['vitest', 'zod', '@galaxie-ai/models/mock'].includes(specifier)))
       )
         continue;
       else problems.push(`${file}: forbidden Go adapter import ${specifier}`);
@@ -519,7 +525,10 @@ for (const area of ['src', 'dist', 'test']) {
           );
         continue;
       }
-      if (specifier.startsWith('@langchain/langgraph') || specifier.startsWith('@galaxie/adapter-'))
+      if (
+        specifier.startsWith('@langchain/langgraph') ||
+        specifier.startsWith('@galaxie-ai/adapter-')
+      )
         problems.push(`${file}: the ADK adapter must not depend on another executor adapter`);
       if (specifier.startsWith('./') || specifier.startsWith('../')) {
         relativeAdapterImport(file, specifier, 'adapter-adk');
@@ -527,13 +536,13 @@ for (const area of ['src', 'dist', 'test']) {
       }
       if (
         specifier === '@google/adk' ||
-        specifier === '@galaxie/core' ||
+        specifier === '@galaxie-ai/core' ||
         specifier.startsWith('@langchain/core/') ||
         ((area !== 'dist' || file.endsWith('.d.ts')) && specifier === 'zod') ||
         (area === 'test' &&
           (specifier.startsWith('node:') ||
             ADK_TEST_ONLY.has(specifier) ||
-            specifier === '@galaxie/models/mock'))
+            specifier === '@galaxie-ai/models/mock'))
       )
         continue;
       problems.push(`${file}: forbidden ADK adapter import ${specifier}`);
@@ -629,8 +638,8 @@ for (const field of [
   'optionalDependencies',
   'peerDependencies',
 ] as const) {
-  if (Object.hasOwn(models[field] ?? {}, '@galaxie/core'))
-    problems.push('packages/models/package.json: models must not depend on @galaxie/core');
+  if (Object.hasOwn(models[field] ?? {}, '@galaxie-ai/core'))
+    problems.push('packages/models/package.json: models must not depend on @galaxie-ai/core');
 }
 
 for (const file of files('packages/models/src', /\.[cm]?tsx?$/)) {
@@ -678,7 +687,7 @@ for (const area of ['src', 'dist']) {
       if (
         specifier.startsWith('./') ||
         specifier.startsWith('../') ||
-        specifier === '@galaxie/core' ||
+        specifier === '@galaxie-ai/core' ||
         specifier.startsWith('@modelcontextprotocol/sdk/client/') ||
         specifier === '@modelcontextprotocol/sdk/types.js'
       )
@@ -718,7 +727,7 @@ for (const entry of readdirSync('packages', { withFileTypes: true })) {
           problems.push(`${file}: OpenAI imports belong only in the models openai provider`);
         if (
           area !== 'test' &&
-          (specifier.startsWith('@galaxie/example-') ||
+          (specifier.startsWith('@galaxie-ai/example-') ||
             resolve(dirname(file), specifier).startsWith(`${resolve('examples')}/`))
         )
           problems.push(`${file}: packages must not import examples`);
@@ -732,8 +741,8 @@ for (const entry of readdirSync('packages', { withFileTypes: true })) {
         if (
           specifier.startsWith('./') ||
           specifier.startsWith('../') ||
-          specifier === '@galaxie/core' ||
-          specifier === '@galaxie/ui-protocol' ||
+          specifier === '@galaxie-ai/core' ||
+          specifier === '@galaxie-ai/ui-protocol' ||
           react ||
           specifier === 'zod' ||
           (area === 'test' && (reactDom || specifier === 'vitest'))
@@ -753,8 +762,8 @@ for (const area of ['src', 'dist']) {
       if (
         specifier.startsWith('./') ||
         specifier.startsWith('../') ||
-        specifier === '@galaxie/core' ||
-        specifier === '@galaxie/adapter-langgraph' ||
+        specifier === '@galaxie-ai/core' ||
+        specifier === '@galaxie-ai/adapter-langgraph' ||
         specifier === '@langchain/langgraph/web' ||
         specifier.startsWith('@langchain/core/') ||
         specifier === 'zod'
@@ -795,18 +804,19 @@ for (const file of files('examples/host-local/src', /\.[cm]?tsx?$/)) {
       );
     if (
       specifier.startsWith('./') ||
-      specifier === '@galaxie/core' ||
-      specifier === '@galaxie/core/browser' ||
-      specifier === '@galaxie/tools-mcp' ||
-      specifier === '@galaxie/storage-indexeddb' ||
-      specifier === '@galaxie/adapter-langgraph' ||
-      specifier === '@galaxie/example-english-tutor' ||
-      specifier === '@galaxie/react' ||
-      specifier === '@galaxie/models/webllm' ||
-      specifier === '@galaxie/models/webllm/worker' ||
-      specifier === '@galaxie/models/builtin-ai' ||
-      specifier === '@galaxie/models/openai' ||
-      (specifier === '@galaxie/models/mock' && file === 'examples/host-local/src/mock-script.ts') ||
+      specifier === '@galaxie-ai/core' ||
+      specifier === '@galaxie-ai/core/browser' ||
+      specifier === '@galaxie-ai/tools-mcp' ||
+      specifier === '@galaxie-ai/storage-indexeddb' ||
+      specifier === '@galaxie-ai/adapter-langgraph' ||
+      specifier === '@galaxie-ai/example-english-tutor' ||
+      specifier === '@galaxie-ai/react' ||
+      specifier === '@galaxie-ai/models/webllm' ||
+      specifier === '@galaxie-ai/models/webllm/worker' ||
+      specifier === '@galaxie-ai/models/builtin-ai' ||
+      specifier === '@galaxie-ai/models/openai' ||
+      (specifier === '@galaxie-ai/models/mock' &&
+        file === 'examples/host-local/src/mock-script.ts') ||
       specifier === 'react' ||
       specifier === 'react/jsx-runtime' ||
       specifier === 'react-dom/client' ||
@@ -826,17 +836,17 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
       : '';
     const mockScript = resolve('examples/rag-browser/src/host/mock-script');
     if (
-      specifier === '@galaxie/storage-indexeddb' &&
+      specifier === '@galaxie-ai/storage-indexeddb' &&
       file !== 'examples/rag-browser/src/host/runtime.ts'
     )
       problems.push(`${file}: only the host runtime may open review storage`);
     if (
-      specifier === '@galaxie/adapter-pyodide' &&
+      specifier === '@galaxie-ai/adapter-pyodide' &&
       file !== 'examples/rag-browser/src/host/runtime.ts'
     )
       problems.push(`${file}: only the host runtime may register the Python adapter`);
     if (
-      specifier === '@galaxie/adapter-pyodide/worker' &&
+      specifier === '@galaxie-ai/adapter-pyodide/worker' &&
       file !== 'examples/rag-browser/src/host/pyodide-worker.ts'
     )
       problems.push(`${file}: only the host Python Worker entry may load Pyodide`);
@@ -860,15 +870,15 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
     if (
       (relative && target.startsWith(`${resolve('examples/rag-browser')}/`)) ||
       [
-        '@galaxie/core',
-        '@galaxie/core/browser',
-        '@galaxie/adapter-langgraph',
-        '@galaxie/adapter-pyodide',
-        '@galaxie/adapter-pyodide/worker',
-        '@galaxie/react',
-        '@galaxie/models/webllm',
-        '@galaxie/models/webllm/worker',
-        '@galaxie/models/builtin-ai',
+        '@galaxie-ai/core',
+        '@galaxie-ai/core/browser',
+        '@galaxie-ai/adapter-langgraph',
+        '@galaxie-ai/adapter-pyodide',
+        '@galaxie-ai/adapter-pyodide/worker',
+        '@galaxie-ai/react',
+        '@galaxie-ai/models/webllm',
+        '@galaxie-ai/models/webllm/worker',
+        '@galaxie-ai/models/builtin-ai',
         '@langchain/langgraph/web',
         '@orama/orama',
         '@huggingface/transformers',
@@ -877,11 +887,11 @@ for (const file of files('examples/rag-browser/src', /\.[cm]?tsx?$/)) {
         'react-dom/client',
         'zod',
         'virtual:rag-python',
-        '@galaxie/storage-indexeddb',
+        '@galaxie-ai/storage-indexeddb',
       ].includes(specifier) ||
       specifier.startsWith('@langchain/core/') ||
       specifier.startsWith('onnxruntime-web/') ||
-      (specifier === '@galaxie/models/mock' &&
+      (specifier === '@galaxie-ai/models/mock' &&
         file === 'examples/rag-browser/src/host/mock-script.ts')
     )
       continue;
@@ -902,7 +912,7 @@ for (const area of ['src', 'server', 'test']) {
       } else if (area === 'server') {
         if (specifier.startsWith('node:') || (specifier === 'vite' && typeOnly)) continue;
       } else if (
-        specifier.startsWith('@galaxie/') ||
+        specifier.startsWith('@galaxie-ai/') ||
         specifier.startsWith('@langchain/') ||
         specifier === 'react' ||
         specifier.startsWith('react/') ||
@@ -953,13 +963,15 @@ for (const root of ['packages', 'examples', 'templates', 'tests', 'scripts']) {
     for (const { specifier } of imports(file, false)) {
       const target = resolve(dirname(file), specifier);
       if (
-        specifier.startsWith('@galaxie/ui-protocol/') ||
+        specifier.startsWith('@galaxie-ai/ui-protocol/') ||
         (!file.startsWith('packages/ui-protocol/') &&
           (specifier.startsWith('.') || specifier.startsWith('/')) &&
           (target === resolve('packages/ui-protocol') ||
             target.startsWith(`${resolve('packages/ui-protocol')}/`)))
       ) {
-        problems.push(`${file}: ui-protocol imports must use the public root @galaxie/ui-protocol`);
+        problems.push(
+          `${file}: ui-protocol imports must use the public root @galaxie-ai/ui-protocol`,
+        );
       }
     }
   }

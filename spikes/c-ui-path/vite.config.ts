@@ -49,11 +49,13 @@ export default defineConfig({
   plugins: [audit, react()],
   resolve: {
     alias: {
-      '@galaxie/core/browser': fileURLToPath(
+      '@galaxie-ai/core/browser': fileURLToPath(
         new URL('../../packages/core/src/browser.ts', import.meta.url),
       ),
-      '@galaxie/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
-      '@galaxie/adapter-langgraph': fileURLToPath(
+      '@galaxie-ai/core': fileURLToPath(
+        new URL('../../packages/core/src/index.ts', import.meta.url),
+      ),
+      '@galaxie-ai/adapter-langgraph': fileURLToPath(
         new URL('../../packages/adapter-langgraph/src/index.ts', import.meta.url),
       ),
     },

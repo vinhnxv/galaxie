@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { DecisionModelOptions, DecisionRequest, DecisionResult } from '@galaxie/core';
+import type { DecisionModelOptions, DecisionRequest, DecisionResult } from '@galaxie-ai/core';
 import { BaseChatModel, type LangSmithParams } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,

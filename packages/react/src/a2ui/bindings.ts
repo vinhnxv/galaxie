@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type JsonObject, type JsonValue, resolveDataPath } from '@galaxie/ui-protocol';
+import { type JsonObject, type JsonValue, resolveDataPath } from '@galaxie-ai/ui-protocol';
 
 export function object(value: unknown): value is JsonObject {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

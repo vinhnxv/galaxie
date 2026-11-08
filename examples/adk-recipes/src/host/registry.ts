@@ -3,8 +3,8 @@
 
 import { goBuild } from 'virtual:adk-recipes-go';
 import { pythonBuild } from 'virtual:adk-recipes-python';
-import type { AgentDefinition, ExecutorAdapter, ModelRouting } from '@galaxie/core';
-import type { MockChatModel } from '@galaxie/models/mock';
+import type { AgentDefinition, ExecutorAdapter, ModelRouting } from '@galaxie-ai/core';
+import type { MockChatModel } from '@galaxie-ai/models/mock';
 import { financialDefinition } from '../recipes/financial/definition.js';
 import { createFinancialMockModels, FINANCIAL_SAMPLE_PROMPT } from '../recipes/financial/script.js';
 import { financialGoAgent, financialGoDefinition } from '../recipes/financial-go/definition.js';
@@ -30,7 +30,7 @@ interface Recipe {
 
 async function pythonRecipe(loan: boolean): ReturnType<Recipe['load']> {
   const [{ createPyodideAdapter }, { createPyodideWorker }] = await Promise.all([
-    import('@galaxie/adapter-pyodide'),
+    import('@galaxie-ai/adapter-pyodide'),
     import('./trusted-types.js'),
   ]);
   return {
@@ -57,7 +57,7 @@ export const recipes: readonly Recipe[] = [
     models: createFinancialMockModels,
     async load() {
       const [{ createAdkAdapter }, { financialAgent }] = await Promise.all([
-        import('@galaxie/adapter-adk'),
+        import('@galaxie-ai/adapter-adk'),
         import('../recipes/financial/agent.js'),
       ]);
       return {
@@ -77,7 +77,7 @@ export const recipes: readonly Recipe[] = [
     async load() {
       if (!goBuild.wasm) throw new Error('The Go recipe assets are unavailable.');
       const [{ createGoAdapter }, { createGoWorker }] = await Promise.all([
-        import('@galaxie/adapter-go'),
+        import('@galaxie-ai/adapter-go'),
         import('./trusted-types.js'),
       ]);
       return {

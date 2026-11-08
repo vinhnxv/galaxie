@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, requestInteraction } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter, requestInteraction } from '@galaxie-ai/adapter-langgraph';
 import {
   type CapabilityBinding,
   type CapabilityContext,
@@ -12,8 +12,8 @@ import {
   type HttpCapabilityOptions,
   httpCapability,
   type SessionId,
-} from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import { Annotation, END, MemorySaver, START, StateGraph } from '@langchain/langgraph/web';
 import {
   InMemorySpanExporter,

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { EventId, RunEvent, RunId } from '@galaxie/core';
+import type { EventId, RunEvent, RunId } from '@galaxie-ai/core';
 import { AIMessageChunk } from '@langchain/core/messages';
 import { expect, test } from 'vitest';
 import { answerDelta, startsModelTurn } from '../src/host/stream.js';

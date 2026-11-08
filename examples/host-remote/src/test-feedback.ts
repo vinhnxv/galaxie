@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { lessonFixture } from '@galaxie/example-english-tutor';
-import { MockChatModel } from '@galaxie/models/mock';
+import { lessonFixture } from '@galaxie-ai/example-english-tutor';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 
 export const sentinelSentence = 'Galaxie remote sentinel 9a2d she walk to school';
 

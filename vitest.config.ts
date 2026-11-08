@@ -11,10 +11,10 @@ import {
 } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
-  '@galaxie/ui-protocol': fileURLToPath(
+  '@galaxie-ai/ui-protocol': fileURLToPath(
     new URL('./packages/ui-protocol/src/index.ts', import.meta.url),
   ),
-  '@galaxie/adapter-kit': fileURLToPath(
+  '@galaxie-ai/adapter-kit': fileURLToPath(
     new URL('./packages/adapter-kit/src/index.ts', import.meta.url),
   ),
   '@google/adk': fileURLToPath(
@@ -23,13 +23,13 @@ const alias = {
       import.meta.url,
     ),
   ),
-  '@galaxie/adapter-adk': fileURLToPath(
+  '@galaxie-ai/adapter-adk': fileURLToPath(
     new URL('./packages/adapter-adk/src/index.ts', import.meta.url),
   ),
-  '@galaxie/adapter-pyodide': fileURLToPath(
+  '@galaxie-ai/adapter-pyodide': fileURLToPath(
     new URL('./packages/adapter-pyodide/src/index.ts', import.meta.url),
   ),
-  '@galaxie/adapter-go': fileURLToPath(
+  '@galaxie-ai/adapter-go': fileURLToPath(
     new URL('./packages/adapter-go/src/index.ts', import.meta.url),
   ),
   '@orama/orama': fileURLToPath(
@@ -38,13 +38,13 @@ const alias = {
   eslint: fileURLToPath(
     new URL('./packages/eslint-plugin/node_modules/eslint/lib/api.js', import.meta.url),
   ),
-  '@galaxie/eslint-plugin': fileURLToPath(
+  '@galaxie-ai/eslint-plugin': fileURLToPath(
     new URL('./packages/eslint-plugin/src/index.ts', import.meta.url),
   ),
-  '@galaxie/tools-mcp': fileURLToPath(
+  '@galaxie-ai/tools-mcp': fileURLToPath(
     new URL('./packages/tools-mcp/src/index.ts', import.meta.url),
   ),
-  '@galaxie/example-mcp-server': fileURLToPath(
+  '@galaxie-ai/example-mcp-server': fileURLToPath(
     new URL('./examples/mcp-server/src/index.ts', import.meta.url),
   ),
   '@modelcontextprotocol/sdk/client/index.js': fileURLToPath(
@@ -65,43 +65,45 @@ const alias = {
       import.meta.url,
     ),
   ),
-  '@galaxie/storage-indexeddb': fileURLToPath(
+  '@galaxie-ai/storage-indexeddb': fileURLToPath(
     new URL('./packages/storage-indexeddb/src/index.ts', import.meta.url),
   ),
-  '@galaxie/example-english-tutor': fileURLToPath(
+  '@galaxie-ai/example-english-tutor': fileURLToPath(
     new URL('./examples/english-tutor/src/index.ts', import.meta.url),
   ),
-  '@galaxie/react': fileURLToPath(new URL('./packages/react/src/index.ts', import.meta.url)),
-  '@galaxie/models/openai': fileURLToPath(
+  '@galaxie-ai/react': fileURLToPath(new URL('./packages/react/src/index.ts', import.meta.url)),
+  '@galaxie-ai/models/openai': fileURLToPath(
     new URL('./packages/models/src/openai/index.ts', import.meta.url),
   ),
   '@langchain/openai': fileURLToPath(
     new URL('./packages/models/node_modules/@langchain/openai/dist/index.js', import.meta.url),
   ),
-  '@galaxie/models/builtin-ai': fileURLToPath(
+  '@galaxie-ai/models/builtin-ai': fileURLToPath(
     new URL('./packages/models/src/builtin-ai/index.ts', import.meta.url),
   ),
-  '@galaxie/models/transformers/worker': fileURLToPath(
+  '@galaxie-ai/models/transformers/worker': fileURLToPath(
     new URL('./packages/models/src/transformers/worker.ts', import.meta.url),
   ),
-  '@galaxie/models/transformers': fileURLToPath(
+  '@galaxie-ai/models/transformers': fileURLToPath(
     new URL('./packages/models/src/transformers/index.ts', import.meta.url),
   ),
-  '@galaxie/models/webllm/worker': fileURLToPath(
+  '@galaxie-ai/models/webllm/worker': fileURLToPath(
     new URL('./packages/models/src/webllm/worker.ts', import.meta.url),
   ),
-  '@galaxie/models/webllm': fileURLToPath(
+  '@galaxie-ai/models/webllm': fileURLToPath(
     new URL('./packages/models/src/webllm/index.ts', import.meta.url),
   ),
-  '@galaxie/models/mock': fileURLToPath(new URL('./packages/models/src/mock.ts', import.meta.url)),
-  '@galaxie/models/decision': fileURLToPath(
+  '@galaxie-ai/models/mock': fileURLToPath(
+    new URL('./packages/models/src/mock.ts', import.meta.url),
+  ),
+  '@galaxie-ai/models/decision': fileURLToPath(
     new URL('./packages/models/src/decision/structured.ts', import.meta.url),
   ),
-  '@galaxie/core/browser': fileURLToPath(
+  '@galaxie-ai/core/browser': fileURLToPath(
     new URL('./packages/core/src/browser.ts', import.meta.url),
   ),
-  '@galaxie/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
-  '@galaxie/adapter-langgraph': fileURLToPath(
+  '@galaxie-ai/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
+  '@galaxie-ai/adapter-langgraph': fileURLToPath(
     new URL('./packages/adapter-langgraph/src/index.ts', import.meta.url),
   ),
 };

@@ -23,43 +23,43 @@ const config: UserConfigExport = defineConfig(({ mode }) => ({
         ),
       },
       ...Object.entries({
-        '@galaxie/react': fileURLToPath(
+        '@galaxie-ai/react': fileURLToPath(
           new URL('../../packages/react/src/index.ts', import.meta.url),
         ),
-        '@galaxie/storage-indexeddb': fileURLToPath(
+        '@galaxie-ai/storage-indexeddb': fileURLToPath(
           new URL('../../packages/storage-indexeddb/src/index.ts', import.meta.url),
         ),
-        '@galaxie/adapter-go/worker': fileURLToPath(
+        '@galaxie-ai/adapter-go/worker': fileURLToPath(
           new URL('../../packages/adapter-go/src/worker.ts', import.meta.url),
         ),
-        '@galaxie/adapter-kit': fileURLToPath(
+        '@galaxie-ai/adapter-kit': fileURLToPath(
           new URL('../../packages/adapter-kit/src/index.ts', import.meta.url),
         ),
-        '@galaxie/core/browser': fileURLToPath(
+        '@galaxie-ai/core/browser': fileURLToPath(
           new URL('../../packages/core/src/browser.ts', import.meta.url),
         ),
-        '@galaxie/core': fileURLToPath(
+        '@galaxie-ai/core': fileURLToPath(
           new URL('../../packages/core/src/index.ts', import.meta.url),
         ),
-        '@galaxie/adapter-adk': fileURLToPath(
+        '@galaxie-ai/adapter-adk': fileURLToPath(
           new URL('../../packages/adapter-adk/src/index.ts', import.meta.url),
         ),
-        '@galaxie/adapter-go': fileURLToPath(
+        '@galaxie-ai/adapter-go': fileURLToPath(
           new URL('../../packages/adapter-go/src/index.ts', import.meta.url),
         ),
-        '@galaxie/models/mock': fileURLToPath(
+        '@galaxie-ai/models/mock': fileURLToPath(
           new URL('../../packages/models/src/mock.ts', import.meta.url),
         ),
-        '@galaxie/models/transformers/worker': fileURLToPath(
+        '@galaxie-ai/models/transformers/worker': fileURLToPath(
           new URL('../../packages/models/src/transformers/worker.ts', import.meta.url),
         ),
-        '@galaxie/models/transformers': fileURLToPath(
+        '@galaxie-ai/models/transformers': fileURLToPath(
           new URL('../../packages/models/src/transformers/index.ts', import.meta.url),
         ),
-        '@galaxie/adapter-pyodide/worker': fileURLToPath(
+        '@galaxie-ai/adapter-pyodide/worker': fileURLToPath(
           new URL('../../packages/adapter-pyodide/src/worker.ts', import.meta.url),
         ),
-        '@galaxie/adapter-pyodide': fileURLToPath(
+        '@galaxie-ai/adapter-pyodide': fileURLToPath(
           new URL('../../packages/adapter-pyodide/src/index.ts', import.meta.url),
         ),
       }).map(([find, replacement]) => ({ find, replacement })),

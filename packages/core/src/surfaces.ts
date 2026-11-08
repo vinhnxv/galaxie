@@ -12,7 +12,7 @@ import {
   type SurfaceContext,
   type SurfaceResult,
   validateSurface,
-} from '@galaxie/ui-protocol';
+} from '@galaxie-ai/ui-protocol';
 import { type ErrorCode, GalaxieError, toErrorInfo } from './errors.js';
 import type { InteractionId, SurfaceId, ViewRevision } from './ids.js';
 import {

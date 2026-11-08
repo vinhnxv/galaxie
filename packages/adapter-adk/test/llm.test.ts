@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import './support/adk-env.js';
-import { GalaxieError } from '@galaxie/core';
+import { GalaxieError } from '@galaxie-ai/core';
 import { FunctionTool, type LlmRequest, type LlmResponse, requestInputTool } from '@google/adk';
 import {
   AIMessage,

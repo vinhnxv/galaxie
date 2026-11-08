@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Catalog } from '@galaxie/ui-protocol';
+import type { Catalog } from '@galaxie-ai/ui-protocol';
 import { type ErrorInfo, GalaxieError } from './errors.js';
 import type { InstanceId, InteractionId, RunId, SurfaceId, ViewRevision } from './ids.js';
 import { containsPrivateEncoded } from './private-values.js';

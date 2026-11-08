@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { resolveProvider } from '@galaxie/adapter-kit';
-import type { ModelCall, ModelPreparation, ModelUsage, RunRequest } from '@galaxie/core';
+import { resolveProvider } from '@galaxie-ai/adapter-kit';
+import type { ModelCall, ModelPreparation, ModelUsage, RunRequest } from '@galaxie-ai/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
@@ -40,7 +40,7 @@ export type GoChatModel =
 export interface GoServices {
   readonly chatModels: Readonly<Record<string, GoChatModel>>;
   /**
-   * The byte-record checkpoint port of `@galaxie/storage-indexeddb`. With it, each pause and each
+   * The byte-record checkpoint port of `@galaxie-ai/storage-indexeddb`. With it, each pause and each
    * completed conversation is stored so that a reload or a lost Worker does not lose it; without
    * it, a paused session lives in the Worker only.
    */

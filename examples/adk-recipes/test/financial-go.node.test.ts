@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { rm } from 'node:fs/promises';
-import { createGoAdapter } from '@galaxie/adapter-go';
-import { createRuntime, type ExecutorAdapter, type RunEvent } from '@galaxie/core';
+import { createGoAdapter } from '@galaxie-ai/adapter-go';
+import { createRuntime, type ExecutorAdapter, type RunEvent } from '@galaxie-ai/core';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import {
   type NodeHost,

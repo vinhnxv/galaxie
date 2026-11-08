@@ -6,13 +6,13 @@ import {
   materializeSurface,
   type PendingInteraction,
   pendingFromSurface,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   type Component,
   type JsonObject,
   type MaterializedSurface,
   validateSurface,
-} from '@galaxie/ui-protocol';
+} from '@galaxie-ai/ui-protocol';
 import { act, type ReactElement, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, test, vi } from 'vitest';

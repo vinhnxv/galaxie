@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PyodideAgent } from '@galaxie/adapter-pyodide';
-import { type AgentDefinition, defineAgentDefinition } from '@galaxie/core';
+import type { PyodideAgent } from '@galaxie-ai/adapter-pyodide';
+import { type AgentDefinition, defineAgentDefinition } from '@galaxie-ai/core';
 import { z } from 'zod';
 import { capabilityRequests } from '../../host/capabilities.js';
 

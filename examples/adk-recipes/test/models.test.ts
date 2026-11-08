@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import '../src/host/adk-env.js';
-import { createAdkAdapter } from '@galaxie/adapter-adk';
-import { createRuntime, type ModelRouting } from '@galaxie/core';
-import { parseModelRecord } from '@galaxie/models/transformers';
+import { createAdkAdapter } from '@galaxie-ai/adapter-adk';
+import { createRuntime, type ModelRouting } from '@galaxie-ai/core';
+import { parseModelRecord } from '@galaxie-ai/models/transformers';
 import { afterEach, expect, test, vi } from 'vitest';
 import { templateOptions } from '../../../packages/models/src/transformers/runtime.js';
 import { seed, setup } from '../../../packages/models/test/support/transformers-loopback.js';

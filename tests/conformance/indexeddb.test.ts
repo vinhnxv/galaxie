@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { RecoveryStore, SessionId, Submission } from '@galaxie/core';
-import { IndexedDBSaver } from '@galaxie/storage-indexeddb';
+import type { RecoveryStore, SessionId, Submission } from '@galaxie-ai/core';
+import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
 import * as web from '@langchain/langgraph/web';
 import { afterEach, expect, expectTypeOf, test } from 'vitest';

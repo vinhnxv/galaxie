@@ -6,7 +6,7 @@ import {
   type LangGraphGraph,
   requestInteraction,
   STREAM_MODES,
-} from '@galaxie/adapter-langgraph';
+} from '@galaxie-ai/adapter-langgraph';
 import {
   type CapabilityBinding,
   type CapabilityName,
@@ -15,7 +15,7 @@ import {
   defineAgentDefinition,
   type SessionId,
   type Submission,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type {
   BaseCheckpointSaver,

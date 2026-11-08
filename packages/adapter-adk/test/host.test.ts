@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import './support/adk-env.js';
-import { type CapabilityBindingPolicy, type CapabilityPort, GalaxieError } from '@galaxie/core';
+import { type CapabilityBindingPolicy, type CapabilityPort, GalaxieError } from '@galaxie-ai/core';
 import { InMemoryRunner, LlmAgent, ParallelAgent, type SequentialAgent } from '@google/adk';
 import { AIMessage, type ToolMessage } from '@langchain/core/messages';
 import { expect, test, vi } from 'vitest';
@@ -18,8 +18,8 @@ const readPolicy: CapabilityBindingPolicy = {
 const policy = vi.hoisted<{ current: CapabilityBindingPolicy | undefined }>(() => ({
   current: undefined,
 }));
-vi.mock('@galaxie/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@galaxie/core')>()),
+vi.mock('@galaxie-ai/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@galaxie-ai/core')>()),
   capabilityBindingPolicy: vi.fn(() => policy.current),
 }));
 

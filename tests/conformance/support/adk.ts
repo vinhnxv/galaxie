@@ -9,8 +9,8 @@ import {
   GalaxieError,
   type RunEvent,
   toErrorInfo,
-} from '@galaxie/core';
-import { createMockLatch, MockChatModel, type MockScript } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { createMockLatch, MockChatModel, type MockScript } from '@galaxie-ai/models/mock';
 import {
   BaseLlm,
   FunctionTool,

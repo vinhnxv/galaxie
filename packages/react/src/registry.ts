@@ -17,8 +17,8 @@ import {
   toErrorInfo,
   type UiBindings,
   validateSync,
-} from '@galaxie/core';
-import type { Catalog } from '@galaxie/ui-protocol';
+} from '@galaxie-ai/core';
+import type { Catalog } from '@galaxie-ai/ui-protocol';
 import type { ReactElement, ReactNode } from 'react';
 import { buildCatalogs, type ComponentStructure } from './a2ui/catalog.js';
 

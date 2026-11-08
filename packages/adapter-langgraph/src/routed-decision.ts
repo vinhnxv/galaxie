@@ -14,7 +14,7 @@ import {
   toErrorInfo,
   validateDecisionAnswers,
   validateDecisionRequest,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import type { LangGraphRunnableConfig } from '@langchain/langgraph/web';
 import type { LangGraphTraceHandler } from './trace-handler.js';
 

@@ -9,7 +9,7 @@ import { checkDependencyLicenses } from '../../scripts/check-dependency-licenses
 const dependency = {
   name: 'license-fixture',
   version: '1.0.0',
-  launchPackage: '@galaxie/core',
+  launchPackage: '@galaxie-ai/core',
   directory: 'unused',
 };
 const allowlist = { permissive: ['MIT'], exceptions: [] };
@@ -24,7 +24,7 @@ test('a missing license fails and names the dependency', () => {
   expect(result.failures).toHaveLength(1);
   expect(result.failures[0]).toContain('license-fixture@1.0.0');
   expect(result.failures[0]).toContain('UNKNOWN');
-  expect(result.failures[0]).toContain('@galaxie/core');
+  expect(result.failures[0]).toContain('@galaxie-ai/core');
 });
 
 test('a GPL dependency fails unless it has a reviewed exception', () => {
@@ -33,7 +33,7 @@ test('a GPL dependency fails unless it has a reviewed exception', () => {
   expect(rejected.failures).toHaveLength(1);
   expect(rejected.failures[0]).toContain('license-fixture@1.0.0');
   expect(rejected.failures[0]).toContain('GPL-3.0');
-  expect(rejected.failures[0]).toContain('@galaxie/core');
+  expect(rejected.failures[0]).toContain('@galaxie-ai/core');
   const accepted = checkDependencyLicenses([dependency], readLicense, {
     ...allowlist,
     exceptions: [

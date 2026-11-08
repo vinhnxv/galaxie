@@ -12,7 +12,7 @@ import {
   type ModelPreparation,
   type OutputSafetyHook,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   Annotation,
   END,

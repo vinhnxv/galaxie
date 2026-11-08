@@ -10,7 +10,7 @@ import {
   isGalaxieError,
   type PendingInteraction,
   toErrorInfo,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { type ConversationRecord, parseRunResult } from './bridge.js';
 import { loadConversation, saveConversation } from './checkpoints.js';
 import { adapterFailure, errorCodeOf } from './errors.js';
@@ -68,7 +68,7 @@ export interface GoBootEvent {
 }
 
 export interface GoAdapterOptions {
-  /** Builds a dedicated Worker running `@galaxie/adapter-go/worker`; prepare builds a new one each time. */
+  /** Builds a dedicated Worker running `@galaxie-ai/adapter-go/worker`; prepare builds a new one each time. */
   readonly createWorker: () => GoWorkerPort;
   /** How long a boot may take before the Worker is terminated; defaults to 30 seconds. */
   readonly readyTimeoutMs?: number;

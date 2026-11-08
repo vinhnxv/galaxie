@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type PendingInteraction, parseInteractionRequest } from '@galaxie/core';
+import { type PendingInteraction, parseInteractionRequest } from '@galaxie-ai/core';
 import { createEvent, type Event } from '@google/adk';
 import { failure } from './errors.js';
 import type { AdkPendingRequest, PausedCall } from './interaction.js';

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentDefinition, ModelDownloadRequest, ModelRouting } from '@galaxie/core';
+import type { AgentDefinition, ModelDownloadRequest, ModelRouting } from '@galaxie-ai/core';
 import {
   checkTransformersModel,
   loadTransformersEngine,
@@ -11,7 +11,7 @@ import {
   type TransformersEngineHandle,
   type TransformersModelRecord,
   type TransformersWorker,
-} from '@galaxie/models/transformers';
+} from '@galaxie-ai/models/transformers';
 
 /**
  * One reply's token limit, for the router reservation and for generation. Later agents receive the

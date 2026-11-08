@@ -7,7 +7,7 @@ import {
   GalaxieError,
   type SessionId,
   type UserInteractionEvent,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, type BaseMessage } from '@langchain/core/messages';
 import type { ChatResult } from '@langchain/core/outputs';

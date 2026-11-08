@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type ErrorCode, type ErrorInfo, GalaxieError, toErrorInfo } from '@galaxie/core';
+import { type ErrorCode, type ErrorInfo, GalaxieError, toErrorInfo } from '@galaxie-ai/core';
 
 export function adapterError(code: ErrorCode, cause?: unknown): ErrorInfo {
   const info = toErrorInfo(code, cause);

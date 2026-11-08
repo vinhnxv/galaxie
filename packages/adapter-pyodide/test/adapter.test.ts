@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { GalaxieError, type ModelCall, type RunRequest } from '@galaxie/core';
+import { GalaxieError, type ModelCall, type RunRequest } from '@galaxie-ai/core';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, AIMessageChunk, type StandardMessageStructure } from '@langchain/core/messages';
 import { afterEach, expect, test, vi } from 'vitest';

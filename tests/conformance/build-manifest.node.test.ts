@@ -15,7 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { type AgentDefinition, createManifest } from '@galaxie/core';
+import { type AgentDefinition, createManifest } from '@galaxie-ai/core';
 import { expect, onTestFinished, test } from 'vitest';
 import { z } from 'zod';
 import { verifyManifest, writeManifest } from '../../scripts/build-manifest.js';

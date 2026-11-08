@@ -3,7 +3,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import { type OpenAICompatibleChatModel, openAICompatible } from '@galaxie/models/openai';
+import { type OpenAICompatibleChatModel, openAICompatible } from '@galaxie-ai/models/openai';
 import { afterEach, expect } from 'vitest';
 import { createGateway, type Gateway, type GatewayOptions } from '../server/gateway.js';
 import type { HybridInstance } from '../src/runtime.js';

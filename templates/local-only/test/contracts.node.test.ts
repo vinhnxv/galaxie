@@ -4,7 +4,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defaultWebLLMModel } from '@galaxie/models/webllm';
+import { defaultWebLLMModel } from '@galaxie-ai/models/webllm';
 import { expect, it } from 'vitest';
 import {
   controlLabels,
@@ -15,11 +15,11 @@ import {
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const launch = [
-  '@galaxie/core',
-  '@galaxie/adapter-langgraph',
-  '@galaxie/models',
-  '@galaxie/storage-indexeddb',
-  '@galaxie/react',
+  '@galaxie-ai/core',
+  '@galaxie-ai/adapter-langgraph',
+  '@galaxie-ai/models',
+  '@galaxie-ai/storage-indexeddb',
+  '@galaxie-ai/react',
 ];
 const reasons = [
   'no_webgpu',
@@ -79,13 +79,13 @@ it('declares only launch packages with registry-compatible ranges and the pinned
   const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
   expect(
     Object.keys(dependencies)
-      .filter((name) => name.startsWith('@galaxie/'))
+      .filter((name) => name.startsWith('@galaxie-ai/'))
       .sort(),
   ).toEqual([...launch].sort());
   for (const name of launch) expect(dependencies[name]).toBe('^0.1.0');
   expect(
     Object.keys(dependencies)
-      .filter((name) => !name.startsWith('@galaxie/'))
+      .filter((name) => !name.startsWith('@galaxie-ai/'))
       .sort(),
   ).toEqual(
     [
@@ -121,7 +121,7 @@ it('keeps source imports inside the template or the five launch packages and def
     for (const match of source.matchAll(/(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g)) {
       const specifier = match[1];
       if (specifier === undefined) throw new Error('The import has no specifier.');
-      if (specifier.startsWith('@galaxie/'))
+      if (specifier.startsWith('@galaxie-ai/'))
         expect(launch).toContain(specifier.split('/').slice(0, 2).join('/'));
       if (specifier.startsWith('.')) {
         const path = relative(root, resolve(dirname(file), specifier));
@@ -130,7 +130,7 @@ it('keeps source imports inside the template or the five launch packages and def
     }
     // Type imports erase; runtime provider and engine imports must remain dynamic.
     const executable = source.replace(/import\s+type\s+[\s\S]*?;/g, '');
-    expect(executable).not.toMatch(/from\s*['"]@(?:galaxie\/models\/webllm|mlc-ai\/web-llm)/);
+    expect(executable).not.toMatch(/from\s*['"]@(?:galaxie-ai\/models\/webllm|mlc-ai\/web-llm)/);
     expect(executable).not.toMatch(/import\s*['"]@mlc-ai\/web-llm/);
   }
 });

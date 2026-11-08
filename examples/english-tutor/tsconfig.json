@@ -3,11 +3,11 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@galaxie/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
-      "@galaxie/core/browser": ["../../packages/core/src/browser.ts"],
-      "@galaxie/core": ["../../packages/core/src/index.ts"],
-      "@galaxie/ui-protocol": ["../../packages/ui-protocol/src/index.ts"],
-      "@galaxie/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"]
+      "@galaxie-ai/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
+      "@galaxie-ai/core/browser": ["../../packages/core/src/browser.ts"],
+      "@galaxie-ai/core": ["../../packages/core/src/index.ts"],
+      "@galaxie-ai/ui-protocol": ["../../packages/ui-protocol/src/index.ts"],
+      "@galaxie-ai/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"]
     }
   },
   "include": ["src"]

@@ -7,7 +7,7 @@ import {
   defineAgentDefinition,
   type RunEvent,
   type RunRequest,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { expect, test } from 'vitest';
 import { z } from 'zod';
 import {

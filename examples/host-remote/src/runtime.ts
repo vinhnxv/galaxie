@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentInstance,
   type BindingsFor,
@@ -10,22 +10,22 @@ import {
   httpCapability,
   type ModelRouting,
   type Runtime,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import {
   createTutorAgent,
   ProgressInputSchema,
   type TutorInput,
   tutorDefinition,
-} from '@galaxie/example-english-tutor';
-import { BuiltInAIChatModel, checkBuiltInAI } from '@galaxie/models/builtin-ai';
-import { openAICompatible } from '@galaxie/models/openai';
+} from '@galaxie-ai/example-english-tutor';
+import { BuiltInAIChatModel, checkBuiltInAI } from '@galaxie-ai/models/builtin-ai';
+import { openAICompatible } from '@galaxie-ai/models/openai';
 import {
   type ConfirmationRegistry,
   createRegistry,
   defineConfirmations,
   educationComponents,
   type Registry,
-} from '@galaxie/react';
+} from '@galaxie-ai/react';
 import { MemorySaver } from '@langchain/langgraph/web';
 import { createSession } from './session.js';
 

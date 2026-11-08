@@ -6,7 +6,7 @@ import {
   GalaxieError,
   type InteractionRequest,
   type Submission,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import type { LangGraphRunnableConfig } from '@langchain/langgraph/web';
 import { requestInteraction } from './interaction.js';
 

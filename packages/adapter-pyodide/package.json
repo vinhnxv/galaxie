@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/adapter-pyodide",
+  "name": "@galaxie-ai/adapter-pyodide",
   "version": "0.0.0",
   "private": true,
   "description": "Worker-based LangGraph Python executor for galaxie.",
@@ -23,9 +23,9 @@
     "dist"
   ],
   "dependencies": {
-    "@galaxie/core": "workspace:*",
+    "@galaxie-ai/core": "workspace:*",
     "pyodide": "314.0.7",
-    "@galaxie/adapter-kit": "workspace:*"
+    "@galaxie-ai/adapter-kit": "workspace:*"
   },
   "peerDependencies": {
     "@langchain/core": "~1.2.20"

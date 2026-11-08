@@ -1,5 +1,5 @@
 {
-  "name": "@galaxie/react",
+  "name": "@galaxie-ai/react",
   "version": "0.1.0",
   "description": "Typed React surfaces and headless interaction components for galaxie.",
   "license": "Apache-2.0",
@@ -29,8 +29,8 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@galaxie/core": "workspace:*",
-    "@galaxie/ui-protocol": "workspace:*"
+    "@galaxie-ai/core": "workspace:*",
+    "@galaxie-ai/ui-protocol": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.2.0",

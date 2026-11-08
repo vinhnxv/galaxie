@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import '../../src/host/adk-env.js';
-import { type AdkAgent, createAdkAdapter } from '@galaxie/adapter-adk';
-import { createRuntime, type ExecutorAdapter, type RunEvent } from '@galaxie/core';
+import { type AdkAgent, createAdkAdapter } from '@galaxie-ai/adapter-adk';
+import { createRuntime, type ExecutorAdapter, type RunEvent } from '@galaxie-ai/core';
 import { createHostCapabilities } from '../../src/host/capabilities.js';
 import { financialAgent, financialDefinition } from '../../src/recipes/financial/agent.js';
 import {

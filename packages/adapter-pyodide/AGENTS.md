@@ -1,4 +1,4 @@
-# @galaxie/adapter-pyodide: coding guidance
+# @galaxie-ai/adapter-pyodide: coding guidance
 
 ## Purpose
 
@@ -9,7 +9,7 @@ See the [README](README.md) and [Python ADR](../../docs/adr/0018-python-agents-t
 ## Entry points
 
 - `createPyodideAdapter` and its host-facing types are exported from [src/index.ts](src/index.ts).
-- `@galaxie/adapter-pyodide/worker` is the Worker entry. Only it imports Pyodide.
+- `@galaxie-ai/adapter-pyodide/worker` is the Worker entry. Only it imports Pyodide.
 - [src/bridge.ts](src/bridge.ts) validates the closed JSON protocol without code generation.
 - [src/runtime-files.ts](src/runtime-files.ts) binds the expected third-party wheel inventory.
 

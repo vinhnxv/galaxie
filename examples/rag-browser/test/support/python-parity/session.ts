@@ -5,8 +5,8 @@ import {
   createPyodideAdapter,
   type PyodideAdapterOptions,
   type PyodideAgent,
-} from '@galaxie/adapter-pyodide';
-import { createRuntime } from '@galaxie/core';
+} from '@galaxie-ai/adapter-pyodide';
+import { createRuntime } from '@galaxie-ai/core';
 import { pythonRagDefinition } from '../../../src/agent/definition-python.js';
 import type { RagOutput } from '../../../src/agent/schemas.js';
 import { reviewRegistry } from '../../../src/host/review-passages.js';

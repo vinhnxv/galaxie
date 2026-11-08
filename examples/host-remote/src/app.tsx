@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentInstance, ModelConsentRequest } from '@galaxie/core';
-import { lessonFixture, type TutorInput } from '@galaxie/example-english-tutor';
-import { AgentSurface, ConfirmationPrompt, ModelRoutes, useAgentSnapshot } from '@galaxie/react';
+import type { AgentInstance, ModelConsentRequest } from '@galaxie-ai/core';
+import { lessonFixture, type TutorInput } from '@galaxie-ai/example-english-tutor';
+import { AgentSurface, ConfirmationPrompt, ModelRoutes, useAgentSnapshot } from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { createRemoteHost, type RemoteHost } from './runtime.js';
 

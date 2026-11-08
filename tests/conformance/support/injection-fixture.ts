@@ -5,7 +5,7 @@ import {
   createLangGraphAdapter,
   gateDecision,
   requestInteraction,
-} from '@galaxie/adapter-langgraph';
+} from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentInstance,
   type AgentSnapshot,
@@ -18,15 +18,15 @@ import {
   type RunEvent,
   type RunId,
   type ViewRevision,
-} from '@galaxie/core';
-import { MockChatModel } from '@galaxie/models/mock';
+} from '@galaxie-ai/core';
+import { MockChatModel } from '@galaxie-ai/models/mock';
 import {
   type ConfirmationRegistry,
   createRegistry,
   defineComponent,
   defineConfirmations,
-} from '@galaxie/react';
-import { createMcpServer, type McpEvent } from '@galaxie/tools-mcp';
+} from '@galaxie-ai/react';
+import { createMcpServer, type McpEvent } from '@galaxie-ai/tools-mcp';
 import {
   Annotation,
   END,

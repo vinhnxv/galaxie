@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createMockLatch } from '@galaxie/models/mock';
+import { createMockLatch } from '@galaxie-ai/models/mock';
 import { expect, test } from 'vitest';
 import {
   AUDITOR_REVISED_ANSWER,

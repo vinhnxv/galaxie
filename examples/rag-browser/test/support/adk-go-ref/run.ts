@@ -13,7 +13,7 @@ import {
   type RunEvent,
   type RunId,
   type SessionId,
-} from '@galaxie/core';
+} from '@galaxie-ai/core';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages';
 import { ChatGenerationChunk, type ChatResult } from '@langchain/core/outputs';

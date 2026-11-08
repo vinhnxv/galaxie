@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie/adapter-langgraph';
-import { createRuntime, type DiagnosticEvent, defineAgentDefinition } from '@galaxie/core';
-import { WebLLMChatModel } from '@galaxie/models/webllm';
+import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
+import { createRuntime, type DiagnosticEvent, defineAgentDefinition } from '@galaxie-ai/core';
+import { WebLLMChatModel } from '@galaxie-ai/models/webllm';
 import { HumanMessage } from '@langchain/core/messages';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test, vi } from 'vitest';

@@ -41,25 +41,25 @@ importers:
 
   examples/adk-recipes:
     dependencies:
-      '@galaxie/adapter-adk':
+      '@galaxie-ai/adapter-adk':
         specifier: workspace:*
         version: link:../../packages/adapter-adk
-      '@galaxie/adapter-go':
+      '@galaxie-ai/adapter-go':
         specifier: workspace:*
         version: link:../../packages/adapter-go
-      '@galaxie/adapter-pyodide':
+      '@galaxie-ai/adapter-pyodide':
         specifier: workspace:*
         version: link:../../packages/adapter-pyodide
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@galaxie/models':
+      '@galaxie-ai/models':
         specifier: workspace:*
         version: link:../../packages/models
-      '@galaxie/react':
+      '@galaxie-ai/react':
         specifier: workspace:*
         version: link:../../packages/react
-      '@galaxie/storage-indexeddb':
+      '@galaxie-ai/storage-indexeddb':
         specifier: workspace:*
         version: link:../../packages/storage-indexeddb
       '@google/adk':
@@ -90,14 +90,14 @@ importers:
 
   examples/english-tutor:
     dependencies:
-      '@galaxie/adapter-langgraph':
+      '@galaxie-ai/adapter-langgraph':
         specifier: workspace:*
         version: link:../../packages/adapter-langgraph
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
-      '@galaxie/models':
+      '@galaxie-ai/models':
         specifier: workspace:*
         version: link:../../packages/models
       '@langchain/core':
@@ -112,22 +112,22 @@ importers:
 
   examples/host-local:
     dependencies:
-      '@galaxie/adapter-langgraph':
+      '@galaxie-ai/adapter-langgraph':
         specifier: workspace:*
         version: link:../../packages/adapter-langgraph
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@galaxie/example-english-tutor':
+      '@galaxie-ai/example-english-tutor':
         specifier: workspace:*
         version: link:../english-tutor
-      '@galaxie/models':
+      '@galaxie-ai/models':
         specifier: workspace:*
         version: link:../../packages/models
-      '@galaxie/react':
+      '@galaxie-ai/react':
         specifier: workspace:*
         version: link:../../packages/react
-      '@galaxie/storage-indexeddb':
+      '@galaxie-ai/storage-indexeddb':
         specifier: workspace:*
         version: link:../../packages/storage-indexeddb
       '@langchain/core':
@@ -158,19 +158,19 @@ importers:
 
   examples/host-remote:
     dependencies:
-      '@galaxie/adapter-langgraph':
+      '@galaxie-ai/adapter-langgraph':
         specifier: workspace:*
         version: link:../../packages/adapter-langgraph
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@galaxie/example-english-tutor':
+      '@galaxie-ai/example-english-tutor':
         specifier: workspace:*
         version: link:../english-tutor
-      '@galaxie/models':
+      '@galaxie-ai/models':
         specifier: workspace:*
         version: link:../../packages/models
-      '@galaxie/react':
+      '@galaxie-ai/react':
         specifier: workspace:*
         version: link:../../packages/react
       '@langchain/core':
@@ -210,22 +210,22 @@ importers:
 
   examples/rag-browser:
     dependencies:
-      '@galaxie/adapter-langgraph':
+      '@galaxie-ai/adapter-langgraph':
         specifier: workspace:*
         version: link:../../packages/adapter-langgraph
-      '@galaxie/adapter-pyodide':
+      '@galaxie-ai/adapter-pyodide':
         specifier: workspace:*
         version: link:../../packages/adapter-pyodide
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@galaxie/models':
+      '@galaxie-ai/models':
         specifier: workspace:*
         version: link:../../packages/models
-      '@galaxie/react':
+      '@galaxie-ai/react':
         specifier: workspace:*
         version: link:../../packages/react
-      '@galaxie/storage-indexeddb':
+      '@galaxie-ai/storage-indexeddb':
         specifier: workspace:*
         version: link:../../packages/storage-indexeddb
       '@huggingface/transformers':
@@ -265,10 +265,10 @@ importers:
 
   packages/adapter-adk:
     dependencies:
-      '@galaxie/adapter-kit':
+      '@galaxie-ai/adapter-kit':
         specifier: workspace:*
         version: link:../adapter-kit
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -296,10 +296,10 @@ importers:
 
   packages/adapter-go:
     dependencies:
-      '@galaxie/adapter-kit':
+      '@galaxie-ai/adapter-kit':
         specifier: workspace:*
         version: link:../adapter-kit
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -312,7 +312,7 @@ importers:
 
   packages/adapter-kit:
     dependencies:
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -322,10 +322,10 @@ importers:
 
   packages/adapter-langgraph:
     dependencies:
-      '@galaxie/adapter-kit':
+      '@galaxie-ai/adapter-kit':
         specifier: workspace:*
         version: link:../adapter-kit
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -341,10 +341,10 @@ importers:
 
   packages/adapter-pyodide:
     dependencies:
-      '@galaxie/adapter-kit':
+      '@galaxie-ai/adapter-kit':
         specifier: workspace:*
         version: link:../adapter-kit
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../core
       pyodide:
@@ -357,7 +357,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@galaxie/ui-protocol':
+      '@galaxie-ai/ui-protocol':
         specifier: workspace:*
         version: link:../ui-protocol
     devDependencies:
@@ -409,10 +409,10 @@ importers:
 
   packages/react:
     dependencies:
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../core
-      '@galaxie/ui-protocol':
+      '@galaxie-ai/ui-protocol':
         specifier: workspace:*
         version: link:../ui-protocol
     devDependencies:
@@ -443,7 +443,7 @@ importers:
 
   packages/tools-mcp:
     dependencies:
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../core
       '@modelcontextprotocol/sdk':
@@ -458,16 +458,16 @@ importers:
 
   templates/hybrid-gateway:
     dependencies:
-      '@galaxie/adapter-langgraph':
+      '@galaxie-ai/adapter-langgraph':
         specifier: ^0.1.0
         version: link:../../packages/adapter-langgraph
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: ^0.1.0
         version: link:../../packages/core
-      '@galaxie/models':
+      '@galaxie-ai/models':
         specifier: ^0.1.0
         version: link:../../packages/models
-      '@galaxie/react':
+      '@galaxie-ai/react':
         specifier: ^0.1.0
         version: link:../../packages/react
       '@langchain/core':
@@ -498,19 +498,19 @@ importers:
 
   templates/local-only:
     dependencies:
-      '@galaxie/adapter-langgraph':
+      '@galaxie-ai/adapter-langgraph':
         specifier: ^0.1.0
         version: link:../../packages/adapter-langgraph
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: ^0.1.0
         version: link:../../packages/core
-      '@galaxie/models':
+      '@galaxie-ai/models':
         specifier: ^0.1.0
         version: link:../../packages/models
-      '@galaxie/react':
+      '@galaxie-ai/react':
         specifier: ^0.1.0
         version: link:../../packages/react
-      '@galaxie/storage-indexeddb':
+      '@galaxie-ai/storage-indexeddb':
         specifier: ^0.1.0
         version: link:../../packages/storage-indexeddb
       '@langchain/core':
@@ -541,25 +541,25 @@ importers:
 
   tests/conformance:
     dependencies:
-      '@galaxie/adapter-kit':
+      '@galaxie-ai/adapter-kit':
         specifier: workspace:*
         version: link:../../packages/adapter-kit
-      '@galaxie/adapter-langgraph':
+      '@galaxie-ai/adapter-langgraph':
         specifier: workspace:*
         version: link:../../packages/adapter-langgraph
-      '@galaxie/core':
+      '@galaxie-ai/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@galaxie/example-english-tutor':
+      '@galaxie-ai/example-english-tutor':
         specifier: workspace:*
         version: link:../../examples/english-tutor
-      '@galaxie/models':
+      '@galaxie-ai/models':
         specifier: workspace:*
         version: link:../../packages/models
-      '@galaxie/react':
+      '@galaxie-ai/react':
         specifier: workspace:*
         version: link:../../packages/react
-      '@galaxie/storage-indexeddb':
+      '@galaxie-ai/storage-indexeddb':
         specifier: workspace:*
         version: link:../../packages/storage-indexeddb
       '@langchain/core':

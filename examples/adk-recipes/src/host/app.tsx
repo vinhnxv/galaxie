@@ -3,8 +3,8 @@
 
 import { goBuild } from 'virtual:adk-recipes-go';
 import { pythonBuild } from 'virtual:adk-recipes-python';
-import type { RunId } from '@galaxie/core';
-import { AgentSurface, ConfirmationPrompt, ModelRoutes, useAgentSnapshot } from '@galaxie/react';
+import type { RunId } from '@galaxie-ai/core';
+import { AgentSurface, ConfirmationPrompt, ModelRoutes, useAgentSnapshot } from '@galaxie-ai/react';
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { loanOutcome } from '../recipes/loan/interaction.js';
 import { LEGAL_DISCLAIMER } from './disclaimer.js';
