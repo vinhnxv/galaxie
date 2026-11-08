@@ -79,7 +79,7 @@ The [local-only starter template](templates/local-only/README.md) has its own ti
 | [`@galaxie/react`](packages/react/README.md) | Typed component registry, snapshot hook and headless components |
 | [`@galaxie/storage-indexeddb`](packages/storage-indexeddb/README.md) | Checkpoints, recovery journal and session export in IndexedDB |
 | [`@galaxie/tools-mcp`](packages/tools-mcp/README.md) | MCP client that binds allowlisted tools as capabilities |
-| [`@galaxie/ui-protocol`](packages/ui-protocol/README.md) | Pure A2UI parser, catalog validator and surface reducer; no core/React integration yet |
+| [`@galaxie/ui-protocol`](packages/ui-protocol/README.md) | Pure A2UI parser, catalog validator and surface reducer; core carries its surfaces in pending interactions and `@galaxie/react` renders them |
 | [`@galaxie/adapter-kit`](packages/adapter-kit/README.md) | Shared internal adapter translation and bridge helpers |
 | [`@galaxie/adapter-langgraph`](packages/adapter-langgraph/README.md) | LangGraph.js adapter |
 | [`@galaxie/adapter-pyodide`](packages/adapter-pyodide/README.md) | Python frameworks through Pyodide |
