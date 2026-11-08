@@ -5,6 +5,14 @@ The package has no dependencies and imports no galaxie package or platform servi
 It shares the launch package version; the wire pin is independent of that version:
 `1.0` at `dee8167996b0a802b18b3ebe51f3515c55b757de`.
 
+## Install
+
+```sh
+pnpm add @galaxie-ai/ui-protocol
+```
+
+It has no peers. `@galaxie-ai/core` and `@galaxie-ai/react` install it as a dependency.
+
 ## API
 
 The public root exports:

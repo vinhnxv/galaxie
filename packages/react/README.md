@@ -2,6 +2,12 @@
 
 Typed agent surfaces and a separate host confirmation prompt. Agent components receive `props`, `actions`, `status` and optional rendered `children`; the host owns instance creation, preparation and disposal.
 
+## Install
+
+```sh
+pnpm add @galaxie-ai/react react zod
+```
+
 ## A2UI surfaces
 
 `AgentSurface` renders materialized A2UI surfaces through host-registered entries.

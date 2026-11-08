@@ -7,10 +7,13 @@ API; the host registers the SDK and exporter.
 
 ## Install
 
-This is a private workspace package, not a published npm release. From this
-repository's root, use Node 24 and pnpm 11, run `pnpm install --frozen-lockfile`,
+```sh
+pnpm add @galaxie-ai/core zod @opentelemetry/api
+```
+
+Peer requirements are in [package.json](package.json). To work on this package, use
+Node 24 and pnpm 11 at the repository root: run `pnpm install --frozen-lockfile`,
 then `pnpm build`. Workspace consumers declare `@galaxie-ai/core` as `workspace:*`.
-Peer requirements are in [package.json](package.json).
 
 ## Entry points
 
@@ -23,8 +26,8 @@ storage persistence and development page warnings keep their feature guards.
 `InvalidationOptions` and `InvalidationWatcher`. Ownership requires Web Locks and
 BroadcastChannel; invalidation requires BroadcastChannel and also works in a Worker.
 
-Moving these functions and types out of the main entry is a breaking change to
-the public API of this package, which has not been published. Update host imports:
+Moving these functions and types out of the main entry was a breaking change to
+the public API, made before the first release. Update host imports:
 
 ```ts
 import { acquireOwnership, watchInvalidation } from '@galaxie-ai/core/browser';

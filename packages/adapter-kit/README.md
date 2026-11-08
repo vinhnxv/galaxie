@@ -5,6 +5,15 @@ framing/validation helpers for galaxie executor adapters. This package registers
 no executor and is an internal building block with no stable standalone API
 promise. It shares the launch packages' release version.
 
+## Install
+
+`@galaxie-ai/adapter-langgraph` installs it as a dependency. Install it directly only to
+write your own adapter:
+
+```sh
+pnpm add @galaxie-ai/adapter-kit @langchain/core@~1.2.20
+```
+
 Only the public root, `@galaxie-ai/adapter-kit`, is importable. Production imports
 are limited to `@galaxie-ai/core` public exports, erased type-only references to
 `@langchain/core` and its subpaths, and relative files inside this package.
