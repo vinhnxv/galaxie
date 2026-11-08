@@ -86,6 +86,21 @@ The fixture's native `nostream` tag and output projection keep model replies and
 
 The corpus adds no runtime control and establishes no real-model or real-device result. Broader M4 release duties, host policy deployment, model/download limitations, external developer trials and device demonstrations remain governed by the brief and existing milestone exit records.
 
+## Dependency advisories accepted as residual risk
+
+These advisories were observed on 2026-11-04 (OSV) against pinned dependencies and are not fixed, because no compatible fix exists or taking it would break a recorded alignment. Each entry names why the affected code is not reached as far as a search could show. That is not proof that it is unreachable. Re-check each entry when the named condition changes.
+
+| Dependency | Advisories | Why it stays | Re-check when |
+| --- | --- | --- | --- |
+| `cryptography` 47.0.0 (Pyodide wheel) | GHSA-537c-gmf6-5ccf (fixed 48.0.1), GHSA-jwv3-5hgf-82ww and GHSA-m2h6-j472-rp4c (fixed 49.0.0), GHSA-g6cj-pr64-35w5 (fixed 50.0.0) | Pyodide 314.0.7 builds 47.0.0 and PyPI has no wasm wheel of a fixed version. The pin is part of the Pyodide alignment ([ADR-0022](adr/0022-google-adk-python-through-the-pyodide-adapter.md) decision 3). The wheel loads only for the ADK framework, lazily through `authlib`; a search found no x509 or PKCS7 use. | Pyodide ships `cryptography` 50.0.0 or later. |
+| `msgpack` 1.1.2 (Pyodide wheel) | GHSA-6v7p-g79w-8964 (fixed 1.2.1), GHSA-j586-36cw-2gc2 (fixed 1.2.3; the advisory says its affected range is not final) | The only use is the `ormsgpack` stand-in's one-shot `packb` and `unpackb` on galaxie's own checkpoint bytes; no `Unpacker` is used. PyPI `msgpack` 1.2.3 has a `cp314` `pyemscripten_2026_0` wheel. Trying it kept the CPython suite and the Pyodide adapter tests passing but failed the test that pins the LangGraph wheel inventory (`tests/conformance/python-wheels.node.test.ts`), so it was not taken: the bump changes a recorded inventory and wants its own decision. | The wheel inventory is next revised, or Pyodide ships `msgpack` 1.2.3 or later. |
+| `uuid` 9.0.1 | GHSA-w5hq-g745-h8pq (buffer bounds in v3, v5 and v6) | No patched 9.x release exists. It arrives through `gaxios` from `google-auth-library` from `@google/adk`, a dev and peer dependency of `packages/adapter-adk`; `gaxios` calls only `uuid.v4()`. | `@google/adk` moves to a `uuid` release with a fix. |
+| `minimatch` 10.2.6 | GHSA-g3hv-75wg-m249 (fixed 11.0.1) | The flaw needs `optimizationLevel` 2 or higher, which ESLint does not set, and attacker-supplied globs. It is dev tooling. The fix is a new major outside ESLint's `^10.2` range. | ESLint releases on `minimatch` 11. |
+| `pyasn1` 0.6.4 | GHSA-2qm8-x737-gmw5, GHSA-9m75-vc3g-4x39, GHSA-fm9c-5rcf-2q5p, GHSA-mm57-4v3p-rchx (fixed 0.6.5) | 0.6.5 was uploaded on 2026-10-27, after the Python lock cutoff `2026-10-23` in `python/pyproject.toml`. It is in `python/uv.lock` only, not in `python/requirements.lock`, so no Worker artifact carries it. | The `exclude-newer` cutoff is next moved. |
+| `diskcache` 5.6.3 | GHSA-w8v5-vhqr-4h9v (no fixed release) | It is in `python/uv.lock` only and not in `python/requirements.lock`, so no Worker artifact carries it. | A fixed release appears. |
+
+Fixed instead of accepted: `golang.org/x/net` moved to v0.60.0 (five HTTP/2 advisories) with `go/wasm.lock` regenerated, and the Python dev tools `pytest`, `setuptools` and `wheel` moved to fixed releases.
+
 [interactions]: ../packages/core/src/interactions.ts
 [instance]: ../packages/core/src/agent-instance.ts
 [registry]: ../packages/react/src/registry.ts
