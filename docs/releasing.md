@@ -1,6 +1,6 @@
 # Releasing galaxie
 
-Nothing is published yet. Publishing is a manual maintainer step.
+The first release is 0.1.0. Publishing is a manual maintainer step.
 
 The seven launch packages are `@galaxie/ui-protocol`, `@galaxie/core`,
 `@galaxie/adapter-kit`, `@galaxie/adapter-langgraph`,
@@ -46,7 +46,7 @@ and require reviewing the measurements again.
 ## Maintainer-only prerequisites
 
 The maintainer must provide an npm account with permission to publish under the
-`@galaxie` scope, with two-factor authentication enabled, and make the repository
+`@galaxie` scope, with two-factor authentication enabled. The repository is already
 public. These are maintainer-only steps.
 
 ## Manual publish steps

@@ -30,7 +30,7 @@ node .server/server/serve.js
 
 Open `http://127.0.0.1:4173`. This command compiles only the gateway, static server and CSP module into `.server/`. The repository root supplies TypeScript and Node types. A copied project must supply its own TypeScript, Node and React type tooling to run type checks or compile the server. The static server serves only `dist/`, sends the CSP response header and never falls through from an API route to a file.
 
-Copy this directory for a new app. The four launch dependencies use exactly `^0.1.0`, linked locally by this repository's workspace settings. **The packages are unpublished today**, so a standalone registry install cannot work yet. The repository-only `tsconfig.workspace.json` maps package sources for checks, without affecting the standalone Vite build. No executable source imports another template, example or package by relative path. The repository-only agent-equality test skips when the local-only source is absent; a copied agent may diverge.
+Copy this directory for a new app. The four launch dependencies use exactly `^0.1.0`, linked locally by this repository's workspace settings. Outside this repository they resolve from the npm registry. **A standalone registry install of this template has not been verified.** The repository-only `tsconfig.workspace.json` maps package sources for checks, without affecting the standalone Vite build. No executable source imports another template, example or package by relative path. The repository-only agent-equality test skips when the local-only source is absent; a copied agent may diverge.
 
 ## Routing, prompts and credentials
 

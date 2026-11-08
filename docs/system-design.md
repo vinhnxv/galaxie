@@ -251,7 +251,7 @@ Spike code is throwaway. Keep it out of `packages/` and never promote it to pack
 
 ## 6. Core runtime and contracts
 
-Core has two entry points. `@galaxie/core` (`index.ts`) exports the public contracts and runtime API with no unguarded browser globals. Optional storage persistence in the model router and page development warnings remain guarded in that main entry. `@galaxie/core/browser` (`browser.ts`) opts into ownership and invalidation helpers and all their public types. Moving those functions and types out of the main entry is a breaking change to the public API of a package that has not been published.
+Core has two entry points. `@galaxie/core` (`index.ts`) exports the public contracts and runtime API with no unguarded browser globals. Optional storage persistence in the model router and page development warnings remain guarded in that main entry. `@galaxie/core/browser` (`browser.ts`) opts into ownership and invalidation helpers and all their public types. Moving those functions and types out of the main entry was a breaking change to the public API, made before the first release.
 
 Modules in `packages/core/src`:
 

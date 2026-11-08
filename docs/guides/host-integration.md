@@ -7,8 +7,8 @@ XSS and other same-origin code can bypass those paths. Read the
 [security review](../security-review.md) and [package guidance](../../llms.txt)
 alongside these integration steps. The seven launch packages (`@galaxie/ui-protocol`,
 `@galaxie/core`, `@galaxie/adapter-kit`, `@galaxie/adapter-langgraph`, `@galaxie/models`,
-`@galaxie/storage-indexeddb` and `@galaxie/react`) are versioned 0.1.0 and not published
-to a registry yet.
+`@galaxie/storage-indexeddb` and `@galaxie/react`) are versioned 0.1.0 and published
+to npm.
 The other packages remain private workspace packages.
 
 ## Layer map
@@ -43,8 +43,8 @@ pnpm build
 pnpm --filter <your-package-name> dev
 ```
 
-The packages are unpublished, so a standalone registry install is not available
-yet. The mock needs no GPU, model download, provider key or agent backend. The
+These steps ran against the workspace packages; a standalone install of the same
+snippets from the npm registry has not been verified. The mock needs no GPU, model download, provider key or agent backend. The
 snippets were built and run in Chromium on the mock during review of this guide;
 that is a check of this page's code, not a result for any real model or device.
 

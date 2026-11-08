@@ -1,6 +1,12 @@
 # @galaxie/storage-indexeddb
 
-An IndexedDB checkpoint saver for LangGraph checkpoint 1.2.0, with per-app and per-principal keys, versioned envelopes and transaction-completion barriers. Its `recovery` port adds a durable submission inbox, write-effect journal and agent identity record. Hosts control retention and session deletion, and observe typed storage failures and upgrade handover. This is a private workspace package.
+An IndexedDB checkpoint saver for LangGraph checkpoint 1.2.0, with per-app and per-principal keys, versioned envelopes and transaction-completion barriers. Its `recovery` port adds a durable submission inbox, write-effect journal and agent identity record. Hosts control retention and session deletion, and observe typed storage failures and upgrade handover.
+
+## Install
+
+```sh
+pnpm add @galaxie/storage-indexeddb @langchain/core@~1.2.20 @langchain/langgraph-checkpoint@~1.2.0
+```
 
 ## Usage
 

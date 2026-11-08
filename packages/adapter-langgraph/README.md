@@ -5,10 +5,13 @@ checkpoint-backed pending interactions and interrupt-ID resume.
 
 ## Install
 
-This is a private workspace package. With Node 24 and pnpm 11, run
-`pnpm install --frozen-lockfile` and `pnpm build` at the repository root.
-Workspace consumers use `@galaxie/adapter-langgraph: workspace:*`.
-[package.json](package.json) records the LangChain and LangGraph peers.
+```sh
+pnpm add @galaxie/adapter-langgraph @langchain/core@~1.2.20 @langchain/langgraph@~1.5.1
+```
+
+[package.json](package.json) records the LangChain and LangGraph peers. To work on this
+package, use Node 24 and pnpm 11: run `pnpm install --frozen-lockfile` and `pnpm build`
+at the repository root. Workspace consumers use `@galaxie/adapter-langgraph: workspace:*`.
 
 ## Minimal model-free graph
 

@@ -7,10 +7,18 @@ There is no root export; select a [package subpath](package.json).
 
 ## Install
 
-This is a private workspace package. At the repository root, use Node 24 and pnpm
-11, run `pnpm install --frozen-lockfile`, then `pnpm build`. Workspace consumers
-declare `@galaxie/models` as `workspace:*`; peer requirements and optional provider
-peers are listed in [package.json](package.json).
+```sh
+pnpm add @galaxie/models @langchain/core@~1.2.20
+```
+
+There is no root export: import a provider subpath (`@galaxie/models/openai`,
+`/builtin-ai`, `/webllm`, `/transformers`, `/decision` or `/mock`). Each provider's
+library is an optional peer, so install only the ones you use: `@mlc-ai/web-llm@0.2.86`,
+`@huggingface/transformers@4.3.2` with `@huggingface/transformers-structured-output@4.3.2`,
+or `@langchain/openai@1.6.3`. Peer requirements are listed in [package.json](package.json).
+To work on this package, use Node 24 and pnpm 11 at the repository root: run
+`pnpm install --frozen-lockfile`, then `pnpm build`. Workspace consumers declare
+`@galaxie/models` as `workspace:*`.
 
 ## Minimal mock
 
