@@ -20,6 +20,8 @@ import { expect, onTestFinished, test } from 'vitest';
 import { z } from 'zod';
 import { verifyManifest, writeManifest } from '../../scripts/build-manifest.js';
 
+// The case-alias tests need a case-insensitive filesystem, so the macOS job in ci.yml runs them.
+const caseAliasNote = 'needs a case-insensitive filesystem';
 const entry = 'export const value = 1;\n';
 const skill = '# Practice\n';
 const lockfile = 'lockfileVersion: 9.0\n';
@@ -269,7 +271,7 @@ test.each(['manifest.json', 'schemas/input.json'])(
 test('rejects entry and skill case aliases inside output before deleting them', (context) => {
   for (const kind of ['entry', 'skill']) {
     const options = fixture();
-    if (!existsSync(join(options.packageDir, 'DIST'))) context.skip();
+    if (!existsSync(join(options.packageDir, 'DIST'))) context.skip(caseAliasNote);
     const out = join(options.packageDir, 'dist/galaxie');
     mkdirSync(out);
     writeFileSync(join(out, 'kept.js'), entry);
@@ -288,7 +290,7 @@ test('rejects entry and skill case aliases inside output before deleting them', 
 
 test('excludes output directory case aliases from the shipped inventory', (context) => {
   const options = fixture();
-  if (!existsSync(join(options.packageDir, 'DIST'))) context.skip();
+  if (!existsSync(join(options.packageDir, 'DIST'))) context.skip(caseAliasNote);
   writeManifest(options);
   const path = join(options.packageDir, 'package.json');
   const metadata = JSON.parse(readFileSync(path, 'utf8'));
@@ -330,7 +332,7 @@ test('never overwrites schema files that alias on the destination filesystem', (
 
 test('verification rejects aliased artifact names even when their bytes match', (context) => {
   const options = fixture();
-  if (!existsSync(join(options.packageDir, 'DIST'))) context.skip();
+  if (!existsSync(join(options.packageDir, 'DIST'))) context.skip(caseAliasNote);
   const request = { kind: 'read', input: z.string(), output: z.boolean() } as const;
   const single = { ...definition, capabilities: { required: { 'z@1': request } } };
   const dual = { ...definition, capabilities: { required: { 'Z@1': request, 'z@1': request } } };

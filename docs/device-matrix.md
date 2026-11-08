@@ -10,7 +10,8 @@ real model or device was exercised for this documentation slice.
 
 Configuration checked on 2026-10-30: [CI workflow](../.github/workflows/ci.yml),
 [Node version](../.nvmrc), [pinned Playwright](../package.json), and
-[Vitest projects](../vitest.config.ts). CI runs on `ubuntu-24.04`, one job per check group.
+[Vitest projects](../vitest.config.ts). CI runs on `ubuntu-24.04`, one job per check group,
+plus one macOS job for the manifest tests that need a case-insensitive filesystem.
 
 | Environment | What runs | Model/device substitution | Evidence |
 | --- | --- | --- | --- |
