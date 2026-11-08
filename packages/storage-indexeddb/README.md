@@ -5,7 +5,7 @@ An IndexedDB checkpoint saver for LangGraph checkpoint 1.2.0, with per-app and p
 ## Install
 
 ```sh
-pnpm add @galaxie/storage-indexeddb @langchain/core@~1.2.20 @langchain/langgraph-checkpoint@~1.2.0
+pnpm add @galaxie-ai/storage-indexeddb @langchain/core@~1.2.20 @langchain/langgraph-checkpoint@~1.2.0
 ```
 
 ## Usage

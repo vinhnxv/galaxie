@@ -73,11 +73,11 @@ The [local-only starter template](templates/local-only/README.md) has its own ti
 ## Install in your own app
 
 ```sh
-pnpm add @galaxie/core @galaxie/adapter-langgraph @galaxie/models @galaxie/storage-indexeddb @galaxie/react
+pnpm add @galaxie-ai/core @galaxie-ai/adapter-langgraph @galaxie-ai/models @galaxie-ai/storage-indexeddb @galaxie-ai/react
 pnpm add zod @opentelemetry/api react @langchain/core@~1.2.20 @langchain/langgraph@~1.5.1 @langchain/langgraph-checkpoint@~1.2.0
 ```
 
-`@galaxie/ui-protocol` and `@galaxie/adapter-kit` arrive as dependencies. `@galaxie/models` has no root export: import a provider subpath such as `@galaxie/models/webllm`, and install only the provider libraries you use, which are optional peers (`@mlc-ai/web-llm`, `@huggingface/transformers` with `@huggingface/transformers-structured-output`, and `@langchain/openai`). Each package README lists its peers and exact ranges.
+`@galaxie-ai/ui-protocol` and `@galaxie-ai/adapter-kit` arrive as dependencies. `@galaxie-ai/models` has no root export: import a provider subpath such as `@galaxie-ai/models/webllm`, and install only the provider libraries you use, which are optional peers (`@mlc-ai/web-llm`, `@huggingface/transformers` with `@huggingface/transformers-structured-output`, and `@langchain/openai`). Each package README lists its peers and exact ranges.
 
 Known limit: the packages were tested with `@langchain/core` 1.2.x. The current `@langchain/langgraph` pulls in `@langchain/langgraph-sdk`, which asks for `@langchain/core` `^1.3.2`, so your package manager can warn about that peer. Core 1.3.x is not tested with galaxie.
 

@@ -5,7 +5,7 @@ Typed agent surfaces and a separate host confirmation prompt. Agent components r
 ## Install
 
 ```sh
-pnpm add @galaxie/react react zod
+pnpm add @galaxie-ai/react react zod
 ```
 
 ## A2UI surfaces

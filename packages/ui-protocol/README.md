@@ -8,10 +8,10 @@ It shares the launch package version; the wire pin is independent of that versio
 ## Install
 
 ```sh
-pnpm add @galaxie/ui-protocol
+pnpm add @galaxie-ai/ui-protocol
 ```
 
-It has no peers. `@galaxie/core` and `@galaxie/react` install it as a dependency.
+It has no peers. `@galaxie-ai/core` and `@galaxie-ai/react` install it as a dependency.
 
 ## API
 
