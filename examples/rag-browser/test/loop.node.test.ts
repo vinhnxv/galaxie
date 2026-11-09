@@ -853,9 +853,11 @@ pythonTest.each(answerExecutors)(
       await group.waitFor({ timeout: 30000 });
       await page.getByRole('button', { name: 'Start over', exact: true }).click();
       await expect.poll(() => group.count()).toBe(0);
-      expect(
-        await page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')),
-      ).toBeNull();
+      // The group leaves the page when the review is disposed; the saved reference is removed after
+      // the session rows are deleted, which can take longer on a loaded runner.
+      await expect
+        .poll(() => page.evaluate(() => localStorage.getItem('galaxie.rag-browser.review')))
+        .toBeNull();
       await page.getByLabel('Review passages before answering', { exact: true }).uncheck();
       await selectPython(page);
       await askPydanticAi(page, 'capital of France');

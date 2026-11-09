@@ -195,6 +195,8 @@ test('AT-26 network recorder captures URLs and bodies, blocks outsiders and pass
     body: '{}',
   });
   expect(response).toBeInstanceOf(Response);
+  // The recorder reads a body asynchronously, so it must settle before the entry is compared.
+  await network.settle();
   expect(network.requests.at(-1)).toEqual({ kind: 'fetch', url: fixture.url, body: '{}' });
 });
 
