@@ -102,7 +102,7 @@ Known limit: the packages were tested with `@langchain/core` 1.2.x. The current 
 
 ## Documentation
 
-- [Host integration guide](docs/guides/host-integration.md): CSP, model hosting, storage, ownership, logout, confirmations and proxies.
+- [Host integration guide](docs/guides/host-integration.md): CSP, model hosting, storage, ownership, logout, confirmations, [identity and authorization](docs/guides/host-integration.md#identity-and-authorization) and proxies.
 - [Development tracing guide](docs/guides/tracing.md): spans and exporting through a collector.
 - [System design](docs/system-design.md): components, contracts and runtime flows.
 - [Architecture decision records](docs/adr/README.md): one file per decision.
