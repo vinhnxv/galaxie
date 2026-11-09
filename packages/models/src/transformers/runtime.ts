@@ -4,6 +4,12 @@
 import { ModelError } from '../errors.js';
 import { deniedFetch, type ReadOnlyModelCache } from './model-files.js';
 import { localModelKey, type TransformersModelRecord } from './model-record.js';
+import {
+  allowPromptOnCache,
+  type PromptCache,
+  type PromptInputs,
+  prefillInChunks,
+} from './prefill.js';
 import type { DeviceReport, FinishReason, GenerateRequest } from './protocol.js';
 
 /** URLs the host's Worker entry resolved for the ORT assets (ADR-0021 decision 13). */
@@ -44,16 +50,14 @@ export interface TransformersRuntime {
 
 // Structural views of the parts of the library used here. The library is imported dynamically
 // and without its types, so these describe only what this file calls.
-interface Tensorish {
-  readonly dims: readonly number[];
-}
 interface TokenizerLike {
   apply_chat_template(
     messages: unknown[],
     options: Record<string, unknown>,
-  ): { input_ids: Tensorish } & Record<string, unknown>;
+  ): PromptInputs & Record<string, unknown>;
 }
 interface ModelLike {
+  prepare_inputs_for_generation?: (...args: unknown[]) => Record<string, unknown>;
   generate(options: Record<string, unknown>): Promise<unknown>;
   dispose(): Promise<unknown>;
 }
@@ -227,6 +231,7 @@ export const transformersRuntime: TransformersRuntime = {
       device: record.device,
       dtype: record.dtype,
     });
+    allowPromptOnCache(model);
     return {
       device,
       async generate({ request, contextWindow, onText, signal }): Promise<RuntimeGenerateResult> {
@@ -258,9 +263,14 @@ export const transformersRuntime: TransformersRuntime = {
         const interrupt = (): void => stopping.interrupt();
         if (signal.aborted) interrupt();
         signal.addEventListener('abort', interrupt, { once: true });
+        let cache: PromptCache | undefined;
         try {
+          // Long prompts run in slices so no single run holds the GPU long enough for WebKit to
+          // destroy the device.
+          cache = await prefillInChunks(model, inputs, signal);
           await model.generate({
             ...inputs,
+            ...(cache === undefined ? {} : { past_key_values: cache }),
             max_new_tokens: request.maxTokens,
             do_sample: request.temperature > 0,
             ...(request.temperature > 0 ? { temperature: request.temperature } : {}),
@@ -270,6 +280,7 @@ export const transformersRuntime: TransformersRuntime = {
           });
         } finally {
           signal.removeEventListener('abort', interrupt);
+          await cache?.dispose();
         }
         return {
           promptTokens,
