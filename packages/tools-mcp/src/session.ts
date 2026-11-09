@@ -30,6 +30,9 @@ export class PrincipalSession {
   readonly #principal: string;
   readonly #entries: ReadonlyMap<string, McpToolBinding>;
   readonly #lifetime = new AbortController();
+  // WebKit can collect an AbortSignal.any composite that only a pending fetch refers to, and the
+  // fetch then ignores the abort. A request's composite stays reachable here until fetch settles.
+  readonly #inflight = new Set<AbortSignal>();
   #tail: Promise<unknown> = Promise.resolve();
   #connection: Connection | undefined;
   #token = '';
@@ -81,16 +84,23 @@ export class PrincipalSession {
       fetch: async (url, init) => {
         const headers = new Headers(init?.headers);
         headers.set('authorization', `Bearer ${this.#token}`);
-        const response = await (this.#options.fetch ?? globalThis.fetch)(url, {
-          ...init,
-          headers,
-          credentials: 'omit',
-          redirect: 'error',
-          signal: AbortSignal.any([
-            ...(init?.signal === undefined || init.signal === null ? [] : [init.signal]),
-            this.#lifetime.signal,
-          ]),
-        });
+        const signal = AbortSignal.any([
+          ...(init?.signal === undefined || init.signal === null ? [] : [init.signal]),
+          this.#lifetime.signal,
+        ]);
+        this.#inflight.add(signal);
+        let response: Response;
+        try {
+          response = await (this.#options.fetch ?? globalThis.fetch)(url, {
+            ...init,
+            headers,
+            credentials: 'omit',
+            redirect: 'error',
+            signal,
+          });
+        } finally {
+          this.#inflight.delete(signal);
+        }
         if (response.status === 401 || response.status === 403)
           this.#options.emit({ code: 'mcp_unauthorized' });
         if (response.status === 404 && transport.sessionId !== undefined) connection.expired = true;
