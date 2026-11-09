@@ -226,14 +226,14 @@ test('AT-24 a host fetch timeout stays unavailable while the broker signal is ac
       destination: 'user-device',
       timeoutMs: 4000,
       fetch: (url, init) => {
-        brokerSignal = init?.signal ?? undefined;
-        return fetch(url, {
-          ...init,
-          signal: AbortSignal.any([
-            brokerSignal ?? new AbortController().signal,
-            AbortSignal.timeout(1000),
-          ]),
-        });
+        brokerSignal = init?.signal ?? new AbortController().signal;
+        // Joined by hand, not with AbortSignal.any: in WebKit the first fetch in a page whose
+        // signal is an AbortSignal.any composite can stay pending after the composite aborts, so
+        // the broker deadline fired first and the failure was 'timeout' instead of 'unavailable'.
+        const hostFetch = new AbortController();
+        const timer = setTimeout(() => hostFetch.abort(), 1000);
+        brokerSignal.addEventListener('abort', () => hostFetch.abort(), { once: true });
+        return fetch(url, { ...init, signal: hostFetch.signal }).finally(() => clearTimeout(timer));
       },
     }),
     { id: 'item-1' },
