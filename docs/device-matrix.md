@@ -54,8 +54,8 @@ Every case of the group passes on both engines, apart from four skipped cases. A
 | --- | --- | --- | --- |
 | Apple M5 Pro, macOS, Chrome 155; WebGPU adapter `apple metal-3` | 2026-10-29, [M2 exit record](m2-exit-record.md) and [raw figures](../examples/host-local/results/2026-10-29-apple-m5-pro-chrome-155.json) | Two full local tutor lessons: one with Built-in AI available (route inferred from ordering), one with `LanguageModel` removed so WebLLM ran on WebGPU; schema-valid structured calls with no repair | AT-03 demonstrated on this device. AT-04 capture covers page requests after weights were cached; dedicated-worker requests and browser-owned Built-in AI traffic were outside the capture. |
 | Apple M5 Pro, macOS, Chrome 155.0.8059.86 | 2026-10-29, [M3 exit record](m3-exit-record.md) | Real-model host-local with IndexedDB: same-quiz reload restore, writing-prompt restore, duplicate submits, one saved progress effect, cooperative two-tab handover, sign-out from the former owner | The real post-submit reload missed the accept-to-consume crash window. Forced takeover and real back/forward-cache restoration were not demonstrated. |
-| Apple M5 Pro, macOS 27.2, Safari 27.2; WebGPU adapter vendor `apple`, `shader-f16` present | 2026-11-09, manual probe in [ONNX provider record](adk-recipes-real-model-record.md#safari-and-firefox-probe) | The reviewed Qwen3.5-0.8B q4 record (666 MB) downloaded, verified and loaded on WebGPU in the inference Worker under the adk-recipes strict CSP and Trusted Types policy; two single-turn prompts streamed and finished | One run. Provider and Worker only: no ADK recipe, no app UI, no tool call, no WASM backend. Not a support claim or a measurement. |
-| Apple M5 Pro, macOS 27.2, Firefox 159.0.1; WebGPU adapter present with empty vendor and architecture labels, `shader-f16` present | 2026-11-09, same probe | Same record, same path and same result as the Safari row | One run, same limits as the Safari row. |
+| Apple M5 Pro, macOS 27.2, Safari 27.2; WebGPU adapter vendor `apple`, `shader-f16` present | 2026-11-09, manual probe in [ONNX provider record](adk-recipes-real-model-record.md#safari-and-firefox-probe) | The reviewed Qwen3.5-0.8B q4 record (666 MB) downloaded, verified and loaded on WebGPU in the inference Worker under the adk-recipes strict CSP and Trusted Types policy; two single-turn prompts streamed and finished | The two-prompt probe passed. The Financial advisor (ADK JavaScript) recipe then failed here at its fourth model call (about 2200 prompt tokens), after WebKit destroyed the WebGPU device ([record](adk-recipes-real-model-record.md#financial-advisor-adk-javascript-on-safari-and-firefox)). Two runs; not a support claim or a measurement. |
+| Apple M5 Pro, macOS 27.2, Firefox 159.0.1; WebGPU adapter present with empty vendor and architecture labels, `shader-f16` present | 2026-11-09, same probe | Same record, same path and same result as the Safari row | The two-prompt probe passed. The same recipe then ran four model calls, about 80 s each at 384 tokens, and failed at the default 300 s run budget during the fifth ([record](adk-recipes-real-model-record.md#financial-advisor-adk-javascript-on-safari-and-firefox)). Two runs; same caveats. |
 
 The M2 timings are one run per route with cached WebLLM weights, not latency
 distributions. The M3 observations do not establish renderer-crash recovery.
@@ -68,9 +68,9 @@ recorded slice, rather than overriding the current
 - Other browsers, mobile devices, other GPUs and other operating system/device
   combinations have no real-device evidence in these records. Firefox and Safari
   have one short real-model probe each on the maintainer's Mac (see the table above),
-  plus [mock-model runs](#mock-model-runs-on-firefox-and-webkit). Neither has a real
-  ADK recipe run, an app UI run, a tool call, a WASM backend run, a multi-run
-  distribution or a memory figure.
+  plus [mock-model runs](#mock-model-runs-on-firefox-and-webkit). Neither has a
+  completed ADK recipe run (the one attempt failed on each, see the table), a tool
+  call, a WASM backend run, a multi-run distribution or a memory figure.
 - M2 did not measure first-download size/time, time to first token, p50/p95,
   main-thread long tasks or memory. Worker network capture and browser-owned
   download traffic remain gaps in the real local-only demonstration.
