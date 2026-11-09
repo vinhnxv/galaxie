@@ -85,4 +85,12 @@ A follow-up probe on 2026-11-10 (Firefox 159.0.1, same Mac, model read from the 
 
 For this record, the ONNX provider on Firefox 159.0.1 is usable for single calls and too slow for recipes with several model calls inside the default budget. A larger `wallClockMs` was not tried.
 
-This is a demonstration on one machine, two runs per browser, not a measurement and not an answer-quality claim. The Python and Go recipes were not tried.
+This is a demonstration on one machine, two runs per browser, not a measurement and not an answer-quality claim. **Go and Python recipes on Safari.** One run each on 2026-11-10 (Safari 27.2, same Mac, model read from the browser's cache, downloads refused by the harness), after the sliced prefill. Every model call went to the ONNX provider.
+
+| Recipe | Result | Time |
+| --- | --- | --- |
+| Financial advisor (Go) | succeeded, 4 agents routed to the ONNX provider | about 53 s |
+| LLM auditor (Python) | succeeded, 2 agents routed to the ONNX provider | about 26 s |
+| Small-business loan (Python) | stopped at `waiting_input` with the alert "The loan confirmation is invalid. Use Start over to clear it." The 0.8B model answered that the request was invalid, so the confirmation step received no valid payload. | about 39 s to that point |
+
+A first attempt at the Go recipe produced no report within the harness's 5 minutes and its cause is unknown; the repeat succeeded. These are single runs, a demonstration and not a pass/fail result. The text the model wrote is not scored. Firefox and Chrome were not run for the Go and Python recipes.
