@@ -12,3 +12,46 @@
  * non-function declarations fail with 'The request is invalid.'. B2 is satisfied
  * when an extra response-part key fails with the same fixed invalid error.
  */
+
+import { expect, test } from 'vitest';
+import { encodeBridge, parseBridge } from '../src/bridge.js';
+
+const version = 'galaxie.bridge/v2';
+const model = { role: 'answer', messages: [{ role: 'user', content: 'question' }], options: {} };
+
+function request(options: unknown): string {
+  return JSON.stringify({
+    v: version,
+    id: 'native-probe',
+    kind: 'request',
+    op: 'model',
+    payload: { ...model, options },
+  });
+}
+
+test('an ordinary model request round trips unchanged', () => {
+  const raw = request({});
+  expect(encodeBridge(parseBridge(raw))).toBe(raw);
+});
+
+// B1: a bridge channel for provider-side declarations is required for support.
+test.each([
+  { nativeTools: [{ type: 'web_search' }] },
+  { builtinTools: [{ type: 'web_search' }] },
+  { tools: [{ type: 'web_search' }] },
+])('native declaration shape %j has the fixed invalid refusal', (options) => {
+  expect(() => parseBridge(request(options))).toThrow('The request is invalid.');
+});
+
+// B2: provider-side result parts must not cross the closed reply shape.
+test('a model response with native parts has the fixed invalid refusal', () => {
+  const raw = JSON.stringify({
+    v: version,
+    id: 'native-probe',
+    kind: 'response',
+    op: 'model',
+    ok: true,
+    payload: { content: 'answer', nativeToolCalls: [{ type: 'web_search_call' }] },
+  });
+  expect(() => parseBridge(raw)).toThrow('The request is invalid.');
+});
