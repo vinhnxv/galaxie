@@ -1,0 +1,45 @@
+{
+  "predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "question": "What is the capital of Spain?",
+        "reasoning": "Use the offline fact for What is the capital of Spain?.",
+        "answer": "Madrid"
+      },
+      {
+        "augmented": true,
+        "question": "What is the capital of Italy?",
+        "reasoning": "Use the offline fact for What is the capital of Italy?.",
+        "answer": "Rome"
+      }
+    ],
+    "signature": {
+      "instructions": "Given the fields `question`, produce the fields `answer`.",
+      "fields": [
+        {
+          "prefix": "Question:",
+          "description": "${question}"
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Answer:",
+          "description": "${answer}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

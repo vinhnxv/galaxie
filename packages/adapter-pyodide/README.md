@@ -297,7 +297,8 @@ false. Nested modules have no checkpoint namespaces, interrupt propagation or
 nested stream paths: a pause unwinds the whole program. Sync entry points,
 `dspy.Parallel`, threaded `Evaluate`,
 optimizers, multimodal inputs, embeddings, service retrievers and provider-string
-LMs are unsupported. Offline-optimized program-state loading is untested.
+LMs are unsupported. Offline-optimized JSON state has the scripted evidence and
+limits [below](#offline-optimized-program-state).
 JSONAdapter works without streaming; provider `response_format`/native schema
 output is unsupported. The default ChatAdapter disables JSON fallback, since a
 fallback would change the replay call sequence. Parse failures end the run.
@@ -362,6 +363,82 @@ usage, cancellation after a checked delta, early public stream close followed by
 terminal model settlement and another run, a mid-stream block with only the allowed prefix observed in Python, fixed
 failures for non-JSON/oversized chunks, and stream-free event replay. Chromium keeps
 the existing CSP and Trusted Types policy and blocks external requests.
+
+### Offline-optimized program state
+
+DSPy 3.4.1 JSON state from native `LabeledFewShot`, `BootstrapFewShot` with a
+scripted LM, ReAct with demos on both predictors and an instructions-only
+stand-in loads through `Module.load` on CPython, Node Pyodide and headless
+Chromium. The seven separate state cases compare native transcripts, including
+demo prompts, one capability tool call and fail-closed LM refusals. These are
+scripted-model results; they say nothing about real-model answer quality or
+MIPROv2, COPRO or GEPA output.
+
+Save portable state offline with no LM attached (`module.set_lm(None)` then
+`module.save('state.json')`). List `state.json` alongside the Python files in the
+agent descriptor's `files`. In the bundled entry, construct the same program,
+then load and bind in this order:
+
+```python
+from pathlib import Path
+from galaxie.dspy import GalaxieLM
+
+module.load(Path(__file__).with_name('state.json'))
+module.set_lm(GalaxieLM('answer'))
+```
+
+Loading replaces each predictor's LM. A saved ordinary `dspy.LM`, or `lm: null`
+without a subsequent `set_lm`, fails `unsupported` at prepare before any model
+or external request. JSON state files are public build assets: never include
+private data, user data or credentials. Their bytes carry the page bundle's
+trust, like the Python agent sources; they have no independent integrity check.
+
+Each downloaded source is capped at 1,048,576 UTF-8 bytes; exceeding that cap
+fails `invalid` before a Worker starts. The complete boot frame has the same
+bound, including all source text, JSON escaping and protocol fields; exceeding
+it fails `unsupported`. Quotes and newlines amplify the encoded size. A 256 KiB
+synthetic state loads in both Worker lanes. A 1,048,577-byte state fails the
+per-file cap, and a 1,048,476-byte state fails the boot-frame cap in both lanes.
+
+On 2026-11-10, on an Apple M5 Pro (macOS arm64), the Node Pyodide probe found
+1,041,564 bytes accepted and 1,042,332 bytes refused (768-byte resolution) for
+this test's sources and synthetic long demos. At the accepted size the model
+request completed at 997,307 bridge bytes, leaving 51,269 bytes of headroom.
+This is a sampled boundary, not a universal maximum: other source files,
+escaping and demo shapes change both boot and model-request sizes. Model context
+limits can reject a prompt even when it fits the bridge.
+
+| State bytes | Worker boot to ready (ms) | `Module.load` (ms) | Outcome |
+| --- | --- | --- | --- |
+| 1,024 | 2,570.80 | 1.86 | Completed |
+| 262,144 | 2,574.04 | 2.38 | Completed |
+| 1,041,564 | 2,572.88 | 2.86 | Completed |
+
+These are single-machine observations with local runtime assets and wheels,
+possibly warm OS caches, and other tests running concurrently, not performance
+claims or thresholds. Boot includes interpreter startup, wheel installation,
+imports and program construction; load measures only `Module.load`. Chromium
+load cost, other devices, Firefox and WebKit are unmeasured. Reproduce with:
+
+```sh
+GALAXIE_DSPY_STATE_MEASURE=1 pnpm exec vitest run --project node tests/conformance/dspy-state-limits.node.test.ts --silent=false --reporter=verbose
+```
+
+The executable round-trip catalog matches on all three lanes:
+
+| State property | DSPy 3.4.1 behavior |
+| --- | --- |
+| Demos and instructions | Restored; demo objects become plain `dict`, and Pydantic demo values become dictionaries without their custom type. |
+| Field metadata | Prefix and description are applied positionally, without saved field names. Reordering live fields silently misapplies them. ChatAdapter renders field names and descriptions, not the saved prefix. |
+| Predictor LM | Replaced by the saved LM or `None`; always rebind the galaxie LM after loading. |
+| LM class and endpoints | Custom LM classes raise `ValueError` by default. `api_base`, `base_url` and `model_list` are dropped unless unsafe LM loading is enabled; the ordinary saved LM still fails executor validation. Keep unsafe loading disabled. |
+| Predictor config, tools and module code | Not reconstructed from state; the live config, tool functions and ReAct `max_iters` remain. Rebuild the same program before loading. |
+| Missing/extra predictor keys | A missing key raises `KeyError` before changing the module; extra top-level keys are ignored by a module containing predictors. |
+| Dependency versions | Saved Python, DSPy and cloudpickle metadata matches in these lanes. DSPy only warns on a mismatch; metadata is not a compatibility gate. |
+| Pickle | `Module.load` of a `.pkl` path raises `ValueError` without `allow_pickle`; an agent descriptor listing `.pkl` fails `invalid` before fetching. `save_program=True` and `dspy.load` are outside this JSON path. |
+
+Other DSPy versions, real-model optimizer output and paused sessions resumed
+after a state-file change remain untested.
 
 ## Google ADK (Python) agents
 
