@@ -48,6 +48,12 @@ export const adkPythonCases = [
   'agents-transfer',
   'stream-agents-sequential',
   'agents-confirm-last',
+  'agents-confirm-first',
+  'agents-confirm-middle',
+  'agents-confirm-nested',
+  'agents-confirm-parallel',
+  'agents-confirm-parallel-reversed',
+  'agents-long-running-middle',
 ] as const;
 /** The Chromium lane repeats these; the Node lane runs all of them. */
 export const adkPythonBrowserCases = [
@@ -66,6 +72,8 @@ export interface AgentReply {
   readonly toolCalls?: readonly ToolCall[];
   /** The reply waits until this agent has delivered its final answer, which orders parallel branches. */
   readonly after?: string;
+  /** The reply waits until this agent has returned a tool call, before it can finish a paused turn. */
+  readonly afterCall?: string;
 }
 export interface Spec {
   readonly prompt: string;
@@ -212,6 +220,8 @@ export class RecordingModel extends BaseChatModel {
       ...(jsonSchema === undefined ? {} : { jsonSchema }),
     });
     if (picked?.entry.after !== undefined) await this.agents?.done(picked.entry.after).promise;
+    if (picked?.entry.afterCall !== undefined)
+      await this.agents?.done(`${picked.entry.afterCall}/call`).promise;
     const result = picked
       ? await this.#scripted(picked)._generate([new HumanMessage(picked.agent)], options)
       : await this.mock._generate(messages, options);
@@ -226,6 +236,10 @@ export class RecordingModel extends BaseChatModel {
     if (picked && !picked.entry.toolCalls?.length) {
       const agents = this.agents;
       setTimeout(() => agents?.done(picked.agent).resolve(), 100);
+    }
+    if (picked?.entry.toolCalls?.length) {
+      const agents = this.agents;
+      setTimeout(() => agents?.done(`${picked.agent}/call`).resolve(), 100);
     }
     return result;
   }

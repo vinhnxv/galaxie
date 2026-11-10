@@ -215,7 +215,9 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [0]
+          "indexes": [
+            0
+          ]
         }
       }
     ]
@@ -243,7 +245,9 @@
       {
         "action": "deny",
         "payload": {
-          "indexes": [0]
+          "indexes": [
+            0
+          ]
         }
       }
     ]
@@ -278,7 +282,10 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [1, 0]
+          "indexes": [
+            1,
+            0
+          ]
         }
       }
     ]
@@ -331,7 +338,9 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [0]
+          "indexes": [
+            0
+          ]
         }
       }
     ]
@@ -384,7 +393,9 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [0]
+          "indexes": [
+            0
+          ]
         }
       }
     ]
@@ -424,13 +435,17 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [0]
+          "indexes": [
+            0
+          ]
         }
       },
       {
         "action": "approve",
         "payload": {
-          "indexes": [0]
+          "indexes": [
+            0
+          ]
         }
       }
     ]
@@ -458,7 +473,9 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [0]
+          "indexes": [
+            0
+          ]
         }
       }
     ]
@@ -654,7 +671,258 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [0]
+          "indexes": [
+            0
+          ]
+        }
+      }
+    ]
+  },
+  "agents-confirm-first": {
+    "prompt": "approve before review",
+    "agents": {
+      "drafter": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "Draft: 6"
+        }
+      ],
+      "reviewer": [
+        {
+          "text": "Reviewed: Draft: 6"
+        }
+      ]
+    },
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [
+            0
+          ]
+        }
+      }
+    ]
+  },
+  "agents-confirm-middle": {
+    "prompt": "approve between stages",
+    "agents": {
+      "drafter": [
+        {
+          "text": "Draft ready."
+        }
+      ],
+      "approver": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "Approved: 6"
+        }
+      ],
+      "reviewer": [
+        {
+          "text": "Reviewed after approval."
+        }
+      ]
+    },
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [
+            0
+          ]
+        }
+      }
+    ]
+  },
+  "agents-confirm-nested": {
+    "prompt": "approve inside the nested sequence",
+    "agents": {
+      "approver": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "Approved: 6"
+        }
+      ],
+      "drafter": [
+        {
+          "text": "Nested draft ready."
+        }
+      ],
+      "reviewer": [
+        {
+          "text": "Reviewed nested draft."
+        }
+      ]
+    },
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [
+            0
+          ]
+        }
+      }
+    ]
+  },
+  "agents-confirm-parallel": {
+    "prompt": "approve one branch",
+    "unordered": true,
+    "agents": {
+      "left": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ],
+          "after": "right"
+        },
+        {
+          "text": "Left approved: 6"
+        }
+      ],
+      "right": [
+        {
+          "text": "Right ready."
+        }
+      ],
+      "merger": [
+        {
+          "text": "Merged after approval."
+        }
+      ]
+    },
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [
+            0
+          ]
+        }
+      }
+    ]
+  },
+  "agents-confirm-parallel-reversed": {
+    "prompt": "approve one branch",
+    "unordered": true,
+    "agents": {
+      "left": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "Left approved: 6"
+        }
+      ],
+      "right": [
+        {
+          "text": "Right ready.",
+          "afterCall": "left"
+        }
+      ],
+      "merger": [
+        {
+          "text": "Merged after approval."
+        }
+      ]
+    },
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [
+            0
+          ]
+        }
+      }
+    ]
+  },
+  "agents-long-running-middle": {
+    "prompt": "complete the pending middle stage",
+    "agents": {
+      "drafter": [
+        {
+          "text": "Draft ready."
+        }
+      ],
+      "approver": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "External result: 6"
+        }
+      ],
+      "reviewer": [
+        {
+          "text": "Reviewed after external result."
+        }
+      ]
+    },
+    "answers": [
+      {
+        "action": "submit",
+        "payload": {
+          "value": 6
         }
       }
     ]

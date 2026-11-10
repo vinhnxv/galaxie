@@ -13,6 +13,7 @@ from typing import Any
 from unittest.mock import patch
 
 from google.adk.agents.run_config import RunConfig, StreamingMode  # pyright: ignore[reportPrivateImportUsage]
+from google.adk.apps import App, ResumabilityConfig
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import InMemoryRunner
@@ -148,6 +149,8 @@ class ScriptedLlm(BaseLlm):
         if entry is not None and entry.get('after'):
             # A reply can wait for another agent's final answer, which fixes the arrival order of parallel branches.
             await self.gates.setdefault(entry['after'], asyncio.Event()).wait()
+        if entry is not None and entry.get('afterCall'):
+            await self.gates.setdefault(f"{entry['afterCall']}/call", asyncio.Event()).wait()
         if self.case == 'abort':
             # ADK ends a cancelled root node quietly, so the fixture records the outcome itself.
             transcript['error'] = {'code': 'cancelled', 'message': 'The run was cancelled.'}
@@ -175,6 +178,8 @@ class ScriptedLlm(BaseLlm):
             for call in entry.get('toolCalls', [])
         ]
         yield LlmResponse(content=types.Content(role='model', parts=parts), turn_complete=True)
+        if agent is not None and entry.get('toolCalls'):
+            self.gates.setdefault(f'{agent}/call', asyncio.Event()).set()
         if agent is not None and not entry.get('toolCalls'):
             self.gates.setdefault(agent, asyncio.Event()).set()
 
@@ -183,7 +188,7 @@ class NativeDouble(BaseTool):
     """Independent native tool: same declaration, runs the fixture's arithmetic directly."""
 
     def __init__(self, case, transcript):
-        super().__init__(name='double', description='Double an integer.', is_long_running=case == 'long-running')
+        super().__init__(name='double', description='Double an integer.', is_long_running=case in suite.LONG_RUNNING_CASES)
         self.case = case
         self.transcript = transcript
 
@@ -275,7 +280,7 @@ async def converse(runner, session, spec, name, transcript):
         if name == 'confirm-double-submit':
             transcript['dispatches'] = ['accepted', 'rejected:duplicate']
         parts = []
-        if name == 'long-running':
+        if name in suite.LONG_RUNNING_CASES:
             parts.append(types.Part(function_response=types.FunctionResponse(
                 id=asks[0][1], name=asks[0][2], response=answer['payload'],
             )))
@@ -299,7 +304,9 @@ async def _run_case(name):
     }
     model = ScriptedLlm(model='answer', case=name, spec=spec, transcript=transcript, gates={})
     agent = suite.factory(name, model, NativeDouble(name, transcript))
-    runner = InMemoryRunner(agent=agent, app_name='conformance')
+    runner = InMemoryRunner(app=App(
+        name='conformance', root_agent=agent, resumability_config=ResumabilityConfig(is_resumable=True),
+    )) if name in suite.RESUMABLE else InMemoryRunner(agent=agent, app_name='conformance')
     session = await runner.session_service.create_session(app_name='conformance', user_id='user', session_id='conformance')
     last = None
     try:

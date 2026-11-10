@@ -22,6 +22,7 @@ import {
   AgentScript,
   RecordingModel,
   renumber,
+  settle,
   type Spec,
 } from './adk-python.js';
 import { autoApprove, confirmationsFor } from './auto-confirm.js';
@@ -35,6 +36,12 @@ export const adkPythonReloadCases = [
   'confirm-consecutive',
   'stream-confirm-approve',
   'agents-confirm-last',
+  'agents-confirm-first',
+  'agents-confirm-middle',
+  'agents-confirm-nested',
+  'agents-confirm-parallel',
+  'agents-confirm-parallel-reversed',
+  'agents-long-running-middle',
 ] as const;
 /** Write cases that need a second lifetime, so they have no golden of their own. */
 export const adkPythonWriteCases = ['approved-write', 'resumed-write'] as const;
@@ -297,7 +304,7 @@ export async function executeAdkReloadStep(
 }
 
 /** The transcript one uninterrupted lifetime would have recorded. */
-export function joinAdkReload(steps: readonly AdkReloadResult[]): AdkPythonTranscript {
+export function joinAdkReload(steps: readonly AdkReloadResult[], name: string): AdkPythonTranscript {
   const last = steps.at(-1);
   if (!last) throw new Error('The reload steps are missing.');
   const merged: AdkPythonTranscript = {
@@ -325,6 +332,11 @@ export function joinAdkReload(steps: readonly AdkReloadResult[]): AdkPythonTrans
     })),
   );
   const actual = JSON.parse(JSON.stringify(merged)) as AdkPythonTranscript;
-  renumber(actual.requests);
+  const spec = (specs as unknown as Record<string, Spec>)[name];
+  if (!spec) throw new Error('The reload case is unknown.');
+  if (spec.unordered) {
+    settle(actual);
+    for (const request of actual.requests) renumber([request]);
+  } else renumber(actual.requests);
   return actual;
 }

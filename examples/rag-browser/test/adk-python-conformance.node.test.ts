@@ -253,7 +253,7 @@ describe.skipIf(!pythonWheelsAvailable)(
               'utf8',
             ),
           );
-          expect(joinAdkReload(steps)).toEqual(golden);
+          expect(joinAdkReload(steps, name)).toEqual(golden);
           expect(result.consumed).toBe(true);
         });
       },

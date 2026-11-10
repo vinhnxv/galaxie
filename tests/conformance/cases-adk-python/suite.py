@@ -12,14 +12,23 @@ CASES = (
     'confirm-incomplete', 'confirm-double-submit', 'confirm-consecutive', 'stream-confirm-approve',
     'agents-sequential', 'agents-parallel', 'agents-loop', 'agents-transfer', 'stream-agents-sequential',
     'agents-confirm-last',
+    'agents-confirm-first', 'agents-confirm-middle', 'agents-confirm-nested',
+    'agents-confirm-parallel', 'agents-confirm-parallel-reversed', 'agents-long-running-middle',
 )
 # Cases whose agent tree has several agents; the scripted model answers by agent name.
 SHAPES = (
     'agents-sequential', 'agents-parallel', 'agents-loop', 'agents-transfer', 'stream-agents-sequential',
     'agents-confirm-last',
+    'agents-confirm-first', 'agents-confirm-middle', 'agents-confirm-nested',
+    'agents-confirm-parallel', 'agents-confirm-parallel-reversed', 'agents-long-running-middle',
+)
+RESUMABLE = (
+    'agents-confirm-first', 'agents-confirm-middle', 'agents-confirm-nested',
+    'agents-confirm-parallel', 'agents-confirm-parallel-reversed', 'agents-long-running-middle',
 )
 CONFIRMATION_CASES = tuple(name for name in CASES if 'confirm' in name)
-INTERACTION_CASES = (*CONFIRMATION_CASES, 'long-running')
+LONG_RUNNING_CASES = ('long-running', 'agents-long-running-middle')
+INTERACTION_CASES = (*CONFIRMATION_CASES, *LONG_RUNNING_CASES)
 PARAMETERS = {
     'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'],
     'additionalProperties': False,
@@ -46,7 +55,7 @@ def external_answer(requests, action, payload):
 
 def hooks(name):
     """The author hooks of an interaction case; the native lane applies them itself."""
-    return {'interaction': interaction, **({'resume': external_answer} if name == 'long-running' else {})}
+    return {'interaction': interaction, **({'resume': external_answer} if name in LONG_RUNNING_CASES else {})}
 
 
 def shape(name, model, tool):
@@ -74,6 +83,16 @@ def shape(name, model, tool):
         )
     if kind == 'agents-confirm-last':
         return SequentialAgent(name='pipeline', sub_agents=[leaf('drafter'), leaf('approver', [tool])])
+    if kind == 'agents-confirm-first':
+        return SequentialAgent(name='pipeline', sub_agents=[leaf('drafter', [tool]), leaf('reviewer')])
+    if kind in ('agents-confirm-middle', 'agents-long-running-middle'):
+        return SequentialAgent(name='pipeline', sub_agents=[leaf('drafter'), leaf('approver', [tool]), leaf('reviewer')])
+    if kind == 'agents-confirm-nested':
+        inner = SequentialAgent(name='inner', sub_agents=[leaf('approver', [tool]), leaf('drafter')])
+        return SequentialAgent(name='pipeline', sub_agents=[inner, leaf('reviewer')])
+    if kind in ('agents-confirm-parallel', 'agents-confirm-parallel-reversed'):
+        fanout = ParallelAgent(name='fanout', sub_agents=[leaf('left', [tool]), leaf('right')])
+        return SequentialAgent(name='pipeline', sub_agents=[fanout, leaf('merger', include_contents='none')])
     raise ValueError('The conformance case is unknown.')
 
 
@@ -87,7 +106,7 @@ def factory(name, model=None, tool=None):
         model = llm('answer')
         tool = capability_tool(
             'double', 'math.double@1', PARAMETERS, 'Double an integer.',
-            require_confirmation=name in CONFIRMATION_CASES, long_running=name == 'long-running',
+            require_confirmation=name in CONFIRMATION_CASES, long_running=name in LONG_RUNNING_CASES,
         )
     options = {'output_schema': Answer, 'output_key': 'result'} if name == 'output-schema' else {}
     agent = shape(name, model, tool) if name in SHAPES else LlmAgent(
