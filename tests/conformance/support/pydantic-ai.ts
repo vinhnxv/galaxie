@@ -56,9 +56,17 @@ export const pydanticCases = [
   'native-output-repair',
   'native-output-repair-refused',
   'stream-native-output',
+  'native-output-second-repair-refused',
+  'native-output-repair-budget-exhausted',
+  'stream-native-output-repair',
 ] as const;
 interface Spec {
   readonly prompt: string;
+  readonly sequence?: 'tool-calls' | 'assistant-turns';
+  readonly route?: {
+    readonly repairAttempts?: number;
+    readonly runRepairBudget?: number;
+  };
   readonly replies: readonly { readonly text: string; readonly toolCalls?: readonly ToolCall[] }[];
   readonly answers?: readonly { readonly action: string; readonly payload: unknown }[];
 }
@@ -201,14 +209,19 @@ export async function executePydanticCase(
     [],
     undefined,
     name === 'stream-abort' ? latch : undefined,
-    name === 'native-output-repair' || name === 'native-output-repair-refused'
-      ? 'assistant-turns'
-      : 'tool-calls',
+    spec.sequence,
   );
   const runtime = createRuntime({
     appId: 'pydantic-conformance',
     executors: [createPyodideAdapter({ ...options, framework: 'pydantic-ai' })],
-    budgets: { steps: 25, toolCalls: 10, tokens: 2000 },
+    budgets: {
+      steps: 25,
+      toolCalls: 10,
+      tokens: 2000,
+      ...(spec.route?.runRepairBudget === undefined
+        ? {}
+        : { repairAttempts: spec.route.runRepairBudget }),
+    },
     outputSafety: ({ text }) => (/BLOCKED_(ARGUMENT|ID|TEXT)/.test(text) ? 'block' : 'allow'),
   });
   try {
@@ -278,7 +291,9 @@ export async function executePydanticCase(
               providers: ['mock'],
               allow: ['in-browser'],
               maxTokens: 100,
-              ...(name === 'native-output-repair' ? { repairAttempts: 1 } : {}),
+              ...(spec.route?.repairAttempts === undefined
+                ? {}
+                : { repairAttempts: spec.route.repairAttempts }),
             },
           },
         },
