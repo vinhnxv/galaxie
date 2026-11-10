@@ -658,6 +658,22 @@
       }
     ]
   },
+  "native-output": {
+    "prompt": "native output",
+    "replies": [{ "text": "{\"value\":6}" }]
+  },
+  "native-output-repair": {
+    "prompt": "native repair",
+    "replies": [{ "text": "{\"value\":\"invalid\"}" }, { "text": "{\"value\":6}" }]
+  },
+  "native-output-repair-refused": {
+    "prompt": "native repair refused",
+    "replies": [{ "text": "{\"value\":\"invalid\"}" }, { "text": "{\"value\":6}" }]
+  },
+  "stream-native-output": {
+    "prompt": "stream native output",
+    "replies": [{ "text": "{\"value\": 6}" }]
+  },
   "stream-approval-argument-block": {
     "prompt": "stream approval argument block",
     "replies": [

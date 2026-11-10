@@ -198,7 +198,7 @@ async def _run_case(name, *, reload=False):
         def __init__(self):
             super().__init__(profile={
                 'supports_tools': True, 'supports_text_output': True,
-                'supports_json_schema_output': False, 'supports_json_object_output': False,
+                'supports_json_schema_output': True, 'supports_json_object_output': False,
                 'default_structured_output_mode': 'tool',
             })
 
@@ -221,12 +221,16 @@ async def _run_case(name, *, reload=False):
             yield NativeStream(parameters, response, name)
 
         async def _response(self, messages, settings, parameters):
+            if name == 'native-output-repair-refused' and transcript['responses']:
+                raise GalaxieError('invalid')
             mapped = await mapper._map_messages(messages, parameters, model_settings=settings)
             for message in mapped:
                 if message.get('content') is None:
                     message['content'] = ''
             tools = [mapper._map_tool_definition(tool, settings or {}) for tool in parameters.declared_tool_defs.values()]
             request = {'messages': mapped, 'tools': tools}
+            if parameters.output_mode == 'native':
+                request['jsonSchema'] = mapper._map_json_schema(parameters.output_object)['json_schema']['schema']
             if tools:
                 request['toolChoice'] = 'auto' if parameters.allow_text_output else 'required'
             transcript['requests'].append(normalized(request))

@@ -1,0 +1,82 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "native repair"
+        }
+      ],
+      "tools": [],
+      "jsonSchema": {
+        "properties": {
+          "value": {
+            "type": "integer"
+          }
+        },
+        "required": ["value"],
+        "title": "Answer",
+        "type": "object"
+      }
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "native repair"
+        },
+        {
+          "role": "assistant",
+          "content": "{\"value\":\"invalid\"}"
+        },
+        {
+          "role": "user",
+          "content": "Your previous response failed the application's validation (this is automated feedback, not a message from the user):\n<validation_errors>\n[{\"type\":\"int_parsing\",\"loc\":[\"value\"],\"msg\":\"Input should be a valid integer, unable to parse string as an integer\",\"input\":\"invalid\"}]\n</validation_errors>"
+        }
+      ],
+      "tools": [],
+      "jsonSchema": {
+        "properties": {
+          "value": {
+            "type": "integer"
+          }
+        },
+        "required": ["value"],
+        "title": "Answer",
+        "type": "object"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "content": "{\"value\":\"invalid\"}",
+      "toolCalls": []
+    },
+    {
+      "content": "{\"value\":6}",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "value": 6
+  },
+  "error": null
+}
