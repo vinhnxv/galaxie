@@ -153,6 +153,15 @@ def test_non_galaxie_child_models_and_model_overrides_are_refused(override):
     assert seen == []
 
 
+def test_empty_model_override_is_refused_before_transport():
+    seen = []
+    install_replies([], seen)
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(run_child(tool_context(), Agent(GalaxieModel('child')), 'child', model=''))
+    assert error.value.code == 'unsupported'
+    assert seen == []
+
+
 @pytest.mark.parametrize('shape', ['native-tool', 'native-factory', 'native-output-with-tool', 'instrumentation', 'settings'])
 def test_child_validation_keeps_existing_prepare_refusals(shape):
     seen = []

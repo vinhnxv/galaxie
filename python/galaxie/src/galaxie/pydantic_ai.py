@@ -359,7 +359,8 @@ async def run_child(
     if not isinstance(key, str) or not isinstance(ctx.conversation_id, str) or not ctx.conversation_id:
         raise GalaxieError('invalid')
     _check_run(ctx.run_id)
-    if not isinstance(agent, Agent) or not isinstance(options.get('model') or agent.model, GalaxieModel):
+    model = options.get('model')
+    if not isinstance(agent, Agent) or not isinstance(agent.model if model is None else model, GalaxieModel):
         raise GalaxieError('unsupported')
     _uninstrumented(agent)
     _validate_agent(agent)
