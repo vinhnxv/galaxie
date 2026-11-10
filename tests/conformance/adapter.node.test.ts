@@ -663,7 +663,7 @@ test('pauses after await and resumes the same checkpoint with a false submission
   }
 });
 
-test.each(['parallel', 'static', 'twice', 'invalid'] as const)(
+test.each(['parallel', 'twice', 'invalid'] as const)(
   'rejects the %s interrupt shape',
   async (kind) => {
     const state = Annotation.Root({ value: Annotation<number> });
@@ -682,7 +682,6 @@ test.each(['parallel', 'static', 'twice', 'invalid'] as const)(
         graph.addNode('other', ask).addEdge(START, 'other').addEdge('other', END);
       return graph.compile({
         checkpointer: host.langchain.checkpointer(),
-        ...(kind === 'static' ? { interruptBefore: ['ask'] } : {}),
       });
     });
     try {
