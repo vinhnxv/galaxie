@@ -18,7 +18,7 @@ Read [the project status](docs/status.md) before changing an area. It records im
 Node.js 24 and pnpm 11 (through Corepack).
 
 - `pnpm install`
-- `pnpm check`: everything CI runs. Run it before you report work as done.
+- `pnpm check`: the local validation suite. CI additionally runs Firefox and WebKit report gates. Run it before you report work as done.
 - `pnpm format`: apply Biome formatting and safe fixes.
 
 The compiler settings are strict (system design §10): relative imports end in `.js`, type-only imports use `import type`, exported functions declare their return types, and syntax that TypeScript cannot erase, such as `enum`, is not allowed.

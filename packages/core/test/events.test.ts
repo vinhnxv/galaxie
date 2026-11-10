@@ -30,6 +30,38 @@ test('stream events are live only and terminal events replay with their original
   await runtime.dispose();
 });
 
+test('a slow event consumer fails without blocking another consumer or losing terminal replay', async () => {
+  const gate = deferred<void>();
+  const { instance, runtime } = await ready([
+    [
+      { wait: gate.promise },
+      ...Array.from({ length: 2048 }, (_, index) => stream(index)),
+      { type: 'output', output: 'done' },
+    ],
+  ]);
+  try {
+    const { runId } = await instance.start('input');
+    const slow = instance.events(runId)[Symbol.asyncIterator]();
+    const first = slow.next();
+    const following = collect(instance.events(runId));
+    gate.resolve();
+    await expect(first).resolves.toMatchObject({ value: { type: 'stream', sequence: 0 } });
+    const events = await following;
+    expect(events).toHaveLength(2049);
+    expect(events.at(-1)).toMatchObject({ type: 'output', output: 'done', sequence: 2048 });
+    await expect(slow.next()).rejects.toMatchObject({
+      code: 'budget_exceeded',
+      message: 'The budget limit was reached.',
+    });
+    await expect(slow.next()).resolves.toEqual({ done: true, value: undefined });
+    expect(instance.getSnapshot().run?.status).toBe('succeeded');
+    expect(await collect(instance.events(runId))).toEqual([events.at(-1)]);
+  } finally {
+    gate.resolve();
+    await runtime.dispose();
+  }
+});
+
 test('consumer return immediately detaches and resolves outstanding next calls', async () => {
   const gate = deferred<void>();
   const { instance, runtime } = await ready([
