@@ -237,6 +237,110 @@ models only and retain the page/Worker CSP and Trusted Types policy. The
 serves all four executors. A mock-only hands-on Chrome check of DSPy (2026-10-31)
 covered a cited answer, review with two kept passages, reload restore of the executor and pending review, resume and Start over.
 
+## pydantic-ai agent delegation probes
+
+The [CPython probes](cases-pydantic-ai-delegation/test_delegation_probes.py) and
+[Node Pyodide probes](pydantic-ai-delegation.node.test.ts) characterize the shipped
+executor unchanged, using the same [scripted replies](cases-pydantic-ai-delegation/fixtures.json).
+The outcome rule was committed before observations, in the Python fixture docstring
+and Node test comment. A green test pins an observation, including a gap; it does
+not mean the satisfaction condition holds. An unmeasured required probe makes its
+gap undetermined. Informational probes do not decide outcomes.
+
+Versions: pydantic-ai-slim 2.60.0, pydantic-graph 2.60.0, CPython 3.14.5,
+Pyodide 314.0.7, Node 24.15.0 and pnpm 11.21.0. Re-run these probes on every
+pydantic-ai version bump, including the public hook and message identity checks.
+
+Variants: `plain` forwards nothing; `usage` forwards `deps`, `usage` and
+`usage_limits`; `conv` also reuses the parent's conversation ID; the probe-local
+`helper` derives a child conversation ID by hashing the parent's conversation ID
+and tool-call ID while forwarding usage. All evidence below is scripted.
+
+| Probe | Priority | CPython result | Node Pyodide result |
+| --- | --- | --- | --- |
+| D1 accounting | P0 | Not applicable | Satisfied for usage/conv/helper: four model calls, two capability calls, 16 tokens and 16 fixture cost units. Exact-budget success and 15-token/15-cost/one-tool refusals establish shared accounting. |
+| D2 parent step limit 3 | P0 | Plain not satisfied: six model calls. Usage/conv satisfied: three then `budget_exceeded`. | Same, including helper bounded at three. JS does not independently enforce pydantic-ai steps. |
+| D3 child private data | P0 | Not applicable | Satisfied: after one child read, `private-user` sticks; the next child request fails `denied` before reaching its third-party provider. Three bridge requests, two provider calls total. |
+| D4 scope identity | P0 | Plain not satisfied: different child scopes on identical runs. Conv not satisfied: child and parent both use `pydantic-ai/conversation/1/0`. Helper satisfied: stable, disjoint scopes. | Not applicable |
+| D5 mid-delegate write reload | P0 | Not applicable | Plain not satisfied: two write bodies, two effect IDs. Conv/helper satisfied in this topology: one write body, identical effect ID on replay. Conv still fails D4. |
+| D6 native repair counter | P1 | Not satisfied: two native children start with indices 0 and 1 across five requests. | A zero run repair budget rejects the second child before provider dispatch: three provider calls, child bridge indices 0 and 1. |
+| D7 checked child streaming | P1 | Not applicable | Partly satisfied: child deltas are checked and a forbidden delta fails `denied`; child deltas are absent from host stream events. |
+| D8 non-bridge child | P1 | Not satisfied: FunctionModel child is invisible; only two parent requests reach the bridge. | Not applicable |
+| P1 excluded deferred output | P0 | Satisfied: native `UserError`, two requests, zero gated bodies. | Not applicable |
+| P2 deferral returned as data | P0 | Satisfied: three requests, zero gated bodies; parent completes without a host pause. | Same. |
+| P3 hoisted approval | P0 | Satisfied: explicit metadata forwarding or `ToolApproved.override_args` resumes the child; five requests total, writes with values 2 and 3 once each. Default resume loses child metadata. | Satisfied with explicit metadata forwarding: one pause, five requests, writes 2 and 3 once each. |
+| P4 hoist snapshot/reload | P0 | Not applicable | Satisfied: identical restored pending interaction; writes 2 and 3 execute once each across fresh Workers. |
+| P5 parallel pauses | P1 | One pending parent interaction contains two delegate approvals; three requests, zero gated bodies. | Not applicable |
+| P6 answer/state validation | P1 | Not satisfied overall: explicit resume schema rejects extra answer fields, but outer restore accepts corrupt child metadata. Child validation becomes parent tool retry data; parent completes without the gated write. | Not applicable |
+| S1 child stream paths | P0 | Not applicable | Not satisfied: identical runs have no child delta events or child path; parent stream paths are empty. |
+| S2 capability flag | P1 | Not exposed by the Python Executor | Satisfied: actual prepared adapter advertises `subgraphs: false`. |
+| G1 public nested-run detection | P0 | Satisfied: public `AbstractCapability.before_run`, message `run_id`, streamed `run_context` and tool `RunContext` distinguish nested work from top-level retries, resume, sequential runs and parallel tools. | Not applicable |
+| G2 guard before bridge | P0 | Satisfied: `unsupported` before child model/capability requests, including an approved child capability before its next model request. | Satisfied: nested ordinary/streaming model requests never reach bridge; the restored approved child capability is also refused before any live request. |
+| F1 flattened gate | P0 when evaluating the pause alternative | Satisfied: one pause, two model calls, one gated capability execution. | Satisfied: identical restored pending interaction, one write overall. |
+
+Exactly one outcome per gap follows from the fixed rule:
+
+| Gap | Outcome | Deciding evidence |
+| --- | --- | --- |
+| Plain delegation without pauses | **Alternative** | D2/D4/D5 fail for plain/shared-ID forms; D1-D5 hold for the helper and G1/G2 demonstrate a public-only guard. A follow-up can extend the owning Python executor/model/tool methods and add one child-run helper without a core export or bridge change. |
+| Child pause propagation | **Supported by the probe-local hoist pattern** | P1/P2 execute no unapproved gated bodies; P3/P4 complete and restore the hoisted child in both applicable lanes. A shipped hoist API and parity cases remain follow-up work. |
+| Subgraphs flag and stream paths | **Refused** | S1 has no child path. `subgraphs` stays false despite the successful pause pattern. |
+
+### Where native behavior cannot be matched
+
+A child's `DeferredToolRequests` is tool data until the parent explicitly hoists
+it into `ApprovalRequired` metadata. Excluding it from the child output types
+raises native `UserError`. Neither form publishes a child host interaction by
+itself. The hoist serializes the child conversation, then resumes with its history,
+identity and `DeferredToolResults`; the parent's synchronous resume callback must
+preserve that state explicitly. The shipped default callback forwards approvals
+only. The outer snapshot validator does not validate author-owned child metadata;
+author code must validate it and must not treat parent completion as proof the
+child completed. Parallel answers, reject/CallDeferred hoists and broader child
+state tampering remain unmeasured.
+
+A child using a non-`GalaxieModel` bypasses bridge accounting. SDK-controlled
+budgets and label checks cover bridged calls, not arbitrary trusted Python code.
+The two native children also share the executor's repair counter, so the second
+child's first native request is charged as a repair. Per-child repair accounting
+is follow-up work; avoid sequential native-output delegates in the meantime.
+
+### Author guidance
+
+Prefer flattening into one agent with capability-backed tools until an
+executor-owned helper and guard ship. The spike adds neither to the shipped
+source: delegating shapes are currently accepted without a nested-run guard.
+For experiments with the measured helper, forward `usage=ctx.usage` and
+`usage_limits=ctx.usage_limits`, derive a stable, distinct child conversation ID
+from the parent's conversation and tool-call IDs, and keep deterministic call
+order. A new random child ID defeats write replay; simply forwarding the parent's
+ID collides with its index space. Writes still need host confirmation, broker
+recovery and the same scoped checkpoint/recovery store. The public guard must
+check model and capability boundaries: an approved child tool can execute before
+its next model request. The measured hoist and guard are test fixtures, not a
+public library API or a general nested checkpoint contract.
+
+### Not measured
+
+- Delegation in Chromium, Firefox or WebKit: this spike measures CPython and Node
+  Pyodide semantics; no browser delegation harness was added.
+- Real providers, network reachability from the Worker, latency, cost or device
+  performance. Fixture cost units only test the core accounting boundary.
+- Arbitrary mid-run continuation without an earlier committed parent pause,
+  general nested graphs, deeper delegation trees and scheduler interleavings.
+- The prepared flag in CPython: it belongs to the JavaScript adapter, so S2 is
+  measured in Node instead. All required probes ran in their applicable lanes.
+
+Reproduce with:
+
+```sh
+node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation
+pnpm exec vitest run --project node tests/conformance/pydantic-ai-delegation.node.test.ts
+```
+
+These are characterization probes rather than additions to the compatibility
+matrix. Existing cases, goldens, matrices, locks and shipped source stay unchanged.
+
 ## DSPy custom engines and replay
 
 The separate [DSPy matrix](compatibility-matrix-dspy.json) lists 48 scripted
