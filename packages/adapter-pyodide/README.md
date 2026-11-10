@@ -382,8 +382,14 @@ agent code is not a model-chosen call and is unchanged. A tool you write yoursel
 The conformance cases show these shapes with the same results as native ADK 2.12.0: a single
 `LlmAgent`, a `SequentialAgent`, a `ParallelAgent` (inside a sequence), a `LoopAgent`, and an
 `LlmAgent` with `sub_agents` that transfers with `transfer_to_agent`, each for run and stream, and a
-confirmation in the last child of a `SequentialAgent`, also across a reload. Two parallel branches
-that call write capabilities keep branch-local replay scopes. `Workflow`, `AgentTool` and every
+confirmation in any child of a `SequentialAgent` (including nested sequences), a long-running
+middle child and one confirming branch under each `ParallelAgent`, also across a reload on Node.
+Newly enabled pause positions use ADK resumability; original last-child sequences keep their
+runner. Loop pauses remain refused because native resumability repeats an earlier writer's
+finished tool. Resumable apps refuse duplicate agent names, `temp:` output keys and `LlmAgent`
+transfer children. Two parallel branches
+that call write capabilities keep branch-local replay scopes; recovery tests count one host
+invocation per write across reload, reversed arrival and failed-resume retry. `Workflow`, `AgentTool` and every
 pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) names fail
 `unsupported` at prepare. `subgraphs` stays false.
 

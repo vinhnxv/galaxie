@@ -52,8 +52,12 @@ and agent sources are trusted build outputs. See ADR-0018 decisions 9 and 10.
 
 The `adk` framework (executor `adk-python`, ADR-0022) accepts only `LlmAgent`,
 `SequentialAgent`, `ParallelAgent` and `LoopAgent` trees built from `galaxie.adk` models
-and tools; a pause is allowed only in a leaf that is the last child under sequential
-ancestors. Keep `subgraphs` false and keep the parallel-write replay test
+and tools. A leaf may pause under sequential ancestors at any child position; a single
+pausing agent beneath each Parallel ancestor may ask for confirmation. Loop pauses,
+long-running Parallel tools and transfer pauses stay refused. Newly enabled positions
+use ADK resumability and refuse duplicate names anywhere, `temp:` output keys and
+`LlmAgent` transfer children; original last-child sequences keep their runner.
+Keep `subgraphs` false and keep the parallel-write replay test
 (`tests/conformance/adk-python-agents.node.test.ts`) green when changing effect scopes.
 Rebuild the wheel (`node scripts/build-python-wheels.ts`) after changing `python/galaxie`.
 
