@@ -230,7 +230,10 @@ async def _run_case(name, *, reload=False):
             tools = [mapper._map_tool_definition(tool, settings or {}) for tool in parameters.declared_tool_defs.values()]
             request = {'messages': mapped, 'tools': tools}
             if parameters.output_mode == 'native':
-                request['jsonSchema'] = mapper._map_json_schema(parameters.output_object)['json_schema']['schema']
+                constraint = mapper._map_json_schema(parameters.output_object)
+                assert constraint['type'] == 'json_schema'
+                assert 'schema' in constraint['json_schema']
+                request['jsonSchema'] = constraint['json_schema']['schema']
             if tools:
                 request['toolChoice'] = 'auto' if parameters.allow_text_output else 'required'
             transcript['requests'].append(normalized(request))
