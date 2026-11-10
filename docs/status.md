@@ -1,5 +1,21 @@
 # Project status
 
+On 2026-11-11, the LangGraph adapter gained a strict single ID-less
+`requestInteraction` path: task-derived identity, bare resume and restored-value
+registration. Native Node, galaxie Node and Chromium have zero differences for
+single and sequential-node cases; memory recovery covers all five crash windows
+under `sync`, `async` and `exit`, including held-node abort, and Chromium IndexedDB
+covers close/reopen reload. A body-invoked child without a child checkpoint
+namespace publishes once, applies one answer and completes; a compiled child with
+a namespace is refused before publication. Exact valid NodeInterrupt/raw
+GraphInterrupt requests publish once and fail on the first answer; their accepted
+inbox entries survive failure and restore retries them. Refused second calls restore
+with `executor_error`. Second pauses in body-invoked children, repeated child pauses,
+loop revisits, real models and Python remain unmeasured. Earlier state-folded answers
+are outside the adapter's latest-pending-write registration. See [limits](../packages/adapter-langgraph/README.md#id-less-interrupts)
+and [new evidence](../tests/conformance/README.md#id-less-interrupts). Existing goldens,
+matrices, locks and core are unchanged.
+
 This document records galaxie's implemented behavior, verification evidence and documented limits.
 
 On 2026-11-10, the LangGraph adapter began refusing compiled static breakpoints
@@ -66,7 +82,7 @@ galaxie has its first four M1 runtime slices: `packages/core` provides lifecycle
 
 The [parallel/repeated-interrupt spike](../spikes/parallel-interrupts/README.md) measured scripted LangGraph.js 1.5.1 graphs on Node under `sync`, `async` and `exit`, with unmodified core, fake executors and a spike-local LangGraph executor. Parallel interrupts are **refused** because a finished no-state-write sibling lacks distinguishable completion evidence. Several requests in one top-level node are **supported as a proven design, implementation pending review**; repeated child pauses remain refused. Both gaps remain unsupported in shipped code. Chromium, reopened IndexedDB and real models were not measured for this design. [ADR-0030](adr/0030-several-engine-pauses-published-one-at-a-time.md) is Proposed. The [LangGraph.js compatibility matrix](../tests/conformance/compatibility-matrix.json) is unchanged because this spike adds no conformance case or lane difference.
 
-The [static-breakpoint/ID-less-interrupt spike](../spikes/static-breakpoints/README.md) measures scripted LangGraph.js 1.5.1 graphs on Node under `sync`, `async` and `exit` through unmodified core. Static breakpoints have the **alternative** outcome: an explicit `requestInteraction` gate passes continue/reject and crash recovery, while a synthesized static reject leaves its checkpoint pending and inbox accepted. A single top-level ID-less `interrupt()` reached through a stripped-config `requestInteraction` is **supported as a proven design, implementation pending review**; native bare resume, stable task identity and core recovery pass. `NodeInterrupt` and raw `GraphInterrupt` remain refused because resume throws again. Static breakpoints and ID-less interrupts remain unsupported; the shipped prepare refusal and gate alternative are described above. The spike itself measured no Chromium, reopened IndexedDB, cancellation/restore or broader ID-less shapes and changed no compatibility matrix or golden.
+The [static-breakpoint/ID-less-interrupt spike](../spikes/static-breakpoints/README.md) measures scripted LangGraph.js 1.5.1 graphs on Node under `sync`, `async` and `exit` through unmodified core. Static breakpoints have the **alternative** outcome: an explicit `requestInteraction` gate passes continue/reject and crash recovery, while a synthesized static reject leaves its checkpoint pending and inbox accepted. A single top-level ID-less `interrupt()` reached through a stripped-config `requestInteraction` was **supported as a proven design** in that spike; native bare resume, stable task identity and core recovery pass. `NodeInterrupt` and raw `GraphInterrupt` remain refused because resume throws again. Static breakpoints remain unsupported; the shipped prepare refusal, gate alternative and subsequent ID-less implementation are described above. The spike itself measured no Chromium, reopened IndexedDB, cancellation/restore or broader ID-less shapes and changed no compatibility matrix or golden.
 
 `@galaxie-ai/models/transformers` now runs ONNX chat models through Transformers.js in a host-owned Worker with per-file SHA-256 model records, streaming, cancellation, a record-declared text tool-call format and schema-constrained output through an optional constraint package; tests use a fake runtime on Node and headless Chromium and a strict-CSP probe page, no model record is pinned and no real-device run exists (see [ADR-0021](adr/0021-in-browser-onnx-chat-provider.md), Proposed).
 

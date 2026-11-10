@@ -3,7 +3,7 @@
 ## Purpose
 
 Run native LangGraph graphs through core's executor contract, preserving streams,
-checkpoint interrupts and resume by interrupt ID. Do not build a second graph engine.
+checkpoint interrupts and resume by interrupt ID or a verified task-derived ID-less identity. Do not build a second graph engine.
 See the [README](README.md) and [contracts](../../docs/system-design.md#6-core-runtime-and-contracts).
 
 ## Entry points
@@ -34,7 +34,7 @@ The role and provider must already be declared and bound by the host.
 - Put `host.langchain.decide` and `gateDecision` in separate nodes, storing answers in
   state: an interrupted node re-runs from its start on resume. Gate thresholds and
   interaction text are host-authored; a decision can add a question, never remove a confirmation.
-- Keep one interrupt per node. New surface revisions use a later node and a new interrupt ID, never an in-place pending update.
+- Keep one interrupt per node. A single ID-less request uses a verified root task and bare resume; see [ID-less limits](README.md#id-less-interrupts). New surface revisions use a later node and a new interrupt ID, never an in-place pending update.
 - Compile graphs with `host.langchain.checkpointer()` and call tools through
   `host.capabilities.call(name, input, config)`.
 - Pass node `config` to every capability call: its full checkpoint task namespace
@@ -64,8 +64,12 @@ The role and provider must already be declared and bound by the host.
 
 ## Limits
 
-Parallel interrupts, ID-less interrupts and multiple interaction requests per node
-are unsupported. Prepare refuses compiled `interruptBefore` and `interruptAfter`
+Parallel interrupts and multiple interaction requests per node are unsupported.
+One strict ID-less request on a root checkpoint task is supported, including the
+measured body-invoked child with no child namespace; compiled child namespaces are
+refused. Exact valid NodeInterrupt/raw GraphInterrupt requests publish once and
+fail unsupported on the first answer. See [ID-less interrupts](README.md#id-less-interrupts)
+for recovery registration and unmeasured repeated child pauses and loop revisits. Prepare refuses compiled `interruptBefore` and `interruptAfter`
 on the graph, `graph.config` and discoverable compiled subgraphs, including
 unreachable breakpoints. Enumeration failures also fail `unsupported`. An override
 prepare cannot see ends the run `unsupported` at its first pause, after earlier

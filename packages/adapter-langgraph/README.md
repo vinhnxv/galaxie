@@ -250,7 +250,7 @@ See [coding guidance](AGENTS.md), [explicit context rules and parity](../../test
 and [runtime contracts](../../docs/system-design.md#6-core-runtime-and-contracts).
 Parallel interrupts remain unsupported. Use `requestInteraction` with the complete node
 config instead of `NodeInterrupt` or raw `GraphInterrupt`; the
-[Node spike](../../spikes/static-breakpoints/README.md) records the unshipped single-call ID-less design.
+[Node spike](../../spikes/static-breakpoints/README.md) records the original design evidence.
 
 ## Replacing static breakpoints
 
@@ -310,3 +310,52 @@ One interrupt per node still applies. Advance a surface revision by resuming and
 reducing the next batch against the previous record in a later node, then interrupt
 with a new ID. Pending interrupts cannot be updated in place. `requestInteraction`
 and existing four-field checkpoints are unchanged.
+
+
+## ID-less interrupts
+
+A single `requestInteraction` whose runnable config lost `checkpoint_ns` now pauses
+instead of ending `unsupported` (a behavior change from 0.1.0). It must carry the
+strict four-field request and belong to one root checkpoint task without a child
+checkpoint namespace. Identity is `idless:<taskId>:<committedResumeCount>`; the
+supported ordinal is zero. The adapter re-reads that identity before sending a
+bare `{ action, payload }` resume, rather than an interrupt-ID map. Different nodes
+can pause in sequence. Always pass the complete node config; stripping namespaces
+is not recommended.
+
+A child invoked inside a node body can expose the same single pause on its parent
+task with no child checkpoint namespace. The measured child completes after one
+answer: parent and gate bodies each run twice, and the effect after the pause runs
+once. A **compiled child** with a checkpoint namespace is refused before publication.
+
+The fixed `unsupported` error also refuses multiple/mixed interrupts, unfinished
+fan-out siblings, malformed IDs (`null`, empty or non-string), non-request values,
+ID-less surface records, uncorroborated checkpoints and a second call in one node.
+Forged `idless:` identities cannot reach graph execution. Core still checks stale
+identity, action, payload and duplicate submissions.
+
+`NodeInterrupt` or raw `GraphInterrupt` carrying an exact valid request cannot be
+distinguished from the supported shape at pause time: it publishes once and ends
+`unsupported` on the first answer. String-valued `NodeInterrupt` is refused before
+publication. With recovery, the raw-request answer remains accepted; restore
+retries and fails again. After a second call in one node is refused, restore fails
+with `executor_error`, leaving the accepted entry intact. Replace these forms with
+`requestInteraction`; use one request per node.
+
+Every resume value in the latest checkpoint's pending writes is registered through
+`registerRestoredData` before an ID-less pending read returns or resume starts.
+Committed values require that hook. This covers null-task and task writes, including
+an errored task that already consumed one answer; its identity remains ordinal zero.
+Earlier answers already folded into graph state are not re-registered by this
+adapter; core's recovery inbox registers accepted payloads when recovery is enabled.
+
+[Conformance and recovery tests](../../tests/conformance/README.md#id-less-interrupts)
+cover Node and Chromium with scripted graphs, all three durability modes, and
+Chromium IndexedDB reload. Unaccepted, accepted-before-resume, held mid-resume,
+completed-before-inbox-consumption and uninterrupted windows commit the answer
+once. The held window re-executes the gate once more; `exit` durability has no
+mid-run null-task resume write, while `sync` and `async` do. A thrown/aborted held
+node also preserves identity. These counts do not promise exactly-once external
+side effects. Second pauses inside body-invoked children, repeated child pauses,
+loop revisits, real models and LangGraph Python are unmeasured here. Firefox and
+WebKit are covered only by the CI report gates.

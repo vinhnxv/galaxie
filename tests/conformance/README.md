@@ -412,3 +412,42 @@ pnpm run test:go
 - CI runs the suite as separate jobs. `GALAXIE_TEST_GROUP` selects a file group for one `pnpm test` run: `general` (everything that does not load the Pyodide wheels, including the Go tests), `python-dspy`, `python-pydantic`, `python-adk` and `python-rest` (the rest of the wheel-loading tests); `python` is the four Python groups together. The groups share no file and together hold every file, so unset runs the whole suite as before. A pull request that changes only documents, Go, or packages no Python test reads skips the Python jobs (`scripts/ci-scope.ts`); a push to `main` always runs all of them.
 
 Goldens are updated only by the native Node snapshot command, `pnpm conformance:update`, when intentionally changing the baseline. Review any resulting diff. Runtime control work must leave the existing goldens and compatibility matrix unchanged.
+
+
+## ID-less interrupts
+
+The separate `IDLESS_CASE_NAMES` registry keeps the original twelve cases and
+compatibility matrices unchanged; the Python port covers those original twelve.
+`idless-submit` and `idless-sequence` compare native Node, galaxie Node and Chromium
+with zero differences, using bare resumes and pauses without native IDs.
+`idless-shapes.json` records native interruption, body/effect counts and answer
+application beside the asserted galaxie publication/refusal outcome. It includes
+parallel Send, mixed IDs, repeated calls, NodeInterrupt/raw GraphInterrupt, compiled
+children and a body-invoked child. The body child pauses on its parent task without
+a child checkpoint namespace, publishes once and completes after one answer;
+compiled children with a namespace publish nothing and fail `unsupported`.
+
+`idless-recovery.test.ts` covers unaccepted, accepted-before-resume, held mid-resume
+(including abort), completed-before-inbox-consumption and uninterrupted windows for
+`sync`, `async` and `exit` on Node and Chromium. Identity remains stable, applications
+remain one, consumed inbox entries reject duplicates, and restored values register
+before replay. `exit` has no mid-run null-task resume write; `sync` and `async` do.
+`idless.test.ts` checks repeated reads, reversed saver writes, forged/stale IDs,
+invalid actions/payloads, unfinished siblings, refusal restore behavior and duplicate
+answers. `indexeddb.test.ts` adds parity and close/reopen reload for both cases.
+
+Exact valid NodeInterrupt/raw GraphInterrupt requests publish once and fail on the
+first answer; recovery retains the accepted entry and retries that failure. A
+refused second call in one node restores with `executor_error`. Earlier answers
+already folded into graph state are outside latest-pending-write registration;
+core registers accepted inbox payloads when recovery is configured. Second pauses
+inside body-invoked children, repeated child pauses, loop revisits, real models and
+Python ID-less behavior are unmeasured. Firefox and WebKit have CI report gates
+only. See [author guidance and limits](../../packages/adapter-langgraph/README.md#id-less-interrupts).
+
+Run the focused evidence without updating existing goldens:
+
+```sh
+pnpm exec vitest run --project node packages/adapter-langgraph/test/idless.test.ts tests/conformance/idless.node.test.ts tests/conformance/idless.test.ts tests/conformance/idless-recovery.test.ts
+pnpm exec vitest run --project 'browser (chromium)' tests/conformance/idless.test.ts tests/conformance/idless-recovery.test.ts tests/conformance/indexeddb.test.ts
+```
