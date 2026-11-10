@@ -156,6 +156,24 @@ without provider SDKs. Use `GalaxieModel(role)` for routed model calls and
 tool-call arguments, IDs and names on every growing chunk and at completion.
 Only checked reply text reaches `messages`; tool arguments and results do not.
 
+Tool-less agents can use `output_type=NativeOutput(Model)` to send the output
+schema through the routed provider's `jsonSchema` constraint, without putting it
+in a prompt. The host must declare `structured-output` for the provider; streaming
+also requires `streaming`. Python validates the checked reply. Native validation
+retries carry a one-based `repairAttempt` through the bridge and consume the
+route's `ModelRoute.repairAttempts` (default `0`) and the shared run repair budget
+(default `2`); the host must enable repairs as well as the agent's output retries.
+Tool-output and `PromptedOutput` retries remain ordinary model calls. Native output
+with function tools, non-empty or unknown toolsets, deferred requests or a string
+schema template fails `unsupported` at prepare. Agent-level callable settings and
+every setting except `stop_sequences` are also refused at prepare; model- or
+capability-contributed settings and later tools are refused before the bridge.
+Use host provider configuration for sampling and `ModelRoute.maxTokens` for output
+limits. The [spike record](../../docs/adr/0018-python-agents-through-pyodide.md#pydantic-ai-nativeoutput-and-model-settings-spike-2026-11)
+lists provider constraints and the mock-only evidence, including OpenAI strict
+schema requirements. Native retry feedback includes pydantic validation detail
+sent only to the routed model; repair accounting is cooperative with trusted Python.
+
 This executor declares `streaming`, `interrupts`, `resume` and `checkpoints` true.
 Supply `services.checkpoints: saver.byteRecords` and `recovery: saver.recovery`
 from the same scoped `IndexedDBSaver` to restore after reload. Without the recovery
