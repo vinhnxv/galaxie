@@ -1,0 +1,652 @@
+{
+  "smoke": {
+    "prompt": "smoke",
+    "scripts": {
+      "smoke": [
+        {
+          "text": "done"
+        }
+      ]
+    }
+  },
+  "delegation": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "parent-write",
+              "name": "double",
+              "args": {
+                "value": 1
+              }
+            },
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-write",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "scopes": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "parent-write",
+              "name": "double",
+              "args": {
+                "value": 1
+              }
+            },
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-write",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "steps": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "again-1",
+              "name": "again",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "again-2",
+              "name": "again",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "again-3",
+              "name": "again",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "labels": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-read",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "recovery": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "checkpoint",
+              "name": "gate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-write",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "returned-pause": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-gate",
+              "name": "gate",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "excluded-pause": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-gate",
+              "name": "gate",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "hoist": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-write",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-gate",
+              "name": "gate",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "flatten": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "flat-gate",
+              "name": "gate",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ]
+    }
+  },
+  "stream": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "child-stream"
+        }
+      ]
+    }
+  },
+  "native": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate-1",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate-2",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "{\"value\":2}"
+        }
+      ],
+      "child-2": [
+        {
+          "text": "{\"value\":3}"
+        }
+      ]
+    }
+  },
+  "external": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ]
+    }
+  },
+  "parallel-pause": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate-1",
+              "name": "delegate",
+              "args": {}
+            },
+            {
+              "id": "delegate-2",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-gate",
+              "name": "gate",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "guard": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-read",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  },
+  "guard-stream": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "child-stream"
+        }
+      ]
+    }
+  },
+  "top-retry": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "invalid-json"
+        },
+        {
+          "text": "{\"value\":7}"
+        }
+      ]
+    }
+  },
+  "top-parallel": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "first",
+              "name": "double",
+              "args": {
+                "value": 1
+              }
+            },
+            {
+              "id": "second",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ]
+    }
+  },
+  "guard-resume": {
+    "prompt": "parent",
+    "scripts": {
+      "parent": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "delegate",
+              "name": "delegate",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "text": "parent-done"
+        }
+      ],
+      "child": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "child-read",
+              "name": "double",
+              "args": {
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "text": "child-done"
+        }
+      ]
+    }
+  }
+}
