@@ -42,6 +42,7 @@ The role and provider must already be declared and bound by the host.
   or restore replays its successful receipt when the host supplies recovery.
 - Keep each task's capability call order deterministic. Nested child tasks and
   later tasks have separate scopes. Without recovery, host writes repeat.
+- Replace static breakpoints with a separate `requestInteraction` gate node and continue/reject edges: continue reaches work, reject reaches `END`. Keep its prefix deterministic and side-effect free. Continue never replaces `approval: 'confirm'` or host write confirmation coverage.
 - Put side effects after interrupts, including effects outside the broker:
   resuming can re-execute the node prefix.
 - Preserve native stream behavior; the host must project display data separately.
@@ -63,8 +64,12 @@ The role and provider must already be declared and bound by the host.
 
 ## Limits
 
-Parallel interrupts, static breakpoints, ID-less interrupts and multiple
-interaction requests per node are unsupported. Use an explicit `requestInteraction` gate with continue/reject edges instead of static breakpoints, and `requestInteraction` with complete node config instead of `NodeInterrupt` or raw `GraphInterrupt` (see the [Node spike](../../spikes/static-breakpoints/README.md)). Context installation is
+Parallel interrupts, ID-less interrupts and multiple interaction requests per node
+are unsupported. Prepare refuses compiled `interruptBefore` and `interruptAfter`
+on the graph, `graph.config` and discoverable compiled subgraphs, including
+unreachable breakpoints. Enumeration failures also fail `unsupported`. An override
+prepare cannot see ends the run `unsupported` at its first pause, after earlier
+nodes have run. Use an explicit `requestInteraction` gate with continue/reject edges instead of static breakpoints, and `requestInteraction` with complete node config instead of `NodeInterrupt` or raw `GraphInterrupt` (see the [Node spike](../../spikes/static-breakpoints/README.md)). Context installation is
 first-writer-wins: Node hosts needing async LangChain context initialize real
 `AsyncLocalStorage` before the first `prepare`; the adapter preserves it.
 The synchronous shim cannot provide implicit context after an await.

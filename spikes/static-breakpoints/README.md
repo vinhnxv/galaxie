@@ -33,10 +33,10 @@ Recorded on 2026-11-10 with Node v24.15.0 and pnpm 11.21.0, on the maintainer's 
 
 | Gap | Outcome | Deciding evidence | Follow-up |
 | --- | --- | --- | --- |
-| Static breakpoints | **alternative** | CS3 and CS6-reject fail the durable-reject requirement in all modes; CR1 passes in all modes. | Document gate-node replacement for static breakpoints and refuse compiled breakpoints at prepare in the LangGraph adapter |
+| Static breakpoints | **alternative** | CS3 and CS6-reject fail the durable-reject requirement in all modes; CR1 passes in all modes. | Shipped: [prepare refusal and gate replacement](../../packages/adapter-langgraph/README.md#replacing-static-breakpoints), with [conformance evidence](../../tests/conformance/README.md#static-breakpoint-refusal-and-gate-replacement) |
 | ID-less interrupts | **supported** | I4 reaches an ID-less requestInteraction call; I5, I6 and CI2 pass in all modes. Only one top-level pending call qualifies; NodeInterrupt and raw GraphInterrupt remain refused (I2, I3, CI1). | Support ID-less LangGraph interrupts raised through interrupt() with synthesized interaction IDs |
 
-Supported means design proven, implementation pending review. Both gaps remain unsupported in the shipped adapter. This spike adds no conformance case, golden or matrix entry.
+Supported means design proven, implementation pending review. Static breakpoints are now refused at prepare in the shipped adapter; explicit gates are the shipped alternative, with separate continue/reject cases and reload evidence linked above. ID-less interrupts remain unsupported. This spike itself adds no conformance case, golden or matrix entry.
 
 The outcome rule was fixed before the final evidence run: static support requires every critical before/continue/reject/restore/crash/refusal/content probe in every mode, with unproven other shapes explicitly refused. Otherwise a passing gate replacement gives alternative; otherwise refused. ID-less support requires a requestInteraction-reachable missing-ID call and passing native resume, stable identity and core restore in every mode. Otherwise ordinary ID-bearing calls plus the requestInteraction replacement can establish alternative; otherwise refused. Unmeasured critical probes cannot establish support. Passing tests reproduce the observations, including design failures recorded as `pass: false`.
 
