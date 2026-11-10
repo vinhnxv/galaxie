@@ -16,6 +16,7 @@ CASES = (
     'approval-double-submit', 'approval-consecutive', 'approval-repeated-ids',
     'approval-argument-block', 'stream-approval-approve', 'stream-approval-argument-block',
     'native-output', 'native-output-repair', 'native-output-repair-refused', 'stream-native-output',
+    'native-output-second-repair-refused', 'native-output-repair-budget-exhausted', 'stream-native-output-repair',
 )
 PARAMETERS = {'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'], 'additionalProperties': False}
 
@@ -51,7 +52,10 @@ def factory(name, model=None):
         return Executor(agent, interaction=interaction, resume=resume if name in ('approval-mixed', 'call-deferred') else None)
     tools = [tool] if name in ('capability', 'sequential-tools', 'capability-denial', 'argument-block', 'stream-tools', 'stream-id-block') else []
     output_type = PromptedOutput(Answer) if name == 'prompted-output' else Answer if name in ('tool-output', 'output-retry', 'stream-tool-output', 'stream-output-retry') else str
-    if name in ('native-output', 'native-output-repair', 'native-output-repair-refused', 'stream-native-output'):
+    if name in (
+        'native-output', 'native-output-repair', 'native-output-repair-refused', 'stream-native-output',
+        'native-output-second-repair-refused', 'native-output-repair-budget-exhausted', 'stream-native-output-repair',
+    ):
         output_type = NativeOutput(Answer)
     if name == 'stream-final-mismatch' and model is None:
         import galaxie.pydantic_ai as face
@@ -67,5 +71,6 @@ def factory(name, model=None):
     return Agent(
         model or GalaxieModel('answer'), output_type=output_type, tools=tools,
         instructions='Use the supplied tools and answer briefly.', system_prompt='You are a deterministic fixture.',
-        retries=1, name='conformance',
+        retries=2 if name in ('native-output-second-repair-refused', 'native-output-repair-budget-exhausted') else 1,
+        name='conformance',
     )

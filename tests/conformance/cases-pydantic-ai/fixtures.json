@@ -677,6 +677,32 @@
     "prompt": "stream native output",
     "replies": [{ "text": "{\"value\": 6}" }]
   },
+  "native-output-second-repair-refused": {
+    "prompt": "native second repair refused",
+    "sequence": "assistant-turns",
+    "route": { "repairAttempts": 1 },
+    "replies": [
+      { "text": "{\"value\":\"invalid\"}" },
+      { "text": "{\"value\":\"invalid\"}" },
+      { "text": "{\"value\":6}" }
+    ]
+  },
+  "native-output-repair-budget-exhausted": {
+    "prompt": "native repair budget exhausted",
+    "sequence": "assistant-turns",
+    "route": { "repairAttempts": 2, "runRepairBudget": 1 },
+    "replies": [
+      { "text": "{\"value\":\"invalid\"}" },
+      { "text": "{\"value\":\"invalid\"}" },
+      { "text": "{\"value\":6}" }
+    ]
+  },
+  "stream-native-output-repair": {
+    "prompt": "stream native repair",
+    "sequence": "assistant-turns",
+    "route": { "repairAttempts": 1 },
+    "replies": [{ "text": "{\"value\": \"invalid\"}" }, { "text": "{\"value\": 6}" }]
+  },
   "stream-approval-argument-block": {
     "prompt": "stream approval argument block",
     "replies": [
