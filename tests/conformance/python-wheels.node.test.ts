@@ -37,7 +37,37 @@ test('wheel fetch accepts pinned bytes and rejects changed bytes without leaving
   }
 });
 
-test('CPython and Pyodide locks agree except for the exact documented cryptography pair', async () => {
+test('the vendored cryptography wheel is verified without a network fetch', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'galaxie-vendored-wheel-'));
+  const wheel = lockedWheels.find((item) => item.name === 'cryptography');
+  if (!wheel?.url) throw new Error('The cryptography wheel is missing.');
+  const pin = { ...wheel, url: wheel.url };
+  let fetches = 0;
+  const fetcher: typeof fetch = async () => {
+    fetches++;
+    throw new Error('The vendored wheel must not use the network.');
+  };
+  try {
+    await fetchWheel(pin, directory, fetcher);
+    expect((await readFile(join(directory, pin.file))).byteLength).toBe(pin.bytes);
+    await expect(
+      fetchWheel({ ...pin, sha256: '0'.repeat(64) }, directory, fetcher),
+    ).rejects.toThrow('The Python wheel could not be verified.');
+    expect(await readdir(directory)).toEqual([]);
+    await expect(
+      fetchWheel(
+        { ...pin, url: new URL('../../package.json', import.meta.url).href },
+        directory,
+        fetcher,
+      ),
+    ).rejects.toThrow('The Python wheel could not be verified.');
+    expect(fetches).toBe(0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('CPython and Pyodide locks agree on every shared distribution version', async () => {
   const lock = JSON.parse(
     await readFile(new URL('../../python/requirements.lock', import.meta.url), 'utf8'),
   ) as { packages: LockedWheel[] };
@@ -51,13 +81,7 @@ test('CPython and Pyodide locks agree except for the exact documented cryptograp
   );
   for (const item of lock.packages) {
     const nativeVersion = versions.get(item.name.replaceAll('_', '-').toLowerCase());
-    if (item.name === 'cryptography') {
-      // ADR-0022 records the sole platform difference and the unavailable patched WASM wheel.
-      expect({ native: nativeVersion, pyodide: item.version }).toEqual({
-        native: '50.0.2',
-        pyodide: '47.0.0',
-      });
-    } else if (nativeVersion !== undefined) expect(nativeVersion, item.name).toBe(item.version);
+    if (nativeVersion !== undefined) expect(nativeVersion, item.name).toBe(item.version);
   }
   expect(versions.get('langgraph')).toBe('1.2.16');
   expect(versions.get('langchain-core')).toBe('1.7.0');
@@ -131,7 +155,7 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
 test('the ADK wheel set is the pinned closure, with servers, SDKs and cloud clients kept out', async () => {
   const adk = lockedWheels.filter((wheel) => wheel.frameworks?.includes('adk'));
   expect(adk).toHaveLength(29);
-  expect(adk.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(12_622_878);
+  expect(adk.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(12_818_857);
   expect(
     createHash('sha256')
       .update(
@@ -143,14 +167,14 @@ test('the ADK wheel set is the pinned closure, with servers, SDKs and cloud clie
           .join('\n'),
       )
       .digest('hex'),
-  ).toBe('afbf242ab7af557c7cf973b4a76caff2f3225d0acbf60f7457799345752c3b98');
+  ).toBe('fbd8e11141657666439aa1cfb3ec2af5eb184f925e0e69c295d788169bc4fdd2');
   const only = lockedWheels.filter(
     (wheel) => wheel.frameworks?.length === 1 && wheel.frameworks[0] === 'adk',
   );
   expect(only.map((wheel) => `${wheel.name} ${wheel.version} ${wheel.bytes}`)).toEqual([
     'annotated-doc 0.0.5 5302',
     'authlib 1.9.1 266042',
-    'cryptography 47.0.0 2174338',
+    'cryptography 50.0.2 2370317',
     'fastapi 0.161.1 149049',
     'google-adk 2.12.0 4998446',
     'google-auth 2.62.0 267911',

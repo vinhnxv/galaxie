@@ -2,6 +2,13 @@
 
 This document records galaxie's implemented behavior, verification evidence and documented limits.
 
+The ADK Python wheel set now uses a vendored `cryptography` 50.0.2 WASM build linked
+to OpenSSL 4.0.3, replacing the affected 47.0.0 artifact; the native lock matches.
+The shared offline gate checks the loaded extension and constrained-CA wildcard
+refusal on CPython, Node Pyodide and Chromium Pyodide under the unchanged strict
+CSP. See the [artifact provenance and limits](../python/wheels/README.md) and
+[dependency review](security-review.md#dependency-advisories-accepted-as-residual-risk).
+
 The repository is public. No legal review of learner data (minors, consent, retention) has been done, because the project has no legal counsel; see the [README](../README.md#intended-use-and-disclaimer) and [ADR-0024](adr/0024-apache-2-0-license-and-dco.md). The seven launch packages are on npm at 0.1.0; the other packages in this repository are not published.
 
 `@galaxie-ai/ui-protocol` provides pinned A2UI v1.0 messages, strict parsing, catalog validation and a pure surface reducer. Core uses it for pending surfaces and React renders them (see the next paragraphs). It is verified by its own Node and Chromium tests, replayed upstream example messages and a conformance test that compares its URL check with core's. Nothing is measured about its cost on large surfaces. See the [package API and limits](../packages/ui-protocol/README.md).

@@ -17,11 +17,11 @@ All source downloads, including their response bodies, share a 30-second deadlin
 Expiry rejects preparation with the fixed `timeout` error; explicit cancellation
 keeps the `cancelled` outcome. The download timer is cleared before Worker boot.
 
-The native reference environment pins cryptography 50.0.2; Pyodide 314.0.7 still
-supplies 47.0.0 because no patched compatible wheel is published. This is the only
-shared-distribution version difference (ADR-0022). Native dependency advisory
-results do not cover that older browser wheel or its linked OpenSSL. Framework
-versions and the msgpack 1.2.4 pin stay aligned across both environments.
+The native reference environment and the Worker pin cryptography 50.0.2.
+The Worker uses a [vendored WASM wheel](../../python/wheels/README.md) linked to
+OpenSSL 4.0.3 because Pyodide 314.0.7 supplies only 47.0.0. Framework versions
+and the msgpack 1.2.4 pin stay aligned across both environments; the lock test
+requires every shared distribution to have one version (ADR-0022).
 
 The agent descriptor is `{ baseUrl, files, module, entry }`. Source paths are relative
 Python or JSON files, the module is a dotted Python import name, and the entry is a
@@ -392,7 +392,7 @@ pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) 
 The 29-wheel `adk` set carries the licenses its wheels declare in their dist-info metadata:
 
 - Apache-2.0: `google-adk` (declared by classifier), `google-genai`, `google-auth`, `tenacity`, `opentelemetry-api`, `opentelemetry-semantic-conventions` and `requests` (which ships a `NOTICE` file).
-- `Apache-2.0 OR BSD-3-Clause`: Pyodide's `cryptography` 47.0.0, with `LICENSE`, `LICENSE.APACHE` and `LICENSE.BSD` in its `dist-info`. It ships no separate notice for its native extension, so a host that redistributes the wheel should check that extension's own notices.
+- `Apache-2.0 OR BSD-3-Clause`: the vendored `cryptography` 50.0.2 WASM wheel, with `LICENSE`, `LICENSE.APACHE`, `LICENSE.BSD` and the linked dependencies' license texts in its `dist-info/licenses`. It statically links OpenSSL 4.0.3 (Apache-2.0). See the [artifact provenance and verification](../../python/wheels/README.md).
 - `Apache-2.0 OR BSD-2-Clause`: `packaging`. `MIT OR Apache-2.0`: `sniffio`.
 - BSD-3-Clause: `authlib`, `joserfc`, `websockets`, `starlette`, `httpx`, `idna` and `pycparser`.
 - MIT: `fastapi`, `annotated-doc`, `annotated-types`, `anyio`, `cffi`, `charset-normalizer`, `pydantic`, `pydantic-core`, `typing-inspection` and `urllib3`.
