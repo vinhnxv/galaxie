@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 # SPDX-License-Identifier: Apache-2.0
 
-"""Delegation spike: fixed outcome rule, recorded before running probes.
+"""Delegation probes: original spike outcome rule retained for comparison.
 
 Green tests pin observations; only the satisfaction conditions below decide outcomes.
 An unmeasured P0 makes the affected gap undetermined. P1 is informational.
@@ -47,49 +47,19 @@ limit, not permission to import internals. Re-run on every pydantic-ai bump.
 
 import hashlib
 import json
-from contextlib import asynccontextmanager
-from contextvars import ContextVar
 from typing import Any
 
 from pydantic import BaseModel
 from pydantic_ai import (
     Agent, ApprovalRequired, DeferredToolRequests, DeferredToolResults, NativeOutput,
-    RunContext, Tool, ToolApproved,
+    RunContext, ToolApproved,
 )
-from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.conversation import ConversationTypeAdapter
 from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
 from galaxie import GalaxieError
-from galaxie.pydantic_ai import Executor, GalaxieModel, capability_tool
-
-_owner: ContextVar[str | None] = ContextVar('delegation_probe_owner', default=None)
-
-
-class OwnerCapability(AbstractCapability):
-    async def before_run(self, ctx: RunContext) -> None:
-        _owner.set(ctx.run_id)
-
-
-class GuardedModel(GalaxieModel):
-    """Probe-local guard using only public hooks and public message identity."""
-
-    def check(self, messages, run_context=None) -> None:
-        current = run_context.run_id if run_context is not None else messages[-1].run_id
-        if not current or current != _owner.get():
-            raise GalaxieError('unsupported')
-
-    async def request(self, messages, model_settings, model_request_parameters):
-        self.check(messages)
-        return await super().request(messages, model_settings, model_request_parameters)
-
-    @asynccontextmanager
-    async def request_stream(self, messages, model_settings, model_request_parameters, run_context=None):
-        self.check(messages, run_context)
-        async with super().request_stream(messages, model_settings, model_request_parameters, run_context) as result:
-            yield result
-
+from galaxie.pydantic_ai import Executor, GalaxieModel, capability_tool, run_child
 
 PARAMETERS = {'type': 'object', 'properties': {'value': {'type': 'integer'}},
               'required': ['value'], 'additionalProperties': False}
@@ -113,9 +83,6 @@ def forwarding(ctx: RunContext, variant: str) -> dict[str, Any]:
         options.update(usage=ctx.usage, usage_limits=ctx.usage_limits)
     if variant == 'conv':
         options['conversation_id'] = ctx.conversation_id
-    elif variant == 'helper':
-        options['conversation_id'] = hashlib.sha256(
-            json.dumps([ctx.conversation_id, ctx.tool_call_id]).encode()).hexdigest()
     return options
 
 
@@ -138,46 +105,35 @@ def override_arguments(requests: DeferredToolRequests, action: str, payload: Any
     return results
 
 
-def factory(name: str = 'smoke', variant: str = 'usage') -> Executor:
-    """Create unchanged executors; helper/hoist are probe-local author patterns only."""
-    guarded = variant == 'guarded' or name in ('guard', 'guard-stream', 'guard-resume')
+def factory(name: str = 'smoke', variant: str = 'helper') -> Executor:
+    """Exercise the shipped helper/guard; approval hoisting stays probe-local."""
     require_delegate_approval = name == 'guard-resume'
-    model_class = GuardedModel if guarded else GalaxieModel
-    owner = [OwnerCapability()] if guarded else []
+    if name in ('guard', 'guard-stream', 'guard-resume'):
+        variant = 'plain'
     if name in ('guard', 'guard-resume'):
         name = 'labels'
     elif name == 'guard-stream':
         name = 'stream'
     if name == 'smoke':
-        return Executor(Agent(model_class('answer'), capabilities=owner))
+        return Executor(Agent(GalaxieModel('answer')))
     if name == 'top-retry':
-        return Executor(Agent(model_class('answer'), output_type=NativeOutput(Answer), capabilities=owner))
+        return Executor(Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer)))
     def make_tool(tool_name: str):
-        tool = capability_tool(tool_name, 'math.double@1', PARAMETERS)
-        if not guarded:
-            return tool
-
-        async def invoke(ctx: RunContext, **arguments):
-            if ctx.run_id != _owner.get():
-                raise GalaxieError('unsupported')
-            return await tool.function(ctx, **arguments)
-
-        return Tool.from_schema(invoke, name=tool_name, description=tool.description,
-                                json_schema=PARAMETERS, takes_ctx=True)
+        return capability_tool(tool_name, 'math.double@1', PARAMETERS)
 
     if name == 'top-parallel':
-        return Executor(Agent(model_class('answer'), tools=[
+        return Executor(Agent(GalaxieModel('answer'), tools=[
             make_tool('double'),
-        ], capabilities=owner))
+        ]))
     parent_tools = []
     if name in ('delegation', 'scopes'):
         parent_tools.append(make_tool('double'))
     if name == 'flatten':
         flat_gate = make_tool('gate')
         flat_gate.requires_approval = True
-        return Executor(Agent(model_class('answer'), output_type=[str, DeferredToolRequests],
-                              tools=[flat_gate], capabilities=owner), interaction=display)
-    parent = Agent(model_class('answer'), output_type=[str, DeferredToolRequests], tools=parent_tools, capabilities=owner)
+        return Executor(Agent(GalaxieModel('answer'), output_type=[str, DeferredToolRequests],
+                              tools=[flat_gate]), interaction=display)
+    parent = Agent(GalaxieModel('answer'), output_type=[str, DeferredToolRequests], tools=parent_tools)
     if name == 'recovery':
         @parent.tool_plain(requires_approval=True)
         async def gate() -> str:
@@ -197,7 +153,7 @@ def factory(name: str = 'smoke', variant: str = 'usage') -> Executor:
                 return ModelResponse(parts=[TextPart('outside-bridge')])
             model = FunctionModel(external)
         else:
-            model = model_class('child')
+            model = GalaxieModel('child')
         output_type = NativeOutput(Answer) if name == 'native' else (
             str if name == 'excluded-pause' else [str, DeferredToolRequests])
         child = Agent(model, output_type=output_type, tools=tools)
@@ -206,7 +162,7 @@ def factory(name: str = 'smoke', variant: str = 'usage') -> Executor:
             async def again() -> str:
                 return 'again'
         options = forwarding(ctx, variant)
-        prompt = 'child-2' if name == 'native' and ctx.tool_call_id == 'delegate-2' else 'child'
+        prompt: str | None = 'child-2' if name == 'native' and ctx.tool_call_id == 'delegate-2' else 'child'
         if name == 'stream':
             async with child.run_stream(prompt, **options) as streamed:
                 return await streamed.get_output()
@@ -214,14 +170,23 @@ def factory(name: str = 'smoke', variant: str = 'usage') -> Executor:
             # The parent's synchronous resume callback must explicitly preserve this
             # metadata; the shipped default callback forwards approvals only.
             saved = ConversationTypeAdapter.validate_json(child_state or ctx.tool_call_metadata['child'])
-            options['conversation_id'] = saved.conversation_id
+            if variant in ('plain', 'usage', 'conv'):
+                options['conversation_id'] = saved.conversation_id
             options['message_history'] = saved.messages
             assert saved.deferred_tool_requests is not None
             options['deferred_tool_results'] = DeferredToolResults(
                 approvals={call.tool_call_id: True for call in saved.deferred_tool_requests.approvals})
-            result = await child.run(None, **options)
-        else:
+            prompt = None
+        if variant in ('plain', 'usage', 'conv'):
             result = await child.run(prompt, **options)
+        else:
+            options.pop('infer_name')
+            options.pop('usage', None)
+            options.pop('usage_limits', None)
+            # Keep the spike's ID-derived formula only as a replay-sensitivity control.
+            # Using it as a helper key registers the run without bypassing the guard.
+            key = hashlib.sha256(json.dumps([ctx.conversation_id, ctx.tool_call_id]).encode()).hexdigest() if variant == 'id-control' else ''
+            result = await run_child(ctx, child, prompt, key=key, **options)
         if name in ('hoist', 'parallel-pause') and isinstance(result.output, DeferredToolRequests):
             raise ApprovalRequired(metadata={'child': ConversationTypeAdapter.dump_json(result.conversation).decode()})
         return result.output
