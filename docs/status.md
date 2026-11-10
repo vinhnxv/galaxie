@@ -58,8 +58,9 @@ prove the exact values.
 
 On 2026-11-11, pydantic-ai 2.60.0 delegation probes on CPython and Node Pyodide
 recorded an alternative for plain delegation: a probe-local helper forwards usage
-and derives distinct stable child identity; a public-only guard detects nested
-model and capability work. Plain children exceed parent step limits and repeat
+and derives distinct child identity from stable delegate tool-call IDs across
+replay; a public-only guard detects wrapped nested model and capability work.
+Plain children exceed parent step limits and repeat
 writes after reload; shared conversation IDs collide with parent scopes. Explicit
 child-approval hoisting completes and restores in the measured pattern, but child
 stream events have no paths, so `subgraphs` remains false. No helper, hoist API or

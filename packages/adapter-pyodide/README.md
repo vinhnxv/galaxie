@@ -197,8 +197,10 @@ scope, logout fencing and ownership composition. `subgraphs` stays false: the
 [delegation probes](../../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
 observe checked child deltas without host child events or paths. Plain delegation
 has a measured alternative: forward usage and derive a stable, distinct child
-conversation ID. A fresh child ID repeats a write after reload, and simply reusing
-the parent's ID collides with its effect positions. Explicitly hoisting child
+conversation ID, with stable delegate tool-call IDs across parent model replay.
+Regenerated delegate IDs change the child scope and can repeat a write; this
+variant is unmeasured. A fresh child ID repeats a write after reload, and simply
+reusing the parent's ID collides with its effect positions. Explicitly hoisting child
 approval state into the parent's metadata completes and restores in the measured
 pattern, using an author resume callback that preserves child state. These are
 probe-local patterns; an executor-owned helper, hoist API and public-only nested

@@ -313,8 +313,10 @@ source: delegating shapes are currently accepted without a nested-run guard.
 For experiments with the measured helper, forward `usage=ctx.usage` and
 `usage_limits=ctx.usage_limits`, derive a stable, distinct child conversation ID
 from the parent's conversation and tool-call IDs, and keep deterministic call
-order. A new random child ID defeats write replay; simply forwarding the parent's
-ID collides with its index space. Writes still need host confirmation, broker
+order and stable delegate tool-call IDs across parent model replay. Regenerating
+a delegate ID changes the child scope and can repeat a write; that variant was
+not measured. A new random child ID defeats write replay; simply forwarding the
+parent's ID collides with its index space. Writes still need host confirmation, broker
 recovery and the same scoped checkpoint/recovery store. The public guard must
 check model and capability boundaries: an approved child tool can execute before
 its next model request. The measured hoist and guard are test fixtures, not a
@@ -327,7 +329,11 @@ public library API or a general nested checkpoint contract.
 - Real providers, network reachability from the Worker, latency, cost or device
   performance. Fixture cost units only test the core accounting boundary.
 - Arbitrary mid-run continuation without an earlier committed parent pause,
-  general nested graphs, deeper delegation trees and scheduler interleavings.
+  regenerated delegate tool-call IDs, general nested graphs, deeper delegation
+  trees and scheduler interleavings. D5 replays a fixed scripted delegate ID.
+- Composition of the successful helper and refusal guard in one shipped API.
+  Guard probes cover wrapped `GalaxieModel` and `capability_tool` boundaries;
+  direct trusted `capabilities.call` and non-bridge models are outside that guard.
 - The prepared flag in CPython: it belongs to the JavaScript adapter, so S2 is
   measured in Node instead. All required probes ran in their applicable lanes.
 

@@ -131,8 +131,11 @@ every pydantic-ai bump, including the public hook and message identity checks.
 | Subgraphs flag and stream paths | Refused | S1 observes checked child deltas without host child stream events or paths. `subgraphs` remains false. |
 
 The helper, hoist API and guard are follow-up implementation work, not shipped
-exports or a run-time refusal. Prefer flattening into one agent with capability
-tools until those land. A guard must also cover capability invocation, because
+exports or a run-time refusal. Helper replay requires stable delegate tool-call
+IDs as well as call order: regenerated IDs change child scope and can repeat a
+write, and this variant is unmeasured. Helper/guard composition and direct trusted
+capability calls outside the wrappers are also unmeasured. Prefer flattening into
+one agent with capability tools until those land. A guard must also cover capability invocation, because
 approved child tools run before the next model request. Sequential native-output
 children share the repair counter; a second child's first request consumes repair
 budget. Non-GalaxieModel children bypass the bridge. Outer restore accepts
