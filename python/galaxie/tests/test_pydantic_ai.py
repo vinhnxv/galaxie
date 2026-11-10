@@ -332,6 +332,23 @@ def test_native_output_validation_retries_carry_growing_repair_indices(retries):
         assert '<validation_errors>' in payload['messages'][-1]['content']
 
 
+def test_a_history_processor_cannot_hide_or_invent_native_repair_attempts():
+    from pydantic_ai.capabilities import ProcessHistory
+    from pydantic_ai.messages import ModelMessage, ModelRequest
+
+    def drop_replies(messages: list[ModelMessage]) -> list[ModelMessage]:
+        return [message for message in messages if isinstance(message, ModelRequest)]
+
+    seen = []
+    transport_for([{'content': '{"value":"x"}'}, {'content': '{"value":"x"}'}, {'content': '{"value":8}'}], seen)
+    agent = Agent(
+        GalaxieModel('answer'), output_type=NativeOutput(Answer), retries=2,
+        capabilities=[ProcessHistory(drop_replies)],
+    )
+    assert asyncio.run(prepare_executor(agent).run({'prompt': 'question'}, 'conversation', 5)) == {'value': 8}
+    assert [payload['options'].get('repairAttempt') for payload in seen] == [None, 1, 2]
+
+
 def test_native_output_router_refusal_propagates_without_another_retry():
     seen = []
     async def transport(raw):

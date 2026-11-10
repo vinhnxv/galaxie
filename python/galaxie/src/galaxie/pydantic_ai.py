@@ -35,6 +35,9 @@ from . import capabilities
 from ._bridge import GalaxieError, request
 
 _positions: ContextVar[int] = ContextVar('galaxie_pydantic_positions', default=0)
+# Native-output requests sent so far in the current run. Counting requests, not history messages,
+# keeps a history processor from hiding or inventing repair attempts.
+_native_requests: ContextVar[list[int] | None] = ContextVar('galaxie_pydantic_native_requests', default=None)
 
 
 def _json(value: Any) -> Any:
@@ -188,8 +191,14 @@ class GalaxieModel(Model):
             if parameters.declared_tool_defs or parameters.prompted_output_template or parameters.output_object is None:
                 raise GalaxieError('unsupported')
             options['jsonSchema'] = _json(parameters.output_object.json_schema)
-            # Native mode has no tools or resumed history: each earlier response failed validation.
-            repairs = sum(isinstance(message, ModelResponse) for message in messages)
+            # Native mode has no tools or resumed pauses, so every request after the first in a run
+            # retries a reply that failed validation or an output validator.
+            counter = _native_requests.get()
+            if counter is None:
+                repairs = sum(isinstance(message, ModelResponse) for message in messages)
+            else:
+                repairs = counter[0]
+                counter[0] += 1
             if repairs:
                 options['repairAttempt'] = repairs
         stop = settings.get('stop_sequences') if settings else None
@@ -585,6 +594,7 @@ class Executor:
             raise GalaxieError('invalid')
         state.pending = None
         token = _positions.set(position)
+        native_token = _native_requests.set([0])
         with capture_run_messages() as messages:
             try:
                 if on_stream is None:
@@ -598,6 +608,7 @@ class Executor:
             finally:
                 state.position = position + len(messages)
                 _positions.reset(token)
+                _native_requests.reset(native_token)
         state.conversation = result.conversation
         if isinstance(result.output, DeferredToolRequests):
             try:

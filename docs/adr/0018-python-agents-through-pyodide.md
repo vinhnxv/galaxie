@@ -144,9 +144,13 @@ keeps tool mode; `PromptedOutput` keeps its existing prompt behavior.
 `GalaxieModel` maps only the native output object's schema to `jsonSchema`; its
 `name`, `description` and `strict` are not forwarded. The adapter requires
 `structured-output`, plus `streaming` for streamed requests, and checks growing and
-final text in JavaScript before Python validates it. Each native validation retry
-carries the count of earlier responses as a one-based `repairAttempt`. Native
-mode has no tools or resumed history, so these are failed output attempts.
+final text in JavaScript before Python validates it. Each native request after the
+first in a run carries its request count as a one-based `repairAttempt`. The count
+comes from the run, not from the message history, so a history processor cannot hide
+or invent attempts. Native mode has no tools or resumed pauses, so every later request
+retries a reply that failed schema validation or an output validator: a `ModelRetry`
+from an output validator is charged like a schema failure and, with the default
+`repairAttempts` of `0`, fails `invalid`.
 
 The bridge requires a positive safe integer beside `jsonSchema`. The adapter
 forwards it to `ModelPort.begin`, which rejects an index above the route's
