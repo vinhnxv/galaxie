@@ -22,8 +22,8 @@ import {
   AgentScript,
   RecordingModel,
   renumber,
-  settle,
   type Spec,
+  settle,
 } from './adk-python.js';
 import { autoApprove, confirmationsFor } from './auto-confirm.js';
 
@@ -304,7 +304,10 @@ export async function executeAdkReloadStep(
 }
 
 /** The transcript one uninterrupted lifetime would have recorded. */
-export function joinAdkReload(steps: readonly AdkReloadResult[], name: string): AdkPythonTranscript {
+export function joinAdkReload(
+  steps: readonly AdkReloadResult[],
+  name: string,
+): AdkPythonTranscript {
   const last = steps.at(-1);
   if (!last) throw new Error('The reload steps are missing.');
   const merged: AdkPythonTranscript = {

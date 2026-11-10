@@ -215,9 +215,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -245,9 +243,7 @@
       {
         "action": "deny",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -282,10 +278,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            1,
-            0
-          ]
+          "indexes": [1, 0]
         }
       }
     ]
@@ -338,9 +331,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -393,9 +384,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -435,17 +424,13 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       },
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -473,9 +458,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -671,9 +654,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -708,9 +689,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -750,9 +729,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -792,9 +769,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -836,9 +811,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
@@ -880,9 +853,7 @@
       {
         "action": "approve",
         "payload": {
-          "indexes": [
-            0
-          ]
+          "indexes": [0]
         }
       }
     ]
