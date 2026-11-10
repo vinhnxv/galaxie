@@ -277,11 +277,14 @@ Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformanc
 
 ## Google ADK Python conversations
 
-The separate [ADK Python matrix](compatibility-matrix-adk-python.json) lists 27 scripted cases for
+The separate [ADK Python matrix](compatibility-matrix-adk-python.json) lists 33 scripted cases for
 the `adk-python` executor against pinned `google-adk` 2.12.0 in the Pyodide Worker: text, tools,
 denials, streaming, confirmations, long-running tools, durable restore, and the agent shapes
 `agents-sequential`, `stream-agents-sequential`, `agents-parallel`, `agents-loop`,
-`agents-transfer` and `agents-confirm-last`. The references are native CPython runs of ADK's own
+`agents-transfer`, `agents-confirm-last`, `agents-confirm-first`, `agents-confirm-middle`,
+`agents-confirm-nested`, `agents-confirm-parallel`, `agents-confirm-parallel-reversed` and
+`agents-long-running-middle`. The six new workflow-pause cases enable native ADK resumability;
+existing cases keep their original runner and golden bytes. The references are native CPython runs of ADK's own
 `Runner` (`cases-adk-python/`, written to `golden-adk-python/` by
 [`scripts/record-adk-python-conformance.py`](../../scripts/record-adk-python-conformance.py);
 add `--check` to verify them). The [Worker lane](adk-python.node.test.ts) runs the same agents
@@ -290,13 +293,19 @@ reloads fresh Workers over one store, and the
 [Chromium lane](../../examples/rag-browser/test/adk-python-conformance.node.test.ts) runs a subset
 under the strict CSP and Trusted Types. Shape cases script each model by agent name (the name in
 ADK's system instruction); `agents-parallel` sorts concurrent requests and orders its branches with
-a reply gate in both lanes.
+a reply gate in both lanes. Parallel pause cases also normalize per agent; `afterCall` waits for
+another agent's tool call so the reversed-order fixture can proceed before approval.
 
 [`adk-python-agents.node.test.ts`](adk-python-agents.node.test.ts) asserts that `Workflow`,
 `AgentTool` and the pause shapes ADK cannot resume faithfully fail `unsupported` at prepare, with
-their native results recorded in `cases-adk-python/test_adk_python_refused_shapes.py`, and that two
-parallel branches calling write capabilities replay their own receipts when re-dispatched in the
-opposite order. [`adk-python-scan.node.test.ts`](adk-python-scan.node.test.ts) scans the Worker
+their non-resumable native results recorded in `cases-adk-python/test_adk_python_refused_shapes.py`.
+`cases-adk-python/test_adk_python_resumable_shapes.py` compares resumed and uninterrupted model/tool
+counts and records why Loop pauses and two confirming Parallel branches remain refused.
+The agents lane proves write-receipt replay after reload in a sequence and both Parallel arrival
+orders, after a failed resume with automatic recovery of the accepted answer, and when two
+parallel write branches are re-dispatched in the opposite order. The six new pause goldens also
+reproduce across fresh Workers in the restore lane. The Chromium subset is unchanged.
+[`adk-python-scan.node.test.ts`](adk-python-scan.node.test.ts) scans the Worker
 traffic, events, snapshots, diagnostics, spans, checkpoints and recovery journal for a per-call
 credential through success, 401 and transport failure. All lanes use scripted models and injected
 fetch; no real model, device measurement or third-party endpoint is involved.

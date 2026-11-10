@@ -39,7 +39,13 @@
     "agents-loop",
     "agents-transfer",
     "stream-agents-sequential",
-    "agents-confirm-last"
+    "agents-confirm-last",
+    "agents-confirm-first",
+    "agents-confirm-middle",
+    "agents-confirm-nested",
+    "agents-confirm-parallel",
+    "agents-confirm-parallel-reversed",
+    "agents-long-running-middle"
   ],
   "differences": [],
   "normalizations": [
@@ -54,7 +60,8 @@
     "Stage AP5 stores a conversation as an adk-python.session/v1 record: the event log in the checkpoint and the per-session integrity key, pause counter and pending request in the metadata. One record travels in one 1 MiB bridge frame, so the executor projects the record size at every appended event and fails unsupported before the next model or tool dispatch; a start inside the margin is refused. Failed and cancelled runs write nothing, and partial events and binary parts are never stored. Restore is covered by tests/conformance/adk-python-restore.node.test.ts, not the golden cases, because it needs a second runtime lifetime.",
     "Stage AP6 shape cases script the model by agent: a request is attributed to the agent named in ADK's system instruction (Your internal name is ...), and the reply is the agent's next entry after its own earlier assistant turns. The galaxie lane builds a fresh MockChatModel per call from that entry, so usage, tool offering and streaming chunking come from the same mock.",
     "agents-parallel runs two branches concurrently, so its transcripts sort requests by agent and turn, responses by agent and per-agent turn, and capability calls by value before comparing; tool-call IDs are numbered per request. The right branch's final answer waits for the left branch's (an `after` gate in both lanes) so the merger agent sees one branch event as its last context in every run.",
-    "subgraphs stays false: ADK sub-agent events carry author and branch, not LangGraph namespaces, so galaxie exposes no nested stream paths or nested-pause parity."
+    "The six workflow-pause cases agents-confirm-first, agents-confirm-middle, agents-confirm-nested, agents-confirm-parallel, agents-confirm-parallel-reversed and agents-long-running-middle run with ADK ResumabilityConfig(is_resumable=True) in both lanes. Existing cases keep the non-resumable runner. Parallel pause transcripts use the same per-agent ordering and per-request call numbering as agents-parallel; afterCall gates a reply on another agent returning a tool call, so it can order branches before approval.",
+    "subgraphs stays false: ADK sub-agent events carry author and branch, not LangGraph namespaces, so galaxie exposes no nested stream paths or sub-agent checkpoint namespaces."
   ],
   "shapes": {
     "supported": [
@@ -64,15 +71,16 @@
       "LoopAgent",
       "LlmAgent with sub_agents (transfer_to_agent)"
     ],
-    "pausing": "A confirmation or long-running tool can pause only in a leaf agent that is the last child under every ancestor, and every ancestor must be a SequentialAgent. agents-confirm-last pauses and resumes in the last child of a SequentialAgent (also reloaded in tests/conformance/adk-python-restore.node.test.ts).",
+    "pausing": "A confirmation or long-running tool can pause in a uniquely named leaf under SequentialAgent ancestors, including first, middle and nested children. One confirmation-only pausing agent is also accepted beneath each ParallelAgent, including a fan-out followed by later sequence stages. Newly enabled shapes use ADK resumable invocations; existing last-child sequences keep the non-resumable runner. All six new workflow-pause cases also reload while paused in tests/conformance/adk-python-restore.node.test.ts.",
     "refusedAtPrepare": {
       "Workflow": "Native ADK 2.12.0 runs it (final text 'step done'); the executor fails unsupported at prepare.",
       "AgentTool": "Native ADK runs the nested agent (root, worker, root); the executor fails unsupported at prepare.",
-      "pause inside ParallelAgent": "Native ADK resumes only the paused branch and never runs the agent after the fan-out; unsupported at prepare.",
-      "pause inside LoopAgent": "Native ADK ends the run after the first pass and never starts the next iteration; unsupported at prepare.",
-      "pause in a non-last SequentialAgent child": "Native ADK never runs the siblings after the paused child; unsupported at prepare.",
-      "pause in a transfer target": "Native ADK resumes the target in place; refused at prepare because the transferring agent's state is not restored."
+      "pause inside LoopAgent": "A bare resumable loop continues, but a loop with an earlier writer repeats that finished tool on resume; the general shape stays unsupported at prepare.",
+      "pause in a transfer target": "Native ADK resumes the target in place; refused at prepare because the transferring agent's state is not restored.",
+      "multiple pausing agents inside ParallelAgent": "Native resumable ADK asks both branches but resumes only one; the single pending tracker also cannot represent independent branch pauses.",
+      "long-running pause inside ParallelAgent": "Refused because interleaved sibling calls can reset the single long-running call tracker.",
+      "ambiguous resumable app": "Any duplicate agent name, temp: output key or LlmAgent transfer children in a resumable app is unsupported at prepare: ADK keys progress by name, drops temporary state on resume and transfer resumability is unproven."
     },
-    "evidence": "tests/conformance/cases-adk-python/test_adk_python_refused_shapes.py records the native results; tests/conformance/adk-python-agents.node.test.ts asserts the Worker refusals and the parallel write replay."
+    "evidence": "tests/conformance/cases-adk-python/test_adk_python_refused_shapes.py records non-resumable behavior; test_adk_python_resumable_shapes.py records resumable model/tool counts and refused loop/parallel results. New workflow-pause goldens match live and restored Workers; tests/conformance/adk-python-agents.node.test.ts asserts prepare rules and recovery receipt replay."
   }
 }

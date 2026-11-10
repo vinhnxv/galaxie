@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createRuntime, defineAgentDefinition, type RunEvent } from '@galaxie-ai/core';
+import {
+  createRuntime,
+  defineAgentDefinition,
+  type PendingInteraction,
+  type RunEvent,
+  type RunId,
+  type SessionId,
+} from '@galaxie-ai/core';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
@@ -44,8 +51,8 @@ def paused(agent):
     return Executor(agent, interaction=interaction)
 `;
 
-/** Shapes that native ADK 2.12.0 runs (test_adk_python_refused_shapes.py) and the executor refuses. */
-const refusedAgents = `${header}
+/** Supported and refused shapes, with native evidence in the ADK Python shape tests. */
+const agents = `${header}
 def parallel_pause():
     return paused(ParallelAgent(name='fanout', sub_agents=[branch('left', True), plain('right')]))
 
@@ -75,6 +82,21 @@ def last_child_pause():
 
 def parallel_writes():
     return Executor(ParallelAgent(name='fanout', sub_agents=[branch('left'), branch('right')]))
+
+def parallel_two_pauses():
+    return paused(ParallelAgent(name='fanout', sub_agents=[branch('left', True), branch('right', True)]))
+
+def parallel_long_running():
+    tool = capability_tool('put', 'store.put@1', PARAMETERS, 'Start a write.', long_running=True)
+    worker = LlmAgent(name='left', model=llm('answer'), instruction='Write.', tools=[tool])
+    return paused(ParallelAgent(name='fanout', sub_agents=[worker, plain('right')]))
+
+def sequence_write_pause():
+    return paused(SequentialAgent(name='pipeline', sub_agents=[branch('writer'), branch('approver', True), plain('tail')]))
+
+def parallel_write_pause():
+    fanout = ParallelAgent(name='fanout', sub_agents=[branch('left', True), branch('right')])
+    return paused(SequentialAgent(name='pipeline', sub_agents=[fanout, plain('merger')]))
 `;
 
 const definition = defineAgentDefinition({
@@ -209,7 +231,7 @@ test.skipIf(!pythonWheelsAvailable)(
     const fixture = await createPythonFixture({
       framework: 'adk',
       module: 'agents',
-      sources: { 'agents.py': refusedAgents },
+      sources: { 'agents.py': agents },
     });
     const runtime = createRuntime({
       appId: 'adk-python-refused',
@@ -218,22 +240,23 @@ test.skipIf(!pythonWheelsAvailable)(
     });
     const model = new BranchModel();
     try {
-      // The control pauses where ADK can resume it, so the hook alone does not explain a refusal.
-      const control = await runtime.create(definition, {
-        principalScope: 'fixture',
-        agent: { ...fixture.agent, entry: 'last_child_pause' },
-        services: { chatModels: { mock: model } },
-        models,
-        bindings,
-      });
-      await control.prepare();
+      for (const entry of ['last_child_pause', 'first_child_pause', 'parallel_pause']) {
+        const accepted = await runtime.create(definition, {
+          principalScope: 'fixture',
+          agent: { ...fixture.agent, entry },
+          services: { chatModels: { mock: model } },
+          models,
+          bindings,
+        });
+        await accepted.prepare();
+      }
       for (const entry of [
-        'parallel_pause',
         'loop_pause',
-        'first_child_pause',
         'transfer_pause',
         'agent_tool',
         'workflow',
+        'parallel_two_pauses',
+        'parallel_long_running',
       ]) {
         const instance = await runtime.create(definition, {
           principalScope: 'fixture',
@@ -254,6 +277,225 @@ test.skipIf(!pythonWheelsAvailable)(
   240000,
 );
 
+type ResumeScenario =
+  | 'sequence'
+  | 'parallel-sibling-first'
+  | 'parallel-pause-first'
+  | 'sequence-retry';
+
+/** Script each agent by its own history, including the same turn after a failed resume. */
+class ResumeModel extends BaseChatModel {
+  readonly calls: string[] = [];
+  readonly order: string[] = [];
+  readonly #siblingDone = Promise.withResolvers<void>();
+  readonly #pausedCall = Promise.withResolvers<void>();
+  readonly #scenario: ResumeScenario;
+  #fail: boolean;
+  constructor(scenario: ResumeScenario) {
+    super({});
+    this.#scenario = scenario;
+    this.#fail = scenario === 'sequence-retry';
+  }
+  override _llmType(): string {
+    return 'adk-python-resume-writes';
+  }
+  override bindTools(): this {
+    return this;
+  }
+  override async _generate(messages: BaseMessage[]): Promise<ChatResult> {
+    const system = messages.find((message) => message.type === 'system');
+    const text = typeof system?.content === 'string' ? system.content : '';
+    const agent = /Your internal name is "([^"]+)"/.exec(text)?.[1];
+    if (!agent) throw new Error('The agent is missing.');
+    this.calls.push(agent);
+    if (agent === 'tail' || agent === 'merger') return reply(`${agent} done`);
+    const sibling = agent === 'writer' || agent === 'right';
+    const turn = messages.filter((message) => message.type === 'ai').length;
+    if (turn === 0) {
+      if (agent === 'left' && this.#scenario === 'parallel-sibling-first')
+        await this.#siblingDone.promise;
+      if (agent === 'right' && this.#scenario === 'parallel-pause-first')
+        await this.#pausedCall.promise;
+      this.order.push(`${agent}-call`);
+      if (!sibling) this.#pausedCall.resolve();
+      return reply('', [{ id: `put-${agent}`, name: 'put', args: { value: sibling ? 1 : 2 } }]);
+    }
+    if (!sibling && this.#fail) {
+      this.#fail = false;
+      throw new Error('PRIVATE RESUME PROVIDER DETAIL');
+    }
+    this.order.push(`${agent}-done`);
+    if (sibling) this.#siblingDone.resolve();
+    return reply(`${agent} done`);
+  }
+}
+
+for (const scenario of [
+  'sequence',
+  'parallel-sibling-first',
+  'parallel-pause-first',
+  'sequence-retry',
+] as const) {
+  test.skipIf(!pythonWheelsAvailable)(
+    pythonWheelsAvailable
+      ? `ADK Python invokes each workflow write once across reload (${scenario})`
+      : missingPythonWheels,
+    async () => {
+      const fixture = await createPythonFixture({
+        framework: 'adk',
+        module: 'agents',
+        sources: { 'agents.py': agents },
+      });
+      const parallel = scenario.startsWith('parallel-');
+      const model = new ResumeModel(scenario);
+      const invoked: number[] = [];
+      const store = {
+        checkpoints: new MemoryByteCheckpoints(),
+        recovery: new MemoryRecoveryStore(),
+      };
+      const create = () =>
+        createRuntime({
+          appId: 'adk-python-workflow-writes',
+          executors: [createPyodideAdapter({ ...fixture.options, framework: 'adk' })],
+          budgets: { steps: 20, toolCalls: 10, tokens: 5000 },
+          outputSafety: () => 'allow',
+        });
+      let runtime = create();
+      let stopApproving = (): void => {};
+      async function open(sessionId?: SessionId) {
+        const instance = await runtime.create(definition, {
+          principalScope: 'fixture',
+          agent: {
+            ...fixture.agent,
+            entry: parallel ? 'parallel_write_pause' : 'sequence_write_pause',
+          },
+          ...(sessionId === undefined ? {} : { sessionId }),
+          recovery: store.recovery,
+          confirmations: confirmationsFor(['store.put@1'], 'adk-python-workflow-writes-v1'),
+          services: { chatModels: { mock: model }, checkpoints: store.checkpoints },
+          models,
+          ui: {
+            surfaces: ['main'],
+            components: {
+              'tests.Approval/v1': { actions: { approve: { payload: z.unknown() } } },
+            },
+          },
+          bindings: {
+            'store.put@1': {
+              ...bindings['store.put@1'],
+              approval: 'confirm',
+              concurrency: 2,
+              async invoke(input: { value: number }) {
+                invoked.push(input.value);
+                model.order.push(input.value === 1 ? 'sibling-write' : 'approved-write');
+                return input;
+              },
+            },
+          },
+        });
+        await instance.prepare();
+        stopApproving = autoApprove(instance);
+        return instance;
+      }
+      async function collect(
+        instance: Awaited<ReturnType<typeof open>>,
+        runId: RunId,
+        stopAtPause = false,
+      ): Promise<{ pending?: PendingInteraction; output?: unknown; error?: { code: string } }> {
+        const result: { pending?: PendingInteraction; output?: unknown; error?: { code: string } } =
+          {};
+        for await (const event of instance.events(runId)) {
+          if (event.type === 'output') result.output = event.output;
+          else if (event.type === 'error') result.error = event.error;
+          else if (event.type === 'interaction' && stopAtPause) {
+            result.pending = event.interaction;
+            break;
+          }
+        }
+        return result;
+      }
+      try {
+        const first = await open();
+        const started = await first.start({ prompt: 'write before and after approval' });
+        const paused = await collect(first, started.runId, true);
+        expect(paused.error).toBeUndefined();
+        expect(paused.pending).toBeDefined();
+        expect(invoked).toEqual([1]);
+        if (scenario === 'parallel-sibling-first')
+          expect(model.order.indexOf('sibling-write')).toBeLessThan(
+            model.order.indexOf('left-call'),
+          );
+        if (scenario === 'parallel-pause-first')
+          expect(model.order.indexOf('left-call')).toBeLessThan(
+            model.order.indexOf('sibling-write'),
+          );
+        const sessionId = first.sessionId;
+        const pausedRows = structuredClone([...store.checkpoints.rows.values()]);
+        stopApproving();
+        await runtime.dispose();
+        runtime = create();
+        const second = await open(sessionId);
+        const restored = await second.restore();
+        if (!restored) throw new Error('The workflow pause was not restored.');
+        const pending = second.getSnapshot().run?.pending;
+        expect(pending).toEqual(paused.pending);
+        if (!pending) throw new Error('The restored interaction is missing.');
+        expect(
+          await second.dispatch({
+            instanceId: second.instanceId,
+            runId: restored.runId,
+            ...pending,
+            action: 'approve',
+            payload: { indexes: [0] },
+          }),
+        ).toMatchObject({ status: 'accepted' });
+        let completed = await collect(second, restored.runId);
+        if (scenario === 'sequence-retry') {
+          expect(completed.error).toMatchObject({ code: 'unavailable' });
+          expect(invoked).toEqual([1, 2]);
+          // The failed resume wrote no checkpoint: the same pending pause remains durable.
+          expect([...store.checkpoints.rows.values()]).toEqual(pausedRows);
+          expect(await store.recovery.submissions(sessionId)).toMatchObject([
+            { status: 'accepted' },
+          ]);
+          stopApproving();
+          await runtime.dispose();
+          runtime = create();
+          const third = await open(sessionId);
+          // Core retries the durable accepted answer without asking the user to submit it again.
+          const retry = await third.restore();
+          if (!retry) throw new Error('The failed resume could not be retried.');
+          completed = await collect(third, retry.runId);
+        }
+        expect(completed.error).toBeUndefined();
+        expect(completed.output).toBe(parallel ? 'merger done' : 'tail done');
+        expect(invoked).toEqual([1, 2]);
+        expect(store.recovery.journal.size).toBe(2);
+        expect([...store.recovery.journal.values()].map((record) => record.status)).toEqual([
+          'succeeded',
+          'succeeded',
+        ]);
+        expect(
+          model.calls.filter((agent) => agent === (parallel ? 'right' : 'writer')),
+        ).toHaveLength(2);
+        expect(
+          model.calls.filter((agent) => agent === (parallel ? 'left' : 'approver')),
+        ).toHaveLength(scenario === 'sequence-retry' ? 3 : 2);
+        expect(
+          model.calls.filter((agent) => agent === (parallel ? 'merger' : 'tail')),
+        ).toHaveLength(1);
+        expect(fixture.counts.created).toBe(scenario === 'sequence-retry' ? 3 : 2);
+        expect(fixture.workerErrors).toEqual([]);
+      } finally {
+        stopApproving();
+        await runtime.dispose();
+        await fixture.cleanup();
+      }
+    },
+    240000,
+  );
+}
+
 test.skipIf(!pythonWheelsAvailable)(
   pythonWheelsAvailable
     ? 'ADK Python replays each parallel branch write from its own receipt in reversed order'
@@ -262,7 +504,7 @@ test.skipIf(!pythonWheelsAvailable)(
     const fixture = await createPythonFixture({
       framework: 'adk',
       module: 'agents',
-      sources: { 'agents.py': refusedAgents },
+      sources: { 'agents.py': agents },
     });
     const store = { checkpoints: new MemoryByteCheckpoints(), recovery: new MemoryRecoveryStore() };
     // Content-free diagnostics explain a first-round failure whose public error is a fixed message.

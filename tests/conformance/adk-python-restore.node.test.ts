@@ -102,7 +102,7 @@ test.skipIf(!pythonWheelsAvailable).each(adkPythonReloadCases)(
       const golden = JSON.parse(
         await readFile(new URL(`./golden-adk-python/${name}.json`, import.meta.url), 'utf8'),
       );
-      expect(joinAdkReload(steps)).toEqual(golden);
+      expect(joinAdkReload(steps, name)).toEqual(golden);
       expect(fixture.counts.created).toBe(steps.length);
       expect(fixture.counts.terminated).toBe(steps.length);
       expect(fixture.workerErrors).toEqual([]);

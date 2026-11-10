@@ -909,25 +909,321 @@ def quiet_child(name='quiet'):
 
 
 @pytest.mark.parametrize('build', [
-    lambda: SequentialAgent(name='root', sub_agents=[named('a', gated()), quiet_child()]),
-    lambda: ParallelAgent(name='root', sub_agents=[named('a', gated()), quiet_child()]),
     lambda: LoopAgent(name='root', sub_agents=[named('a', gated())], max_iterations=2),
     lambda: LlmAgent(name='root', model=llm('answer'), instruction='x', tools=[gated()], sub_agents=[quiet_child()]),
     lambda: LlmAgent(name='root', model=llm('answer'), instruction='x', sub_agents=[named('a', gated())]),
-    lambda: SequentialAgent(name='root', sub_agents=[
-        SequentialAgent(name='inner', sub_agents=[named('a', gated()), quiet_child('b')]), quiet_child('c'),
-    ]),
     lambda: SequentialAgent(name='root', sub_agents=[quiet_child('a'), named('a', gated())]),
+    lambda: ParallelAgent(name='root', sub_agents=[named('a', gated()), named('b', gated())]),
+    lambda: ParallelAgent(name='root', sub_agents=[named('a', capability_tool(
+        'math.double@1', 'math.double@1', PARAMETERS, 'Start.', long_running=True,
+    )), quiet_child()]),
+    lambda: SequentialAgent(name='root', sub_agents=[
+        SequentialAgent(name='same', sub_agents=[named('a', gated())]),
+        SequentialAgent(name='same', sub_agents=[quiet_child('b')]),
+    ]),
+    lambda: SequentialAgent(name='root', sub_agents=[
+        ParallelAgent(name='fanout', sub_agents=[named('a', gated()), quiet_child('same')]), quiet_child('same'),
+    ]),
+    lambda: SequentialAgent(name='root', sub_agents=[
+        named('a', gated()), LlmAgent(name='b', model=llm('answer'), output_key='temp:draft'),
+    ]),
+    lambda: SequentialAgent(name='root', sub_agents=[
+        named('a', gated()), LlmAgent(name='b', model=llm('answer'), sub_agents=[quiet_child('c')]),
+    ]),
+    lambda: SequentialAgent(name='root', sub_agents=[named('a', gated()), named('b', gated()), quiet_child('tail')]),
+    lambda: SequentialAgent(name='root', sub_agents=[
+        ParallelAgent(name='fanout', sub_agents=[
+            named('a', gated()), named('stopper', loop_exit()),
+        ]), quiet_child('tail'),
+    ]),
 ])
-def test_a_pausing_agent_that_is_not_the_last_to_run_or_has_a_duplicate_name_fails_unsupported(build):
-    assert code_of(lambda: Executor(build())) == 'unsupported'
+def test_an_unproven_pause_or_ambiguous_resumable_tree_fails_unsupported(build):
+    seen = []
+    transport_for([], seen)
+    assert code_of(lambda: Executor(build(), interaction=interact)) == 'unsupported'
+    assert seen == []
+
+
+def workflow_pause(shape, *, long_running=False):
+    tool = capability_tool('math.double@1', 'math.double@1', PARAMETERS, 'Start.', long_running=True) if long_running else gated()
+    paused = named('paused', tool)
+    if shape == 'first':
+        children = [paused, quiet_child('tail')]
+    elif shape == 'middle':
+        children = [quiet_child('before'), paused, quiet_child('tail')]
+    elif shape == 'nested':
+        children = [SequentialAgent(name='inner', sub_agents=[paused, quiet_child('after')]), quiet_child('tail')]
+    elif shape == 'parallel':
+        children = [ParallelAgent(name='fanout', sub_agents=[paused, named('writer', double())]), quiet_child('tail')]
+    else:
+        raise AssertionError(shape)
+    return SequentialAgent(name='pipeline', sub_agents=list(children))
+
+
+@pytest.mark.parametrize('shape', ['first', 'middle', 'nested', 'parallel'])
+def test_new_workflow_pause_shapes_select_the_resumable_runner_without_dispatch(shape):
+    seen = []
+    transport_for([], seen)
+    executor = Executor(workflow_pause(shape), interaction=interact)
+    assert executor._resumable is True
+    assert seen == []
+
+
+@pytest.mark.parametrize(('shape', 'long_running'), [
+    ('first', False), ('middle', False), ('nested', False), ('middle', True),
+])
+@pytest.mark.parametrize('reload', [False, True])
+def test_workflow_successors_run_once_after_a_live_or_restored_pause(shape, long_running, reload):
+    before = [{'content': 'before done'}] if shape == 'middle' else []
+    after = [{'content': 'after done'}] if shape == 'nested' else []
+    seen = []
+    transport_for([
+        *before, {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]},
+        *([{'pending': True}] if long_running else []),
+    ], seen)
+    hooks: dict[str, Any] = {'interaction': interact}
+    if long_running:
+        hooks['resume'] = lambda requests, action, payload: [{'response': {'value': 42}}]
+    original = durable(Executor(workflow_pause(shape, long_running=long_running), **hooks))
+    assert run(original) is None
+    pending = original.pending('s1')
+    assert pending is not None
+    executor = original
+    if reload:
+        executor = durable(Executor(workflow_pause(shape, long_running=long_running), **hooks))
+        assert asyncio.run(executor._restore(*stored(original), 'bound')) == 's1'
+        assert executor.pending('s1') == pending
+    transport_for([
+        *([] if long_running else [{'value': 42}]), {'content': 'paused done'}, *after, {'content': 'tail done'},
+    ], seen)
+    assert answer(executor, pending) == 'tail done'
+    assert executor.pending('s1') is None
+    assert [op for op, _ in seen] == [
+        *(['model'] if shape == 'middle' else []), 'model', 'capability', 'model',
+        *(['model'] if shape == 'nested' else []), 'model',
+    ]
+
+
+def workflow_record(shape='middle', *, sibling=None):
+    if shape == 'parallel':
+        paused = named('paused', gated())
+        paused.model = llm('paused')
+        sibling = quiet_child('sibling') if sibling is None else sibling
+        if isinstance(sibling, LlmAgent):
+            sibling.model = llm('sibling')
+        tree = SequentialAgent(name='pipeline', sub_agents=[
+            ParallelAgent(name='fanout', sub_agents=[paused, sibling]), quiet_child('tail'),
+        ])
+        replies = []
+    elif shape == 'loop-before':
+        tree = SequentialAgent(name='pipeline', sub_agents=[
+            LoopAgent(name='earlier_loop', max_iterations=2, sub_agents=[quiet_child('worker')]),
+            named('paused', gated()), quiet_child('tail'),
+        ])
+        replies = [{'content': 'pass one'}, {'content': 'pass two'}, {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}]
+    else:
+        tree = workflow_pause(shape)
+        replies = [*([{'content': 'before done'}] if shape == 'middle' else []),
+                   {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}]
+    executor = durable(Executor(tree, interaction=interact))
+    if shape == 'parallel':
+        async def transport(raw):
+            message = json.loads(raw)
+            reply = (
+                {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]} if message['payload']['role'] == 'paused'
+                else {'content': 'sibling done'}
+            )
+            return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
+        _bridge.install_transport(transport)
+    else:
+        transport_for(replies)
+    assert run(executor) is None
+    return executor, stored(executor)
+
+
+@pytest.mark.parametrize(('shape', 'change'), [
+    ('middle', lambda events: events[1]['actions']['agentState'].update(current_sub_agent='unknown')),
+    ('middle', lambda events: events[4]['actions']['agentState'].update(current_sub_agent='before')),
+    ('middle', lambda events: events.pop(4)),
+    ('middle', lambda events: events[1].update(author='unknown')),
+    ('middle', lambda events: events[1].update(nodeInfo={'path': 'other'})),
+    ('middle', lambda events: events[1].update(nodeInfo={'outputFor': ['pipeline']})),
+    ('middle', lambda events: events[1].update(nodeInfo={'messageAsOutput': True})),
+    ('loop-before', lambda events: next(event for event in events if event['author'] == 'earlier_loop')['actions']['agentState'].update(times_looped=3)),
+    ('loop-before', lambda events: [event for event in events if event['author'] == 'earlier_loop' and 'agentState' in event['actions']][1]['actions']['agentState'].update(times_looped=0)),
+    ('loop-before', lambda events: next(event for event in events if event['author'] == 'earlier_loop')['actions']['agentState'].update(times_looped=True)),
+    ('parallel', lambda events: events.remove(next(event for event in events if event['author'] == 'sibling' and event['actions'].get('endOfAgent')))),
+])
+def test_inconsistent_restored_workflow_state_is_unrecoverable_before_dispatch(shape, change):
+    original, (checkpoint, metadata) = workflow_record(shape)
+    executor = durable(Executor(original.agent, interaction=interact))
+    seen = []
+    transport_for([], seen)
+    bad = edit(checkpoint, lambda value: change(value['events']))
+    assert code_of(lambda: asyncio.run(executor._restore(bad, metadata, 'bound'))) == 'unrecoverable'
+    assert executor.pending('s1') is None
+    assert executor._sessions.sessions == {}
+    assert seen == []
+
+
+@pytest.mark.parametrize(('build', 'deleted'), [
+    (lambda: quiet_child('sibling'), 'sibling'),
+    (lambda: SequentialAgent(name='sibling', sub_agents=[quiet_child('worker')]), 'sibling'),
+    (lambda: ParallelAgent(name='sibling', sub_agents=[quiet_child('worker')]), 'sibling'),
+    (lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]), 'sibling'),
+    (lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]), 'worker'),
+])
+def test_deleting_an_entire_nonempty_parallel_sibling_history_fails_restore_before_dispatch(build, deleted):
+    sibling = build()
+    original, (checkpoint, metadata) = workflow_record('parallel', sibling=sibling)
+    missing = sibling.find_agent(deleted)
+    assert missing is not None
+    bad = edit(checkpoint, lambda value: value.update(events=[
+        event for event in value['events'] if missing.find_agent(event['author']) is None
+    ]))
+    executor = durable(Executor(original.agent, interaction=interact))
+    seen = []
+    transport_for([], seen)
+    assert code_of(lambda: asyncio.run(executor._restore(bad, metadata, 'bound'))) == 'unrecoverable'
+    assert executor.pending('s1') is None
+    assert executor._sessions.sessions == {}
+    assert seen == []
+
+
+@pytest.mark.parametrize('build', [
+    lambda: SequentialAgent(name='sibling'),
+    lambda: ParallelAgent(name='sibling'),
+    lambda: LoopAgent(name='sibling', max_iterations=1),
+    lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty')]),
+    lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]),
+    lambda: ParallelAgent(name='sibling', sub_agents=[
+        ParallelAgent(name='inner', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]),
+    ]),
+])
+def test_parallel_siblings_with_empty_workflows_restore_without_repeating_completed_models(build):
+    original, (checkpoint, metadata) = workflow_record('parallel', sibling=build())
+    executor = durable(Executor(original.agent, interaction=interact))
+    seen = []
+    transport_for([], seen)
+    assert asyncio.run(executor._restore(checkpoint, metadata, 'bound')) == 's1'
+    assert executor.pending('s1') == original.pending('s1')
+    assert seen == []
+    transport_for([{'value': 42}, {'content': 'paused done'}, {'content': 'tail done'}], seen)
+    assert answer(executor, executor.pending('s1')) == 'tail done'
+    assert [op for op, _ in seen] == ['capability', 'model', 'model']
+
+
+@pytest.mark.parametrize('actions', [{'agentState': {}}, {'endOfAgent': True}])
+def test_non_resumable_records_refuse_injected_workflow_state(actions):
+    _, (checkpoint, metadata) = paused_record()
+    bad = edit(checkpoint, lambda value: value['events'][0]['actions'].update(actions))
+    assert code_of(lambda: restored(bad, metadata)) == 'unrecoverable'
+
+
+@pytest.mark.parametrize('path', ['root', 'root@2', 'other@1', 'pipeline/root@1'])
+def test_a_non_resumable_record_refuses_workflow_node_paths(path):
+    _, (checkpoint, metadata) = paused_record()
+    bad = edit(checkpoint, lambda value: value['events'][1].update(nodeInfo={'path': path}))
+    assert code_of(lambda: restored(bad, metadata)) == 'unrecoverable'
+
+
+def test_legacy_transfer_node_paths_restore_and_continue_without_resumability():
+    root = LlmAgent(name='router', model=llm('answer'), sub_agents=[quiet_child('specialist')])
+    executor = durable(Executor(root))
+    transport_for([
+        {'content': '', 'toolCalls': [tool_call('transfer_to_agent', '{"agent_name":"specialist"}')]},
+        {'content': 'specialist done'}, {'content': 'specialist again'},
+    ])
+    assert run(executor) == 'specialist done'
+    assert run(executor) == 'specialist again'
+    checkpoint, metadata = stored(executor)
+    paths = {event['nodeInfo']['path'] for event in json.loads(checkpoint)['events']}
+    assert paths == {'', 'router@1', 'router@1/specialist@1'}
+    other = durable(Executor(root))
+    assert asyncio.run(other._restore(checkpoint, metadata, 'bound')) == 's1'
+    transport_for([{'content': 'continued'}])
+    assert run(other) == 'continued'
+    assert not other._resumable
+    for path in ('specialist@1', 'router@1/specialist@2', 'other@1/specialist@1'):
+        bad = edit(checkpoint, lambda value: next(
+            event for event in value['events'] if event['author'] == 'specialist'
+        ).update(nodeInfo={'path': path}))
+        assert code_of(lambda: asyncio.run(other._restore(bad, metadata, 'bound'))) == 'unrecoverable'
+
+
+@pytest.mark.parametrize('reload', [False, True])
+def test_parallel_pause_finishes_its_writing_sibling_before_publication_and_never_repeats_it(reload):
+    seen = []
+    replies = {
+        'paused': [{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}, {'content': 'paused done'}],
+        'writer': [{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":7}')]}, {'content': 'written'}],
+        'tail': [{'content': 'tail done'}],
+    }
+    writer_done = asyncio.Event()
+
+    async def transport(raw):
+        message = json.loads(raw)
+        op, payload = message['op'], message['payload']
+        if op == 'model':
+            role = payload['role']
+            if role == 'paused' and len(replies[role]) == 2:
+                await writer_done.wait()
+            reply = replies[role].pop(0)
+            if role == 'writer' and not replies[role]:
+                writer_done.set()
+        else:
+            reply = {'value': payload['input']['value'] * 2}
+        seen.append((op, payload))
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
+
+    def build():
+        root = workflow_pause('parallel')
+        for name in replies:
+            child = root.find_agent(name)
+            assert isinstance(child, LlmAgent)
+            child.model = llm(name)
+        return durable(Executor(root, interaction=interact))
+
+    _bridge.install_transport(transport)
+    original = build()
+    assert run(original) is None
+    assert [payload['input']['value'] for op, payload in seen if op == 'capability'] == [7]
+    pending = original.pending('s1')
+    assert pending is not None
+    executor = original
+    if reload:
+        executor = build()
+        assert asyncio.run(executor._restore(*stored(original), 'bound')) == 's1'
+        assert executor.pending('s1') == pending
+    assert answer(executor, pending) == 'tail done'
+    assert [payload['input']['value'] for op, payload in seen if op == 'capability'] == [7, 21]
+    assert [payload['role'] for op, payload in seen if op == 'model'] == ['writer', 'writer', 'paused', 'paused', 'tail']
+
+
+def test_a_failed_resumable_answer_keeps_its_pause_and_its_write_scope_on_retry():
+    executor = durable(Executor(workflow_pause('first'), interaction=interact))
+    transport_for([{'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}')]}])
+    assert run(executor) is None
+    pending = executor.pending('s1')
+    before = stored(executor)
+    seen = []
+    transport_for([{'value': 42}, 'unavailable'], seen)
+    assert code_of(lambda: answer(executor, pending)) == 'unavailable'
+    assert executor.pending('s1') == pending
+    assert stored(executor) == before
+    transport_for([{'value': 42}, {'content': 'paused done'}, {'content': 'tail done'}], seen)
+    assert answer(executor, pending) == 'tail done'
+    scopes = [payload['effectScope'] for op, payload in seen if op == 'capability']
+    assert scopes == ['adk-python/s1/root/0/0'] * 2
 
 
 def test_a_pausing_agent_in_the_last_position_is_accepted_and_others_are_unaffected():
-    Executor(SequentialAgent(name='root', sub_agents=[
+    existing = Executor(SequentialAgent(name='root', sub_agents=[
         quiet_child(), SequentialAgent(name='inner', sub_agents=[quiet_child('b'), named('last', gated())]),
     ]), interaction=interact)
-    Executor(ParallelAgent(name='root', sub_agents=[named('a', double()), quiet_child()]))
+    assert not existing._resumable
+    plain = Executor(ParallelAgent(name='root', sub_agents=[named('a', double()), quiet_child()]))
+    assert not plain._resumable
 
 
 def test_a_pause_in_the_last_child_of_a_sequence_resumes_that_child():
@@ -941,6 +1237,9 @@ def test_a_pause_in_the_last_child_of_a_sequence_resumes_that_child():
     assert run(executor) is None
     pending = executor.pending('s1')
     assert pending is not None
+    assert not executor._resumable
+    assert all(event.actions.agent_state is None and event.actions.end_of_agent is None
+               for event in executor._sessions.sessions['galaxie']['galaxie']['s1'].events)
     assert answer(executor, pending) == 'last done'
     assert [op for op, _ in seen] == ['model', 'model', 'capability', 'model']
 
@@ -1242,3 +1541,29 @@ def test_a_session_id_that_cannot_fit_the_frame_is_refused_at_snapshot():
     executor = durable(Executor(agent()))
     assert run(executor, session='s' * 400000) == 'hello'
     assert code_of(lambda: executor._snapshot('s' * 400000, 'q' * 200000)) == 'unsupported'
+
+
+@pytest.mark.parametrize('reload', [False, True])
+def test_a_resumable_agent_that_pauses_twice_resumes_each_time_and_runs_its_successors_once(reload):
+    seen = []
+    transport_for([
+        {'content': 'before done'}, {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}', 'call_a')]},
+    ], seen)
+    original = durable(Executor(workflow_pause('middle'), interaction=interact))
+    assert run(original) is None
+    first = original.pending('s1')
+    assert first is not None
+    transport_for([{'value': 42}, {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":5}', 'call_b')]}], seen)
+    assert answer(original, first) is None
+    second = original.pending('s1')
+    assert second is not None and second['id'] != first['id']
+    executor = original
+    if reload:
+        executor = durable(Executor(workflow_pause('middle'), interaction=interact))
+        assert asyncio.run(executor._restore(*stored(original), 'bound')) == 's1'
+        assert executor.pending('s1') == second
+    transport_for([{'value': 10}, {'content': 'paused done'}, {'content': 'tail done'}], seen)
+    assert answer(executor, second) == 'tail done'
+    assert [op for op, _ in seen] == [
+        'model', 'model', 'capability', 'model', 'capability', 'model', 'model',
+    ]
