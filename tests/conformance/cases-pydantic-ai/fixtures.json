@@ -664,10 +664,13 @@
   },
   "native-output-repair": {
     "prompt": "native repair",
+    "sequence": "assistant-turns",
+    "route": { "repairAttempts": 1 },
     "replies": [{ "text": "{\"value\":\"invalid\"}" }, { "text": "{\"value\":6}" }]
   },
   "native-output-repair-refused": {
     "prompt": "native repair refused",
+    "sequence": "assistant-turns",
     "replies": [{ "text": "{\"value\":\"invalid\"}" }, { "text": "{\"value\":6}" }]
   },
   "stream-native-output": {
