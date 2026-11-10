@@ -80,6 +80,7 @@ export interface Spec {
   readonly replies?: readonly { readonly text: string; readonly toolCalls?: readonly ToolCall[] }[];
   readonly agents?: Readonly<Record<string, readonly AgentReply[]>>;
   readonly unordered?: boolean;
+  readonly order?: readonly (readonly [string, string])[];
   readonly answers?: readonly { readonly action: string; readonly payload: unknown }[];
 }
 export interface AdkPythonTranscript {
@@ -118,6 +119,7 @@ interface Picked {
 /** The replies of a multi-agent case, shared by every bound copy of the model. */
 export class AgentScript {
   readonly replies: Readonly<Record<string, readonly AgentReply[]>>;
+  readonly trace: string[] = [];
   readonly #done = new Map<string, PromiseWithResolvers<void>>();
   constructor(replies: Readonly<Record<string, readonly AgentReply[]>>) {
     this.replies = replies;
@@ -219,6 +221,8 @@ export class RecordingModel extends BaseChatModel {
       ...(this.tools.length ? { toolChoice: this.choice } : {}),
       ...(jsonSchema === undefined ? {} : { jsonSchema }),
     });
+    const turn = messages.filter((message) => message.type === 'ai').length + 1;
+    if (picked) this.agents?.trace.push(`${picked.agent}#${turn}:request`);
     if (picked?.entry.after !== undefined) await this.agents?.done(picked.entry.after).promise;
     if (picked?.entry.afterCall !== undefined)
       await this.agents?.done(`${picked.entry.afterCall}/call`).promise;
@@ -232,6 +236,7 @@ export class RecordingModel extends BaseChatModel {
       content: message.content,
       toolCalls: 'tool_calls' in message ? message.tool_calls : [],
     });
+    if (picked) this.agents?.trace.push(`${picked.agent}#${turn}:response`);
     // The gated branch starts after this answer has crossed the bridge; a heuristic margin, not a signal.
     if (picked && !picked.entry.toolCalls?.length) {
       const agents = this.agents;
@@ -309,6 +314,64 @@ export function renumber(requests: unknown[]): void {
       if (typeof message['tool_call_id'] === 'string')
         message['tool_call_id'] = number(message['tool_call_id']);
     }
+}
+
+interface AgentRequest {
+  readonly agent: string;
+  readonly messages: Record<string, unknown>[];
+}
+
+/** Check raw IDs before normalization can hide a dangling, repeated or changed call. */
+export function assertCallConsistency(requests: unknown[]): void {
+  const previous = new Map<string, string[]>();
+  for (const request of requests as AgentRequest[]) {
+    const issued = new Set<string>();
+    const answered = new Set<string>();
+    const ids: string[] = [];
+    for (const message of request.messages) {
+      for (const call of (message['tool_calls'] as { id: string }[] | undefined) ?? []) {
+        if (issued.has(call.id))
+          throw new Error('Assistant call IDs must be unique within a request.');
+        issued.add(call.id);
+        ids.push(call.id);
+      }
+      const id = message['tool_call_id'];
+      if (typeof id === 'string') {
+        if (!issued.has(id) || answered.has(id))
+          throw new Error('A tool response must match one earlier unanswered assistant call.');
+        answered.add(id);
+        ids.push(id);
+      }
+    }
+    const before = previous.get(request.agent) ?? [];
+    if (before.length > ids.length || before.some((id, index) => ids[index] !== id))
+      throw new Error('An agent call ID history must retain the preceding request as a prefix.');
+    previous.set(request.agent, ids);
+  }
+}
+
+/** Each agent owns its call history; number that history once across all its requests. */
+export function renumberPerAgent(requests: unknown[]): void {
+  const agents = new Map<string, unknown[]>();
+  for (const request of requests as AgentRequest[]) {
+    const group = agents.get(request.agent) ?? [];
+    group.push(request);
+    agents.set(request.agent, group);
+  }
+  for (const group of agents.values()) renumber(group);
+}
+
+/** Compare declared happens-before pairs against arrival order, before transcript sorting. */
+export function assertOrder(
+  trace: readonly string[],
+  order: readonly (readonly [string, string])[],
+): void {
+  for (const [earlier, later] of order) {
+    const first = trace.indexOf(earlier);
+    const second = trace.indexOf(later);
+    if (first < 0 || second < 0 || first >= second)
+      throw new Error(`The arrival trace must place ${earlier} before ${later}.`);
+  }
 }
 
 export async function executeAdkPythonCase(
@@ -483,9 +546,10 @@ export async function executeAdkPythonCase(
     }
     const actual = JSON.parse(JSON.stringify(transcript)) as AdkPythonTranscript;
     if (spec.unordered) {
+      assertOrder(model.agents?.trace ?? [], spec.order ?? []);
+      assertCallConsistency(actual.requests);
       settle(actual);
-      // Branches share no call history, so each request numbers its own calls.
-      for (const request of actual.requests) renumber([request]);
+      renumberPerAgent(actual.requests);
     } else renumber(actual.requests);
     return actual;
   } finally {

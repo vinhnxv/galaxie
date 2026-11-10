@@ -20,8 +20,11 @@ import specs from '../cases-adk-python/fixtures.json' with { type: 'json' };
 import {
   type AdkPythonTranscript,
   AgentScript,
+  assertCallConsistency,
+  assertOrder,
   RecordingModel,
   renumber,
+  renumberPerAgent,
   type Spec,
   settle,
 } from './adk-python.js';
@@ -58,6 +61,7 @@ export interface AdkReloadStep {
 export interface AdkReloadResult {
   readonly sessionId: string;
   readonly transcript: AdkPythonTranscript;
+  readonly trace: readonly string[];
   readonly restored?: PendingInteraction;
   readonly pending?: PendingInteraction;
   readonly crashed: boolean;
@@ -118,6 +122,8 @@ export async function executeAdkReloadStep(
     ...(step.name.startsWith('stream-') ? { streams: [] } : {}),
   };
   const latch = createMockLatch();
+  const agents = spec.agents ? new AgentScript(spec.agents) : undefined;
+  const trace = agents?.trace ?? [];
   const script: MockScript = {
     [spec.prompt]: (spec.replies ?? []).map((reply, index, all) => ({
       ...reply,
@@ -181,14 +187,7 @@ export async function executeAdkReloadStep(
         ...(step.sessionId === undefined ? {} : { sessionId: step.sessionId as SessionId }),
         services: {
           chatModels: {
-            mock: new RecordingModel(
-              script,
-              transcript,
-              [],
-              undefined,
-              undefined,
-              spec.agents ? new AgentScript(spec.agents) : undefined,
-            ),
+            mock: new RecordingModel(script, transcript, [], undefined, undefined, agents),
           },
           checkpoints: store.checkpoints,
         },
@@ -228,7 +227,7 @@ export async function executeAdkReloadStep(
       step.sessionId === undefined
         ? await instance.start({ prompt: spec.prompt })
         : await instance.restore();
-    if (!run) return { sessionId: instance.sessionId, transcript, crashed, consumed: true };
+    if (!run) return { sessionId: instance.sessionId, transcript, trace, crashed, consumed: true };
     restored = step.sessionId === undefined ? undefined : instance.getSnapshot().run?.pending;
     if (restored) {
       const answer = spec.answers?.[step.answerIndex ?? 0];
@@ -290,6 +289,7 @@ export async function executeAdkReloadStep(
     return {
       sessionId: instance.sessionId,
       transcript,
+      trace,
       crashed,
       consumed: submissions.length > 0 && submissions.every((entry) => entry.status === 'consumed'),
       ...(retriedOutput === undefined ? {} : { retriedOutput }),
@@ -338,8 +338,13 @@ export function joinAdkReload(
   const spec = (specs as unknown as Record<string, Spec>)[name];
   if (!spec) throw new Error('The reload case is unknown.');
   if (spec.unordered) {
+    assertOrder(
+      steps.flatMap((step) => step.trace),
+      spec.order ?? [],
+    );
+    assertCallConsistency(actual.requests);
     settle(actual);
-    for (const request of actual.requests) renumber([request]);
+    renumberPerAgent(actual.requests);
   } else renumber(actual.requests);
   return actual;
 }

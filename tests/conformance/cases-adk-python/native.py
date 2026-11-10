@@ -54,6 +54,47 @@ def renumber(requests):
     return requests
 
 
+def assert_call_consistency(requests):
+    """Check raw IDs before normalization can hide a dangling, repeated or changed call."""
+    previous = {}
+    for request in requests:
+        issued = set()
+        answered = set()
+        ids = []
+        for message in request['messages']:
+            for call in message.get('tool_calls', []):
+                if call['id'] in issued:
+                    raise ValueError('Assistant call IDs must be unique within a request.')
+                issued.add(call['id'])
+                ids.append(call['id'])
+            if 'tool_call_id' in message:
+                identifier = message['tool_call_id']
+                if identifier not in issued or identifier in answered:
+                    raise ValueError('A tool response must match one earlier unanswered assistant call.')
+                answered.add(identifier)
+                ids.append(identifier)
+        before = previous.get(request['agent'], [])
+        if ids[:len(before)] != before:
+            raise ValueError('An agent call ID history must retain the preceding request as a prefix.')
+        previous[request['agent']] = ids
+
+
+def renumber_per_agent(requests):
+    """Each agent owns its call history; number that history once across all its requests."""
+    agents = {}
+    for request in requests:
+        agents.setdefault(request['agent'], []).append(request)
+    for group in agents.values():
+        renumber(group)
+
+
+def assert_order(trace, order):
+    """Compare declared happens-before pairs against arrival order, before transcript sorting."""
+    for earlier, later in order:
+        if earlier not in trace or later not in trace or trace.index(earlier) >= trace.index(later):
+            raise ValueError(f'The arrival trace must place {earlier} before {later}.')
+
+
 def agent_of(request):
     """The name ADK states in every agent's system instruction."""
     match = re.search(r'Your internal name is "([^"]+)"', request['messages'][0]['content'])
@@ -132,6 +173,7 @@ class ScriptedLlm(BaseLlm):
     spec: Any
     transcript: Any
     gates: Any = None
+    trace: Any
 
     async def generate_content_async(self, llm_request, stream=False):
         transcript = self.transcript
@@ -140,12 +182,15 @@ class ScriptedLlm(BaseLlm):
         request = map_request(llm_request)
         agent = None
         entry = None
+        turn = sum(1 for message in request['messages'] if message['role'] == 'assistant') + 1
         if 'agents' in self.spec:
             # A multi-agent case answers by agent name; the reply is the one after the agent's own earlier turns.
             agent = agent_of(request)
             request['agent'] = agent
-            entry = self.spec['agents'][agent][sum(1 for message in request['messages'] if message['role'] == 'assistant')]
+            entry = self.spec['agents'][agent][turn - 1]
         transcript['requests'].append(request)
+        if agent is not None:
+            self.trace.append(f'{agent}#{turn}:request')
         if entry is not None and entry.get('after'):
             # A reply can wait for another agent's final answer, which fixes the arrival order of parallel branches.
             await self.gates.setdefault(entry['after'], asyncio.Event()).wait()
@@ -160,6 +205,7 @@ class ScriptedLlm(BaseLlm):
             transcript['responses'].append({'content': entry['text'], 'toolCalls': entry.get('toolCalls', [])})
         else:
             transcript['responses'].append({'agent': agent, 'content': entry['text'], 'toolCalls': entry.get('toolCalls', [])})
+            self.trace.append(f'{agent}#{turn}:response')
         if self.case == 'argument-block':
             raise GalaxieError('denied')
         if stream and self.case.startswith('stream-'):
@@ -302,7 +348,7 @@ async def _run_case(name):
         'requests': [], 'responses': [], 'capabilities': [], 'interactions': [], 'output': None, 'error': None,
         **({'streams': []} if streaming else {}),
     }
-    model = ScriptedLlm(model='answer', case=name, spec=spec, transcript=transcript, gates={})
+    model = ScriptedLlm(model='answer', case=name, spec=spec, transcript=transcript, gates={}, trace=[])
     agent = suite.factory(name, model, NativeDouble(name, transcript))
     runner = InMemoryRunner(app=App(
         name='conformance', root_agent=agent, resumability_config=ResumabilityConfig(is_resumable=True),
@@ -318,10 +364,10 @@ async def _run_case(name):
     except GalaxieError as error:
         transcript['error'] = {'code': error.code, 'message': str(error)}
     if spec.get('unordered'):
+        assert_order(model.trace, spec.get('order', []))
+        assert_call_consistency(transcript['requests'])
         settle(transcript)
-        # Branches share no call history, so each request numbers its own calls.
-        for request in transcript['requests']:
-            renumber([request])
+        renumber_per_agent(transcript['requests'])
     else:
         transcript['requests'] = renumber(transcript['requests'])
     return normalized(transcript)
