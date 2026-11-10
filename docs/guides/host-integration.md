@@ -247,6 +247,10 @@ Apply each control at its host boundary and keep its documented limits:
 - [Host confirmations](#host-confirmations): bind significant writes to
   single-use approvals of the exact parameters; see the
   [confirmation tests](../../tests/conformance/confirmations.test.ts).
+- [Identity and authorization](#identity-and-authorization): attach your session
+  provider, client abilities and server policy engine to the existing principal,
+  capability, confirmation and credential seams; galaxie ships no integration with
+  any of them.
 - [Output safety and display](#output-safety-and-display): check routed model
   output and render trusted projections as text; see the
   [output safety tests](../../tests/conformance/output-safety.test.ts).
@@ -545,6 +549,211 @@ Every backend write still requires authentication, authorization and idempotency
 Only host-controlled MCP servers/gateways are supported; configure reviewed
 metadata pins and close principal sessions on sign-out per
 [the MCP contract](../system-design.md#61-mcp-client).
+
+## Identity and authorization
+
+galaxie ships no integration with an authentication or authorization library. The
+host owns login, the backend authorizes every request, and client-side policy is
+defense in depth only ([brief §2](../galaxie-project-brief.md#2-boundaries-what-galaxie-does-and-does-not-do),
+[§9.3](../galaxie-project-brief.md#93-network-and-credentials) and baseline B1 in
+[§9.7](../galaxie-project-brief.md#97-mandatory-security-baseline-invariant-adr-0012)).
+This section shows where a session provider (such as Auth.js or Better Auth), a
+client ability library (such as CASL) and a server policy engine (such as Casbin)
+attach to seams that already exist. These names are examples. This guide does not
+test or pin any of them, and its snippets call only galaxie APIs and host
+placeholders.
+
+| Concern | galaxie seam | Host duty | Limit |
+| --- | --- | --- | --- |
+| Who the user is | `CreateOptions.principalScope`, storage and cross-tab APIs | Derive a stable opaque scope from the trusted session | [Scope pattern](#storage-persistence-and-recovery); a scope keys local state and proves nothing |
+| Sign-out or user switch | `saver.invalidatePrincipal()`, `watchInvalidation` | Treat both as logout | [Ownership and logout](#ownership-and-logout); requests already sent can still complete |
+| Which capabilities the agent may use | `bindings`, `grantScope: 'run'`, `start(input, { grants })` | Bind and grant per principal | The broker denies by default; this narrows the agent and does not authorize requests |
+| Approval of significant writes | `approval: 'confirm'`, `confirmations.policyRevision` | Change the revision when policy changes | [Host confirmations](#host-confirmations); this invalidates pending approvals only |
+| Backend authority | Backend checks and short-lived scoped tokens (baseline B10) | Authorize every request | `X-Galaxie-*` headers attribute a call and never authorize it |
+| Remote models | `getCredential` and a host proxy | Issue per-call credentials | [Remote models through a host proxy](#remote-models-through-a-host-proxy) |
+| MCP | `createMcpServer` `token` and `closePrincipal` | Run the gateway; close principals on sign-out | [MCP contract](../system-design.md#61-mcp-client); host-controlled servers only |
+
+### Session providers
+
+A session provider tells host code who is signed in. Derive `principalScope` from a
+stable, opaque identifier, never from an email address or display name. Use the
+host's own user record id when it fits the scope pattern. Otherwise map the
+provider identity deterministically: some provider subjects, such as
+`provider|id`, contain characters the pattern rejects. Hash the issuer and subject
+so the result always fits and stays unique across every sign-in provider you
+enable, and fail closed only when no stable identity exists:
+
+```ts
+const scopePattern = /^[A-Za-z0-9._:-]{1,128}$/;
+
+export async function principalScopeFor(user: {
+  readonly id?: string;
+  readonly issuer: string;
+  readonly subject: string;
+}): Promise<string> {
+  if (user.id !== undefined && scopePattern.test(`uid:${user.id}`)) return `uid:${user.id}`;
+  if (user.subject === '') throw new Error('No stable user identity');
+  const bytes = new TextEncoder().encode(`${user.issuer}:${user.subject}`);
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  return `sub:${Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+```
+
+Treat sign-out and a change of signed-in user as logout, following
+[Ownership and logout](#ownership-and-logout). Keep session cookies and provider
+tokens out of agent input, graph state and capability arguments.
+
+### Client abilities
+
+A client ability library such as CASL answers "may this user use this
+capability?" in the page. Build the ability from rules the server sends, and use it
+only to choose which bindings to pass, which run grants to request and which UI to
+show. Feed the rules' version into `confirmations.policyRevision` so a change
+invalidates pending approvals. The ability is page data: same-origin code can alter
+it, so the backend still checks every request.
+
+Three broker rules decide whether that choice takes effect:
+
+- Omitting a binding narrows only optional capabilities. A missing `required`
+  binding makes `runtime.create` fail with `invalid`, so a user who lacks a required
+  capability gets no instance, and the host shows its own explanation.
+- A run grant gates only a binding with `grantScope: 'run'`. A binding with another
+  scope runs without a grant, and a grant requested for it makes `start` fail.
+- Bind any capability whose use a permission can revoke with `grantScope: 'run'`,
+  and recompute grants from the current ability on every `start` and `restore`.
+
+```ts
+// canUse reads the client ability; orders and notes are host-defined bindings.
+const bindings = {
+  // Required by the agent: always bound, run-scoped so the grant decides.
+  'orders.get@1': ordersGet,
+  // Optional for the agent: bound only when the user may use it.
+  ...(canUse('notes.save@1') ? { 'notes.save@1': notesSave } : {}),
+};
+const instance = await runtime.create(definition, { principalScope, agent, bindings });
+const grants = (['orders.get@1', 'notes.save@1'] as const).filter(canUse);
+await instance.start(input, { grants });
+```
+
+### Server policy engines
+
+A server-side policy engine such as Casbin enforces on your backend endpoints and
+on the MCP gateway, and decides the scopes of the short-lived tokens the backend
+issues to the agent. It is the authority. A browser copy of the policy is a hint
+for the interface. Do not run an engine in the browser as authority, and not
+inside the Go WASM worker: policy stays in JavaScript
+([ADR-0023](../adr/0023-google-adk-go-through-a-wasm-worker.md)).
+
+### Permission changes without sign-out
+
+Enforce a downgrade on the backend, by evaluating current policy on each request
+or by rejecting tokens minted under the old policy revision. Client steps are
+cleanup, not revocation. On the client:
+
+1. Change `policyRevision`, which invalidates pending approvals.
+2. Call `closePrincipal(principalScope)` on each MCP server and drop cached
+   capability tokens, so new tokens are minted under the narrowed policy.
+3. Dispose the instance and create it again with narrowed bindings and grants.
+
+You may recreate the instance with the same `sessionId` and principal-scoped
+checkpointer and call `restore()`. A waiting run continues under the narrowed
+bindings. A run that is executing when you dispose is cancelled, and requests
+already sent can still complete.
+
+### Credentials for APIs, MCP and remote models
+
+Agent code, prompts, graph state and capability arguments never hold a bearer
+token, API key or custom auth header. The host attaches credentials at the
+transport. Tokens come from your backend, are short-lived and are scoped to the
+bound capabilities ([baseline B10](../adr/0012-security-baseline.md)). The
+`X-Galaxie-*` attribution headers never authorize.
+
+- **HTTP capabilities.** Set `credentials: 'omit'` on each binding and return a
+  scoped token and any custom headers (API key, tenant, signature) from its async
+  `headers(context)` callback, as
+  [host-remote](../../examples/host-remote/src/runtime.ts) does. The default
+  `credentials: 'same-origin'` also sends the user's session cookie on same-origin
+  requests, and backend endpoints that serve agent capabilities must not accept that
+  cookie as authority. Core sets `content-type`, the attribution headers and `Idempotency-Key`
+  after your headers, so you cannot replace them. `headers(context)` does not
+  receive the input. A header that depends on the request body, such as an HMAC
+  signature, uses the binding's `fetch` option or a host-written binding with its
+  own `invoke`, and takes values only from validated `id` or `enum` fields, never
+  `freeText`.
+- **Step-up tokens.** A sensitive write uses `approval: 'confirm'`. The binding
+  runs only after the user confirms the exact arguments, so `headers(context)` can
+  then fetch a one-use token bound to `context.effectId`.
+- **MCP.** `token({ principalScope, signal })` is sent as `Authorization: Bearer`
+  with `credentials: 'omit'` and `redirect: 'error'`, and is read again before each
+  call. Other headers go through the server's `fetch` option, which applies to every
+  request to that server. Tools that need different authentication use separate
+  server entries, or a gateway that decides by tool and token scope.
+- **Remote models.** `getCredential` supplies the bearer per call.
+  `openAICompatible` `headers` may add static headers but rejects `authorization`,
+  `cookie` and `host`. A provider with another authentication scheme uses `fetch`
+  or a host proxy that speaks the OpenAI-compatible format.
+- **Where keys live.** Application keys (model providers, partner APIs, third-party
+  MCP credentials) stay in your backend, proxy or MCP gateway, and the browser holds
+  only the short-lived token. A user's own key for their own endpoint
+  (`user-endpoint`) comes through `getCredential`, bound to that endpoint's origin;
+  never send a host-proxy token to a URL from user settings. galaxie stores no key,
+  and you do. Direct browser calls to commercial model providers and OAuth to
+  third-party MCP servers are outside the current scope
+  ([ADR-0006](../adr/0006-model-providers-and-routing.md),
+  [ADR-0011](../adr/0011-mcp-via-controlled-servers.md)).
+
+```ts
+'progress.save@1': httpCapability({
+  kind: 'write',
+  destination: 'host-server',
+  method: 'POST',
+  url: `${origin}/api/progress`,
+  timeoutMs: 10_000,
+  concurrency: 1,
+  grantScope: 'run',
+  approval: 'confirm',
+  retry: 'none',
+  credentials: 'omit',
+  // scopedToken is a host function that asks your backend for a short-lived token.
+  headers: async (context) => ({
+    authorization: `Bearer ${await scopedToken(context.principalScope, 'progress:write')}`,
+  }),
+}),
+```
+
+Same-origin code can read a credential during its call. Short lifetimes, narrow
+scopes, spending limits at your proxy and backend authorization contain that.
+Custom headers sent cross-origin need `Access-Control-Allow-Headers` on the server
+and the origin in your CSP `connect-src`.
+
+### What the agent sees
+
+The agent is never the authority and should know only what it needs.
+
+- **No permission, no tool.** The agent sees only the capabilities you bound for
+  this principal. An unbound or ungranted call fails with `denied` at the broker,
+  whatever the model asks for.
+- **Handle `denied`.** Agent code reports the refusal to the user and does not retry
+  through another tool or with changed arguments. Test this behavior, but no control
+  may depend on it.
+- **Prompt hints are for the interface.** You may summarize the user's permissions in
+  instructions so the agent answers well. Prompt injection can override them, so they
+  never replace bindings, host checks or backend authorization.
+- **UI actions are capabilities.** Agent authors must not touch the DOM; the
+  [`galaxie/no-dom` rule](../../packages/eslint-plugin/README.md) flags it but is a
+  linting aid, not enforcement. Navigation, form
+  prefill and similar directives are host-bound capabilities that accept declared
+  `enum` or `id` targets, never free URLs. Check `canUse` inside the binding. The
+  target page still enforces its own access as if the user had clicked, because
+  hiding a button is presentation and not authorization.
+- **Agent output on screen** follows [Output safety and display](#output-safety-and-display),
+  which checks routed text only and cannot retract chunks already allowed. Render
+  only the registered components.
+
+These controls narrow what the agent can do on SDK-controlled paths. They do not
+make an integration sufficient on their own: same-origin code can bypass them, a
+client-side check is not authority, and your backend remains responsible for
+authentication, authorization and spending limits.
 
 ## Output safety and display
 
