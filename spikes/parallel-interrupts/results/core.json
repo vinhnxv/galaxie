@@ -1,0 +1,623 @@
+{
+  "C": {
+    "C1": {
+      "pass": true,
+      "observation": {
+        "published": ["r", "r:1"],
+        "applied": [
+          {
+            "id": "r",
+            "payload": "first-token"
+          },
+          {
+            "id": "r:1",
+            "payload": "second-token"
+          }
+        ]
+      }
+    },
+    "C2": {
+      "pass": true,
+      "observation": {
+        "duringResume": "duplicate",
+        "whileSecondPending": "duplicate",
+        "firstApplications": 1
+      }
+    },
+    "C3": {
+      "pass": true,
+      "observation": {
+        "committedPick": "r",
+        "submitted": "r:1",
+        "receipt": "stale",
+        "extraSegments": 0,
+        "advertisedNextButCheckpointRolledBack": "stale"
+      }
+    },
+    "C4": {
+      "pass": true,
+      "observation": {
+        "window": "accepted-before-commit",
+        "applied": [
+          {
+            "id": "r",
+            "payload": "first-token"
+          },
+          {
+            "id": "r:1",
+            "payload": "second-token"
+          }
+        ]
+      }
+    },
+    "C5": {
+      "pass": true,
+      "observation": {
+        "window": "committed-before-publication",
+        "applied": [
+          {
+            "id": "r",
+            "payload": "first-token"
+          },
+          {
+            "id": "r:1",
+            "payload": "second-token"
+          }
+        ],
+        "statuses": ["consumed", "consumed"]
+      }
+    },
+    "C10": {
+      "pass": true,
+      "observation": {
+        "twoPauseSet": "unsupported",
+        "ordinalOne": "unsupported",
+        "publishedSurfaceRecords": 0
+      }
+    },
+    "C6": {
+      "pass": true,
+      "observation": {
+        "published": ["a", "b"],
+        "applied": [
+          {
+            "id": "a",
+            "payload": "a-token"
+          },
+          {
+            "id": "b",
+            "payload": "b-token"
+          }
+        ]
+      }
+    },
+    "C7": {
+      "pass": true,
+      "observation": {
+        "stablePick": true,
+        "windows": [
+          {
+            "window": "a",
+            "applied": [
+              {
+                "id": "a",
+                "payload": "a-token"
+              },
+              {
+                "id": "b",
+                "payload": "b-token"
+              }
+            ]
+          },
+          {
+            "window": "b",
+            "applied": [
+              {
+                "id": "a",
+                "payload": "a-token"
+              },
+              {
+                "id": "b",
+                "payload": "b-token"
+              }
+            ]
+          },
+          {
+            "window": "c",
+            "applied": [
+              {
+                "id": "a",
+                "payload": "a-token"
+              },
+              {
+                "id": "b",
+                "payload": "b-token"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "pick-order-negative-control": {
+      "pass": true,
+      "observation": {
+        "changedPick": "b",
+        "acceptedA": "consumed-without-application",
+        "laterPublicationOfA": "unsupported",
+        "applied": [
+          {
+            "id": "b",
+            "payload": "b-token"
+          }
+        ]
+      }
+    },
+    "C8": {
+      "pass": true,
+      "observation": [
+        {
+          "recovery": false,
+          "prefixExecutions": 3,
+          "confirmations": 3,
+          "writes": 3,
+          "repeatedApproval": "stale",
+          "oldApprovalsRejectedAcrossExecutions": 3
+        },
+        {
+          "recovery": true,
+          "prefixExecutions": 3,
+          "confirmations": 1,
+          "writes": 1,
+          "repeatedApproval": "stale",
+          "oldApprovalsRejectedAcrossExecutions": 0
+        }
+      ]
+    },
+    "C9": {
+      "pass": true,
+      "observation": [
+        {
+          "branches": 2,
+          "prefixes": {
+            "a": 2,
+            "b": 3
+          },
+          "totalIncludingInitial": 5,
+          "resumeOnly": 3,
+          "estimate": 3
+        },
+        {
+          "branches": 3,
+          "prefixes": {
+            "a": 2,
+            "b": 3,
+            "c": 4
+          },
+          "totalIncludingInitial": 9,
+          "resumeOnly": 6,
+          "estimate": 6
+        }
+      ]
+    }
+  },
+  "L": {
+    "L1": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "published": ["r", "r:1"],
+          "receipts": ["accepted", "accepted"],
+          "bodyExecutions": 3
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "published": ["r", "r:1"],
+          "receipts": ["accepted", "accepted"],
+          "bodyExecutions": 3
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "published": ["r", "r:1"],
+          "receipts": ["accepted", "accepted"],
+          "bodyExecutions": 3
+        }
+      }
+    ],
+    "L2": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "pendingIdentityAndPropsPreserved": true,
+          "oldRun": "stale",
+          "restoredRun": "duplicate"
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "pendingIdentityAndPropsPreserved": true,
+          "oldRun": "stale",
+          "restoredRun": "duplicate"
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "pendingIdentityAndPropsPreserved": true,
+          "oldRun": "stale",
+          "restoredRun": "duplicate"
+        }
+      }
+    ],
+    "L5": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "recoveryOnReload": false,
+          "urlValidation": [
+            {
+              "registrationSuppressed": false,
+              "restore": "denied"
+            },
+            {
+              "registrationSuppressed": true,
+              "restore": "published"
+            }
+          ],
+          "structuredOutbound": [
+            {
+              "registrationSuppressed": false,
+              "receipt": "denied",
+              "hostCalls": 0
+            },
+            {
+              "registrationSuppressed": true,
+              "receipt": "sent",
+              "hostCalls": 1
+            }
+          ]
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "recoveryOnReload": false,
+          "urlValidation": [
+            {
+              "registrationSuppressed": false,
+              "restore": "denied"
+            },
+            {
+              "registrationSuppressed": true,
+              "restore": "published"
+            }
+          ],
+          "structuredOutbound": [
+            {
+              "registrationSuppressed": false,
+              "receipt": "denied",
+              "hostCalls": 0
+            },
+            {
+              "registrationSuppressed": true,
+              "receipt": "sent",
+              "hostCalls": 1
+            }
+          ]
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "recoveryOnReload": false,
+          "urlValidation": [
+            {
+              "registrationSuppressed": false,
+              "restore": "denied"
+            },
+            {
+              "registrationSuppressed": true,
+              "restore": "published"
+            }
+          ],
+          "structuredOutbound": [
+            {
+              "registrationSuppressed": false,
+              "receipt": "denied",
+              "hostCalls": 0
+            },
+            {
+              "registrationSuppressed": true,
+              "receipt": "sent",
+              "hostCalls": 1
+            }
+          ]
+        }
+      }
+    ],
+    "L8": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "unstrippedMapDetected": true,
+          "strippedResumeReachedSecondCall": true
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "unstrippedMapDetected": true,
+          "strippedResumeReachedSecondCall": true
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "unstrippedMapDetected": true,
+          "strippedResumeReachedSecondCall": true
+        }
+      }
+    ],
+    "L3": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "askB"],
+          "counts": {
+            "askA": 2,
+            "askB": 3,
+            "join": 1
+          }
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "askB"],
+          "counts": {
+            "askA": 2,
+            "askB": 3,
+            "join": 1
+          }
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "askB"],
+          "counts": {
+            "askA": 2,
+            "askB": 3,
+            "join": 1
+          }
+        }
+      }
+    ],
+    "L4": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "reopenedSaver": true,
+          "stableCheckpointPick": true,
+          "windows": [
+            {
+              "window": "a",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "b",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "c",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            }
+          ]
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "reopenedSaver": true,
+          "stableCheckpointPick": true,
+          "windows": [
+            {
+              "window": "a",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "b",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "c",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            }
+          ]
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "reopenedSaver": true,
+          "stableCheckpointPick": true,
+          "windows": [
+            {
+              "window": "a",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "b",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "c",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            }
+          ]
+        }
+      }
+    ],
+    "L6": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "noteB"],
+          "completedNoWriteTaskLast": true,
+          "counts": {
+            "askA": 2,
+            "noteB": 3
+          }
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "noteB"],
+          "completedNoWriteTaskLast": true,
+          "counts": {
+            "askA": 2,
+            "noteB": 3
+          }
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "noteB"],
+          "completedNoWriteTaskLast": true,
+          "counts": {
+            "askA": 2,
+            "noteB": 3
+          }
+        }
+      }
+    ],
+    "L7": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "branches": 3,
+          "prefixes": {
+            "askA": 2,
+            "askB": 3,
+            "askC": 4
+          },
+          "totalIncludingInitial": 9,
+          "resumeOnly": 6,
+          "estimate": 6
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "branches": 3,
+          "prefixes": {
+            "askA": 2,
+            "askB": 3,
+            "askC": 4
+          },
+          "totalIncludingInitial": 9,
+          "resumeOnly": 6,
+          "estimate": 6
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "branches": 3,
+          "prefixes": {
+            "askA": 2,
+            "askB": 3,
+            "askC": 4
+          },
+          "totalIncludingInitial": 9,
+          "resumeOnly": 6,
+          "estimate": 6
+        }
+      }
+    ]
+  }
+}

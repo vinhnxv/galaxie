@@ -50,6 +50,7 @@ Each ADR records one decision for galaxie: the context, the decision, the altern
 | [0027](0027-a2ui-surfaces.md) | A2UI surfaces with host-owned catalogs and policy | Accepted |
 | [0028](0028-decision-model-role.md) | Decision model roles through the model router | Accepted |
 | [0029](0029-reconcile-hook-for-unknown-outcome-writes.md) | Optional reconcile hook for unknown-outcome writes | Proposed |
+| [0030](0030-several-engine-pauses-published-one-at-a-time.md) | Several engine pauses published one at a time | Proposed |
 
 ## Template
 
