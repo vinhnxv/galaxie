@@ -37,7 +37,7 @@ test('wheel fetch accepts pinned bytes and rejects changed bytes without leaving
   }
 });
 
-test('CPython and Pyodide locks agree on every shared distribution version', async () => {
+test('CPython and Pyodide locks agree except for the exact documented cryptography pair', async () => {
   const lock = JSON.parse(
     await readFile(new URL('../../python/requirements.lock', import.meta.url), 'utf8'),
   ) as { packages: LockedWheel[] };
@@ -51,11 +51,17 @@ test('CPython and Pyodide locks agree on every shared distribution version', asy
   );
   for (const item of lock.packages) {
     const nativeVersion = versions.get(item.name.replaceAll('_', '-').toLowerCase());
-    if (nativeVersion !== undefined) expect(nativeVersion, item.name).toBe(item.version);
+    if (item.name === 'cryptography') {
+      // ADR-0022 records the sole platform difference and the unavailable patched WASM wheel.
+      expect({ native: nativeVersion, pyodide: item.version }).toEqual({
+        native: '50.0.2',
+        pyodide: '47.0.0',
+      });
+    } else if (nativeVersion !== undefined) expect(nativeVersion, item.name).toBe(item.version);
   }
   expect(versions.get('langgraph')).toBe('1.2.16');
   expect(versions.get('langchain-core')).toBe('1.7.0');
-  expect(lock.packages.find((item) => item.name === 'msgpack')?.version).toBe('1.1.2');
+  expect(lock.packages.find((item) => item.name === 'msgpack')?.version).toBe('1.2.4');
 });
 
 test('framework wheel sets preserve the LangGraph inventory and keep provider SDKs out', async () => {
@@ -70,7 +76,7 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     ).toBe(true);
   }
   const langgraph = inventory.filter((wheel) => wheel.frameworks?.includes('langgraph'));
-  expect(langgraph.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(6_042_342);
+  expect(langgraph.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(6_045_432);
   const fingerprint = langgraph
     .map(
       (wheel) =>
@@ -78,7 +84,7 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     )
     .join('\n');
   expect(createHash('sha256').update(fingerprint).digest('hex')).toBe(
-    'af0f855f9a3ad22e27237d198f94a690d7e05ca54ebeb9ae6b8b2de165582cd1',
+    'bcf53369f41c241c62bddd69d02315297cfdc7af5d4ddae9020ca66dc47ecc7d',
   );
   const pydantic = inventory.filter((wheel) => wheel.frameworks?.includes('pydantic-ai'));
   expect(pydantic.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(5_208_632);
@@ -118,7 +124,7 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     const uploadTimes = [...(block ?? '').matchAll(/upload-time = "([^"]+)"/g)];
     expect(uploadTimes.length, wheel.name).toBeGreaterThan(0);
     for (const match of uploadTimes)
-      expect(Date.parse(match[1] ?? '')).toBeLessThan(Date.parse('2026-10-23T17:00:00Z'));
+      expect(Date.parse(match[1] ?? '')).toBeLessThan(Date.parse('2026-11-03T00:00:00Z'));
   }
 });
 
@@ -171,7 +177,7 @@ test('the ADK wheel set is the pinned closure, with servers, SDKs and cloud clie
   expect(lockedWheels.filter((wheel) => forbidden(wheel.name))).toEqual([]);
 });
 
-test('adding the ADK extra moved no earlier pin in either lock', async () => {
+test('native framework and extension pins match the maintained constraints', async () => {
   const native = await readFile(new URL('../../python/uv.lock', import.meta.url), 'utf8');
   const versions = new Map(
     [...native.matchAll(/\[\[package\]\]\nname = "([^"]+)"\nversion = "([^"]+)"/g)].map((match) => [
@@ -186,7 +192,9 @@ test('adding the ADK extra moved no earlier pin in either lock', async () => {
     'opentelemetry-semantic-conventions': '0.66b1',
     tenacity: '9.2.1',
     websockets: '17.3',
-    cryptography: '47.0.0',
+    cryptography: '50.0.2',
+    msgpack: '1.2.4',
+    pyasn1: '0.6.5',
     cffi: '2.0.0',
     pycparser: '3.0',
     'google-adk': '2.12.0',
@@ -205,7 +213,9 @@ test('adding the ADK extra moved no earlier pin in either lock', async () => {
     'opentelemetry-semantic-conventions==0.66b1',
     'tenacity==9.2.1',
     'websockets==17.3',
-    'cryptography==47.0.0',
+    'cryptography==50.0.2',
+    'msgpack==1.2.4',
+    'pyasn1==0.6.5',
     'cffi==2.0.0',
     'pycparser==3.0',
   ])

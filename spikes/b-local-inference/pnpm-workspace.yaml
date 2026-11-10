@@ -3,6 +3,11 @@
 # Resolve only versions published at least 7 days ago, as the root workspace does.
 minimumReleaseAge: 10080
 
+overrides:
+  # No 4.3.2 release exists; 4.1.1 precedes the advisory's affected range.
+  'deepmerge@>=4.2.0 <=4.3.1': 4.1.1
+  'follow-redirects@>=1.16.0 <=1.16.1': 1.16.2
+
 # protobufjs (a dependency of onnxruntime-web) has a postinstall script that only prints a
 # version-scheme warning. The page does not need it, so it never runs.
 allowBuilds:

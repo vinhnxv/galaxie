@@ -341,11 +341,11 @@ export const lockedWheels: readonly LockedWheel[] = [
   },
   {
     name: 'msgpack',
-    version: '1.1.2',
-    url: 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/msgpack-1.1.2-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
-    file: 'msgpack-1.1.2-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
-    bytes: 50624,
-    sha256: '6f33ca4ae9f5f2bff8759a8b21a7544f7a5a595ad3e848e179eb9f86458dbc22',
+    version: '1.2.4',
+    url: 'https://files.pythonhosted.org/packages/41/29/efdc3d1d09e4e0e45955b0aad559b4c1f5d908767c9fb1021990c52182a5/msgpack-1.2.4-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
+    file: 'msgpack-1.2.4-cp314-cp314-pyemscripten_2026_0_wasm32.whl',
+    bytes: 53714,
+    sha256: '06a0657a4110d563255006b7cb7147432f67827144e429c2cdb1c967548d1817',
     frameworks: ['langgraph'],
   },
   {
@@ -584,7 +584,6 @@ export const lockedWheels: readonly LockedWheel[] = [
   },
 ];
 
-export const runtimeVersion: string = '314.0.7';
 export const runtimeFiles: readonly { readonly file: string; readonly bytes: number }[] = [
   { file: 'pyodide.mjs', bytes: 17931 },
   { file: 'pyodide.asm.mjs', bytes: 1250344 },

@@ -337,21 +337,32 @@ export function createPyodideAdapter(
         }
       >();
       let sources: BootPayload['sources'];
+      const download = new AbortController();
+      const downloadSignal = AbortSignal.any([preparation.signal, download.signal]);
+      const downloadTimer = setTimeout(() => download.abort(), 30_000);
       try {
+        if (preparation.signal.aborted) throw adapterFailure('cancelled');
         sources = await Promise.all(
           agent.files.map(async (path) => {
             const response = await fetch(new URL(path, base), {
               credentials: 'omit',
               redirect: 'error',
-              signal: preparation.signal,
+              signal: downloadSignal,
             });
             return { path, text: await source(response) };
           }),
         );
       } catch (error) {
         throw adapterFailure(
-          preparation.signal.aborted ? 'cancelled' : failureCode(error, 'unavailable'),
+          preparation.signal.aborted
+            ? 'cancelled'
+            : download.signal.aborted
+              ? 'timeout'
+              : failureCode(error, 'unavailable'),
         );
+      } finally {
+        clearTimeout(downloadTimer);
+        download.abort();
       }
 
       const dispatch = (client: Connection, message: BridgeMessage): void => {
