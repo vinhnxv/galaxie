@@ -11,6 +11,16 @@ import {
 import { executePydanticCase, pydanticCases } from './support/pydantic-ai.js';
 import { pydanticSources } from './support/pydantic-ai-sources.node.js';
 
+const nativeRepairAttempts: Readonly<Record<string, readonly (number | undefined)[]>> = {
+  'native-output': [undefined],
+  'native-output-repair': [undefined, 1],
+  'native-output-repair-refused': [undefined, 1],
+  'native-output-second-repair-refused': [undefined, 1, 2],
+  'native-output-repair-budget-exhausted': [undefined, 1, 2],
+  'stream-native-output': [undefined],
+  'stream-native-output-repair': [undefined, 1],
+};
+
 test.skipIf(!pythonWheelsAvailable).each(pydanticCases)(
   pythonWheelsAvailable
     ? 'Node Pyodide matches native pydantic-ai requests and output: %s'
@@ -26,6 +36,13 @@ test.skipIf(!pythonWheelsAvailable).each(pydanticCases)(
         await readFile(new URL(`./golden-pydantic-ai/${name}.json`, import.meta.url), 'utf8'),
       );
       expect(actual).toEqual(golden);
+      if (nativeRepairAttempts[name]) {
+        const attempts = fixture.fromWorker
+          .map((raw) => JSON.parse(raw))
+          .filter((frame) => frame.kind === 'request' && frame.op === 'model')
+          .map((frame) => frame.payload.options?.repairAttempt);
+        expect(attempts).toEqual(nativeRepairAttempts[name]);
+      }
       expect(fixture.workerErrors).toEqual([]);
       if (name.endsWith('argument-block'))
         expect(fixture.toWorker.join('\n')).not.toContain('BLOCKED_ARGUMENT');

@@ -183,15 +183,16 @@ only documented exception-string and tuple-array decoding is allowed to differ.
 
 ## pydantic-ai conversations
 
-The separate [pydantic-ai matrix](compatibility-matrix-pydantic-ai.json) lists 35
+The separate [pydantic-ai matrix](compatibility-matrix-pydantic-ai.json) lists 38
 native-reference cases for model calls, tools, output validation, checked streaming
 and deferred interactions. Native CPython, Node Pyodide and real headless Chromium
 compare the same OpenAI-format requests, responses, capabilities, interactions and
 stream projections. The CPython-only recorder uses the pinned OpenAI mapper;
 provider SDKs do not enter the Worker wheel sets.
 
-Four native-output cases compare the routed schema constraint, validated output,
-one permitted repair, the default route's repair refusal and checked text streaming.
+Seven native-output cases compare the routed schema constraint, validated output,
+one permitted repair, a second repair refused by the route, run repair budget
+exhaustion, the default route's repair refusal, checked text streaming and streamed repair.
 The mock ignores the schema; these cases establish parity, not real-model constraint
 enforcement. Existing goldens and reload variants remain unchanged.
 

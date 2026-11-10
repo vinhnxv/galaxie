@@ -44,7 +44,10 @@
     "native-output",
     "native-output-repair",
     "native-output-repair-refused",
-    "stream-native-output"
+    "stream-native-output",
+    "native-output-second-repair-refused",
+    "native-output-repair-budget-exhausted",
+    "stream-native-output-repair"
   ],
   "differences": [],
   "normalizations": [
@@ -61,7 +64,8 @@
   ],
   "limits": [
     "NativeOutput is supported only without function tools, non-empty or unknown toolsets, deferred requests or a schema template. These shapes and agent-level model settings other than stop_sequences fail unsupported at prepare; later-contributed tools or settings fail before the bridge.",
-    "The native-output-repair-refused native fixture uses the router's fixed invalid refusal as a stand-in; Pyodide lanes exercise ModelPort.begin with the route's default repairAttempts: 0. The two native repair cases use the mock's assistant-turn sequencing. The mock ignores the schema; no real-model constraint enforcement is claimed.",
+    "The native-output reference derives the repair index from its own message history and applies the router's route-index limit before charging the run repair budget. Both Pyodide lanes exercise the real router with per-case route and budget settings from fixtures.json. The reference does not receive the face's index, so parity proves the counter only at the exercised boundaries; Node bridge-frame assertions and Python unit tests prove the exact values. Repair cases use the mock's assistant-turn sequencing. The mock ignores the schema; no real-model constraint enforcement is claimed.",
+    "The stream-native-output-repair case streams the rejected attempt's checked text before validation fails, then streams the permitted repair.",
     "A route without the tool-calling feature fails unavailable under the existing router semantics; a leased model without bindTools fails unsupported. Both fail before provider dispatch, without fallback.",
     "All model replies are deterministic scripts. Native conformance blocks socket connections; Pyodide fixtures block external requests and use verified local assets.",
     "The capability-denial fixture raises the same fixed denial from a native tool and the JavaScript broker binding.",

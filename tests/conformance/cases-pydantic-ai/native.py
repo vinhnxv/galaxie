@@ -188,6 +188,7 @@ async def _run_case(name, *, reload=False):
     streaming = name.startswith('stream-')
     if streaming:
         transcript['streams'] = []
+    charged_repairs = 0
     mapper = OpenAIChatModel('conformance', provider=OpenAIProvider(api_key='unused-fixture-key'), profile={
         'supports_tools': True, 'supports_text_output': True,
         'supports_json_schema_output': False, 'supports_json_object_output': False,
@@ -221,8 +222,17 @@ async def _run_case(name, *, reload=False):
             yield NativeStream(parameters, response, name)
 
         async def _response(self, messages, settings, parameters):
-            if name == 'native-output-repair-refused' and transcript['responses']:
-                raise GalaxieError('invalid')
+            nonlocal charged_repairs
+            if parameters.output_mode == 'native':
+                # The reference has no bridge index, so derive it from its own history.
+                repair = sum(isinstance(message, ModelResponse) for message in messages)
+                route = spec.get('route', {})
+                if repair:
+                    if repair > route.get('repairAttempts', 0):
+                        raise GalaxieError('invalid')
+                    if charged_repairs >= route.get('runRepairBudget', 2):
+                        raise GalaxieError('budget_exceeded')
+                    charged_repairs += 1
             mapped = await mapper._map_messages(messages, parameters, model_settings=settings)
             for message in mapped:
                 if message.get('content') is None:
