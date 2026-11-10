@@ -51,7 +51,7 @@ def leaf(name, replies=None, *, confirm=False, long_running=False):
     tools = [LongRunningFunctionTool(pending_double)] if long_running else [FunctionTool(double, require_confirmation=confirm)]
     return LlmAgent(
         name=name, model=Scripted(model=name, replies=list(replies or [f'{name} done'])),
-        instruction='Answer.', tools=tools,
+        instruction='Answer.', tools=list(tools),
     )
 
 

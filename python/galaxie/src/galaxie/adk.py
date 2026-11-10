@@ -23,7 +23,7 @@ from typing import Any, cast
 
 from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode  # pyright: ignore[reportPrivateImportUsage]
-from google.adk.apps import App
+from google.adk.apps import App, ResumabilityConfig
 from google.adk.events import Event
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_request import LlmRequest
@@ -549,19 +549,22 @@ def _is_exit(tool: Any) -> bool:
     return type(tool) is FunctionTool and tool.func is exit_loop and tool in _tools
 
 
-def _validate(root: Any) -> frozenset[str]:
+def _validate(root: Any) -> tuple[frozenset[str], bool]:
     """Fail closed unless every agent, model and tool in the tree is one galaxie can govern.
 
-    Returns the names of the agents that can pause. ADK resumes only the agent that paused, so a
-    pausing agent must be the last one to run: native ADK 2.12.0 never runs the siblings after it,
-    and a pause inside a loop or parallel agent resumes without the surrounding iteration (ADR-0022).
+    Returns the pausing agents and whether their positions need ADK's resumable runner.
+    Existing last-child sequences keep their original runner. Loops, transfer pauses,
+    multiple pausing parallel branches and long-running parallel calls stay refused (ADR-0022).
     """
     visited = 0
     names: dict[str, int] = {}
     pausing: set[str] = set()
+    resumable = False
+    resumable_refused = False
+    parallel_pauses: dict[int, int] = {}
 
     def walk(agent: Any, inherited: bool, depth: int, path: set[int], lineage: tuple[tuple[Any, int], ...]) -> bool:
-        nonlocal visited
+        nonlocal visited, resumable, resumable_refused
         visited += 1
         if depth > MAX_DEPTH or visited > MAX_AGENTS or id(agent) in path:
             raise GalaxieError('unsupported')
@@ -575,6 +578,8 @@ def _validate(root: Any) -> frozenset[str]:
         exits = False
         pauses = False
         if isinstance(agent, LlmAgent):
+            resumable_refused = resumable_refused or bool(agent.sub_agents) or bool(
+                agent.output_key and agent.output_key.startswith('temp:'))
             if agent.model != '':
                 if type(agent.model) is not _GalaxieLlm or agent.model not in _models:
                     raise GalaxieError('unsupported')
@@ -601,10 +606,20 @@ def _validate(root: Any) -> frozenset[str]:
             raise GalaxieError('invalid')
         if pauses:
             if agent.sub_agents or any(
-                type(parent) is not SequentialAgent or index != len(parent.sub_agents) - 1
-                for parent, index in lineage
+                type(parent) not in (SequentialAgent, ParallelAgent) for parent, _ in lineage
             ):
                 raise GalaxieError('unsupported')
+            for parent, _ in lineage:
+                if isinstance(parent, ParallelAgent):
+                    parallel_pauses[id(parent)] = parallel_pauses.get(id(parent), 0) + 1
+                    if parallel_pauses[id(parent)] > 1 or any(
+                        isinstance(tool, _CapabilityTool) and tool.is_long_running for tool in agent.tools
+                    ):
+                        raise GalaxieError('unsupported')
+            resumable = resumable or any(
+                type(parent) is not SequentialAgent or index != len(parent.sub_agents) - 1
+                for parent, index in lineage
+            )
             pausing.add(agent.name)
         path.add(id(agent))
         for index, child in enumerate(agent.sub_agents):
@@ -618,7 +633,9 @@ def _validate(root: Any) -> frozenset[str]:
     # The agent named on a pausing event must identify one agent.
     if any(names[name] != 1 for name in pausing):
         raise GalaxieError('unsupported')
-    return frozenset(pausing)
+    if resumable and (resumable_refused or any(count != 1 for count in names.values())):
+        raise GalaxieError('unsupported')
+    return frozenset(pausing), resumable
 
 
 def _event_size(event: Event) -> int:
@@ -856,6 +873,125 @@ def _stored_pending(raw: Any, conversation: str, pauses: int, events: list[Event
     return _Pending(asks, {'id': interaction['id'], 'value': value})
 
 
+def _workflow_state(root: BaseAgent, resumable: bool, events: list[Event], pause: _Pending | None) -> None:
+    """Refuse routing state the tree and its pending invocation could not have produced.
+
+    ADK's integrity plugin stamps calls, not workflow progress. A changed child index
+    or missing parallel completion would otherwise re-run finished work on resume.
+    """
+    legacy_paths: set[tuple[str, str]] = set()
+
+    def legacy(agent: BaseAgent, prefix: str) -> None:
+        path = f'{prefix}/{agent.name}@1' if prefix else f'{agent.name}@1'
+        if isinstance(agent, LlmAgent):
+            legacy_paths.add((agent.name, path))
+        for child in agent.sub_agents:
+            legacy(child, path)
+
+    if not resumable and isinstance(root, LlmAgent):
+        legacy(root, '')
+    for event in events:
+        node = event.node_info
+        # ADK's standalone LlmAgent node runner stamps the static ancestry with
+        # @1 per agent (Context._derive_node_path), including transfer targets.
+        legacy_node = (event.author, node.path) in legacy_paths
+        if (node.path and not legacy_node) or node.output_for is not None or node.message_as_output is not None:
+            raise ValueError()
+        state, end = event.actions.agent_state, event.actions.end_of_agent
+        if state is None and end is None:
+            continue
+        agent = root.find_agent(event.author)
+        if not resumable or agent is None or (end is not None and (end is not True or state is not None)):
+            raise ValueError()
+        if state is None:
+            continue
+        if isinstance(agent, (SequentialAgent, LoopAgent)):
+            keys = {'current_sub_agent', *({'times_looped'} if isinstance(agent, LoopAgent) else set())}
+            if set(state) != keys or state['current_sub_agent'] not in {child.name for child in agent.sub_agents}:
+                raise ValueError()
+            if isinstance(agent, LoopAgent):
+                count = state['times_looped']
+                if type(count) is not int or count < 0 or (agent.max_iterations is not None and count > agent.max_iterations):
+                    raise ValueError()
+        elif state:
+            raise ValueError()
+    if not resumable or pause is None:
+        return
+    pending_calls = {
+        ask.call: event for ask in pause.asks for event in events
+        for part in (event.content.parts or [] if event.content is not None else [])
+        if part.function_call is not None and part.function_call.id == ask.call
+    }
+    if len(pending_calls) != len(pause.asks) or len({(event.invocation_id, event.author) for event in pending_calls.values()}) != 1:
+        raise ValueError()
+    pending = next(iter(pending_calls.values()))
+    agent = root.find_agent(pending.author)
+    if not isinstance(agent, LlmAgent):
+        raise ValueError()
+    # A loop's next iteration resets its descendants. All other progress in an
+    # invocation advances once through the children and never moves backwards.
+    positions: dict[str, tuple[int, int]] = {}
+    latest: dict[str, dict[str, Any]] = {}
+    ended: set[str] = set()
+    observed: set[str] = set()
+
+    def reset(children: list[BaseAgent]) -> None:
+        for child in children:
+            positions.pop(child.name, None)
+            latest.pop(child.name, None)
+            ended.discard(child.name)
+            observed.discard(child.name)
+            reset(child.sub_agents)
+
+    for event in events:
+        if event.invocation_id != pending.invocation_id or event.author == 'user':
+            continue
+        current = root.find_agent(event.author)
+        if current is None:
+            raise ValueError()
+        observed.add(current.name)
+        state = event.actions.agent_state
+        if state is not None:
+            if current.name in ended:
+                raise ValueError()
+            if isinstance(current, (SequentialAgent, LoopAgent)):
+                index = [child.name for child in current.sub_agents].index(state['current_sub_agent'])
+                count = state.get('times_looped', 0)
+                previous = positions.get(current.name)
+                expected = (0, 0)
+                if previous is not None:
+                    iteration, child = previous
+                    expected = (iteration, child + 1)
+                    if isinstance(current, LoopAgent) and child + 1 == len(current.sub_agents):
+                        expected = (iteration + 1, 0)
+                if (count, index) != expected:
+                    raise ValueError()
+                if isinstance(current, LoopAgent) and previous is not None and count != previous[0]:
+                    reset(current.sub_agents)
+                positions[current.name] = (count, index)
+            elif current.name in latest:
+                raise ValueError()
+            latest[current.name] = state
+        if event.actions.end_of_agent:
+            ended.add(current.name)
+    child = agent
+    if child.name in ended:
+        raise ValueError()
+    while (parent := child.parent_agent) is not None:
+        state = latest.get(parent.name)
+        if state is None or parent.name in ended:
+            raise ValueError()
+        if isinstance(parent, SequentialAgent) and state.get('current_sub_agent') != child.name:
+            raise ValueError()
+        if isinstance(parent, ParallelAgent):
+            for branch in parent.sub_agents:
+                if branch is child:
+                    continue
+                if any(branch.find_agent(name) is not None for name in observed) and branch.name not in ended:
+                    raise ValueError()
+        child = parent
+
+
 def _confirmation(call: types.FunctionCall) -> _Ask:
     original = (call.args or {}).get('originalFunctionCall')
     if (
@@ -957,7 +1093,7 @@ class Executor:
         resume: Callable[[list[dict[str, Any]], str, Any], list[dict[str, Any]]] | None = None,
     ) -> None:
         with quiet():
-            self._pausing = _validate(agent)
+            self._pausing, self._resumable = _validate(agent)
         # A pause with nowhere to show it would run its capability and then fail, so refuse it first.
         if self._pausing and interaction is None:
             raise GalaxieError('unsupported')
@@ -1003,7 +1139,10 @@ class Executor:
         if runner is None:
             plugin = ToolCallIntegrityPlugin(secret_key=self._keys.setdefault(session, secrets.token_bytes(32)))
             runner = Runner(
-                app=App(name=APP_NAME, root_agent=self.agent, plugins=[plugin]),
+                app=App(
+                    name=APP_NAME, root_agent=self.agent, plugins=[plugin],
+                    resumability_config=ResumabilityConfig(is_resumable=True) if self._resumable else None,
+                ),
                 session_service=self._sessions,
             )
             self._runners[session] = runner
@@ -1086,6 +1225,7 @@ class Executor:
                 _stored_pending(meta['pending'], conversation, meta['pauses'], events)
                 if meta['pending'] is not None else None
             )
+            _workflow_state(self.agent, self._resumable, events, pause)
         except Exception:
             raise GalaxieError('unrecoverable') from None
         self.forget(conversation)
