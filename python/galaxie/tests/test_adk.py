@@ -1090,6 +1090,32 @@ def test_deleting_an_entire_nonempty_parallel_sibling_history_fails_restore_befo
     assert seen == []
 
 
+@pytest.mark.parametrize(('build', 'author', 'action'), [
+    (lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]),
+     'worker', 'endOfAgent'),
+    (lambda: ParallelAgent(name='sibling', sub_agents=[
+        ParallelAgent(name='inner', sub_agents=[quiet_child('worker')]),
+        SequentialAgent(name='empty'),
+    ]), 'inner', 'endOfAgent'),
+    (lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]),
+     'sibling', 'agentState'),
+    (lambda: SequentialAgent(name='sibling', sub_agents=[quiet_child('worker')]), 'sibling', 'endOfAgent'),
+])
+def test_unfinished_parallel_siblings_fail_restore_before_dispatch(build, author, action):
+    # Empty children omit the enclosing Parallel marker, exposing descendant completion checks.
+    original, (checkpoint, metadata) = workflow_record('parallel', sibling=build())
+    bad = edit(checkpoint, lambda value: value['events'].remove(next(
+        event for event in value['events'] if event['author'] == author and action in event['actions']
+    )))
+    executor = durable(Executor(original.agent, interaction=interact))
+    seen = []
+    transport_for([], seen)
+    assert code_of(lambda: asyncio.run(executor._restore(bad, metadata, 'bound'))) == 'unrecoverable'
+    assert executor.pending('s1') is None
+    assert executor._sessions.sessions == {}
+    assert seen == []
+
+
 @pytest.mark.parametrize('build', [
     lambda: SequentialAgent(name='sibling'),
     lambda: ParallelAgent(name='sibling'),
