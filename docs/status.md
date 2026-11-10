@@ -56,6 +56,18 @@ from history rather than receiving the face's value, so parity proves the counte
 only at the exercised boundaries; Node bridge assertions and Python unit tests
 prove the exact values.
 
+On 2026-11-11, pydantic-ai 2.60.0 delegation probes on CPython and Node Pyodide
+recorded an alternative for plain delegation: a probe-local helper forwards usage
+and derives distinct child identity from stable delegate tool-call IDs across
+replay; a public-only guard detects wrapped nested model and capability work.
+Plain children exceed parent step limits and repeat
+writes after reload; shared conversation IDs collide with parent scopes. Explicit
+child-approval hoisting completes and restores in the measured pattern, but child
+stream events have no paths, so `subgraphs` remains false. No helper, hoist API or
+guard ships yet. Native children share the repair counter, and outer snapshot
+validation does not validate author-owned child metadata. Browser delegation and
+real providers remain unmeasured. See the [probe results and limits](../tests/conformance/README.md#pydantic-ai-agent-delegation-probes).
+
 The repository is public. No legal review of learner data (minors, consent, retention) has been done, because the project has no legal counsel; see the [README](../README.md#intended-use-and-disclaimer) and [ADR-0024](adr/0024-apache-2-0-license-and-dco.md). The seven launch packages are on npm at 0.1.0; the other packages in this repository are not published.
 
 `@galaxie-ai/ui-protocol` provides pinned A2UI v1.0 messages, strict parsing, catalog validation and a pure surface reducer. Core uses it for pending surfaces and React renders them (see the next paragraphs). It is verified by its own Node and Chromium tests, replayed upstream example messages and a conformance test that compares its URL check with core's. Nothing is measured about its cost on large surfaces. See the [package API and limits](../packages/ui-protocol/README.md).

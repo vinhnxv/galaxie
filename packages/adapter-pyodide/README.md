@@ -193,9 +193,22 @@ cancellation or Worker loss discards them, and subsequent pending/resume fails
 `unavailable`. Snapshots cover pause and completion boundaries, not arbitrary
 mid-run replay. Write deduplication requires recovery and deterministic call order;
 a replay with changed arguments fails `unrecoverable`. Keep the existing app/principal
-scope, logout fencing and ownership composition. `subgraphs` stays false: child
-agent deferrals do not propagate to the parent, and pydantic-graph 2.60 has no
-persistence module matching nested interrupt and stream semantics.
+scope, logout fencing and ownership composition. `subgraphs` stays false: the
+[delegation probes](../../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
+observe checked child deltas without host child events or paths. Plain delegation
+has a measured alternative: forward usage and derive a stable, distinct child
+conversation ID, with stable delegate tool-call IDs across parent model replay.
+Regenerated delegate IDs change the child scope and can repeat a write; this
+variant is unmeasured. A fresh child ID repeats a write after reload, and simply
+reusing the parent's ID collides with its effect positions. Explicitly hoisting child
+approval state into the parent's metadata completes and restores in the measured
+pattern, using an author resume callback that preserves child state. These are
+probe-local patterns; an executor-owned helper, hoist API and public-only nested
+model/capability guard remain follow-up work. No nested-run refusal ships yet.
+Prefer flattening gated tools into one agent's capability-backed tools. Sequential
+native-output delegates share repair accounting; outer snapshot validation does
+not validate author-owned child metadata. Browser delegation, real providers and
+general nested checkpoint semantics remain unmeasured.
 
 Include `DeferredToolRequests` in the agent's output types to pause on
 `requires_approval`, `ApprovalRequired` or `CallDeferred`. Wrap the agent in `Executor(agent,
