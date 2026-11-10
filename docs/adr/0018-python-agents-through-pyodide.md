@@ -15,6 +15,7 @@
   2026-11-04: recorded Google ADK Python 2.12.0 as the fifth Python executor option (`adk-python`), with its agent-shape and credential-scan evidence in [ADR-0022](0022-google-adk-python-through-the-pyodide-adapter.md); status stays Proposed.
   2026-11-10: recorded tool-less pydantic-ai NativeOutput with routed schemas and bounded repair, and the prepare-time refusal of provider-specific settings; status stays Proposed.
   2026-11-11: recorded scripted delegation, helper identity, public nested-run guard and hoisted approval/restore probes; child stream paths remain absent and status stays Proposed.
+  2026-11-11: recorded the outcome of the pydantic-ai builtin and native tools spike; status stays Proposed.
 
 ## Context
 
@@ -223,5 +224,57 @@ the schema. Python face/bridge and JavaScript adapter tests also cover refusals
 before dispatch and preservation of the ordinary model path. Existing goldens,
 other executors, core contracts and dependency locks are unchanged. No real-model
 constraint reliability or device performance is claimed.
+
+### pydantic-ai builtin and native tools spike (2026-11)
+
+The [native-tool refusal probes](../../tests/conformance/README.md#pydantic-ai-native-tool-refusal-probes)
+apply a rule committed before measurement to pydantic-ai-slim and pydantic-graph
+2.60.0, CPython 3.14.5 and Node Pyodide 314.0.7. All evidence is scripted or mock.
+
+| Gap | Outcome | Evidence and reason |
+| --- | --- | --- |
+| Static retrieval kinds: `web_search`, `web_fetch`, `x_search`, `file_search`, `mcp_server` | Refused | N1/N2/N3 refuse native declarations before bridge work. N4 proves equal ordinary/local capability traffic, but two model requests fail its fixed one-request criterion, so it does not award alternative. |
+| Static `advisor`, `code_execution`, `image_generation`, `memory`, `tool_search` | Refused | N1/N2 show prepare/request refusal; provider execution or state has no broker path. Required tool search first conflicts with the upstream automatic declaration; a public capability mutation exposes it to prepare validation. |
+| Dynamic and per-run native tools | Refused | D1 refuses factories at prepare without invoking them; D2/D3 refuse overrides and direct optional requests before transport. D4 observes no per-run capabilities option from the executor. |
+| Native response parts | Refused | RP1 rejects history with `unsupported`; RP2 and B1/B2 reject closed-shape violations with `invalid`; RP3 rejects array provider content with `unsupported` before Python receives a reply. |
+
+Support requires four conditions, none established here: S1, a repository provider
+executing native tools (the OpenAI-compatible mapper accepts function declarations
+and string replies only; WebLLM, Built-in AI and Transformers have no native-tool
+execution); S2, bridge declaration/result channels (B1/B2 reject both); S3, a router
+feature for the kind (the four `ModelFeature` labels contain none); S4, measured
+provider-side execution through broker grants, labels, budgets and confirmations
+(no such execution occurred). The evidence README cites the owning source paths.
+
+Characterization first pinned acceptance at prepare and refusal at the first
+request. The new validation beside `_validate_agent` now refuses static native
+tools and callable factories with fixed `unsupported` before transport. Even a
+factory returning `None` is refused without execution. Only optional `tool_search`
+is ignored at prepare, because pydantic-ai injects it into ordinary agents;
+deferred-loading tools still activate the request-time refusal. Revalidating an
+executor checks capabilities added after its construction. The existing request,
+history, reply, bridge and adapter checks stay unchanged.
+
+For retrieval, authors can declare `capability_tool(name, capability, schema)`
+bound by the host to a broker capability, or use
+`WebSearch(native=False, local=<capability_tool>)`. The measured search replacement
+has identical requests, one capability call and positional effect scopes. Returned
+data keeps the broker's labels; grants, destination policy, budgets and host write
+confirmation still apply. This documents a working retrieval form, not provider
+tool parity or an alternative outcome under the fixed rule. Generic code execution
+is forbidden by ADR-0012 A.3; image results lack a bridge channel, while memory and
+advisor tools keep state or invoke models outside the router. No replacement for
+those native tools ships here.
+
+`MCP` defaults to `native=False` in 2.60.0; the measured native form explicitly
+sets `native=True, local=False` with inert server arguments. Its local fallback
+requires the absent optional `fastmcp` package. `MCP(local=True)` and
+`WebSearch(local='duckduckgo')` could open Worker network access and were not run.
+Native-tool Chromium probes, real providers, actual native execution and network
+reachability remain unmeasured. A host-registered model that runs tools internally
+and returns only a string is undetectable by this adapter; the host takes on those
+controls under ADR-0012's SDK-controlled-path limit. That limit is reasoned, not
+measured. Existing goldens, matrices, locks, decision 11 and JavaScript package
+source are unchanged. This ADR stays Proposed.
 
 [S4]: https://pyodide.org/en/stable/usage/packages-in-pyodide.html
