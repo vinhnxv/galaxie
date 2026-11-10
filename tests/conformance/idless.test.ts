@@ -9,10 +9,16 @@ import {
   toErrorInfo,
 } from '@galaxie-ai/core';
 import * as web from '@langchain/langgraph/web';
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from '@opentelemetry/sdk-trace';
 import { expect, test, vi } from 'vitest';
 import { z } from 'zod';
+import { serializeSpans } from '../../packages/core/test/span-tree.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
-import { answer, ask, IDLESS_CASE_NAMES, idlessCases } from './cases/idless.js';
+import { answer, ask, IDLESS_CASE_NAMES, idlessCases, question } from './cases/idless.js';
 import { IDLESS_SHAPES, shapeGraph } from './cases/idless-shapes.js';
 import sequence from './golden/idless-sequence.json' with { type: 'json' };
 import shapes from './golden/idless-shapes.json' with { type: 'json' };
@@ -329,5 +335,66 @@ test('an unfinished fan-out sibling cannot consume a bare answer after abort', a
   } finally {
     held.resolve();
     await runtime.dispose();
+  }
+});
+
+test('ID-less identity and errors omit node names; spans omit request and answer content', async () => {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const requestCanary = 'private-idless-request-canary';
+  const answerCanary = 'private-idless-answer-canary';
+  const nodeCanary = 'private-idless-node-canary';
+  const runtime = createRuntime({
+    appId: 'tests',
+    executors: [createLangGraphAdapter()],
+    tracerProvider: provider,
+  });
+  try {
+    const instance = await runtime.create(definition, {
+      principalScope: 'tests',
+      agent: (host) =>
+        new web.StateGraph(web.Annotation.Root({ answer: web.Annotation<unknown> }))
+          .addNode(nodeCanary, async (_, config) => {
+            await ask({ request: requestInteraction }, config, {
+              ...question,
+              props: { question: requestCanary },
+            });
+            throw new Error(answerCanary);
+          })
+          .addEdge(web.START, nodeCanary)
+          .addEdge(nodeCanary, web.END)
+          .compile({ checkpointer: host.langchain.checkpointer() }),
+    });
+    await instance.prepare();
+    const { runId } = await instance.start({});
+    for await (const event of instance.events(runId)) if (event.type === 'interaction') break;
+    const pending = instance.getSnapshot().run?.pending;
+    if (pending === undefined) throw new Error('Expected an ID-less pause.');
+    expect(pending.props).toEqual({ question: requestCanary });
+    await instance.dispatch({
+      instanceId: instance.instanceId,
+      runId,
+      ...pending,
+      action: 'submit',
+      payload: { answer: answerCanary },
+    });
+    for await (const _event of instance.events(runId)) {
+      /* Drain the fixed failure. */
+    }
+    await runtime.dispose();
+    expect(instance.getSnapshot().run?.error).toMatchObject(toErrorInfo('executor_error'));
+    const spans = exporter.getFinishedSpans();
+    expect(spans.length).toBeGreaterThan(0);
+    const identityAndError = JSON.stringify({
+      identity: pending.interactionId,
+      snapshot: instance.getSnapshot(),
+    });
+    for (const canary of [requestCanary, answerCanary, nodeCanary])
+      expect(identityAndError).not.toContain(canary);
+    for (const canary of [requestCanary, answerCanary])
+      expect(serializeSpans(spans)).not.toContain(canary);
+  } finally {
+    await runtime.dispose();
+    await provider.shutdown();
   }
 });
