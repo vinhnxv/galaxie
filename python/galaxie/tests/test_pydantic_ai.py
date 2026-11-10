@@ -5,6 +5,7 @@ import asyncio
 import json
 import subprocess
 import sys
+from itertools import repeat
 
 import pytest
 from pydantic import BaseModel
@@ -375,6 +376,29 @@ def test_stream_native_output_uses_checked_text_deltas_and_the_schema_constraint
     assert [data[0]['content'] for mode, data in streams if mode == 'messages'] == ['{"value": ', '8}']
 
 
+def test_stream_native_output_repair_keeps_checked_deltas_and_growing_indices():
+    seen = []
+    streaming_transport_for([
+        ([{'content': '{"value": '}, {'content': '"x"}'}], {'content': '{"value": "x"}'}),
+        ([{'content': '{"value": '}, {'content': '8}'}], {'content': '{"value": 8}'}),
+    ], seen)
+    streams = []
+    executor = prepare_executor(Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer), retries=1))
+    assert asyncio.run(executor.run({'prompt': 'question'}, 'conversation', 5, on_stream=lambda mode, data: streams.append((mode, data)))) == {'value': 8}
+    assert [payload['options'].get('repairAttempt') for payload in seen] == [None, 1]
+    assert all(payload['options']['stream'] is True and payload['options']['jsonSchema'] == ANSWER_SCHEMA for payload in seen)
+    assert [data[0]['content'] for mode, data in streams if mode == 'messages'] == ['{"value": ', '"x"}', '{"value": ', '8}']
+
+
+def test_native_output_repair_indices_restart_on_each_run_of_one_executor():
+    seen = []
+    transport_for([{'content': '{"value":"x"}'}, {'content': '{"value":8}'}, {'content': '{"value":9}'}], seen)
+    executor = prepare_executor(Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer), retries=1))
+    assert asyncio.run(executor.run({'prompt': 'first'}, 'conversation', 5)) == {'value': 8}
+    assert asyncio.run(executor.run({'prompt': 'second'}, 'conversation', 5)) == {'value': 9}
+    assert [payload['options'].get('repairAttempt') for payload in seen] == [None, 1, None]
+
+
 @pytest.mark.parametrize('shape', ['capability', 'plain-tool', 'deferred', 'template', 'empty-template', 'toolset'])
 @pytest.mark.parametrize('prepare', [prepare_executor, Executor])
 def test_native_output_unprovable_shapes_fail_at_prepare_without_bridge_traffic(shape, prepare):
@@ -593,10 +617,16 @@ def test_tool_ids_from_previous_starts_may_repeat_with_distinct_scopes():
 
 
 def streaming_transport(chunks, reply, seen=None):
+    streaming_transport_for(repeat((chunks, reply)), seen)
+
+
+def streaming_transport_for(replies, seen=None):
+    replies = iter(replies)
     async def transport(raw):
         message = json.loads(raw)
         if seen is not None:
             seen.append(message['payload'])
+        chunks, reply = next(replies)
         for chunk in chunks:
             _bridge.receive_model_chunk(json.dumps({
                 **message, 'kind': 'notify', 'op': 'model-chunk', 'payload': chunk,
