@@ -1,0 +1,252 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "id": "<interrupt:1>",
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Gate/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "decision": "continue"
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 2,
+          "decision": "continue"
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 2,
+          "decision": "continue",
+          "counts": {
+            "prepare": 1,
+            "work": 1
+          }
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "prepare": {}
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "id": "<interrupt:1>",
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Gate/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "gate": {
+            "decision": "continue"
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "work": {
+            "value": 2
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "finish": {
+            "counts": {
+              "prepare": 1,
+              "work": 1
+            }
+          }
+        }
+      }
+    ],
+    "messages": [],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "updates",
+    "updates",
+    "values",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 2,
+    "decision": "continue",
+    "counts": {
+      "prepare": 1,
+      "work": 1
+    }
+  },
+  "state": {
+    "values": {
+      "value": 2,
+      "decision": "continue",
+      "counts": {
+        "prepare": 1,
+        "work": 1
+      }
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "prepare"
+      ],
+      "values": {
+        "value": 1
+      },
+      "parentCheckpointId": "<uuid:1>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [
+        "gate"
+      ],
+      "values": {
+        "value": 1
+      },
+      "parentCheckpointId": "<uuid:2>"
+    },
+    {
+      "metadata": {
+        "step": 2,
+        "source": "loop"
+      },
+      "next": [
+        "work"
+      ],
+      "values": {
+        "value": 1,
+        "decision": "continue"
+      },
+      "parentCheckpointId": "<uuid:3>"
+    },
+    {
+      "metadata": {
+        "step": 3,
+        "source": "loop"
+      },
+      "next": [
+        "finish"
+      ],
+      "values": {
+        "value": 2,
+        "decision": "continue"
+      },
+      "parentCheckpointId": "<uuid:4>"
+    },
+    {
+      "metadata": {
+        "step": 4,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 2,
+        "decision": "continue",
+        "counts": {
+          "prepare": 1,
+          "work": 1
+        }
+      },
+      "parentCheckpointId": "<uuid:5>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  },
+  "pauses": [
+    {
+      "interrupts": [
+        {
+          "id": "<interrupt:1>",
+          "value": {
+            "surfaceId": "main",
+            "viewRevision": "r1",
+            "component": "conformance.Gate/v1",
+            "props": {
+              "question": "Continue?"
+            }
+          }
+        }
+      ],
+      "historyLength": 3
+    }
+  ]
+}

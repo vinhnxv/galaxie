@@ -6,9 +6,12 @@ import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
 import * as web from '@langchain/langgraph/web';
 import { afterEach, expect, expectTypeOf, test } from 'vitest';
+import { GATE_CASE_NAMES, gateCases } from './cases/gates.js';
 import { CASE_NAMES, type CaseName, cases } from './cases/index.js';
 import branching from './golden/branching.json' with { type: 'json' };
 import capability from './golden/capability.json' with { type: 'json' };
+import gateContinue from './golden/gate-continue.json' with { type: 'json' };
+import gateReject from './golden/gate-reject.json' with { type: 'json' };
 import interruptDurabilityExit from './golden/interrupt-durability-exit.json' with { type: 'json' };
 import interruptDurabilitySync from './golden/interrupt-durability-sync.json' with { type: 'json' };
 import interruptResume from './golden/interrupt-resume.json' with { type: 'json' };
@@ -95,6 +98,52 @@ const reloadCases = {
   'interrupt-durability-sync': interruptDurabilitySync,
   'interrupt-durability-exit': interruptDurabilityExit,
 } as const;
+
+const gateGoldens = { 'gate-continue': gateContinue, 'gate-reject': gateReject };
+
+test.each(GATE_CASE_NAMES)(
+  '%s with IndexedDB matches native with zero differences',
+  async (name) => {
+    const saver = await open();
+    expect(
+      diff(gateGoldens[name], normalize(await runGalaxie(gateCases[name], () => saver))),
+    ).toEqual([]);
+  },
+);
+
+test.each(GATE_CASE_NAMES)(
+  '%s stays resolved after IndexedDB close, reopen and restore',
+  async (name) => {
+    const databaseName = `galaxie-gate-restore-${crypto.randomUUID()}`;
+    const saver = await open(databaseName);
+    const paused = await runGalaxie(gateCases[name], () => saver, true);
+    const first = await saver.list({}).next();
+    const sessionId = first.value?.config.configurable?.['thread_id'] as SessionId;
+    expect(typeof sessionId).toBe('string');
+    saver.close();
+    const reopened = await open(databaseName);
+    const restored = await runGalaxie(gateCases[name], () => reopened, false, sessionId);
+    expect(restored.outcome).toEqual({ status: 'succeeded' });
+    expect(restored.pauses).toEqual(paused.pauses);
+    expect(normalize({ pauses: restored.pauses })).toEqual({ pauses: gateGoldens[name].pauses });
+    expect(restored.state.next).toEqual([]);
+    expect(restored.final).toEqual(
+      name === 'gate-continue'
+        ? { value: 2, decision: 'continue', counts: { prepare: 0, work: 1 } }
+        : { value: 1, decision: 'reject' },
+    );
+    expect(
+      restored.events.updates.filter(
+        ({ data }) => typeof data === 'object' && data !== null && 'work' in data,
+      ),
+    ).toHaveLength(name === 'gate-continue' ? 1 : 0);
+    reopened.close();
+    const completed = await open(databaseName);
+    await expect(runGalaxie(gateCases[name], () => completed, false, sessionId)).rejects.toThrow(
+      'The conformance session has no pending interaction.',
+    );
+  },
+);
 
 test('the IndexedDB recovery port conforms structurally to the core contract', async () => {
   const saver = await open();
