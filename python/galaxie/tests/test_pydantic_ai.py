@@ -338,7 +338,9 @@ def test_a_history_processor_cannot_hide_or_invent_native_repair_attempts():
     from pydantic_ai.messages import ModelMessage, ModelRequest
 
     def drop_replies(messages: list[ModelMessage]) -> list[ModelMessage]:
-        return [message for message in messages if isinstance(message, ModelRequest)]
+        # Keep the current request's attribution: upstream merges adjacent requests without run_id.
+        requests: list[ModelMessage] = [message for message in messages if isinstance(message, ModelRequest)]
+        return requests[-1:]
 
     seen = []
     transport_for([{'content': '{"value":"x"}'}, {'content': '{"value":"x"}'}, {'content': '{"value":8}'}], seen)

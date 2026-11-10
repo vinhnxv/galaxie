@@ -344,8 +344,8 @@ def test_d4_first_and_resumed_run_keyword_names_are_fixed() -> None:
                 'interactionId': pending['id'], 'action': 'approve', 'payload': {'toolCallIds': ['call_1']},
             }) == 'answer'
         assert [set(item.kwargs) for item in wrapped.call_args_list] == [
-            {'conversation_id', 'usage_limits', 'infer_name'},
-            {'conversation_id', 'usage_limits', 'infer_name', 'deferred_tool_results', 'message_history', 'usage'},
+            {'conversation_id', 'usage_limits', 'infer_name', 'run_id'},
+            {'conversation_id', 'usage_limits', 'infer_name', 'run_id', 'deferred_tool_results', 'message_history', 'usage'},
         ]
 
     asyncio.run(run())
