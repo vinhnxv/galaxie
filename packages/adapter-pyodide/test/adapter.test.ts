@@ -375,6 +375,46 @@ test.each(['allowed', 'route-refused'] as const)(
   },
 );
 
+test.each(['allowed', 'refused'] as const)(
+  'a structured repair reaches the router before provider dispatch: %s',
+  async (outcome) => {
+    vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
+    const workers: FixtureWorker[] = [];
+    const provider = model('{"answer":"42"}');
+    const executor = await setup(workers, 'pydantic-ai').prepare(
+      descriptor,
+      { chatModels: { model: provider } },
+      preparation,
+    );
+    const worker = workers[0];
+    if (!worker) throw new Error('The fixture Worker is missing.');
+    const jsonSchema = { type: 'object', properties: { answer: { type: 'string' } } };
+    modelRoundTrip(worker, false, { jsonSchema, repairAttempt: 2 });
+    const run = request();
+    if (outcome === 'refused')
+      vi.mocked(run.request.models.begin).mockRejectedValue(
+        new GalaxieError('invalid', 'The request is invalid.'),
+      );
+    const result = await collect(executor.run(run.request));
+    expect(run.request.models.begin).toHaveBeenCalledWith('answer', {
+      signal: run.request.signal,
+      requires: ['structured-output'],
+      repairAttempt: 2,
+    });
+    if (outcome === 'allowed') {
+      expect(provider.invoke).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ jsonSchema }),
+      );
+      expect(result).toMatchObject([{ type: 'output', output: { content: '{"answer":"42"}' } }]);
+    } else {
+      expect(provider.invoke).not.toHaveBeenCalled();
+      expect(result).toMatchObject([{ type: 'error', error: { code: 'invalid' } }]);
+    }
+    await executor.dispose();
+  },
+);
+
 test('a model request without a JSON Schema leaves the lease and provider options unchanged', async () => {
   vi.stubGlobal('fetch', async () => new Response('def create_agent(): pass'));
   const workers: FixtureWorker[] = [];

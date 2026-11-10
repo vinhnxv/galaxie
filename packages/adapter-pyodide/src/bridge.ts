@@ -84,6 +84,8 @@ export interface ModelPayload {
     readonly stream?: boolean;
     /** A JSON Schema object the reply must follow; routing requires `structured-output`. */
     readonly jsonSchema?: Readonly<Record<string, unknown>>;
+    /** One-based structured-output repair index, charged through the router; requires jsonSchema. */
+    readonly repairAttempt?: number;
     readonly tools?: readonly ToolDefinition[];
     readonly toolChoice?:
       | 'auto'
@@ -289,11 +291,20 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
         Array.isArray(value['messages']) &&
         value['messages'].every(modelMessage) &&
         object(value['options']) &&
-        keys(value['options'], [], ['stop', 'stream', 'tools', 'toolChoice', 'jsonSchema']) &&
+        keys(
+          value['options'],
+          [],
+          ['stop', 'stream', 'tools', 'toolChoice', 'jsonSchema', 'repairAttempt'],
+        ) &&
         validModelOption('tools', value['options']['tools'], toolDefinition) &&
         (value['options']['toolChoice'] === undefined ||
           toolChoice(value['options']['toolChoice'])) &&
         validModelOption('jsonSchema', value['options']['jsonSchema']) &&
+        (value['options']['repairAttempt'] === undefined ||
+          (typeof value['options']['repairAttempt'] === 'number' &&
+            Number.isSafeInteger(value['options']['repairAttempt']) &&
+            value['options']['repairAttempt'] >= 1 &&
+            value['options']['jsonSchema'] !== undefined)) &&
         validModelOption('stream', value['options']['stream']) &&
         validModelOption('stop', value['options']['stop'])
       );

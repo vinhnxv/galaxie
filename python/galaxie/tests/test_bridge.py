@@ -188,6 +188,23 @@ def test_a_chunk_for_a_stream_that_just_ended_is_dropped_but_other_ids_stay_inva
             }))
 
 
+def test_model_repair_attempt_requires_a_schema_and_a_positive_safe_integer():
+    payload = {'role': 'answer', 'messages': [], 'options': {'jsonSchema': {}, 'repairAttempt': 1}}
+    async def transport(raw):
+        message = json.loads(raw)
+        assert message['payload'] == payload
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': {'content': '{}'}})
+    _bridge.install_transport(transport)
+    assert asyncio.run(_bridge.request('model', payload)) == {'content': '{}'}
+    _bridge.install_transport(unused_transport)
+    for options in [
+        *({'jsonSchema': {}, 'repairAttempt': value} for value in [True, 0, -1, 1.0, 1.5, '1', None, 2**53]),
+        {'repairAttempt': 1},
+    ]:
+        with pytest.raises(GalaxieError, match='^The request is invalid\\.$'):
+            asyncio.run(_bridge.request('model', {**payload, 'options': options}))
+
+
 def test_model_tool_shapes_are_closed_on_both_sides():
     tool = {'type': 'function', 'function': {'name': 'double', 'parameters': {'type': 'object'}}}
     call = {'id': 'one', 'type': 'function', 'function': {'name': 'double', 'arguments': '{"value":2}'}}
