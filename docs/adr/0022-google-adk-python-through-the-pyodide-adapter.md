@@ -92,8 +92,11 @@ transfer children are refused because their resumable routing was not exercised.
 
 Restore checks state authors and direct-child names, loop counter types and
 bounds, forward child/iteration progress, the current child on the pending
-agent's ancestry, and completion markers for observed Parallel siblings. A
-non-resumable record cannot carry agent state. Resumable workflow records must
+agent's ancestry, and completion markers for Parallel siblings, including a
+sibling whose entire history was deleted. Empty workflows emit no completion;
+their enclosing Parallel branches may omit it too, so restore checks their
+nonempty descendants instead. A non-resumable record cannot carry agent state.
+Resumable workflow records must
 have empty `node_info`; output routing fields are always refused. ADK's standalone
 LlmAgent runner writes legacy records with exact static ancestry paths using `@1`
 per agent, such as `router@1/specialist@1`. Only that known author/path pair or an empty path

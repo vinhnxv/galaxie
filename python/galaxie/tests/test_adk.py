@@ -998,12 +998,13 @@ def test_workflow_successors_run_once_after_a_live_or_restored_pause(shape, long
     ]
 
 
-def workflow_record(shape='middle'):
+def workflow_record(shape='middle', *, sibling=None):
     if shape == 'parallel':
         paused = named('paused', gated())
         paused.model = llm('paused')
-        sibling = quiet_child('sibling')
-        sibling.model = llm('sibling')
+        sibling = quiet_child('sibling') if sibling is None else sibling
+        if isinstance(sibling, LlmAgent):
+            sibling.model = llm('sibling')
         tree = SequentialAgent(name='pipeline', sub_agents=[
             ParallelAgent(name='fanout', sub_agents=[paused, sibling]), quiet_child('tail'),
         ])
@@ -1057,6 +1058,53 @@ def test_inconsistent_restored_workflow_state_is_unrecoverable_before_dispatch(s
     assert executor.pending('s1') is None
     assert executor._sessions.sessions == {}
     assert seen == []
+
+
+@pytest.mark.parametrize(('build', 'deleted'), [
+    (lambda: quiet_child('sibling'), 'sibling'),
+    (lambda: SequentialAgent(name='sibling', sub_agents=[quiet_child('worker')]), 'sibling'),
+    (lambda: ParallelAgent(name='sibling', sub_agents=[quiet_child('worker')]), 'sibling'),
+    (lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]), 'sibling'),
+    (lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]), 'worker'),
+])
+def test_deleting_an_entire_nonempty_parallel_sibling_history_fails_restore_before_dispatch(build, deleted):
+    sibling = build()
+    original, (checkpoint, metadata) = workflow_record('parallel', sibling=sibling)
+    missing = sibling.find_agent(deleted)
+    assert missing is not None
+    bad = edit(checkpoint, lambda value: value.update(events=[
+        event for event in value['events'] if missing.find_agent(event['author']) is None
+    ]))
+    executor = durable(Executor(original.agent, interaction=interact))
+    seen = []
+    transport_for([], seen)
+    assert code_of(lambda: asyncio.run(executor._restore(bad, metadata, 'bound'))) == 'unrecoverable'
+    assert executor.pending('s1') is None
+    assert executor._sessions.sessions == {}
+    assert seen == []
+
+
+@pytest.mark.parametrize('build', [
+    lambda: SequentialAgent(name='sibling'),
+    lambda: ParallelAgent(name='sibling'),
+    lambda: LoopAgent(name='sibling', max_iterations=1),
+    lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty')]),
+    lambda: ParallelAgent(name='sibling', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]),
+    lambda: ParallelAgent(name='sibling', sub_agents=[
+        ParallelAgent(name='inner', sub_agents=[SequentialAgent(name='empty'), quiet_child('worker')]),
+    ]),
+])
+def test_parallel_siblings_with_empty_workflows_restore_without_repeating_completed_models(build):
+    original, (checkpoint, metadata) = workflow_record('parallel', sibling=build())
+    executor = durable(Executor(original.agent, interaction=interact))
+    seen = []
+    transport_for([], seen)
+    assert asyncio.run(executor._restore(checkpoint, metadata, 'bound')) == 's1'
+    assert executor.pending('s1') == original.pending('s1')
+    assert seen == []
+    transport_for([{'value': 42}, {'content': 'paused done'}, {'content': 'tail done'}], seen)
+    assert answer(executor, executor.pending('s1')) == 'tail done'
+    assert [op for op, _ in seen] == ['capability', 'model', 'model']
 
 
 @pytest.mark.parametrize('actions', [{'agentState': {}}, {'endOfAgent': True}])

@@ -934,15 +934,28 @@ def _workflow_state(root: BaseAgent, resumable: bool, events: list[Event], pause
     positions: dict[str, tuple[int, int]] = {}
     latest: dict[str, dict[str, Any]] = {}
     ended: set[str] = set()
-    observed: set[str] = set()
 
     def reset(children: list[BaseAgent]) -> None:
         for child in children:
             positions.pop(child.name, None)
             latest.pop(child.name, None)
             ended.discard(child.name)
-            observed.discard(child.name)
             reset(child.sub_agents)
+
+    def finished(branch: BaseAgent) -> bool:
+        if branch.name in ended:
+            return True
+        # Empty workflows emit no completion. Parallel also omits its marker
+        # when a child has none, but every nonempty child must still finish.
+        if isinstance(branch, ParallelAgent) and branch.sub_agents:
+            if branch.name not in latest:
+                raise ValueError()
+            children = [finished(child) for child in branch.sub_agents]
+            if not all(children):
+                return False
+        elif not isinstance(branch, LlmAgent) and not branch.sub_agents:
+            return False
+        raise ValueError()
 
     for event in events:
         if event.invocation_id != pending.invocation_id or event.author == 'user':
@@ -950,7 +963,6 @@ def _workflow_state(root: BaseAgent, resumable: bool, events: list[Event], pause
         current = root.find_agent(event.author)
         if current is None:
             raise ValueError()
-        observed.add(current.name)
         state = event.actions.agent_state
         if state is not None:
             if current.name in ended:
@@ -988,8 +1000,7 @@ def _workflow_state(root: BaseAgent, resumable: bool, events: list[Event], pause
             for branch in parent.sub_agents:
                 if branch is child:
                     continue
-                if any(branch.find_agent(name) is not None for name in observed) and branch.name not in ended:
-                    raise ValueError()
+                finished(branch)
         child = parent
 
 
