@@ -672,9 +672,9 @@ bound capabilities ([baseline B10](../adr/0012-security-baseline.md)). The
   scoped token and any custom headers (API key, tenant, signature) from its async
   `headers(context)` callback, as
   [host-remote](../../examples/host-remote/src/runtime.ts) does. The default
-  `credentials: 'same-origin'` also sends the user's session cookie, and backend
-  endpoints that serve agent capabilities must not accept that cookie as
-  authority. Core sets `content-type`, the attribution headers and `Idempotency-Key`
+  `credentials: 'same-origin'` also sends the user's session cookie on same-origin
+  requests, and backend endpoints that serve agent capabilities must not accept that
+  cookie as authority. Core sets `content-type`, the attribution headers and `Idempotency-Key`
   after your headers, so you cannot replace them. `headers(context)` does not
   receive the input. A header that depends on the request body, such as an HMAC
   signature, uses the binding's `fetch` option or a host-written binding with its
@@ -739,14 +739,16 @@ The agent is never the authority and should know only what it needs.
 - **Prompt hints are for the interface.** You may summarize the user's permissions in
   instructions so the agent answers well. Prompt injection can override them, so they
   never replace bindings, host checks or backend authorization.
-- **UI actions are capabilities.** Agents do not touch the DOM (see the
-  [`galaxie/no-dom` rule](../../packages/eslint-plugin/README.md)). Navigation, form
+- **UI actions are capabilities.** Agent authors must not touch the DOM; the
+  [`galaxie/no-dom` rule](../../packages/eslint-plugin/README.md) flags it but is a
+  linting aid, not enforcement. Navigation, form
   prefill and similar directives are host-bound capabilities that accept declared
   `enum` or `id` targets, never free URLs. Check `canUse` inside the binding. The
   target page still enforces its own access as if the user had clicked, because
   hiding a button is presentation and not authorization.
 - **Agent output on screen** follows [Output safety and display](#output-safety-and-display),
-  so the agent cannot render controls or links outside the allowed set.
+  which checks routed text only and cannot retract chunks already allowed. Render
+  only the registered components.
 
 These controls narrow what the agent can do on SDK-controlled paths. They do not
 make an integration sufficient on their own: same-origin code can bypass them, a
