@@ -5,9 +5,13 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type Browser, chromium } from 'playwright';
+import { type Browser, chromium, type Page } from 'playwright';
 import { build, type PreviewServer, preview } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import type {
+  DspyReloadResult,
+  DspyReloadStep,
+} from '../../../tests/conformance/support/dspy-restore.js';
 import {
   dspyStateCases,
   type executeDspyStateCase,
@@ -17,6 +21,8 @@ import {
   stateLimitCases,
   syntheticState,
 } from '../../../tests/conformance/support/dspy-state-limits.js';
+import { stateRestoreScenarios } from '../../../tests/conformance/support/dspy-state-restore.js';
+import { stateRestoreSources } from '../../../tests/conformance/support/dspy-state-restore-sources.node.js';
 import {
   dspyStateSources,
   selectedStateSource,
@@ -51,6 +57,17 @@ beforeAll(async () => {
     await mkdir(path, { recursive: true });
     for (const [file, source] of Object.entries(await dspyStateSources(name)))
       await writeFile(join(path, file), source);
+  }
+  for (const scenario of stateRestoreScenarios) {
+    for (const lifetime of scenario.swap === 'same'
+      ? (['pause'] as const)
+      : (['pause', 'resume'] as const)) {
+      const name = scenario.name + (lifetime === 'resume' ? '-resume' : '');
+      const path = join(publicDir, 'conformance', name);
+      await mkdir(path, { recursive: true });
+      for (const [file, source] of Object.entries(await stateRestoreSources(scenario, lifetime)))
+        await writeFile(join(path, file), source);
+    }
   }
   const local = JSON.parse(
     await readFile(
@@ -186,6 +203,98 @@ test.each([...dspyStateCases, ...Object.keys(stateLimitCases), 'state-pickle-sou
         });
         expect(result.transcript.requests).toEqual([]);
         if (name === 'state-pickle-source') expect(sourceRequests).toEqual([]);
+      }
+      expect(external).toEqual([]);
+      expect(headers.length).toBeGreaterThan(0);
+      expect(headers.every((value) => value === header)).toBe(true);
+    } finally {
+      await context.close();
+    }
+  },
+  90000,
+);
+
+async function reloadResult(page: Page): Promise<{
+  reload: DspyReloadResult;
+  error?: string;
+  errorCode?: string;
+  violations: string[];
+}> {
+  await page.waitForFunction(
+    () => Reflect.get(globalThis, 'dspyStateConformance')?.done,
+    undefined,
+    { timeout: 60000 },
+  );
+  return page.evaluate(() => Reflect.get(globalThis, 'dspyStateConformance'));
+}
+
+async function nextReload(
+  page: Page,
+  step: DspyReloadStep & { variant?: 'resume' },
+): ReturnType<typeof reloadResult> {
+  await page.evaluate(
+    (step) => sessionStorage.setItem('dspyStateReloadStep', JSON.stringify(step)),
+    step,
+  );
+  await page.reload();
+  return reloadResult(page);
+}
+
+test.each(stateRestoreScenarios)(
+  'Chromium resumes a paused DSPy session across a state swap: $name',
+  async (scenario) => {
+    if (!browser) throw new Error('The state conformance browser is missing.');
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    const external: string[] = [];
+    const headers: string[] = [];
+    await context.route('**/*', (route) => {
+      if (new URL(route.request().url()).origin === origin) return route.continue();
+      external.push(route.request().url());
+      return route.abort();
+    });
+    context.on('response', (response) =>
+      headers.push(response.headers()['content-security-policy'] ?? ''),
+    );
+    try {
+      const page = await context.newPage();
+      await page.goto(`${origin}/?case=${scenario.name}&reload`);
+      const first = await reloadResult(page);
+      expect(first.error).toBeUndefined();
+      expect(first.violations).toEqual([]);
+      expect(first.reload.pending).toBeDefined();
+      expect(first.reload.error).toBeUndefined();
+      expect(first.reload.calls).toEqual(['before']);
+      expect(first.reload.requests).toBe(scenario.program === 'state-durable-early-model' ? 1 : 0);
+      const step = { name: scenario.program, sessionId: first.reload.sessionId };
+      const restored = await nextReload(page, {
+        ...step,
+        ...(scenario.swap === 'same' ? {} : { variant: 'resume' as const }),
+      });
+      expect(restored.error).toBeUndefined();
+      expect(restored.violations).toEqual([]);
+      expect(restored.reload.restored).toEqual(first.reload.pending);
+      expect(restored.reload.pending).toBeUndefined();
+      expect(restored.reload.calls).toEqual([]);
+      if (scenario.outcome === 'completes') {
+        const sources = await stateRestoreSources(scenario, 'resume');
+        const state = JSON.parse(sources['state.json'] ?? '');
+        expect(restored.reload.error).toBeUndefined();
+        expect(restored.reload.output).toEqual({
+          answer: 'done',
+          receipt: 'RESTORED_CAPABILITY_SECRET',
+          demos: state.demos.length,
+          instructions: state.signature.instructions,
+        });
+        expect(restored.reload.requests).toBe(1);
+        expect(restored.reload.consumed).toBe(true);
+      } else {
+        expect(restored.reload.error).toMatchObject({ code: 'unrecoverable' });
+        expect(restored.reload.output).toBeUndefined();
+        expect(restored.reload.requests).toBe(0);
+        const poisoned = await nextReload(page, step);
+        expect(poisoned.errorCode).toBe('unrecoverable');
+        expect(poisoned.reload).toBeUndefined();
+        expect(poisoned.violations).toEqual([]);
       }
       expect(external).toEqual([]);
       expect(headers.length).toBeGreaterThan(0);

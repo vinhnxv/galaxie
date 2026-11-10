@@ -285,10 +285,19 @@ cover loaded LMs, pickle sources and both size bounds. The executable catalog
 records round-trip losses; the opt-in Node probe measures size and load cost
 without timing thresholds. See the [results and limits](../../packages/adapter-pyodide/README.md#offline-optimized-program-state).
 
+Eight separate paused-session scenarios swap unchanged, prompt-changing or
+saved-training-only state in fresh Workers on CPython, Node Pyodide and Chromium
+with a page reload through IndexedDB; they add no goldens or matrix entries.
+They verify journal-dependent refusal, accepted swaps with no changed journaled
+request, persistent poisoning after refusal and the author-side SHA-256 interaction
+props recipe; see [observed outcomes](../../packages/adapter-pyodide/README.md#paused-sessions-and-a-changed-state-file).
+
 ```sh
 node scripts/test-python.ts ../tests/conformance/cases-dspy/test_dspy_state.py
+node scripts/test-python.ts ../tests/conformance/cases-dspy/test_dspy_state_durable.py
 python/.venv/bin/python -I scripts/record-dspy-state-conformance.py --check
 pnpm exec vitest run --project node tests/conformance/dspy-state.node.test.ts
+pnpm exec vitest run --project node tests/conformance/dspy-state-restore.node.test.ts
 pnpm exec vitest run --project node tests/conformance/dspy-state-limits.node.test.ts
 pnpm exec vitest run --project node examples/rag-browser/test/dspy-state-conformance.node.test.ts
 GALAXIE_DSPY_STATE_MEASURE=1 pnpm exec vitest run --project node tests/conformance/dspy-state-limits.node.test.ts --silent=false --reporter=verbose

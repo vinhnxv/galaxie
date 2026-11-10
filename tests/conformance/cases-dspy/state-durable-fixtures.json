@@ -1,0 +1,60 @@
+{
+  "swaps": {
+    "same": { "state": "state-predict-demos" },
+    "prompt": { "state": "state-instructions-only" },
+    "inert": {
+      "state": "state-predict-demos",
+      "set": { "train": [{ "question": "What is the capital of France?", "answer": "Paris" }] }
+    }
+  },
+  "scenarios": [
+    {
+      "name": "early-same",
+      "program": "state-durable-early-model",
+      "swap": "same",
+      "outcome": "completes"
+    },
+    {
+      "name": "early-inert",
+      "program": "state-durable-early-model",
+      "swap": "inert",
+      "outcome": "completes"
+    },
+    {
+      "name": "early-prompt",
+      "program": "state-durable-early-model",
+      "swap": "prompt",
+      "outcome": "unrecoverable"
+    },
+    {
+      "name": "late-same",
+      "program": "state-durable-late-model",
+      "swap": "same",
+      "outcome": "completes"
+    },
+    {
+      "name": "late-prompt",
+      "program": "state-durable-late-model",
+      "swap": "prompt",
+      "outcome": "completes"
+    },
+    {
+      "name": "fingerprint-same",
+      "program": "state-durable-fingerprint",
+      "swap": "same",
+      "outcome": "completes"
+    },
+    {
+      "name": "fingerprint-prompt",
+      "program": "state-durable-fingerprint",
+      "swap": "prompt",
+      "outcome": "unrecoverable"
+    },
+    {
+      "name": "fingerprint-inert",
+      "program": "state-durable-fingerprint",
+      "swap": "inert",
+      "outcome": "unrecoverable"
+    }
+  ]
+}

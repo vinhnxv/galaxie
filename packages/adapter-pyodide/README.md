@@ -437,8 +437,58 @@ The executable round-trip catalog matches on all three lanes:
 | Dependency versions | Saved Python, DSPy and cloudpickle metadata matches in these lanes. DSPy only warns on a mismatch; metadata is not a compatibility gate. |
 | Pickle | `Module.load` of a `.pkl` path raises `ValueError` without `allow_pickle`; an agent descriptor listing `.pkl` fails `invalid` before fetching. `save_program=True` and `dspy.load` are outside this JSON path. |
 
-Other DSPy versions, real-model optimizer output and paused sessions resumed
-after a state-file change remain untested.
+Other DSPy versions and real-model optimizer output remain untested.
+
+### Paused sessions and a changed state file
+
+The replay journal compares a digest of each model request, capability call and
+interaction request made before the pause. A changed state file fails
+`unrecoverable` before any live model or capability call if it changes a journaled
+request. The session then stays unrecoverable, including after restoring the
+original file. A changed `state.json` is otherwise not detected: this guard belongs
+to the journal, which does not fingerprint the state file automatically.
+
+Eight scripted scenarios verify this on native CPython, Node Pyodide and headless
+Chromium, with a page reload through IndexedDB in Chromium. Each program calls
+`docs.lookup@1`, pauses for review, then calls `Predict`; `state-durable-early-model`
+also calls `Predict` before the pause, `state-durable-late-model` does not, and
+`state-durable-fingerprint` adds the file digest to the review props. The swaps use
+`state-predict-demos` unchanged (`same`), `state-instructions-only` with changed
+demos, instructions and field text (`prompt`), or `state-predict-demos` with changed
+saved `train` examples and an identical prompt (`inert`).
+
+All three `same` cases complete without repeating the earlier calls. `early-prompt`
+fails `unrecoverable` and remains refused under the original state. `early-inert`
+completes because the model request digest is unchanged. `late-prompt` also
+completes: no journaled call depends on the old state, and the post-pause model call
+uses the new state (zero demos and the saved offline instructions).
+
+To bind a paused session to the exact state bytes, compute SHA-256 from the file
+loaded at Worker boot and include it in the interaction props on every replay:
+
+```python
+import hashlib
+from pathlib import Path
+from galaxie.dspy import request_interaction
+
+state_path = Path(__file__).with_name('state.json')
+state_digest = hashlib.sha256(state_path.read_bytes()).hexdigest()
+# Load this file and rebind the LM when constructing the program.
+# Inside the program, publish the digest with the review request:
+answer = request_interaction({
+    'surfaceId': 'main',
+    'viewRevision': 'first',
+    'component': 'test.Review/v1',
+    'props': {'stateDigest': state_digest},
+})
+```
+
+This author pattern makes a changed file a journaled interaction difference.
+`fingerprint-prompt` and `fingerprint-inert` both fail `unrecoverable` without live
+calls and stay refused under the original state; `fingerprint-same` completes.
+It does not add an independent integrity check to the public build assets. These
+results cover DSPy 3.4.1 and scripted models only; Firefox, WebKit and real-model
+behavior remain unmeasured.
 
 ## Google ADK (Python) agents
 
