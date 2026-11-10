@@ -199,5 +199,425 @@
         }
       ]
     }
+  },
+  "L": {
+    "L1": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "published": ["r", "r:1"],
+          "receipts": ["accepted", "accepted"],
+          "bodyExecutions": 3
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "published": ["r", "r:1"],
+          "receipts": ["accepted", "accepted"],
+          "bodyExecutions": 3
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "published": ["r", "r:1"],
+          "receipts": ["accepted", "accepted"],
+          "bodyExecutions": 3
+        }
+      }
+    ],
+    "L2": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "pendingIdentityAndPropsPreserved": true,
+          "oldRun": "stale",
+          "restoredRun": "duplicate"
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "pendingIdentityAndPropsPreserved": true,
+          "oldRun": "stale",
+          "restoredRun": "duplicate"
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "pendingIdentityAndPropsPreserved": true,
+          "oldRun": "stale",
+          "restoredRun": "duplicate"
+        }
+      }
+    ],
+    "L5": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "recoveryOnReload": false,
+          "urlValidation": [
+            {
+              "registrationSuppressed": false,
+              "restore": "denied"
+            },
+            {
+              "registrationSuppressed": true,
+              "restore": "published"
+            }
+          ],
+          "structuredOutbound": [
+            {
+              "registrationSuppressed": false,
+              "receipt": "denied",
+              "hostCalls": 0
+            },
+            {
+              "registrationSuppressed": true,
+              "receipt": "sent",
+              "hostCalls": 1
+            }
+          ]
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "recoveryOnReload": false,
+          "urlValidation": [
+            {
+              "registrationSuppressed": false,
+              "restore": "denied"
+            },
+            {
+              "registrationSuppressed": true,
+              "restore": "published"
+            }
+          ],
+          "structuredOutbound": [
+            {
+              "registrationSuppressed": false,
+              "receipt": "denied",
+              "hostCalls": 0
+            },
+            {
+              "registrationSuppressed": true,
+              "receipt": "sent",
+              "hostCalls": 1
+            }
+          ]
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "recoveryOnReload": false,
+          "urlValidation": [
+            {
+              "registrationSuppressed": false,
+              "restore": "denied"
+            },
+            {
+              "registrationSuppressed": true,
+              "restore": "published"
+            }
+          ],
+          "structuredOutbound": [
+            {
+              "registrationSuppressed": false,
+              "receipt": "denied",
+              "hostCalls": 0
+            },
+            {
+              "registrationSuppressed": true,
+              "receipt": "sent",
+              "hostCalls": 1
+            }
+          ]
+        }
+      }
+    ],
+    "L8": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "unstrippedMapDetected": true,
+          "strippedResumeReachedSecondCall": true
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "unstrippedMapDetected": true,
+          "strippedResumeReachedSecondCall": true
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "unstrippedMapDetected": true,
+          "strippedResumeReachedSecondCall": true
+        }
+      }
+    ],
+    "L3": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "askB"],
+          "counts": {
+            "askA": 2,
+            "askB": 3,
+            "join": 1
+          }
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "askB"],
+          "counts": {
+            "askA": 2,
+            "askB": 3,
+            "join": 1
+          }
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "askB"],
+          "counts": {
+            "askA": 2,
+            "askB": 3,
+            "join": 1
+          }
+        }
+      }
+    ],
+    "L4": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "reopenedSaver": true,
+          "stableCheckpointPick": true,
+          "windows": [
+            {
+              "window": "a",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "b",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "c",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            }
+          ]
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "reopenedSaver": true,
+          "stableCheckpointPick": true,
+          "windows": [
+            {
+              "window": "a",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "b",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "c",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            }
+          ]
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "reopenedSaver": true,
+          "stableCheckpointPick": true,
+          "windows": [
+            {
+              "window": "a",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "b",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            },
+            {
+              "window": "c",
+              "counts": {
+                "askA": 2,
+                "askB": 3,
+                "join": 1
+              },
+              "statuses": ["consumed", "consumed"],
+              "acceptedAnswers": ["a-token", "b-token"]
+            }
+          ]
+        }
+      }
+    ],
+    "L6": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "noteB"],
+          "completedNoWriteTaskLast": true,
+          "counts": {
+            "askA": 2,
+            "noteB": 3
+          }
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "noteB"],
+          "completedNoWriteTaskLast": true,
+          "counts": {
+            "askA": 2,
+            "noteB": 3
+          }
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "published": ["askA", "noteB"],
+          "completedNoWriteTaskLast": true,
+          "counts": {
+            "askA": 2,
+            "noteB": 3
+          }
+        }
+      }
+    ],
+    "L7": [
+      {
+        "mode": "sync",
+        "pass": true,
+        "observation": {
+          "branches": 3,
+          "prefixes": {
+            "askA": 2,
+            "askB": 3,
+            "askC": 4
+          },
+          "totalIncludingInitial": 9,
+          "resumeOnly": 6,
+          "estimate": 6
+        }
+      },
+      {
+        "mode": "async",
+        "pass": true,
+        "observation": {
+          "branches": 3,
+          "prefixes": {
+            "askA": 2,
+            "askB": 3,
+            "askC": 4
+          },
+          "totalIncludingInitial": 9,
+          "resumeOnly": 6,
+          "estimate": 6
+        }
+      },
+      {
+        "mode": "exit",
+        "pass": true,
+        "observation": {
+          "branches": 3,
+          "prefixes": {
+            "askA": 2,
+            "askB": 3,
+            "askC": 4
+          },
+          "totalIncludingInitial": 9,
+          "resumeOnly": 6,
+          "estimate": 6
+        }
+      }
+    ]
   }
 }
