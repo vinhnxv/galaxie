@@ -319,8 +319,9 @@ instead of ending `unsupported` (a behavior change from 0.1.0). It must carry th
 strict four-field request and belong to one root checkpoint task without a child
 checkpoint namespace. Identity is `idless:<taskId>:<committedResumeCount>`; the
 supported ordinal is zero. The adapter re-reads that identity before sending a
-bare `{ action, payload }` resume, rather than an interrupt-ID map. Different nodes
-can pause in sequence. Always pass the complete node config; stripping namespaces
+bare `{ action, payload }` resume, rather than an interrupt-ID map. Different ID-less nodes
+can pause in sequence. An ID-bearing pause followed by an ID-less pause is refused
+before publishing the latter. Always pass the complete node config; stripping namespaces
 is not recommended.
 
 A child invoked inside a node body can expose the same single pause on its parent
