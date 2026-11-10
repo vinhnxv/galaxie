@@ -248,7 +248,54 @@ tool-calling or injection-resistance result is claimed.
 
 See [coding guidance](AGENTS.md), [explicit context rules and parity](../../tests/conformance/README.md)
 and [runtime contracts](../../docs/system-design.md#6-core-runtime-and-contracts).
-Parallel interrupts and static breakpoints remain unsupported. Use an explicit `requestInteraction` gate with continue/reject edges instead of a static breakpoint, and use `requestInteraction` with the complete node config instead of `NodeInterrupt` or raw `GraphInterrupt`; the [Node spike](../../spikes/static-breakpoints/README.md) records the alternatives and the unshipped single-call ID-less design.
+Parallel interrupts remain unsupported. Use `requestInteraction` with the complete node
+config instead of `NodeInterrupt` or raw `GraphInterrupt`; the
+[Node spike](../../spikes/static-breakpoints/README.md) records the unshipped single-call ID-less design.
+
+## Replacing static breakpoints
+
+Compiled `interruptBefore` and `interruptAfter` settings are refused at prepare with
+`GalaxieError('unsupported', 'The graph must not use compiled static breakpoints.')`.
+The check includes `graph.config` overrides and discoverable compiled subgraphs.
+Non-empty arrays, `'*'` and unexpected non-nullish values are refused; absent,
+nullish and empty-array settings are accepted. Enumeration failures use the same
+fixed error. No node runs and no checkpoint is written. This also refuses a graph
+whose breakpoint node would never be reached, even if it previously completed.
+Core exposes its own fixed `unsupported` message through `instance.prepare()`.
+An override hidden inside a wrapper cannot be inspected at prepare: its first
+pause ends the run `unsupported`, after any preceding nodes have run.
+
+Replace the breakpoint with a gate in its own node, before the work node:
+
+```ts
+const request = {
+  surfaceId: 'main',
+  viewRevision: 'r1',
+  component: 'app.Gate/v1',
+  props: { question: 'Continue?' },
+};
+
+// The graph state declares a decision field; the host binds continue/reject actions.
+builder
+  .addNode('gate', async (_state, config) => {
+    await Promise.resolve();
+    return { decision: requestInteraction(request, config).action };
+  })
+  .addEdge('prepare', 'gate')
+  .addConditionalEdges('gate', ({ decision }) => decision === 'reject' ? END : 'work');
+```
+
+Keep the gate's prefix deterministic and side-effect free: it re-executes on
+resume. `continue` reaches work; `reject` reaches `END` with no work. Both actions
+can use a null payload. A gate after a node replaces an after-breakpoint by
+changing topology; there is no compile-time toggle. The conformance cases cover
+a gate before work, not the after-node shape. Continue and reject survive reload
+with memory checkpoints on Node/Chromium and reopened IndexedDB in Chromium;
+a completed reject restores no pending interaction.
+
+A gate's `continue` is never a write approval. Writes still require
+`approval: 'confirm'` and host confirmation coverage. See the
+[gate and refusal evidence](../../tests/conformance/README.md#static-breakpoint-refusal-and-gate-replacement).
 Code is Apache-2.0 (see [LICENSE](../../LICENSE)).
 
 ## Materialized surface interrupts

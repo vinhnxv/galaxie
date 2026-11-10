@@ -20,6 +20,41 @@ The reload tests pause `interrupt-resume`, `interrupt-subgraph` and both durabil
 
 Additional tests in this directory run on both Node and Chromium unless their filename ends in `.node.test.ts` or they are the Chromium-only `indexeddb.test.ts`. They cover runtime controls beyond transcript parity. The single guarantee-to-code-and-test map is in [system design §9](../../docs/system-design.md#9-security-baseline-map).
 
+## Static-breakpoint refusal and gate replacement
+
+[`gate-replacement.node.test.ts`](gate-replacement.node.test.ts) owns three new
+native Node goldens. [`compiled-breakpoints.json`](golden/compiled-breakpoints.json)
+records before, after, both, wildcard and compiled-child pause settings, pending
+nodes, zero checkpoint interrupts and root interrupt updates alongside the fixed
+prepare refusal. [`gate-continue.json`](golden/gate-continue.json) and
+[`gate-reject.json`](golden/gate-reject.json) record an explicit, separate
+`requestInteraction` gate before work: continue runs work once; reject reaches
+`END` without work. The request is content-free and the gate forwards node config
+after an await.
+
+[`gate-replacement.test.ts`](gate-replacement.test.ts) compares both gate
+transcripts with zero differences on Node and Chromium, without a matrix lookup.
+It checks prepare refusal before any node or checkpoint, core's fixed public
+message, and the existing run-time backstop for invisible before/after/wildcard
+overrides and a child invoked from a node body with forwarded config. Each ends
+`unsupported` with no interaction or pending entry. Named overrides execute the
+preceding node once; wildcard-before executes none. All measured pauses emit a
+root interrupt, so no post-stream state check was added.
+
+Memory-saver tests restore both gate answers in a new runtime, preserve pending
+identity and props, and refuse repeated completed answers. Continue after reload
+runs work once without rerunning prepare. Reject preserves the value, emits no
+work update and restores no pending interaction again. [`indexeddb.test.ts`](indexeddb.test.ts)
+adds zero-difference gate parity and close/reopen restore for both actions in
+Chromium, with another reopen confirming completion. Each database is deleted.
+
+The separate [`gates.ts`](cases/gates.ts) registry leaves `CASE_NAMES` at twelve;
+the Python port covers those original twelve, not these additional JavaScript
+cases. Existing goldens and matrices are unchanged. The fixtures use no model or
+network. Gate-after-node topology and broader node-body child shapes remain
+unmeasured. A gate's continue does not authorize writes: host confirmation
+coverage and `approval: 'confirm'` still apply.
+
 ## Tutor portability, parent effects and credential scan
 
 [`tutor-portability.node.test.ts`](tutor-portability.node.test.ts) covers AT-05 on Node. Both hosts declare the same workspace tutor package, alias its source entry and import its definition through the package. The test checks import specifiers and host graph construction, compares an in-memory SHA-256 entry digest and source inventory using the manifest builder's hash encoding, and checks local versus HTTP capability bindings. Vite bundles source, so the inventory covers source, package metadata and declared skills rather than the release manifest's `dist` files. Existing host loops separately execute the unchanged tutor with mocks; the optional combined runtime/node-set check is omitted because the remote host requires its browser/server harness.
@@ -81,7 +116,7 @@ The table lists tested behavior rather than every LangChain context API. The ada
 
 ## Native Python reference
 
-[`cases-python/`](cases-python/) ports all twelve graph cases to the pinned native
+[`cases-python/`](cases-python/) ports the original twelve graph cases to the pinned native
 CPython 3.14 and LangGraph Python environment. Its modules expose `INPUT`, `SCRIPT`,
 `RESUMES` and `factory(checkpointer, model, capability, interaction)`. The optional
 ports default to deterministic local fixtures; the Pyodide harness injects galaxie's

@@ -16,6 +16,7 @@ import {
   toErrorInfo,
 } from '@galaxie-ai/core';
 import { Command, GraphRecursionError, isGraphInterrupt } from '@langchain/langgraph/web';
+import { refuseStaticBreakpoints } from './breakpoints.js';
 import { adapterError } from './errors.js';
 import {
   createHost,
@@ -102,6 +103,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           'unsupported',
           'The graph must support checkpoint state inspection.',
         );
+      await refuseStaticBreakpoints(graph);
       const pending = async (sessionId: string): Promise<PendingInteraction | undefined> => {
         if (graph === undefined)
           throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');

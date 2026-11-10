@@ -6,8 +6,8 @@
       "gzip": 2300
     },
     "@galaxie-ai/adapter-langgraph/.": {
-      "minified": 28400,
-      "gzip": 8300
+      "minified": 32100,
+      "gzip": 9300
     },
     "@galaxie-ai/core/.": {
       "minified": 116700,
