@@ -917,11 +917,12 @@ def _workflow_state(root: BaseAgent, resumable: bool, events: list[Event], pause
             raise ValueError()
     if not resumable or pause is None:
         return
-    pending_calls = {
-        ask.call: event for ask in pause.asks for event in events
+    call_events = {
+        part.function_call.id: event for event in events
         for part in (event.content.parts or [] if event.content is not None else [])
-        if part.function_call is not None and part.function_call.id == ask.call
+        if part.function_call is not None
     }
+    pending_calls = {ask.call: call_events[ask.call] for ask in pause.asks if ask.call in call_events}
     if len(pending_calls) != len(pause.asks) or len({(event.invocation_id, event.author) for event in pending_calls.values()}) != 1:
         raise ValueError()
     pending = next(iter(pending_calls.values()))
