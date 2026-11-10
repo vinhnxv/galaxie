@@ -1151,6 +1151,64 @@ def test_legacy_transfer_node_paths_restore_and_continue_without_resumability():
         assert code_of(lambda: asyncio.run(other._restore(bad, metadata, 'bound'))) == 'unrecoverable'
 
 
+@pytest.mark.parametrize(('shape', 'expected_paths'), [
+    ('llm', {('user', ''), ('router', 'router@1'), ('specialist', 'router@1/specialist@1')}),
+    ('sequential', {('user', ''), ('router', ''), ('specialist', ''), ('tail', '')}),
+    ('parallel', {('user', ''), ('router', ''), ('specialist', ''), ('side', '')}),
+    ('loop', {('user', ''), ('router', ''), ('specialist', '')}),
+])
+def test_transfer_node_paths_are_tied_to_the_root_shape_and_round_trip(shape, expected_paths):
+    specialist = LlmAgent(name='specialist', model=llm('specialist'))
+    router = LlmAgent(name='router', model=llm('router'), sub_agents=[specialist])
+    if shape == 'llm':
+        root = router
+    elif shape == 'sequential':
+        root = SequentialAgent(name='pipeline', sub_agents=[router, quiet_child('tail')])
+    elif shape == 'parallel':
+        root = ParallelAgent(name='fanout', sub_agents=[router, quiet_child('side')])
+    else:
+        root = LoopAgent(name='loop', max_iterations=2, sub_agents=[router])
+
+    async def transport(raw):
+        message = json.loads(raw)
+        reply = (
+            {'content': '', 'toolCalls': [tool_call('transfer_to_agent', '{"agent_name":"specialist"}')]}
+            if message['payload']['role'] == 'router' else {'content': 'done'}
+        )
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
+
+    _bridge.install_transport(transport)
+    executor = durable(Executor(root))
+    assert not executor._resumable
+    run(executor, steps=20)
+    run(executor, steps=20)
+    checkpoint, metadata = stored(executor)
+    assert {(event['author'], event['nodeInfo'].get('path', ''))
+            for event in json.loads(checkpoint)['events']} == expected_paths
+    other = durable(Executor(root))
+    assert asyncio.run(other._restore(checkpoint, metadata, 'bound')) == 's1'
+    assert run(other, steps=20) == 'done'
+    if shape == 'llm':
+        return
+    # The same transferring leaves stamp no paths beneath workflow roots.
+    for author, path in [
+        ('router', f'{root.name}@1/router@1'),
+        ('specialist', f'{root.name}@1/router@1/specialist@2'),
+        ('specialist', 'other@1/router@1/specialist@1'),
+        ('user', f'{root.name}@1'),
+    ]:
+        bad = edit(checkpoint, lambda value: next(
+            event for event in value['events'] if event['author'] == author
+        ).update(nodeInfo={'path': path}))
+        refused = durable(Executor(root))
+        seen = []
+        transport_for([], seen)
+        assert code_of(lambda: asyncio.run(refused._restore(bad, metadata, 'bound'))) == 'unrecoverable'
+        assert refused.pending('s1') is None
+        assert refused._sessions.sessions == {}
+        assert seen == []
+
+
 @pytest.mark.parametrize('reload', [False, True])
 def test_parallel_pause_finishes_its_writing_sibling_before_publication_and_never_repeats_it(reload):
     seen = []

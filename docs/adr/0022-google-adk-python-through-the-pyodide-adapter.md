@@ -106,7 +106,12 @@ have empty `node_info`; output routing fields are always refused. ADK's standalo
 LlmAgent runner writes legacy records with exact static ancestry paths using `@1`
 per agent, such as `router@1/specialist@1`. Only that known author/path pair or an empty path
 is accepted for a non-resumable LlmAgent-root tree. Changed paths, including a
-different ordinal, fail `unrecoverable` before installation or dispatch. Python
+different ordinal, fail `unrecoverable` before installation or dispatch. The path
+format is tied to the root shape: scripted transfer probes under Sequential,
+Parallel and Loop roots record only empty paths for every author, including
+`router` and `specialist`, across continued sessions. Those roots accept only
+empty paths, and round-trip tests pin the observed author/path pairs and refuse
+injected ancestry paths before installation or dispatch. Python
 tests in `python/galaxie/tests/test_adk.py` cover these checks, legacy transfer
 round trips and failed-resume scope stability. A writer who can forge a fully
 consistent record and its colocated key remains outside these integrity checks.
