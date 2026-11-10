@@ -17,7 +17,7 @@ override-dependencies = [
   "tenacity==9.2.1", "websockets==17.3",
 ]
 constraint-dependencies = [
-  "cryptography==47.0.0", "cffi==2.0.0", "pycparser==3.0",
+  "cryptography==50.0.2", "cffi==2.0.0", "pycparser==3.0",
   "msgpack==1.1.2", "orjson==3.11.8", "pydantic==2.12.5",
   "pydantic-core==2.41.5", "xxhash==3.6.0", "zstandard==0.25.0",
   "regex==2026.3.32", "rpds-py==0.30.0", "pyyaml==6.0.3",

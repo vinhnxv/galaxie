@@ -383,7 +383,7 @@ pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) 
 The 29-wheel `adk` set carries the licenses its wheels declare in their dist-info metadata:
 
 - Apache-2.0: `google-adk` (declared by classifier), `google-genai`, `google-auth`, `tenacity`, `opentelemetry-api`, `opentelemetry-semantic-conventions` and `requests` (which ships a `NOTICE` file).
-- `Apache-2.0 OR BSD-3-Clause`: Pyodide's `cryptography` 47.0.0, with `LICENSE`, `LICENSE.APACHE` and `LICENSE.BSD` in its `dist-info`. It ships no separate notice for its native extension, so a host that redistributes the wheel should check that extension's own notices.
+- `Apache-2.0 OR BSD-3-Clause`: the vendored `cryptography` 50.0.2 WASM wheel, with `LICENSE`, `LICENSE.APACHE`, `LICENSE.BSD` and the linked dependencies' license texts in its `dist-info/licenses`. It statically links OpenSSL 4.0.3 (Apache-2.0). See the [artifact provenance and verification](../../python/wheels/README.md).
 - `Apache-2.0 OR BSD-2-Clause`: `packaging`. `MIT OR Apache-2.0`: `sniffio`.
 - BSD-3-Clause: `authlib`, `joserfc`, `websockets`, `starlette`, `httpx`, `idna` and `pycparser`.
 - MIT: `fastapi`, `annotated-doc`, `annotated-types`, `anyio`, `cffi`, `charset-normalizer`, `pydantic`, `pydantic-core`, `typing-inspection` and `urllib3`.

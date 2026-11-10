@@ -44,9 +44,17 @@ export async function fetchWheel(
     await rm(path, { force: true });
   } catch {}
   try {
-    const response = await fetcher(wheel.url, { credentials: 'omit' });
-    if (!response.ok) throw new Error(invalidWheel);
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    const source = new URL(wheel.url, import.meta.url);
+    let bytes: Uint8Array;
+    if (source.protocol === 'file:') {
+      const vendored = new URL(`../python/wheels/${wheel.file}`, import.meta.url);
+      if (source.href !== vendored.href) throw new Error(invalidWheel);
+      bytes = new Uint8Array(await readFile(source));
+    } else {
+      const response = await fetcher(wheel.url, { credentials: 'omit' });
+      if (!response.ok) throw new Error(invalidWheel);
+      bytes = new Uint8Array(await response.arrayBuffer());
+    }
     if (!matches(bytes, wheel)) throw new Error(invalidWheel);
     await mkdir(directory, { recursive: true });
     await writeFile(path, bytes);

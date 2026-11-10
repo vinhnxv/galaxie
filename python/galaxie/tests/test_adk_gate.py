@@ -4,10 +4,18 @@
 """Offline Google ADK gate with scripted models, also evaluated unchanged inside Pyodide."""
 
 import asyncio
+import datetime
 import hashlib
 import json
+import sys
 import threading
 
+import cryptography
+from cryptography import x509
+from cryptography.hazmat.backends.openssl.backend import backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.verification import Criticality, ExtensionPolicy, PolicyBuilder, Store, VerificationError
 from google.adk.agents import LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from google.adk.agents._streaming_mode import StreamingMode
 from google.adk.agents.run_config import RunConfig
@@ -346,7 +354,61 @@ async def gate_integrity():
         raise AssertionError("A tampered stored call must fail the integrity check.")
 
 
+def gate_cryptography():
+    """Exercise the rebuilt extension and reject a wildcard outside a CA's permitted names."""
+    assert cryptography.__version__ == "50.0.2"
+    if sys.platform == "emscripten":
+        assert backend.openssl_version_text().startswith("OpenSSL 4.0.3 ")
+    now = datetime.datetime(2026, 11, 10, tzinfo=datetime.timezone.utc)
+
+    def issue(name, issuer, key, signer, ca, extensions=()):
+        builder = (
+            x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(issuer)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(days=1))
+            .not_valid_after(now + datetime.timedelta(days=1))
+            .add_extension(x509.BasicConstraints(ca=ca, path_length=None), critical=True)
+        )
+        for extension in extensions:
+            builder = builder.add_extension(extension, critical=True)
+        return builder.sign(signer, hashes.SHA256())
+
+    root_key, ca_key, leaf_key = [ec.generate_private_key(ec.SECP256R1()) for _ in range(3)]
+    root_name, ca_name, leaf_name = [
+        x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, name)])
+        for name in ["Gate Root", "Gate Constrained CA", "Gate Leaf"]
+    ]
+    root = issue(root_name, root_name, root_key, root_key, True)
+    ca = issue(ca_name, root_name, ca_key, root_key, True, [
+        x509.NameConstraints(permitted_subtrees=[x509.DNSName("limited.example.test")], excluded_subtrees=None),
+    ])
+    policy = (
+        PolicyBuilder().store(Store([root])).time(now)
+        .extension_policies(
+            ca_policy=ExtensionPolicy.permit_all().require_present(x509.BasicConstraints, Criticality.AGNOSTIC, None),
+            ee_policy=ExtensionPolicy.permit_all().require_present(x509.SubjectAlternativeName, Criticality.AGNOSTIC, None),
+        )
+    )
+    allowed = issue(leaf_name, ca_name, leaf_key, ca_key, False, [
+        x509.SubjectAlternativeName([x509.DNSName("limited.example.test")]),
+    ])
+    assert policy.build_server_verifier(x509.DNSName("limited.example.test")).verify(allowed, [ca]) == [allowed, ca, root]
+    wildcard = issue(leaf_name, ca_name, leaf_key, ca_key, False, [
+        x509.SubjectAlternativeName([x509.DNSName("*.example.test")]),
+    ])
+    try:
+        policy.build_server_verifier(x509.DNSName("outside.example.test")).verify(wildcard, [ca])
+    except VerificationError as error:
+        assert "name constraint" in str(error).lower()
+    else:
+        raise AssertionError("A wildcard outside the CA's permitted names must be rejected.")
+
+
 async def run_gate():
+    gate_cryptography()
     spawned = []
     original = threading.Thread.start
 
