@@ -39,6 +39,7 @@ export interface ConformanceTools {
   call(name: string, input: unknown, config?: LangGraphRunnableConfig): Promise<unknown>;
 }
 export interface ConformanceCase {
+  readonly identity?: 'idless';
   readonly resumes?: readonly Submission[];
   readonly capabilities?: Readonly<
     Record<
@@ -80,7 +81,7 @@ export interface Transcript {
 }
 
 export interface TranscriptPause {
-  readonly interrupts: readonly { readonly id: string; readonly value: unknown }[];
+  readonly interrupts: readonly { readonly id?: string; readonly value: unknown }[];
   readonly historyLength: number;
 }
 
@@ -97,15 +98,25 @@ function rootInterrupt(path: readonly string[], mode: string, data: unknown): bo
 async function readPause(
   graph: ConformanceGraph,
   config: LangGraphRunnableConfig,
+  identity?: 'idless',
 ): Promise<TranscriptPause> {
   const state = await graph.getState(config);
   const interrupts = state.tasks.flatMap((task) => task.interrupts);
   const interrupt = interrupts[0];
-  if (interrupts.length !== 1 || interrupt === undefined || !interrupt.id)
+  if (
+    interrupts.length !== 1 ||
+    interrupt === undefined ||
+    (identity === 'idless' ? interrupt.id !== undefined : !interrupt.id)
+  )
     throw new Error('Expected one checkpoint interrupt.');
   let historyLength = 0;
   for await (const _checkpoint of graph.getStateHistory(config)) historyLength++;
-  return { interrupts: [{ id: interrupt.id, value: interrupt.value }], historyLength };
+  return {
+    interrupts: [
+      { ...(identity === 'idless' ? {} : { id: interrupt.id as string }), value: interrupt.value },
+    ],
+    historyLength,
+  };
 }
 
 function emptyTranscript(): Transcript {
@@ -186,14 +197,16 @@ export async function runNative(
         if (rootInterrupt(path, mode, data)) interrupted = true;
       }
       if (!interrupted) break;
-      const pause = await readPause(graph, config);
+      const pause = await readPause(graph, config, fixture.identity);
       transcript.pauses ??= [];
       transcript.pauses.push(pause);
       const resume = fixture.resumes?.[resumeIndex++];
       const id = pause.interrupts[0]?.id;
-      if (resume === undefined || id === undefined)
+      if (resume === undefined || (fixture.identity !== 'idless' && id === undefined))
         throw new Error('The conformance case has no remaining resume.');
-      input = new langgraph.Command({ resume: { [id]: resume } });
+      input = new langgraph.Command({
+        resume: fixture.identity === 'idless' ? resume : { [id as string]: resume },
+      });
     }
     transcript.final = final;
   } catch (error) {
@@ -298,7 +311,11 @@ export async function runGalaxie(
         else if (event.type === 'interaction') {
           if (graph === undefined) throw new Error('The conformance graph was not prepared.');
           const threadId = await firstThreadId(saver);
-          const pause = await readPause(graph, { configurable: { thread_id: threadId } });
+          const pause = await readPause(
+            graph,
+            { configurable: { thread_id: threadId } },
+            fixture.identity,
+          );
           transcript.pauses ??= [];
           transcript.pauses.push(pause);
           if (stopAtInterrupt) break;
@@ -309,9 +326,15 @@ export async function runGalaxie(
           // The host sees run.pending, so it must match the committed interrupt exactly.
           const { interactionId, ...request } = pending;
           const committed = pause.interrupts[0];
+          const state =
+            fixture.identity === 'idless'
+              ? await graph.getState({ configurable: { thread_id: threadId } })
+              : undefined;
+          const task = state?.tasks.find((task) => task.interrupts.length > 0);
           if (
             committed === undefined ||
-            interactionId !== committed.id ||
+            interactionId !==
+              (fixture.identity === 'idless' ? `idless:${task?.id}:0` : committed.id) ||
             JSON.stringify(request) !== JSON.stringify(committed.value)
           )
             throw new Error('The pending interaction differs from the committed interrupt.');

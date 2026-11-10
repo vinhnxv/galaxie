@@ -1,0 +1,285 @@
+{
+  "supported": {
+    "native": {
+      "interruptIdsPresent": [
+        false
+      ],
+      "interruptingTasks": 1,
+      "childNamespace": false,
+      "beforeCounts": {
+        "parent": 0,
+        "gate": 1,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 0,
+        "gate": 2,
+        "effects": 1
+      },
+      "applications": 1,
+      "answers": [
+        {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        }
+      ],
+      "pendingAfterAnswer": 0
+    },
+    "galaxie": {
+      "code": "succeeded",
+      "published": 1
+    }
+  },
+  "nodeInterruptString": {
+    "native": {
+      "interruptIdsPresent": [
+        false
+      ],
+      "interruptingTasks": 1,
+      "childNamespace": false,
+      "beforeCounts": {
+        "parent": 0,
+        "gate": 1,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 0,
+        "gate": 2,
+        "effects": 0
+      },
+      "applications": 0,
+      "answers": [],
+      "pendingAfterAnswer": 1
+    },
+    "galaxie": {
+      "code": "unsupported",
+      "published": 0
+    }
+  },
+  "nodeInterruptRequest": {
+    "native": {
+      "interruptIdsPresent": [
+        false
+      ],
+      "interruptingTasks": 1,
+      "childNamespace": false,
+      "beforeCounts": {
+        "parent": 0,
+        "gate": 1,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 0,
+        "gate": 2,
+        "effects": 0
+      },
+      "applications": 0,
+      "answers": [],
+      "pendingAfterAnswer": 1
+    },
+    "galaxie": {
+      "code": "unsupported",
+      "published": 1
+    }
+  },
+  "rawGraphInterrupt": {
+    "native": {
+      "interruptIdsPresent": [
+        false
+      ],
+      "interruptingTasks": 1,
+      "childNamespace": false,
+      "beforeCounts": {
+        "parent": 0,
+        "gate": 1,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 0,
+        "gate": 2,
+        "effects": 0
+      },
+      "applications": 0,
+      "answers": [],
+      "pendingAfterAnswer": 1
+    },
+    "galaxie": {
+      "code": "unsupported",
+      "published": 1
+    }
+  },
+  "parallelSend": {
+    "native": {
+      "interruptIdsPresent": [
+        false,
+        false
+      ],
+      "interruptingTasks": 2,
+      "childNamespace": false,
+      "beforeCounts": {
+        "parent": 0,
+        "gate": 2,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 0,
+        "gate": 4,
+        "effects": 2
+      },
+      "applications": 2,
+      "answers": [
+        {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        },
+        {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        }
+      ],
+      "pendingAfterAnswer": 0
+    },
+    "galaxie": {
+      "code": "unsupported",
+      "published": 0
+    }
+  },
+  "twoInOneNode": {
+    "native": {
+      "interruptIdsPresent": [
+        false
+      ],
+      "interruptingTasks": 1,
+      "childNamespace": false,
+      "beforeCounts": {
+        "parent": 0,
+        "gate": 1,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 0,
+        "gate": 2,
+        "effects": 0
+      },
+      "applications": 0,
+      "answers": [],
+      "pendingAfterAnswer": 1
+    },
+    "galaxie": {
+      "code": "unsupported",
+      "published": 1
+    }
+  },
+  "childCompiled": {
+    "native": {
+      "interruptIdsPresent": [
+        false
+      ],
+      "interruptingTasks": 1,
+      "childNamespace": true,
+      "beforeCounts": {
+        "parent": 0,
+        "gate": 1,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 0,
+        "gate": 2,
+        "effects": 1
+      },
+      "applications": 1,
+      "answers": [
+        {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        }
+      ],
+      "pendingAfterAnswer": 0
+    },
+    "galaxie": {
+      "code": "unsupported",
+      "published": 0
+    }
+  },
+  "bodyChild": {
+    "native": {
+      "interruptIdsPresent": [
+        false
+      ],
+      "interruptingTasks": 1,
+      "childNamespace": false,
+      "beforeCounts": {
+        "parent": 1,
+        "gate": 1,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 2,
+        "gate": 2,
+        "effects": 1
+      },
+      "applications": 1,
+      "answers": [
+        {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        }
+      ],
+      "pendingAfterAnswer": 0
+    },
+    "galaxie": {
+      "code": "succeeded",
+      "published": 1
+    }
+  },
+  "mixed": {
+    "native": {
+      "interruptIdsPresent": [
+        false,
+        true
+      ],
+      "interruptingTasks": 2,
+      "childNamespace": false,
+      "beforeCounts": {
+        "parent": 0,
+        "gate": 1,
+        "effects": 0
+      },
+      "afterCounts": {
+        "parent": 0,
+        "gate": 2,
+        "effects": 1
+      },
+      "applications": 2,
+      "answers": [
+        {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        },
+        {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        }
+      ],
+      "pendingAfterAnswer": 0
+    },
+    "galaxie": {
+      "code": "unsupported",
+      "published": 0
+    }
+  }
+}

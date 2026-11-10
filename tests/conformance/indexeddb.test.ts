@@ -7,11 +7,14 @@ import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
 import * as web from '@langchain/langgraph/web';
 import { afterEach, expect, expectTypeOf, test } from 'vitest';
 import { GATE_CASE_NAMES, gateCases } from './cases/gates.js';
+import { IDLESS_CASE_NAMES, idlessCases } from './cases/idless.js';
 import { CASE_NAMES, type CaseName, cases } from './cases/index.js';
 import branching from './golden/branching.json' with { type: 'json' };
 import capability from './golden/capability.json' with { type: 'json' };
 import gateContinue from './golden/gate-continue.json' with { type: 'json' };
 import gateReject from './golden/gate-reject.json' with { type: 'json' };
+import idlessSequence from './golden/idless-sequence.json' with { type: 'json' };
+import idlessSubmit from './golden/idless-submit.json' with { type: 'json' };
 import interruptDurabilityExit from './golden/interrupt-durability-exit.json' with { type: 'json' };
 import interruptDurabilitySync from './golden/interrupt-durability-sync.json' with { type: 'json' };
 import interruptResume from './golden/interrupt-resume.json' with { type: 'json' };
@@ -212,6 +215,7 @@ test.each(Object.keys(reloadCases) as (keyof typeof reloadCases)[])(
 
     const submission = cases[name].resumes?.[0];
     if (submission === undefined) throw new Error('The reload fixture has no submission.');
+    if (interrupt.id === undefined) throw new Error('The ID-bearing fixture has no interrupt ID.');
     await resume(graph, config, interrupt.id, submission);
     const finished = await graph.getState(config);
     const { counts, ...values } = finished.values as Record<string, unknown>;
@@ -259,3 +263,37 @@ test.each(Object.keys(reloadCases) as (keyof typeof reloadCases)[])(
     );
   },
 );
+
+const idlessGoldens = { 'idless-submit': idlessSubmit, 'idless-sequence': idlessSequence };
+test.each(IDLESS_CASE_NAMES)(
+  '%s with IndexedDB matches native with zero differences',
+  async (name) => {
+    const saver = await open();
+    expect(
+      diff(idlessGoldens[name], normalize(await runGalaxie(idlessCases[name], () => saver))),
+    ).toEqual([]);
+  },
+);
+
+test.each(IDLESS_CASE_NAMES)('%s restores after IndexedDB close and reopen', async (name) => {
+  const databaseName = `galaxie-idless-restore-${crypto.randomUUID()}`;
+  const saver = await open(databaseName);
+  const paused = await runGalaxie(idlessCases[name], () => saver, true);
+  const tuple = await saver.list({}).next();
+  const sessionId = tuple.value?.config.configurable?.['thread_id'] as SessionId;
+  saver.close();
+  const reopened = await open(databaseName);
+  const restored = await runGalaxie(idlessCases[name], () => reopened, false, sessionId);
+  expect(restored.pauses?.[0]).toEqual(paused.pauses?.[0]);
+  expect(restored.outcome).toEqual({ status: 'succeeded' });
+  expect(restored.final).toMatchObject({
+    answer: idlessSubmit.final.answer,
+    applications: name === 'idless-submit' ? 1 : 2,
+  });
+  expect(restored.state.next).toEqual([]);
+  reopened.close();
+  const completed = await open(databaseName);
+  await expect(runGalaxie(idlessCases[name], () => completed, false, sessionId)).rejects.toThrow(
+    'The conformance session has no pending interaction.',
+  );
+});

@@ -1,0 +1,271 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "applications": 0
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "applications": 0
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "answer": {
+            "action": "submit",
+            "payload": {
+              "answer": "yes"
+            }
+          },
+          "applications": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "answer": {
+            "action": "submit",
+            "payload": {
+              "answer": "yes"
+            }
+          },
+          "applications": 1,
+          "counts": {
+            "prepare": 1,
+            "gate": 2,
+            "second": 0
+          }
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "prepare": {}
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "gate": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            },
+            "applications": 1
+          }
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "finish": {
+            "counts": {
+              "prepare": 1,
+              "gate": 2,
+              "second": 0
+            }
+          }
+        }
+      }
+    ],
+    "messages": [],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "updates",
+    "updates",
+    "values",
+    "values",
+    "updates",
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 1,
+    "answer": {
+      "action": "submit",
+      "payload": {
+        "answer": "yes"
+      }
+    },
+    "applications": 1,
+    "counts": {
+      "prepare": 1,
+      "gate": 2,
+      "second": 0
+    }
+  },
+  "state": {
+    "values": {
+      "value": 1,
+      "answer": {
+        "action": "submit",
+        "payload": {
+          "answer": "yes"
+        }
+      },
+      "applications": 1,
+      "counts": {
+        "prepare": 1,
+        "gate": 2,
+        "second": 0
+      }
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {
+        "applications": 0
+      },
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "prepare"
+      ],
+      "values": {
+        "value": 1,
+        "applications": 0
+      },
+      "parentCheckpointId": "<uuid:1>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [
+        "gate"
+      ],
+      "values": {
+        "value": 1,
+        "applications": 0
+      },
+      "parentCheckpointId": "<uuid:2>"
+    },
+    {
+      "metadata": {
+        "step": 2,
+        "source": "loop"
+      },
+      "next": [
+        "finish"
+      ],
+      "values": {
+        "value": 1,
+        "answer": {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        },
+        "applications": 1
+      },
+      "parentCheckpointId": "<uuid:3>"
+    },
+    {
+      "metadata": {
+        "step": 3,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 1,
+        "answer": {
+          "action": "submit",
+          "payload": {
+            "answer": "yes"
+          }
+        },
+        "applications": 1,
+        "counts": {
+          "prepare": 1,
+          "gate": 2,
+          "second": 0
+        }
+      },
+      "parentCheckpointId": "<uuid:4>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  },
+  "pauses": [
+    {
+      "interrupts": [
+        {
+          "value": {
+            "surfaceId": "main",
+            "viewRevision": "r1",
+            "component": "conformance.Question/v1",
+            "props": {
+              "question": "Continue?"
+            }
+          }
+        }
+      ],
+      "historyLength": 3
+    }
+  ]
+}
