@@ -182,6 +182,68 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+test.each(['headers', 'body'] as const)(
+  'source preparation times out while waiting for %s and does not boot a Worker',
+  async (phase) => {
+    vi.useFakeTimers();
+    const workers: FixtureWorker[] = [];
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal('fetch', async (_url: unknown, init: RequestInit) => {
+      signal = init.signal as AbortSignal;
+      if (phase === 'headers') {
+        return new Promise<Response>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(signal?.reason), { once: true });
+        });
+      }
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            signal?.addEventListener('abort', () => controller.error(signal?.reason), {
+              once: true,
+            });
+          },
+        }),
+      );
+    });
+    const preparing = setup(workers).prepare(
+      descriptor,
+      { chatModels: { model: model() } },
+      preparation,
+    );
+    const rejected = expect(preparing).rejects.toMatchObject({
+      code: 'timeout',
+      message: 'The operation timed out.',
+    });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejected;
+    expect(signal?.aborted).toBe(true);
+    expect(workers).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+  },
+);
+
+test('source preparation preserves explicit cancellation and clears its deadline', async () => {
+  vi.useFakeTimers();
+  const controller = new AbortController();
+  const workers: FixtureWorker[] = [];
+  vi.stubGlobal('fetch', async (_url: unknown, init: RequestInit) => {
+    const signal = init.signal as AbortSignal;
+    return new Promise<Response>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  });
+  const preparing = setup(workers).prepare(
+    descriptor,
+    { chatModels: { model: model() } },
+    { ...preparation, signal: controller.signal },
+  );
+  const rejected = expect(preparing).rejects.toMatchObject({ code: 'cancelled' });
+  controller.abort();
+  await rejected;
+  expect(workers).toHaveLength(0);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
 const offeredTools: NonNullable<ModelPayload['options']['tools']> = [
   { type: 'function', function: { name: 'double', parameters: { type: 'object' } } },
 ];

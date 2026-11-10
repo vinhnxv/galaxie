@@ -11,10 +11,11 @@ pnpm check
 pnpm format
 ```
 
-`pnpm check` runs the same checks as CI: source and dependency licenses, Biome,
+`pnpm check` runs the local validation suite: source and dependency licenses, Biome,
 TypeScript 7 and 6, Node and Chromium tests, Python and Go tests, Python type
 checking, builds, dependency boundaries and documentation links. Run it before
-opening a pull request. `pnpm format` applies formatting and safe fixes.
+opening a pull request. CI additionally runs Firefox and WebKit tests against the
+known-failure report gate. `pnpm format` applies formatting and safe fixes.
 
 The Pyodide tests load the galaxie Python wheel from the git-ignored
 `.cache/python-wheels/`. CI rebuilds it; on your machine run

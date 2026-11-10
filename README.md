@@ -66,7 +66,7 @@ This serves a local English-tutor host with a scripted mock model, so nothing is
 - [`examples/rag-browser`](examples/rag-browser/README.md): retrieval built in the browser, with cited answers. `pnpm --filter @galaxie-ai/example-rag-browser dev:mock` serves it with mock models.
 - [`examples/mcp-server`](examples/mcp-server/README.md): a reference MCP server used by the tests.
 
-`pnpm check` runs every check that CI runs, including the Go and Python lanes, so it also needs a Go toolchain and Python with `uv`. The [toolchain section](docs/system-design.md#10-toolchain) describes the TypeScript tooling.
+`pnpm check` runs the local validation suite, including the Go and Python lanes, so it also needs a Go toolchain and Python with `uv`. CI additionally runs Firefox and WebKit report gates. The [toolchain section](docs/system-design.md#10-toolchain) describes the TypeScript tooling.
 
 The [local-only starter template](templates/local-only/README.md) has its own tiny agent, uses available Built-in AI or an immediate mock, and loads WebLLM only after a size-disclosed opt-in. The [hybrid-gateway starter](templates/hybrid-gateway/README.md) runs the same agent through a same-origin Node gateway with server-held prompts and scoped HTTP capabilities.
 
@@ -102,7 +102,7 @@ Known limit: the packages were tested with `@langchain/core` 1.2.x. The current 
 
 ## Documentation
 
-- [Host integration guide](docs/guides/host-integration.md): CSP, model hosting, storage, ownership, logout, confirmations, [identity and authorization](docs/guides/host-integration.md#identity-and-authorization) and proxies.
+- [Host integration guide](docs/guides/host-integration.md): CSP, model hosting, storage, ownership, logout, confirmations and proxies.
 - [Development tracing guide](docs/guides/tracing.md): spans and exporting through a collector.
 - [System design](docs/system-design.md): components, contracts and runtime flows.
 - [Architecture decision records](docs/adr/README.md): one file per decision.

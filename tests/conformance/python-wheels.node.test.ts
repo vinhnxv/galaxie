@@ -85,7 +85,7 @@ test('CPython and Pyodide locks agree on every shared distribution version', asy
   }
   expect(versions.get('langgraph')).toBe('1.2.16');
   expect(versions.get('langchain-core')).toBe('1.7.0');
-  expect(lock.packages.find((item) => item.name === 'msgpack')?.version).toBe('1.1.2');
+  expect(lock.packages.find((item) => item.name === 'msgpack')?.version).toBe('1.2.4');
 });
 
 test('framework wheel sets preserve the LangGraph inventory and keep provider SDKs out', async () => {
@@ -100,7 +100,7 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     ).toBe(true);
   }
   const langgraph = inventory.filter((wheel) => wheel.frameworks?.includes('langgraph'));
-  expect(langgraph.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(6_042_342);
+  expect(langgraph.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(6_045_432);
   const fingerprint = langgraph
     .map(
       (wheel) =>
@@ -108,7 +108,7 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     )
     .join('\n');
   expect(createHash('sha256').update(fingerprint).digest('hex')).toBe(
-    'af0f855f9a3ad22e27237d198f94a690d7e05ca54ebeb9ae6b8b2de165582cd1',
+    'bcf53369f41c241c62bddd69d02315297cfdc7af5d4ddae9020ca66dc47ecc7d',
   );
   const pydantic = inventory.filter((wheel) => wheel.frameworks?.includes('pydantic-ai'));
   expect(pydantic.reduce((sum, wheel) => sum + wheel.bytes, 0)).toBe(5_208_632);
@@ -148,7 +148,7 @@ test('framework wheel sets preserve the LangGraph inventory and keep provider SD
     const uploadTimes = [...(block ?? '').matchAll(/upload-time = "([^"]+)"/g)];
     expect(uploadTimes.length, wheel.name).toBeGreaterThan(0);
     for (const match of uploadTimes)
-      expect(Date.parse(match[1] ?? '')).toBeLessThan(Date.parse('2026-10-23T17:00:00Z'));
+      expect(Date.parse(match[1] ?? '')).toBeLessThan(Date.parse('2026-11-03T00:00:00Z'));
   }
 });
 
@@ -217,6 +217,8 @@ test('native framework and extension pins match the maintained constraints', asy
     tenacity: '9.2.1',
     websockets: '17.3',
     cryptography: '50.0.2',
+    msgpack: '1.2.4',
+    pyasn1: '0.6.5',
     cffi: '2.0.0',
     pycparser: '3.0',
     'google-adk': '2.12.0',
@@ -236,6 +238,8 @@ test('native framework and extension pins match the maintained constraints', asy
     'tenacity==9.2.1',
     'websockets==17.3',
     'cryptography==50.0.2',
+    'msgpack==1.2.4',
+    'pyasn1==0.6.5',
     'cffi==2.0.0',
     'pycparser==3.0',
   ])

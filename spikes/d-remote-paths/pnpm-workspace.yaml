@@ -2,3 +2,6 @@
 
 # Resolve only versions published at least 7 days ago, as the root workspace does.
 minimumReleaseAge: 10080
+
+overrides:
+  'body-parser@>=2.0.0 <2.4.0': 2.4.0

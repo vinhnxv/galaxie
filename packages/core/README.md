@@ -64,6 +64,15 @@ See [coding guidance](AGENTS.md), [runtime contracts](../../docs/system-design.m
 [conformance coverage](../../tests/conformance/README.md).
 Code is Apache-2.0 (see [LICENSE](../../LICENSE)).
 
+## Event consumers
+
+`instance.events(runId)` delivers stream events live and replays recorded host and
+terminal events. Each live consumer can queue up to 1,024 events. If a consumer falls
+behind that limit, its next read rejects with the fixed `budget_exceeded` error and
+the iterator detaches. The run and other consumers continue; recorded events remain
+available to a new iterator. Consume continuously and call `return()` when finished.
+The limit counts events, not payload bytes; stream data still passes by reference.
+
 ## Decision roles
 
 Declare a bounded role with `models: { triage: { modality: 'decision' } }`.

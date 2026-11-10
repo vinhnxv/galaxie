@@ -13,6 +13,15 @@ localWheels, onBoot?, framework? })`. The default framework is `langgraph`;
 message and error listeners, and `terminate()`. A browser `Worker` satisfies that
 shape. Node hosts wrap `worker_threads.Worker`. Constructing the adapter fetches
 nothing and starts no Worker; `prepare` loads the source files and boots the interpreter.
+All source downloads, including their response bodies, share a 30-second deadline.
+Expiry rejects preparation with the fixed `timeout` error; explicit cancellation
+keeps the `cancelled` outcome. The download timer is cleared before Worker boot.
+
+The native reference environment and the Worker pin cryptography 50.0.2.
+The Worker uses a [vendored WASM wheel](../../python/wheels/README.md) linked to
+OpenSSL 4.0.3 because Pyodide 314.0.7 supplies only 47.0.0. Framework versions
+and the msgpack 1.2.4 pin stay aligned across both environments; the lock test
+requires every shared distribution to have one version (ADR-0022).
 
 The agent descriptor is `{ baseUrl, files, module, entry }`. Source paths are relative
 Python or JSON files, the module is a dotted Python import name, and the entry is a
