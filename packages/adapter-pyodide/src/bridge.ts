@@ -301,8 +301,7 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
           toolChoice(value['options']['toolChoice'])) &&
         validModelOption('jsonSchema', value['options']['jsonSchema']) &&
         (value['options']['repairAttempt'] === undefined ||
-          (typeof value['options']['repairAttempt'] === 'number' &&
-            Number.isSafeInteger(value['options']['repairAttempt']) &&
+          (count(value['options']['repairAttempt']) &&
             value['options']['repairAttempt'] >= 1 &&
             value['options']['jsonSchema'] !== undefined)) &&
         validModelOption('stream', value['options']['stream']) &&
