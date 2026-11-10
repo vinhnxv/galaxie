@@ -77,7 +77,7 @@ So a single model run that lasts about 3 s or more fails, and the prompt length 
 - A 2722-token prompt, which failed on Safari before, completed in 5.6 s sliced. Firefox produced the same text as Safari for all three prompts (15 s to 21 s).
 - The Financial advisor (ADK JavaScript) recipe, which failed at its fourth call before, succeeded on Safari in about 52 s, with all four agents routed to the ONNX provider (one run). The Firefox recipe run was not repeated, so the budget failure above stands.
 
-Chrome was not repeated with this change: its profile on this Mac no longer holds the model and the download was not approved again. The slice size is a constant, not a record field: it was chosen from the 0.8B model's timings above, and a larger model needs its own check. This is one Mac and one Safari version.
+The Financial advisor (ADK JavaScript) recipe was not repeated on Chrome with this change; Chrome ran the Go and Python recipes instead (see below). The slice size is a constant, not a record field: it was chosen from the 0.8B model's timings above, and a larger model needs its own check. This is one Mac and one Safari version.
 
 **Firefox.** Every call completes, including the 2211-token prompt. Generation is slow: about 78 s for 384 tokens, roughly 5 tokens per second, against about 9 s on Safari. The run's default wall-clock budget (`wallClockMs`, 300000) expires during call 5, so the run fails with the budget error rather than a model error. In both runs a stale tab of the earlier probe reloaded and started a second page load; the two runs' timings agree to within 0.1 s although the second page appeared at different moments, so this record does not attribute the slowness to it.
 
@@ -93,4 +93,14 @@ This is a demonstration on one machine, two runs per browser, not a measurement 
 | LLM auditor (Python) | succeeded, 2 agents routed to the ONNX provider | about 26 s |
 | Small-business loan (Python) | stopped at `waiting_input` with the alert "The loan confirmation is invalid. Use Start over to clear it." The 0.8B model answered that the request was invalid, so the confirmation step received no valid payload. | about 39 s to that point |
 
-A first attempt at the Go recipe produced no report within the harness's 5 minutes and its cause is unknown; the repeat succeeded. These are single runs, a demonstration and not a pass/fail result. The text the model wrote is not scored. The same three recipes ran once each on Firefox 159.0.1 the same day: LLM auditor (Python) succeeded in about 150 s, against about 26 s on Safari. Small-business loan (Python) stopped at the same invalid confirmation after about 181 s, with output of the same length as on Safari. Financial advisor (Go) failed with "The budget limit was reached." at the default 300 s wall-clock budget, as the JavaScript version did. Chrome was not run for the Go and Python recipes.
+A first attempt at the Go recipe produced no report within the harness's 5 minutes and its cause is unknown; the repeat succeeded. These are single runs, a demonstration and not a pass/fail result. The text the model wrote is not scored. The same three recipes ran once each on Firefox 159.0.1 the same day: LLM auditor (Python) succeeded in about 150 s, against about 26 s on Safari. Small-business loan (Python) stopped at the same invalid confirmation after about 181 s, with output of the same length as on Safari. Financial advisor (Go) failed with "The budget limit was reached." at the default 300 s wall-clock budget, as the JavaScript version did.
+
+**Go and Python recipes on Chrome.** One run each on 2026-11-10 (Chrome 157, same Mac, WebGPU adapter `apple metal-3`), after the sliced prefill and with the 666 MB download approved for this run. The first attempt, which downloaded the model inside the run, failed with "The budget limit was reached." because the download used up the run's wall-clock budget. The runs below read the model from the browser's cache. Every model call went to the ONNX provider.
+
+| Recipe | Result | Time |
+| --- | --- | --- |
+| Financial advisor (Go) | succeeded, 4 agents routed to the ONNX provider | about 36 s |
+| LLM auditor (Python) | succeeded, 2 agents routed to the ONNX provider | about 50 s |
+| Small-business loan (Python) | stopped at `waiting_input` with the same alert as on Safari and Firefox and output of the same length (2353 characters) | about 30 s to that point |
+
+These are single runs, a demonstration and not a pass/fail result. The text the model wrote is not scored. The loan stop is the same on all three browsers, so it comes from what the model answered, not from the engine. The times are not a ranking: the Chrome auditor run was slower than Safari's although the Go run was faster.
