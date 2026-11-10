@@ -1,8 +1,7 @@
 # Decision model measurement spike
 
 Throwaway instrument for [ADR-0028](../../docs/adr/0028-decision-model-role.md).
-The [spike plan](../../docs/plans/2026-11-07-spike-decision-models-plan.md) precedes any
-maintainer device run. Implementation stays here; no spike imports another spike or a package.
+The spike plan was written before any maintainer device run. Implementation stays here; no spike imports another spike or a package.
 Copied patterns name their source in header comments.
 
 **Mock numbers are harness evidence only, never a model measurement.** Results are
