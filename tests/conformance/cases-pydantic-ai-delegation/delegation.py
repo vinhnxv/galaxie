@@ -161,7 +161,7 @@ def factory(name: str = 'smoke', variant: str = 'helper') -> Executor:
             @child.tool_plain
             async def again() -> str:
                 return 'again'
-        options = forwarding(ctx, variant)
+        options = forwarding(ctx, variant) if variant in ('plain', 'usage', 'conv') else {}
         prompt: str | None = 'child-2' if name == 'native' and ctx.tool_call_id == 'delegate-2' else 'child'
         if name == 'stream':
             async with child.run_stream(prompt, **options) as streamed:
@@ -180,9 +180,6 @@ def factory(name: str = 'smoke', variant: str = 'helper') -> Executor:
         if variant in ('plain', 'usage', 'conv'):
             result = await child.run(prompt, **options)
         else:
-            options.pop('infer_name')
-            options.pop('usage', None)
-            options.pop('usage_limits', None)
             # Keep the spike's ID-derived formula only as a replay-sensitivity control.
             # Using it as a helper key registers the run without bypassing the guard.
             key = hashlib.sha256(json.dumps([ctx.conversation_id, ctx.tool_call_id]).encode()).hexdigest() if variant == 'id-control' else ''

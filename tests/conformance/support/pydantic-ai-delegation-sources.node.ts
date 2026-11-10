@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 
 export async function delegationSources(
   name = 'smoke',
-  variant = 'usage',
+  variant = 'helper',
 ): Promise<Record<string, string>> {
   return {
     'delegation.py': await readFile(
