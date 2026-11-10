@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { collect } from '../../packages/core/test/fake-executor.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 
 test.each([true, false])(
@@ -118,7 +119,7 @@ test.each([true, false])(
     );
     await instance.prepare();
     const { runId } = await instance.start({});
-    await expect.poll(() => instance.getSnapshot().run?.status).toBe('waiting_input');
+    await waitForRunStatus(instance, 'waiting_input');
     expect(parentBodies).toBe(1);
     expect(writes).toHaveLength(1);
     const pending = instance.getSnapshot().run?.pending;
@@ -132,7 +133,7 @@ test.each([true, false])(
         payload: { answer: 'continue' },
       }),
     ).toMatchObject({ status: 'accepted' });
-    await expect.poll(() => instance.getSnapshot().run?.status).toBe('succeeded');
+    await waitForRunStatus(instance, 'succeeded');
     expect((await collect(instance.events(runId))).at(-1)).toMatchObject({
       type: 'output',
       output: { answer: { answer: 'continue' } },

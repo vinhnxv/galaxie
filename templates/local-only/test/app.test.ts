@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import type { RunStatus } from '@galaxie-ai/core';
 import { ModelError } from '@galaxie-ai/models/builtin-ai';
 import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
 import { act, createElement } from 'react';
@@ -13,12 +14,14 @@ import {
   sessionKey,
   type TemplateHost,
   type TemplateHostOptions,
+  type TemplateInstance,
 } from '../src/runtime.js';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 let host: TemplateHost | undefined;
+let instance: TemplateInstance | undefined;
 
 async function unmount(): Promise<void> {
   await act(async () => root?.unmount());
@@ -27,6 +30,7 @@ async function unmount(): Promise<void> {
   container = undefined;
   await host?.dispose();
   host = undefined;
+  instance = undefined;
 }
 
 afterEach(async () => {
@@ -44,6 +48,33 @@ async function shown(check: () => boolean): Promise<void> {
     .toBe(true);
 }
 
+async function waitForRunStatus(target: RunStatus): Promise<void> {
+  const current = instance;
+  if (current === undefined) throw new Error('The question instance is missing.');
+  return new Promise((resolve, reject) => {
+    const check = (): void => {
+      const run = current.getSnapshot().run;
+      if (run?.status === target) {
+        unsubscribe();
+        resolve();
+      } else if (
+        run?.status === 'succeeded' ||
+        run?.status === 'failed' ||
+        run?.status === 'cancelled'
+      ) {
+        unsubscribe();
+        reject(
+          new Error(
+            `Expected run status ${target}, observed ${run.status}${run.error === undefined ? '' : ` (${run.error.code})`}.`,
+          ),
+        );
+      }
+    };
+    const unsubscribe = current.subscribe(check);
+    check();
+  });
+}
+
 async function mount(options: TemplateHostOptions = {}): Promise<TemplateHost> {
   const current = await createTemplateHost({
     builtInAIProbe: async () => {
@@ -53,10 +84,16 @@ async function mount(options: TemplateHostOptions = {}): Promise<TemplateHost> {
     ...options,
   });
   host = current;
+  const createInstance = vi.spyOn(current, 'createInstance');
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
   await act(async () => root?.render(createElement(App, { host: current })));
+  const created = createInstance.mock.results[0];
+  if (created?.type !== 'return') throw new Error('The question instance was not created.');
+  instance = await created.value;
+  await waitForRunStatus('waiting_input');
+  await act(async () => {});
   await shown(() => container?.querySelector('input[type="radio"]') != null);
   return current;
 }
@@ -76,6 +113,8 @@ async function completeQuestion(): Promise<void> {
     radio.click();
   });
   await act(async () => button('Submit answers').click());
+  await waitForRunStatus('succeeded');
+  await act(async () => {});
   await shown(
     () =>
       container?.textContent?.includes('Correct. Keep practicing one small step at a time.') ===
@@ -180,6 +219,8 @@ it('selects WebLLM only after a successful opted-in load and removes the control
   expect(container?.querySelectorAll('section button')).toHaveLength(0);
   await act(async () => container?.querySelector<HTMLInputElement>('input[value="four"]')?.click());
   await act(async () => button('Submit answers').click());
+  await waitForRunStatus('succeeded');
+  await act(async () => {});
   await shown(
     () => container?.textContent?.includes('Correct. A local encouraging comment.') === true,
   );
