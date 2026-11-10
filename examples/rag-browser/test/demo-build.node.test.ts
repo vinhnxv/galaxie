@@ -158,7 +158,18 @@ test('mock demo enforces meta CSP without headers and restores a paused review',
         return [first?.tagName, first?.getAttribute('http-equiv'), first?.getAttribute('content')];
       }),
     ).toEqual(['META', 'Content-Security-Policy', cspMetaValue('mock')]);
+    // The checkbox is disabled while the index builds, so click it only once the index is ready.
+    await expect
+      .poll(
+        () =>
+          page.getByText('Ready: 12 passages (0 pasted). Device: mock.', { exact: true }).count(),
+        {
+          timeout: 30000,
+        },
+      )
+      .toBe(1);
     const option = page.getByLabel('Review passages before answering', { exact: true });
+    await expect.poll(() => option.isEnabled(), { timeout: 30000 }).toBe(true);
     expect(await option.isChecked()).toBe(true);
     expect(await page.getByText(cue, { exact: true }).isVisible()).toBe(true);
     await option.uncheck();
