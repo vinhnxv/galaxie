@@ -19,7 +19,7 @@ from collections.abc import AsyncGenerator, Callable, Collection, Iterator
 from contextvars import ContextVar
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode  # pyright: ignore[reportPrivateImportUsage]
@@ -945,20 +945,22 @@ def _workflow_state(root: BaseAgent, resumable: bool, events: list[Event], pause
             ended.discard(child.name)
             reset(child.sub_agents)
 
-    def finished(branch: BaseAgent) -> bool:
+    def completion(branch: BaseAgent) -> Literal['ended', 'markerless', 'unfinished']:
         if branch.name in ended:
-            return True
+            return 'ended'
         # Empty workflows emit no completion. Parallel also omits its marker
         # when a child has none, but every nonempty child must still finish.
         if isinstance(branch, ParallelAgent) and branch.sub_agents:
             if branch.name not in latest:
-                raise ValueError()
-            children = [finished(child) for child in branch.sub_agents]
-            if not all(children):
-                return False
+                return 'unfinished'
+            children = [completion(child) for child in branch.sub_agents]
+            if 'unfinished' in children:
+                return 'unfinished'
+            if 'markerless' in children:
+                return 'markerless'
         elif not isinstance(branch, LlmAgent) and not branch.sub_agents:
-            return False
-        raise ValueError()
+            return 'markerless'
+        return 'unfinished'
 
     for event in events:
         if event.invocation_id != pending.invocation_id or event.author == 'user':
@@ -1003,7 +1005,8 @@ def _workflow_state(root: BaseAgent, resumable: bool, events: list[Event], pause
             for branch in parent.sub_agents:
                 if branch is child:
                     continue
-                finished(branch)
+                if completion(branch) == 'unfinished':
+                    raise ValueError()
         child = parent
 
 

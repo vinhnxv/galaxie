@@ -520,6 +520,11 @@
   "agents-parallel": {
     "prompt": "fan out",
     "unordered": true,
+    "order": [
+      ["left#2:response", "right#2:response"],
+      ["left#2:response", "merger#1:request"],
+      ["right#2:response", "merger#1:request"]
+    ],
     "agents": {
       "left": [
         {
@@ -777,6 +782,11 @@
   "agents-confirm-parallel": {
     "prompt": "approve one branch",
     "unordered": true,
+    "order": [
+      ["right#1:response", "left#1:response"],
+      ["left#2:response", "merger#1:request"],
+      ["right#1:response", "merger#1:request"]
+    ],
     "agents": {
       "left": [
         {
@@ -819,6 +829,11 @@
   "agents-confirm-parallel-reversed": {
     "prompt": "approve one branch",
     "unordered": true,
+    "order": [
+      ["left#1:response", "right#1:response"],
+      ["left#2:response", "merger#1:request"],
+      ["right#1:response", "merger#1:request"]
+    ],
     "agents": {
       "left": [
         {

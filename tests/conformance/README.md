@@ -350,9 +350,13 @@ through the adapter, router and broker on Node, the [restore lane](adk-python-re
 reloads fresh Workers over one store, and the
 [Chromium lane](../../examples/rag-browser/test/adk-python-conformance.node.test.ts) runs a subset
 under the strict CSP and Trusted Types. Shape cases script each model by agent name (the name in
-ADK's system instruction); `agents-parallel` sorts concurrent requests and orders its branches with
-a reply gate in both lanes. Parallel pause cases also normalize per agent; `afterCall` waits for
-another agent's tool call so the reversed-order fixture can proceed before approval.
+ADK's system instruction). The unordered Parallel cases number tool-call IDs once per agent,
+check raw call-ID consistency across each agent's requests, and assert fixture-declared
+happens-before constraints against the arrival trace before sorting concurrent transcripts.
+Both native and Worker lanes check the reply-gate order and that the merger follows both
+branches; reload joins traces across runtime lifetimes. `afterCall` waits for another agent's
+tool call so the reversed-order fixture can proceed before approval. Existing goldens are
+byte-identical.
 
 [`adk-python-agents.node.test.ts`](adk-python-agents.node.test.ts) asserts that `Workflow`,
 `AgentTool` and the pause shapes ADK cannot resume faithfully fail `unsupported` at prepare, with
