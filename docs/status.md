@@ -68,6 +68,18 @@ guard ships yet. Native children share the repair counter, and outer snapshot
 validation does not validate author-owned child metadata. Browser delegation and
 real providers remain unmeasured. See the [probe results and limits](../tests/conformance/README.md#pydantic-ai-agent-delegation-probes).
 
+On 2026-11-11, pydantic-ai builtin and native tool probes recorded refusal for
+all ten native kinds, dynamic tools and native response parts. Static tools and
+factories now fail `unsupported` at prepare, preserving the auto-injected optional
+tool search; overrides and deferred loading retain the request-time backstop.
+Capability retrieval and `WebSearch(native=False, local=<capability_tool>)` complete
+with equal transcripts, but take two model requests, so the fixed one-request
+criterion does not award an alternative outcome. Evidence covers 67 CPython
+probes, four Node Pyodide tests and five bridge tests with scripted models only.
+Native-tool Chromium probes, real providers, native tool execution, local network
+fallbacks, network reachability and providers returning only text after internal
+tool execution remain unmeasured. See the [outcomes and documented limits](adr/0018-python-agents-through-pyodide.md#pydantic-ai-builtin-and-native-tools-spike-2026-11).
+
 The repository is public. No legal review of learner data (minors, consent, retention) has been done, because the project has no legal counsel; see the [README](../README.md#intended-use-and-disclaimer) and [ADR-0024](adr/0024-apache-2-0-license-and-dco.md). The seven launch packages are on npm at 0.1.0; the other packages in this repository are not published.
 
 `@galaxie-ai/ui-protocol` provides pinned A2UI v1.0 messages, strict parsing, catalog validation and a pure surface reducer. Core uses it for pending surfaces and React renders them (see the next paragraphs). It is verified by its own Node and Chromium tests, replayed upstream example messages and a conformance test that compares its URL check with core's. Nothing is measured about its cost on large surfaces. See the [package API and limits](../packages/ui-protocol/README.md).

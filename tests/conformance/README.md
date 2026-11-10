@@ -347,6 +347,130 @@ pnpm exec vitest run --project node tests/conformance/pydantic-ai-delegation.nod
 These are characterization probes rather than additions to the compatibility
 matrix. Existing cases, goldens, matrices, locks and shipped source stay unchanged.
 
+## pydantic-ai native tool refusal probes
+
+The [CPython probes](../../python/galaxie/tests/test_pydantic_ai_native_tools.py),
+[Node Pyodide probes](pydantic-ai-native-tools.node.test.ts) and
+[bridge probes](../../packages/adapter-pyodide/test/bridge-native-tools.test.ts)
+pin scripted observations separately from their outcome. The rule and probe
+criteria were committed before any run. Versions: pydantic-ai-slim 2.60.0,
+pydantic-graph 2.60.0, CPython 3.14.5, Pyodide 314.0.7, Node 24.15.0 and pnpm
+11.21.0. A version bump reopens the question; the kind registry is pinned by name.
+
+A cell is one static kind, dynamic/per-run tools, or response parts. Support
+requires provider execution, a bridge declaration/result channel, a router feature
+and broker grant/label/budget/confirmation proof. An alternative requires failed
+support, a retrieval kind and satisfied N4. Otherwise fixed refusal before any
+model/capability/interaction request establishes refusal. A P0 bypass is unsafe as
+shipped; unmeasured P0 makes its cell undetermined. The rule reads only satisfied
+results; green characterization assertions can pin a not-satisfied condition.
+
+| Probe | CPython result | Node Pyodide result | Bridge result |
+| --- | --- | --- | --- |
+| N1 static tools, both prepare entries | Satisfied for all ten kinds after the prepare check | Satisfied for static kinds after the prepare check | Not applicable |
+| N2 request backstop, each kind | Satisfied: fixed `unsupported`, zero requests | Satisfied: fixed `unsupported`, zero model/capability/interaction requests | Not applicable |
+| N3 adaptive native capabilities | Satisfied: WebSearch, WebFetch, ImageGeneration, XSearch and explicit native-only MCP refuse at prepare | Not applicable | Not applicable |
+| N4 retrieval equivalence and one-request criterion | **Not satisfied:** equal transcripts, two model requests and one capability request | **Not satisfied:** equal raw/normalized traffic, two model requests and one capability request | Not applicable |
+| N5 native-default local search (informational) | Satisfied: refuses at prepare; `native=False` is required | Not applicable | Not applicable |
+| N6 ordinary agents | Satisfied: baseline, function and capability tools prepare and complete | Satisfied: baseline, function and capability tools prepare and complete | Not applicable |
+| N7 deferred loading (informational) | Satisfied: prepare accepts, first request refuses with zero traffic | Not applicable | Not applicable |
+| D1 native factories | Satisfied after the prepare check: tool/None factories refuse without invocation | Satisfied after the prepare check: tool/None factories refuse before model work | Not applicable |
+| D2 agent override | Satisfied: fixed `unsupported`, zero traffic | Not applicable | Not applicable |
+| D3 direct native requests | Satisfied: ordinary/streamed and required/optional tools refuse before transport | Not applicable | Not applicable |
+| D4 first/resumed run keywords (informational) | Satisfied: no `capabilities` option | Not applicable | Not applicable |
+| RP1 four native history parts | Satisfied: fixed `unsupported`, zero traffic | Not applicable | Not applicable |
+| RP2 malformed native reply shapes | Satisfied: all three fail fixed `invalid` | Not applicable | Not applicable |
+| B1 native declaration shapes | Not applicable | Not applicable | Satisfied: both unknown options and non-function declaration fail fixed `invalid` |
+| B2 native response parts | Not applicable | Not applicable | Satisfied: extra response key fails fixed `invalid` |
+| RP3 array provider reply | Not applicable | Satisfied: model called once, zero capabilities, fixed `unsupported`, no successful Python model reply | Not applicable |
+| RP4 internal provider execution with text only (informational) | Not applicable | Unmeasured; reasoned below | Not applicable |
+
+N1 first observed acceptance at both preparation entries for nine static kinds,
+then fixed refusal at the first request with zero traffic. A factory returning a
+native tool behaved the same; a factory returning `None` completed one ordinary
+model request. That characterization was committed before adding the prepare
+check. The check ignores only optional `tool_search`, which ordinary agents carry,
+and refuses other static tools and all factories without executing them. Preparing
+an already-created executor revalidates capabilities added afterwards.
+
+Required `tool_search` conflicts with pydantic-ai's automatic optional declaration
+during `Agent` construction. The probes pin that upstream `UserError` separately
+(Node Worker boot reports fixed `unavailable` for this construction failure);
+a public `root_capability.capabilities` mutation adds the required form to a clean
+agent and proves the executor's prepare refusal. Before the check, that mutation
+prepared and then failed fixed `executor_error` with zero model/capability traffic
+because the run encountered the duplicate declarations. Direct requests prove its model
+backstop. `MCP` defaults to `native=False`; N3 explicitly uses
+`MCP(native=True, local=False, url=..., id=...)` with inert values, avoiding the
+optional local client. These are observed constructor differences, not skipped
+native kinds.
+
+N4's ordinary capability tool and `WebSearch(native=False, local=<same tool>)`
+produce equal final answers and model payloads, one function declaration per
+request, one capability call, and a scope matching
+`pydantic-ai/<conversation>/<n>/<n>`. CPython uses no extra request options beyond
+`tools` and `toolChoice`; Node additionally uses checked `stream`. Both need a tool
+response followed by a final model answer: **two model requests**. The fixed
+criterion says exactly one, so N4 is not satisfied and no retrieval cell earns an
+alternative outcome. Authors can still use the measured ordinary/local capability
+form for retrieval; this is not provider-tool parity. The plain form also expresses
+file retrieval through a host-bound capability.
+
+| Cell | Outcome | Deciding probes |
+| --- | --- | --- |
+| Static `advisor` | Refused | N1/N2; support conditions absent |
+| Static `code_execution` | Refused | N1/N2; no generic code capability |
+| Static `file_search` | Refused | N1/N2; N4 not satisfied |
+| Static `image_generation` | Refused | N1/N2/N3; no image result channel |
+| Static `mcp_server` | Refused | N1/N2/N3; N4 not satisfied |
+| Static `memory` | Refused | N1/N2; provider-held state |
+| Static `tool_search` | Refused | N1/N2, informational N7; no native loading channel |
+| Static `web_fetch` | Refused | N1/N2/N3; N4 not satisfied |
+| Static `web_search` | Refused | N1/N2/N3; N4 not satisfied |
+| Static `x_search` | Refused | N1/N2/N3; N4 not satisfied |
+| Dynamic and per-run native tools | Refused | D1/D2/D3; D4 informational |
+| Provider-native response parts | Refused | RP1/RP2/B1/B2/RP3; RP4 informational |
+
+The four support conditions are not established:
+
+- S1: no native-tool execution is declared in the repository providers.
+  [OpenAI-compatible declarations and replies](../../packages/models/src/openai/chat-model.ts)
+  require function tools and string content;
+  [WebLLM](../../packages/models/src/webllm/chat-model.ts),
+  [Built-in AI](../../packages/models/src/builtin-ai/chat-model.ts) and
+  [Transformers](../../packages/models/src/transformers/chat-model.ts) have no native
+  provider-tool execution path.
+- S2: B1/B2 reject declarations and results in the
+  [closed bridge](../../packages/adapter-pyodide/src/bridge.ts).
+- S3: [ModelFeature](../../packages/core/src/models.ts) contains only streaming,
+  structured-output, tool-calling and cancellation, with no native-tool label.
+- S4: no provider-side use through broker grants, labels, budgets and confirmation
+  was observed; the native request path refused before dispatch.
+
+**Where native behavior cannot be matched.** Provider-side execution carries no
+broker effect identity or per-tool grant, label, budget or confirmation path.
+Provider-held memory and advisor calls are outside the router. ADR-0012 forbids a
+generic code capability, and the bridge has no image result channel.
+`MCP(local=True)` and `WebSearch(local='duckduckgo')` could open Worker network
+access; neither was run. The MCP fallback also needs the absent optional
+`fastmcp` package. Use host-bound capabilities to keep retrieval data under broker
+labels and destination policy. A host-registered provider that executes native
+tools internally and returns only text is invisible to this adapter; the host
+takes on those controls under ADR-0012's SDK-controlled-path limit. That conclusion
+is reasoned, not a measurement.
+
+**Not measured.** Native-tool Chromium probes, real providers, actual native tool
+execution, network reachability, the optional MCP/DuckDuckGo fallbacks and
+string-only replies after internal provider execution. All applicable P0 native
+probe shapes ran on their declared lanes; no wheel-dependent lane was skipped.
+No golden, matrix, existing case, lock or JavaScript package source changed.
+
+```sh
+node scripts/test-python.ts galaxie/tests/test_pydantic_ai_native_tools.py
+pnpm exec vitest run --project node tests/conformance/pydantic-ai-native-tools.node.test.ts
+pnpm exec vitest run --project node packages/adapter-pyodide/test/bridge-native-tools.test.ts
+```
+
 ## DSPy custom engines and replay
 
 The separate [DSPy matrix](compatibility-matrix-dspy.json) lists 48 scripted
