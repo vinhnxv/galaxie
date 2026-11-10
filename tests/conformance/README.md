@@ -241,6 +241,23 @@ pnpm exec vitest run --project node examples/rag-browser/test/dspy-conformance.n
 python/.venv/bin/python -I scripts/record-dspy-conformance.py --check
 ```
 
+Offline-optimized state has a separate seven-case family and new goldens;
+it does not extend the existing DSPy matrix. Native scripted `LabeledFewShot`,
+scripted-LM `BootstrapFewShot`, multi-predictor ReAct demos and an instructions-only
+stand-in compare CPython, Node Pyodide and Chromium transcripts. Refusal tests
+cover loaded LMs, pickle sources and both size bounds. The executable catalog
+records round-trip losses; the opt-in Node probe measures size and load cost
+without timing thresholds. See the [results and limits](../../packages/adapter-pyodide/README.md#offline-optimized-program-state).
+
+```sh
+node scripts/test-python.ts ../tests/conformance/cases-dspy/test_dspy_state.py
+python/.venv/bin/python -I scripts/record-dspy-state-conformance.py --check
+pnpm exec vitest run --project node tests/conformance/dspy-state.node.test.ts
+pnpm exec vitest run --project node tests/conformance/dspy-state-limits.node.test.ts
+pnpm exec vitest run --project node examples/rag-browser/test/dspy-state-conformance.node.test.ts
+GALAXIE_DSPY_STATE_MEASURE=1 pnpm exec vitest run --project node tests/conformance/dspy-state-limits.node.test.ts --silent=false --reporter=verbose
+```
+
 `pnpm test:python` also checks native transcripts and journal validation. All lanes
 use pinned local wheels, synthetic replies and blocked external requests, with
 unchanged CSP and Trusted Types. The maintained RAG tests add input-owned search,

@@ -1,0 +1,122 @@
+{
+  "state-predict-demos": {
+    "state": "state-predict-demos",
+    "question": "What is the capital of France?",
+    "provenance": "LabeledFewShot",
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ],
+    "trainset": [
+      {
+        "question": "What is the capital of Spain?",
+        "answer": "Madrid"
+      },
+      {
+        "question": "What is the capital of Italy?",
+        "answer": "Rome"
+      },
+      {
+        "question": "What is the capital of Germany?",
+        "answer": "Berlin"
+      }
+    ]
+  },
+  "state-chain-of-thought-bootstrap": {
+    "state": "state-chain-of-thought-bootstrap",
+    "question": "What is the capital of France?",
+    "provenance": "BootstrapFewShot",
+    "replies": [
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ],
+    "trainset": [
+      {
+        "question": "What is the capital of Spain?",
+        "answer": "Madrid"
+      },
+      {
+        "question": "What is the capital of Italy?",
+        "answer": "Rome"
+      }
+    ]
+  },
+  "state-react-demos": {
+    "state": "state-react-demos",
+    "question": "What is the capital of France?",
+    "provenance": "LabeledFewShot",
+    "replies": [
+      {
+        "text": "[[ ## next_thought ## ]]\nLook up the fact.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"France\"}\n[[ ## completed ## ]]"
+      },
+      {
+        "text": "[[ ## reasoning ## ]]\nUse the supplied fact.\n[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ],
+    "trainset": [
+      {
+        "question": "What is the capital of Spain?",
+        "answer": "Madrid",
+        "trajectory": "",
+        "next_thought": "Look up the saved fact.",
+        "next_tool_name": "lookup",
+        "next_tool_args": {
+          "query": "Madrid"
+        },
+        "reasoning": "Use the saved fact."
+      },
+      {
+        "question": "What is the capital of Italy?",
+        "answer": "Rome",
+        "trajectory": "",
+        "next_thought": "Look up the saved fact.",
+        "next_tool_name": "lookup",
+        "next_tool_args": {
+          "query": "Rome"
+        },
+        "reasoning": "Use the saved fact."
+      },
+      {
+        "question": "What is the capital of Germany?",
+        "answer": "Berlin",
+        "trajectory": "",
+        "next_thought": "Look up the saved fact.",
+        "next_tool_name": "lookup",
+        "next_tool_args": {
+          "query": "Berlin"
+        },
+        "reasoning": "Use the saved fact."
+      }
+    ]
+  },
+  "state-instructions-only": {
+    "state": "state-instructions-only",
+    "question": "What is the capital of France?",
+    "provenance": "instructions-only stand-in",
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "state-hostile-lm": {
+    "state": "state-hostile-lm",
+    "question": "What is the capital of France?",
+    "provenance": "hostile LM stand-in",
+    "replies": []
+  },
+  "state-forgot-lm": {
+    "state": "state-predict-demos",
+    "question": "What is the capital of France?",
+    "provenance": "missing LM stand-in",
+    "replies": []
+  },
+  "state-roundtrip-catalog": {
+    "state": "state-predict-demos",
+    "question": "What is the capital of France?",
+    "provenance": "round-trip probes",
+    "replies": []
+  }
+}

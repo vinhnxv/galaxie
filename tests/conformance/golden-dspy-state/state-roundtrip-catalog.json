@@ -1,0 +1,40 @@
+{
+  "requests": [],
+  "responses": [],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "pickle": "ValueError",
+    "customLm": "ValueError",
+    "missingKey": "KeyError",
+    "missingKeyUnchanged": true,
+    "extraKeyIgnored": true,
+    "reorderedFields": {
+      "second": {
+        "__dspy_field_type": "input",
+        "prefix": "First saved:",
+        "desc": "First saved description"
+      },
+      "first": {
+        "__dspy_field_type": "input",
+        "prefix": "Second saved:",
+        "desc": "Second saved description"
+      },
+      "answer": {
+        "__dspy_field_type": "output",
+        "prefix": "Answer:",
+        "desc": "${answer}"
+      }
+    },
+    "demoType": "dict",
+    "demoValueType": "dict",
+    "config": {
+      "temperature": 0.25
+    },
+    "lmRestored": false,
+    "toolPreserved": true,
+    "maxIters": 3,
+    "versionsMatch": true
+  },
+  "error": null
+}

@@ -1,0 +1,40 @@
+{
+  "traces": [],
+  "train": [],
+  "demos": [],
+  "signature": {
+    "instructions": "Given the fields `question`, produce the fields `answer`.",
+    "fields": [
+      {
+        "prefix": "Question:",
+        "description": "${question}"
+      },
+      {
+        "prefix": "Answer:",
+        "description": "${answer}"
+      }
+    ]
+  },
+  "lm": {
+    "_dspy_lm_class": "dspy.clients.lm.LM",
+    "model": "openai/hostile",
+    "model_type": "chat",
+    "cache": true,
+    "num_retries": 3,
+    "temperature": null,
+    "max_tokens": null,
+    "api_base": "https://hostile.example/v1",
+    "base_url": "https://hostile.example/v1",
+    "model_list": ["hostile"],
+    "finetuning_model": null,
+    "launch_kwargs": {},
+    "train_kwargs": {}
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "traces": [],
+  "train": [],
+  "demos": [],
+  "signature": {
+    "instructions": "Answer using the saved offline instruction.",
+    "fields": [
+      {
+        "prefix": "Question:",
+        "description": "${question}"
+      },
+      {
+        "prefix": "Saved answer:",
+        "description": "The saved capital city."
+      }
+    ]
+  },
+  "lm": null,
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}
