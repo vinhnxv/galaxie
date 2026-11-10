@@ -48,6 +48,14 @@ Later-contributed tools and settings fail before the bridge. Provider-specific
 settings remain refused; real-model schema enforcement is unverified. See the
 [spike record and provider limits](adr/0018-python-agents-through-pyodide.md#pydantic-ai-nativeoutput-and-model-settings-spike-2026-11).
 
+On 2026-11-11, three additional native-output cases cover second-repair route
+refusal, run repair budget exhaustion and streamed repair on Node Pyodide and
+Chromium. Node asserts the exact bridge repair indices. The 35 earlier goldens and
+eight reload variants are unchanged. The native reference derives its repair index
+from history rather than receiving the face's value, so parity proves the counter
+only at the exercised boundaries; Node bridge assertions and Python unit tests
+prove the exact values.
+
 The repository is public. No legal review of learner data (minors, consent, retention) has been done, because the project has no legal counsel; see the [README](../README.md#intended-use-and-disclaimer) and [ADR-0024](adr/0024-apache-2-0-license-and-dco.md). The seven launch packages are on npm at 0.1.0; the other packages in this repository are not published.
 
 `@galaxie-ai/ui-protocol` provides pinned A2UI v1.0 messages, strict parsing, catalog validation and a pure surface reducer. Core uses it for pending surfaces and React renders them (see the next paragraphs). It is verified by its own Node and Chromium tests, replayed upstream example messages and a conformance test that compares its URL check with core's. Nothing is measured about its cost on large surfaces. See the [package API and limits](../packages/ui-protocol/README.md).

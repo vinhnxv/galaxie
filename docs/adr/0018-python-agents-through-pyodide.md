@@ -121,7 +121,7 @@ The 2026-11-10 spike has these outcomes at pydantic-ai 2.60.0. This ADR stays Pr
 
 | Gap | Outcome | Evidence and reason |
 | --- | --- | --- |
-| Tool-less `NativeOutput(Model)` | Supported | `native-output`, `native-output-repair`, `native-output-repair-refused` and `stream-native-output` match native CPython on Node Pyodide and real headless Chromium. Requests carry `jsonSchema`, with no schema prompt; Python returns the validated model. All 31 existing goldens and eight reload variants are unchanged. |
+| Tool-less `NativeOutput(Model)` | Supported | `native-output`, `native-output-repair`, `native-output-repair-refused`, `stream-native-output`, `native-output-second-repair-refused`, `native-output-repair-budget-exhausted` and `stream-native-output-repair` match native CPython on Node Pyodide and real headless Chromium. Requests carry `jsonSchema`, with no schema prompt; Python returns the validated model. The three additional repair cases leave all 35 earlier goldens and eight reload variants unchanged. |
 | Native output beside tools, deferred requests or a string schema template | Refused at prepare | `test_native_output_unprovable_shapes_fail_at_prepare_without_bridge_traffic` covers capability/plain tools, unknown toolsets, deferred requests and templates, including an empty string. No routed provider combines tools and a schema constraint in one call; a template would put the schema into the prompt. The request-time backstop refuses later tools and prompted templates before the bridge. |
 | Provider-specific model settings | Refused | `test_agent_model_settings_fail_at_prepare_without_bridge_traffic`, `test_model_owned_settings_are_refused_before_merging_or_stripping` and the existing request-time refusal test cover the boundary. The router selects the provider at call time; an agent cannot know which provider a prefixed setting will reach. `ModelPort` has no per-call settings channel, and request shaping, credentials and output limits stay host-owned under ADR-0006 and ADR-0012. |
 
@@ -182,9 +182,14 @@ this pydantic-ai path.
 | Mock | Accepts but ignores `jsonSchema`; test-only. | Native parity cases use scripted replies; repair cases opt into assistant-turn sequencing. |
 
 The [matrix](../../tests/conformance/compatibility-matrix-pydantic-ai.json)
-records the schema normalization and the native fixed-error stand-in for the
-default-route repair refusal. Both Pyodide lanes exercise the real router limit.
-Python face/bridge and JavaScript adapter tests also cover repair indices, refusals
+records the schema normalization. The native reference derives the repair index
+from its own history and checks the route limit before charging the run repair
+budget. Both Pyodide lanes exercise the real router with per-case route and budget
+settings in `fixtures.json`. The reference does not receive the face's index, so
+parity proves the counter only at the exercised boundaries; Node bridge-frame
+assertions and Python unit tests prove the exact values. The streamed repair case
+emits the rejected attempt's checked text before validation fails. The mock ignores
+the schema. Python face/bridge and JavaScript adapter tests also cover refusals
 before dispatch and preservation of the ordinary model path. Existing goldens,
 other executors, core contracts and dependency locks are unchanged. No real-model
 constraint reliability or device performance is claimed.
