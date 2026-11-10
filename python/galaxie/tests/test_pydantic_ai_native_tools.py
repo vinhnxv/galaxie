@@ -114,8 +114,8 @@ def test_n1_registry_has_no_unmeasured_kind() -> None:
 
 @pytest.mark.parametrize('kind', KINDS)
 @pytest.mark.parametrize('prepare', [Executor, prepare_executor])
-def test_n1_static_native_tools_are_accepted_at_prepare(kind: str, prepare: Any) -> None:
-    # Prepare refusal is not satisfied: these agents currently pass construction.
+def test_n1_static_native_tools_refuse_at_prepare(kind: str, prepare: Any) -> None:
+    # Static native tools must fail before any transport request.
     seen: list[dict[str, Any]] = []
     transport_for([], seen)
     if kind == 'tool_search':
@@ -126,24 +126,23 @@ def test_n1_static_native_tools_are_accepted_at_prepare(kind: str, prepare: Any)
             "Native tool id 'tool_search' maps to conflicting definitions in agent capabilities. "
             'Native tool ids must be unique within a capability layer.'
         )
+        agent = Agent(GalaxieModel('answer'))
+        agent.root_capability.capabilities = [*agent.root_capability.capabilities, NativeTool(native_tool(kind))]
     else:
-        executor = prepare(Agent(GalaxieModel('answer'), capabilities=[NativeTool(native_tool(kind))]))
-        assert isinstance(executor, Executor)
+        agent = Agent(GalaxieModel('answer'), capabilities=[NativeTool(native_tool(kind))])
+    with pytest.raises(GalaxieError) as refusal:
+        prepare(agent)
+    assert_error(refusal)
     assert_counts(seen)
 
 
 @pytest.mark.parametrize('kind', KINDS)
-def test_n2_static_native_tools_refuse_at_first_request(kind: str) -> None:
+def test_n2_static_native_tools_refuse_at_direct_request(kind: str) -> None:
     # Refusal requires fixed unsupported and no model/capability/interaction traffic.
     seen: list[dict[str, Any]] = []
     transport_for([], seen)
     with pytest.raises(GalaxieError) as error:
-        if kind == 'tool_search':
-            # Agent construction conflicts with its auto tool; pin the direct backstop.
-            asyncio.run(GalaxieModel('answer').request([], None, ModelRequestParameters(native_tools=[native_tool(kind)])))
-        else:
-            executor = Executor(Agent(GalaxieModel('answer'), capabilities=[NativeTool(native_tool(kind))]))
-            asyncio.run(executor.run({'prompt': 'question'}, 'native-static', 5))
+        asyncio.run(GalaxieModel('answer').request([], None, ModelRequestParameters(native_tools=[native_tool(kind)])))
     assert_error(error)
     assert_counts(seen)
 
@@ -153,14 +152,12 @@ def test_n2_static_native_tools_refuse_at_first_request(kind: str) -> None:
     MCP(native=True, local=False, url='https://example.invalid/mcp', id='offline-server'),
 ], ids=['web-search', 'web-fetch', 'image-generation', 'x-search', 'mcp-native-only'])
 @pytest.mark.parametrize('prepare', [Executor, prepare_executor])
-def test_n3_adaptive_native_tools_accept_prepare_and_refuse_run(capability: Any, prepare: Any) -> None:
-    # Prepare refusal is not satisfied; native-only MCP needs no optional MCP package.
+def test_n3_adaptive_native_tools_refuse_at_prepare(capability: Any, prepare: Any) -> None:
+    # Native-only MCP needs no optional MCP package.
     seen: list[dict[str, Any]] = []
     transport_for([], seen)
-    executor = prepare(Agent(GalaxieModel('answer'), capabilities=[capability]))
-    assert_counts(seen)
     with pytest.raises(GalaxieError) as error:
-        asyncio.run(executor.run({'prompt': 'question'}, 'native-adaptive', 5))
+        prepare(Agent(GalaxieModel('answer'), capabilities=[capability]))
     assert_error(error)
     assert_counts(seen)
 
@@ -196,14 +193,13 @@ def test_n4_explicit_local_search_equals_an_ordinary_capability_tool_but_uses_tw
     assert transcripts[0] == transcripts[1]
 
 
-def test_n5_local_search_with_native_default_is_refused_at_request() -> None:
+def test_n5_local_search_with_native_default_is_refused_at_prepare() -> None:
     # Informational: authors must explicitly choose native=False for the local path.
     seen: list[dict[str, Any]] = []
     transport_for([], seen)
     tool = capability_tool('search', 'docs.search@1', SCHEMA)
-    executor = Executor(Agent(GalaxieModel('answer'), capabilities=[WebSearch(local=tool)]))
     with pytest.raises(GalaxieError) as error:
-        asyncio.run(executor.run({'prompt': 'question'}, 'native-default', 5))
+        Executor(Agent(GalaxieModel('answer'), capabilities=[WebSearch(local=tool)]))
     assert_error(error)
     assert_counts(seen)
 
@@ -247,25 +243,45 @@ def test_n7_deferred_loading_refuses_at_request() -> None:
 
 
 @pytest.mark.parametrize('returns_tool', [True, False])
-def test_d1_native_factories_accept_prepare(returns_tool: bool) -> None:
-    # A factory returning None currently runs: request refusal is not satisfied.
+@pytest.mark.parametrize('prepare', [Executor, prepare_executor])
+def test_d1_native_factories_refuse_at_prepare(returns_tool: bool, prepare: Any) -> None:
+    # Factories cannot be proven safe without executing author code in a run.
     seen: list[dict[str, Any]] = []
-    transport_for([{'content': 'answer'}] if not returns_tool else [], seen)
+    transport_for([], seen)
+    invoked = []
 
     def factory(ctx: RunContext[Any]) -> AbstractNativeTool | None:
+        invoked.append(ctx)
         return WebSearchTool() if returns_tool else None
 
     agent = Agent(GalaxieModel('answer'), capabilities=[NativeTool(factory)])
+    with pytest.raises(GalaxieError) as error:
+        prepare(agent)
+    assert_error(error)
+    assert invoked == []
+    assert_counts(seen)
+
+
+def test_native_capabilities_added_after_construction_are_revalidated() -> None:
+    seen: list[dict[str, Any]] = []
+    transport_for([], seen)
+    agent = Agent(GalaxieModel('answer'))
     executor = Executor(agent)
-    assert prepare_executor(agent).agent is agent
-    if returns_tool:
-        with pytest.raises(GalaxieError) as error:
-            asyncio.run(executor.run({'prompt': 'question'}, 'native-factory', 5))
-        assert_error(error)
-        assert_counts(seen)
-    else:
-        assert asyncio.run(executor.run({'prompt': 'question'}, 'native-factory', 5)) == 'answer'
-        assert_counts(seen, model=1)
+    agent.root_capability.capabilities = [*agent.root_capability.capabilities, NativeTool(WebSearchTool())]
+    with pytest.raises(GalaxieError) as error:
+        prepare_executor(executor)
+    assert_error(error)
+    assert_counts(seen)
+
+
+@pytest.mark.parametrize('prepare', [Executor, prepare_executor])
+def test_optional_native_tools_are_also_refused_at_prepare(prepare: Any) -> None:
+    seen: list[dict[str, Any]] = []
+    transport_for([], seen)
+    with pytest.raises(GalaxieError) as error:
+        prepare(Agent(GalaxieModel('answer'), capabilities=[NativeTool(WebSearchTool(optional=True))]))
+    assert_error(error)
+    assert_counts(seen)
 
 
 def test_d2_native_override_refuses_before_transport() -> None:

@@ -352,7 +352,15 @@ def _uninstrumented(agent: Agent) -> None:
         raise GalaxieError('unsupported')
 
 
+def _validate_native_tools(agent: Agent) -> None:
+    for tool in agent.root_capability.get_native_tools():
+        # Ordinary agents carry optional tool search, dropped unless deferred tools need it.
+        if callable(tool) or tool.kind != 'tool_search' or not tool.optional:
+            raise GalaxieError('unsupported')
+
+
 def _validate_agent(agent: Agent) -> None:
+    _validate_native_tools(agent)
     settings = agent.model_settings
     if callable(settings) or (settings and not set(settings) <= {'stop_sequences'}):
         raise GalaxieError('unsupported')

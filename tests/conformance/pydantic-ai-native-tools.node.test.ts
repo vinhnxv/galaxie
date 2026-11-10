@@ -247,7 +247,7 @@ async function measure(
 const probe = test.skipIf(!pythonWheelsAvailable);
 const unsupported = { code: 'unsupported', message: 'This operation is unsupported.' };
 
-// N1/N2/D1: characterize prepare acceptance before the conditional validation change.
+// N1/N2/D1: static declarations/factories refuse at prepare; direct requests retain the backstop.
 probe(
   `native static tools and factories before bridge dispatch (${missingPythonWheels} if skipped)`,
   async () => {
@@ -261,24 +261,30 @@ probe(
         ...kinds
           .filter((kind) => kind !== 'tool_search')
           .flatMap((kind) => [`native_${kind}`, `executor_${kind}`]),
-        ...kinds.map((kind) => `request_${kind}`),
         'native_optional',
         'default_search',
         'late_tool_search',
         'executor_late_tool_search',
         'factory_tool',
+        'factory_none',
       ]) {
+        const sent = fixture.fromWorker.length;
+        const recorded = transcript();
+        const model = new RecordingModel({ search: [{ id: 'reply-1', text: 'done' }] }, recorded);
+        await expect(measure(fixture, entry, model), entry).rejects.toMatchObject(unsupported);
+        expect(
+          requests(fixture.fromWorker.slice(sent)).filter((message) =>
+            ['model', 'capability', 'interaction'].includes(message.op),
+          ),
+          entry,
+        ).toEqual([]);
+        expect(recorded.requests, entry).toEqual([]);
+      }
+      for (const entry of kinds.map((kind) => `request_${kind}`)) {
         const recorded = transcript();
         const model = new RecordingModel({ search: [{ id: 'reply-1', text: 'done' }] }, recorded);
         const result = await measure(fixture, entry, model);
-        // Prepare acceptance violates the static refusal condition; request refusal is pinned.
-        expect(errors(result.events), entry).toEqual([
-          expect.objectContaining(
-            entry.includes('late_tool_search')
-              ? { code: 'executor_error', message: 'The executor or agent code failed.' }
-              : unsupported,
-          ),
-        ]);
+        expect(errors(result.events), entry).toEqual([expect.objectContaining(unsupported)]);
         expect(outputs(result.events), entry).toEqual([]);
         expect(
           result.bridge.filter((message) => ['model', 'capability'].includes(message.op)),
@@ -322,9 +328,9 @@ probe(
   240000,
 );
 
-// N6/D1: the implicit optional tool search and a factory returning None can run today.
+// N6: the implicit optional tool search must keep ordinary agents working.
 probe(
-  'baseline, ordinary tools and an empty native factory complete without capability work',
+  'baseline and ordinary tools complete without capability work',
   async () => {
     const fixture = await createPythonFixture({
       framework: 'pydantic-ai',
@@ -332,7 +338,7 @@ probe(
       sources: { 'agents.py': agents },
     });
     try {
-      for (const entry of ['baseline', 'ordinary', 'factory_none']) {
+      for (const entry of ['baseline', 'ordinary']) {
         const recorded = transcript();
         const result = await measure(
           fixture,
