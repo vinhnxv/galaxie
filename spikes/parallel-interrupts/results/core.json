@@ -1,0 +1,203 @@
+{
+  "C": {
+    "C1": {
+      "pass": true,
+      "observation": {
+        "published": ["r", "r:1"],
+        "applied": [
+          {
+            "id": "r",
+            "payload": "first-token"
+          },
+          {
+            "id": "r:1",
+            "payload": "second-token"
+          }
+        ]
+      }
+    },
+    "C2": {
+      "pass": true,
+      "observation": {
+        "duringResume": "duplicate",
+        "whileSecondPending": "duplicate",
+        "firstApplications": 1
+      }
+    },
+    "C3": {
+      "pass": true,
+      "observation": {
+        "committedPick": "r",
+        "submitted": "r:1",
+        "receipt": "stale",
+        "extraSegments": 0,
+        "advertisedNextButCheckpointRolledBack": "stale"
+      }
+    },
+    "C4": {
+      "pass": true,
+      "observation": {
+        "window": "accepted-before-commit",
+        "applied": [
+          {
+            "id": "r",
+            "payload": "first-token"
+          },
+          {
+            "id": "r:1",
+            "payload": "second-token"
+          }
+        ]
+      }
+    },
+    "C5": {
+      "pass": true,
+      "observation": {
+        "window": "committed-before-publication",
+        "applied": [
+          {
+            "id": "r",
+            "payload": "first-token"
+          },
+          {
+            "id": "r:1",
+            "payload": "second-token"
+          }
+        ],
+        "statuses": ["consumed", "consumed"]
+      }
+    },
+    "C10": {
+      "pass": true,
+      "observation": {
+        "twoPauseSet": "unsupported",
+        "ordinalOne": "unsupported",
+        "publishedSurfaceRecords": 0
+      }
+    },
+    "C6": {
+      "pass": true,
+      "observation": {
+        "published": ["a", "b"],
+        "applied": [
+          {
+            "id": "a",
+            "payload": "a-token"
+          },
+          {
+            "id": "b",
+            "payload": "b-token"
+          }
+        ]
+      }
+    },
+    "C7": {
+      "pass": true,
+      "observation": {
+        "stablePick": true,
+        "windows": [
+          {
+            "window": "a",
+            "applied": [
+              {
+                "id": "a",
+                "payload": "a-token"
+              },
+              {
+                "id": "b",
+                "payload": "b-token"
+              }
+            ]
+          },
+          {
+            "window": "b",
+            "applied": [
+              {
+                "id": "a",
+                "payload": "a-token"
+              },
+              {
+                "id": "b",
+                "payload": "b-token"
+              }
+            ]
+          },
+          {
+            "window": "c",
+            "applied": [
+              {
+                "id": "a",
+                "payload": "a-token"
+              },
+              {
+                "id": "b",
+                "payload": "b-token"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "pick-order-negative-control": {
+      "pass": true,
+      "observation": {
+        "changedPick": "b",
+        "acceptedA": "consumed-without-application",
+        "laterPublicationOfA": "unsupported",
+        "applied": [
+          {
+            "id": "b",
+            "payload": "b-token"
+          }
+        ]
+      }
+    },
+    "C8": {
+      "pass": true,
+      "observation": [
+        {
+          "recovery": false,
+          "prefixExecutions": 3,
+          "confirmations": 3,
+          "writes": 3,
+          "repeatedApproval": "stale",
+          "oldApprovalsRejectedAcrossExecutions": 3
+        },
+        {
+          "recovery": true,
+          "prefixExecutions": 3,
+          "confirmations": 1,
+          "writes": 1,
+          "repeatedApproval": "stale",
+          "oldApprovalsRejectedAcrossExecutions": 0
+        }
+      ]
+    },
+    "C9": {
+      "pass": true,
+      "observation": [
+        {
+          "branches": 2,
+          "prefixes": {
+            "a": 2,
+            "b": 3
+          },
+          "totalIncludingInitial": 5,
+          "resumeOnly": 3,
+          "estimate": 3
+        },
+        {
+          "branches": 3,
+          "prefixes": {
+            "a": 2,
+            "b": 3,
+            "c": 4
+          },
+          "totalIncludingInitial": 9,
+          "resumeOnly": 6,
+          "estimate": 6
+        }
+      ]
+    }
+  }
+}

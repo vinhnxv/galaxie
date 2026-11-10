@@ -16,5 +16,5 @@ export default defineConfig({
     },
     dedupe: ['zod', '@opentelemetry/api'],
   },
-  test: { environment: 'node' },
+  test: { environment: 'node', fileParallelism: false },
 });

@@ -1,0 +1,556 @@
+{
+  "environment": {
+    "node": "v24.15.0",
+    "langgraph": "1.5.1",
+    "checkpoint": "1.2.0",
+    "models": "scripted only"
+  },
+  "probes": [
+    {
+      "probe": "N1",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "ids": ["id-1", "id-1"],
+        "questions": [
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-first",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "first"
+            }
+          },
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-second",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "second"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "probe": "N1",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "ids": ["id-1", "id-1"],
+        "questions": [
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-first",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "first"
+            }
+          },
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-second",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "second"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "probe": "N1",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "ids": ["id-1", "id-1"],
+        "questions": [
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-first",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "first"
+            }
+          },
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-second",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "second"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "probe": "N2",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "resumeValues": ["answer-first"],
+        "ordinal": 1,
+        "interactionId": "id-1:1",
+        "resumeWriteOwners": ["interrupt", "task"]
+      }
+    },
+    {
+      "probe": "N2",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "resumeValues": ["answer-first"],
+        "ordinal": 1,
+        "interactionId": "id-1:1",
+        "resumeWriteOwners": ["interrupt", "task"]
+      }
+    },
+    {
+      "probe": "N2",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "resumeValues": ["answer-first"],
+        "ordinal": 1,
+        "interactionId": "id-1:1",
+        "resumeWriteOwners": ["interrupt", "task"]
+      }
+    },
+    {
+      "probe": "N3",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "output": {
+          "answers": {
+            "first": "answer-first",
+            "second": "answer-second"
+          }
+        },
+        "counts": {
+          "twice": 3
+        }
+      }
+    },
+    {
+      "probe": "N3",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "output": {
+          "answers": {
+            "first": "answer-first",
+            "second": "answer-second"
+          }
+        },
+        "counts": {
+          "twice": 3
+        }
+      }
+    },
+    {
+      "probe": "N3",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "output": {
+          "answers": {
+            "first": "answer-first",
+            "second": "answer-second"
+          }
+        },
+        "counts": {
+          "twice": 3
+        }
+      }
+    },
+    {
+      "probe": "N4",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "fanout": [
+          {
+            "rawId": "id-1",
+            "taskId": "id-2"
+          },
+          {
+            "rawId": "id-3",
+            "taskId": "id-4"
+          }
+        ],
+        "sendFanout": [
+          {
+            "rawId": "id-5",
+            "taskId": "id-6"
+          },
+          {
+            "rawId": "id-7",
+            "taskId": "id-8"
+          }
+        ]
+      }
+    },
+    {
+      "probe": "N4",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "fanout": [
+          {
+            "rawId": "id-1",
+            "taskId": "id-2"
+          },
+          {
+            "rawId": "id-3",
+            "taskId": "id-4"
+          }
+        ],
+        "sendFanout": [
+          {
+            "rawId": "id-5",
+            "taskId": "id-6"
+          },
+          {
+            "rawId": "id-7",
+            "taskId": "id-8"
+          }
+        ]
+      }
+    },
+    {
+      "probe": "N4",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "fanout": [
+          {
+            "rawId": "id-1",
+            "taskId": "id-2"
+          },
+          {
+            "rawId": "id-3",
+            "taskId": "id-4"
+          }
+        ],
+        "sendFanout": [
+          {
+            "rawId": "id-5",
+            "taskId": "id-6"
+          },
+          {
+            "rawId": "id-7",
+            "taskId": "id-8"
+          }
+        ]
+      }
+    },
+    {
+      "probe": "N5",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "completedA": true,
+        "remainingIds": ["id-1"],
+        "quietDone": false,
+        "quietDoneChannels": ["__resume__", "__interrupt__"],
+        "quietRemaining": [
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-askA",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "askA"
+            }
+          },
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-noteB",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "noteB"
+            }
+          }
+        ],
+        "reason": "Completed no-state-write task has a resume write, so the runner does not add NO_WRITES; stale interrupt remains indistinguishable."
+      }
+    },
+    {
+      "probe": "N5",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "completedA": true,
+        "remainingIds": ["id-1"],
+        "quietDone": false,
+        "quietDoneChannels": ["__resume__", "__interrupt__"],
+        "quietRemaining": [
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-askA",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "askA"
+            }
+          },
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-noteB",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "noteB"
+            }
+          }
+        ],
+        "reason": "Completed no-state-write task has a resume write, so the runner does not add NO_WRITES; stale interrupt remains indistinguishable."
+      }
+    },
+    {
+      "probe": "N5",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "completedA": true,
+        "remainingIds": ["id-1"],
+        "quietDone": false,
+        "quietDoneChannels": ["__resume__", "__interrupt__"],
+        "quietRemaining": [
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-askA",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "askA"
+            }
+          },
+          {
+            "surfaceId": "main",
+            "viewRevision": "revision-noteB",
+            "component": "spike.Question/v1",
+            "props": {
+              "question": "noteB"
+            }
+          }
+        ],
+        "reason": "Completed no-state-write task has a resume write, so the runner does not add NO_WRITES; stale interrupt remains indistinguishable."
+      }
+    },
+    {
+      "probe": "N6",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "order": ["id-1", "id-2"],
+        "repeated": [
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"]
+        ],
+        "afterPartial": ["id-2"],
+        "afterReopenAndReversedWrites": ["id-2"],
+        "taskOrderStable": true,
+        "pickRule": "task order, raw interrupt ID, ordinal"
+      }
+    },
+    {
+      "probe": "N6",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "order": ["id-1", "id-2"],
+        "repeated": [
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"]
+        ],
+        "afterPartial": ["id-2"],
+        "afterReopenAndReversedWrites": ["id-2"],
+        "taskOrderStable": true,
+        "pickRule": "task order, raw interrupt ID, ordinal"
+      }
+    },
+    {
+      "probe": "N6",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "order": ["id-1", "id-2"],
+        "repeated": [
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"],
+          ["id-1", "id-2"]
+        ],
+        "afterPartial": ["id-2"],
+        "afterReopenAndReversedWrites": ["id-2"],
+        "taskOrderStable": true,
+        "pickRule": "task order, raw interrupt ID, ordinal"
+      }
+    },
+    {
+      "probe": "N7",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "prefixBefore": {
+          "askA": 1,
+          "askB": 1
+        },
+        "prefixAfterPartial": {
+          "askA": 2,
+          "askB": 2
+        },
+        "finalCounts": {
+          "askA": 2,
+          "askB": 3,
+          "join": 1
+        },
+        "output": {
+          "answers": {
+            "askA": "answer-A",
+            "askB": "answer-B"
+          }
+        }
+      }
+    },
+    {
+      "probe": "N7",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "prefixBefore": {
+          "askA": 1,
+          "askB": 1
+        },
+        "prefixAfterPartial": {
+          "askA": 2,
+          "askB": 2
+        },
+        "finalCounts": {
+          "askA": 2,
+          "askB": 3,
+          "join": 1
+        },
+        "output": {
+          "answers": {
+            "askA": "answer-A",
+            "askB": "answer-B"
+          }
+        }
+      }
+    },
+    {
+      "probe": "N7",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "prefixBefore": {
+          "askA": 1,
+          "askB": 1
+        },
+        "prefixAfterPartial": {
+          "askA": 2,
+          "askB": 2
+        },
+        "finalCounts": {
+          "askA": 2,
+          "askB": 3,
+          "join": 1
+        },
+        "output": {
+          "answers": {
+            "askA": "answer-A",
+            "askB": "answer-B"
+          }
+        }
+      }
+    },
+    {
+      "probe": "N8",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "intended": "answer-second",
+        "received": {
+          "id-1:1": "answer-second"
+        }
+      }
+    },
+    {
+      "probe": "N8",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "intended": "answer-second",
+        "received": {
+          "id-1:1": "answer-second"
+        }
+      }
+    },
+    {
+      "probe": "N8",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "intended": "answer-second",
+        "received": {
+          "id-1:1": "answer-second"
+        }
+      }
+    },
+    {
+      "probe": "N9",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "childSnapshotLocated": false,
+        "resumeValues": [],
+        "ordinal": null,
+        "executorShape": "refused: spike executor does not traverse child checkpoint namespaces"
+      }
+    },
+    {
+      "probe": "N9",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "childSnapshotLocated": false,
+        "resumeValues": [],
+        "ordinal": null,
+        "executorShape": "refused: spike executor does not traverse child checkpoint namespaces"
+      }
+    },
+    {
+      "probe": "N9",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "childSnapshotLocated": false,
+        "resumeValues": [],
+        "ordinal": null,
+        "executorShape": "refused: spike executor does not traverse child checkpoint namespaces"
+      }
+    }
+  ]
+}
