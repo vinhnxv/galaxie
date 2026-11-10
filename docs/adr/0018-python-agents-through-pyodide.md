@@ -16,6 +16,7 @@
   2026-11-10: recorded tool-less pydantic-ai NativeOutput with routed schemas and bounded repair, and the prepare-time refusal of provider-specific settings; status stays Proposed.
   2026-11-11: recorded scripted delegation, helper identity, public nested-run guard and hoisted approval/restore probes; child stream paths remain absent and status stays Proposed.
   2026-11-11: recorded the outcome of the pydantic-ai builtin and native tools spike; status stays Proposed.
+  2026-11-11: added the public delegation helper, fail-closed nested-run guard, per-child repair accounting and scripted changed-ID recovery evidence; status stays Proposed.
 
 ## Context
 
@@ -62,7 +63,7 @@ Every galaxie guarantee is enforced in `@galaxie-ai/core` and the JavaScript pro
 8. **Interrupts.** `request_interaction(request, config)` wraps LangGraph Python's `interrupt()` with the same four-field request. The adapter's `pending()` reads it through `get_state` over the bridge. The LangGraph.js limits still apply: one interrupt ID per pending state, no parallel interrupts, no static breakpoints.
 9. **Trust.** Python agent code is trusted, as JavaScript agent code is (ADR-0002). Python can still import `js` and call `fetch` from the worker. The worker has no DOM, but that is not an isolation boundary. Removing network globals after packages load is a mitigation only. A Python lint aid flags `import js`, `pyodide.http`, `urllib`, `socket`, direct provider SDKs and provider-prefixed model strings such as `Agent('openai:…')`, with the same limits as the ESLint plugin.
 10. **Packages.** A Python agent ships its wheels and a hash-locked lockfile, and the generated manifest's SHA-256 inventory covers them. Missing compiled dependencies get either Pyodide wheels built with `pyodide-build` and hosted with pinned hashes, or same-name pure-Python stand-ins. Both are pinned to exact upstream versions. For DSPy custom engines, the Worker omits the non-imported hard dependencies `litellm`, `openai`, `gepa`, `tenacity`, `diskcache` and `cachetools`. CPython uses a same-name workspace `litellm==1.106.2` member with metadata only and no importable module; accidental provider use fails closed. The existing release cutoff and all existing pins remain fixed. galaxie does not fork Pyodide.
-11. **Framework order.** LangGraph Python with LangChain models and tools comes first. pydantic-ai comes second, pinned as `pydantic-ai-slim==2.60.0` with `pydantic-graph==2.60.0`, without provider SDKs in its Worker wheel set. Its tools wrap `host.capabilities.call`, and structured output is validated in Python after JavaScript checks the raw text. Tool-less `NativeOutput` sends the schema as a routed `jsonSchema` constraint without prompt text, with native validation retries charged through `ModelRoute.repairAttempts` and the shared run repair budget. Deferred tool requests end the agent run and become one author-mapped galaxie interaction; resume supplies complete `DeferredToolResults` to a new run. At each pause and completion, pinned `ConversationTypeAdapter` bytes preserve messages, usage, conversation identity and deferred requests through the existing scoped byte-record port. Pause ordinals and effect positions also persist. The port accepts only `langgraph-python | pydantic-ai-python | dspy-python` byte-row tags; exports copy the stored tag. With matching recovery, accepted answers reconcile and succeeded write receipts replay after reload. It declares `streaming`, `interrupts`, `resume` and `checkpoints` true. Without the port, cancellation or Worker loss still discards pending state. Snapshots do not journal every in-flight model call. `subgraphs` remains false: measured child streams have no host child events or paths. Plain delegation needs stable distinct child identity and shared usage; an explicit child-approval hoist completes and restores in the probe-local pattern. No executor-owned delegation helper, hoist API or nested-run guard ships yet; see the delegation verification below. The maintained RAG example offers it for mock tool-calling models, with cited text output and optional passage review through deferred approval metadata. Its scoped byte records, recovery store and fenced ownership restore the pending review after reload; Start over deletes it. The default question flow stays in memory. The built-in browser providers do not declare tool calling, so default mode omits this executor. DSPy comes third, pinned to 3.4.1 with custom-engine `GalaxieLM(role)`, asynchronous module execution and capability-backed tools over bridge v2. It declares `streaming`, `interrupts`, `resume` and `checkpoints` true, and `subgraphs` false: nested modules have no checkpoint namespace, interrupt propagation or stream paths, and a pause unwinds the whole program. `request_interaction` pauses module or tool code; resume re-executes against digests and recorded results of completed model, capability and interaction calls. Author code must be deterministic apart from those calls; divergence fails `unrecoverable` before later live calls. Replayed calls are silent and uncharged. Session-bound journals and counters persist through the byte-record port with recovery, refuse a different DSPy version or journal format, and must fit the 1 MiB bridge bound before a pause publishes. Completion keeps compact counters; work after the last committed pause can repeat after Worker loss, with broker receipts preventing repeated writes when recovery and stable call order apply. DSPy's RAG program retrieves from run input, optionally pauses before any model request, then answers from kept passages with `ChainOfThought`. It requires no model tool calling and is offered whenever the answer role has a configured provider. Real-model format reliability remains unmeasured. CrewAI stays in the Remote tier.
+11. **Framework order.** LangGraph Python with LangChain models and tools comes first. pydantic-ai comes second, pinned as `pydantic-ai-slim==2.60.0` with `pydantic-graph==2.60.0`, without provider SDKs in its Worker wheel set. Its tools wrap `host.capabilities.call`, and structured output is validated in Python after JavaScript checks the raw text. Tool-less `NativeOutput` sends the schema as a routed `jsonSchema` constraint without prompt text, with native validation retries charged through `ModelRoute.repairAttempts` and the shared run repair budget. Deferred tool requests end the agent run and become one author-mapped galaxie interaction; resume supplies complete `DeferredToolResults` to a new run. At each pause and completion, pinned `ConversationTypeAdapter` bytes preserve messages, usage, conversation identity and deferred requests through the existing scoped byte-record port. Pause ordinals and effect positions also persist. The port accepts only `langgraph-python | pydantic-ai-python | dspy-python` byte-row tags; exports copy the stored tag. With matching recovery, accepted answers reconcile and succeeded write receipts replay after reload. It declares `streaming`, `interrupts`, `resume` and `checkpoints` true. Without the port, cancellation or Worker loss still discards pending state. Snapshots do not journal every in-flight model call. `subgraphs` remains false: measured child streams have no host child events or paths. `galaxie.pydantic_ai.run_child` shares the parent's usage and limits, derives distinct child identity from message position and key, and resets native repair accounting per child. A public-only guard refuses plain nested model/capability work and nested `Executor.run` before bridge requests. It fails closed when request attribution is missing; it is accident-proofing, while ADR-0012 controls stay in JavaScript. Child-approval hoisting remains a probe-local pattern with no shipped hoist API; see the delegation verification below. The maintained RAG example offers it for mock tool-calling models, with cited text output and optional passage review through deferred approval metadata. Its scoped byte records, recovery store and fenced ownership restore the pending review after reload; Start over deletes it. The default question flow stays in memory. The built-in browser providers do not declare tool calling, so default mode omits this executor. DSPy comes third, pinned to 3.4.1 with custom-engine `GalaxieLM(role)`, asynchronous module execution and capability-backed tools over bridge v2. It declares `streaming`, `interrupts`, `resume` and `checkpoints` true, and `subgraphs` false: nested modules have no checkpoint namespace, interrupt propagation or stream paths, and a pause unwinds the whole program. `request_interaction` pauses module or tool code; resume re-executes against digests and recorded results of completed model, capability and interaction calls. Author code must be deterministic apart from those calls; divergence fails `unrecoverable` before later live calls. Replayed calls are silent and uncharged. Session-bound journals and counters persist through the byte-record port with recovery, refuse a different DSPy version or journal format, and must fit the 1 MiB bridge bound before a pause publishes. Completion keeps compact counters; work after the last committed pause can repeat after Worker loss, with broker receipts preventing repeated writes when recovery and stable call order apply. DSPy's RAG program retrieves from run input, optionally pauses before any model request, then answers from kept passages with `ChainOfThought`. It requires no model tool calling and is offered whenever the answer role has a configured provider. Real-model format reliability remains unmeasured. CrewAI stays in the Remote tier.
    An `Executor` with `stream_fields` always streams in the Worker and requires a provider declaring streaming. Declared fields must belong to exactly one predictor with a plain `str` output annotation. Streaming ReActV2 requires `next_thought` annotated as `str`; a field header indented on its line is not streamed, though final parsing still supplies its value. JSONAdapter is non-streaming only: the Worker excludes `jiter`. Native provider schema mode is unsupported, and ChatAdapter JSON fallback is disabled to keep call sequences deterministic.
 
    ReAct turns an ordinary exception from author tool code into an observation containing a five-frame traceback, including file paths and source lines; the next routed model call carries it. Authors must keep sensitive details out of those exceptions. Galaxie failures end the run before another model call and retain fixed codes instead of travelling as observations.
@@ -119,32 +120,64 @@ Every galaxie guarantee is enforced in `@galaxie-ai/core` and the JavaScript pro
 
 ### pydantic-ai agent delegation spike (2026-11)
 
-The [committed probes and fixed outcome rule](../../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
-measure the shipped Executor unchanged with scripted replies. Versions:
+`galaxie.pydantic_ai.run_child` and the public-only nested-run guard now ship.
+The [delegation probes](../../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
+pin the helper and refusal behavior with scripted replies. Versions:
 pydantic-ai-slim 2.60.0, pydantic-graph 2.60.0, CPython 3.14.5, Pyodide 314.0.7,
-Node 24.15.0 and pnpm 11.21.0. This ADR remains Proposed. Re-open the probes on
-every pydantic-ai bump, including the public hook and message identity checks.
+Node 24.15.0 and pnpm 11.21.0. This ADR remains Proposed. Re-run the probes on
+every pydantic-ai bump, including the public message and tool run-ID checks.
 
 | Gap | Outcome | Evidence and limits |
 | --- | --- | --- |
-| Plain delegation without pauses | Alternative | D1-D5 hold for the probe-local helper; plain runs exceed the parent's step limit and repeat a write after reload, while reusing the parent conversation ID collides with parent effect positions. Forwarded usage and an ID derived from the parent conversation/tool-call IDs bound requests and replay the child write once. G1/G2 demonstrate a public-only guard using top-level `before_run`, public model message/stream run IDs and tool `RunContext`; no private pydantic-ai imports are required. |
-| Child pause propagation | Supported by the probe-local hoist pattern | P1/P2 execute no unapproved gated body. P3/P4 serialize child conversation state into parent approval metadata, preserve it explicitly through the synchronous resume callback and restore the identical interaction across fresh Workers; each child write executes once. The default resume callback loses child state. |
-| Subgraphs flag and stream paths | Refused | S1 observes checked child deltas without host child stream events or paths. `subgraphs` remains false. |
+| Delegation without child pauses | Supported through `run_child`; plain nested runs refused | The helper shares usage and limits, derives distinct positional child identity and isolates each child's native repair counter. Three new CPython/Node Pyodide conformance cases cover a write after approval reload, shared step budgets and `unsupported` before a plain child reaches the bridge. Exact token, cost and tool-call budget probes include child work. |
+| Child pause propagation | Supported by the probe-local hoist pattern | Explicitly serialized child conversation state in parent approval metadata completes and restores across fresh Workers, with each write once. The author's synchronous resume callback must preserve that state; the default callback does not. No hoist API ships. |
+| Subgraphs flag and stream paths | Refused | There are no host child stream events or paths. `run_child` is non-streaming, plain child streams are refused, and `subgraphs` remains false. |
 
-The helper, hoist API and guard are follow-up implementation work, not shipped
-exports or a run-time refusal. Helper replay requires stable delegate tool-call
-IDs as well as call order: regenerated IDs change child scope and can repeat a
-write, and this variant is unmeasured. Helper/guard composition and direct trusted
-capability calls outside the wrappers are also unmeasured. Prefer flattening into
-one agent with capability tools until those land. A guard must also cover capability invocation, because
-approved child tools run before the next model request. Sequential native-output
-children share the repair counter; a second child's first request consumes repair
-budget. Non-GalaxieModel children bypass the bridge. Outer restore accepts
-corrupt author-owned child metadata; native child validation can become parent
-retry data rather than a failed parent run. Authors own child-state validation.
-The probes cover Node memory-backed byte checkpoints and recovery, not browser
-delegation, real providers, arbitrary mid-run continuation or general nested
-checkpoint semantics. No existing golden, matrix, lock or shipped source changes.
+Child conversation identity hashes a domain tag, parent conversation ID, message
+position, part index and helper key. It excludes the provider's tool-call ID.
+CPython observes equal helper child identities and scopes when that ID changes at
+the same position. On Node Pyodide, a crash after the child write followed by a
+scripted changed delegate ID restores the identical child scope and effect ID,
+with one write and one journal entry. The ID-sensitive control uses the spike's
+ID-derived hash as a registered helper key; it changes scope and effect ID and
+writes twice. The control stays registered because plain child runs are now
+refused. These probes measure galaxie's sensitivity to a changed ID; whether a
+real provider regenerates IDs is unmeasured. Replay still requires deterministic
+call order and structure, host confirmations and matching checkpoint/recovery
+stores.
+
+`Executor.run` registers its fresh run ID and helper children for that execution.
+`GalaxieModel.request`, `request_stream` and `capability_tool` refuse an absent or
+unregistered run ID before bridge work; a nested `Executor.run` also fails
+`unsupported`. Only public pydantic-ai APIs are used. Direct model/helper use
+outside an executor remains available. A non-streamed request reaching the model
+without `run_id` fails closed, including when a history processor causes upstream
+normalization to merge adjacent requests and discard their attribution. Keeping
+the current attributed request when trimming history avoids that measured case.
+Ordinary retries, resume, sequential runs and parallel tools pass. The guard is
+accident-proofing, not an isolation boundary: plain non-`GalaxieModel` children and
+direct trusted `capabilities.call` can bypass it. The helper itself refuses a
+child whose selected model, including a `model=` override, is not a
+`GalaxieModel`, and retains the existing native-tool,
+instrumentation and model-setting validation. ADR-0012 controls remain enforced
+in JavaScript.
+
+Sequential native-output helper children begin at repair indices `[0, 0]`, even
+with no repair allowance; retries within a child still use the host route and
+shared run repair limits. Child approval metadata remains author-owned: outer
+snapshot validation accepts corrupt child metadata, and native validation can
+become parent retry data rather than a failed parent run. Authors must validate
+that state and must not infer child completion from parent completion.
+
+The [separate matrix](../../tests/conformance/compatibility-matrix-pydantic-ai-delegation.json)
+records the three new goldens. The budget reference independently shares native
+usage and maps `UsageLimitExceeded` to `budget_exceeded`; the refusal reference
+encodes the adapter limit before recording a child request. Node-only probes
+assert receipt replay, exact effect IDs and repair indices. Existing goldens,
+matrices, locks and core contracts are unchanged. The probes use Node memory-backed
+byte checkpoints and recovery. Chromium delegation, real providers, arbitrary
+mid-run continuation and general nested checkpoint semantics remain unmeasured.
+The JavaScript entry size budget covers neither the Python wheel nor the adapter.
 
 ### pydantic-ai NativeOutput and model-settings spike (2026-11)
 

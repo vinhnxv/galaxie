@@ -56,17 +56,25 @@ from history rather than receiving the face's value, so parity proves the counte
 only at the exercised boundaries; Node bridge assertions and Python unit tests
 prove the exact values.
 
-On 2026-11-11, pydantic-ai 2.60.0 delegation probes on CPython and Node Pyodide
-recorded an alternative for plain delegation: a probe-local helper forwards usage
-and derives distinct child identity from stable delegate tool-call IDs across
-replay; a public-only guard detects wrapped nested model and capability work.
-Plain children exceed parent step limits and repeat
-writes after reload; shared conversation IDs collide with parent scopes. Explicit
-child-approval hoisting completes and restores in the measured pattern, but child
-stream events have no paths, so `subgraphs` remains false. No helper, hoist API or
-guard ships yet. Native children share the repair counter, and outer snapshot
-validation does not validate author-owned child metadata. Browser delegation and
-real providers remain unmeasured. See the [probe results and limits](../tests/conformance/README.md#pydantic-ai-agent-delegation-probes).
+On 2026-11-11, pydantic-ai 2.60.0 gained `galaxie.pydantic_ai.run_child` and a
+public-only nested-run guard. Helper children share usage and limits, derive
+identity from the delegate's message position and key, and start their own native
+repair counter. Plain nested `GalaxieModel` runs, child streams and nested
+`Executor.run` calls fail `unsupported` before bridge work. The guard fails closed
+when request history loses `run_id`; direct trusted capability calls and plain
+non-bridge models remain outside it. This is accident-proofing, with ADR-0012
+controls still enforced in JavaScript.
+
+Three new native CPython/Node Pyodide conformance cases cover a child write after
+approval reload, shared step budgets and nested-run refusal. A scripted changed-ID
+recovery probe preserves the helper's child scope and effect ID and writes once;
+the ID-sensitive control writes twice. Real-provider ID regeneration remains
+unmeasured. Sequential native children start at repair indices `[0, 0]`, including
+with no repair allowance. Child-approval hoisting remains probe-local, outer
+snapshots do not validate author-owned child metadata, and `subgraphs` stays false.
+Browser delegation, real providers and general nested checkpoints remain
+unmeasured. Existing goldens, matrices and locks are unchanged. No size budget
+covers the Python wheel or adapter. See the [evidence and author guidance](../tests/conformance/README.md#pydantic-ai-agent-delegation-probes).
 
 On 2026-11-11, pydantic-ai builtin and native tool probes recorded refusal for
 all ten native kinds, dynamic tools and native response parts. Static tools and
