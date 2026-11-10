@@ -25,70 +25,356 @@
  * and writes once. Full lane/priority table is in delegation.py's docstring.
  */
 
-import { createRuntime, defineAgentDefinition } from '@galaxie-ai/core';
 import { expect, test } from 'vitest';
-import { z } from 'zod';
 import {
   createPythonFixture,
   missingPythonWheels,
   pythonWheelsAvailable,
 } from '../../examples/rag-browser/test/support/python.node.js';
-import { createPyodideAdapter } from '../../packages/adapter-pyodide/src/adapter.js';
-import { delegationModel } from './support/pydantic-ai-delegation.js';
+import {
+  type DelegationStep,
+  delegationStore,
+  executeDelegationProbe,
+} from './support/pydantic-ai-delegation.js';
 import { delegationSources } from './support/pydantic-ai-delegation-sources.node.js';
 
-test.skipIf(!pythonWheelsAvailable)(
+const probe = test.skipIf(!pythonWheelsAvailable);
+async function measure(step: DelegationStep, variant = 'usage') {
+  const fixture = await createPythonFixture({
+    sources: await delegationSources(step.name, variant),
+    module: 'selected',
+  });
+  try {
+    const result = await executeDelegationProbe(fixture.options, fixture.agent, step);
+    const bridge = fixture.fromWorker
+      .map(
+        (raw) =>
+          JSON.parse(raw) as {
+            kind: string;
+            op: string;
+            payload: {
+              role?: string;
+              effectScope?: string;
+              options?: { repairAttempt?: number; stream?: boolean };
+            };
+          },
+      )
+      .filter((message) => message.kind === 'request');
+    const modelReplies = fixture.toWorker
+      .map(
+        (raw) =>
+          JSON.parse(raw) as {
+            kind: string;
+            op: string;
+            ok?: boolean;
+            payload: {
+              usage?: { input_tokens: number; output_tokens: number; total_tokens: number };
+            };
+          },
+      )
+      .filter((message) => message.kind === 'response' && message.op === 'model' && message.ok);
+    return { ...result, bridge, modelReplies };
+  } finally {
+    await fixture.cleanup();
+  }
+}
+
+probe(
   `delegation scaffold smoke (${missingPythonWheels} if skipped)`,
   async () => {
-    const fixture = await createPythonFixture({
-      sources: await delegationSources(),
-      module: 'selected',
+    const result = await measure({ name: 'smoke' });
+    expect(result.transcript.output).toBe('done');
+    expect(result.transcript.error).toBeNull();
+    expect(result.transcript.requests).toHaveLength(1);
+  },
+  90000,
+);
+
+// P0 accounting clause: core sees each bridged model/capability exactly once.
+probe.each(['usage', 'conv', 'helper'])(
+  'D1 exact shared accounting: %s',
+  async (variant) => {
+    const result = await measure(
+      { name: 'delegation', budgets: { tokens: 16, cost: 16, toolCalls: 2 } },
+      variant,
+    );
+    expect(result.transcript.error).toBeNull();
+    expect(result.transcript.output).toBe('parent-done');
+    expect(result.transcript.requests).toHaveLength(4);
+    expect(result.transcript.capabilities).toHaveLength(2);
+    // Core exposes no aggregate usage snapshot for this executor. The exact-budget
+    // run and the one-unit-below refusals below prove settlement across both runs.
+    expect(result.modelReplies.map((reply) => reply.payload.usage)).toEqual(
+      Array.from({ length: 4 }, () => ({ input_tokens: 2, output_tokens: 2, total_tokens: 4 })),
+    );
+    expect(result.subgraphs).toBe(false);
+    expect(
+      result.bridge
+        .filter((message) => message.op === 'model')
+        .map((message) => message.payload.role),
+    ).toEqual(['answer', 'child', 'child', 'answer']);
+  },
+  90000,
+);
+
+probe.each(['tokens', 'cost', 'toolCalls'] as const)(
+  'D1 %s budget refuses the first call beyond the exact allowance',
+  async (budget) => {
+    const result = await measure({
+      name: 'delegation',
+      budgets: { [budget]: budget === 'toolCalls' ? 1 : 15 },
     });
-    const { model, transcript } = delegationModel();
-    const runtime = createRuntime({
-      appId: 'delegation-probes',
-      executors: [createPyodideAdapter({ ...fixture.options, framework: 'pydantic-ai' })],
+    expect(result.transcript.error).toMatchObject({ code: 'budget_exceeded' });
+    expect(result.transcript.requests).toHaveLength(budget === 'toolCalls' ? 2 : 3);
+    expect(result.transcript.capabilities).toHaveLength(budget === 'toolCalls' ? 1 : 2);
+    expect(
+      result.spans.find((span) => span.name.startsWith('invoke_agent'))?.attributes[
+        'galaxie.budget.name'
+      ],
+    ).toBe(budget);
+  },
+  90000,
+);
+
+// P0 step clause: plain is characterized even when the assertion is green.
+probe.each(['plain', 'usage', 'conv', 'helper'])(
+  'D2 total requests at parent step limit 3: %s',
+  async (variant) => {
+    const result = await measure({ name: 'steps', budgets: { steps: 3 } }, variant);
+    expect(result.transcript.requests).toHaveLength(variant === 'plain' ? 6 : 3);
+    expect(result.transcript.error).toEqual(
+      variant === 'plain' ? null : expect.objectContaining({ code: 'budget_exceeded' }),
+    );
+  },
+  90000,
+);
+
+// P0 labels clause: one allowed child call precedes the labeled read; no later one reaches remote.
+probe(
+  'D3 child private output denies the next remote call before provider dispatch',
+  async () => {
+    const result = await measure({ name: 'labels', privateOutput: true, remoteChild: true });
+    expect(result.transcript.error).toMatchObject({ code: 'denied' });
+    expect(result.snapshot.run?.labels).toContain('private-user');
+    expect(result.transcript.requests).toHaveLength(2);
+    expect(result.transcript.capabilities).toHaveLength(1);
+    expect(
+      result.bridge
+        .filter((message) => message.op === 'model')
+        .map((message) => message.payload.role),
+    ).toEqual(['answer', 'child', 'child']);
+    expect(result.snapshot.routes?.['child']).toEqual({
+      providerId: 'remote',
+      destination: 'third-party',
     });
-    try {
-      const instance = await runtime.create(
-        defineAgentDefinition({
-          id: 'conformance/delegation',
-          version: '1',
-          executor: 'pydantic-ai-python',
-          input: z.unknown(),
-          models: { answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
-        }),
-        {
-          principalScope: 'fixture',
-          agent: fixture.agent,
-          services: { chatModels: { mock: model } },
-          models: {
-            providers: {
-              mock: {
-                destination: 'in-browser',
-                modality: 'text',
-                languages: ['en'],
-                features: ['tool-calling', 'streaming'],
-                pricing: { inputPerToken: 0, outputPerToken: 0 },
-              },
-            },
-            roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
-          },
-        },
-      );
-      await instance.prepare();
-      const run = await instance.start({ prompt: 'smoke' });
-      const events = [];
-      for await (const event of instance.events(run.runId)) events.push(event);
+  },
+  90000,
+);
+
+probe.each(['plain', 'conv', 'helper'])(
+  'D5 restore mid-delegate write: %s',
+  async (variant) => {
+    const store = delegationStore();
+    const first = await measure(
+      { name: 'recovery', store, answer: true, crashAfterWrite: true },
+      variant,
+    );
+    expect(first.crashed).toBe(true);
+    expect(first.writes.map((write) => write.value)).toEqual([2]);
+    expect(first.pending).toBeDefined();
+    const firstEffects = store.effects.slice();
+    expect(firstEffects).toEqual(first.writes.map((write) => write.effectId));
+    const second = await measure(
+      { name: 'recovery', store, sessionId: first.sessionId, answer: true },
+      variant,
+    );
+    expect(second.transcript.error).toBeNull();
+    expect(second.transcript.output).toBe('parent-done');
+    const before = first.bridge
+      .filter((message) => message.op === 'capability')
+      .map((message) => message.payload.effectScope);
+    const after = second.bridge
+      .filter((message) => message.op === 'capability')
+      .map((message) => message.payload.effectScope);
+    expect(before).toHaveLength(1);
+    expect(after).toHaveLength(1);
+    expect(after[0] === before[0]).toBe(variant !== 'plain');
+    const restoredEffects = store.effects.slice(firstEffects.length);
+    expect(restoredEffects).toHaveLength(1);
+    expect(restoredEffects[0] === firstEffects[0]).toBe(variant !== 'plain');
+    expect([...first.writes, ...second.writes].map((write) => write.value)).toEqual(
+      variant === 'plain' ? [2, 2] : [2],
+    );
+    const records = [...store.recovery.journal.values()];
+    expect(records).toHaveLength(variant === 'plain' ? 2 : 1);
+    expect(records.every((record) => record.status === 'succeeded')).toBe(true);
+  },
+  90000,
+);
+
+// P0 pause clause: child data is not a host pause, but its gated body must stay unexecuted.
+probe(
+  'P2 returned child deferral is ordinary parent tool data',
+  async () => {
+    const result = await measure({ name: 'returned-pause' });
+    expect(result.transcript.output).toBe('parent-done');
+    expect(result.transcript.error).toBeNull();
+    expect(result.transcript.interactions).toEqual([]);
+    expect(result.transcript.capabilities).toEqual([]);
+    expect(result.transcript.requests).toHaveLength(3);
+  },
+  90000,
+);
+
+probe(
+  'P3 hoisted child approval resumes once in the same Worker',
+  async () => {
+    const result = await measure(
+      { name: 'hoist', answer: true, store: delegationStore() },
+      'helper',
+    );
+    expect(result.transcript.error).toBeNull();
+    expect(result.transcript.output).toBe('parent-done');
+    expect(result.transcript.interactions).toHaveLength(1);
+    expect(result.writes.map((write) => write.value)).toEqual([2, 3]);
+    expect(result.transcript.requests).toHaveLength(5);
+  },
+  90000,
+);
+
+probe(
+  'P4 hoisted child state survives snapshot and fresh Worker',
+  async () => {
+    const store = delegationStore();
+    const first = await measure({ name: 'hoist', store }, 'helper');
+    expect(first.pending).toBeDefined();
+    expect(first.writes.map((write) => write.value)).toEqual([2]);
+    const second = await measure(
+      { name: 'hoist', store, sessionId: first.sessionId, answer: true },
+      'helper',
+    );
+    expect(second.restored).toEqual(first.pending);
+    expect(second.transcript.error).toBeNull();
+    expect(second.transcript.output).toBe('parent-done');
+    expect([...first.writes, ...second.writes].map((write) => write.value)).toEqual([2, 3]);
+    expect(store.recovery.journal.size).toBe(2);
+  },
+  90000,
+);
+
+probe(
+  'F1 flattened gate restores and writes once',
+  async () => {
+    const store = delegationStore();
+    const first = await measure({ name: 'flatten', store });
+    expect(first.pending).toBeDefined();
+    expect(first.writes).toEqual([]);
+    const second = await measure({
+      name: 'flatten',
+      store,
+      sessionId: first.sessionId,
+      answer: true,
+    });
+    expect(second.restored).toEqual(first.pending);
+    expect(second.transcript.error).toBeNull();
+    expect(second.transcript.output).toBe('parent-done');
+    expect(second.writes.map((write) => write.value)).toEqual([3]);
+    expect(store.recovery.journal.size).toBe(1);
+  },
+  90000,
+);
+
+// Informational D7; P0 S1 requires real child events with a path, not vacuous stability.
+probe(
+  'D7/S1 child streaming is checked but has no projected child events or path',
+  async () => {
+    const first = await measure({ name: 'stream' });
+    const second = await measure({ name: 'stream' });
+    for (const result of [first, second]) {
+      expect(result.transcript.error).toBeNull();
+      expect(result.transcript.output).toBe('parent-done');
+      expect(result.checks).toContain('child-stream');
       expect(
-        events.filter((event) => event.type === 'output').map((event) => event.output),
-      ).toEqual(['done']);
-      expect(transcript.requests).toHaveLength(1);
-      expect(events.filter((event) => event.type === 'error')).toEqual([]);
-    } finally {
-      await runtime.dispose();
-      await fixture.cleanup();
+        result.bridge
+          .filter((message) => message.op === 'model' && message.payload.role === 'child')
+          .map((message) => message.payload.options?.stream),
+      ).toEqual([true]);
+      const streams = result.events.filter((event) => event.type === 'stream');
+      expect(JSON.stringify(streams)).not.toContain('child-stream');
+      expect(
+        streams
+          .filter((event) => event.mode === 'messages')
+          .map((event) => (event.data as [{ content: string }])[0].content)
+          .join(''),
+      ).toBe('parent-done');
+      expect(streams.map((event) => event.path)).toEqual(streams.map(() => []));
     }
+    const blocked = await measure({ name: 'stream', blockChild: true });
+    expect(blocked.transcript.error).toMatchObject({ code: 'denied' });
+    expect(blocked.transcript.requests).toHaveLength(2);
+    expect(blocked.transcript.output).toBeNull();
+  },
+  90000,
+);
+
+probe(
+  'D6 shared repair accounting charges the second native child against core repair budget',
+  async () => {
+    const result = await measure({
+      name: 'native',
+      repairAttempts: 1,
+      budgets: { repairAttempts: 0 },
+    });
+    expect(result.transcript.error).toMatchObject({ code: 'budget_exceeded' });
+    expect(result.transcript.requests).toHaveLength(3);
+    expect(
+      result.bridge
+        .filter((message) => message.op === 'model' && message.payload.role === 'child')
+        .map((message) => message.payload.options?.repairAttempt ?? 0),
+    ).toEqual([0, 1]);
+    expect(
+      result.spans.find((span) => span.name.startsWith('invoke_agent'))?.attributes[
+        'galaxie.budget.name'
+      ],
+    ).toBe('repairAttempts');
+  },
+  90000,
+);
+
+// P0 guard clause, shared public-only candidate from the CPython probes.
+probe.each(['guard', 'guard-stream'])(
+  'G2 %s refuses nested work before its first bridge request',
+  async (name) => {
+    const result = await measure({ name });
+    expect(result.transcript.error).toMatchObject({ code: 'unsupported' });
+    expect(result.transcript.requests).toHaveLength(1);
+    expect(
+      result.bridge
+        .filter((message) => message.op === 'model')
+        .map((message) => message.payload.role),
+    ).toEqual(['answer']);
+    expect(result.transcript.capabilities).toEqual([]);
+  },
+  90000,
+);
+
+probe(
+  'G2 capability guard refuses an approved child before its next model request',
+  async () => {
+    const store = delegationStore();
+    const first = await measure({ name: 'hoist', store }, 'helper');
+    expect(first.pending).toBeDefined();
+    expect(first.writes.map((write) => write.value)).toEqual([2]);
+    const restored = await measure(
+      { name: 'hoist', store, sessionId: first.sessionId, answer: true },
+      'guarded',
+    );
+    expect(restored.restored).toEqual(first.pending);
+    expect(restored.transcript.error).toMatchObject({ code: 'unsupported' });
+    expect(
+      restored.bridge.filter((message) => message.op === 'model' || message.op === 'capability'),
+    ).toEqual([]);
+    expect(restored.writes).toEqual([]);
   },
   90000,
 );
