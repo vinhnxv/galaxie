@@ -9,14 +9,14 @@ import json
 import math
 import re
 from copy import deepcopy
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from pydantic_ai import Agent, AgentRunResult, Conversation, ConversationTypeAdapter, DeferredToolRequests, DeferredToolResults, RunContext, Tool, capture_run_messages
+from pydantic_ai import Agent, AgentRunResult, Conversation, ConversationTypeAdapter, DeferredToolRequests, DeferredToolResults, NativeOutput, RunContext, Tool, capture_run_messages
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (
@@ -27,6 +27,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model, ModelRequestParameters, StreamedResponse
 from pydantic_ai.models.instrumented import InstrumentedModel
 from pydantic_ai.settings import ModelSettings
+from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.usage import RequestUsage, UsageLimits
 from pydantic_core import to_jsonable_python
 
@@ -150,7 +151,7 @@ class GalaxieModel(Model):
             raise GalaxieError('invalid')
         super().__init__(profile={
             'supports_tools': True, 'supports_text_output': True,
-            'supports_json_schema_output': False, 'supports_json_object_output': False,
+            'supports_json_schema_output': True, 'supports_json_object_output': False,
             'supports_image_output': False, 'default_structured_output_mode': 'tool',
         })
         self.role = role
@@ -171,6 +172,7 @@ class GalaxieModel(Model):
             model_request_parameters.native_tools or model_request_parameters.thinking
             or model_request_parameters.allow_image_output
             or (model_settings and not set(model_settings) <= {'stop_sequences'})
+            or (self.settings and not set(self.settings) <= {'stop_sequences'})
         ):
             raise GalaxieError('unsupported')
         settings, parameters = self.prepare_request(model_settings, model_request_parameters)
@@ -182,6 +184,14 @@ class GalaxieModel(Model):
             }} for tool in parameters.declared_tool_defs.values()
         ]
         options = {}
+        if parameters.output_mode == 'native':
+            if parameters.declared_tool_defs or parameters.prompted_output_template or parameters.output_object is None:
+                raise GalaxieError('unsupported')
+            options['jsonSchema'] = _json(parameters.output_object.json_schema)
+            # Native mode has no tools or resumed history: each earlier response failed validation.
+            repairs = sum(isinstance(message, ModelResponse) for message in messages)
+            if repairs:
+                options['repairAttempt'] = repairs
         stop = settings.get('stop_sequences') if settings else None
         if stop is not None:
             options['stop'] = stop
@@ -333,6 +343,20 @@ def _uninstrumented(agent: Agent) -> None:
         raise GalaxieError('unsupported')
 
 
+def _validate_agent(agent: Agent) -> None:
+    settings = agent.model_settings
+    if callable(settings) or (settings and not set(settings) <= {'stop_sequences'}):
+        raise GalaxieError('unsupported')
+    spec = agent.output_type
+    outputs = spec if isinstance(spec, Sequence) and not isinstance(spec, str) else [spec]
+    for output in outputs:
+        if isinstance(output, NativeOutput) and (
+            DeferredToolRequests in outputs or isinstance(output.template, str)
+            or any(not isinstance(toolset, FunctionToolset) or toolset.tools for toolset in agent.toolsets)
+        ):
+            raise GalaxieError('unsupported')
+
+
 def _interaction(value: Any) -> dict[str, Any]:
     """Mirror the four-field JSON display contract without importing a framework."""
     def json_value(item: Any, ancestors: set[int]) -> bool:
@@ -385,6 +409,7 @@ class Executor:
         if not isinstance(agent, Agent):
             raise GalaxieError('unsupported')
         _uninstrumented(agent)
+        _validate_agent(agent)
         self.agent = agent
         self.prompt = prompt
         self.output = output
@@ -594,6 +619,7 @@ def prepare_executor(value: Any) -> Executor:
     """Accept the entry factory's agent or an explicit executor wrapper."""
     if isinstance(value, Executor):
         _uninstrumented(value.agent)
+        _validate_agent(value.agent)
         return value
     if isinstance(value, Agent):
         return Executor(value)

@@ -10,13 +10,14 @@ import pytest
 from pydantic import BaseModel
 from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults, NativeOutput, PromptedOutput
 from pydantic_ai.capabilities import Instrumentation
-from pydantic_ai.exceptions import UserError
 from pydantic_ai.messages import (
     InstructionPart, ModelRequest, ModelResponse, SystemPromptPart, TextPart,
     ToolCallPart, ToolReturnPart, UserPromptPart,
 )
 from pydantic_ai.models import ModelRequestParameters
 from pydantic_ai.models.instrumented import InstrumentedModel
+from pydantic_ai.output import OutputObjectDefinition
+from pydantic_ai.toolsets import CombinedToolset, FunctionToolset
 from pydantic_ai.tools import ToolDefinition
 
 from galaxie import GalaxieError, _bridge
@@ -275,6 +276,9 @@ class Answer(BaseModel):
     value: int
 
 
+ANSWER_SCHEMA = {'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'], 'title': 'Answer'}
+
+
 def test_executor_validates_tool_output_and_retries_as_ordinary_model_calls():
     seen = []
     transport_for([
@@ -284,6 +288,9 @@ def test_executor_validates_tool_output_and_retries_as_ordinary_model_calls():
     executor = prepare_executor(Agent(GalaxieModel('answer'), output_type=Answer, retries=1))
     assert asyncio.run(executor.run({'prompt': 'question'}, 'conversation', 5)) == {'value': 7}
     assert len(seen) == 2
+    assert all(set(payload['options']) == {'tools', 'toolChoice'} for payload in seen)
+    assert seen[0]['options']['tools'][0]['function']['name'] == 'final_result'
+    assert seen[0]['options']['toolChoice'] == 'required'
     assert seen[1]['messages'][-1]['role'] == 'tool'
     assert json.loads(seen[1]['messages'][-1]['content'])['error'][0]['type'] == 'int_parsing'
 
@@ -296,12 +303,132 @@ def test_exhausted_validation_retries_have_a_fixed_error():
     assert str(error.value) == 'The executor or agent code failed.'
 
 
-def test_prompted_output_parses_text_and_native_output_remains_unsupported():
+def test_prompted_output_parses_text():
     transport_for([{'content': '{"value":8}'}])
     agent = Agent(GalaxieModel('answer'), output_type=PromptedOutput(Answer))
     assert asyncio.run(prepare_executor(agent).run({'prompt': 'question'}, 'conversation', 5)) == {'value': 8}
-    with pytest.raises(UserError, match='Native structured output'):
-        asyncio.run(Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer)).run('question'))
+
+
+def test_native_output_sends_only_the_schema_constraint_and_validates_the_reply():
+    seen = []
+    transport_for([{'content': '{"value":8}'}], seen)
+    agent = Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer))
+    assert asyncio.run(prepare_executor(agent).run({'prompt': 'question'}, 'conversation', 5)) == {'value': 8}
+    assert seen[0]['options'] == {'jsonSchema': ANSWER_SCHEMA}
+    assert all('properties' not in message['content'] and 'schema' not in message['content'] for message in seen[0]['messages'])
+
+
+@pytest.mark.parametrize('retries', [1, 2])
+def test_native_output_validation_retries_carry_growing_repair_indices(retries):
+    seen = []
+    transport_for([{'content': '{"value":"x"}'}] * retries + [{'content': '{"value":8}'}], seen)
+    executor = prepare_executor(Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer), retries=retries))
+    assert asyncio.run(executor.run({'prompt': 'question'}, 'conversation', 5)) == {'value': 8}
+    assert [payload['options'].get('repairAttempt') for payload in seen] == [None, *range(1, retries + 1)]
+    for payload in seen[1:]:
+        assert payload['options']['jsonSchema'] == ANSWER_SCHEMA
+        assert payload['messages'][-1]['role'] == 'user'
+        assert 'int_parsing' in payload['messages'][-1]['content']
+        assert '<validation_errors>' in payload['messages'][-1]['content']
+
+
+def test_native_output_router_refusal_propagates_without_another_retry():
+    seen = []
+    async def transport(raw):
+        message = json.loads(raw)
+        seen.append(message['payload'])
+        if message['payload']['options'].get('repairAttempt'):
+            return json.dumps({**message, 'kind': 'response', 'ok': False, 'error': {'code': 'invalid'}})
+        return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': {'content': '{"value":"x"}'}})
+    _bridge.install_transport(transport)
+    executor = prepare_executor(Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer), retries=2))
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run({'prompt': 'question'}, 'conversation', 5))
+    assert (error.value.code, str(error.value)) == ('invalid', 'The request is invalid.')
+    assert len(seen) == 2
+
+
+def test_stream_native_output_uses_checked_text_deltas_and_the_schema_constraint():
+    seen = []
+    streaming_transport([{'content': '{"value": '}, {'content': '8}'}], {'content': '{"value": 8}'}, seen)
+    streams = []
+    executor = prepare_executor(Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer)))
+    assert asyncio.run(executor.run({'prompt': 'question'}, 'conversation', 5, on_stream=lambda mode, data: streams.append((mode, data)))) == {'value': 8}
+    assert seen[0]['options'] == {'jsonSchema': ANSWER_SCHEMA, 'stream': True}
+    assert [data[0]['content'] for mode, data in streams if mode == 'messages'] == ['{"value": ', '8}']
+
+
+@pytest.mark.parametrize('shape', ['capability', 'plain-tool', 'deferred', 'template', 'empty-template', 'toolset'])
+@pytest.mark.parametrize('prepare', [prepare_executor, Executor])
+def test_native_output_unprovable_shapes_fail_at_prepare_without_bridge_traffic(shape, prepare):
+    seen = []
+    transport_for([], seen)
+    output = [NativeOutput(Answer), DeferredToolRequests] if shape == 'deferred' else NativeOutput(Answer, template='{schema}' if shape == 'template' else '' if shape == 'empty-template' else None)
+    tools = [capability_tool('lookup', 'docs.search@1', {'type': 'object'})] if shape == 'capability' else []
+    toolsets = [CombinedToolset([FunctionToolset()])] if shape == 'toolset' else []
+    agent = Agent(GalaxieModel('answer'), output_type=output, tools=tools, toolsets=toolsets)
+    if shape == 'plain-tool':
+        @agent.tool_plain
+        def lookup() -> str:
+            return 'unused'
+    with pytest.raises(GalaxieError) as error:
+        prepare(agent)
+    assert (error.value.code, str(error.value)) == ('unsupported', 'This operation is unsupported.')
+    assert seen == []
+
+
+@pytest.mark.parametrize('settings', [{'temperature': 0}, {'openai_reasoning_effort': 'high'}, lambda ctx: {'stop_sequences': ['x']}])
+@pytest.mark.parametrize('prepare', [prepare_executor, Executor])
+def test_agent_model_settings_fail_at_prepare_without_bridge_traffic(settings, prepare):
+    seen = []
+    transport_for([], seen)
+    with pytest.raises(GalaxieError) as error:
+        prepare(Agent(GalaxieModel('answer'), model_settings=settings))
+    assert error.value.code == 'unsupported'
+    assert seen == []
+
+
+def test_prepare_revalidates_an_executor_after_agent_configuration_changes():
+    executor = Executor(Agent(GalaxieModel('answer')))
+    executor.agent.model_settings = {'temperature': 0}
+    with pytest.raises(GalaxieError) as error:
+        prepare_executor(executor)
+    assert error.value.code == 'unsupported'
+
+
+def test_native_output_allows_template_false_and_stop_sequences():
+    seen = []
+    transport_for([{'content': '{"value":8}'}], seen)
+    executor = prepare_executor(Agent(GalaxieModel('answer'), output_type=NativeOutput(Answer, template=False), model_settings={'stop_sequences': ['END']}))
+    assert asyncio.run(executor.run({'prompt': 'question'}, 'conversation', 5)) == {'value': 8}
+    assert seen[0]['options'] == {'jsonSchema': ANSWER_SCHEMA, 'stop': ['END']}
+
+
+@pytest.mark.parametrize('shape', ['tools', 'template'])
+def test_native_output_request_backstop_refuses_tools_and_prompted_templates(shape):
+    seen = []
+    transport_for([], seen)
+    parameters = ModelRequestParameters(
+        output_mode='native', output_object=OutputObjectDefinition(json_schema=Answer.model_json_schema(), name='Answer'),
+        function_tools=[ToolDefinition(name='lookup')] if shape == 'tools' else [],
+        prompted_output_template='{schema}' if shape == 'template' else None,
+    )
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(GalaxieModel('answer').request([], None, parameters))
+    assert error.value.code == 'unsupported'
+    assert seen == []
+
+
+@pytest.mark.parametrize('settings', [{'temperature': 0}, {'thinking': True}, {'cache': True}])
+def test_model_owned_settings_are_refused_before_merging_or_stripping(settings):
+    seen = []
+    transport_for([], seen)
+    model = GalaxieModel('answer')
+    model._settings = settings
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(model.request([], None, ModelRequestParameters()))
+    assert error.value.code == 'unsupported'
+    assert seen == []
 
 
 def test_capability_tool_has_a_position_derived_scope_and_propagates_denial():
