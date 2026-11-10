@@ -10,11 +10,14 @@ import {
 } from '@galaxie-ai/core';
 import type { BaseCheckpointSaver, StateSnapshot } from '@langchain/langgraph/web';
 
+const INTERRUPT_CHANNEL = '__interrupt__';
+const RESUME_CHANNEL = '__resume__';
+
 type Writes = NonNullable<Awaited<ReturnType<BaseCheckpointSaver['getTuple']>>>['pendingWrites'];
 
 export function committedResumeValues(writes: Writes, taskId?: string): unknown[] {
   return (writes ?? []).flatMap(([id, channel, value]) =>
-    channel === '__resume__' && (taskId === undefined || id === taskId)
+    channel === RESUME_CHANNEL && (taskId === undefined || id === taskId)
       ? Array.isArray(value)
         ? value
         : [value]
@@ -52,7 +55,7 @@ export async function readIdlessPending(
     return unsupported();
   }
   const writes = tuple?.pendingWrites;
-  if (!writes?.some(([id, channel]) => id === task.id && channel === '__interrupt__'))
+  if (!writes?.some(([id, channel]) => id === task.id && channel === INTERRUPT_CHANNEL))
     return unsupported();
   for (const sibling of tasks) {
     if (
@@ -61,8 +64,8 @@ export async function readIdlessPending(
         ([id, channel]) =>
           id === sibling.id &&
           channel !== '__error__' &&
-          channel !== '__interrupt__' &&
-          channel !== '__resume__',
+          channel !== INTERRUPT_CHANNEL &&
+          channel !== RESUME_CHANNEL,
       )
     )
       return unsupported();

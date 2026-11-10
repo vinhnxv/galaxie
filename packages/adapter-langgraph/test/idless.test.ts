@@ -10,10 +10,21 @@ import {
   type SessionId,
   toErrorInfo,
 } from '@galaxie-ai/core';
-import type { StateSnapshot } from '@langchain/langgraph/web';
+import { RunnableLambda } from '@langchain/core/runnables';
+import {
+  Annotation,
+  Command,
+  END,
+  INTERRUPT,
+  MemorySaver,
+  START,
+  StateGraph,
+  type StateSnapshot,
+} from '@langchain/langgraph/web';
 import { expect, test, vi } from 'vitest';
 import { createLangGraphAdapter } from '../src/adapter.js';
 import type { LangGraphGraph } from '../src/host.js';
+import { requestInteraction } from '../src/interaction.js';
 
 const taskId = 'ec4b3ae8-7d3a-493e-80c3-2360165681ae';
 const nullTask = '00000000-0000-0000-0000-000000000000';
@@ -333,3 +344,58 @@ test.each([interactionId, '0123456789abcdef' as InteractionId])(
     expect(result.at(-1)).toMatchObject({ type: 'error', error: toErrorInfo('unsupported') });
   },
 );
+
+test('installed LangGraph writes pin the interrupt, resume and null-task channel contract', async () => {
+  const saver = new MemorySaver();
+  const entered = Promise.withResolvers<void>();
+  const held = Promise.withResolvers<void>();
+  const answer = { action: 'submit', payload: 'installed-resume-canary' };
+  const graph = new StateGraph(Annotation.Root({ answer: Annotation<unknown> }))
+    .addNode('gate', async (_, config) => {
+      const configurable = { ...config.configurable };
+      delete configurable['checkpoint_ns'];
+      await RunnableLambda.from((_, inner) => requestInteraction(question, inner)).invoke(
+        {},
+        { ...config, configurable },
+      );
+      entered.resolve();
+      await held.promise;
+      throw new Error('The simulated resumed node failed.');
+    })
+    .addEdge(START, 'gate')
+    .addEdge('gate', END)
+    .compile({ checkpointer: saver });
+  const executor = await prepare(graph);
+  const config = { configurable: { thread_id: sessionId } };
+  await graph.invoke({}, config);
+  const task = (await graph.getState(config)).tasks[0];
+  if (task === undefined) throw new Error('Expected a checkpoint task.');
+  expect(INTERRUPT).toBe('__interrupt__');
+  expect((await saver.getTuple(config))?.pendingWrites).toEqual([
+    [task.id, '__interrupt__', { value: question }],
+  ]);
+  const pending = await executor.pending(sessionId);
+  const execution = graph
+    .invoke(new Command({ resume: answer }), config)
+    .catch((error: unknown) => error);
+  try {
+    await entered.promise;
+    expect((await saver.getTuple(config))?.pendingWrites).toContainEqual([
+      nullTask,
+      '__resume__',
+      answer,
+    ]);
+  } finally {
+    held.resolve();
+  }
+  expect(await execution).toBeInstanceOf(Error);
+  expect((await saver.getTuple(config))?.pendingWrites).toContainEqual([
+    task.id,
+    '__resume__',
+    [answer],
+  ]);
+  const registered = vi.fn();
+  expect(await executor.pending(sessionId, { registerRestoredData: registered })).toEqual(pending);
+  expect(registered).toHaveBeenCalledWith(answer);
+  await executor.dispose();
+});
