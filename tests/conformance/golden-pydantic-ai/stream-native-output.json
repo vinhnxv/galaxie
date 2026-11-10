@@ -1,0 +1,72 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "stream native output"
+        }
+      ],
+      "tools": [],
+      "jsonSchema": {
+        "properties": {
+          "value": {
+            "type": "integer"
+          }
+        },
+        "required": ["value"],
+        "title": "Answer",
+        "type": "object"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "content": "{\"value\": 6}",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "value": 6
+  },
+  "error": null,
+  "streams": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "model-request",
+        "index": 0
+      }
+    },
+    {
+      "mode": "messages",
+      "data": [
+        {
+          "type": "ai",
+          "content": "{\"value\": "
+        },
+        {}
+      ]
+    },
+    {
+      "mode": "messages",
+      "data": [
+        {
+          "type": "ai",
+          "content": "6}"
+        },
+        {}
+      ]
+    }
+  ]
+}

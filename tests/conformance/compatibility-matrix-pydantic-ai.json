@@ -40,10 +40,15 @@
     "approval-repeated-ids",
     "approval-argument-block",
     "stream-approval-approve",
-    "stream-approval-argument-block"
+    "stream-approval-argument-block",
+    "native-output",
+    "native-output-repair",
+    "native-output-repair-refused",
+    "stream-native-output"
   ],
   "differences": [],
   "normalizations": [
+    "Native output records the routed jsonSchema; CPython takes it from the OpenAI mapper's response_format.json_schema.schema. Name, description and strict are not compared because the routed contract carries only the schema.",
     "Assistant tool-only content null maps to the bridge's empty string.",
     "LangChain message roles and tool calls map back to OpenAI-format request messages; tool-call IDs and JSON argument strings remain compared.",
     "Reply transcripts project text and tool calls without provider-generated message IDs or timestamps.",
@@ -55,6 +60,8 @@
     "Reload variants use the existing case goldens. Native CPython roundtrips ConversationTypeAdapter bytes between fresh agents; Node recreates Workers and Chromium reloads pages with reopened IndexedDB. Restored interaction IDs are compared before transcript normalization."
   ],
   "limits": [
+    "NativeOutput is supported only without function tools, non-empty or unknown toolsets, deferred requests or a schema template. These shapes and agent-level model settings other than stop_sequences fail unsupported at prepare; later-contributed tools or settings fail before the bridge.",
+    "The native-output-repair-refused native fixture uses the router's fixed invalid refusal as a stand-in; Pyodide lanes exercise ModelPort.begin with the route's default repairAttempts: 0. The two native repair cases use the mock's assistant-turn sequencing. The mock ignores the schema; no real-model constraint enforcement is claimed.",
     "A route without the tool-calling feature fails unavailable under the existing router semantics; a leased model without bindTools fails unsupported. Both fail before provider dispatch, without fallback.",
     "All model replies are deterministic scripts. Native conformance blocks socket connections; Pyodide fixtures block external requests and use verified local assets.",
     "The capability-denial fixture raises the same fixed denial from a native tool and the JavaScript broker binding.",

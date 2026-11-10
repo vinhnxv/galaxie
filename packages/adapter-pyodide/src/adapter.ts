@@ -499,6 +499,9 @@ export function createPyodideAdapter(
               const lease = await run.request.models.begin(input.role, {
                 signal: run.request.signal,
                 ...(requires.length ? { requires } : {}),
+                ...(input.options.repairAttempt === undefined
+                  ? {}
+                  : { repairAttempt: input.options.repairAttempt }),
               });
               call = { lease, settled: false };
               run.leases.add(call);

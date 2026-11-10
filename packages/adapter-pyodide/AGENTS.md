@@ -43,7 +43,10 @@ subgraphs preserve nested paths, child interrupts, resume and durable restore. S
 calls require a provider declaring `streaming`, including implicit graph message
 streaming from Python `ainvoke`. Growing text and final text are checked in JavaScript
 before forwarding; earlier allowed deltas cannot be retracted after a block.
-The adapter supports asynchronous text-only model calls and streaming. Python code
+The adapter supports asynchronous text-only model calls, schema-constrained replies
+and streaming. A bridge `repairAttempt` must be a positive safe integer beside
+`jsonSchema`; forward it to `ModelPort.begin` so native-output retries consume the
+host's route and run repair limits. Python code
 is trusted and can import `js`; a Worker is not an isolation boundary. CSP constrains
 Worker requests, while a lint aid remains advisory. Runtime loader, WASM and standard
 library bytes share the page build's trust; the adapter does not bind their bytes.

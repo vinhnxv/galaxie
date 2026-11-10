@@ -1,0 +1,44 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a deterministic fixture."
+        },
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly."
+        },
+        {
+          "role": "user",
+          "content": "native repair refused"
+        }
+      ],
+      "tools": [],
+      "jsonSchema": {
+        "properties": {
+          "value": {
+            "type": "integer"
+          }
+        },
+        "required": ["value"],
+        "title": "Answer",
+        "type": "object"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "content": "{\"value\":\"invalid\"}",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "invalid",
+    "message": "The request is invalid."
+  }
+}

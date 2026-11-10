@@ -52,6 +52,10 @@ export const pydanticCases = [
   'approval-argument-block',
   'stream-approval-approve',
   'stream-approval-argument-block',
+  'native-output',
+  'native-output-repair',
+  'native-output-repair-refused',
+  'stream-native-output',
 ] as const;
 interface Spec {
   readonly prompt: string;
@@ -91,12 +95,14 @@ export class RecordingModel extends BaseChatModel {
   readonly tools: BindToolsInput[];
   readonly choice: unknown;
   readonly streamLatch: ReturnType<typeof createMockLatch> | undefined;
+  readonly sequence: 'tool-calls' | 'assistant-turns';
   constructor(
     script: MockScript,
     transcript: PydanticTranscript,
     tools: BindToolsInput[] = [],
     choice?: unknown,
     streamLatch?: ReturnType<typeof createMockLatch>,
+    sequence: 'tool-calls' | 'assistant-turns' = 'tool-calls',
   ) {
     super({});
     this.script = script;
@@ -104,9 +110,10 @@ export class RecordingModel extends BaseChatModel {
     this.tools = tools;
     this.choice = choice;
     this.streamLatch = streamLatch;
+    this.sequence = sequence;
     this.mock = tools.length
-      ? new MockChatModel(script).bindTools(tools)
-      : new MockChatModel(script);
+      ? new MockChatModel(script, { sequence }).bindTools(tools)
+      : new MockChatModel(script, { sequence });
   }
   override _llmType(): string {
     return 'conformance-recording';
@@ -121,16 +128,19 @@ export class RecordingModel extends BaseChatModel {
       tools,
       kwargs?.tool_choice,
       this.streamLatch,
+      this.sequence,
     );
   }
   override async _generate(
     messages: BaseMessage[],
     options: this['ParsedCallOptions'],
   ): Promise<ChatResult> {
+    const jsonSchema: unknown = Reflect.get(options, 'jsonSchema');
     this.transcript.requests.push({
       messages: normalizeMessages(messages),
       tools: this.tools,
       ...(this.tools.length ? { toolChoice: this.choice } : {}),
+      ...(jsonSchema === undefined ? {} : { jsonSchema }),
     });
     const result = await this.mock._generate(messages, options);
     const message = result.generations[0]?.message;
@@ -191,6 +201,9 @@ export async function executePydanticCase(
     [],
     undefined,
     name === 'stream-abort' ? latch : undefined,
+    name === 'native-output-repair' || name === 'native-output-repair-refused'
+      ? 'assistant-turns'
+      : 'tool-calls',
   );
   const runtime = createRuntime({
     appId: 'pydantic-conformance',
@@ -256,11 +269,18 @@ export async function executePydanticCase(
               destination: 'in-browser',
               modality: 'text',
               languages: ['en'],
-              features: ['tool-calling', 'streaming'],
+              features: ['tool-calling', 'streaming', 'structured-output'],
               pricing: { inputPerToken: 0, outputPerToken: 0 },
             },
           },
-          roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
+          roles: {
+            answer: {
+              providers: ['mock'],
+              allow: ['in-browser'],
+              maxTokens: 100,
+              ...(name === 'native-output-repair' ? { repairAttempts: 1 } : {}),
+            },
+          },
         },
       },
     );

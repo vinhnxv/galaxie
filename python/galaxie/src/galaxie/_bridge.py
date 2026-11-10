@@ -102,7 +102,7 @@ def _model_request(value):
     if not (
         _keys(value, ('role', 'messages', 'options')) and _text(value['role'])
         and isinstance(value['messages'], list) and all(_model_message(message) for message in value['messages'])
-        and _keys(value['options'], (), ('stop', 'stream', 'tools', 'toolChoice', 'jsonSchema'))
+        and _keys(value['options'], (), ('stop', 'stream', 'tools', 'toolChoice', 'jsonSchema', 'repairAttempt'))
     ):
         return False
     options = value['options']
@@ -111,6 +111,11 @@ def _model_request(value):
     if 'stream' in options and type(options['stream']) is not bool:
         return False
     if 'jsonSchema' in options and not isinstance(options['jsonSchema'], dict):
+        return False
+    if 'repairAttempt' in options and not (
+        type(options['repairAttempt']) is int and 1 <= options['repairAttempt'] <= 2**53 - 1
+        and 'jsonSchema' in options
+    ):
         return False
     if 'tools' in options and not (isinstance(options['tools'], list) and all(_tool_definition(item) for item in options['tools'])):
         return False

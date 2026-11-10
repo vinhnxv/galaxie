@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from pydantic import BaseModel
-from pydantic_ai import Agent, CallDeferred, DeferredToolRequests, DeferredToolResults, PromptedOutput, Tool
+from pydantic_ai import Agent, CallDeferred, DeferredToolRequests, DeferredToolResults, NativeOutput, PromptedOutput, Tool
 
 from galaxie.pydantic_ai import Executor, GalaxieModel, capability_tool
 
@@ -15,6 +15,7 @@ CASES = (
     'approval-stale', 'approval-invalid-action', 'approval-incomplete', 'approval-invalid-interaction',
     'approval-double-submit', 'approval-consecutive', 'approval-repeated-ids',
     'approval-argument-block', 'stream-approval-approve', 'stream-approval-argument-block',
+    'native-output', 'native-output-repair', 'native-output-repair-refused', 'stream-native-output',
 )
 PARAMETERS = {'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'], 'additionalProperties': False}
 
@@ -50,6 +51,8 @@ def factory(name, model=None):
         return Executor(agent, interaction=interaction, resume=resume if name in ('approval-mixed', 'call-deferred') else None)
     tools = [tool] if name in ('capability', 'sequential-tools', 'capability-denial', 'argument-block', 'stream-tools', 'stream-id-block') else []
     output_type = PromptedOutput(Answer) if name == 'prompted-output' else Answer if name in ('tool-output', 'output-retry', 'stream-tool-output', 'stream-output-retry') else str
+    if name in ('native-output', 'native-output-repair', 'native-output-repair-refused', 'stream-native-output'):
+        output_type = NativeOutput(Answer)
     if name == 'stream-final-mismatch' and model is None:
         import galaxie.pydantic_ai as face
         original = face.request
