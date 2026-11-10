@@ -89,6 +89,11 @@ children remain unproven. Because resumability applies to the whole app, duplica
 names anywhere in that app are refused: ADK keys progress by name. `temp:` output
 keys are refused because ADK drops temporary state on resume, and `LlmAgent`
 transfer children are refused because their resumable routing was not exercised.
+A resumable tree also allows one pausing agent in total, because a second pausing
+agent has no native or restore evidence under resumability, and refuses an exit
+tool beneath a Parallel ancestor, because ADK cancels the other branches on that
+escalation before their completion is recorded. One agent that pauses twice is
+covered live and after reload.
 
 Restore checks state authors and direct-child names, loop counter types and
 bounds, forward child/iteration progress, the current child on the pending

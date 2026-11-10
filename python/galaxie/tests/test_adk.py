@@ -930,6 +930,12 @@ def quiet_child(name='quiet'):
     lambda: SequentialAgent(name='root', sub_agents=[
         named('a', gated()), LlmAgent(name='b', model=llm('answer'), sub_agents=[quiet_child('c')]),
     ]),
+    lambda: SequentialAgent(name='root', sub_agents=[named('a', gated()), named('b', gated()), quiet_child('tail')]),
+    lambda: SequentialAgent(name='root', sub_agents=[
+        ParallelAgent(name='fanout', sub_agents=[
+            named('a', gated()), named('stopper', loop_exit()),
+        ]), quiet_child('tail'),
+    ]),
 ])
 def test_an_unproven_pause_or_ambiguous_resumable_tree_fails_unsupported(build):
     seen = []
@@ -1535,3 +1541,29 @@ def test_a_session_id_that_cannot_fit_the_frame_is_refused_at_snapshot():
     executor = durable(Executor(agent()))
     assert run(executor, session='s' * 400000) == 'hello'
     assert code_of(lambda: executor._snapshot('s' * 400000, 'q' * 200000)) == 'unsupported'
+
+
+@pytest.mark.parametrize('reload', [False, True])
+def test_a_resumable_agent_that_pauses_twice_resumes_each_time_and_runs_its_successors_once(reload):
+    seen = []
+    transport_for([
+        {'content': 'before done'}, {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":21}', 'call_a')]},
+    ], seen)
+    original = durable(Executor(workflow_pause('middle'), interaction=interact))
+    assert run(original) is None
+    first = original.pending('s1')
+    assert first is not None
+    transport_for([{'value': 42}, {'content': '', 'toolCalls': [tool_call('math_double_1', '{"value":5}', 'call_b')]}], seen)
+    assert answer(original, first) is None
+    second = original.pending('s1')
+    assert second is not None and second['id'] != first['id']
+    executor = original
+    if reload:
+        executor = durable(Executor(workflow_pause('middle'), interaction=interact))
+        assert asyncio.run(executor._restore(*stored(original), 'bound')) == 's1'
+        assert executor.pending('s1') == second
+    transport_for([{'value': 10}, {'content': 'paused done'}, {'content': 'tail done'}], seen)
+    assert answer(executor, second) == 'tail done'
+    assert [op for op, _ in seen] == [
+        'model', 'model', 'capability', 'model', 'capability', 'model', 'model',
+    ]

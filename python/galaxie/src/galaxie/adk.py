@@ -600,6 +600,9 @@ def _validate(root: Any) -> tuple[frozenset[str], bool]:
                     continue
                 if _is_exit(tool):
                     exits = True
+                    # An escalation inside a parallel agent cancels its other branches, so a resumable
+                    # tree would re-run a branch whose completion was never recorded.
+                    resumable_refused = resumable_refused or any(isinstance(parent, ParallelAgent) for parent, _ in lineage)
                     continue
                 raise GalaxieError('unsupported')
         if not isinstance(agent.sub_agents, list):
@@ -633,7 +636,7 @@ def _validate(root: Any) -> tuple[frozenset[str], bool]:
     # The agent named on a pausing event must identify one agent.
     if any(names[name] != 1 for name in pausing):
         raise GalaxieError('unsupported')
-    if resumable and (resumable_refused or any(count != 1 for count in names.values())):
+    if resumable and (resumable_refused or len(pausing) > 1 or any(count != 1 for count in names.values())):
         raise GalaxieError('unsupported')
     return frozenset(pausing), resumable
 
