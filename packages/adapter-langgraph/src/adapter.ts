@@ -13,9 +13,15 @@ import {
   parseInteractionRequest,
   parseSurfaceRecord,
   pendingFromSurface,
+  type RunRequest,
   toErrorInfo,
 } from '@galaxie-ai/core';
-import { Command, GraphRecursionError, isGraphInterrupt } from '@langchain/langgraph/web';
+import {
+  type BaseCheckpointSaver,
+  Command,
+  GraphRecursionError,
+  isGraphInterrupt,
+} from '@langchain/langgraph/web';
 import { refuseStaticBreakpoints } from './breakpoints.js';
 import { adapterError } from './errors.js';
 import {
@@ -26,6 +32,7 @@ import {
   type LangGraphServices,
   validServices,
 } from './host.js';
+import { readIdlessPending } from './idless.js';
 import { installContext } from './interaction.js';
 import { LangGraphTraceHandler } from './trace-handler.js';
 
@@ -104,15 +111,35 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           'The graph must support checkpoint state inspection.',
         );
       await refuseStaticBreakpoints(graph);
-      const pending = async (sessionId: string): Promise<PendingInteraction | undefined> => {
+      const bound = graph as LangGraphGraph & { readonly checkpointer?: BaseCheckpointSaver };
+      const checkpointer =
+        typeof bound.checkpointer?.getTuple === 'function'
+          ? bound.checkpointer
+          : host.langchain.checkpointer();
+      const pending = async (
+        sessionId: string,
+        options?: Pick<RunRequest, 'registerRestoredData'>,
+      ): Promise<PendingInteraction | undefined> => {
         if (graph === undefined)
           throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');
         const state = await graph.getState({ configurable: { thread_id: sessionId } });
         const interrupts = state.tasks.flatMap((task) => task.interrupts);
         if (interrupts.length === 0) return undefined;
+        if (interrupts.some(({ id }) => id === undefined))
+          return readIdlessPending(
+            state.tasks,
+            sessionId,
+            checkpointer,
+            options?.registerRestoredData,
+          );
         const ids = new Set(interrupts.map(({ id }) => id));
         const interrupt = interrupts[0];
-        if (ids.size !== 1 || interrupt === undefined || !interrupt.id)
+        if (
+          ids.size !== 1 ||
+          interrupt === undefined ||
+          typeof interrupt.id !== 'string' ||
+          !interrupt.id
+        )
           throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
         const request = parseInteractionRequest(interrupt.value);
         if (request === undefined) {
@@ -139,13 +166,24 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
           let interrupted = false;
           try {
             const command = request.command;
+            const idless = command.type === 'resume' && command.interactionId.startsWith('idless:');
+            if (idless) {
+              const interaction = await pending(request.sessionId, request);
+              if (interaction === undefined || interaction.interactionId !== command.interactionId)
+                throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
+            }
             const input =
               command.type === 'start'
                 ? command.input
                 : new Command({
-                    resume: {
-                      [command.interactionId]: { action: command.action, payload: command.payload },
-                    },
+                    resume: idless
+                      ? { action: command.action, payload: command.payload }
+                      : {
+                          [command.interactionId]: {
+                            action: command.action,
+                            payload: command.payload,
+                          },
+                        },
                   });
             const source = async function* (): AsyncGenerator<unknown> {
               yield input;
@@ -180,10 +218,12 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
             }
             if (!request.signal.aborted) {
               if (interrupted) {
-                const interaction = await pending(request.sessionId);
+                const interaction = await pending(request.sessionId, request);
                 if (
                   interaction === undefined ||
-                  (command.type === 'resume' && interaction.interactionId === command.interactionId)
+                  (command.type === 'resume' &&
+                    (interaction.interactionId === command.interactionId ||
+                      (!idless && interaction.interactionId.startsWith('idless:'))))
                 )
                   throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
                 yield { type: 'interaction', interaction };
