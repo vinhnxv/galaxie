@@ -9,6 +9,7 @@
     "scripts",
     "tests/conformance/cases-pydantic-ai",
     "tests/conformance/cases-pydantic-ai-delegation",
+    "tests/conformance/cases-pydantic-ai-delegation-suite",
     "tests/conformance/cases-dspy",
     "tests/conformance/cases-adk-python"
   ],
@@ -23,6 +24,14 @@
   ],
   "exclude": ["**/build", "**/node_modules", "**/__pycache__", "**/.*"],
   "executionEnvironments": [
+    {
+      "root": "tests/conformance/cases-pydantic-ai-delegation-suite",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai-delegation-suite"]
+    },
+    {
+      "root": "scripts/record-pydantic-ai-delegation-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai-delegation-suite"]
+    },
     {
       "root": "tests/conformance/cases-pydantic-ai-delegation",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai-delegation"]

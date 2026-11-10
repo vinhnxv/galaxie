@@ -1,0 +1,22 @@
+{
+  "framework": "pydantic-ai 2.60.0",
+  "lanes": ["CPython", "Node Pyodide"],
+  "cases": [
+    {
+      "name": "delegation-reload-write",
+      "outcome": "supported",
+      "normalization": "Interaction IDs become pause-N; native reload uses serialized Conversation."
+    },
+    {
+      "name": "delegation-shared-budgets",
+      "outcome": "supported",
+      "normalization": "Native UsageLimitExceeded maps to fixed budget_exceeded."
+    },
+    {
+      "name": "delegation-nested-plain-refused",
+      "outcome": "refused",
+      "normalization": "Native reference encodes unsupported before recording a child request."
+    }
+  ],
+  "limits": "Scripted replies only. No Chromium delegation lane, child approval hoist API or child stream paths. Existing matrices remain unchanged."
+}
