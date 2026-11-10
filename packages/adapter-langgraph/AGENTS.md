@@ -64,7 +64,7 @@ The role and provider must already be declared and bound by the host.
 ## Limits
 
 Parallel interrupts, static breakpoints, ID-less interrupts and multiple
-interaction requests per node are unsupported. Context installation is
+interaction requests per node are unsupported. Use an explicit `requestInteraction` gate with continue/reject edges instead of static breakpoints, and `requestInteraction` with complete node config instead of `NodeInterrupt` or raw `GraphInterrupt` (see the [Node spike](../../spikes/static-breakpoints/README.md)). Context installation is
 first-writer-wins: Node hosts needing async LangChain context initialize real
 `AsyncLocalStorage` before the first `prepare`; the adapter preserves it.
 The synchronous shim cannot provide implicit context after an await.

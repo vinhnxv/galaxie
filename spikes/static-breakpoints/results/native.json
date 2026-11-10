@@ -1,0 +1,1329 @@
+{
+  "environment": {
+    "node": "v24.15.0",
+    "langgraph": "1.5.1",
+    "checkpoint": "1.2.0",
+    "scripted": true
+  },
+  "probes": [
+    {
+      "probe": "I1",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "shapes": [
+          {
+            "kind": "dynamic",
+            "interrupts": [
+              {
+                "id": "id-1",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "send",
+            "interrupts": [
+              {
+                "id": "id-2",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              },
+              {
+                "id": "id-3",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "dynamicChild",
+            "interrupts": [
+              {
+                "id": "id-4",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "I1",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "shapes": [
+          {
+            "kind": "dynamic",
+            "interrupts": [
+              {
+                "id": "id-1",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "send",
+            "interrupts": [
+              {
+                "id": "id-2",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              },
+              {
+                "id": "id-3",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "dynamicChild",
+            "interrupts": [
+              {
+                "id": "id-4",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "I1",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "shapes": [
+          {
+            "kind": "dynamic",
+            "interrupts": [
+              {
+                "id": "id-1",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "send",
+            "interrupts": [
+              {
+                "id": "id-2",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              },
+              {
+                "id": "id-3",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "dynamicChild",
+            "interrupts": [
+              {
+                "id": "id-4",
+                "value": {
+                  "surfaceId": "breakpoint",
+                  "viewRevision": "gate-work",
+                  "component": "spike.Breakpoint/v1",
+                  "props": {
+                    "node": "work",
+                    "kind": "before"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "I2",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "initial": [
+          {
+            "value": "m"
+          }
+        ],
+        "pendingAfterResume": [
+          {
+            "value": "m"
+          }
+        ],
+        "executions": 2,
+        "advances": false
+      }
+    },
+    {
+      "probe": "I2",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "initial": [
+          {
+            "value": "m"
+          }
+        ],
+        "pendingAfterResume": [
+          {
+            "value": "m"
+          }
+        ],
+        "executions": 2,
+        "advances": false
+      }
+    },
+    {
+      "probe": "I2",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "initial": [
+          {
+            "value": "m"
+          }
+        ],
+        "pendingAfterResume": [
+          {
+            "value": "m"
+          }
+        ],
+        "executions": 2,
+        "advances": false
+      }
+    },
+    {
+      "probe": "I3",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "initial": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "pendingAfterResume": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "executions": 2,
+        "advances": false
+      }
+    },
+    {
+      "probe": "I3",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "initial": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "pendingAfterResume": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "executions": 2,
+        "advances": false
+      }
+    },
+    {
+      "probe": "I3",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "initial": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "pendingAfterResume": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "executions": 2,
+        "advances": false
+      }
+    },
+    {
+      "probe": "I4",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "interrupts": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "reachableWithoutId": true,
+        "producer": "requestInteraction with stripped config"
+      }
+    },
+    {
+      "probe": "I4",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "interrupts": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "reachableWithoutId": true,
+        "producer": "requestInteraction with stripped config"
+      }
+    },
+    {
+      "probe": "I4",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "interrupts": [
+          {
+            "value": {
+              "surfaceId": "breakpoint",
+              "viewRevision": "gate-work",
+              "component": "spike.Breakpoint/v1",
+              "props": {
+                "node": "work",
+                "kind": "before"
+              }
+            }
+          }
+        ],
+        "reachableWithoutId": true,
+        "producer": "requestInteraction with stripped config"
+      }
+    },
+    {
+      "probe": "I5",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "result": {
+          "trace": ["gate"],
+          "visits": 0,
+          "answer": {
+            "action": "continue",
+            "payload": null
+          }
+        },
+        "counts": {
+          "gate": 2
+        },
+        "parallelBareResume": {
+          "pendingBefore": 2,
+          "result": {
+            "trace": [
+              "gate:{\"action\":\"continue\",\"payload\":null}",
+              "gate:{\"action\":\"continue\",\"payload\":null}"
+            ],
+            "visits": 0,
+            "answer": {
+              "action": "continue",
+              "payload": null
+            }
+          },
+          "counts": {
+            "gate": 4
+          },
+          "bothTasksReceiveSameAnswer": true
+        }
+      }
+    },
+    {
+      "probe": "I5",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "result": {
+          "trace": ["gate"],
+          "visits": 0,
+          "answer": {
+            "action": "continue",
+            "payload": null
+          }
+        },
+        "counts": {
+          "gate": 2
+        },
+        "parallelBareResume": {
+          "pendingBefore": 2,
+          "result": {
+            "trace": [
+              "gate:{\"action\":\"continue\",\"payload\":null}",
+              "gate:{\"action\":\"continue\",\"payload\":null}"
+            ],
+            "visits": 0,
+            "answer": {
+              "action": "continue",
+              "payload": null
+            }
+          },
+          "counts": {
+            "gate": 4
+          },
+          "bothTasksReceiveSameAnswer": true
+        }
+      }
+    },
+    {
+      "probe": "I5",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "result": {
+          "trace": ["gate"],
+          "visits": 0,
+          "answer": {
+            "action": "continue",
+            "payload": null
+          }
+        },
+        "counts": {
+          "gate": 2
+        },
+        "parallelBareResume": {
+          "pendingBefore": 2,
+          "result": {
+            "trace": [
+              "gate:{\"action\":\"continue\",\"payload\":null}",
+              "gate:{\"action\":\"continue\",\"payload\":null}"
+            ],
+            "visits": 0,
+            "answer": {
+              "action": "continue",
+              "payload": null
+            }
+          },
+          "counts": {
+            "gate": 4
+          },
+          "bothTasksReceiveSameAnswer": true
+        }
+      }
+    },
+    {
+      "probe": "I6",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "taskId": "id-1",
+        "committedResumeCount": 0,
+        "tenReadsAndReopenStable": true
+      }
+    },
+    {
+      "probe": "I6",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "taskId": "id-1",
+        "committedResumeCount": 0,
+        "tenReadsAndReopenStable": true
+      }
+    },
+    {
+      "probe": "I6",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "taskId": "id-1",
+        "committedResumeCount": 0,
+        "tenReadsAndReopenStable": true
+      }
+    },
+    {
+      "probe": "S1",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "next": ["work"],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "work",
+            "interrupts": []
+          }
+        ],
+        "counts": {
+          "prepare": 1
+        },
+        "updates": [
+          {
+            "prepare": {
+              "trace": ["prepare"],
+              "visits": 0
+            }
+          },
+          {
+            "__interrupt__": []
+          }
+        ],
+        "compiledBefore": ["work"]
+      }
+    },
+    {
+      "probe": "S1",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "next": ["work"],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "work",
+            "interrupts": []
+          }
+        ],
+        "counts": {
+          "prepare": 1
+        },
+        "updates": [
+          {
+            "prepare": {
+              "trace": ["prepare"],
+              "visits": 0
+            }
+          },
+          {
+            "__interrupt__": []
+          }
+        ],
+        "compiledBefore": ["work"]
+      }
+    },
+    {
+      "probe": "S1",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "next": ["work"],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "work",
+            "interrupts": []
+          }
+        ],
+        "counts": {
+          "prepare": 1
+        },
+        "updates": [
+          {
+            "prepare": {
+              "trace": ["prepare"],
+              "visits": 0
+            }
+          },
+          {
+            "__interrupt__": []
+          }
+        ],
+        "compiledBefore": ["work"]
+      }
+    },
+    {
+      "probe": "S2",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "next": ["work"],
+        "counts": {
+          "prepare": 1
+        },
+        "metadata": {
+          "source": "loop",
+          "step": 1,
+          "parents": {},
+          "thread_id": "native-async"
+        },
+        "parentTasks": ["prepare"],
+        "versionsSeen": {
+          "__input__": {},
+          "__start__": {
+            "__start__": 1
+          },
+          "prepare": {
+            "branch:to:prepare": 2
+          }
+        },
+        "parentSourceStable": true,
+        "versionsDifferenceSource": "Not proven without a retained parent checkpoint."
+      }
+    },
+    {
+      "probe": "S2",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "next": ["work"],
+        "counts": {
+          "prepare": 1
+        },
+        "metadata": {
+          "source": "loop",
+          "step": 1,
+          "parents": {},
+          "thread_id": "native-exit"
+        },
+        "versionsSeen": {
+          "__input__": {},
+          "__start__": {
+            "__start__": 1
+          },
+          "prepare": {
+            "branch:to:prepare": 2
+          }
+        },
+        "parentSourceStable": false,
+        "versionsDifferenceSource": "Not proven without a retained parent checkpoint."
+      }
+    },
+    {
+      "probe": "S2",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "next": ["work"],
+        "counts": {
+          "prepare": 1
+        },
+        "metadata": {
+          "source": "loop",
+          "step": 1,
+          "parents": {},
+          "thread_id": "native-sync"
+        },
+        "parentTasks": ["prepare"],
+        "versionsSeen": {
+          "__input__": {},
+          "__start__": {
+            "__start__": 1
+          },
+          "prepare": {
+            "branch:to:prepare": 2
+          }
+        },
+        "parentSourceStable": true,
+        "versionsDifferenceSource": "Not proven without a retained parent checkpoint."
+      }
+    },
+    {
+      "probe": "S3",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "continued": {
+          "trace": ["prepare", "work", "finish"],
+          "visits": 1
+        },
+        "counts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        },
+        "commands": [
+          {
+            "form": "empty-command",
+            "result": {
+              "error": "EmptyInputError"
+            },
+            "counts": {
+              "prepare": 1
+            }
+          },
+          {
+            "form": "resume-without-interrupt",
+            "result": {
+              "trace": ["prepare", "work", "finish"],
+              "visits": 1
+            },
+            "counts": {
+              "prepare": 1,
+              "work": 1,
+              "finish": 1
+            }
+          }
+        ],
+        "transformCounts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "S3",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "continued": {
+          "trace": ["prepare", "work", "finish"],
+          "visits": 1
+        },
+        "counts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        },
+        "commands": [
+          {
+            "form": "empty-command",
+            "result": {
+              "error": "EmptyInputError"
+            },
+            "counts": {
+              "prepare": 1
+            }
+          },
+          {
+            "form": "resume-without-interrupt",
+            "result": {
+              "trace": ["prepare", "work", "finish"],
+              "visits": 1
+            },
+            "counts": {
+              "prepare": 1,
+              "work": 1,
+              "finish": 1
+            }
+          }
+        ],
+        "transformCounts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "S3",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "continued": {
+          "trace": ["prepare", "work", "finish"],
+          "visits": 1
+        },
+        "counts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        },
+        "commands": [
+          {
+            "form": "empty-command",
+            "result": {
+              "error": "EmptyInputError"
+            },
+            "counts": {
+              "prepare": 1
+            }
+          },
+          {
+            "form": "resume-without-interrupt",
+            "result": {
+              "trace": ["prepare", "work", "finish"],
+              "visits": 1
+            },
+            "counts": {
+              "prepare": 1,
+              "work": 1,
+              "finish": 1
+            }
+          }
+        ],
+        "transformCounts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "S4",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "first": {
+          "checkpoint": "id-1",
+          "tasks": [
+            {
+              "id": "id-2",
+              "name": "work"
+            }
+          ],
+          "next": ["work"]
+        },
+        "second": {
+          "checkpoint": "id-3",
+          "tasks": [
+            {
+              "id": "id-4",
+              "name": "work"
+            }
+          ],
+          "next": ["work"]
+        },
+        "tenReadsAndReopenStable": true
+      }
+    },
+    {
+      "probe": "S4",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "first": {
+          "checkpoint": "id-1",
+          "tasks": [
+            {
+              "id": "id-2",
+              "name": "work"
+            }
+          ],
+          "next": ["work"]
+        },
+        "second": {
+          "checkpoint": "id-3",
+          "tasks": [
+            {
+              "id": "id-4",
+              "name": "work"
+            }
+          ],
+          "next": ["work"]
+        },
+        "tenReadsAndReopenStable": true
+      }
+    },
+    {
+      "probe": "S4",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "first": {
+          "checkpoint": "id-1",
+          "tasks": [
+            {
+              "id": "id-2",
+              "name": "work"
+            }
+          ],
+          "next": ["work"]
+        },
+        "second": {
+          "checkpoint": "id-3",
+          "tasks": [
+            {
+              "id": "id-4",
+              "name": "work"
+            }
+          ],
+          "next": ["work"]
+        },
+        "tenReadsAndReopenStable": true
+      }
+    },
+    {
+      "probe": "S5",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "counts": {
+          "prepare": 1,
+          "work": 2,
+          "finish": 1
+        },
+        "complete": true
+      }
+    },
+    {
+      "probe": "S5",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "counts": {
+          "prepare": 1,
+          "work": 2,
+          "finish": 1
+        },
+        "complete": true
+      }
+    },
+    {
+      "probe": "S5",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "counts": {
+          "prepare": 1,
+          "work": 2,
+          "finish": 1
+        },
+        "complete": true
+      }
+    },
+    {
+      "probe": "S6-fanoutBoth",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "next": ["a", "b"],
+        "matching": ["a", "b"],
+        "counts": {
+          "a": 1,
+          "b": 1
+        }
+      }
+    },
+    {
+      "probe": "S6-fanoutBoth",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "next": ["a", "b"],
+        "matching": ["a", "b"],
+        "counts": {
+          "a": 1,
+          "b": 1
+        }
+      }
+    },
+    {
+      "probe": "S6-fanoutBoth",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "next": ["a", "b"],
+        "matching": ["a", "b"],
+        "counts": {
+          "a": 1,
+          "b": 1
+        }
+      }
+    },
+    {
+      "probe": "S6-fanoutOne",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "next": ["a", "b"],
+        "matching": ["a"],
+        "counts": {
+          "a": 1,
+          "b": 1
+        }
+      }
+    },
+    {
+      "probe": "S6-fanoutOne",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "next": ["a", "b"],
+        "matching": ["a"],
+        "counts": {
+          "a": 1,
+          "b": 1
+        }
+      }
+    },
+    {
+      "probe": "S6-fanoutOne",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "next": ["a", "b"],
+        "matching": ["a"],
+        "counts": {
+          "a": 1,
+          "b": 1
+        }
+      }
+    },
+    {
+      "probe": "S7",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "compiled": "*",
+        "next": ["prepare"],
+        "hiddenTagExclusion": "Not measured."
+      }
+    },
+    {
+      "probe": "S7",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "compiled": "*",
+        "next": ["prepare"],
+        "hiddenTagExclusion": "Not measured."
+      }
+    },
+    {
+      "probe": "S7",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "compiled": "*",
+        "next": ["prepare"],
+        "hiddenTagExclusion": "Not measured."
+      }
+    },
+    {
+      "probe": "S8",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "dynamic": {
+          "id": "id-1",
+          "value": {
+            "surfaceId": "breakpoint",
+            "viewRevision": "gate-work",
+            "component": "spike.Breakpoint/v1",
+            "props": {
+              "node": "work",
+              "kind": "before"
+            }
+          }
+        },
+        "counts": {
+          "prepare": 1,
+          "gate": 2,
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "S8",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "dynamic": {
+          "id": "id-1",
+          "value": {
+            "surfaceId": "breakpoint",
+            "viewRevision": "gate-work",
+            "component": "spike.Breakpoint/v1",
+            "props": {
+              "node": "work",
+              "kind": "before"
+            }
+          }
+        },
+        "counts": {
+          "prepare": 1,
+          "gate": 2,
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "S8",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "dynamic": {
+          "id": "id-1",
+          "value": {
+            "surfaceId": "breakpoint",
+            "viewRevision": "gate-work",
+            "component": "spike.Breakpoint/v1",
+            "props": {
+              "node": "work",
+              "kind": "before"
+            }
+          }
+        },
+        "counts": {
+          "prepare": 1,
+          "gate": 2,
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "S9",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "next": ["work"],
+        "hasTaskError": true
+      }
+    },
+    {
+      "probe": "S9",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "next": ["work"],
+        "hasTaskError": true
+      }
+    },
+    {
+      "probe": "S9",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "next": ["work"],
+        "hasTaskError": true
+      }
+    },
+    {
+      "probe": "S10",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "parentNext": ["child"],
+        "childStateAvailable": true,
+        "nativeResumeCounts": {
+          "work": 1
+        },
+        "checkpointDiscovery": "Nested checkpoint identity not verified; executor refuses child pauses."
+      }
+    },
+    {
+      "probe": "S10",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "parentNext": ["child"],
+        "childStateAvailable": true,
+        "nativeResumeCounts": {
+          "work": 1
+        },
+        "checkpointDiscovery": "Nested checkpoint identity not verified; executor refuses child pauses."
+      }
+    },
+    {
+      "probe": "S10",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "parentNext": ["child"],
+        "childStateAvailable": true,
+        "nativeResumeCounts": {
+          "work": 1
+        },
+        "checkpointDiscovery": "Nested checkpoint identity not verified; executor refuses child pauses."
+      }
+    },
+    {
+      "probe": "S11",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "readableExitCheckpoint": true,
+        "nativeContinueTransformAndReopen": true
+      }
+    },
+    {
+      "probe": "S11",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "readableExitCheckpoint": true,
+        "nativeContinueTransformAndReopen": true
+      }
+    },
+    {
+      "probe": "S11",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "readableExitCheckpoint": true,
+        "nativeContinueTransformAndReopen": true
+      }
+    },
+    {
+      "probe": "S12",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "next": ["work"],
+        "compiledBefore": [],
+        "runtimeOverrideInvisible": true
+      }
+    },
+    {
+      "probe": "S12",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "next": ["work"],
+        "compiledBefore": [],
+        "runtimeOverrideInvisible": true
+      }
+    },
+    {
+      "probe": "S12",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "next": ["work"],
+        "compiledBefore": [],
+        "runtimeOverrideInvisible": true
+      }
+    }
+  ]
+}

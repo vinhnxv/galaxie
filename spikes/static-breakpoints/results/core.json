@@ -1,0 +1,1279 @@
+{
+  "environment": {
+    "node": "v24.15.0",
+    "langgraph": "1.5.1",
+    "checkpoint": "1.2.0",
+    "scripted": true
+  },
+  "C": [
+    {
+      "probe": "CI1",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "nodeInterrupt": "unsupported",
+        "rawInterrupt": "unsupported",
+        "parallelMissingIds": "unsupported"
+      }
+    },
+    {
+      "probe": "CI1",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "nodeInterrupt": "unsupported",
+        "rawInterrupt": "unsupported",
+        "parallelMissingIds": "unsupported"
+      }
+    },
+    {
+      "probe": "CI1",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "nodeInterrupt": "unsupported",
+        "rawInterrupt": "unsupported",
+        "parallelMissingIds": "unsupported"
+      }
+    },
+    {
+      "probe": "CI2",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "synthesizedPending": {
+          "surfaceId": "breakpoint",
+          "viewRevision": "gate-work",
+          "component": "spike.Breakpoint/v1",
+          "props": {
+            "node": "work",
+            "kind": "before"
+          },
+          "interactionId": "idless:id-1:0"
+        },
+        "restoredAndAppliedOnce": true,
+        "crashWindows": [
+          {
+            "fault": "beforeResume",
+            "beforeCounts": {
+              "gate": 1
+            },
+            "afterCounts": {
+              "gate": 1
+            },
+            "restoredStatus": "succeeded",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          },
+          {
+            "fault": "afterCommit",
+            "beforeCounts": {
+              "gate": 2
+            },
+            "afterCounts": {},
+            "restoredStatus": "no pending run",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          },
+          {
+            "fault": "none",
+            "beforeCounts": {
+              "gate": 2
+            },
+            "afterCounts": {},
+            "restoredStatus": "no pending run",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CI2",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "synthesizedPending": {
+          "surfaceId": "breakpoint",
+          "viewRevision": "gate-work",
+          "component": "spike.Breakpoint/v1",
+          "props": {
+            "node": "work",
+            "kind": "before"
+          },
+          "interactionId": "idless:id-1:0"
+        },
+        "restoredAndAppliedOnce": true,
+        "crashWindows": [
+          {
+            "fault": "beforeResume",
+            "beforeCounts": {
+              "gate": 1
+            },
+            "afterCounts": {
+              "gate": 1
+            },
+            "restoredStatus": "succeeded",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          },
+          {
+            "fault": "afterCommit",
+            "beforeCounts": {
+              "gate": 2
+            },
+            "afterCounts": {},
+            "restoredStatus": "no pending run",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          },
+          {
+            "fault": "none",
+            "beforeCounts": {
+              "gate": 2
+            },
+            "afterCounts": {},
+            "restoredStatus": "no pending run",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CI2",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "synthesizedPending": {
+          "surfaceId": "breakpoint",
+          "viewRevision": "gate-work",
+          "component": "spike.Breakpoint/v1",
+          "props": {
+            "node": "work",
+            "kind": "before"
+          },
+          "interactionId": "idless:id-1:0"
+        },
+        "restoredAndAppliedOnce": true,
+        "crashWindows": [
+          {
+            "fault": "beforeResume",
+            "beforeCounts": {
+              "gate": 1
+            },
+            "afterCounts": {
+              "gate": 1
+            },
+            "restoredStatus": "succeeded",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          },
+          {
+            "fault": "afterCommit",
+            "beforeCounts": {
+              "gate": 2
+            },
+            "afterCounts": {},
+            "restoredStatus": "no pending run",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          },
+          {
+            "fault": "none",
+            "beforeCounts": {
+              "gate": 2
+            },
+            "afterCounts": {},
+            "restoredStatus": "no pending run",
+            "checkpointStillPending": false,
+            "inbox": ["consumed"]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CR1",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "replacement": "explicit requestInteraction gate and conditional END edge",
+        "results": [
+          {
+            "action": "continue",
+            "counts": {
+              "gate": 1,
+              "work": 1,
+              "finish": 1
+            },
+            "crashWindows": [
+              {
+                "fault": "beforeResume",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 1
+                },
+                "afterCounts": {
+                  "gate": 1,
+                  "work": 1,
+                  "finish": 1
+                },
+                "restoredStatus": "succeeded",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "afterCommit",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2,
+                  "work": 1,
+                  "finish": 1
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "none",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2,
+                  "work": 1,
+                  "finish": 1
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              }
+            ]
+          },
+          {
+            "action": "reject",
+            "counts": {
+              "gate": 1
+            },
+            "crashWindows": [
+              {
+                "fault": "beforeResume",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 1
+                },
+                "afterCounts": {
+                  "gate": 1
+                },
+                "restoredStatus": "succeeded",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "afterCommit",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "none",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CR1",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "replacement": "explicit requestInteraction gate and conditional END edge",
+        "results": [
+          {
+            "action": "continue",
+            "counts": {
+              "gate": 1,
+              "work": 1,
+              "finish": 1
+            },
+            "crashWindows": [
+              {
+                "fault": "beforeResume",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 1
+                },
+                "afterCounts": {
+                  "gate": 1,
+                  "work": 1,
+                  "finish": 1
+                },
+                "restoredStatus": "succeeded",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "afterCommit",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2,
+                  "work": 1,
+                  "finish": 1
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "none",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2,
+                  "work": 1,
+                  "finish": 1
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              }
+            ]
+          },
+          {
+            "action": "reject",
+            "counts": {
+              "gate": 1
+            },
+            "crashWindows": [
+              {
+                "fault": "beforeResume",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 1
+                },
+                "afterCounts": {
+                  "gate": 1
+                },
+                "restoredStatus": "succeeded",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "afterCommit",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "none",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CR1",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "replacement": "explicit requestInteraction gate and conditional END edge",
+        "results": [
+          {
+            "action": "continue",
+            "counts": {
+              "gate": 1,
+              "work": 1,
+              "finish": 1
+            },
+            "crashWindows": [
+              {
+                "fault": "beforeResume",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 1
+                },
+                "afterCounts": {
+                  "gate": 1,
+                  "work": 1,
+                  "finish": 1
+                },
+                "restoredStatus": "succeeded",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "afterCommit",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2,
+                  "work": 1,
+                  "finish": 1
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "none",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2,
+                  "work": 1,
+                  "finish": 1
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              }
+            ]
+          },
+          {
+            "action": "reject",
+            "counts": {
+              "gate": 1
+            },
+            "crashWindows": [
+              {
+                "fault": "beforeResume",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 1
+                },
+                "afterCounts": {
+                  "gate": 1
+                },
+                "restoredStatus": "succeeded",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "afterCommit",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              },
+              {
+                "fault": "none",
+                "beforeCounts": {
+                  "prepare": 1,
+                  "gate": 2
+                },
+                "afterCounts": {},
+                "restoredStatus": "no pending run",
+                "checkpointStillPending": false,
+                "inbox": ["consumed"]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CR2",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "publishesResumesAndRestores": true,
+        "counts": {
+          "gate": 1
+        }
+      }
+    },
+    {
+      "probe": "CR2",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "publishesResumesAndRestores": true,
+        "counts": {
+          "gate": 1
+        }
+      }
+    },
+    {
+      "probe": "CR2",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "publishesResumesAndRestores": true,
+        "counts": {
+          "gate": 1
+        }
+      }
+    },
+    {
+      "probe": "CS1",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "pending": {
+          "interactionId": "breakpoint:before:id-1:id-2",
+          "surfaceId": "breakpoint",
+          "viewRevision": "breakpoint:before:id-1:id-2",
+          "component": "spike.Breakpoint/v1",
+          "props": {
+            "node": "work",
+            "kind": "before"
+          }
+        },
+        "valuesAndUpdatesPreserved": true
+      }
+    },
+    {
+      "probe": "CS1",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "pending": {
+          "interactionId": "breakpoint:before:id-1:id-2",
+          "surfaceId": "breakpoint",
+          "viewRevision": "breakpoint:before:id-1:id-2",
+          "component": "spike.Breakpoint/v1",
+          "props": {
+            "node": "work",
+            "kind": "before"
+          }
+        },
+        "valuesAndUpdatesPreserved": true
+      }
+    },
+    {
+      "probe": "CS1",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "pending": {
+          "interactionId": "breakpoint:before:id-1:id-2",
+          "surfaceId": "breakpoint",
+          "viewRevision": "breakpoint:before:id-1:id-2",
+          "component": "spike.Breakpoint/v1",
+          "props": {
+            "node": "work",
+            "kind": "before"
+          }
+        },
+        "valuesAndUpdatesPreserved": true
+      }
+    },
+    {
+      "probe": "CS2",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "counts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        },
+        "outputMatchesNative": true
+      }
+    },
+    {
+      "probe": "CS2",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "counts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        },
+        "outputMatchesNative": true
+      }
+    },
+    {
+      "probe": "CS2",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "counts": {
+          "prepare": 1,
+          "work": 1,
+          "finish": 1
+        },
+        "outputMatchesNative": true
+      }
+    },
+    {
+      "probe": "CS3",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "liveError": "denied",
+        "workExecutions": 0,
+        "noInboxRestoreRepublishes": true,
+        "inboxRemainsAccepted": true,
+        "restoredError": "denied",
+        "sameCheckpointPause": true,
+        "newStartPrepareExecutions": 2
+      }
+    },
+    {
+      "probe": "CS3",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "liveError": "denied",
+        "workExecutions": 0,
+        "noInboxRestoreRepublishes": true,
+        "inboxRemainsAccepted": true,
+        "restoredError": "denied",
+        "sameCheckpointPause": true,
+        "newStartPrepareExecutions": 2
+      }
+    },
+    {
+      "probe": "CS3",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "liveError": "denied",
+        "workExecutions": 0,
+        "noInboxRestoreRepublishes": true,
+        "inboxRemainsAccepted": true,
+        "restoredError": "denied",
+        "sameCheckpointPause": true,
+        "newStartPrepareExecutions": 2
+      }
+    },
+    {
+      "probe": "CS4",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "outcome": "refused",
+        "reason": "No finished-node derivation implemented across all modes.",
+        "counts": {
+          "prepare": 1
+        }
+      }
+    },
+    {
+      "probe": "CS4",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "outcome": "refused",
+        "reason": "No finished-node derivation implemented across all modes.",
+        "counts": {
+          "prepare": 1
+        }
+      }
+    },
+    {
+      "probe": "CS4",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "outcome": "refused",
+        "reason": "No finished-node derivation implemented across all modes.",
+        "counts": {
+          "prepare": 1
+        }
+      }
+    },
+    {
+      "probe": "CS5",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "identicalPending": true,
+        "oldRun": "stale",
+        "restoredAnswer": "accepted",
+        "repeatedAnswer": "duplicate",
+        "counts": {
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "CS5",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "identicalPending": true,
+        "oldRun": "stale",
+        "restoredAnswer": "accepted",
+        "repeatedAnswer": "duplicate",
+        "counts": {
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "CS5",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "identicalPending": true,
+        "oldRun": "stale",
+        "restoredAnswer": "accepted",
+        "repeatedAnswer": "duplicate",
+        "counts": {
+          "work": 1,
+          "finish": 1
+        }
+      }
+    },
+    {
+      "probe": "CS6-continue",
+      "mode": "async",
+      "pass": true,
+      "observation": [
+        {
+          "fault": "beforeResume",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {
+            "work": 1,
+            "finish": 1
+          },
+          "restoredStatus": "succeeded",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        },
+        {
+          "fault": "afterCommit",
+          "beforeCounts": {
+            "prepare": 1,
+            "work": 1,
+            "finish": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "no pending run",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        },
+        {
+          "fault": "none",
+          "beforeCounts": {
+            "prepare": 1,
+            "work": 1,
+            "finish": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "no pending run",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        }
+      ]
+    },
+    {
+      "probe": "CS6-continue",
+      "mode": "exit",
+      "pass": true,
+      "observation": [
+        {
+          "fault": "beforeResume",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {
+            "work": 1,
+            "finish": 1
+          },
+          "restoredStatus": "succeeded",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        },
+        {
+          "fault": "afterCommit",
+          "beforeCounts": {
+            "prepare": 1,
+            "work": 1,
+            "finish": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "no pending run",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        },
+        {
+          "fault": "none",
+          "beforeCounts": {
+            "prepare": 1,
+            "work": 1,
+            "finish": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "no pending run",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        }
+      ]
+    },
+    {
+      "probe": "CS6-continue",
+      "mode": "sync",
+      "pass": true,
+      "observation": [
+        {
+          "fault": "beforeResume",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {
+            "work": 1,
+            "finish": 1
+          },
+          "restoredStatus": "succeeded",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        },
+        {
+          "fault": "afterCommit",
+          "beforeCounts": {
+            "prepare": 1,
+            "work": 1,
+            "finish": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "no pending run",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        },
+        {
+          "fault": "none",
+          "beforeCounts": {
+            "prepare": 1,
+            "work": 1,
+            "finish": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "no pending run",
+          "checkpointStillPending": false,
+          "inbox": ["consumed"]
+        }
+      ]
+    },
+    {
+      "probe": "CS6-reject",
+      "mode": "async",
+      "pass": false,
+      "observation": [
+        {
+          "fault": "beforeResume",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        },
+        {
+          "fault": "afterCommit",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        },
+        {
+          "fault": "none",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        }
+      ]
+    },
+    {
+      "probe": "CS6-reject",
+      "mode": "exit",
+      "pass": false,
+      "observation": [
+        {
+          "fault": "beforeResume",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        },
+        {
+          "fault": "afterCommit",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        },
+        {
+          "fault": "none",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        }
+      ]
+    },
+    {
+      "probe": "CS6-reject",
+      "mode": "sync",
+      "pass": false,
+      "observation": [
+        {
+          "fault": "beforeResume",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        },
+        {
+          "fault": "afterCommit",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        },
+        {
+          "fault": "none",
+          "beforeCounts": {
+            "prepare": 1
+          },
+          "afterCounts": {},
+          "restoredStatus": "failed",
+          "restoredError": "denied",
+          "checkpointStillPending": true,
+          "inbox": ["accepted"]
+        }
+      ]
+    },
+    {
+      "probe": "CS7",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "wrongId": "stale",
+        "unknownAction": "invalid",
+        "nonNull": "invalid",
+        "repeated": "duplicate"
+      }
+    },
+    {
+      "probe": "CS7",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "wrongId": "stale",
+        "unknownAction": "invalid",
+        "nonNull": "invalid",
+        "repeated": "duplicate"
+      }
+    },
+    {
+      "probe": "CS7",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "wrongId": "stale",
+        "unknownAction": "invalid",
+        "nonNull": "invalid",
+        "repeated": "duplicate"
+      }
+    },
+    {
+      "probe": "CS8",
+      "mode": "async",
+      "pass": true,
+      "observation": [
+        {
+          "kind": "fanoutBoth",
+          "error": "unsupported",
+          "noPublishedPause": true
+        },
+        {
+          "kind": "child",
+          "error": "unsupported",
+          "noPublishedPause": true
+        },
+        {
+          "kind": "failing",
+          "error": "unsupported",
+          "noPublishedPause": true
+        }
+      ]
+    },
+    {
+      "probe": "CS8",
+      "mode": "exit",
+      "pass": true,
+      "observation": [
+        {
+          "kind": "fanoutBoth",
+          "error": "unsupported",
+          "noPublishedPause": true
+        },
+        {
+          "kind": "child",
+          "error": "unsupported",
+          "noPublishedPause": true
+        },
+        {
+          "kind": "failing",
+          "error": "unsupported",
+          "noPublishedPause": true
+        }
+      ]
+    },
+    {
+      "probe": "CS8",
+      "mode": "sync",
+      "pass": true,
+      "observation": [
+        {
+          "kind": "fanoutBoth",
+          "error": "unsupported",
+          "noPublishedPause": true
+        },
+        {
+          "kind": "child",
+          "error": "unsupported",
+          "noPublishedPause": true
+        },
+        {
+          "kind": "failing",
+          "error": "unsupported",
+          "noPublishedPause": true
+        }
+      ]
+    },
+    {
+      "probe": "CS9",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "ids": ["breakpoint:before:id-1:id-2", "breakpoint:before:id-3:id-4"],
+        "workExecutions": 2
+      }
+    },
+    {
+      "probe": "CS9",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "ids": ["breakpoint:before:id-1:id-2", "breakpoint:before:id-3:id-4"],
+        "workExecutions": 2
+      }
+    },
+    {
+      "probe": "CS9",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "ids": ["breakpoint:before:id-1:id-2", "breakpoint:before:id-3:id-4"],
+        "workExecutions": 2
+      }
+    },
+    {
+      "probe": "CS10",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "noCanaryInSnapshotOrInteractionEvents": true,
+        "nativeStreamsAndUnprojectedOutputContainState": true,
+        "refused": [
+          {
+            "node": "<script>",
+            "refusal": "unsupported"
+          },
+          {
+            "node": "https://evil.example",
+            "refusal": "native node-name validation before compilation"
+          },
+          {
+            "node": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "refusal": "unsupported"
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CS10",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "noCanaryInSnapshotOrInteractionEvents": true,
+        "nativeStreamsAndUnprojectedOutputContainState": true,
+        "refused": [
+          {
+            "node": "<script>",
+            "refusal": "unsupported"
+          },
+          {
+            "node": "https://evil.example",
+            "refusal": "native node-name validation before compilation"
+          },
+          {
+            "node": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "refusal": "unsupported"
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CS10",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "noCanaryInSnapshotOrInteractionEvents": true,
+        "nativeStreamsAndUnprojectedOutputContainState": true,
+        "refused": [
+          {
+            "node": "<script>",
+            "refusal": "unsupported"
+          },
+          {
+            "node": "https://evil.example",
+            "refusal": "native node-name validation before compilation"
+          },
+          {
+            "node": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "refusal": "unsupported"
+          }
+        ]
+      }
+    },
+    {
+      "probe": "CS11",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "continueDidNotApprove": true,
+        "writesBeforeApproval": 0,
+        "writesAfterApproval": 1,
+        "reusedApproval": "stale"
+      }
+    },
+    {
+      "probe": "CS11",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "continueDidNotApprove": true,
+        "writesBeforeApproval": 0,
+        "writesAfterApproval": 1,
+        "reusedApproval": "stale"
+      }
+    },
+    {
+      "probe": "CS11",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "continueDidNotApprove": true,
+        "writesBeforeApproval": 0,
+        "writesAfterApproval": 1,
+        "reusedApproval": "stale"
+      }
+    },
+    {
+      "probe": "CS12",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "registeredBeforePending": [
+          {
+            "action": "continue",
+            "payload": null
+          }
+        ],
+        "missingHook": "unsupported"
+      }
+    },
+    {
+      "probe": "CS12",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "registeredBeforePending": [
+          {
+            "action": "continue",
+            "payload": null
+          }
+        ],
+        "missingHook": "unsupported"
+      }
+    },
+    {
+      "probe": "CS12",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "registeredBeforePending": [
+          {
+            "action": "continue",
+            "payload": null
+          }
+        ],
+        "missingHook": "unsupported"
+      }
+    }
+  ]
+}

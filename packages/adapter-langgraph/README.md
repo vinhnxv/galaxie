@@ -248,7 +248,7 @@ tool-calling or injection-resistance result is claimed.
 
 See [coding guidance](AGENTS.md), [explicit context rules and parity](../../tests/conformance/README.md)
 and [runtime contracts](../../docs/system-design.md#6-core-runtime-and-contracts).
-Parallel interrupts and static breakpoints remain unsupported.
+Parallel interrupts and static breakpoints remain unsupported. Use an explicit `requestInteraction` gate with continue/reject edges instead of a static breakpoint, and use `requestInteraction` with the complete node config instead of `NodeInterrupt` or raw `GraphInterrupt`; the [Node spike](../../spikes/static-breakpoints/README.md) records the alternatives and the unshipped single-call ID-less design.
 Code is Apache-2.0 (see [LICENSE](../../LICENSE)).
 
 ## Materialized surface interrupts

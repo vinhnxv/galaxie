@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "isolatedDeclarations": false,
+    "types": ["node"],
+    "paths": {
+      "@galaxie-ai/core": ["../../packages/core/src/index.ts"],
+      "@galaxie-ai/ui-protocol": ["../../packages/ui-protocol/src/index.ts"]
+    }
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}
