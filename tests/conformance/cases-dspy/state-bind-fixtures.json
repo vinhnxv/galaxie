@@ -1,0 +1,112 @@
+{
+  "outcomeRule": "Supported only if the state-only candidate passes every detection, identical-byte replay, non-sticky rollback, legacy acceptance, old-code refusal, untouched-surface and bounded-metadata criterion in every required lane. Unmeasured counts as failed. Otherwise alternative if all unchanged fingerprint recipe cases pass, else refused. If only unrelated JSON causes an identical-byte failure, measure the Module.load candidate in all lanes before selecting alternative.",
+  "scenarios": [
+    {
+      "name": "bind-early-same",
+      "program": "state-durable-early-model",
+      "swap": "same",
+      "pauseWith": "candidate",
+      "resumeWith": "candidate",
+      "predicted": "completes",
+      "lanes": [
+        "native",
+        "node",
+        "chromium"
+      ]
+    },
+    {
+      "name": "bind-early-inert",
+      "program": "state-durable-early-model",
+      "swap": "inert",
+      "pauseWith": "candidate",
+      "resumeWith": "candidate",
+      "predicted": "unrecoverable",
+      "then": "original",
+      "lanes": [
+        "native",
+        "node",
+        "chromium"
+      ]
+    },
+    {
+      "name": "bind-late-same",
+      "program": "state-durable-late-model",
+      "swap": "same",
+      "pauseWith": "candidate",
+      "resumeWith": "candidate",
+      "predicted": "completes",
+      "lanes": [
+        "native",
+        "node",
+        "chromium"
+      ]
+    },
+    {
+      "name": "bind-late-prompt",
+      "program": "state-durable-late-model",
+      "swap": "prompt",
+      "pauseWith": "candidate",
+      "resumeWith": "candidate",
+      "predicted": "unrecoverable",
+      "then": "original",
+      "lanes": [
+        "native",
+        "node",
+        "chromium"
+      ]
+    },
+    {
+      "name": "bind-late-inert",
+      "program": "state-durable-late-model",
+      "swap": "inert",
+      "pauseWith": "candidate",
+      "resumeWith": "candidate",
+      "predicted": "unrecoverable",
+      "then": "original",
+      "lanes": [
+        "native",
+        "node",
+        "chromium"
+      ]
+    },
+    {
+      "name": "bind-early-prompt",
+      "program": "state-durable-early-model",
+      "swap": "prompt",
+      "pauseWith": "candidate",
+      "resumeWith": "candidate",
+      "predicted": "unrecoverable",
+      "then": "original",
+      "lanes": [
+        "native",
+        "node",
+        "chromium"
+      ]
+    },
+    {
+      "name": "bind-fingerprint-inert",
+      "program": "state-durable-fingerprint",
+      "swap": "inert",
+      "pauseWith": "candidate",
+      "resumeWith": "candidate",
+      "predicted": "unrecoverable",
+      "then": "original",
+      "lanes": [
+        "native"
+      ]
+    },
+    {
+      "name": "bind-legacy-late-prompt",
+      "program": "state-durable-late-model",
+      "swap": "prompt",
+      "pauseWith": "plain",
+      "resumeWith": "candidate",
+      "predicted": "completes",
+      "lanes": [
+        "native",
+        "node",
+        "chromium"
+      ]
+    }
+  ]
+}

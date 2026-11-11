@@ -840,3 +840,22 @@ Run the focused evidence without updating existing goldens:
 pnpm exec vitest run --project node packages/adapter-langgraph/test/idless.test.ts tests/conformance/idless.node.test.ts tests/conformance/idless.test.ts tests/conformance/idless-recovery.test.ts
 pnpm exec vitest run --project 'browser (chromium)' tests/conformance/idless.test.ts tests/conformance/idless-recovery.test.ts tests/conformance/indexeddb.test.ts
 ```
+
+## DSPy paused-session state binding spike
+
+The outcome rule and predictions were fixed before the Node and Chromium runs
+(2026-11-11). Supported only if the state-only candidate passes every detection, identical-byte replay, non-sticky rollback, legacy acceptance, old-code refusal, untouched-surface and bounded-metadata criterion in every required lane. Unmeasured counts as failed. Otherwise alternative if all unchanged fingerprint recipe cases pass, else refused. If only unrelated JSON causes an identical-byte failure, measure the Module.load candidate in all lanes before selecting alternative.
+
+The candidate is test-only; shipped code remains unchanged. Native baseline:
+`test_dspy_state_durable.py` and `test_dspy_durable.py`: 25 passed, matching #203.
+
+| Scenario | Prediction | Observation |
+| --- | --- | --- |
+| `bind-early-same` | completes | Pending measurement |
+| `bind-early-inert` | unrecoverable | Pending measurement |
+| `bind-late-same` | completes | Pending measurement |
+| `bind-late-prompt` | unrecoverable | Pending measurement |
+| `bind-late-inert` | unrecoverable | Pending measurement |
+| `bind-early-prompt` | unrecoverable | Pending measurement |
+| `bind-fingerprint-inert` | unrecoverable | Pending measurement |
+| `bind-legacy-late-prompt` | completes | Pending measurement |
