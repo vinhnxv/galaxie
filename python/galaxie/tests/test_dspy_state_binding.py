@@ -175,7 +175,7 @@ def test_dangling_json_link_and_walk_errors_refuse(tmp_path, monkeypatch):
     (tmp_path / 'sub').mkdir()
     (tmp_path / 'sub' / 'a.json').write_text('{}')
 
-    def denied(root, onerror=None):
+    def denied(root, onerror):
         onerror(PermissionError('denied'))
         return iter(())
 
