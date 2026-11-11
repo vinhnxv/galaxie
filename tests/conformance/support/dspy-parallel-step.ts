@@ -36,7 +36,6 @@ export interface ParallelResult {
   readonly error?: unknown;
 }
 
-/** A round opens only after every label arrives, then releases the chosen order. */
 class ReplyGates {
   readonly rounds = new Map<string, Map<string, ReturnType<typeof Promise.withResolvers<void>>>>();
   readonly order: readonly string[];
@@ -69,7 +68,6 @@ class ReplyGates {
   }
 }
 
-/** One real runtime/Worker lifetime; only the byte and recovery stores survive. */
 export async function executeDspyParallelStep(
   options: PyodideAdapterOptions,
   agent: PyodideAgent,

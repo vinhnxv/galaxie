@@ -45,7 +45,6 @@ def create_agent():
   return sources;
 }
 
-/** Independent native DSPy requests; these are computed, never golden files. */
 export async function parallelNativeReference(
   shape: 'single' | 'multi' | 'write',
   stage = 'before',
@@ -61,7 +60,6 @@ export async function parallelNativeReference(
   return JSON.parse(result.stdout) as { output: unknown; payloads: unknown[] };
 }
 
-/** Batch refusal probes share one Worker without changing the shipped executor. */
 export async function parallelGuardSources(): Promise<Record<string, string>> {
   const sources = await parallelSources('par-fan-single', true);
   sources['selected.py'] = `${header}
