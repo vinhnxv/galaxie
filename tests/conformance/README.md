@@ -1324,7 +1324,7 @@ interaction. Node additionally asserts zero Worker errors and only fixture-origi
 | `pe-embed-callable` | `executor_error`, M0, E0; missing NumPy | As predicted | As predicted |
 | `pe-embed-retriever` | `executor_error`, M0, E0; missing NumPy | As predicted | As predicted |
 | `pe-retrieve-local-rm` | `['local a', 'local b']`, M0, E0 | As predicted | As predicted |
-| `pe-retrieve-colbert` | `executor_error`, M0; native E≥1, Node E only if fetch reached | As predicted; E1 | `executor_error`, M0, E0; XMLHttpRequest reachability unmeasured |
+| `pe-retrieve-colbert` | `executor_error`, M0; native E≥1, Node E only if fetch reached | As predicted; E1 | `executor_error`, M0; E0 locally on macOS, E1 in Ubuntu CI; same fixed refusal and zero bridge requests |
 
 The schema-shape probe runs plain DSPy with a scripted schema-advertising LM,
 not through the galaxie driver. Its object schema is design input, not evidence
@@ -1343,8 +1343,9 @@ not LiteLLM. `backend_selection.select_backend` resolves `openai/gpt-4o` with
 `api_base` and a fixture credential to the native `openai-chat` provider. The
 lm15 router defaults to `StdlibAsyncTransport` under Pyodide too; it does not
 automatically choose the available `FetchTransport`. Source inspection explains
-the zero Node fetch observations. The context probe clears the predictor's LM
-inside `aforward` after prepare so the context supplies the effective LM; otherwise
+the zero Node fetch observations for the runtime LM probes. The context probe
+clears the predictor's LM inside `aforward` after prepare so the context supplies
+the effective LM; otherwise
 the placeholder wins and the probe measures the routed control instead.
 
 A provider LM bound before prepare is refused, but runtime construction is outside
@@ -1355,6 +1356,19 @@ the trusted-code limit of ADR-0018 decision 9. Explicit FetchTransport,
 XMLHttpRequest and real-service reachability are unmeasured. The Worker recorder
 installed successfully in every scenario; absent instrumentation would have made
 egress visibility unmeasured, while the fixture guard still rejects external fetch.
+
+ColBERT differs between the measured Node environments: macOS records no fetch,
+while Ubuntu CI records one rejected `127.0.0.1:9` fetch. Both end
+`executor_error` with zero model/capability requests, no unexpected target and
+clean termination. The exact transport difference remains unmeasured; the
+observation does not establish XMLHttpRequest or real-service reachability.
+The initial CI assertion wrongly required zero attempts for every scenario,
+contradicting the committed ColBERT prediction. It now accepts only zero or one
+rejected sentinel attempt for ColBERT while keeping every other scenario at zero
+and preserving all endpoint, fixed-code, bridge and cleanup assertions. This
+egress observation does not trigger the conditional refusal unit or change any
+outcome. It does trigger a drafted Worker egress design follow-up under
+ADR-0018 decision 9.
 
 The environment probe also corrects a lock/closure assumption: `httpx` is in the
 shared lock but not installed for DSPy. `requests` is present in both lanes;
@@ -1410,3 +1424,6 @@ and one opt-in measurement skipped. Read-only recorders pass: 38 DSPy
 cases, five states and seven state cases. The initial Node package assertion
 exposed the httpx prediction difference; the assertion now records the observation
 without changing the fixture. No Worker refusal fix was required.
+The first Ubuntu CI DSPy shard had 297 passing tests, one opt-in skip and one
+failure: the overly strict ColBERT attempt assertion, not a timeout. The measured
+rejected fetch is retained above rather than hidden by the correction.

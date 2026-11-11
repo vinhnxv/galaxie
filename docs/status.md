@@ -9,8 +9,12 @@ lm15 outside the router: native set/context probes each attempt one rejected
 loopback connection; Node records zero fetch attempts because the default
 transport is sockets. Both end `executor_error`. Typed signatures match plain
 DSPy without provider constraints; an invalid typed reply fails after one request.
-The host-bound RAG retrieval replacement reuses existing evidence. The Worker
-has `requests` but no `httpx`, `openai`, `litellm`, `numpy` or `faiss`. No shipped
+The host-bound RAG retrieval replacement reuses existing evidence. ColBERT records
+zero Node fetch attempts locally on macOS and one rejected loopback fetch in
+Ubuntu CI, with the same fixed failure and zero bridge requests. The exact
+transport difference is unmeasured; a Worker egress decision remains follow-up
+work under ADR-0018 decision 9. The Worker has `requests` but no `httpx`, `openai`,
+`litellm`, `numpy` or `faiss`. No shipped
 source, core contract, golden, matrix or lock changed; conditional refusal was
 unneeded. New Chromium, Firefox/WebKit probes, real services and the other
 [unmeasured shapes and predictions](../tests/conformance/README.md#dspy-provider-strings-schema-output-embeddings-and-retrievers-spike)

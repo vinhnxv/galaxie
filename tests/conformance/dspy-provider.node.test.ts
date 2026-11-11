@@ -140,8 +140,11 @@ test.each(scenarios)(
         expect(result.output).toBeUndefined();
       }
       // Diverges from P2/P3: lm15 defaults to sockets, not FetchTransport, in Pyodide too.
-      // requests/urllib3 may fail before fetch; XMLHttpRequest reachability is unmeasured.
-      if (evidence.recorder) expect(evidence.attempts).toEqual([]);
+      // P15 permits ColBERT to reach the rejecting fetch recorder; the transport varies by lane.
+      if (evidence.recorder) {
+        if (name === 'pe-retrieve-colbert') expect([0, 1]).toContain(evidence.attempts.length);
+        else expect(evidence.attempts).toEqual([]);
+      }
       clean(worker);
     } finally {
       await worker.cleanup();

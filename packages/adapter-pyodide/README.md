@@ -737,8 +737,12 @@ generation; broker grants, destination policy, budgets and labels apply there.
 `pe-retrieve-local-rm` returns bundled passages with no requests, but represents
 an author's local corpus. `pe-retrieve-colbert` ends `executor_error` without
 bridge requests; native `requests` attempts one rejected loopback connection,
-while Node records zero fetch attempts. Direct service access is outside the
-broker; this probe does not establish XMLHttpRequest reachability.
+while Node records zero fetch attempts locally on macOS and one rejected
+`127.0.0.1:9` fetch in Ubuntu CI. Both end with the same fixed code and no
+unexpected target. The exact transport difference is unmeasured. Direct service
+access is outside the broker; the Worker attempt requires a follow-up decision
+on fail-closed handling under ADR-0018 decision 9. This probe does not establish
+XMLHttpRequest reachability or real-service behavior.
 
 `pe-env-facts` finds `requests` in both lanes, `httpx` and `openai` only natively,
 and no `litellm`, `numpy` or `faiss` in either. A package being in the shared lock
