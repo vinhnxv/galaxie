@@ -111,6 +111,8 @@ def program(name: str, *, lm: Any = None, tool: Any = None, interaction: Any = N
             if name == 'par-fan-eval-loop':
                 labels = (*LABELS, 'delta')
                 answers = await self.fan('single', 'before', labels)
+                if question == 'reload':
+                    pause('evaluated')
                 scores = [float(answer == f'{label}:before') for label, answer in zip(labels, answers, strict=True)]
                 return dspy.Prediction(answers=answers, score=100 * sum(scores) / len(scores))
             shape = 'multi' if name.endswith('multi') else 'write' if name == 'par-fan-write' else 'single'

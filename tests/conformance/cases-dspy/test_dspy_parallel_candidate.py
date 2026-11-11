@@ -62,6 +62,22 @@ def test_branch_journal_restores_in_a_fresh_driver(installed, shape, order):
     assert sum(event.get('kind') == 'replayed' for event in store.events) == 1
 
 
+def test_evaluate_replacement_replays_without_model_calls(installed):
+    store = Store('reversed')
+    store.question = 'reload'
+    name = 'par-fan-eval-loop'
+    context = store.boot(name, candidate=True)
+    assert store.execute(context) == {'ok': True, 'interrupted': True}
+    before = native.pending(context)
+    requests = store.requests
+    context = store.boot(name, candidate=True)
+    assert native.pending(context) == before
+    expected, _ = native_reference(evaluate=True)
+    assert store.execute(context, before) == {'ok': True, 'output': expected}
+    assert requests == store.requests == 4
+    assert sum(event.get('kind') == 'replayed' for event in store.events) == 1
+
+
 @pytest.mark.parametrize('name', ['par-fan-write', 'par-fan-multi'])
 def test_reversed_redispatch_reuses_each_branch_receipt(installed, name):
     store = Store('forward')

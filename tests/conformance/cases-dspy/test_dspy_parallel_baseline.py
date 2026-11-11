@@ -43,6 +43,7 @@ class Store(native.Store):
     def __init__(self, order='forward'):
         super().__init__()
         self.order = order
+        self.question = 'fan-out'
         self.model_labels = []
         self.model_payloads = []
         self.arrivals = []
@@ -135,7 +136,7 @@ class Store(native.Store):
         self._owner = asyncio.current_task()
         assert self._owner is not None
         existing = asyncio.all_tasks()
-        context['_galaxie_input'] = json.dumps({'threadId': 'session', 'steps': 50, **({'input': {'question': 'fan-out'}} if pending is None else {'resume': {'interactionId': pending['id'], 'action': 'continue', 'payload': 'continue'}})})
+        context['_galaxie_input'] = json.dumps({'threadId': 'session', 'steps': 50, **({'input': {'question': self.question}} if pending is None else {'resume': {'interactionId': pending['id'], 'action': 'continue', 'payload': 'continue'}})})
         result = json.loads(await context['_galaxie_execute']())
         self._terminated = True
         executor = context['_galaxie_executor']
@@ -254,6 +255,26 @@ def test_fan_out_matches_native_dspy_before_replay(name, shape, order):
 def test_async_evaluate_reference_matches_native_evaluate(threads):
     reference, _ = native_reference(evaluate=True, threads=threads)
     assert reference == {'answers': [f'{label}:before' for label in (*LABELS, 'delta')], 'score': 100.0}
+
+
+def test_shipped_evaluate_replacement_records_reload_outcome():
+    store = Store('reversed')
+    store.question = 'reload'
+    name = 'par-fan-eval-loop'
+    context = store.boot(name)
+    assert store.execute(context) == {'ok': True, 'interrupted': True}
+    before = native.pending(context)
+    requests = store.requests
+    context = store.boot(name)
+    assert native.pending(context) == before
+    result = store.execute(context, before)
+    print(json.dumps({'scenario': name, 'result': result, 'resumeRequests': store.requests - requests}, sort_keys=True))
+    if result['ok']:
+        expected, _ = native_reference(evaluate=True)
+        assert result == {'ok': True, 'output': expected}
+    else:
+        assert result == {'ok': False, 'code': 'unrecoverable'}
+    assert store.requests == requests
 
 
 def test_shipped_pause_inside_branch_leaves_a_sibling_until_harness_cleanup():
