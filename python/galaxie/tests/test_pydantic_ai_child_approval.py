@@ -314,6 +314,38 @@ def test_two_parallel_delegate_pauses_are_refused_before_interaction_factory():
     assert writes(seen) == []
 
 
+def test_child_call_sharing_a_parent_pending_id_is_refused_before_publish():
+    parent_writes = []
+
+    def save(value: int) -> str:
+        parent_writes.append(value)
+        return 'parent-saved'
+
+    def reply(message, seen, response):
+        if message['op'] == 'model' and message['payload']['role'] == 'parent' and response.get('toolCalls'):
+            response['toolCalls'].append(call('save', 'save', '{"value":2}'))
+        return response
+
+    def flat(requests):
+        # Lists only the parent's own approvals, so the parent call 'save' mimics the child's call.
+        return {
+            'surfaceId': 'main', 'viewRevision': 'approval-1', 'component': 'tests.Approval/v1',
+            'props': {'calls': [
+                {'id': part.tool_call_id, 'name': part.tool_name, 'arguments': part.args_as_json_str()}
+                for part in requests.approvals
+            ]},
+        }
+
+    executor, seen, _ = scenario(
+        interaction=flat, reply=reply, parent_tools=[Tool(save, name='save', requires_approval=True)],
+    )
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run({'prompt': 'parent'}, 'fixed', 8))
+    assert error.value.code == 'unsupported'
+    assert executor.pending('fixed') is None
+    assert writes(seen) == parent_writes == []
+
+
 def test_parent_gate_beside_delegate_shares_one_all_or_nothing_approval():
     parent_writes = []
 

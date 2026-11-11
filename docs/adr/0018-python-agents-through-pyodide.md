@@ -178,8 +178,12 @@ With `hoist_approvals=True`, the executor owns the reserved
 128 KiB child-state bound, positional child identity, author key and pending-call
 consistency at publication, restore and re-entry. The child must have exactly one
 approval and no external calls; duplicate call IDs and nested hoist metadata are
-refused. A plain sibling tool's return may follow the pending response without
-being replayed. Validation failures use fixed, content-free `unsupported`,
+refused. A child pending call ID must differ from every parent
+pending ID, so the parent's own call can never stand in for the child's in the display
+check. A plain sibling tool's return may follow the pending response without being
+replayed; a sibling that returns extra user content (`ToolReturn` with `content`) adds
+a part this check does not accept, so that shape fails closed `unsupported` after the
+sibling ran, and the run is lost. Validation failures use fixed, content-free `unsupported`,
 `unrecoverable` and `invalid` errors at those respective boundaries.
 
 The interaction factory reads `hoisted_child_requests(requests)`. Its props must

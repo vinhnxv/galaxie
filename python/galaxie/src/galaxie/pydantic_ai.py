@@ -441,6 +441,11 @@ def _hoisted_children(
             if identifier not in approvals or children:
                 raise ValueError()
             child = _child_payload(metadata[_CHILD_APPROVAL])
+            child_requests = child.conversation.deferred_tool_requests
+            assert child_requests is not None
+            # A shared call id would let the parent's own call satisfy the display check for the child's.
+            if child_requests.approvals[0].tool_call_id in {call.tool_call_id for call in requests.calls + requests.approvals}:
+                raise ValueError()
             if parent is not None and messages is not None:
                 position, part = _pending_position(messages, base, identifier)
                 if child.entry['identity'] != _child_identity(parent, position, part, child.entry['key']):

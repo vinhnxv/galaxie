@@ -306,6 +306,9 @@ Interaction and resume callbacks receive copies of requests. A resume callback
 that adds reserved child metadata to a call without a validated hoist fails
 `invalid`.
 
+A child pending call ID that equals a pending ID of the parent fails `unsupported`.
+A plain child sibling tool that returns extra user content (`ToolReturn` with `content`)
+is also refused after it ran, because its trailing request is not an accepted shape.
 A pause supports one hoisted child with exactly one pending approval and no
 external calls. Several hoisted children, several child approvals, `CallDeferred`
 child calls, nested hoists and child state over 128 KiB fail `unsupported` without
