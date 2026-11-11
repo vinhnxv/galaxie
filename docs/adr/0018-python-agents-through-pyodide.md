@@ -14,6 +14,7 @@
   2026-10-31: recorded DSPy 3.4.1 custom engines, checked streaming, deterministic replay and durable journals, plus the fourth RAG executor; automated evidence plus a mock-only hands-on Chrome check.
   2026-11-04: recorded Google ADK Python 2.12.0 as the fifth Python executor option (`adk-python`), with its agent-shape and credential-scan evidence in [ADR-0022](0022-google-adk-python-through-the-pyodide-adapter.md); status stays Proposed.
   2026-11-10: recorded tool-less pydantic-ai NativeOutput with routed schemas and bounded repair, and the prepare-time refusal of provider-specific settings; status stays Proposed.
+  2026-11-11: pinned `subgraphs: false` for delegating pydantic-ai agents with tests citing probe S1, and measured delegation and child approval in headless Chromium; status stays Proposed.
   2026-11-11: recorded scripted delegation, helper identity, public nested-run guard and hoisted approval/restore probes; child stream paths remain absent and status stays Proposed.
   2026-11-11: recorded the outcome of the pydantic-ai builtin and native tools spike; status stays Proposed.
   2026-11-11: added the public delegation helper, fail-closed nested-run guard, per-child repair accounting and scripted changed-ID recovery evidence; status stays Proposed.
@@ -132,7 +133,7 @@ every pydantic-ai bump, including the public message and tool run-ID checks.
 | --- | --- | --- |
 | Delegation without child pauses | Supported through `run_child`; plain nested runs refused | The helper shares usage and limits, derives distinct positional child identity and isolates each child's native repair counter. Three new CPython/Node Pyodide conformance cases cover a write after approval reload, shared step budgets and `unsupported` before a plain child reaches the bridge. Exact token, cost and tool-call budget probes include child work. |
 | Child pause propagation | Supported through `run_child(..., hoist_approvals=True)` | One child with one pending approval and no external calls pauses the parent. The executor preserves and validates its state and requires the child call in display props. Scripted approve, reject and fresh-Worker restore match independent native references; see the [child approval evidence](../../tests/conformance/README.md#pydantic-ai-child-approval-hoist). |
-| Subgraphs flag and stream paths | Refused | There are no host child stream events or paths. `run_child` is non-streaming, plain child streams are refused, and `subgraphs` remains false. |
+| Subgraphs flag and stream paths | Refused | Probe S1 is pinned by Python wire-notification tests, the adapter driver empty-path tripwire and Node D1 stream assertions. There are no host child stream events or paths. `run_child` is non-streaming, plain child streams are refused, and `subgraphs` remains false, also measured on prepared delegating adapters in Chromium. |
 
 Child conversation identity hashes a domain tag, parent conversation ID, message
 position, part index and helper key. It excludes the provider's tool-call ID.
@@ -215,8 +216,12 @@ usage and maps `UsageLimitExceeded` to `budget_exceeded`; the refusal reference
 encodes the adapter limit before recording a child request. Node-only probes
 assert receipt replay, exact effect IDs and repair indices. Existing goldens,
 matrices, locks and core contracts are unchanged. The probes use Node memory-backed
-byte checkpoints and recovery. Chromium delegation, real providers, arbitrary
-mid-run continuation and general nested checkpoint semantics remain unmeasured.
+byte checkpoints and recovery. The six delegation and child-approval cases also
+match their existing goldens in headless Chromium, with both real page reloads
+reopening scoped IndexedDB and preserving one write overall; the
+[Chromium results](../../tests/conformance/README.md#chromium-results) record the
+per-case observations. Firefox, WebKit, real providers, arbitrary mid-run
+continuation and general nested checkpoint semantics remain unmeasured.
 The JavaScript entry size budget covers neither the Python wheel nor the adapter.
 
 ### pydantic-ai NativeOutput and model-settings spike (2026-11)

@@ -11,6 +11,16 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { lockedWheels } from '../../../packages/adapter-pyodide/src/runtime-files.js';
 import { pydanticCases } from '../../../tests/conformance/support/pydantic-ai.js';
 import {
+  childApprovalCases,
+  joinChildApprovalTranscripts,
+} from '../../../tests/conformance/support/pydantic-ai-child-approval-conformance.js';
+import { childApprovalSuiteSources } from '../../../tests/conformance/support/pydantic-ai-child-approval-suite-sources.node.js';
+import {
+  delegationCases,
+  joinDelegationTranscripts,
+} from '../../../tests/conformance/support/pydantic-ai-delegation-conformance.js';
+import { delegationSuiteSources } from '../../../tests/conformance/support/pydantic-ai-delegation-suite-sources.node.js';
+import {
   joinPydanticReload,
   type PydanticReloadResult,
   type PydanticReloadStep,
@@ -18,6 +28,7 @@ import {
 } from '../../../tests/conformance/support/pydantic-ai-restore.js';
 import { pydanticSources } from '../../../tests/conformance/support/pydantic-ai-sources.node.js';
 import { cspHeader } from '../src/host/csp.js';
+import type { SuiteResult } from './support/pydantic-ai-conformance/suites.js';
 import { missingPythonWheels, pythonWheelsAvailable } from './support/python.node.js';
 
 type BrowserReloadStep = PydanticReloadStep & {
@@ -42,6 +53,7 @@ describe.skipIf(!pythonWheelsAvailable)(
     let browser: Browser | undefined;
     let origin: string;
     let pageLoads = 0;
+    let suiteLoads = 0;
     const header = cspHeader('mock');
     beforeAll(async () => {
       directory = await mkdtemp(join(tmpdir(), 'galaxie-pydantic-conformance-'));
@@ -59,6 +71,20 @@ describe.skipIf(!pythonWheelsAvailable)(
           name,
           files: await pydanticSources(name),
         })),
+      );
+      sources.push(
+        ...(await Promise.all(
+          delegationCases.map(async (name) => ({
+            name,
+            files: await delegationSuiteSources(name),
+          })),
+        )),
+        ...(await Promise.all(
+          childApprovalCases.map(async (name) => ({
+            name,
+            files: await childApprovalSuiteSources([name]),
+          })),
+        )),
       );
       const extraWheels = await Promise.all(
         lockedWheels
@@ -127,7 +153,7 @@ describe.skipIf(!pythonWheelsAvailable)(
         throw new Error('The conformance preview has no port.');
       origin = `http://127.0.0.1:${address.port}`;
       browser = await chromium.launch({ headless: true });
-    }, 120000);
+    }, 900000);
     afterAll(async () => {
       try {
         await browser?.close();
@@ -147,6 +173,7 @@ describe.skipIf(!pythonWheelsAvailable)(
         2 + 3 * 3 + 10,
       );
       expect(pageLoads).toBeLessThanOrEqual(pydanticCases.length + reloadPageLimit);
+      expect(suiteLoads).toBeLessThanOrEqual(8);
     });
     test.each(pydanticCases)(
       'Chromium matches native pydantic-ai requests and output: %s',
@@ -194,6 +221,133 @@ describe.skipIf(!pythonWheelsAvailable)(
         }
       },
       90000,
+    );
+
+    async function suiteScenario(
+      suite: 'delegation' | 'child-approval',
+      name: string,
+      reload: boolean,
+    ): Promise<void> {
+      if (!browser) throw new Error('The conformance browser is missing.');
+      const context = await browser.newContext({ serviceWorkers: 'block' });
+      const external: string[] = [];
+      const headers: string[] = [];
+      const pageErrors: string[] = [];
+      const results: SuiteResult[] = [];
+      const started = performance.now();
+      let loads = 0;
+      try {
+        await context.route('**/*', (route) => {
+          if (new URL(route.request().url()).origin === origin) return route.continue();
+          external.push(route.request().url());
+          return route.abort();
+        });
+        context.on('response', (response) =>
+          headers.push(response.headers()['content-security-policy'] ?? ''),
+        );
+        const page = await context.newPage();
+        page.on('pageerror', (error) => pageErrors.push(error.message));
+        const observe = async (sessionId?: string): Promise<SuiteResult> => {
+          if (++loads > (reload ? 2 : 1))
+            throw new Error('The suite fixture exceeded its page-load bound.');
+          suiteLoads++;
+          if (sessionId === undefined) await page.goto(`${origin}/?suite=${suite}&case=${name}`);
+          else {
+            await page.evaluate(
+              (value) => sessionStorage.setItem('pydanticSuiteStep', JSON.stringify(value)),
+              { sessionId },
+            );
+            await page.reload();
+          }
+          await page.waitForFunction(
+            () => Reflect.get(globalThis, 'pydanticConformance')?.done,
+            undefined,
+            { timeout: 600000 },
+          );
+          const result = await page.evaluate(() => Reflect.get(globalThis, 'pydanticConformance'));
+          expect(result.error).toBeUndefined();
+          expect(result.violations).toEqual([]);
+          expect(result.workerErrors).toEqual([]);
+          const observed = result.suite as SuiteResult;
+          expect(observed.suite).toBe(suite);
+          expect(observed.case).toBe(name);
+          expect(observed.workers).toEqual({ created: 1, terminated: 1 });
+          expect(observed.lifetime.streams.events).toBeGreaterThan(0);
+          expect(observed.lifetime.streams.nonEmptyPaths).toBe(0);
+          expect(observed.subgraphs).toBe(false);
+          results.push(observed);
+          return observed;
+        };
+        const first = await observe();
+        if (reload) {
+          expect(first.lifetime.pending).toBeDefined();
+          expect(first.effects).toBe(0);
+          const second = await observe(first.lifetime.sessionId);
+          expect(second.lifetime.restored).toEqual(first.lifetime.pending);
+          expect(second.lifetime.pending).toBeUndefined();
+          expect(results.map((value) => value.lifetime.writes)).toEqual([0, 1]);
+        }
+        const transcripts = results.map((value) => value.lifetime.transcript);
+        const transcript =
+          suite === 'delegation'
+            ? joinDelegationTranscripts(transcripts)
+            : joinChildApprovalTranscripts(transcripts);
+        expect(transcript).toEqual(
+          JSON.parse(
+            await readFile(
+              new URL(
+                `../../../tests/conformance/golden-pydantic-ai-${suite}/${name}.json`,
+                import.meta.url,
+              ),
+              'utf8',
+            ),
+          ),
+        );
+        const bridge = results.flatMap((value) => value.bridge);
+        const writes = bridge.filter((value) => value.op === 'capability');
+        const expectedWrites = reload || name === 'child-approval-approve' ? 1 : 0;
+        expect(results.at(-1)?.effects).toBe(expectedWrites);
+        expect(writes).toHaveLength(expectedWrites);
+        if (suite === 'child-approval') {
+          expect(bridge.filter((value) => value.op === 'model').map((value) => value.role)).toEqual(
+            name === 'child-approval-reject'
+              ? ['parent', 'child', 'parent']
+              : ['parent', 'child', 'child', 'parent'],
+          );
+          if (expectedWrites)
+            expect(writes[0]?.effectScope).toMatch(/^pydantic-ai\/[0-9a-f]{64}\/\d+\/\d+$/);
+        }
+        if (name === 'delegation-nested-plain-refused')
+          expect(bridge.some((value) => value.role === 'child')).toBe(false);
+        expect(pageErrors).toEqual([]);
+        expect(external).toEqual([]);
+        expect(headers.length).toBeGreaterThan(0);
+        expect(headers.every((value) => value === header)).toBe(true);
+        console.info(
+          `Chromium ${name}: ${Math.round(performance.now() - started)} ms, ${loads} loads`,
+        );
+      } finally {
+        await context.close();
+      }
+    }
+
+    test.each([
+      ['delegation', 'delegation-shared-budgets'],
+      ['delegation', 'delegation-nested-plain-refused'],
+      ['child-approval', 'child-approval-approve'],
+      ['child-approval', 'child-approval-reject'],
+    ] as const)(
+      'Chromium delegation suite matches native in one lifetime: %s / %s',
+      async (suite, name) => suiteScenario(suite, name, false),
+      900000,
+    );
+    test.each([
+      ['delegation', 'delegation-reload-write'],
+      ['child-approval', 'child-approval-restore'],
+    ] as const)(
+      'Chromium delegation suite matches native across page reload: %s / %s',
+      async (suite, name) => suiteScenario(suite, name, true),
+      900000,
     );
 
     async function reloadScenario(

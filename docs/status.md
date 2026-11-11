@@ -80,9 +80,12 @@ approvals, external calls, nested hoists and child state over 128 KiB are refuse
 Only one hoisting child may run per tool body; a second is refused before its own
 work, though the first approved child may already have written. Other author
 metadata stays unvalidated, snapshots remain unauthenticated and `subgraphs`
-stays false. Browser delegation, real providers, general nested checkpoints and
-Node crash-after-write replay of a hoisted resume remain unmeasured. Existing
-goldens, matrices and locks are unchanged. No size budget covers the Python wheel
+stays false (probe S1), pinned by Python wire tests, a driver tripwire and Node
+stream assertions. All six delegation and child-approval cases now match their
+existing goldens in headless Chromium, including both real page reloads with
+reopened scoped IndexedDB and one write overall. Firefox, WebKit, real providers,
+general nested checkpoints and Node crash-after-write replay of a hoisted resume
+remain unmeasured. Existing goldens, matrices and locks are unchanged. No size budget covers the Python wheel
 or adapter. See the [delegation guidance](../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
 and [child approval evidence](../tests/conformance/README.md#pydantic-ai-child-approval-hoist).
 
