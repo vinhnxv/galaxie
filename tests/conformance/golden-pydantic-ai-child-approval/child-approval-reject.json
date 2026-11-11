@@ -43,9 +43,7 @@
                   "type": "integer"
                 }
               },
-              "required": [
-                "value"
-              ],
+              "required": ["value"],
               "additionalProperties": false
             }
           }
