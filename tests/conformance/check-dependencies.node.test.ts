@@ -181,6 +181,8 @@ test.each(['browser', 'ownership', 'invalidation'])(
     expect(indirect.status).toBe(1);
     expect(indirect.output).toContain('packages/core/src/helper.ts: main-entry modules must not');
   },
+  // Five CLI scans each cold-load TypeScript; shared CI runners can exceed the default budget.
+  60000,
 );
 
 test('the browser entry composes ownership and invalidation modules', () => {
