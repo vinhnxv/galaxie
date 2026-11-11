@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import json
 import math
+import os
 import re
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import aclosing
@@ -29,17 +30,22 @@ _STATE_BINDING = 'stateBinding'
 def state_binding(root: str | Path) -> str | None:
     """Bind descriptor JSON paths and Python-visible bytes against accidental swaps."""
     root = Path(root)
+
+    def fail(error: OSError) -> None:
+        raise error
+
     try:
         entries = sorted(
             [path.relative_to(root).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest()]
-            for path in root.rglob('*')
-            if path.is_file() and path.suffix == '.json' and '__pycache__' not in path.relative_to(root).parts
-        ) if root.is_dir() else []
-    except OSError:
+            for directory, names, files in (os.walk(root, onerror=fail) if root.is_dir() else ())
+            for path in (Path(directory, name) for name in files)
+            if path.suffix == '.json' and '__pycache__' not in path.relative_to(root).parts
+        )
+        if not entries:
+            return None
+        return hashlib.sha256(json.dumps(entries, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')).hexdigest()
+    except (OSError, UnicodeEncodeError):
         raise GalaxieError('unsupported') from None
-    if not entries:
-        return None
-    return hashlib.sha256(json.dumps(entries, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')).hexdigest()
 
 
 class _LMError(dspy.LMError):

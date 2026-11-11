@@ -3,6 +3,7 @@
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 import dspy
@@ -162,3 +163,23 @@ def test_completed_and_unrecoverable_metadata_stays_unbound():
         checkpoint, failed_metadata = executor._snapshot('c', 'session')
         assert json.loads(checkpoint)['status'] == 'unrecoverable'
         assert failed_metadata == metadata
+
+
+def test_dangling_json_link_and_walk_errors_refuse(tmp_path, monkeypatch):
+    (tmp_path / 'dangling.json').symlink_to(tmp_path / 'missing-target')
+    with pytest.raises(GalaxieError) as link:
+        state_binding(tmp_path)
+    assert link.value.code == 'unsupported'
+
+    (tmp_path / 'dangling.json').unlink()
+    (tmp_path / 'sub').mkdir()
+    (tmp_path / 'sub' / 'a.json').write_text('{}')
+
+    def denied(root, onerror=None):
+        onerror(PermissionError('denied'))
+        return iter(())
+
+    monkeypatch.setattr(os, 'walk', denied)
+    with pytest.raises(GalaxieError) as walk:
+        state_binding(tmp_path)
+    assert walk.value.code == 'unsupported'
