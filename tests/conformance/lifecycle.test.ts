@@ -26,6 +26,7 @@ import {
   transact,
 } from '../../packages/storage-indexeddb/src/schema.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 
 const appId = 'lifecycle-conformance';
@@ -129,7 +130,7 @@ test('the real adapter maps a marked checkpoint write failure to unrecoverable',
   vi.spyOn(saver, 'put').mockRejectedValue(failure);
   const { instance, diagnostics } = await fixture(saver);
   const { runId } = await instance.start({});
-  await vi.waitFor(() => expect(instance.getSnapshot().run?.status).toBe('failed'));
+  await waitForRunStatus(instance, 'failed');
   expect(instance.getSnapshot().run?.error?.code).toBe('unrecoverable');
   expect(JSON.stringify(instance.getSnapshot())).not.toContain('private-checkpoint-canary');
   const errors = [];
@@ -153,7 +154,7 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const saver = await open(name);
     const first = await fixture(saver, saver.recovery);
     await first.instance.start({});
-    await vi.waitFor(() => expect(first.instance.getSnapshot().run?.status).toBe('waiting_input'));
+    await waitForRunStatus(first.instance, 'waiting_input');
     const sessionId = first.instance.sessionId;
     await first.runtime.dispose();
     saver.close();
@@ -198,7 +199,7 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const saver = await open(name);
     const first = await fixture(saver, saver.recovery);
     await first.instance.start({});
-    await vi.waitFor(() => expect(first.instance.getSnapshot().run?.status).toBe('waiting_input'));
+    await waitForRunStatus(first.instance, 'waiting_input');
     const sessionId = first.instance.sessionId;
     await first.runtime.dispose();
     saver.close();

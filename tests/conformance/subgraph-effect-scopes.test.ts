@@ -17,6 +17,7 @@ import { expect, onTestFinished, test } from 'vitest';
 import { z } from 'zod';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 
 test.each(['task-scopes', 'restore'] as const)(
@@ -142,7 +143,7 @@ test.each(['task-scopes', 'restore'] as const)(
     };
     let fixture = await create();
     await fixture.instance.start({});
-    await expect.poll(() => fixture.instance.getSnapshot().run?.status).toBe('waiting_input');
+    await waitForRunStatus(fixture.instance, 'waiting_input');
     expect(writes).toHaveLength(mode === 'restore' ? 1 : 3);
     const firstReceipts = receipts.slice();
     const firstPending = fixture.instance.getSnapshot().run?.pending;
@@ -172,7 +173,7 @@ test.each(['task-scopes', 'restore'] as const)(
     };
     await submit();
     if (mode === 'task-scopes') {
-      await expect.poll(() => fixture.instance.getSnapshot().run?.status).toBe('waiting_input');
+      await waitForRunStatus(fixture.instance, 'waiting_input');
       expect(fixture.instance.getSnapshot().run?.pending?.interactionId).not.toBe(
         firstPending?.interactionId,
       );
@@ -180,7 +181,7 @@ test.each(['task-scopes', 'restore'] as const)(
       expect(receipts.slice(3, 6)).toEqual(firstReceipts);
       await submit();
     }
-    await expect.poll(() => fixture.instance.getSnapshot().run?.status).toBe('succeeded');
+    await waitForRunStatus(fixture.instance, 'succeeded');
     if (mode === 'restore') {
       expect(parentBodies).toBe(2);
       expect(writes).toHaveLength(1);

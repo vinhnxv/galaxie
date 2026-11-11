@@ -22,6 +22,7 @@ import { expect, onTestFinished, test } from 'vitest';
 import { z } from 'zod';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 import type { ConformanceGraph } from './support/transcript.js';
 
@@ -151,7 +152,7 @@ async function fixture(missing: 'not-applied' | 'unknown' | 'throws') {
   };
   const first = await create();
   await first.instance.start({});
-  await expect.poll(() => first.instance.getSnapshot().run?.status).toBe('waiting_input');
+  await waitForRunStatus(first.instance, 'waiting_input');
   const run = first.instance.getSnapshot().run;
   if (run?.pending === undefined) throw new Error('Expected a pending write interaction.');
   expect(
@@ -191,7 +192,7 @@ test('replays an applied write after reload without invoking it again', async ()
   const output = { saved: 'already applied' };
   lane.backend.set(lane.effectId, output);
   const restored = await lane.reload();
-  await expect.poll(() => restored.instance.getSnapshot().run?.status).toBe('succeeded');
+  await waitForRunStatus(restored.instance, 'succeeded');
   expect(restored.writes).toHaveLength(0);
   await restored.runtime.dispose();
   const state = await restored.graph.getState({ configurable: { thread_id: lane.sessionId } });
@@ -202,7 +203,7 @@ test('replays an applied write after reload without invoking it again', async ()
 test('invokes a write once under its original effect ID when it was not applied', async () => {
   const lane = await fixture('not-applied');
   const restored = await lane.reload();
-  await expect.poll(() => restored.instance.getSnapshot().run?.status).toBe('succeeded');
+  await waitForRunStatus(restored.instance, 'succeeded');
   expect(restored.writes).toHaveLength(1);
   expect(restored.writes[0]?.effectId).toBe(lane.effectId);
   await restored.runtime.dispose();
@@ -215,7 +216,7 @@ test('invokes a write once under its original effect ID when it was not applied'
 test('keeps an unknown write blocked until a later reload finds its result', async () => {
   const lane = await fixture('unknown');
   const unresolved = await lane.reload();
-  await expect.poll(() => unresolved.instance.getSnapshot().run?.status).toBe('failed');
+  await waitForRunStatus(unresolved.instance, 'failed');
   expect(unresolved.instance.getSnapshot().run?.error?.code).toBe('outcome_unknown');
   expect(unresolved.writes).toHaveLength(0);
   expect(await lane.receipt()).toMatchObject({ status: 'outcome_unknown' });
@@ -223,7 +224,7 @@ test('keeps an unknown write blocked until a later reload finds its result', asy
   const output = { saved: 'settled later' };
   lane.backend.set(lane.effectId, output);
   const settled = await lane.reload();
-  await expect.poll(() => settled.instance.getSnapshot().run?.status).toBe('succeeded');
+  await waitForRunStatus(settled.instance, 'succeeded');
   expect(settled.writes).toHaveLength(0);
   await settled.runtime.dispose();
   const state = await settled.graph.getState({ configurable: { thread_id: lane.sessionId } });
@@ -234,7 +235,7 @@ test('keeps an unknown write blocked until a later reload finds its result', asy
 test('keeps a write outcome unknown when reconciliation throws after reload', async () => {
   const lane = await fixture('throws');
   const restored = await lane.reload();
-  await expect.poll(() => restored.instance.getSnapshot().run?.status).toBe('failed');
+  await waitForRunStatus(restored.instance, 'failed');
   expect(restored.instance.getSnapshot().run?.error?.code).toBe('outcome_unknown');
   expect(restored.writes).toHaveLength(0);
   expect(await lane.receipt()).toMatchObject({ status: 'outcome_unknown' });

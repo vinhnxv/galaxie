@@ -19,6 +19,7 @@ import { collect } from '../../packages/core/test/fake-executor.js';
 import { createSpanRecorder, serializeSpans } from '../../packages/core/test/span-tree.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import { FakeOpenAIFetch } from '../../packages/models/test/support/fake-openai-fetch.js';
+import { waitForRunStatus } from './support/run-status.js';
 
 function serialize(value: unknown): string {
   return JSON.stringify(value, (_key, item: unknown) => {
@@ -275,7 +276,7 @@ test.each(['success', '401', 'transport-error'] as const)(
     onTestFinished(unsubscribe);
     await instance.prepare();
     const { runId } = await instance.start({});
-    await expect.poll(() => instance.getSnapshot().run?.status).toBe('waiting_input');
+    await waitForRunStatus(instance, 'waiting_input');
     expect(requests).toHaveLength(1);
     const pausedRecords = saver === undefined ? [] : await storedRecords();
     expect(serialize(pausedRecords)).not.toContain(canary);
