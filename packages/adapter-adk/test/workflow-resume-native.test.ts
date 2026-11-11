@@ -107,6 +107,7 @@ async function measure(
   let stopped = false;
   let serial = 0;
   const turns = new Map<string, number>();
+  const rightFinished = Promise.withResolvers<void>();
   class Scripted extends BaseLlm {
     readonly tag: string;
     constructor(tag: string) {
@@ -125,7 +126,9 @@ async function measure(
       });
       const turn = turns.get(tag) ?? 0;
       turns.set(tag, turn + 1);
-      if (shape.rightFirst && tag === 'left' && turn === 0) await delay(25);
+      if (shape.rightFirst && tag === 'left' && turn === 0) await rightFinished.promise;
+      if (shape.rightFirst && tag === 'right' && turn > 0)
+        setTimeout(() => rightFinished.resolve(), 0);
       const call =
         tag === 'parent'
           ? { name: 'transfer_to_agent', args: { agent_name: 'child' } }

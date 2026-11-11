@@ -165,6 +165,7 @@ async function life(
   const scopes: string[] = [];
   let muted = false;
   const turns = new Map<string, number>();
+  const rightFinished = Promise.withResolvers<void>();
   const reply: Reply = async (seen) => {
     const tag =
       /role=(\w+);/.exec(
@@ -178,13 +179,16 @@ async function life(
       (message) => message.type === 'tool' && message.name === `save_${tag}`,
     ).length;
     if (options.crash && answered > 0) throw new Error('Scripted failure after approved write.');
-    if (shape.rightFirst && tag === 'left') await sleep(25);
+    if (shape.rightFirst && tag === 'left') await rightFinished.promise;
+    if (shape.rightFirst && tag === 'right' && answered > 0)
+      setTimeout(() => rightFinished.resolve(), 0);
     const call =
       tag === 'parent'
         ? { name: 'transfer_to_agent', args: { agent_name: 'child' } }
         : shape.paused.includes(tag) && answered < (shape.twice ? 2 : 1)
           ? { name: `save_${tag}`, args: { q: tag } }
-          : tag === 'writer' && turn % 2 === 0
+          : (tag === 'writer' && turn % 2 === 0) ||
+              (tag === 'right' && turn === 0 && !shape.paused.includes(tag))
             ? { name: `save_${tag}`, args: { q: tag } }
             : undefined;
     return call === undefined
@@ -376,6 +380,10 @@ test.each([...shapes, { id: 'solo', tree: 'solo', paused: ['solo'] } as Shape])(
           const last = first.at(-1);
           expect(last?.type === 'error' ? last.error.code : undefined).toBe('unsupported');
           expect(first.some((event) => event.type === 'interaction')).toBe(false);
+          if (shape.rightFirst) {
+            expect(l.writes).toEqual(['right']);
+            expect(l.requests).toEqual(['left', 'right', 'right']);
+          }
           const before = [...l.writes];
           await sleep(45);
           expect(l.writes).toEqual(before);
