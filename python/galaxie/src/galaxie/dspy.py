@@ -864,6 +864,8 @@ class Executor:
 
 
 def prepare_executor(value: Any, *, state_binding: str | None = None) -> Executor:
+    if state_binding is not None and (type(state_binding) is not str or re.fullmatch('[0-9a-f]{64}', state_binding) is None):
+        raise GalaxieError('unsupported')
     if isinstance(value, Executor):
         _validate(value.module, value.adapter, value.lm)
     elif isinstance(value, dspy.Module):

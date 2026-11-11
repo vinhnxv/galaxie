@@ -112,6 +112,17 @@ def test_equal_and_legacy_metadata_restore(binding):
     assert restored.pending('c') == original.pending('c')
 
 
+@pytest.mark.parametrize('binding', ['', 'invalid', DIGEST.upper(), DIGEST[:-1], DIGEST + '0', 7])
+def test_invalid_preparation_binding_cannot_publish_or_replace_a_bound_session(binding):
+    executor = paused(DIGEST)
+    before = executor._snapshot('c', 'session')
+    for value in [Program(), executor]:
+        with pytest.raises(GalaxieError) as error:
+            prepare_executor(value, state_binding=binding)
+        assert error.value.code == 'unsupported'
+    assert executor._snapshot('c', 'session') == before
+
+
 @pytest.mark.parametrize('mutation', ['wrong', 'uppercase', 'short', 'long', 'number', 'null', 'completed', 'unrecoverable', 'no-manifest', 'extra'])
 def test_invalid_binding_never_replaces_or_registers_a_session(mutation):
     checkpoint, metadata = paused(DIGEST)._snapshot('c', 'session')
