@@ -108,6 +108,16 @@ probe.each(['helper'])(
       Array.from({ length: 4 }, () => ({ input_tokens: 2, output_tokens: 2, total_tokens: 4 })),
     );
     expect(result.subgraphs).toBe(false);
+    // Probe S1: delegation exposes only parent streams until child paths are stable.
+    const streams = result.events.filter((event) => event.type === 'stream');
+    expect(streams.length).toBeGreaterThan(0);
+    for (const event of streams) {
+      expect(event.path).toEqual([]);
+      expect(event.executor).toBe('pydantic-ai-python');
+    }
+    expect(JSON.stringify(streams)).not.toContain('child-');
+    // Routed child replies still pass output safety before returning to Python.
+    expect(result.checks.some((text) => text.includes('child-'))).toBe(true);
     expect(
       result.bridge
         .filter((message) => message.op === 'model')
