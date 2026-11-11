@@ -71,11 +71,20 @@ approval reload, shared step budgets and nested-run refusal. A scripted changed-
 recovery probe preserves the helper's child scope and effect ID and writes once;
 the ID-sensitive control writes twice. Real-provider ID regeneration remains
 unmeasured. Sequential native children start at repair indices `[0, 0]`, including
-with no repair allowance. Child-approval hoisting remains probe-local, outer
-snapshots do not validate author-owned child metadata, and `subgraphs` stays false.
-Browser delegation, real providers and general nested checkpoints remain
-unmeasured. Existing goldens, matrices and locks are unchanged. No size budget
-covers the Python wheel or adapter. See the [evidence and author guidance](../tests/conformance/README.md#pydantic-ai-agent-delegation-probes).
+with no repair allowance. Opt-in `run_child(..., hoist_approvals=True)` now carries
+one child's approval through the parent pause and reload. The executor validates
+its reserved metadata and requires the child's call in display props. Three new
+CPython/Node Pyodide cases cover approve, reject and restore: approved cases write
+once; rejection writes nothing. Several hoisted children per pause, several child
+approvals, external calls, nested hoists and child state over 128 KiB are refused.
+Only one hoisting child may run per tool body; a second is refused before its own
+work, though the first approved child may already have written. Other author
+metadata stays unvalidated, snapshots remain unauthenticated and `subgraphs`
+stays false. Browser delegation, real providers, general nested checkpoints and
+Node crash-after-write replay of a hoisted resume remain unmeasured. Existing
+goldens, matrices and locks are unchanged. No size budget covers the Python wheel
+or adapter. See the [delegation guidance](../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
+and [child approval evidence](../tests/conformance/README.md#pydantic-ai-child-approval-hoist).
 
 On 2026-11-11, pydantic-ai builtin and native tool probes recorded refusal for
 all ten native kinds, dynamic tools and native response parts. Static tools and
