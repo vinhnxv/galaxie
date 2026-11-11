@@ -832,7 +832,7 @@ already folded into graph state are outside latest-pending-write registration;
 core registers accepted inbox payloads when recovery is configured. Second pauses
 inside body-invoked children, repeated child pauses, loop revisits, real models and
 Python ID-less behavior are unmeasured. Firefox and WebKit have CI report gates
-only. See [author guidance and limits](../../packages/adapter-langgraph/README.md#id-less-interrupts).
+only. See [author guidance and limits](../../packages/adapter-langgraph/README.md#id-less-interrupts). The [pause-time discriminator spike](../../spikes/langgraph-nodeinterrupt-pause-time/README.md) records **alternative**: P7/P8 break strict parsing or stream parity, P9/P10 lose restore signals, and P12 verifies the complete-config `requestInteraction` replacement; shipped behavior is unchanged.
 
 Run the focused evidence without updating existing goldens:
 

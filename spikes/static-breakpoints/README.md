@@ -16,6 +16,8 @@ shasum -a 256 spikes/static-breakpoints/results/*.json
 
 Run the last three commands twice: the formatted evidence must be byte-identical. UUID/hash IDs are normalized to first-appearance labels within each observation. Use `exec vitest run <file>` for focused runs; pnpm 11's `test -- <file>` can select sibling tests. The spike has its own workspace and lock, so root install and CI do not install or run it.
 
+The follow-up [NodeInterrupt pause-time discriminator spike](../langgraph-nodeinterrupt-pause-time/README.md) records **alternative** (P7/P8 parsing or parity failures, P9/P10 lost restore signals, P12 replacement); shipped behavior is unchanged.
+
 ## Results
 
 Recorded on 2026-11-10 with Node v24.15.0 and pnpm 11.21.0, on the maintainer's macOS host. These are deterministic scripted observations, not device performance measurements.

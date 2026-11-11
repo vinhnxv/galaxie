@@ -341,7 +341,7 @@ distinguished from the supported shape at pause time: it publishes once and ends
 publication. With recovery, the raw-request answer remains accepted; restore
 retries and fails again. After a second call in one node is refused, restore fails
 with `executor_error`, leaving the accepted entry intact. Replace these forms with
-`requestInteraction`; use one request per node.
+`requestInteraction`; use one request per node. The [pause-time discriminator spike](../../spikes/langgraph-nodeinterrupt-pause-time/README.md) records **alternative**: P7/P8 break strict parsing or stream parity, P9/P10 lose restore signals, and P12 verifies the complete-config `requestInteraction` replacement; shipped behavior is unchanged.
 
 Every resume value in the latest checkpoint's pending writes is registered through
 `registerRestoredData` before an ID-less pending read returns or resume starts.

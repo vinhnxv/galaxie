@@ -1,0 +1,4754 @@
+{
+  "environment": {
+    "node": "v24.15.0",
+    "langgraph": "1.5.1",
+    "core": "1.2.20",
+    "checkpoint": "1.2.0",
+    "scripted": true
+  },
+  "probes": [
+    {
+      "probe": "criteria",
+      "mode": "async",
+      "pass": false,
+      "observation": [
+        {
+          "candidate": "D1",
+          "criteria": {
+            "C1": {
+              "pass": true,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": false,
+              "status": "fail",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": false,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D2",
+          "criteria": {
+            "C1": {
+              "pass": true,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": true,
+              "status": "pass",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": false,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D3",
+          "criteria": {
+            "C1": {
+              "pass": false,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": true,
+              "status": "pass",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": true,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D4",
+          "criteria": {
+            "C1": {
+              "pass": false,
+              "evidence": "P10"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": false,
+              "status": "unmeasured",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": true,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": false,
+              "evidence": "P10: private construction heuristic"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        }
+      ]
+    },
+    {
+      "probe": "criteria",
+      "mode": "exit",
+      "pass": false,
+      "observation": [
+        {
+          "candidate": "D1",
+          "criteria": {
+            "C1": {
+              "pass": true,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": false,
+              "status": "fail",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": false,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D2",
+          "criteria": {
+            "C1": {
+              "pass": true,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": true,
+              "status": "pass",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": false,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D3",
+          "criteria": {
+            "C1": {
+              "pass": false,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": true,
+              "status": "pass",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": true,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D4",
+          "criteria": {
+            "C1": {
+              "pass": false,
+              "evidence": "P10"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": false,
+              "status": "unmeasured",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": true,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": false,
+              "evidence": "P10: private construction heuristic"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        }
+      ]
+    },
+    {
+      "probe": "criteria",
+      "mode": "sync",
+      "pass": false,
+      "observation": [
+        {
+          "candidate": "D1",
+          "criteria": {
+            "C1": {
+              "pass": true,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": false,
+              "status": "fail",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": false,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D2",
+          "criteria": {
+            "C1": {
+              "pass": true,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": true,
+              "status": "pass",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": false,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D3",
+          "criteria": {
+            "C1": {
+              "pass": false,
+              "evidence": "P7/P8/P9/P13"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": true,
+              "status": "pass",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": true,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": true,
+              "evidence": "Public interrupt/responseSchema/error APIs at locked 1.5.1 and 1.2.20; other peer patch versions unmeasured"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        },
+        {
+          "candidate": "D4",
+          "criteria": {
+            "C1": {
+              "pass": false,
+              "evidence": "P10"
+            },
+            "C2": {
+              "pass": true,
+              "evidence": "P2/P3; unmarked thrown requests"
+            },
+            "C3": {
+              "pass": false,
+              "status": "unmeasured",
+              "evidence": "P11: actual publication, first-answer failure, no applied answer, retained inbox through unmodified core"
+            },
+            "C4": {
+              "pass": true,
+              "evidence": "P7/P8/P9 vs P4; P14 ID-bearing control"
+            },
+            "C5": {
+              "pass": true,
+              "evidence": "Constant markers, observer records name/keys/booleans only, fixed unsupported refusal; no spans or logs added"
+            },
+            "C6": {
+              "pass": false,
+              "evidence": "P10: private construction heuristic"
+            },
+            "C7": {
+              "pass": false,
+              "evidence": "P14: existing documented unmarked helper checkpoint would be refused"
+            }
+          },
+          "pass": false
+        }
+      ]
+    },
+    {
+      "probe": "P1",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P1",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P1",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P2",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "NodeInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P2",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "NodeInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P2",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "NodeInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P3",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P3",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P3",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P4",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P4",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P4",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "chunks": [
+          {
+            "__interrupt__": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "observer": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "tasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "pendingWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ],
+        "reopenedTasks": [
+          {
+            "id": "id-1",
+            "name": "gate",
+            "path": ["__pregel_pull", "gate"],
+            "interrupts": [
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "reversedWrites": [
+          [
+            "id-1",
+            "__interrupt__",
+            {
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Continue?"
+                }
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "probe": "P6",
+      "mode": "async",
+      "pass": false,
+      "observation": [
+        {
+          "shape": "nodeInterruptRequest",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "differs",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        },
+        {
+          "shape": "rawGraphInterrupt",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "differs",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        },
+        {
+          "shape": "rawInterruptCall",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "identical",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        }
+      ]
+    },
+    {
+      "probe": "P6",
+      "mode": "exit",
+      "pass": false,
+      "observation": [
+        {
+          "shape": "nodeInterruptRequest",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "differs",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        },
+        {
+          "shape": "rawGraphInterrupt",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "differs",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        },
+        {
+          "shape": "rawInterruptCall",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "identical",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        }
+      ]
+    },
+    {
+      "probe": "P6",
+      "mode": "sync",
+      "pass": false,
+      "observation": [
+        {
+          "shape": "nodeInterruptRequest",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "differs",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        },
+        {
+          "shape": "rawGraphInterrupt",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "differs",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        },
+        {
+          "shape": "rawInterruptCall",
+          "surfaces": {
+            "chunks": "identical",
+            "observer": "identical",
+            "tasks": "identical",
+            "pendingWrites": "identical",
+            "reopenedTasks": "identical",
+            "reversedWrites": "identical"
+          }
+        }
+      ]
+    },
+    {
+      "probe": "P7",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "candidate": "D1",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": true,
+        "strictValue": false,
+        "streamMatchesBare": false,
+        "observerMarks": [false, false],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P7",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "candidate": "D1",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": true,
+        "strictValue": false,
+        "streamMatchesBare": false,
+        "observerMarks": [false, false],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P7",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "candidate": "D1",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    },
+                    "__galaxie": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": true,
+        "strictValue": false,
+        "streamMatchesBare": false,
+        "observerMarks": [false, false],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P8",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "candidate": "D2",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value", "response_schema"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value", "response_schema"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": true,
+        "strictValue": true,
+        "streamMatchesBare": false,
+        "observerMarks": [false, false],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P8",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "candidate": "D2",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value", "response_schema"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value", "response_schema"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": true,
+        "strictValue": true,
+        "streamMatchesBare": false,
+        "observerMarks": [false, false],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P8",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "candidate": "D2",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value", "response_schema"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": false,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value", "response_schema"],
+                  "marked": false,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  },
+                  "response_schema": {
+                    "type": "object",
+                    "$comment": "galaxie.requestInteraction/v1"
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": true,
+        "strictValue": true,
+        "streamMatchesBare": false,
+        "observerMarks": [false, false],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P9",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "candidate": "D3",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": true,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": true,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": true,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": true,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": false,
+        "strictValue": true,
+        "streamMatchesBare": true,
+        "observerMarks": [true, true],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P9",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "candidate": "D3",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": true,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": true,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": true,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": true,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": false,
+        "strictValue": true,
+        "streamMatchesBare": true,
+        "observerMarks": [true, true],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P9",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "candidate": "D3",
+        "surfaces": {
+          "chunks": [
+            {
+              "__interrupt__": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "observer": [
+            {
+              "name": "GraphInterrupt",
+              "marked": true,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": true,
+                  "sameAsStream": true
+                }
+              ]
+            },
+            {
+              "name": "GraphInterrupt",
+              "marked": true,
+              "interrupts": [
+                {
+                  "ownId": true,
+                  "keys": ["id", "value"],
+                  "marked": true,
+                  "sameAsStream": true
+                }
+              ]
+            }
+          ],
+          "tasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          ],
+          "reopenedTasks": [
+            {
+              "id": "id-1",
+              "name": "gate",
+              "path": ["__pregel_pull", "gate"],
+              "interrupts": [
+                {
+                  "value": {
+                    "surfaceId": "main",
+                    "viewRevision": "r1",
+                    "component": "conformance.Question/v1",
+                    "props": {
+                      "question": "Continue?"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "reversedWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                }
+              }
+            ]
+          ]
+        },
+        "live": true,
+        "persisted": false,
+        "strictValue": true,
+        "streamMatchesBare": true,
+        "observerMarks": [true, true],
+        "snapshotMark": false,
+        "uniqueObservedInterrupts": 1,
+        "interruptingRootTasks": 1,
+        "resumed": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        }
+      }
+    },
+    {
+      "probe": "P10",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "helper": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "node": [
+          {
+            "name": "NodeInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "raw": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "liveHelper": true,
+        "liveNode": false,
+        "liveRaw": false,
+        "restoredHelper": false,
+        "privateShapeDependency": "The own undefined id key and error name are construction details, not a persisted helper-origin contract."
+      }
+    },
+    {
+      "probe": "P10",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "helper": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "node": [
+          {
+            "name": "NodeInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "raw": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "liveHelper": true,
+        "liveNode": false,
+        "liveRaw": false,
+        "restoredHelper": false,
+        "privateShapeDependency": "The own undefined id key and error name are construction details, not a persisted helper-origin contract."
+      }
+    },
+    {
+      "probe": "P10",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "helper": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          },
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": true,
+                "keys": ["id", "value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "node": [
+          {
+            "name": "NodeInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "raw": [
+          {
+            "name": "GraphInterrupt",
+            "marked": false,
+            "interrupts": [
+              {
+                "ownId": false,
+                "keys": ["value"],
+                "marked": false,
+                "sameAsStream": true
+              }
+            ]
+          }
+        ],
+        "liveHelper": true,
+        "liveNode": false,
+        "liveRaw": false,
+        "restoredHelper": false,
+        "privateShapeDependency": "The own undefined id key and error name are construction details, not a persisted helper-origin contract."
+      }
+    },
+    {
+      "probe": "P11",
+      "mode": "async",
+      "pass": false,
+      "observation": {
+        "forged": [
+          {
+            "candidate": "D1",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 0,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": []
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": []
+              }
+            }
+          },
+          {
+            "candidate": "D1",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 0,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": []
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": []
+              }
+            }
+          },
+          {
+            "candidate": "D2",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D2",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D3",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D3",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          }
+        ],
+        "scope": "Native graph and a narrow spike-local protocol witness through unmodified core; D1 fails the required one-publication behavior."
+      }
+    },
+    {
+      "probe": "P11",
+      "mode": "exit",
+      "pass": false,
+      "observation": {
+        "forged": [
+          {
+            "candidate": "D1",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 0,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": []
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": []
+              }
+            }
+          },
+          {
+            "candidate": "D1",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 0,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": []
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": []
+              }
+            }
+          },
+          {
+            "candidate": "D2",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D2",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D3",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D3",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          }
+        ],
+        "scope": "Native graph and a narrow spike-local protocol witness through unmodified core; D1 fails the required one-publication behavior."
+      }
+    },
+    {
+      "probe": "P11",
+      "mode": "sync",
+      "pass": false,
+      "observation": {
+        "forged": [
+          {
+            "candidate": "D1",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 0,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": []
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": []
+              }
+            }
+          },
+          {
+            "candidate": "D1",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 0,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": []
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": []
+              }
+            }
+          },
+          {
+            "candidate": "D2",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D2",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 1,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D3",
+            "shape": "nodeInterruptRequest",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          },
+          {
+            "candidate": "D3",
+            "shape": "rawGraphInterrupt",
+            "nativeCounts": {
+              "gate": 2,
+              "effects": 0
+            },
+            "protocol": {
+              "live": {
+                "published": 1,
+                "status": "failed",
+                "error": {
+                  "code": "unsupported",
+                  "message": "This operation is unsupported."
+                },
+                "counts": {
+                  "gate": 2,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              },
+              "restored": {
+                "error": {
+                  "code": "executor_error",
+                  "message": "The executor or agent code failed."
+                },
+                "counts": {
+                  "gate": 0,
+                  "effects": 0
+                },
+                "inbox": ["accepted"]
+              }
+            }
+          }
+        ],
+        "scope": "Native graph and a narrow spike-local protocol witness through unmodified core; D1 fails the required one-publication behavior."
+      }
+    },
+    {
+      "probe": "P12",
+      "mode": "async",
+      "pass": true,
+      "observation": {
+        "idBearing": true,
+        "request": {
+          "surfaceId": "main",
+          "viewRevision": "r1",
+          "component": "conformance.Question/v1",
+          "props": {
+            "question": "Continue?"
+          }
+        },
+        "liveResult": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        },
+        "restoredOutput": {
+          "answer": {
+            "action": "submit",
+            "payload": {
+              "answer": "yes"
+            }
+          }
+        },
+        "restoredCounts": {
+          "gate": 1,
+          "effects": 1
+        },
+        "samePauseAfterReopen": true,
+        "protocol": {
+          "live": {
+            "published": 1,
+            "status": "succeeded",
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            },
+            "inbox": ["consumed"]
+          },
+          "restored": {
+            "status": "succeeded",
+            "counts": {
+              "gate": 1,
+              "effects": 1
+            },
+            "inbox": ["consumed"]
+          }
+        }
+      }
+    },
+    {
+      "probe": "P12",
+      "mode": "exit",
+      "pass": true,
+      "observation": {
+        "idBearing": true,
+        "request": {
+          "surfaceId": "main",
+          "viewRevision": "r1",
+          "component": "conformance.Question/v1",
+          "props": {
+            "question": "Continue?"
+          }
+        },
+        "liveResult": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        },
+        "restoredOutput": {
+          "answer": {
+            "action": "submit",
+            "payload": {
+              "answer": "yes"
+            }
+          }
+        },
+        "restoredCounts": {
+          "gate": 1,
+          "effects": 1
+        },
+        "samePauseAfterReopen": true,
+        "protocol": {
+          "live": {
+            "published": 1,
+            "status": "succeeded",
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            },
+            "inbox": ["consumed"]
+          },
+          "restored": {
+            "status": "succeeded",
+            "counts": {
+              "gate": 1,
+              "effects": 1
+            },
+            "inbox": ["consumed"]
+          }
+        }
+      }
+    },
+    {
+      "probe": "P12",
+      "mode": "sync",
+      "pass": true,
+      "observation": {
+        "idBearing": true,
+        "request": {
+          "surfaceId": "main",
+          "viewRevision": "r1",
+          "component": "conformance.Question/v1",
+          "props": {
+            "question": "Continue?"
+          }
+        },
+        "liveResult": {
+          "output": {
+            "answer": {
+              "action": "submit",
+              "payload": {
+                "answer": "yes"
+              }
+            }
+          },
+          "counts": {
+            "gate": 2,
+            "effects": 1
+          }
+        },
+        "restoredOutput": {
+          "answer": {
+            "action": "submit",
+            "payload": {
+              "answer": "yes"
+            }
+          }
+        },
+        "restoredCounts": {
+          "gate": 1,
+          "effects": 1
+        },
+        "samePauseAfterReopen": true,
+        "protocol": {
+          "live": {
+            "published": 1,
+            "status": "succeeded",
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            },
+            "inbox": ["consumed"]
+          },
+          "restored": {
+            "status": "succeeded",
+            "counts": {
+              "gate": 1,
+              "effects": 1
+            },
+            "inbox": ["consumed"]
+          }
+        }
+      }
+    },
+    {
+      "probe": "P13",
+      "mode": "async",
+      "pass": true,
+      "observation": [
+        {
+          "candidate": "D1",
+          "inOrder": true,
+          "reversed": true,
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        {
+          "candidate": "D2",
+          "inOrder": true,
+          "reversed": true,
+          "pendingWrites": [
+            [
+              "id-2",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "probe": "P13",
+      "mode": "exit",
+      "pass": true,
+      "observation": [
+        {
+          "candidate": "D1",
+          "inOrder": true,
+          "reversed": true,
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        {
+          "candidate": "D2",
+          "inOrder": true,
+          "reversed": true,
+          "pendingWrites": [
+            [
+              "id-2",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "probe": "P13",
+      "mode": "sync",
+      "pass": true,
+      "observation": [
+        {
+          "candidate": "D1",
+          "inOrder": true,
+          "reversed": true,
+          "pendingWrites": [
+            [
+              "id-1",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  },
+                  "__galaxie": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        },
+        {
+          "candidate": "D2",
+          "inOrder": true,
+          "reversed": true,
+          "pendingWrites": [
+            [
+              "id-2",
+              "__interrupt__",
+              {
+                "value": {
+                  "surfaceId": "main",
+                  "viewRevision": "r1",
+                  "component": "conformance.Question/v1",
+                  "props": {
+                    "question": "Continue?"
+                  }
+                },
+                "response_schema": {
+                  "type": "object",
+                  "$comment": "galaxie.requestInteraction/v1"
+                }
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "probe": "P14",
+      "mode": "async",
+      "pass": false,
+      "observation": [
+        {
+          "candidate": "D1",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D2",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D3",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D4",
+          "rawIdlessInterrupt": "preserved live; refused on restore",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "probe": "P14",
+      "mode": "exit",
+      "pass": false,
+      "observation": [
+        {
+          "candidate": "D1",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D2",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D3",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D4",
+          "rawIdlessInterrupt": "preserved live; refused on restore",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "probe": "P14",
+      "mode": "sync",
+      "pass": false,
+      "observation": [
+        {
+          "candidate": "D1",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D2",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D3",
+          "rawIdlessInterrupt": "refused (undocumented fallback; accepted trade-off)",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        },
+        {
+          "candidate": "D4",
+          "rawIdlessInterrupt": "preserved live; refused on restore",
+          "existingUnmarkedHelperCheckpoint": "refused (documented restore shape; fails criterion)",
+          "idBearing": "unchanged",
+          "bearingResume": {
+            "output": {
+              "answer": {
+                "action": "submit",
+                "payload": {
+                  "answer": "yes"
+                }
+              }
+            },
+            "counts": {
+              "gate": 2,
+              "effects": 1
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

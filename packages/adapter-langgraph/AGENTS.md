@@ -68,7 +68,7 @@ Parallel interrupts and multiple interaction requests per node are unsupported.
 One strict ID-less request on a root checkpoint task is supported, including the
 measured body-invoked child with no child namespace; compiled child namespaces are
 refused. Exact valid NodeInterrupt/raw GraphInterrupt requests publish once and
-fail unsupported on the first answer. See [ID-less interrupts](README.md#id-less-interrupts)
+fail unsupported on the first answer. The [pause-time discriminator spike](../../spikes/langgraph-nodeinterrupt-pause-time/README.md) records **alternative**: P7/P8 break strict parsing or stream parity, P9/P10 lose restore signals, and P12 verifies the complete-config `requestInteraction` replacement; shipped behavior is unchanged. See [ID-less interrupts](README.md#id-less-interrupts)
 for recovery registration and unmeasured repeated child pauses and loop revisits. Prepare refuses compiled `interruptBefore` and `interruptAfter`
 on the graph, `graph.config` and discoverable compiled subgraphs, including
 unreachable breakpoints. Enumeration failures also fail `unsupported`. An override
