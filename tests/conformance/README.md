@@ -1274,3 +1274,139 @@ git diff --name-status main
 Focused results: native runtime 15 passed; native DSPy regression 304 passed;
 Node runtime 15 passed; existing Node suites 125 passed and one opt-in measurement
 skipped. Both recorder checks pass (38 cases; five states and seven state cases).
+
+
+## DSPy provider strings, schema output, embeddings and retrievers spike
+
+The 2026-11-11 spike records **alternative** for provider-string LMs,
+**alternative** for native provider schema output, **refused** for embeddings and
+**alternative** for service retrievers. No verbatim API gains new shipped support.
+The [author recipes](../../packages/adapter-pyodide/README.md#provider-strings-schema-output-embeddings-and-retrievers)
+state the host mapping, weaker typed-output guarantee and capability replacement.
+No core contract change is needed. Shipped source, existing fixtures, recorders,
+goldens, matrices and locks remain byte-identical; the conditional refusal unit
+did not fire.
+
+The [fixture](cases-dspy/provider-fixtures.json) fixes the rule and predictions in
+commit `12d3a13`, before native or Node measurement. Support requires every named
+verbatim member to complete with native output/payload parity in both required
+lanes, using the router and broker. Otherwise an alternative requires tidy refusal
+or explicitly recorded outside-bridge behavior, plus a measured replacement in
+both lanes that delivers the goal with its changed guarantee stated. Without that
+replacement the outcome is refused; unmeasured criteria fail. Rejected egress is
+an informational trusted-code finding, not a refusal failure. A Worker hang,
+silent success, non-fixed code, late request or Worker error would trigger the
+conditional refusal procedure before assigning an outcome.
+
+New evidence uses DSPy **3.4.1**, CPython **3.14.5**, Node **24.15.0**, Pyodide
+**314.0.7** and scripted replies only. Native programs run through the real DSPy
+driver; the Node lane uses one fresh Worker per scenario and the existing reload
+runner. Model replies are the constant `done` answer. `M` counts model requests,
+`E` counts rejected egress attempts. Every driver scenario has zero capability
+requests, zero residual tasks, zero requests after termination and no pending
+interaction. Node additionally asserts zero Worker errors and only fixture-origin
+`/python/` requests. Neither recorder forwards I/O; every target is
+`127.0.0.1:9`. No real credential is used.
+
+| Scenario | Prediction (immutable fixture) | Native observation | Node observation |
+| --- | --- | --- | --- |
+| `pe-control-routed` | `done`, M1, E0, plain-DSPy parity | As predicted; output and payload parity | As predicted; output and payload parity |
+| `pe-env-facts` | NumPy/FAISS/LiteLLM absent; OpenAI native only; requests/httpx both lanes | As predicted | **Diverges:** httpx absent; remaining facts match |
+| `pe-lm-runtime-set` | `executor_error`, M0, E≥1 | As predicted; E1 | **Diverges:** same code, M0, E0; default socket transport |
+| `pe-lm-runtime-context` | `executor_error`, M0, E≥1 | As predicted; E1 | **Diverges:** same code, M0, E0; default socket transport |
+| `pe-lm-runtime-nokey` | `executor_error`, M0, E0 | As predicted | As predicted |
+| `pe-lm-kwargs` | `unsupported`, M0, E0 | As predicted | As predicted |
+| `pe-schema-response-format` | `unsupported`, M0, E0 | As predicted | As predicted |
+| `pe-schema-typed-ok` | `done`, M1, parity, no `jsonSchema` | As predicted; E0 | As predicted; E0 |
+| `pe-schema-typed-violation` | Fixed non-success after M1, no retry | `executor_error`, M1, E0 | `executor_error`, M1, E0 |
+| `pe-schema-candidate-shape` | Typed object schema; open mapping `json_object` | Normalized `dict` with `type: json_schema`, inner object schema; mapping `{'type': 'json_object'}` | Unmeasured (native-only) |
+| `pe-embed-hosted-string` | `executor_error`, M0, E0; missing LiteLLM | As predicted | As predicted |
+| `pe-embed-callable` | `executor_error`, M0, E0; missing NumPy | As predicted | As predicted |
+| `pe-embed-retriever` | `executor_error`, M0, E0; missing NumPy | As predicted | As predicted |
+| `pe-retrieve-local-rm` | `['local a', 'local b']`, M0, E0 | As predicted | As predicted |
+| `pe-retrieve-colbert` | `executor_error`, M0; native E≥1, Node E only if fetch reached | As predicted; E1 | `executor_error`, M0, E0; XMLHttpRequest reachability unmeasured |
+
+The schema-shape probe runs plain DSPy with a scripted schema-advertising LM,
+not through the galaxie driver. Its object schema is design input, not evidence
+that galaxie forwards a provider constraint. Native and Node parity references
+compare outputs and model payloads for the routed control and typed-literal case.
+
+| Gap | Outcome | Deciding evidence and replacement |
+| --- | --- | --- |
+| Provider-string LMs | **alternative** | Existing `refused-lm` at prepare plus the three new runtime-LM probes; `pe-control-routed` and `pe-lm-kwargs` prove role mapping and host-owned model configuration on native/Node. |
+| Native provider schema output | **alternative** | `pe-schema-response-format` refuses; typed success/violation and existing `json-adapter`/`parse-failure` prove Python-side validation on native/Node, without provider-constrained decoding. Mapping the router feature remains implementation work. |
+| Embeddings | **refused** | All three `pe-embed-*` shapes fail in both lanes; `pe-env-facts` shows missing dependencies and no measured vector replacement. Router roles are text/decision only. |
+| Service retrievers | **alternative** | `pe-retrieve-colbert` ends outside the broker; native/Node RAG regression proves host-bound `docs.search@1` plus routed generation. Local `rm` is an informational bundled-corpus control. |
+
+Premise correction: DSPy 3.4.1 provider strings default to the native lm15 engine,
+not LiteLLM. `backend_selection.select_backend` resolves `openai/gpt-4o` with
+`api_base` and a fixture credential to the native `openai-chat` provider. The
+lm15 router defaults to `StdlibAsyncTransport` under Pyodide too; it does not
+automatically choose the available `FetchTransport`. Source inspection explains
+the zero Node fetch observations. The context probe clears the predictor's LM
+inside `aforward` after prepare so the context supplies the effective LM; otherwise
+the placeholder wins and the probe measures the routed control instead.
+
+A provider LM bound before prepare is refused, but runtime construction is outside
+that validation and bypasses the router's grants, budgets and destination policy.
+Native rejected connection attempts demonstrate that path. Zero Node fetch
+attempts do **not** establish containment or successful fetch transport: this is
+the trusted-code limit of ADR-0018 decision 9. Explicit FetchTransport,
+XMLHttpRequest and real-service reachability are unmeasured. The Worker recorder
+installed successfully in every scenario; absent instrumentation would have made
+egress visibility unmeasured, while the fixture guard still rejects external fetch.
+
+The environment probe also corrects a lock/closure assumption: `httpx` is in the
+shared lock but not installed for DSPy. `requests` is present in both lanes;
+`openai` and `httpx` are present only natively; `litellm`, `numpy` and `faiss` are
+absent in both. The immutable predictions remain unchanged. Hosted embeddings
+need LiteLLM; callable postprocessing needs NumPy. Adding them changes the pinned
+closure. ADR-0019's retrieval Worker owns embedding and returns passages rather
+than vectors; no embedding role or vector capability is established here.
+
+| Reused evidence | Source | Lanes and treatment |
+| --- | --- | --- |
+| Foreign predictor LM refused at prepare | `golden-dspy/refused-lm.json`, `python/galaxie/tests/test_dspy.py` | Existing native/Node/Chromium evidence; native/Node regression rerun, no duplicate probe |
+| Provider literal lint | `python/galaxie/tests/test_dspy_lint.py` | Native regression; syntax-only aid |
+| Routed payloads, prompted JSON, parse failure | `golden-dspy/predict.json`, `json-adapter.json`, `parse-failure.json` | Existing native/Node/Chromium evidence; native/Node regression rerun |
+| Router schemas and pydantic-ai NativeOutput | `_bridge.py`, `bridge.ts`, `adapter.ts`, `pydantic_ai.py`, ADR-0018 decision 11 | Source/matrix evidence, no DSPy schema-forwarding claim |
+| Host-bound retrieval and routed answer | RAG `test_dspy_agent.py`, `dspy-agent.node.test.ts`, `dspy-conformance.node.test.ts`, `dspy-gate.node.test.ts`; `test_dspy.py` capability tool | Native/Node regression rerun; previous Chromium RAG evidence only |
+| Offline state, descriptor binding, parallel and runtime | PRs #196, #213, #214, #215 | Existing native/Node suites rerun; only previously measured state/binding cases have Chromium evidence |
+
+New Chromium, Firefox and WebKit probes are **unmeasured**. Real models/services,
+other DSPy versions, `engine='litellm'`, `dspy.lm15.register_provider` declarations,
+Databricks/Weaviate retrievers, vector-returning host capabilities,
+undeclared-role refusal and multimodal inputs are unmeasured. No network access
+beyond rejected loopback attempts is needed. Existing Chromium evidence is reused
+only for the rows above; the full gate's browser regressions do not measure the
+new `pe-*` family.
+
+Reproduce from the repository root (wheel rebuild precedes Worker tests):
+
+```sh
+node scripts/build-python-wheels.ts
+cd python
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_provider.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy galaxie/tests/test_dspy.py galaxie/tests/test_dspy_gate.py galaxie/tests/test_dspy_lint.py galaxie/tests/test_dspy_state_binding.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../examples/rag-browser/agent_py/tests/test_dspy_agent.py -q
+cd ..
+python/.venv/bin/python scripts/record-dspy-conformance.py --check
+python/.venv/bin/python scripts/record-dspy-state-conformance.py --check
+pnpm run typecheck:python
+pnpm exec vitest run --project node tests/conformance/dspy-provider.node.test.ts
+VITEST_MAX_WORKERS=4 pnpm exec vitest run --project node tests/conformance/dspy.node.test.ts tests/conformance/dspy-restore.node.test.ts tests/conformance/dspy-state.node.test.ts tests/conformance/dspy-state-restore.node.test.ts tests/conformance/dspy-state-bind.node.test.ts tests/conformance/dspy-state-limits.node.test.ts tests/conformance/dspy-parallel.node.test.ts tests/conformance/dspy-runtime.node.test.ts examples/rag-browser/test/dspy-agent.node.test.ts examples/rag-browser/test/dspy-conformance.node.test.ts examples/rag-browser/test/dspy-gate.node.test.ts
+pnpm format
+pnpm lint
+pnpm typecheck
+pnpm typecheck:ts6
+pnpm run check:docs
+VITEST_MAX_WORKERS=4 pnpm check
+git diff --name-status main
+```
+
+Focused results: native provider 16 passed; native DSPy regression 336 passed;
+native RAG 7 passed; Node provider 15 passed; existing Node/RAG suites 207 passed
+and one opt-in measurement skipped. Read-only recorders pass: 38 DSPy
+cases, five states and seven state cases. The initial Node package assertion
+exposed the httpx prediction difference; the assertion now records the observation
+without changing the fixture. No Worker refusal fix was required.

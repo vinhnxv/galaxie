@@ -190,7 +190,7 @@ def test_schema_candidate_shape():
         mapping = asyncio.run(run(MappingAnswer, '{"answer":{}}'))
     schema = typed.model_json_schema() if isinstance(typed, type) else typed
     if schema.get('type') == 'json_schema':
-        schema = schema['json_schema']['schema']
+        schema = schema['schema']
     assert schema['type'] == 'object'
     assert mapping == {'type': 'json_object'}
     print(json.dumps({'scenario': 'pe-schema-candidate-shape', 'lane': 'native',

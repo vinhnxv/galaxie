@@ -441,8 +441,9 @@ nested stream paths: a pause unwinds the whole program. Sync entry points are
 **refused**; model-calling runtime optimizers have an **alternative** through
 offline JSON state; runtime `LabeledFewShot` is **supported** with an LM rebind in
 the measured native/Node shapes. See the [runtime recipe and limits](#runtime-optimizers-and-the-offline-recipe).
-Multimodal inputs, embeddings, service retrievers and provider-string LMs remain
-unsupported. Offline-optimized JSON state has the scripted evidence and limits
+Provider-string LMs, native provider schema output and service retrievers each
+have an **alternative**; embeddings are **refused**. Multimodal inputs remain
+unsupported. See the [provider recipes and limits](#provider-strings-schema-output-embeddings-and-retrievers). Offline-optimized JSON state has the scripted evidence and limits
 [below](#offline-optimized-program-state).
 
 The parallel spike records **alternative** for `dspy.Parallel` and **alternative**
@@ -457,8 +458,9 @@ Chromium, Firefox, WebKit, real models, other DSPy versions and successful strea
 nested or pausing fan-out and ReAct branches are unmeasured by this spike. See the
 [evidence and exact limits](../../tests/conformance/README.md#dspy-parallel-and-threaded-evaluate-spike).
 
-JSONAdapter works without streaming; provider `response_format`/native schema
-output is unsupported. The default ChatAdapter disables JSON fallback, since a
+JSONAdapter works without streaming; native provider schema output has an
+**alternative** through typed signatures with Python-side validation. Verbatim
+provider `response_format` ends `unsupported` before a model request. The default ChatAdapter disables JSON fallback, since a
 fallback would change the replay call sequence. Parse failures end the run.
 
 An `Executor` with `stream_fields` always streams in the Worker, even if the host
@@ -506,7 +508,9 @@ LMs and instance callbacks are refused.
 The Worker installs an explicit hash-pinned closure without dependency resolution.
 It omits `litellm`, `openai`, `gepa`, `tenacity`, `diskcache` and `cachetools`.
 CPython resolves a metadata-only workspace `litellm==1.106.2` stand-in with no
-importable module; accidental provider use fails closed. The existing cutoff and
+importable module; LiteLLM-dependent calls fail without it. A provider LM
+constructed after prepare is not blocked by predictor validation; the native
+engine uses its own transport outside the router, as measured below. The existing cutoff and
 pins, other frameworks' third-party wheel sets, goldens and matrices stay unchanged.
 The [DSPy matrix](../../tests/conformance/compatibility-matrix-dspy.json) records
 native CPython, Node Pyodide and headless Chromium evidence. The RAG DSPy program
@@ -650,6 +654,100 @@ For model-calling optimizers, or to avoid shipping a large runtime trainset:
 Chromium, Firefox and WebKit runtime probes, real models, other DSPy versions and
 optimizers given an in-Worker plain `dspy.LM` remain unmeasured. Runtime support
 here is measured shipped behavior, not a new golden conformance family.
+
+### Provider strings, schema output, embeddings and retrievers
+
+The 2026-11-11 [provider spike](../../tests/conformance/README.md#dspy-provider-strings-schema-output-embeddings-and-retrievers-spike)
+records provider-string LMs **alternative**, native provider schema output
+**alternative**, embeddings **refused** and service retrievers **alternative** on
+DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. These are scripted
+native/Node observations; no verbatim API gains new shipped support or a core
+contract change.
+
+| Author's provider string | Agent binding | Host responsibility |
+| --- | --- | --- |
+| `dspy.LM('openai/gpt-4o')` | `GalaxieLM('answer')` | Declare `answer` in the agent definition's `models`; map that role to the provider and model in host routing configuration. |
+
+Bind predictors as in [DSPy programs](#dspy-programs); do not construct a provider
+`dspy.LM` in agent code. Sampling parameters such as `temperature` and `max_tokens`
+belong to the host's router configuration. `pe-control-routed` has plain-DSPy
+output and payload parity; `pe-lm-kwargs` ends `unsupported` with zero requests.
+
+In DSPy 3.4.1 provider strings default to the native lm15 engine, **not LiteLLM**.
+The native engine defaults to sockets even in Pyodide; its optional
+`FetchTransport` is not selected automatically. A predictor-bound foreign LM is
+refused at prepare (existing `refused-lm`), but `pe-lm-runtime-set` and
+`pe-lm-runtime-context` construct one after prepare and bypass that validation.
+Each attempts one rejected loopback connection natively and ends `executor_error`
+with zero bridge requests. In Node both end `executor_error` with zero recorded
+fetch attempts. This does not establish network containment: the router's grants,
+budgets and destination policy do not cover this path. It is the trusted-code
+limit in [ADR-0018 decision 9](../../docs/adr/0018-python-agents-through-pyodide.md#decision).
+The syntax-only lint flags literals, not arbitrary runtime construction.
+`pe-lm-runtime-nokey` ends `executor_error` before I/O in both lanes.
+
+For typed output, declare types in the signature and use ChatAdapter with JSON
+fallback disabled, or non-streaming JSONAdapter:
+
+```python
+from typing import Literal
+import dspy
+from galaxie.dspy import GalaxieLM
+
+class Answer(dspy.Signature):
+    question: str = dspy.InputField()
+    answer: Literal['done', 'other'] = dspy.OutputField()
+
+predict = dspy.Predict(Answer)
+predict.set_lm(GalaxieLM('answer'))
+# Inside aforward, under the Executor's adapter:
+reply = await predict.acall(question=question)
+```
+
+DSPy validates typed fields after receiving the reply. `pe-schema-typed-ok`
+matches plain DSPy with one request and no `jsonSchema`; the `int` violation in
+`pe-schema-typed-violation` ends `executor_error` after one request, without retry.
+This is a weaker guarantee than provider-constrained decoding. Verbatim
+`response_format` ends `unsupported` with zero requests. The router's
+structured-output feature is already used by pydantic-ai `NativeOutput`; mapping
+DSPy to it remains implementation work. The native-only
+`pe-schema-candidate-shape` records a normalized `json_schema` dictionary holding
+an object schema and the open-mapping `{'type': 'json_object'}` fallback.
+
+Embeddings are **refused**: `pe-embed-hosted-string`, `pe-embed-callable` and
+`pe-embed-retriever` end `executor_error` without requests or egress. Hosted
+strings need absent LiteLLM; even pure-Python callables need absent NumPy during
+postprocessing. NumPy/FAISS are outside the pinned closure; adding them changes
+the lock and wheel set. Router modalities are `text` and `decision`, and
+[ADR-0019](../../docs/adr/0019-in-browser-retrieval.md) exposes passages rather than
+vectors. For semantic search use host-bound retrieval:
+
+```python
+from galaxie.capabilities import call
+
+# Inside aforward; the host declares and binds the narrow read capability.
+result = await call('docs.search@1', {'query': question, 'mode': 'hybrid', 'k': 10})
+passages = result['passages']
+```
+
+Alternatively bind `galaxie.dspy.capability_tool(name, description, args_schema)`
+as a ReAct tool. The [RAG agent](../../examples/rag-browser/agent_py/rag_dspy/agent.py)
+and its native/Node regression suites demonstrate `docs.search@1` plus routed
+generation; broker grants, destination policy, budgets and labels apply there.
+`pe-retrieve-local-rm` returns bundled passages with no requests, but represents
+an author's local corpus. `pe-retrieve-colbert` ends `executor_error` without
+bridge requests; native `requests` attempts one rejected loopback connection,
+while Node records zero fetch attempts. Direct service access is outside the
+broker; this probe does not establish XMLHttpRequest reachability.
+
+`pe-env-facts` finds `requests` in both lanes, `httpx` and `openai` only natively,
+and no `litellm`, `numpy` or `faiss` in either. A package being in the shared lock
+does not imply it is installed in the DSPy closure. New Chromium, Firefox and
+WebKit probes, real models/services, other DSPy versions, `engine='litellm'`,
+`dspy.lm15.register_provider` declarations, Databricks/Weaviate retrievers,
+vector-returning capabilities, undeclared-role refusal and multimodal inputs
+remain unmeasured. Existing Chromium golden/RAG evidence is reused only where
+previously measured; see the evidence ledger.
 
 ### Paused sessions and a changed state file
 

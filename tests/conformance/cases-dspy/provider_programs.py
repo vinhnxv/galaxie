@@ -9,7 +9,7 @@ import json
 import os
 import socket
 import sys
-from typing import Literal
+from typing import Any, Literal
 from unittest.mock import patch
 
 import dspy
@@ -113,7 +113,7 @@ class Program(dspy.Module):
         signature = (LiteralAnswer if name == 'pe-schema-typed-ok' else
                      IntegerAnswer if name == 'pe-schema-typed-violation' else
                      signature_for('control'))
-        config = {'response_format': AnswerModel} if name == 'pe-schema-response-format' else {}
+        config: dict[str, Any] = {'response_format': AnswerModel} if name == 'pe-schema-response-format' else {}
         self.predict = dspy.Predict(signature, **config)
         self.predict.set_lm(GalaxieLM('answer'))
 
@@ -147,7 +147,8 @@ class Program(dspy.Module):
         if name == 'pe-lm-kwargs':
             return await self.predict.acall(question=question, config={'temperature': 0.2})
         if name == 'pe-embed-hosted-string':
-            await dspy.Embedder(EMBEDDING_MODEL, caching=False, api_key=KEY, api_base=BASE).acall(['a'])
+            provider_options: dict[str, Any] = {'api_key': KEY, 'api_base': BASE}
+            await dspy.Embedder(EMBEDDING_MODEL, caching=False, **provider_options).acall(['a'])
         elif name in ('pe-embed-callable', 'pe-embed-retriever'):
             embedder = dspy.Embedder(lambda texts: [[0.0, 1.0] for _ in texts], caching=False)
             if name == 'pe-embed-callable':
