@@ -105,6 +105,9 @@ class Store(native.Store):
                 result = 'receipt:' + query
                 self.effects[scope] = {'digest': digest, 'status': 'succeeded', 'output': result}
                 if len(self.calls) == self.crash_after_writes:
+                    # Worker loss cancels the owning execution, not just one
+                    # TaskGroup child (whose cancellation alone is non-fatal).
+                    self._owner.cancel()
                     raise asyncio.CancelledError()
         return json.dumps({**{key: message[key] for key in ('v', 'id', 'op')}, 'kind': 'response', 'ok': code is None, **({'error': {'code': code}} if code else {'payload': result})})
 
@@ -128,6 +131,8 @@ class Store(native.Store):
     async def execute_async(self, context, pending=None):
         self._gates = {}
         self._terminated = False
+        self._owner = asyncio.current_task()
+        assert self._owner is not None
         existing = asyncio.all_tasks()
         context['_galaxie_input'] = json.dumps({'threadId': 'session', 'steps': 50, **({'input': {'question': 'fan-out'}} if pending is None else {'resume': {'interactionId': pending['id'], 'action': 'continue', 'payload': 'continue'}})})
         result = json.loads(await context['_galaxie_execute']())
