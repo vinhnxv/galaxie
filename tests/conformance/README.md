@@ -1163,3 +1163,114 @@ Focused evidence: 32 baseline and 43 candidate native tests pass; the full nativ
 DSPy folder passes 172 tests. The new Node lane passes 31 tests, and the six
 existing Node suites pass 94 with one opt-in measurement skipped. Both recorder
 checks pass (38 native cases; five states and seven native state cases).
+
+## DSPy sync entry points and runtime optimizers spike
+
+The 2026-11-11 spike records sync entry points **refused**, model-calling runtime
+optimizers **alternative** through offline JSON state, and runtime
+`LabeledFewShot` **supported** with an LM rebind in the measured shapes. No
+shipped source or core contract changed. The conditional fixed-refusal change
+was not needed. These are scripted-model observations, not answer-quality results.
+
+The [rule and predictions](cases-dspy/runtime-fixtures.json) were committed in
+`b6c2e17` before measurements. Native CPython and Node Pyodide are required lanes;
+an unmeasured support criterion fails. Support needs native output and model
+payload parity; LabeledFewShot also needs deterministic demos and fresh-executor
+replay. Otherwise a model-calling optimizer gets alternative only when measured
+members tidy-refuse and the unchanged offline-state evidence still passes for
+at least BootstrapFewShot. A native optimizer timeout is unmeasured, never a pass.
+Sync migration to `aforward`/`acall` is the existing API, so tidy sync refusal
+records refused. A Worker silent success, unfixed error, post-termination request
+or hang would require the conditional refusal before assigning an outcome.
+Native-only thread findings remain linked to `galaxie-fv4.3.18`.
+
+Versions observed: DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7.
+Models always return the scripted `done` answer; trainsets have three examples.
+In the table, request counts are model requests; every scenario has zero
+capability requests, surviving tasks and requests after termination. Node has no
+Worker errors and only loopback `/python/` asset requests. Prepare refusal is
+thrown before the sync-only author's body executes.
+
+| Scenario | Prediction | Native observation | Node observation |
+| --- | --- | --- | --- |
+| `rt-sync-forward-only` | Prepare `unsupported`, 0 requests | As predicted; body not run | As predicted; prepare rejects |
+| `rt-sync-module-call` | `unsupported`, 0 | As predicted | As predicted |
+| `rt-sync-forward-call` | `unsupported`, 0 | As predicted | As predicted |
+| `rt-sync-lm-call` | `unsupported`, 0 | As predicted | As predicted |
+| `rt-sync-swallowed` | `unsupported`, 0 despite fallback | As predicted; no fallback output | As predicted; no fallback output |
+| `rt-sync-to-thread` | `unsupported`, 0 | As predicted | As predicted; measured first |
+| `rt-sync-acall-control` | `done`, 1 | As predicted | As predicted |
+| `rt-opt-bootstrap` | `unsupported`, 0 despite caught first failure | As predicted | As predicted |
+| `rt-opt-mipro` | Fixed non-success, 0; `unsupported` expected, `executor_error` also tidy | `unsupported`, 0 | `unsupported`, 0 |
+| `rt-opt-copro` | `unsupported`, 0 | As predicted | As predicted |
+| `rt-opt-gepa` | Native fixed non-success or unmeasured timeout; Node `executor_error`, 0 | `unsupported`, 0; subprocess finished, no timeout | `executor_error`, 0; `gepa` absent |
+| `rt-opt-labeled` | Native output, payload and demo parity; 1 | Passed | Passed |
+| `rt-opt-labeled-naive` | `executor_error`, 0 without LM rebind | As predicted | As predicted |
+| `rt-opt-labeled-two-stage` | Pause, restore, replay without dispatch; 2 total | Passed; matches same-executor completion and plain DSPy | Passed; 1 before pause, 0 during replay, 1 after frontier; plain-DSPy parity |
+
+No prediction diverged. All six sync shapes decide refusal; the async control
+is excluded. `rt-sync-swallowed` and `rt-opt-bootstrap` establish that catching
+`Exception` cannot hide the recorded failure. MIPROv2 reaches its sequential
+evaluation refusal before optional `optuna` is needed; COPRO reaches sync prompt
+generation. GEPA uses a tiny metric-call budget and a network-denied native
+subprocess bounded to 120 seconds. Nothing here installs optional dependencies.
+
+The `to_thread` observation confirms the predicted fixed refusal in the Worker,
+with the run context visible, rather than a thread-start error. It does not by
+itself measure Pyodide's internal executor implementation. The reused thread-start
+probe establishes that the Worker cannot start a thread or thread pool. A blocking
+bridge would stall the event loop that delivers replies and handles cancellation
+and budgets; that is architectural reasoning, not a blocking-bridge experiment.
+
+LabeledFewShot makes no model call during compile. Its seeded two-demo projection
+is Tokyo then Rome in both lanes, and model payloads match the plain-DSPy reference.
+`reset_copy` clears predictor LMs; the measured pattern rebinds `GalaxieLM` after
+compile and uses `acall`. The naive copy has no default LM and fails. The two-stage
+program re-compiles on restore without changing the first request's digest, emits
+one `replayed` event before live work and dispatches only the second request.
+Author code must be deterministic apart from journaled calls. Runtime support is
+measured behavior under shipped code; promotion to golden cases is separate work.
+
+| Evidence | Reused or new | Lanes and scope |
+| --- | --- | --- |
+| No-run sync LM and sync-only module refusal, `python/galaxie/tests/test_dspy.py` | Reused | Native regression |
+| #214 sequential Parallel/Evaluate refusal; thread/pool errors and native silent-swallow finding | Reused | Native/Node; existing tests unchanged; follow-ups `galaxie-fv4.3.17` and `galaxie-fv4.3.18` |
+| #196 seven offline-state cases, size bounds and round-trip catalog | Reused | Native/Node regressions rerun; prior Chromium evidence, no new state cases |
+| #213 descriptor JSON binding of paused sessions | Reused | Prior native/Node/Chromium evidence; native/Node regressions rerun |
+| Fourteen `rt-*` scenarios above | New | Native and Node only |
+| Plain-DSPy labeled reference and fresh-executor replay | New | Native/Node output, payloads, seeded demos and replay frontier |
+
+The [offline recipe](../../packages/adapter-pyodide/README.md#runtime-optimizers-and-the-offline-recipe)
+uses optimize, JSON save, ship, load and LM rebind. Verified offline producers
+remain LabeledFewShot, scripted-LM BootstrapFewShot, ReAct demos and an
+instructions-only stand-in. Offline MIPROv2/COPRO/GEPA output is **unmeasured**.
+Chromium, Firefox and WebKit runtime probes, real models, other DSPy versions,
+KNNFewShot/Ensemble/SIMBA/BetterTogether/fine-tuning optimizers and optimizers
+given an in-Worker plain `dspy.LM` are **unmeasured**. No core contract change is
+needed; ADR-0012 controls, shipped source, goldens, matrices and locks are unchanged.
+
+Reproduce from the repository root (rebuild wheels before any Worker tests):
+
+```sh
+node scripts/build-python-wheels.ts
+cd python
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_runtime.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy galaxie/tests/test_dspy.py galaxie/tests/test_dspy_gate.py galaxie/tests/test_dspy_state_binding.py -q
+cd ..
+python/.venv/bin/python scripts/record-dspy-conformance.py --check
+python/.venv/bin/python scripts/record-dspy-state-conformance.py --check
+pnpm run typecheck:python
+pnpm exec vitest run --project node tests/conformance/dspy-runtime.node.test.ts
+pnpm exec vitest run --project node tests/conformance/dspy.node.test.ts tests/conformance/dspy-restore.node.test.ts tests/conformance/dspy-state.node.test.ts tests/conformance/dspy-state-restore.node.test.ts tests/conformance/dspy-state-bind.node.test.ts tests/conformance/dspy-state-limits.node.test.ts tests/conformance/dspy-parallel.node.test.ts
+pnpm format
+pnpm lint
+pnpm typecheck
+pnpm typecheck:ts6
+pnpm run check:docs
+VITEST_MAX_WORKERS=4 pnpm check
+git diff --name-status main
+```
+
+Focused results: native runtime 15 passed; native DSPy regression 304 passed;
+Node runtime 15 passed; existing Node suites 125 passed and one opt-in measurement
+skipped. Both recorder checks pass (38 cases; five states and seven state cases).
