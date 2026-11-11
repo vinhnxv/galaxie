@@ -107,6 +107,7 @@ class Store(native.Store):
                 if len(self.calls) == self.crash_after_writes:
                     # Worker loss cancels the owning execution, not just one
                     # TaskGroup child (whose cancellation alone is non-fatal).
+                    assert self._owner is not None
                     self._owner.cancel()
                     raise asyncio.CancelledError()
         return json.dumps({**{key: message[key] for key in ('v', 'id', 'op')}, 'kind': 'response', 'ok': code is None, **({'error': {'code': code}} if code else {'payload': result})})
