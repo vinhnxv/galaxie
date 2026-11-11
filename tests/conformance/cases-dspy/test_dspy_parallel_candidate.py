@@ -97,6 +97,42 @@ def test_divergence_releases_barrier_without_dispatch(installed, changed):
     assert (store.requests - requests, len(store.calls) - calls, store.orphans, store.after_termination) == (0, 0, 0, 0)
 
 
+@pytest.mark.parametrize('fault', ['changed', 'ended'])
+def test_live_sibling_waits_for_divergent_replay_prefix(installed, fault):
+    store = Store()
+    store.boot('par-fan-single')
+
+    async def run():
+        def payload(question):
+            return {'role': 'answer', 'messages': [{'role': 'user', 'content': '[[ ## question ## ]]\n' + question + '\n\n'}], 'options': {}}
+        first, second = payload('alpha:before'), payload('beta:before')
+        session = face._Session(journal=[
+            {'kind': 'model', 'digest': face._digest(value), 'branch': f'{key}/0', 'result': {'content': 'done'}}
+            for key, value in [('alpha', first), ('beta', second)]
+        ])
+        active = face._Run('barrier', 1, session, replay=2)
+        token = face._run.set(active)
+        waiting = asyncio.Event()
+        async def alpha():
+            assert active.begin('model', first)[1]
+            live = payload('alpha:after')
+            assert not active.begin('model', live)[1]
+            waiting.set()
+            await face.request('model', live)
+        async def beta():
+            await waiting.wait()
+            if fault == 'changed':
+                active.begin('model', payload('beta:changed'))
+        try:
+            with pytest.raises(BaseException) as caught:
+                await candidate.branches({'alpha': alpha, 'beta': beta})
+            assert face.error_code(caught.value) == 'unrecoverable'
+            assert store.requests == 0 and store.calls == []
+        finally:
+            face._run.reset(token)
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize('name', ['par-fan-pause-in-branch', 'par-fan-concurrent-pauses'])
 def test_branch_pause_refusal_drains_siblings(installed, name):
     store = Store()
