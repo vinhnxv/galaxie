@@ -302,6 +302,9 @@ validated state for approved calls and drops that state on denial. A child that
 asks again produces a new interaction. If the delegate tool itself has
 `requires_approval=True`, there are two pauses: approve the delegate first, then
 approve the child's call; neither pause executes the child's gated body.
+Interaction and resume callbacks receive copies of requests. A resume callback
+that adds reserved child metadata to a call without a validated hoist fails
+`invalid`.
 
 A pause supports one hoisted child with exactly one pending approval and no
 external calls. Several hoisted children, several child approvals, `CallDeferred`

@@ -394,6 +394,58 @@ def test_executor_replaces_callback_metadata_with_validated_child_state(metadata
     assert len(writes(seen)) == 1
 
 
+@pytest.mark.parametrize('kind', ['approval', 'external'])
+def test_callback_cannot_introduce_reserved_metadata_for_an_ordinary_request(kind):
+    part = ToolCallPart('ordinary', '{}', tool_call_id='ordinary')
+    requests = DeferredToolRequests(**{'approvals' if kind == 'approval' else 'calls': [part]})
+
+    def callback(requests, action, payload):
+        return DeferredToolResults(
+            **{'approvals' if kind == 'approval' else 'calls': {'ordinary': True}},
+            metadata={'ordinary': {RESERVED: {'unvalidated': True}}},
+        )
+
+    executor = Executor(Agent(GalaxieModel('parent')), resume=callback)
+    with pytest.raises(GalaxieError) as error:
+        executor._results(requests, 'approve', {}, parent='fixed', messages=[ModelResponse([part])], base=0)
+    assert error.value.code == 'invalid'
+    assert requests.metadata == {}
+
+
+def test_failing_resume_callback_cannot_mutate_ordinary_requests():
+    part = ToolCallPart('ordinary', '{}', tool_call_id='ordinary')
+    requests = DeferredToolRequests(approvals=[part])
+
+    def callback(supplied, action, payload):
+        supplied.metadata['ordinary'] = {RESERVED: {'unvalidated': True}}
+        return DeferredToolResults()
+
+    executor = Executor(Agent(GalaxieModel('parent')), resume=callback)
+    with pytest.raises(GalaxieError) as error:
+        executor._results(requests, 'approve', {}, parent='fixed', messages=[ModelResponse([part])], base=0)
+    assert error.value.code == 'invalid'
+    assert requests.metadata == {}
+
+
+def test_interaction_factory_cannot_mutate_ordinary_requests_on_publish_or_restore():
+    def interaction(requests):
+        value = display(requests)
+        requests.metadata['delegate'] = {RESERVED: {'unvalidated': True}}
+        return value
+
+    executor, seen, _ = scenario(delegate_approval=True, interaction=interaction)
+    assert asyncio.run(executor.run({'prompt': 'parent'}, 'fixed', 8)) is None
+    pause = executor._conversations['fixed'].pending
+    assert pause is not None and pause.requests.metadata == {}
+    checkpoint, metadata = executor._snapshot('fixed')
+    assert json.loads(checkpoint)['deferred_tool_requests']['metadata'] == {}
+    restored, _, _ = scenario(delegate_approval=True, interaction=interaction)
+    assert restored._restore(checkpoint, metadata) == 'fixed'
+    assert restored.pending('fixed') == executor.pending('fixed')
+    assert json.loads(restored._snapshot('fixed')[0])['deferred_tool_requests']['metadata'] == {}
+    assert writes(seen) == []
+
+
 def test_callback_denial_never_reenters_child_and_discards_its_metadata():
     def callback(requests, action, payload):
         return DeferredToolResults(approvals={'delegate': False}, metadata=requests.metadata)

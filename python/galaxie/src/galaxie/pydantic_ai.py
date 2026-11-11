@@ -797,7 +797,7 @@ class Executor:
                 value = _interaction(pause['interaction']['value'])
                 _validate_child_display(value, children)
                 # Stored props must be what this agent's interaction factory derives from the requests.
-                if self.interaction is None or _interaction(self.interaction(deepcopy(requests) if children else requests)) != value:
+                if self.interaction is None or _interaction(self.interaction(deepcopy(requests))) != value:
                     raise ValueError()
                 state.pending = _Pause(pause['position'], conversation.messages, requests, pause['interaction'])
             self._conversations[identifier] = state
@@ -814,7 +814,7 @@ class Executor:
         try:
             children = _hoisted_children(requests, 'invalid', parent=parent, messages=messages, base=base)
             if self.resume is not None:
-                results = self.resume(deepcopy(requests) if children else requests, action, payload)
+                results = self.resume(deepcopy(requests), action, payload)
             else:
                 if (
                     action not in ('approve', 'deny') or calls
@@ -830,6 +830,10 @@ class Executor:
                 not isinstance(results, DeferredToolResults)
                 or set(results.approvals) != approvals or set(results.calls) != calls
                 or not set(results.metadata) <= approvals | calls
+                or any(
+                    isinstance(metadata, dict) and _CHILD_APPROVAL in metadata and identifier not in children
+                    for identifier, metadata in results.metadata.items()
+                )
             ):
                 raise GalaxieError('invalid')
             normalized = results.to_tool_call_results()
@@ -944,7 +948,7 @@ class Executor:
                 children = _hoisted_children(
                     result.output, 'unsupported', parent=conversation_id, messages=result.all_messages(), base=position,
                 )
-                value = _interaction(self.interaction(deepcopy(result.output) if children else result.output))
+                value = _interaction(self.interaction(deepcopy(result.output)))
                 _validate_child_display(value, children)
             except Exception:
                 raise GalaxieError('unsupported') from None
