@@ -1,0 +1,19 @@
+{
+  "prompt": "parent",
+  "steps": 10,
+  "scripts": {
+    "parent": [
+      { "text": "", "toolCalls": [{ "id": "delegate", "name": "delegate", "args": {} }] },
+      { "text": "parent-done" }
+    ],
+    "child": [
+      { "text": "", "toolCalls": [{ "id": "save", "name": "save", "args": { "value": 2 } }] },
+      { "text": "child-done" }
+    ]
+  },
+  "cases": {
+    "child-approval-approve": { "action": "approve" },
+    "child-approval-reject": { "action": "deny" },
+    "child-approval-restore": { "action": "approve" }
+  }
+}

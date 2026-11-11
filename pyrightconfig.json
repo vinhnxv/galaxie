@@ -10,6 +10,7 @@
     "tests/conformance/cases-pydantic-ai",
     "tests/conformance/cases-pydantic-ai-delegation",
     "tests/conformance/cases-pydantic-ai-delegation-suite",
+    "tests/conformance/cases-pydantic-ai-child-approval",
     "tests/conformance/cases-dspy",
     "tests/conformance/cases-adk-python"
   ],
@@ -24,6 +25,14 @@
   ],
   "exclude": ["**/build", "**/node_modules", "**/__pycache__", "**/.*"],
   "executionEnvironments": [
+    {
+      "root": "tests/conformance/cases-pydantic-ai-child-approval",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai-child-approval"]
+    },
+    {
+      "root": "scripts/record-pydantic-ai-child-approval-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai-child-approval"]
+    },
     {
       "root": "tests/conformance/cases-pydantic-ai-delegation-suite",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai-delegation-suite"]
