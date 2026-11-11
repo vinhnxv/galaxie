@@ -5,6 +5,7 @@
 
 import asyncio
 import hashlib
+import inspect
 import json
 import math
 import re
@@ -48,6 +49,9 @@ class _ActiveRun:
 
 
 _active: ContextVar[_ActiveRun | None] = ContextVar('galaxie_pydantic_active', default=None)
+# Set only around a model call made by a run that carries _RunAuthority. Message history can carry
+# another run's stamp (a prompt-less resume keeps it), so the stamp is never used to authorize.
+_authorized: ContextVar[str | None] = ContextVar('galaxie_pydantic_authorized', default=None)
 _OutputT = TypeVar('_OutputT')
 
 
@@ -230,7 +234,7 @@ class GalaxieModel(Model):
         self, messages: list[ModelMessage], model_settings: ModelSettings | None,
         model_request_parameters: ModelRequestParameters,
     ) -> ModelResponse:
-        _check_run(messages[-1].run_id if messages else None)
+        _check_run(_authorized.get())
         payload, parameters = self._prepare(messages, model_settings, model_request_parameters)
         reply = await request('model', payload)
         return _reply(reply, messages, set(parameters.declared_tool_defs), self.role)
@@ -346,7 +350,18 @@ def _call_position(ctx: RunContext) -> tuple[int, int]:
     raise GalaxieError('invalid')
 
 
-class _ChildRunGuard(AbstractCapability[Any]):
+class _RunAuthority(AbstractCapability[Any]):
+    async def wrap_model_request(
+        self, ctx: RunContext[Any], *, request_context: ModelRequestContext, handler: Any,
+    ) -> ModelResponse:
+        token = _authorized.set(ctx.run_id)
+        try:
+            return await handler(request_context)
+        finally:
+            _authorized.reset(token)
+
+
+class _ChildRunGuard(_RunAuthority):
     async def before_run(self, ctx: RunContext[Any]) -> None:
         if not isinstance(ctx.model, GalaxieModel):
             raise GalaxieError('unsupported')
@@ -367,7 +382,8 @@ async def run_child(
     Use distinct keys for several children in one tool call. Replay must preserve
     call order and structure. Child approval hoisting and streaming are not provided.
     """
-    if set(options) & {'usage', 'usage_limits', 'conversation_id', 'run_id', 'infer_name', 'metadata'}:
+    reserved = {'usage', 'usage_limits', 'conversation', 'conversation_id', 'run_id', 'infer_name', 'metadata', 'workspace', 'spec'}
+    if set(options) & reserved or not set(options) <= set(inspect.signature(Agent.run).parameters):
         raise GalaxieError('invalid')
     if not isinstance(key, str) or not isinstance(ctx.conversation_id, str) or not ctx.conversation_id:
         raise GalaxieError('invalid')
@@ -660,7 +676,10 @@ class Executor:
             raise GalaxieError('invalid')
         state = self._conversations.setdefault(conversation_id, _Conversation())
         run_id = uuid4().hex
-        options = {'conversation_id': conversation_id, 'usage_limits': UsageLimits(request_limit=steps), 'infer_name': False, 'run_id': run_id}
+        options = {
+            'conversation_id': conversation_id, 'usage_limits': UsageLimits(request_limit=steps), 'infer_name': False,
+            'run_id': run_id, 'capabilities': [_RunAuthority()],
+        }
         position = state.position
         if resume is not None:
             pause = state.pending

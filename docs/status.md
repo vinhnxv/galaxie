@@ -60,9 +60,10 @@ On 2026-11-11, pydantic-ai 2.60.0 gained `galaxie.pydantic_ai.run_child` and a
 public-only nested-run guard. Helper children share usage and limits, derive
 identity from the delegate's message position and key, and start their own native
 repair counter. Plain nested `GalaxieModel` runs, child streams and nested
-`Executor.run` calls fail `unsupported` before bridge work. The guard fails closed
-when request history loses `run_id`; direct trusted capability calls and plain
-non-bridge models remain outside it. This is accident-proofing, with ADR-0012
+`Executor.run` calls fail `unsupported` before bridge work. A model request is authorized
+by the running agent's own capability, never by history stamps; direct trusted
+capability calls, plain non-bridge models and work started with an empty context
+remain outside the guard. This is accident-proofing, with ADR-0012
 controls still enforced in JavaScript.
 
 Three new native CPython/Node Pyodide conformance cases cover a child write after

@@ -208,8 +208,9 @@ index and `key`. It does not use the provider's tool-call ID. Keep replay call
 order and structure deterministic, and use distinct keys for several children in
 one tool body. Reusing a child identity within one executor run fails `invalid`.
 
-The helper reserves `usage`, `usage_limits`, `conversation_id`, `run_id`,
-`infer_name` and `metadata`; passing any of them fails `invalid`. The child model,
+The helper reserves `usage`, `usage_limits`, `conversation`, `conversation_id`,
+`run_id`, `infer_name`, `metadata`, `workspace` and `spec`; passing any of them, or an
+option `Agent.run` does not accept, fails `invalid`. The child model,
 including a `model=` override, must be a `GalaxieModel`, or it fails `unsupported`.
 Agent overrides and capability model selections are checked at run and request
 time. Child streaming enabled by event handlers or capabilities is also refused
@@ -221,14 +222,16 @@ children. Plain nested `child.run`, `child.run_stream`, capability tools from an
 unregistered run and nested `Executor.run` fail `unsupported` before bridge work.
 The checks use public pydantic-ai run and request contexts. Run IDs are revoked
 when the parent finishes, fails or is cancelled, including in inherited background
-task contexts. Non-streamed request history must
-preserve `run_id`: if history processing or upstream merging of adjacent
-`ModelRequest` objects leaves the model request without it, the request fails closed.
-Keep the current attributed request when trimming history. Ordinary retries,
-resume, sequential top-level runs and parallel tools pass the measured checks.
+task contexts. A model request is authorized by the capability of the run that
+makes it, never by `run_id` stamps in message history, so a prompt-less nested run
+that inherits the parent's history is refused like any other plain nested run.
+Ordinary retries, resume, sequential top-level runs and parallel tools pass the
+measured checks.
 Outside an `Executor`, direct model/helper use remains available without the guard.
 The guard is accident-proofing, not an isolation boundary: direct trusted
-`capabilities.call` and plain non-`GalaxieModel` children can bypass it. ADR-0012
+`capabilities.call`, plain non-`GalaxieModel` children and work started in a thread or
+task with an empty context (for example `run_in_executor` with a fresh event loop)
+can bypass it. ADR-0012
 controls remain in the JavaScript bridge and broker.
 
 The [delegation evidence](../../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)

@@ -340,10 +340,11 @@ native repair counter, leaving the parent and siblings unchanged. A permitted
 retry still consumes the route and shared run repair budgets.
 
 The guard checks public run IDs at model and capability boundaries and refuses a
-nested `Executor.run`. A non-streamed request reaching the model without `run_id`
-fails closed with `unsupported`. History processing that causes upstream merging
-of adjacent requests can discard that field; keep the current attributed request
-when trimming history. Normal retries, resume and parallel tools pass the measured
+nested `Executor.run`. A non-streamed request is authorized by the
+capability of the run that makes it; message-history `run_id` stamps are not trusted,
+so a prompt-less nested run that inherits the parent's history fails `unsupported`
+(regression test `test_prompt_less_nested_run_inheriting_parent_history_is_refused_before_transport`).
+Normal retries, resume and parallel tools pass the measured
 checks. Writes still require host confirmation and matching scoped checkpoint and
 recovery stores. For gated child workflows, flatten into one agent unless the
 probe-local child-state hoisting and validation are needed.

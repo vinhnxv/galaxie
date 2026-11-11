@@ -19,7 +19,7 @@ from pydantic_ai.output import OutputObjectDefinition
 from pydantic_ai.usage import RunUsage, UsageLimits
 
 from galaxie import GalaxieError, _bridge
-from galaxie.pydantic_ai import Executor, GalaxieModel, capability_tool, run_child
+from galaxie.pydantic_ai import Executor, GalaxieModel, _authorized, capability_tool, run_child
 
 
 def call(name, identifier='call-1', arguments='{}'):
@@ -129,7 +129,10 @@ def test_child_identity_follows_position_and_key_instead_of_provider_call_id(sha
     assert (scopes[0] == scopes[1]) == (shape == 'replay')
 
 
-@pytest.mark.parametrize('option', ['usage', 'usage_limits', 'conversation_id', 'run_id', 'infer_name', 'metadata'])
+@pytest.mark.parametrize('option', [
+    'usage', 'usage_limits', 'conversation', 'conversation_id', 'run_id', 'infer_name', 'metadata',
+    'workspace', 'spec', 'unknown_option',
+])
 def test_reserved_child_options_fail_before_transport(option):
     seen = []
     install_replies([], seen)
@@ -283,14 +286,18 @@ def test_native_children_have_independent_repairs_and_restore_the_parent_counter
         parameters = ModelRequestParameters(
             output_mode='native', output_object=OutputObjectDefinition(json_schema=Answer.model_json_schema(), name='Answer'),
         )
-        await GalaxieModel('parent-native').request(
-            [ModelRequest(parts=[UserPromptPart('before')], run_id=ctx.run_id)], None, parameters,
-        )
+        token = _authorized.set(ctx.run_id)
+        try:
+            await GalaxieModel('parent-native').request([ModelRequest(parts=[UserPromptPart('before')])], None, parameters)
+        finally:
+            _authorized.reset(token)
         assert (await run_child(ctx, child, 'first')).output == Answer(value=2)
         assert (await run_child(ctx, child, 'second', key='second')).output == Answer(value=3)
-        await GalaxieModel('parent-native').request(
-            [ModelRequest(parts=[UserPromptPart('after')], run_id=ctx.run_id)], None, parameters,
-        )
+        token = _authorized.set(ctx.run_id)
+        try:
+            await GalaxieModel('parent-native').request([ModelRequest(parts=[UserPromptPart('after')])], None, parameters)
+        finally:
+            _authorized.reset(token)
         return 'delegated'
 
     assert asyncio.run(Executor(parent).run({'prompt': 'parent'}, 'fixed', 8)) == 'parent'
@@ -366,21 +373,22 @@ def test_direct_calls_inside_executor_fail_closed_without_an_allowed_run_id(oper
     assert [message['payload']['role'] for message in seen] == ['parent']
 
 
-def test_history_normalization_that_loses_run_identity_is_refused_before_the_retry():
+def test_prompt_less_nested_run_inheriting_parent_history_is_refused_before_transport():
+    # A prompt-less run keeps the run_id stamped on the last request of its history, so message
+    # stamps never authorize a model request; only the wrapper of the running agent does.
     seen = []
-    install_replies([{'content': '{"value":"invalid"}'}], seen)
+    install_replies([{'content': '', 'toolCalls': [call('delegate')]}, {'content': 'unreachable'}], seen)
+    parent = Agent(GalaxieModel('parent'))
+    nested = Agent(GalaxieModel('nested'))
 
-    def drop_replies(messages: list[ModelMessage]) -> list[ModelMessage]:
-        return [message for message in messages if isinstance(message, ModelRequest)]
+    @parent.tool
+    async def delegate(ctx: RunContext) -> str:
+        return (await nested.run(None, message_history=ctx.messages[:-1])).output
 
-    agent = Agent(
-        GalaxieModel('parent'), output_type=NativeOutput(Answer), retries=1,
-        capabilities=[ProcessHistory(drop_replies)],
-    )
     with pytest.raises(GalaxieError) as error:
-        asyncio.run(Executor(agent).run({'prompt': 'parent'}, 'fixed', 5))
+        asyncio.run(Executor(parent).run({'prompt': 'parent'}, 'fixed', 5))
     assert error.value.code == 'unsupported'
-    assert len(seen) == 1
+    assert [message['payload']['role'] for message in seen] == ['parent']
 
 
 def test_resumed_run_can_delegate_and_later_top_level_runs_remain_allowed():

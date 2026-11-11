@@ -151,10 +151,11 @@ It revokes those IDs at exit, including in contexts inherited by background task
 `GalaxieModel.request`, `request_stream` and `capability_tool` refuse an absent or
 unregistered run ID before bridge work; a nested `Executor.run` also fails
 `unsupported`. Only public pydantic-ai APIs are used. Direct model/helper use
-outside an executor remains available. A non-streamed request reaching the model
-without `run_id` fails closed, including when a history processor causes upstream
-normalization to merge adjacent requests and discard their attribution. Keeping
-the current attributed request when trimming history avoids that measured case.
+outside an executor remains available. A non-streamed request is authorized by the
+`wrap_model_request` capability of the run that makes it, never by `run_id` stamps in
+message history (a prompt-less nested run that inherits the parent's history keeps the
+parent's stamp, so stamps cannot authorize). A request made outside such a wrapper
+during an executor run fails closed.
 Ordinary retries, resume, sequential runs and parallel tools pass. The guard is
 accident-proofing, not an isolation boundary: plain non-`GalaxieModel` children and
 direct trusted `capabilities.call` can bypass it. The helper itself refuses a
