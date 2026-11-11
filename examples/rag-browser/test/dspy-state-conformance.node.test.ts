@@ -16,6 +16,8 @@ import {
   dspyStateCases,
   type executeDspyStateCase,
 } from '../../../tests/conformance/support/dspy-state.js';
+import { stateBindScenarios } from '../../../tests/conformance/support/dspy-state-bind.js';
+import { stateBindSources } from '../../../tests/conformance/support/dspy-state-bind-sources.node.js';
 import {
   limitSources,
   stateLimitCases,
@@ -66,6 +68,20 @@ beforeAll(async () => {
       const path = join(publicDir, 'conformance', name);
       await mkdir(path, { recursive: true });
       for (const [file, source] of Object.entries(await stateRestoreSources(scenario, lifetime)))
+        await writeFile(join(path, file), source);
+    }
+  }
+  for (const scenario of stateBindScenarios.filter((scenario) =>
+    scenario.lanes.includes('chromium'),
+  )) {
+    for (const lifetime of ['pause', 'resume'] as const) {
+      const path = join(
+        publicDir,
+        'conformance',
+        scenario.name + (lifetime === 'resume' ? '-resume' : ''),
+      );
+      await mkdir(path, { recursive: true });
+      for (const [file, source] of Object.entries(await stateBindSources(scenario, lifetime)))
         await writeFile(join(path, file), source);
     }
   }
@@ -125,7 +141,7 @@ beforeAll(async () => {
     throw new Error('The conformance preview has no port.');
   origin = `http://127.0.0.1:${address.port}`;
   browser = await chromium.launch({ headless: true });
-}, 90000);
+}, 900000);
 
 afterAll(async () => {
   await browser?.close();
@@ -219,6 +235,7 @@ async function reloadResult(page: Page): Promise<{
   error?: string;
   errorCode?: string;
   violations: string[];
+  bindTraffic?: { models: number; capabilities: number; replayed: number };
 }> {
   await page.waitForFunction(
     () => Reflect.get(globalThis, 'dspyStateConformance')?.done,
@@ -304,4 +321,107 @@ test.each(stateRestoreScenarios)(
     }
   },
   90000,
+);
+
+/** Compare all stored bytes and effect rows around a refused restore. */
+async function bindingStore(page: Page): Promise<string> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('dspy-state-reload');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const stores = ['checkpoints', 'writes', 'journal'];
+      const tx = db.transaction(stores, 'readonly');
+      const rows = await Promise.all(
+        stores.map(
+          (name) =>
+            new Promise<unknown>((resolve, reject) => {
+              const request = tx.objectStore(name).getAll();
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+            }),
+        ),
+      );
+      return JSON.stringify(rows, (_key, value: unknown) =>
+        value instanceof Uint8Array ? [...value] : value,
+      );
+    } finally {
+      db.close();
+    }
+  });
+}
+
+test.each(stateBindScenarios.filter((scenario) => scenario.lanes.includes('chromium')))(
+  'Chromium binds paused DSPy state before replay: $name',
+  async (scenario) => {
+    if (!browser) throw new Error('The state conformance browser is missing.');
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    const external: string[] = [];
+    const headers: string[] = [];
+    await context.route('**/*', (route) => {
+      if (new URL(route.request().url()).origin === origin) return route.continue();
+      external.push(route.request().url());
+      return route.abort();
+    });
+    context.on('response', (response) =>
+      headers.push(response.headers()['content-security-policy'] ?? ''),
+    );
+    try {
+      const page = await context.newPage();
+      await page.goto(`${origin}/?case=${scenario.name}&reload`);
+      const first = await reloadResult(page);
+      expect(first.error).toBeUndefined();
+      expect(first.violations).toEqual([]);
+      expect(first.reload.error).toBeUndefined();
+      expect(first.reload.pending).toBeDefined();
+      expect(first.reload.calls).toEqual(['before']);
+      expect(first.reload.requests).toBe(scenario.program === 'state-durable-early-model' ? 1 : 0);
+      const saved = await bindingStore(page);
+      const step = { name: scenario.program, sessionId: first.reload.sessionId };
+      const restored = await nextReload(page, { ...step, variant: 'resume' });
+      expect(restored.violations).toEqual([]);
+      if (scenario.predicted === 'unrecoverable') {
+        expect(restored.errorCode).toBe('unrecoverable');
+        expect(restored.error).toBe('Stored state cannot be recovered.');
+        expect(restored.reload).toBeUndefined();
+        expect(restored.bindTraffic).toEqual({ models: 0, capabilities: 0, replayed: 0 });
+        expect(await bindingStore(page)).toBe(saved);
+      } else {
+        const sources = await stateBindSources(scenario, 'resume');
+        const state = JSON.parse(sources['state.json'] ?? '');
+        expect(restored.error).toBeUndefined();
+        expect(restored.reload.restored).toEqual(first.reload.pending);
+        expect(restored.reload.pending).toBeUndefined();
+        expect(restored.reload.error).toBeUndefined();
+        expect(restored.reload.output).toEqual({
+          answer: 'done',
+          receipt: 'RESTORED_CAPABILITY_SECRET',
+          demos: state.demos.length,
+          instructions: state.signature.instructions,
+        });
+        expect(restored.reload.calls).toEqual([]);
+        expect(restored.reload.requests).toBe(1);
+        expect(restored.reload.consumed).toBe(true);
+        expect(restored.bindTraffic).toEqual({ models: 1, capabilities: 0, replayed: 1 });
+      }
+      if (scenario.then === 'original') {
+        const rollback = await nextReload(page, step);
+        expect(rollback.error).toBeUndefined();
+        expect(rollback.violations).toEqual([]);
+        expect(rollback.reload.restored).toEqual(first.reload.pending);
+        expect(rollback.reload.error).toBeUndefined();
+        expect(rollback.reload.output).toMatchObject({ answer: 'done', demos: 2 });
+        expect(rollback.reload.calls).toEqual([]);
+        expect(rollback.bindTraffic).toEqual({ models: 1, capabilities: 0, replayed: 1 });
+      }
+      expect(external).toEqual([]);
+      expect(headers.length).toBeGreaterThan(0);
+      expect(headers.every((value) => value === header)).toBe(true);
+    } finally {
+      await context.close();
+    }
+  },
+  900000,
 );

@@ -15,6 +15,10 @@ import {
   executeDspyStateCase,
 } from '../../../../../tests/conformance/support/dspy-state.js';
 import {
+  observeStateBind,
+  stateBindScenarios,
+} from '../../../../../tests/conformance/support/dspy-state-bind.js';
+import {
   stateLimitCases,
   stateLimitSpec,
 } from '../../../../../tests/conformance/support/dspy-state-limits.js';
@@ -29,6 +33,7 @@ const result: {
   errorCode?: string;
   violations: string[];
   done: boolean;
+  bindTraffic?: { models: number; capabilities: number; replayed: number };
 } = { violations: [], done: false };
 Reflect.set(globalThis, 'dspyStateConformance', result);
 addEventListener('securitypolicyviolation', (event) =>
@@ -47,7 +52,8 @@ factory.createPolicy('default', {
 try {
   const parameters = new URLSearchParams(location.search);
   const name = parameters.get('case') ?? '';
-  const scenario = stateRestoreScenarios.find((scenario) => scenario.name === name);
+  const bindScenario = stateBindScenarios.find((scenario) => scenario.name === name);
+  const scenario = bindScenario ?? stateRestoreScenarios.find((scenario) => scenario.name === name);
   if (
     !scenario &&
     ![...dspyStateCases, ...Object.keys(stateLimitCases), 'state-pickle-source'].includes(name)
@@ -66,6 +72,8 @@ try {
       return worker;
     },
   };
+  const observed = observeStateBind(options);
+  if (bindScenario) result.bindTraffic = observed.traffic;
   if (parameters.has('reload')) {
     if (!scenario) throw new Error('The state restore scenario is unknown.');
     const saved = sessionStorage.getItem('dspyStateReloadStep');
@@ -81,13 +89,18 @@ try {
     });
     try {
       result.reload = await executeDspyReloadStep(
-        options,
+        bindScenario ? observed.options : options,
         {
           baseUrl: new URL(
             `/conformance/${name}${step.variant === 'resume' ? '-resume' : ''}/`,
             location.href,
           ).href,
-          files: ['state_durable.py', 'state.json', 'selected.py'],
+          files: [
+            'state_durable.py',
+            'state.json',
+            'selected.py',
+            ...(bindScenario ? ['state_bind_candidate.py'] : []),
+          ],
           module: 'selected',
           entry: 'create_agent',
         },
