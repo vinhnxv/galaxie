@@ -15,6 +15,7 @@ import {
   LoopAgent,
   ParallelAgent,
   SequentialAgent,
+  StreamingMode,
   setLogger,
 } from '@google/adk';
 import { expect, test } from 'vitest';
@@ -27,14 +28,14 @@ import { z } from 'zod';
  * W4-temp                  PASS            PASS                  temp lost
  * W5 worker/writer         FAIL            PASS                  NA: no prior state
  * W6 left/right/last/both   FAIL            PASS except both     PASS/NA
- * W7 last/middle           PASS/FAIL       FAIL: zero bodies    PASS
+ * W7 last/middle           PASS/FAIL       PASS                 PASS
  * W8 transfer/workflow     PASS/FAIL       PASS                  NA/PASS
  * N3: persistent state survives; temp output is already absent at the next
  * request, including before resume. No workflow progress actions are emitted.
  * W6 left/last: a right-branch body finishes after the consumer stops; resume
  * invokes left with no branch. Both-branch case loses the unanswered right.
- * W7: cutting off at the long-running call skips the body; a supplied response
- * resumes its author only with resumability enabled. Default routing errors.
+ * W7: stop after the pending tool result, matching the adapter cutoff; an
+ * external response resumes its author with resumability. Default routing errors.
  */
 
 type Tree = string | { seq: Tree[] } | { loop: Tree[] } | { par: Tree[] } | { transfer: Tree };
@@ -174,7 +175,7 @@ async function measure(
         seen.tools.push(tree);
         seen.branches.push(context?.invocationContext.branch);
         if (stopped) seen.late.push(`tool:${tree}`);
-        return paused && shape.long && !uninterrupted ? undefined : { saved: tree };
+        return { saved: tree };
       },
     });
     return new LlmAgent({
@@ -203,17 +204,29 @@ async function measure(
   });
   type Message = NonNullable<Parameters<typeof runner.runAsync>[0]['newMessage']>;
   const segment = async (newMessage: Message): Promise<Event | undefined> => {
-    for await (const event of runner.runAsync({ userId: 'u', sessionId: session.id, newMessage })) {
+    let long: Event | undefined;
+    for await (const event of runner.runAsync({
+      userId: 'u',
+      sessionId: session.id,
+      newMessage,
+      runConfig: { streamingMode: StreamingMode.SSE, pauseOnToolCalls: false },
+    })) {
       seen.events.push(event);
       const waiting =
+        long !== undefined ||
         (event.content?.parts ?? []).some(
           (part) => part.functionCall?.name === 'adk_request_confirmation',
-        ) || (event.longRunningToolIds?.length ?? 0) > 0;
+        );
       if (waiting && !uninterrupted) {
         seen.pauses += 1;
         stopped = true;
-        return event;
+        return long ?? event;
       }
+      if (
+        (event.longRunningToolIds?.length ?? 0) > 0 &&
+        event.content?.parts?.some((part) => part.functionCall !== undefined)
+      )
+        long = event;
     }
     return undefined;
   };
@@ -302,8 +315,8 @@ const expected: Record<string, { full: string; off: string; on: string; tools: s
     on: 'left right left',
     tools: 'left',
   },
-  'W7-last': { full: 'a b b', off: 'a b', on: 'a b b', tools: '' },
-  'W7-middle': { full: 'a b b c', off: 'a b', on: 'a b b', tools: '' },
+  'W7-last': { full: 'a b b', off: 'a b', on: 'a b b', tools: 'b' },
+  'W7-middle': { full: 'a b b c', off: 'a b', on: 'a b b', tools: 'b' },
   W8: {
     full: 'parent child child',
     off: 'parent child child',
