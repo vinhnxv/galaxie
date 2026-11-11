@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement.
 
 ## Context
 
@@ -148,3 +148,72 @@ that decision; their current refusals remain. Nested pauses additionally require
 resumable inner state and branch-scoped effect scopes. Nested wrappers, inner
 schemas, pausing tools, Workflow and raw AgentTool remain refused. The native
 two-call result passed; concurrency of the proposed isolated wrapper is unmeasured.
+
+### Workflow-child resume spike (2026-11)
+
+#### Outcome rule registered before measurement (2026-11-12)
+
+The candidate uses ADK 2.3.0's `resumabilityConfig: {isResumable: true}`
+only when resuming a leaf in the last child chain of `SequentialAgent`s.
+Existing first-child and transfer-chain pauses keep the default Runner. All
+measurements use scripted models on Node and headless Chromium, without real
+endpoints or credentials. Firefox and WebKit remain unmeasured.
+
+Candidate shapes (sequences are `SequentialAgent`, loop is `LoopAgent`, tool is a
+gated `capabilityTool` with `requireConfirmation: true` unless noted):
+
+| ID | Tree | Today on adk-js |
+| --- | --- | --- |
+| W1 | `Seq[first(tool), second]` (control) | accepted (restart through first children) |
+| W2 | `Seq[a, b(tool), c]` | refused |
+| W3 | `Seq[Seq[inner(tool), b], c]` (first-child chain, control) and `Seq[a, Seq[b(tool), c]]` (nested, not first) | first accepted, second refused |
+| W4 | `Seq[a, b(tool)]` and nested last chain `Seq[a, Seq[b, c(tool)]]`, plus a deny answer and two consecutive pauses by the same agent | refused |
+| W5 | `Loop(2)[worker(tool)]` and `Loop(2)[writer, checker(tool)]` | refused |
+| W6 | `Seq[Par[left(tool), right], merger]` in both arrival orders, `Seq[a, Par[left(tool), right]]`, and two confirming branches | refused |
+| W7 | long-running tool: `Seq[a, b(long-running)]` (last) and `Seq[a, b(long-running), c]` (middle) | refused |
+| W8 | transfer chain `LlmAgent[child(tool)]` (control); transfer target inside a workflow agent | first accepted, second refused |
+
+Every gate is measured per shape and recorded as pass, fail, or not applicable
+with a reason. Measurement must not stop at the first failure. A later gate may
+be skipped only when the scenario no longer exists, such as a galaxie write-once
+check for a shape already refused at pause time. An unmeasured gate is never a pass.
+
+| Gate | Required evidence |
+| --- | --- |
+| N1: native continuity | With resumability on, after the answer every unfinished agent runs exactly once, no finished agent is asked again, and ordered model requests equal the uninterrupted ungated script. Parallel measures both arrival orders. |
+| N2: native tool once | The gated tool body runs once per logical call. |
+| N3: native state | Non-`temp:` state written before the pause is visible after resume; record `temp:` visibility separately. Informational: loss of `temp:` decides its admission refusal, not failure of the whole shape. |
+| G1: live parity | With the test-only resumable Runner seam, output, ordered requests, capability calls and published interaction match native resumable. Exactly one interaction is published per pause; no capability runs before the answer. |
+| G2: reload parity | Dispose and recreate the runtime over the same bytes (memory on Node, IndexedDB on Chromium); republish the same interaction ID and finish with the live transcript. |
+| G3: writes once, scope stable | With recovery and host confirmations, host invoke count equals logical writes across approve, reload and approved-write/model-failure/retry. The resumed write's effect scope equals the uninterrupted write's scope. |
+| G4: restore admission | A stored pause in a refused position fails `unrecoverable` before model or capability calls. Measure unchanged code first, then shipped code if the candidate proceeds. |
+| G5: refusals and controls | Refused shapes end `unsupported` at pause, publish no interaction, execute no capability after pause and roll back. Controls use the default Runner with unchanged event logs. |
+
+A shape is ACCEPTED iff N1, N2, G1, G2, G3 pass and G4 passes after the
+conditional implementation, all measured. Any failed gate makes it REFUSED. An
+unmeasured gate is a failure for acceptance and is recorded as unmeasured.
+Controls (W1, W3 first chain, W8 transfer chain) never move to the resumable
+Runner. If resumability fails N1 for a control, the record states that
+resumability is shape-specific. The outcome is ACCEPTED-PARTIAL if at least one
+shape passes (ship exactly that set, keeping executable refusal tests for the
+rest), otherwise REFUSED. If W4's base last-child shape fails any gate, the
+outcome is REFUSED, because every other shape is predicted to fail already.
+No shipped source changes precede this decision.
+
+Predictions, fixed before measurement:
+
+- P0 (mechanism): resumability changes only routing; workflow agents write no
+  `agentState`, `endOfAgent` or `nodeInfo`; the resumed branch agent has no context branch.
+- Native under resumability: W1 FAIL N1 (the successor never runs), W2 FAIL,
+  W3 nested-not-first FAIL, W3 first chain FAIL, W4 PASS (both variants), W5 FAIL
+  (later iterations never run), W6 FAIL (the merger never runs, a cut-off sibling
+  is never resumed, and in the reversed order its pending work is lost), W7 last
+  PASS, W7 middle FAIL, W8 chain PASS (and unchanged).
+- Galaxie: W4 and W7-last pass G1 to G3; W6 fails G3 even in an order where N1
+  passes, because `sequenceOf` throws `invalid` for the branch-less resumed
+  context; G4 FAILS on unchanged code (resume-time admission does not exist) and
+  passes after the conditional implementation.
+- Overall: ACCEPTED-PARTIAL. Accepted: a pause in the last child chain of
+  `SequentialAgent`s (confirmation and long-running), leaf agent, no `temp:`
+  output key anywhere in the tree. Refused: W2, W3 nested-not-first, W5, W6,
+  W7 middle, transfer under a workflow agent. Firefox and WebKit unmeasured.
