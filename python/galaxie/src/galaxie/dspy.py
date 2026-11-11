@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import aclosing
 from contextvars import ContextVar
 from dataclasses import dataclass, field, fields
+from pathlib import Path
 from typing import Any
 
 import dspy
@@ -20,6 +21,25 @@ from dspy.streaming import StatusMessageProvider, StreamListener, StreamResponse
 
 from . import capabilities
 from ._bridge import ERROR_MESSAGES, MAX_BYTES, GalaxieError, _model_reply, request
+
+
+_STATE_BINDING = 'stateBinding'
+
+
+def state_binding(root: str | Path) -> str | None:
+    """Bind descriptor JSON paths and Python-visible bytes against accidental swaps."""
+    root = Path(root)
+    try:
+        entries = sorted(
+            [path.relative_to(root).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest()]
+            for path in root.rglob('*')
+            if path.is_file() and path.suffix == '.json' and '__pycache__' not in path.relative_to(root).parts
+        ) if root.is_dir() else []
+    except OSError:
+        raise GalaxieError('unsupported') from None
+    if not entries:
+        return None
+    return hashlib.sha256(json.dumps(entries, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')).hexdigest()
 
 
 class _LMError(dspy.LMError):
@@ -655,6 +675,7 @@ class Executor:
         self.adapter = adapter if adapter is not None else dspy.ChatAdapter(use_json_adapter_fallback=False)
         self.lm = dspy.settings.lm if isinstance(dspy.settings.lm, GalaxieLM) else None
         self._sessions: dict[str, _Session] = {}
+        self._state_binding: str | None = None
         if isinstance(stream_fields, str) or any(not isinstance(field, str) or not field for field in stream_fields) or len(set(stream_fields)) != len(stream_fields):
             raise GalaxieError('unsupported')
         self.stream_fields = tuple(stream_fields)
@@ -676,6 +697,8 @@ class Executor:
             'status': 'unrecoverable' if state.unrecoverable else 'paused' if state.pending else 'completed',
         }
         metadata = {'v': 1, 'dspy': dspy.__version__, 'adapter': type(self.adapter).__name__, 'session': session}
+        if self._state_binding is not None and checkpoint['status'] == 'paused':
+            metadata[_STATE_BINDING] = self._state_binding
         def encode(value: Any) -> bytes:
             return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')
         return encode(checkpoint), encode(metadata)
@@ -684,7 +707,8 @@ class Executor:
         """Validate a session-bound journal and derive its pending request from the frontier."""
         try:
             raw, meta = json.loads(checkpoint), json.loads(metadata)
-            if (type(meta) is not dict or set(meta) != {'v', 'dspy', 'adapter', 'session'}
+            keys = {'v', 'dspy', 'adapter', 'session'}
+            if (type(meta) is not dict or set(meta) not in (keys, keys | {_STATE_BINDING})
                 or type(meta['v']) is not int or meta['v'] != 1
                 or meta['dspy'] != dspy.__version__ or meta['adapter'] != type(self.adapter).__name__
                 or meta['session'] != session
@@ -694,6 +718,11 @@ class Executor:
                 or type(raw['pauses']) is not int or raw['pauses'] < 0
                 or type(raw['journal']) is not list or raw['status'] not in {'paused', 'completed', 'unrecoverable'}):
                 raise ValueError()
+            if _STATE_BINDING in meta:
+                binding = meta[_STATE_BINDING]
+                if (raw['status'] != 'paused' or type(binding) is not str
+                    or re.fullmatch('[0-9a-f]{64}', binding) is None or binding != self._state_binding):
+                    raise ValueError()
             identifier = raw['conversation_id']
             state = _Session(ordinal=raw['ordinal'], pauses=raw['pauses'], value=raw['input'], journal=raw['journal'], unrecoverable=raw['status'] == 'unrecoverable')
             interactions = 0
@@ -834,10 +863,12 @@ class Executor:
             _run.reset(token)
 
 
-def prepare_executor(value: Any) -> Executor:
+def prepare_executor(value: Any, *, state_binding: str | None = None) -> Executor:
     if isinstance(value, Executor):
         _validate(value.module, value.adapter, value.lm)
-        return value
-    if isinstance(value, dspy.Module):
-        return Executor(value)
-    raise GalaxieError('unsupported')
+    elif isinstance(value, dspy.Module):
+        value = Executor(value)
+    else:
+        raise GalaxieError('unsupported')
+    value._state_binding = state_binding
+    return value
