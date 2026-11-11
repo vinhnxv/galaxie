@@ -397,13 +397,12 @@ def test_executor_replaces_callback_metadata_with_validated_child_state(metadata
 @pytest.mark.parametrize('kind', ['approval', 'external'])
 def test_callback_cannot_introduce_reserved_metadata_for_an_ordinary_request(kind):
     part = ToolCallPart('ordinary', '{}', tool_call_id='ordinary')
-    requests = DeferredToolRequests(**{'approvals' if kind == 'approval' else 'calls': [part]})
+    requests = DeferredToolRequests(approvals=[part]) if kind == 'approval' else DeferredToolRequests(calls=[part])
 
     def callback(requests, action, payload):
-        return DeferredToolResults(
-            **{'approvals' if kind == 'approval' else 'calls': {'ordinary': True}},
-            metadata={'ordinary': {RESERVED: {'unvalidated': True}}},
-        )
+        results = DeferredToolResults(approvals={'ordinary': True}) if kind == 'approval' else DeferredToolResults(calls={'ordinary': True})
+        results.metadata = {'ordinary': {RESERVED: {'unvalidated': True}}}
+        return results
 
     executor = Executor(Agent(GalaxieModel('parent')), resume=callback)
     with pytest.raises(GalaxieError) as error:
