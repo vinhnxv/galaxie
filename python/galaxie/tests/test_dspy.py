@@ -130,12 +130,15 @@ def test_synchronous_calls_are_unsupported_and_imports_have_no_provider():
     ('evaluate', 2, BaseException, 10),
     ('evaluate', None, Exception, 10),
     ('async', 2, BaseException, 10),
+    ('async-n2', 2, BaseException, 10),
 ])
 def test_thread_pool_refusal_survives_author_catches_and_cleans_up(kind, threads, caught, max_errors):
     class Program(dspy.Module):
         def __init__(self):
             self.predict = dspy.Predict('question -> answer')
             self.predict.set_lm(GalaxieLM('answer'))
+            self.multi = dspy.Predict('question -> answer', n=2)
+            self.multi.set_lm(GalaxieLM('answer'))
 
         async def aforward(self, question):
             if question == 'supported':
@@ -146,8 +149,9 @@ def test_thread_pool_refusal_survives_author_catches_and_cleans_up(kind, threads
                     dspy.Evaluate(devset=examples, num_threads=threads, display_progress=False, display_table=False)(self.predict, metric=lambda *_: 1)
                 else:
                     def call(question):
-                        return asyncio.run(self.predict.acall(question=question))
-                    dspy.Parallel(num_threads=threads, max_errors=max_errors, disable_progress_bar=True)([(call if kind == 'async' else self.predict, example) for example in examples])
+                        predictor = self.multi if kind == 'async-n2' else self.predict
+                        return asyncio.run(predictor.acall(question=question))
+                    dspy.Parallel(num_threads=threads, max_errors=max_errors, disable_progress_bar=True)([(call if kind.startswith('async') else self.predict, example) for example in examples])
             except caught:
                 pass
             return dspy.Prediction(answer='fallback')

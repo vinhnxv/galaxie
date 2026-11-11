@@ -509,7 +509,12 @@ changes. ADR-0012 controls remain in JavaScript and are unchanged.
 Raw author-created threads without DSPy's settings remain unattributed natively;
 a thread-start error caught by author code is invisible to the executor. DSPy's
 own logger is unchanged: the threaded refusal produced no per-item records in the
-measured native probe, while sequential refusal can still log item text.
+measured native probe, while sequential refusal and an `n > 1` async call from a
+worker thread can still log item text. Items already queued in a native pool may
+keep running author callables after the run ended; their LM calls stay refused. An
+author's own `await asyncio.to_thread(...)` that fails to start a thread in the
+Worker is also reported as `unsupported`, and an error re-raised or wrapped
+without the `Thread.start` frame still ends `executor_error`.
 Chromium, Firefox, WebKit, real models and other DSPy versions are unmeasured.
 Use sequential `await module.acall(...)` loops; the branch journal remains a
 separate follow-up. See the [tests and limits](../../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).

@@ -539,6 +539,7 @@ class GalaxieLM(dspy.LM):
         raise _LMError('unsupported')
 
     async def acall(self, prompt: Any = None, *, messages: Any = None, **kwargs: Any) -> Any:
+        _refuse_foreign()
         run = _run.get()
         if run is not None:
             run.check()
