@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 os.environ['LITELLM_LOCAL_MODEL_COST_MAP'] = 'true'
 import dspy
 from galaxie._bridge import install_transport, GalaxieError, receive_model_chunk, notify_stream_data, request, MAX_BYTES
-from galaxie.dspy import prepare_executor, error_code
+from galaxie.dspy import prepare_executor, error_code, state_binding
 from _galaxie_transport import request as _transport, notify as _notify
 sys.path.insert(0, '/agent')
 async def _galaxie_request(raw):
@@ -16,8 +16,10 @@ install_transport(_galaxie_request, _notify)
 dspy.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
 _galaxie_conversations = {}
 _galaxie_revisions = {}
+_galaxie_state_root = globals().get('_galaxie_state_root', '/agent')
 try:
-    _galaxie_executor = prepare_executor(getattr(importlib.import_module(_galaxie_module), _galaxie_entry)())
+    _galaxie_binding = state_binding(_galaxie_state_root) if _galaxie_durable else None
+    _galaxie_executor = prepare_executor(getattr(importlib.import_module(_galaxie_module), _galaxie_entry)(), state_binding=_galaxie_binding)
     _galaxie_ready = {'ok': True}
 except BaseException as error:
     _galaxie_ready = {'ok': False, 'code': error_code(error)}
