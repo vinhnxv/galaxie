@@ -1,0 +1,51 @@
+{
+  "rule": {
+    "requiredLanes": ["native", "node"],
+    "unmeasuredFails": true,
+    "supported": "The unmodified verbatim API passes result parity, replay, writes once, divergence-before-dispatch and tidy fixed refusals in both required lanes.",
+    "alternative": "Otherwise an async replacement passes those criteria for at least one journaled call per branch under shipped code in both required lanes; document the measured shape limits.",
+    "alternativeDesign": "Otherwise the test-only branch journal passes all eight criteria in both required lanes; recommend sequential acall loops today.",
+    "refused": "Otherwise record the failing probes and technical reason; sequential acall loops remain the author guidance."
+  },
+  "orders": {
+    "forward": ["alpha", "beta", "gamma"],
+    "reversed": ["gamma", "beta", "alpha"],
+    "rotated": ["beta", "gamma", "alpha"]
+  },
+  "predictions": {
+    "nativeParallelThreads": {
+      "ok": true,
+      "output": { "answers": [null, null, null] },
+      "requests": 0
+    },
+    "nativeParallelSequential": { "ok": false, "code": "unsupported", "requests": 0 },
+    "nativeEvaluateThreads": { "ok": true, "score": 0.0, "requests": 0 },
+    "nativeEvaluateSequential": { "ok": false, "code": "unsupported", "requests": 0 },
+    "singleCallGather": "Result parity, replay, write identity and divergence-before-dispatch pass in every arrival order under shipped code.",
+    "multiCallGather": "Shipped replay or re-dispatch fails unrecoverable in another order; the branch journal passes.",
+    "nodeThreads": {
+      "thread": "RuntimeError",
+      "pool": "RuntimeError",
+      "threadedCode": "executor_error",
+      "sequentialCode": "unsupported"
+    },
+    "pauseInBranch": "Shipped code may leave an unfinished journal or orphan sibling; the branch journal ends unsupported and drains siblings.",
+    "outcomes": { "parallel": "alternative", "threadedEvaluate": "alternative" }
+  },
+  "scenarios": [
+    "par-verbatim-parallel-threads",
+    "par-verbatim-parallel-sequential",
+    "par-verbatim-evaluate-threads",
+    "par-verbatim-evaluate-sequential",
+    "par-verbatim-thread-start",
+    "par-fan-single",
+    "par-fan-write",
+    "par-fan-multi",
+    "par-fan-two-stage-single",
+    "par-fan-two-stage-multi",
+    "par-fan-diverge",
+    "par-fan-pause-in-branch",
+    "par-fan-concurrent-pauses",
+    "par-fan-eval-loop"
+  ]
+}

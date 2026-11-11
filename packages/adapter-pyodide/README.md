@@ -438,10 +438,22 @@ and arguments before ChatAdapter, JSONAdapter or ReAct parses them.
 `streaming`, `interrupts`, `resume` and `checkpoints` are true; `subgraphs` is
 false. Nested modules have no checkpoint namespaces, interrupt propagation or
 nested stream paths: a pause unwinds the whole program. Sync entry points,
-`dspy.Parallel`, threaded `Evaluate`,
 optimizers, multimodal inputs, embeddings, service retrievers and provider-string
 LMs are unsupported. Offline-optimized JSON state has the scripted evidence and
 limits [below](#offline-optimized-program-state).
+
+The parallel spike records **alternative** for `dspy.Parallel` and **alternative**
+for threaded `Evaluate`: use a sequential loop of `await module.acall(...)` today.
+The branch-keyed replacement is a proven test-only design awaiting implementation.
+With several threads the verbatim APIs end `executor_error` in Node Pyodide;
+natively they can silently return `None` entries or score 0.0. With one thread
+both end `unsupported`. Plain single-call `asyncio.gather` replays in the measured
+Node cases but fails natively; multi-call re-dispatch can repeat a write before
+`unrecoverable`. Author code must be deterministic apart from journaled calls.
+Chromium, Firefox, WebKit, real models, other DSPy versions and successful streaming,
+nested or pausing fan-out and ReAct branches are unmeasured by this spike. See the
+[evidence and exact limits](../../tests/conformance/README.md#dspy-parallel-and-threaded-evaluate-spike).
+
 JSONAdapter works without streaming; provider `response_format`/native schema
 output is unsupported. The default ChatAdapter disables JSON fallback, since a
 fallback would change the replay call sequence. Parse failures end the run.

@@ -1011,3 +1011,155 @@ Shipped verification:
 - `git diff --stat main -- 'tests/conformance/golden*' 'tests/conformance/compatibility-matrix*' pnpm-lock.yaml python/uv.lock python/requirements.lock`
   and `git diff --stat main -- packages/core` — empty; protected files remain
   byte-identical. Recorders are unchanged.
+
+## DSPy parallel and threaded Evaluate spike
+
+On 2026-11-11 the recorded outcome is **alternative** for `dspy.Parallel` and
+**alternative** for threaded `dspy.Evaluate`, with a replacement proven as a
+test-only design. Use a sequential loop of `await module.acall(...)` today.
+Neither verbatim API nor the candidate gains shipped support in this spike.
+
+The [fixed rule and predictions](cases-dspy/parallel-fixtures.json) were committed
+before Node measurements. An unmeasured required criterion fails. Per gap, the
+rule chooses verbatim support only after parity, replay, writes once,
+divergence-before-dispatch and tidy refusals pass in native CPython and Node
+Pyodide. Otherwise it chooses an alternative if shipped async single-call
+fan-out passes those checks in both lanes, or a design-only alternative if the
+candidate additionally passes unchanged-root bytes, old/new compatibility and
+bounds in their required lanes. Otherwise the outcome is refused. The deciding
+probes are `par-verbatim-parallel-*` plus `par-fan-*` for Parallel, and
+`par-verbatim-evaluate-*` plus `par-fan-eval-loop` for Evaluate. The verbatim
+probes fail, shipped replay has native counterexamples, and the candidate passes
+the required measurements. The conditional prepare-time refusal therefore did
+not fire. Follow-up implementation and fixed thread-pool refusal are drafted in
+the PR; no tracker issue was filed by the spike.
+
+Measured versions: DSPy 3.4.1, CPython 3.14.5, Node 24.15.0, Pyodide 314.0.7 and
+pnpm 11.21.0. Native orders are forward, reversed and rotated; Node exercises the
+forward/reversed orders named below. Replies depend on question content, never
+arrival order. Native uses events; Node releases each promise only after the
+preceding response is posted to the Worker. Host write confirmations remain
+enabled, with binding concurrency 4. A crash disposes the runtime after two real
+succeeded receipts while the third confirmation remains unapproved.
+
+In this table, R0 is shipped code and R1 is the test-only candidate. Request counts
+are live model requests; writes count actual host effects, excluding replayed
+receipts. A dash means that candidate comparison is inapplicable. **Every new
+spike probe is unmeasured in Chromium, Firefox and WebKit.** Existing browser
+regression gates do not measure these new scenarios.
+
+| Probe | Prediction | Native observation, R0 / R1 | Node observation, R0 / R1 |
+| --- | --- | --- | --- |
+| `par-verbatim-parallel-threads` | Native success with `None`; Node `executor_error` | Success, `[None, None, None]`, 0 requests/writes / — | `executor_error`, 0 requests/writes / — |
+| `par-verbatim-parallel-sequential` | `unsupported` | `unsupported`, 0 requests/writes / — | `unsupported`, 0 requests/writes / — |
+| `par-verbatim-evaluate-threads` | Native score 0.0; Node `executor_error` | Success, score 0.0, three empty predictions, 0 requests/writes / — | `executor_error`, 0 requests/writes / — |
+| `par-verbatim-evaluate-sequential` | `unsupported` | `unsupported`, 0 requests/writes / — | `unsupported`, 0 requests/writes / — |
+| `par-verbatim-thread-start` | Worker thread/pool both `RuntimeError` | Both started, 0 requests/writes / — | Both `RuntimeError`, 0 requests/writes / — |
+| `par-fan-single` | Live parity in every order | Native output and full payload multiset match, 3 requests / same | Forward/reversed parity, 3 requests / same |
+| `par-fan-write` | Stable scopes across crash/re-dispatch | Two writes before crash, one new write after reversed re-dispatch; 3 effects total / same | Same 2 + 1 writes, 3 succeeded receipts / same |
+| `par-fan-multi` | Live parity; R0 re-dispatch fails, R1 completes | Live parity, 6 requests/3 writes. Crash then reverse: `unrecoverable`, observed duplicate `alpha` under a new scope / 3 total writes, parity after re-dispatch | Reversed live parity, 6 requests/3 writes / same. Multi-call crash is unmeasured in Node |
+| `par-fan-two-stage-single` | R0 and R1 replay and complete | **Diverged:** all three measured R0 orders ended `unrecoverable`, 0 resume requests; observed initial order `alpha,gamma,beta` / completes, 3 new after-join requests, one `replayed` event | Completes, 3 new after-join requests, one `replayed` event / same |
+| `par-fan-two-stage-multi` | R0 fails, R1 completes | `unrecoverable`, 0 resume requests / completes, 6 new after-join requests and 3 new writes, one `replayed` event | Same refusal, 0 live requests/writes / same completion with opposite reply order |
+| `par-fan-diverge` | Changed prompt or removed branch refuses before dispatch | Both end `unrecoverable`, 0 post-resume requests/writes / same; mixed-prefix barrier probes also send 0 requests | Both end `unrecoverable`, 0 post-resume requests/writes / same |
+| `par-fan-pause-in-branch` | R0 may strand a sibling; R1 drains and refuses | `unsupported`, cleared journal, 1 held model request and 1 sibling at return / `unsupported`, 0 surviving tasks | `unsupported`, 1 sibling at return / `unsupported`, 0 surviving tasks |
+| `par-fan-concurrent-pauses` | `unsupported` | `unsupported`, 0 requests/writes/tasks / same | `unsupported`, 0 requests/writes/tasks / same |
+| `par-fan-eval-loop` | R0 and R1 parity, including replay | Live score 100.0 and 4 requests; **diverged:** R0 reload `unrecoverable`, 0 resume requests / score 100.0, 4 initial and 0 resume requests, one `replayed` event | Live/native parity and silent replay, score 100.0 / same |
+| Candidate group validation | Fixed `unsupported`, no stranded work | Invalid/duplicate keys, nested groups, streaming and width 33 refuse; empty/one-branch groups work / R1 only | Same refusals, 0 requests/writes/surviving tasks / R1 only |
+| Unused format, restore and bounds | Root bytes unchanged; old/new fail closed; bounded entries | Root checkpoint/metadata byte equality; legacy restore completes; old reader refuses branch record with unchanged rows; one optional string, at most 70 characters, width cap 32; existing pause-size refusal / R1 only | Width/guard refusal measured; byte equality and old-reader checks are native-only required probes |
+
+All Node observations assert zero model/capability requests after termination,
+zero Worker errors and loopback fixture requests only. The native harness records
+orphan tasks before cancelling them; cleanup is not counted as a candidate pass.
+The native reference runs plain DSPy `Parallel(num_threads=3)` and
+`Evaluate(num_threads=1/3)` with content-keyed custom engines. Live and continued
+outputs and full model payload multisets match that independent reference.
+
+### What the Worker's single thread allows
+
+Asyncio branches and concurrent bridge requests work: the reply gates wait for
+all branch requests before releasing any reply. `threading.Thread.start` and
+`ThreadPoolExecutor.submit` raise `RuntimeError` in this Worker. Synchronous model
+entry points cannot await the bridge. Natively, DSPy's pool catches ordinary
+exceptions, so Parallel can return `None` and Evaluate can return score 0.0 while
+the run reports success. The one-thread path sees the active run's refusal and
+ends `unsupported`.
+
+The prediction that single-call gather starts in task-creation order was wrong
+natively: DSPy 3.4.1 awaits `asyncio.to_thread(prepare, ...)` before journal entry.
+Recorded initial order `alpha,gamma,beta` differed from replay. Plain gather
+single-call and evaluation replay pass in Node, and write-only crash re-dispatch
+keeps receipts in both lanes, but these limits do not establish a portable async
+replacement. Multi-call branches can allocate another branch's scope, and the
+native crash probe actually repeated `alpha` before `unrecoverable` propagated.
+Multi-call work should remain sequential until the follow-up ships.
+
+```python
+answers = []
+for label in ('alpha', 'beta', 'gamma'):
+    answers.append((await module.acall(question=label)).answer)
+```
+
+Author code must be deterministic apart from journaled calls. The candidate uses
+static branch keys, branch-local ordinals and a barrier before live calls;
+divergent replay releases waiting siblings without dispatch. It cancels and
+awaits all branch tasks before returning. The initial Node helper released all
+promises together and failed four ordering assertions; the final helper gates on
+actual response posts. That was a measurement-harness correction, not a change
+to shipped code or to the predictions.
+
+### Journal format and core contracts
+
+The candidate adds one optional `branch` field to model and capability entries,
+holding `<key>/<ordinal>`. Keys are ASCII, 1–64 characters; ordinals are bounded
+to keep the whole marker at most 70 characters. The group cap is 32. The existing
+pause-size check counts branch bytes. Root-only checkpoint and metadata bytes
+remain identical. The real restore validator is reused after validating and
+removing only that optional key; all other shape checks remain in force. New
+code restores legacy records. Unmodified code rejects the added entry key with
+fixed `unrecoverable` and does not change stored rows. Metadata stays `v: 1` in
+the experiment; shipping must decide the optional-key/version policy under
+[ADR-0018 decision 7](../../docs/adr/0018-python-agents-through-pyodide.md#decision).
+
+No core contract change was needed: Python owns the journal and effect scopes;
+the adapter transports opaque checkpoint bytes and core treats scopes as opaque
+strings. Existing confirmations, budgets, routing and ADR-0012 controls remain.
+The candidate's install handle restores every replaced attribute; tests assert
+that uninstall does so. No shipped Python or package source, existing golden,
+matrix, recorder or lock changes in this spike.
+
+Chromium, Firefox, WebKit, real models and other DSPy versions are unmeasured for
+these probes. Successful streaming fan-out, nested groups, pauses inside branches
+and ReAct loops in branches are not established as product behavior. Refusal
+probes cover the first three; no ReAct fan-out claim follows from them.
+
+### Reproduce the parallel measurements
+
+Run from the repository root, except where `cd python` is shown. Fetch the wheel
+cache if absent, then rebuild the local wheel before Node or browser tests.
+Recorder commands always require `--check`.
+
+```sh
+node scripts/build-python-wheels.ts
+cd python
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_parallel_baseline.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_parallel_candidate.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy -q
+cd ..
+python/.venv/bin/python scripts/record-dspy-conformance.py --check
+python/.venv/bin/python scripts/record-dspy-state-conformance.py --check
+pnpm exec vitest run --project node tests/conformance/dspy-parallel.node.test.ts
+pnpm exec vitest run --project node tests/conformance/dspy.node.test.ts tests/conformance/dspy-restore.node.test.ts tests/conformance/dspy-state.node.test.ts tests/conformance/dspy-state-restore.node.test.ts tests/conformance/dspy-state-bind.node.test.ts tests/conformance/dspy-state-limits.node.test.ts
+pnpm run typecheck:python
+pnpm format
+pnpm lint
+pnpm typecheck
+pnpm typecheck:ts6
+pnpm run check:docs
+VITEST_MAX_WORKERS=4 pnpm check
+git diff --name-status main
+```
+
+Focused evidence: 32 baseline and 43 candidate native tests pass; the full native
+DSPy folder passes 172 tests. The new Node lane passes 31 tests, and the six
+existing Node suites pass 94 with one opt-in measurement skipped. Both recorder
+checks pass (38 native cases; five states and seven native state cases).

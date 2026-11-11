@@ -21,6 +21,7 @@
   2026-11-11: added executor-owned child approval hoisting, required child-call display, reserved-state validation and scripted approve/reject/reload evidence; status stays Proposed.
 
   2026-11-11: recorded the DSPy state-binding spike and shipped its optional paused-record metadata key; status stays Proposed.
+  2026-11-11: recorded alternative outcomes for DSPy Parallel and threaded Evaluate, with a test-only branch journal design; status stays Proposed.
 
 ## Context
 
@@ -437,3 +438,44 @@ pause. Firefox, WebKit, real models, other DSPy versions, concurrent tabs, forge
 metadata, large many-file descriptors and legacy sessions that pause again outside
 native CPython remain unmeasured. ADR-0012 guarantees are unchanged; this ADR stays
 Proposed. See the [shipped evidence](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
+
+### DSPy parallel and threaded Evaluate spike (2026-11)
+
+The recorded outcome is **alternative** for `dspy.Parallel` and **alternative**
+for threaded `Evaluate`, with the replacement proven as a design only. Shipped
+author guidance is a sequential loop of `await module.acall(...)`. The
+[evidence table](../../tests/conformance/README.md#dspy-parallel-and-threaded-evaluate-spike)
+records fixed predictions, observations and the outcome rule on DSPy 3.4.1,
+CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7 with scripted models.
+
+`par-verbatim-parallel-threads` returns three `None` entries natively;
+`par-verbatim-evaluate-threads` returns score 0.0 and empty predictions, both with
+zero bridge work. Both end `executor_error` in the Worker. Their sequential
+variants end `unsupported` in both lanes. `par-verbatim-thread-start` observes
+`RuntimeError` for both thread start and pool submission in the Worker. Its single
+thread permits asyncio concurrency and concurrent bridge requests; synchronous
+model entry points cannot await the bridge.
+
+Contrary to prediction, native single-call gather replay failed:
+`par-fan-two-stage-single` and `par-fan-eval-loop` ended `unrecoverable` without
+live dispatch. DSPy suspends in `asyncio.to_thread` before journal entry, so task
+creation order is insufficient. Both replay in the measured Node cases.
+Multi-call re-dispatch can repeat a write before reporting `unrecoverable`.
+The branch-keyed candidate passes the measured parity, replay, receipt reuse and
+divergence-before-dispatch checks. Pauses inside branches leave no candidate task;
+shipped code leaves one sibling until cleanup. Refusals use existing fixed codes.
+
+The candidate adds one optional `branch` string per model/capability journal entry,
+bounded to 70 characters, with a group width cap of 32. Root-only checkpoint and
+metadata bytes are unchanged. New code accepts old records; unmodified code
+refuses branch records with `unrecoverable` and leaves stored rows unchanged.
+The format finding is unresolved for shipping: the follow-up must decide an optional
+key under `v: 1` versus a version bump under decision 7. No core contract change was
+needed: checkpoint bytes and effect scopes remain opaque to core. This spike
+changes no shipped source; the conditional prepare-time refusal did not fire.
+
+Author code must be deterministic apart from journaled calls. Chromium, Firefox,
+WebKit, real models and other DSPy versions remain unmeasured here. Successful
+streaming fan-out, nested groups, pauses inside branches and ReAct branches are
+not established; the candidate only measures fixed refusals for the first three.
+ADR-0012 controls are unchanged and this ADR remains Proposed.
