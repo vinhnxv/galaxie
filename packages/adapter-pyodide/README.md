@@ -151,8 +151,9 @@ mock models, with no real model or corpus download.
 For trusted pydantic-ai agents, select `framework: 'pydantic-ai'` and executor
 `pydantic-ai-python`. The entry returns an `Agent` or `galaxie.pydantic_ai.Executor`.
 The pinned runtime uses `pydantic-ai-slim==2.60.0` and `pydantic-graph==2.60.0`,
-without provider SDKs. Use `GalaxieModel(role)` for routed model calls and
-`capability_tool(...)` for broker-bound tools. JavaScript checks reply text,
+without provider SDKs. Use `GalaxieModel(role)` for routed model calls,
+`capability_tool(...)` for broker-bound tools and `run_child(ctx, agent, prompt, ...)`
+from `galaxie.pydantic_ai` for delegation inside a tool. JavaScript checks reply text,
 tool-call arguments, IDs and names on every growing chunk and at completion.
 Only checked reply text reaches `messages`; tool arguments and results do not.
 
@@ -195,22 +196,58 @@ cancellation or Worker loss discards them, and subsequent pending/resume fails
 `unavailable`. Snapshots cover pause and completion boundaries, not arbitrary
 mid-run replay. Write deduplication requires recovery and deterministic call order;
 a replay with changed arguments fails `unrecoverable`. Keep the existing app/principal
-scope, logout fencing and ownership composition. `subgraphs` stays false: the
-[delegation probes](../../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
-observe checked child deltas without host child events or paths. Plain delegation
-has a measured alternative: forward usage and derive a stable, distinct child
-conversation ID, with stable delegate tool-call IDs across parent model replay.
-Regenerated delegate IDs change the child scope and can repeat a write; this
-variant is unmeasured. A fresh child ID repeats a write after reload, and simply
-reusing the parent's ID collides with its effect positions. Explicitly hoisting child
-approval state into the parent's metadata completes and restores in the measured
-pattern, using an author resume callback that preserves child state. These are
-probe-local patterns; an executor-owned helper, hoist API and public-only nested
-model/capability guard remain follow-up work. No nested-run refusal ships yet.
-Prefer flattening gated tools into one agent's capability-backed tools. Sequential
-native-output delegates share repair accounting; outer snapshot validation does
-not validate author-owned child metadata. Browser delegation, real providers and
-general nested checkpoint semantics remain unmeasured.
+scope, logout fencing and ownership composition.
+
+**Delegation.** `await run_child(ctx, child, prompt, key='')` returns the child's
+`AgentRunResult`. It defaults `deps` to `ctx.deps` (an explicit override is allowed),
+shares `ctx.usage` and `ctx.usage_limits`, and gives each child a fresh native-output
+repair counter. The parent and siblings keep their own counters; permitted repairs
+still consume the host's shared run repair budget. The child's conversation ID is
+a hash of a domain tag, parent conversation ID, delegate message position, part
+index and `key`. It does not use the provider's tool-call ID. Keep replay call
+order and structure deterministic, and use distinct keys for several children in
+one tool body. Reusing a child identity within one executor run fails `invalid`.
+
+The helper reserves `usage`, `usage_limits`, `conversation`, `conversation_id`,
+`run_id`, `infer_name`, `metadata`, `workspace` and `spec`; passing any of them, or an
+option `Agent.run` does not accept, fails `invalid`. The child model,
+including a `model=` override, must be a `GalaxieModel`, or it fails `unsupported`.
+Agent overrides and capability model selections are checked at run and request
+time. Child streaming enabled by event handlers or capabilities is also refused
+before a child model request reaches the bridge.
+The existing instrumentation, native-tool and model-setting refusals also apply.
+
+During an `Executor` run, the guard accepts the parent and registered helper
+children. Plain nested `child.run`, `child.run_stream`, capability tools from an
+unregistered run and nested `Executor.run` fail `unsupported` before bridge work.
+The checks use public pydantic-ai run and request contexts. Run IDs are revoked
+when the parent finishes, fails or is cancelled, including in inherited background
+task contexts. A model request is authorized by the capability of the run that
+makes it, never by `run_id` stamps in message history, so a prompt-less nested run
+that inherits the parent's history is refused like any other plain nested run.
+Ordinary retries, resume, sequential top-level runs and parallel tools pass the
+measured checks.
+Outside an `Executor`, direct model/helper use remains available without the guard.
+The guard is accident-proofing, not an isolation boundary: direct trusted
+`capabilities.call`, plain non-`GalaxieModel` children and work started in a thread or
+task with an empty context (for example `run_in_executor` with a fresh event loop)
+can bypass it. ADR-0012
+controls remain in the JavaScript bridge and broker.
+
+The [delegation evidence](../../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
+covers CPython and Node Pyodide. After a crash following a child write, a scripted
+changed delegate ID preserves the helper's child scope and effect ID, so the write
+runs once; the ID-sensitive control writes twice. This measures sensitivity to ID
+changes, not whether a real provider regenerates IDs. Writes still require host
+confirmation and matching checkpoint/recovery stores. Explicit child-approval
+hoisting remains probe-local and needs an author resume callback that preserves
+child state; outer snapshots do not validate that author-owned metadata. Flatten
+gated tools into one agent when that state handling is unnecessary. `subgraphs`
+stays false: there is no helper child streaming or host child stream path, and
+plain child streams are refused. Chromium delegation, real providers, arbitrary
+mid-run continuation and general nested checkpoints remain unmeasured. The size
+budget covers JavaScript package entries; neither this adapter nor the Python
+wheel has a size budget.
 
 Include `DeferredToolRequests` in the agent's output types to pause on
 `requires_approval`, `ApprovalRequired` or `CallDeferred`. Wrap the agent in `Executor(agent,

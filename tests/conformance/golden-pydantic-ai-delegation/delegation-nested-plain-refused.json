@@ -1,0 +1,46 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "parent"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "delegate",
+            "description": "Delegate to the child.",
+            "parameters": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "delegate",
+          "name": "delegate",
+          "args": {}
+        }
+      ]
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "unsupported",
+    "message": "This operation is unsupported."
+  }
+}

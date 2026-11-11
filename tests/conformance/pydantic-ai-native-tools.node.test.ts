@@ -325,7 +325,9 @@ probe(
       await fixture.cleanup();
     }
   },
-  240000,
+  // About 25 sequential Pyodide probes. The python-pydantic CI group runs every pydantic file on a
+  // shared two-core runner, so the budget covers that contention, not one probe's own cost.
+  900000,
 );
 
 // N6: the implicit optional tool search must keep ordinary agents working.

@@ -61,6 +61,7 @@ export interface DelegationStep {
   readonly answer?: boolean;
   readonly crashAfterWrite?: boolean;
   readonly repairAttempts?: number;
+  readonly delegateId?: string;
 }
 
 export interface DelegationResult {
@@ -95,11 +96,19 @@ export async function executeDelegationProbe(
     error: null,
   };
   const latch = createMockLatch();
+  const delegateId = step.delegateId;
   const script: MockScript = Object.fromEntries(
     Object.entries(spec.scripts).map(([prompt, replies]) => [
       prompt,
       replies.map((reply, index) => ({
         ...reply,
+        ...(prompt === 'parent' && delegateId !== undefined && reply.toolCalls
+          ? {
+              toolCalls: reply.toolCalls.map((call) =>
+                call.name === 'delegate' ? { ...call, id: delegateId } : call,
+              ),
+            }
+          : {}),
         id: `${prompt}-${index}`,
         usage: { input_tokens: 2, output_tokens: 2, total_tokens: 4 },
         ...(step.crashAfterWrite && prompt === 'child' && index === replies.length - 1

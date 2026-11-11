@@ -5,6 +5,7 @@
 
 import asyncio
 import hashlib
+import inspect
 import json
 import math
 import re
@@ -14,17 +15,18 @@ from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
+from uuid import uuid4
 
 from pydantic_ai import Agent, AgentRunResult, Conversation, ConversationTypeAdapter, DeferredToolRequests, DeferredToolResults, NativeOutput, RunContext, Tool, capture_run_messages
-from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai.capabilities import AbstractCapability, Instrumentation
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (
     ModelMessage, ModelRequest, ModelResponse, ModelResponsePart, ModelResponseStreamEvent,
     PartStartEvent, PartDeltaEvent, RetryPromptPart, SystemPromptPart, TextPart, TextPartDelta,
     ToolCallPart, ToolReturnPart, UserPromptPart,
 )
-from pydantic_ai.models import Model, ModelRequestParameters, StreamedResponse
+from pydantic_ai.models import Model, ModelRequestContext, ModelRequestParameters, StreamedResponse
 from pydantic_ai.models.instrumented import InstrumentedModel
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.toolsets import FunctionToolset
@@ -38,6 +40,25 @@ _positions: ContextVar[int] = ContextVar('galaxie_pydantic_positions', default=0
 # Native-output requests sent so far in the current run. Counting requests, not history messages,
 # keeps a history processor from hiding or inventing repair attempts.
 _native_requests: ContextVar[list[int] | None] = ContextVar('galaxie_pydantic_native_requests', default=None)
+
+
+@dataclass
+class _ActiveRun:
+    run_ids: set[str]
+    child_ids: set[str]
+
+
+_active: ContextVar[_ActiveRun | None] = ContextVar('galaxie_pydantic_active', default=None)
+# Set only around a model call made by a run that carries _RunAuthority. Message history can carry
+# another run's stamp (a prompt-less resume keeps it), so the stamp is never used to authorize.
+_authorized: ContextVar[str | None] = ContextVar('galaxie_pydantic_authorized', default=None)
+_OutputT = TypeVar('_OutputT')
+
+
+def _check_run(run_id: str | None) -> None:
+    active = _active.get()
+    if active is not None and run_id not in active.run_ids:
+        raise GalaxieError('unsupported')
 
 
 def _json(value: Any) -> Any:
@@ -213,6 +234,7 @@ class GalaxieModel(Model):
         self, messages: list[ModelMessage], model_settings: ModelSettings | None,
         model_request_parameters: ModelRequestParameters,
     ) -> ModelResponse:
+        _check_run(_authorized.get())
         payload, parameters = self._prepare(messages, model_settings, model_request_parameters)
         reply = await request('model', payload)
         return _reply(reply, messages, set(parameters.declared_tool_defs), self.role)
@@ -222,6 +244,7 @@ class GalaxieModel(Model):
         self, messages: list[ModelMessage], model_settings: ModelSettings | None,
         model_request_parameters: ModelRequestParameters, run_context: RunContext[Any] | None = None,
     ) -> AsyncIterator[StreamedResponse]:
+        _check_run(run_context.run_id if run_context is not None else messages[-1].run_id if messages else None)
         payload, parameters = self._prepare(messages, model_settings, model_request_parameters)
         payload['options']['stream'] = True
         chunks: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
@@ -318,6 +341,82 @@ class _GalaxieStream(StreamedResponse):
         return self._timestamp
 
 
+def _call_position(ctx: RunContext) -> tuple[int, int]:
+    for response_index, message in reversed(list(enumerate(ctx.messages))):
+        if isinstance(message, ModelResponse):
+            for part_index, part in enumerate(message.parts):
+                if isinstance(part, ToolCallPart) and part.tool_call_id == ctx.tool_call_id and part.tool_name == ctx.tool_name:
+                    return _positions.get() + response_index, part_index
+    raise GalaxieError('invalid')
+
+
+class _RunAuthority(AbstractCapability[Any]):
+    async def wrap_model_request(
+        self, ctx: RunContext[Any], *, request_context: ModelRequestContext, handler: Any,
+    ) -> ModelResponse:
+        token = _authorized.set(ctx.run_id)
+        try:
+            return await handler(request_context)
+        finally:
+            _authorized.reset(token)
+
+
+class _ChildRunGuard(_RunAuthority):
+    async def before_run(self, ctx: RunContext[Any]) -> None:
+        if not isinstance(ctx.model, GalaxieModel):
+            raise GalaxieError('unsupported')
+
+    async def before_model_request(
+        self, ctx: RunContext[Any], request_context: ModelRequestContext,
+    ) -> ModelRequestContext:
+        if not isinstance(request_context.model, GalaxieModel) or request_context.streaming:
+            raise GalaxieError('unsupported')
+        return request_context
+
+
+async def run_child(
+    ctx: RunContext, agent: Agent[Any, _OutputT], prompt: str | None, *, key: str = '', **options: Any,
+) -> AgentRunResult[_OutputT]:
+    """Delegate from a tool with shared usage and a replay-stable positional identity.
+
+    Use distinct keys for several children in one tool call. Replay must preserve
+    call order and structure. Child approval hoisting and streaming are not provided.
+    """
+    reserved = {'usage', 'usage_limits', 'conversation', 'conversation_id', 'run_id', 'infer_name', 'metadata', 'workspace', 'spec'}
+    if set(options) & reserved or not set(options) <= set(inspect.signature(Agent.run).parameters):
+        raise GalaxieError('invalid')
+    if not isinstance(key, str) or not isinstance(ctx.conversation_id, str) or not ctx.conversation_id:
+        raise GalaxieError('invalid')
+    _check_run(ctx.run_id)
+    model = options.get('model')
+    if not isinstance(agent, Agent) or not isinstance(agent.model if model is None else model, GalaxieModel):
+        raise GalaxieError('unsupported')
+    _uninstrumented(agent)
+    _validate_agent(agent)
+    position, part = _call_position(ctx)
+    identifier = hashlib.sha256(json.dumps([
+        'galaxie.pydantic-ai.child', ctx.conversation_id, position, part, key,
+    ], ensure_ascii=False).encode()).hexdigest()
+    run_id = uuid4().hex
+    active = _active.get()
+    if active is not None:
+        if identifier in active.child_ids:
+            raise GalaxieError('invalid')
+        active.child_ids.add(identifier)
+        active.run_ids.add(run_id)
+    native_token = _native_requests.set([0])
+    try:
+        options['capabilities'] = [*(options.get('capabilities') or []), _ChildRunGuard()]
+        return await agent.run(
+            prompt, **{'deps': ctx.deps, **options}, usage=ctx.usage, usage_limits=ctx.usage_limits,
+            conversation_id=identifier, run_id=run_id, infer_name=False,
+        )
+    finally:
+        _native_requests.reset(native_token)
+        if active is not None:
+            active.run_ids.discard(run_id)
+
+
 def capability_tool(
     name: str, capability: str, parameters: dict[str, Any], description: str | None = None,
 ) -> Tool:
@@ -326,21 +425,18 @@ def capability_tool(
         raise GalaxieError('invalid')
 
     async def invoke(ctx: RunContext, **arguments: Any) -> Any:
+        _check_run(ctx.run_id)
         conversation = ctx.conversation_id
         if not isinstance(conversation, str) or not conversation:
             raise GalaxieError('invalid')
-        for response_index, message in reversed(list(enumerate(ctx.messages))):
-            if isinstance(message, ModelResponse):
-                for part_index, part in enumerate(message.parts):
-                    if isinstance(part, ToolCallPart) and part.tool_call_id == ctx.tool_call_id and part.tool_name == ctx.tool_name:
-                        scope = f'pydantic-ai/{conversation}/{_positions.get() + response_index}/{part_index}'
-                        return await capabilities.call(capability, arguments, effect_scope=scope, tool=True)
-        raise GalaxieError('invalid')
+        position, part = _call_position(ctx)
+        scope = f'pydantic-ai/{conversation}/{position}/{part}'
+        return await capabilities.call(capability, arguments, effect_scope=scope, tool=True)
 
     return Tool.from_schema(invoke, name=name, description=description, json_schema=parameters, takes_ctx=True)
 
 
-def _uninstrumented(agent: Agent) -> None:
+def _uninstrumented(agent: Agent[Any, Any]) -> None:
     def instrumented(capability: Any) -> bool:
         return isinstance(capability, Instrumentation) or any(
             instrumented(child) for child in getattr(capability, 'capabilities', [])
@@ -352,14 +448,14 @@ def _uninstrumented(agent: Agent) -> None:
         raise GalaxieError('unsupported')
 
 
-def _validate_native_tools(agent: Agent) -> None:
+def _validate_native_tools(agent: Agent[Any, Any]) -> None:
     for tool in agent.root_capability.get_native_tools():
         # Ordinary agents carry optional tool search, dropped unless deferred tools need it.
         if callable(tool) or tool.kind != 'tool_search' or not tool.optional:
             raise GalaxieError('unsupported')
 
 
-def _validate_agent(agent: Agent) -> None:
+def _validate_agent(agent: Agent[Any, Any]) -> None:
     _validate_native_tools(agent)
     settings = agent.model_settings
     if callable(settings) or (settings and not set(settings) <= {'stop_sequences'}):
@@ -572,12 +668,18 @@ class Executor:
         on_stream: Callable[[str, Any], None] | None = None,
         resume: dict[str, Any] | None = None,
     ) -> Any:
+        if _active.get() is not None:
+            raise GalaxieError('unsupported')
         _uninstrumented(self.agent)
         Agent.instrument_all(False)
         if not isinstance(conversation_id, str) or not conversation_id:
             raise GalaxieError('invalid')
         state = self._conversations.setdefault(conversation_id, _Conversation())
-        options = {'conversation_id': conversation_id, 'usage_limits': UsageLimits(request_limit=steps), 'infer_name': False}
+        run_id = uuid4().hex
+        options = {
+            'conversation_id': conversation_id, 'usage_limits': UsageLimits(request_limit=steps), 'infer_name': False,
+            'run_id': run_id, 'capabilities': [_RunAuthority()],
+        }
         position = state.position
         if resume is not None:
             pause = state.pending
@@ -603,6 +705,8 @@ class Executor:
         state.pending = None
         token = _positions.set(position)
         native_token = _native_requests.set([0])
+        active = _ActiveRun({run_id}, set())
+        active_token = _active.set(active)
         with capture_run_messages() as messages:
             try:
                 if on_stream is None:
@@ -614,9 +718,11 @@ class Executor:
             except UnexpectedModelBehavior:
                 raise GalaxieError('executor_error') from None
             finally:
+                active.run_ids.clear()
                 state.position = position + len(messages)
                 _positions.reset(token)
                 _native_requests.reset(native_token)
+                _active.reset(active_token)
         state.conversation = result.conversation
         if isinstance(result.output, DeferredToolRequests):
             try:

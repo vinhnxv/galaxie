@@ -1,0 +1,131 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "parent"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "delegate",
+            "description": "Delegate to the child.",
+            "parameters": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "child"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "again",
+            "description": "",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "child"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "again-1",
+              "type": "function",
+              "function": {
+                "name": "again",
+                "arguments": "{}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "again-1",
+          "content": "again"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "again",
+            "description": "",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "delegate",
+          "name": "delegate",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "again-1",
+          "name": "again",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "again-2",
+          "name": "again",
+          "args": {}
+        }
+      ]
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "budget_exceeded",
+    "message": "The budget limit was reached."
+  }
+}

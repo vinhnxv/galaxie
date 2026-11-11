@@ -1,0 +1,45 @@
+{
+  "delegation-reload-write": {
+    "prompt": "parent",
+    "steps": 10,
+    "scripts": {
+      "parent": [
+        { "text": "", "toolCalls": [{ "id": "gate", "name": "gate", "args": {} }] },
+        { "text": "", "toolCalls": [{ "id": "delegate", "name": "delegate", "args": {} }] },
+        { "text": "parent-done" }
+      ],
+      "child": [
+        { "text": "", "toolCalls": [{ "id": "save", "name": "save", "args": { "value": 2 } }] },
+        { "text": "child-done" }
+      ]
+    },
+    "answers": [{ "action": "approve", "payload": { "toolCallIds": ["gate"] } }]
+  },
+  "delegation-shared-budgets": {
+    "prompt": "parent",
+    "steps": 3,
+    "scripts": {
+      "parent": [
+        { "text": "", "toolCalls": [{ "id": "delegate", "name": "delegate", "args": {} }] },
+        { "text": "parent-done" }
+      ],
+      "child": [
+        { "text": "", "toolCalls": [{ "id": "again-1", "name": "again", "args": {} }] },
+        { "text": "", "toolCalls": [{ "id": "again-2", "name": "again", "args": {} }] },
+        { "text": "", "toolCalls": [{ "id": "again-3", "name": "again", "args": {} }] },
+        { "text": "child-done" }
+      ]
+    }
+  },
+  "delegation-nested-plain-refused": {
+    "prompt": "parent",
+    "steps": 10,
+    "scripts": {
+      "parent": [
+        { "text": "", "toolCalls": [{ "id": "delegate", "name": "delegate", "args": {} }] },
+        { "text": "parent-done" }
+      ],
+      "child": [{ "text": "child-done" }]
+    }
+  }
+}

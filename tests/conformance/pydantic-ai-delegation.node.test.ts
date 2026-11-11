@@ -39,7 +39,7 @@ import {
 import { delegationSources } from './support/pydantic-ai-delegation-sources.node.js';
 
 const probe = test.skipIf(!pythonWheelsAvailable);
-async function measure(step: DelegationStep, variant = 'usage') {
+async function measure(step: DelegationStep, variant = 'helper') {
   const fixture = await createPythonFixture({
     sources: await delegationSources(step.name, variant),
     module: 'selected',
@@ -91,7 +91,7 @@ probe(
 );
 
 // P0 accounting clause: core sees each bridged model/capability exactly once.
-probe.each(['usage', 'conv', 'helper'])(
+probe.each(['helper'])(
   'D1 exact shared accounting: %s',
   async (variant) => {
     const result = await measure(
@@ -136,15 +136,16 @@ probe.each(['tokens', 'cost', 'toolCalls'] as const)(
   90000,
 );
 
-// P0 step clause: plain is characterized even when the assertion is green.
+// The shipped guard refuses plain variants; the helper shares the step budget.
 probe.each(['plain', 'usage', 'conv', 'helper'])(
   'D2 total requests at parent step limit 3: %s',
   async (variant) => {
     const result = await measure({ name: 'steps', budgets: { steps: 3 } }, variant);
-    expect(result.transcript.requests).toHaveLength(variant === 'plain' ? 6 : 3);
-    expect(result.transcript.error).toEqual(
-      variant === 'plain' ? null : expect.objectContaining({ code: 'budget_exceeded' }),
-    );
+    expect(result.transcript.requests).toHaveLength(variant === 'helper' ? 3 : 1);
+    expect(result.transcript.error).toMatchObject({
+      code: variant === 'helper' ? 'budget_exceeded' : 'unsupported',
+    });
+    expect(result.transcript.capabilities).toEqual([]);
   },
   90000,
 );
@@ -171,8 +172,8 @@ probe(
   90000,
 );
 
-probe.each(['plain', 'conv', 'helper'])(
-  'D5 restore mid-delegate write: %s',
+probe.each(['helper', 'id-control'])(
+  'D5 restore mid-delegate write after a regenerated delegate ID: %s',
   async (variant) => {
     const store = delegationStore();
     const first = await measure(
@@ -185,7 +186,13 @@ probe.each(['plain', 'conv', 'helper'])(
     const firstEffects = store.effects.slice();
     expect(firstEffects).toEqual(first.writes.map((write) => write.effectId));
     const second = await measure(
-      { name: 'recovery', store, sessionId: first.sessionId, answer: true },
+      {
+        name: 'recovery',
+        store,
+        sessionId: first.sessionId,
+        answer: true,
+        delegateId: 'regenerated-delegate',
+      },
       variant,
     );
     expect(second.transcript.error).toBeNull();
@@ -198,15 +205,15 @@ probe.each(['plain', 'conv', 'helper'])(
       .map((message) => message.payload.effectScope);
     expect(before).toHaveLength(1);
     expect(after).toHaveLength(1);
-    expect(after[0] === before[0]).toBe(variant !== 'plain');
+    expect(after[0] === before[0]).toBe(variant === 'helper');
     const restoredEffects = store.effects.slice(firstEffects.length);
     expect(restoredEffects).toHaveLength(1);
-    expect(restoredEffects[0] === firstEffects[0]).toBe(variant !== 'plain');
+    expect(restoredEffects[0] === firstEffects[0]).toBe(variant === 'helper');
     expect([...first.writes, ...second.writes].map((write) => write.value)).toEqual(
-      variant === 'plain' ? [2, 2] : [2],
+      variant === 'id-control' ? [2, 2] : [2],
     );
     const records = [...store.recovery.journal.values()];
-    expect(records).toHaveLength(variant === 'plain' ? 2 : 1);
+    expect(records).toHaveLength(variant === 'id-control' ? 2 : 1);
     expect(records.every((record) => record.status === 'succeeded')).toBe(true);
   },
   90000,
@@ -284,64 +291,43 @@ probe(
   90000,
 );
 
-// Informational D7; P0 S1 requires real child events with a path, not vacuous stability.
+// Streaming children have no supported host path and are refused before dispatch.
 probe(
-  'D7/S1 child streaming is checked but has no projected child events or path',
+  'D7/S1 plain child streaming is refused and subgraphs stays false',
   async () => {
-    const first = await measure({ name: 'stream' });
-    const second = await measure({ name: 'stream' });
-    for (const result of [first, second]) {
-      expect(result.transcript.error).toBeNull();
-      expect(result.transcript.output).toBe('parent-done');
-      expect(result.checks).toContain('child-stream');
-      expect(
-        result.bridge
-          .filter((message) => message.op === 'model' && message.payload.role === 'child')
-          .map((message) => message.payload.options?.stream),
-      ).toEqual([true]);
-      const streams = result.events.filter((event) => event.type === 'stream');
-      expect(JSON.stringify(streams)).not.toContain('child-stream');
-      expect(
-        streams
-          .filter((event) => event.mode === 'messages')
-          .map((event) => (event.data as [{ content: string }])[0].content)
-          .join(''),
-      ).toBe('parent-done');
-      expect(streams.map((event) => event.path)).toEqual(streams.map(() => []));
-    }
-    const blocked = await measure({ name: 'stream', blockChild: true });
-    expect(blocked.transcript.error).toMatchObject({ code: 'denied' });
-    expect(blocked.transcript.requests).toHaveLength(2);
-    expect(blocked.transcript.output).toBeNull();
+    const result = await measure({ name: 'stream' });
+    expect(result.transcript.error).toMatchObject({ code: 'unsupported' });
+    expect(result.transcript.output).toBeNull();
+    expect(result.transcript.requests).toHaveLength(1);
+    expect(result.transcript.capabilities).toEqual([]);
+    expect(result.checks).not.toContain('child-stream');
+    expect(result.bridge.filter((message) => message.payload.role === 'child')).toEqual([]);
+    expect(result.subgraphs).toBe(false);
   },
   90000,
 );
 
 probe(
-  'D6 shared repair accounting charges the second native child against core repair budget',
+  'D6 sequential native children each start at repair zero with no repair allowance',
   async () => {
     const result = await measure({
       name: 'native',
-      repairAttempts: 1,
+      repairAttempts: 0,
       budgets: { repairAttempts: 0 },
     });
-    expect(result.transcript.error).toMatchObject({ code: 'budget_exceeded' });
-    expect(result.transcript.requests).toHaveLength(3);
+    expect(result.transcript.error).toBeNull();
+    expect(result.transcript.output).toBe('parent-done');
+    expect(result.transcript.requests).toHaveLength(5);
     expect(
       result.bridge
         .filter((message) => message.op === 'model' && message.payload.role === 'child')
         .map((message) => message.payload.options?.repairAttempt ?? 0),
-    ).toEqual([0, 1]);
-    expect(
-      result.spans.find((span) => span.name.startsWith('invoke_agent'))?.attributes[
-        'galaxie.budget.name'
-      ],
-    ).toBe('repairAttempts');
+    ).toEqual([0, 0]);
   },
   90000,
 );
 
-// P0 guard clause, shared public-only candidate from the CPython probes.
+// The shipped guard uses only public run identities at model and capability calls.
 probe.each(['guard', 'guard-stream'])(
   'G2 %s refuses nested work before its first bridge request',
   async (name) => {
@@ -367,7 +353,7 @@ probe(
     expect(first.writes.map((write) => write.value)).toEqual([2]);
     const restored = await measure(
       { name: 'hoist', store, sessionId: first.sessionId, answer: true },
-      'guarded',
+      'plain',
     );
     expect(restored.restored).toEqual(first.pending);
     expect(restored.transcript.error).toMatchObject({ code: 'unsupported' });

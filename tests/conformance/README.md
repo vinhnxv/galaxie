@@ -240,112 +240,149 @@ covered a cited answer, review with two kept passages, reload restore of the exe
 ## pydantic-ai agent delegation probes
 
 The [CPython probes](cases-pydantic-ai-delegation/test_delegation_probes.py) and
-[Node Pyodide probes](pydantic-ai-delegation.node.test.ts) characterize the shipped
-executor unchanged, using the same [scripted replies](cases-pydantic-ai-delegation/fixtures.json).
-The outcome rule was committed before observations, in the Python fixture docstring
-and Node test comment. A green test pins an observation, including a gap; it does
-not mean the satisfaction condition holds. An unmeasured required probe makes its
-gap undetermined. Informational probes do not decide outcomes.
+[Node Pyodide probes](pydantic-ai-delegation.node.test.ts) now exercise the shipped
+`galaxie.pydantic_ai.run_child` and nested-run guard with the same
+[scripted replies](cases-pydantic-ai-delegation/fixtures.json). The original spike
+outcome rule remains in the fixture docstring for comparison; the tables below
+record the shipped behavior. A green characterization test can still pin a limit.
 
 Versions: pydantic-ai-slim 2.60.0, pydantic-graph 2.60.0, CPython 3.14.5,
 Pyodide 314.0.7, Node 24.15.0 and pnpm 11.21.0. Re-run these probes on every
-pydantic-ai version bump, including the public hook and message identity checks.
+pydantic-ai version bump, including public message and tool run-ID checks.
 
-Variants: `plain` forwards nothing; `usage` forwards `deps`, `usage` and
-`usage_limits`; `conv` also reuses the parent's conversation ID; the probe-local
-`helper` derives a child conversation ID by hashing the parent's conversation ID
-and tool-call ID while forwarding usage. All evidence below is scripted.
+Variants: `plain` forwards nothing; `usage` forwards dependencies, usage and
+limits; `conv` also reuses the parent's conversation ID. All three plain nested
+forms are now refused. `helper` calls the shipped `run_child`. `id-control` uses
+the spike's hash of parent conversation/tool-call IDs as a helper key, keeping
+the control registered while making it sensitive to regenerated tool-call IDs.
+All evidence below is scripted.
 
 | Probe | Priority | CPython result | Node Pyodide result |
 | --- | --- | --- | --- |
-| D1 accounting | P0 | Not applicable | Satisfied for usage/conv/helper: four model calls, two capability calls, 16 tokens and 16 fixture cost units. Exact-budget success and 15-token/15-cost/one-tool refusals establish shared accounting. |
-| D2 parent step limit 3 | P0 | Plain not satisfied: six model calls. Usage/conv satisfied: three then `budget_exceeded`. | Same, including helper bounded at three. JS does not independently enforce pydantic-ai steps. |
-| D3 child private data | P0 | Not applicable | Satisfied: after one child read, `private-user` sticks; the next child request fails `denied` before reaching its third-party provider. Three bridge requests, two provider calls total. |
-| D4 scope identity | P0 | Plain not satisfied: different child scopes on identical runs. Conv not satisfied: child and parent both use `pydantic-ai/conversation/1/0`. Helper satisfied: stable, disjoint scopes. | Not applicable |
-| D5 mid-delegate write reload | P0 | Not applicable | Plain not satisfied: two write bodies, two effect IDs. Conv/helper satisfied in this topology: one write body, identical effect ID on replay. Conv still fails D4. |
-| D6 native repair counter | P1 | Not satisfied: two native children start with indices 0 and 1 across five requests. | A zero run repair budget rejects the second child before provider dispatch: three provider calls, child bridge indices 0 and 1. |
-| D7 checked child streaming | P1 | Not applicable | Partly satisfied: child deltas are checked and a forbidden delta fails `denied`; child deltas are absent from host stream events. |
-| D8 non-bridge child | P1 | Not satisfied: FunctionModel child is invisible; only two parent requests reach the bridge. | Not applicable |
-| P1 excluded deferred output | P0 | Satisfied: native `UserError`, two requests, zero gated bodies. | Not applicable |
-| P2 deferral returned as data | P0 | Satisfied: three requests, zero gated bodies; parent completes without a host pause. | Same. |
-| P3 hoisted approval | P0 | Satisfied: explicit metadata forwarding or `ToolApproved.override_args` resumes the child; five requests total, writes with values 2 and 3 once each. Default resume loses child metadata. | Satisfied with explicit metadata forwarding: one pause, five requests, writes 2 and 3 once each. |
-| P4 hoist snapshot/reload | P0 | Not applicable | Satisfied: identical restored pending interaction; writes 2 and 3 execute once each across fresh Workers. |
+| D1 accounting | P0 | Not applicable | Helper: four model calls, two capability calls, 16 tokens and 16 fixture cost units. Exact-budget success and 15-token/15-cost/one-tool refusals establish shared accounting. |
+| D2 parent step limit 3 | P0 | Helper: three requests then `budget_exceeded`. Plain/usage/conv: `unsupported` after one parent request, no child request or capability call. | Same. JavaScript does not independently enforce pydantic-ai steps. |
+| D3 child private data | P0 | Not applicable | After one helper child read, `private-user` sticks; the next child request fails `denied` before reaching its third-party provider. Three bridge requests, two provider calls total. |
+| D4 scope identity | P0 | Helper scopes are stable, distinct from the parent and unchanged when the delegate tool-call ID changes at the same position. The ID-sensitive control changes scope. | Not applicable |
+| D5 mid-delegate write reload | P0 | Not applicable | After a crash following the child write, a changed scripted delegate ID preserves the helper's scope and effect ID: one write, one journal entry. The ID-sensitive control changes both IDs: two writes, two entries. |
+| D6 native repair counter | P1 | Two sequential helper children begin at repair indices `[0, 0]` across five requests. | Both complete with route and run repair allowances of zero; bridge indices are `[0, 0]`. |
+| D7 child streaming | P1 | Not applicable | Plain child streaming fails `unsupported` before child dispatch. The helper has no streaming variant. |
+| D8 non-bridge child | P1 | A plain FunctionModel child remains invisible to the bridge: only two parent requests. The helper and `model=` override validation refuse that child with `unsupported` before transport. | Not applicable |
+| P1 excluded deferred output | P0 | Native `UserError`, two requests, zero gated bodies. | Not applicable |
+| P2 deferral returned as data | P0 | Three requests, zero gated bodies; parent completes without a host pause. | Same. |
+| P3 hoisted approval | P0 | Probe-local metadata forwarding or `ToolApproved.override_args` resumes a helper child; five requests, writes 2 and 3 once each. Default resume loses child metadata. | Explicit metadata forwarding: one pause, five requests, writes 2 and 3 once each. |
+| P4 hoist snapshot/reload | P0 | Not applicable | Identical restored pending interaction; writes 2 and 3 once each across fresh Workers. |
 | P5 parallel pauses | P1 | One pending parent interaction contains two delegate approvals; three requests, zero gated bodies. | Not applicable |
-| P6 answer/state validation | P1 | Not satisfied overall: explicit resume schema rejects extra answer fields, but outer restore accepts corrupt child metadata. Child validation becomes parent tool retry data; parent completes without the gated write. | Not applicable |
-| S1 child stream paths | P0 | Not applicable | Not satisfied: identical runs have no child delta events or child path; parent stream paths are empty. |
-| S2 capability flag | P1 | Not exposed by the Python Executor | Satisfied: actual prepared adapter advertises `subgraphs: false`. |
-| G1 public nested-run detection | P0 | Satisfied: public `AbstractCapability.before_run`, message `run_id`, streamed `run_context` and tool `RunContext` distinguish nested work from top-level retries, resume, sequential runs and parallel tools. | Not applicable |
-| G2 guard before bridge | P0 | Satisfied: `unsupported` before child model/capability requests, including an approved child capability before its next model request. | Satisfied: nested ordinary/streaming model requests never reach bridge; the restored approved child capability is also refused before any live request. |
-| F1 flattened gate | P0 when evaluating the pause alternative | Satisfied: one pause, two model calls, one gated capability execution. | Satisfied: identical restored pending interaction, one write overall. |
+| P6 answer/state validation | P1 | Explicit resume schema rejects extra answer fields, but outer restore accepts corrupt child metadata. Child validation becomes parent tool retry data; parent completes without the gated write. | Not applicable |
+| S1 child stream paths | P0 | Not applicable | No child stream paths ship; plain child streams are refused. |
+| S2 capability flag | P1 | Not exposed by the Python Executor | Actual prepared adapter advertises `subgraphs: false`. |
+| G1 public nested-run detection | P0 | Public message `run_id`, streamed `run_context` and tool `RunContext` distinguish registered work from plain nested runs. Top-level retries, resume, sequential runs and parallel tools pass. | Not applicable |
+| G2 guard before bridge | P0 | `unsupported` before child model/capability requests, including an approved child capability before its next model request. | Nested ordinary/streaming model requests never reach the bridge; the restored approved plain child capability is refused before live work. |
+| F1 flattened gate | P0 for the pause alternative | One pause, two model calls, one gated capability execution. | Identical restored pending interaction, one write overall. |
 
-Exactly one outcome per gap follows from the fixed rule:
-
-| Gap | Outcome | Deciding evidence |
+| Gap | Shipped outcome | Evidence and limits |
 | --- | --- | --- |
-| Plain delegation without pauses | **Alternative** | D2/D4/D5 fail for plain/shared-ID forms; D1-D5 hold for the helper and G1/G2 demonstrate a public-only guard. A follow-up can extend the owning Python executor/model/tool methods and add one child-run helper without a core export or bridge change. |
-| Child pause propagation | **Supported by the probe-local hoist pattern** | P1/P2 execute no unapproved gated bodies; P3/P4 complete and restore the hoisted child in both applicable lanes. A shipped hoist API and parity cases remain follow-up work. |
-| Subgraphs flag and stream paths | **Refused** | S1 has no child path. `subgraphs` stays false despite the successful pause pattern. |
+| Delegation without child pauses | **Supported through `run_child`; plain nested runs refused** | Shared budgets, positional identity, per-child repairs and public-only refusal checks pass. Three new conformance cases match native CPython on Node Pyodide. |
+| Child pause propagation | **Supported by the probe-local hoist pattern** | P1/P2 execute no unapproved gated bodies; P3/P4 complete and restore the explicitly hoisted child. No hoist API ships. |
+| Subgraphs flag and stream paths | **Refused** | No child stream paths exist; `subgraphs` remains false. |
+
+The separate [delegation matrix](compatibility-matrix-pydantic-ai-delegation.json)
+and [native suite](cases-pydantic-ai-delegation-suite/delegation_native.py) add
+three new goldens: `delegation-reload-write` (five model requests, one child write,
+final `parent-done`), `delegation-shared-budgets` (three requests then
+`budget_exceeded`) and `delegation-nested-plain-refused` (one parent request,
+`unsupported`, no capability call). Native reload also serializes and restores the
+parent conversation before approval. The native budget reference shares usage
+independently; the native refusal reference encodes the adapter's expected limit.
+Crash-after-write replay, exact effect IDs, journal sizes, token/cost/tool-call
+budgets and native repair indices are Node-only assertions, outside the goldens.
 
 ### Where native behavior cannot be matched
 
-A child's `DeferredToolRequests` is tool data until the parent explicitly hoists
-it into `ApprovalRequired` metadata. Excluding it from the child output types
-raises native `UserError`. Neither form publishes a child host interaction by
-itself. The hoist serializes the child conversation, then resumes with its history,
-identity and `DeferredToolResults`; the parent's synchronous resume callback must
-preserve that state explicitly. The shipped default callback forwards approvals
-only. The outer snapshot validator does not validate author-owned child metadata;
-author code must validate it and must not treat parent completion as proof the
-child completed. Parallel answers, reject/CallDeferred hoists and broader child
-state tampering remain unmeasured.
+A child's `DeferredToolRequests` remains tool data until the parent explicitly
+hoists it into `ApprovalRequired` metadata. Excluding it from the child output
+types raises native `UserError`. Neither form publishes a child host interaction
+by itself. The probe-local hoist serializes the child conversation, then resumes
+with its history and deferred results through `run_child`; the parent's
+synchronous resume callback must preserve that state. The shipped default callback
+forwards approvals only. Outer snapshot validation does not validate author-owned
+child metadata; authors must validate it and must not treat parent completion as
+proof that the child completed. Parallel answers, reject/CallDeferred hoists and
+broader child-state tampering remain unmeasured.
 
-A child using a non-`GalaxieModel` bypasses bridge accounting. SDK-controlled
-budgets and label checks cover bridged calls, not arbitrary trusted Python code.
-The two native children also share the executor's repair counter, so the second
-child's first native request is charged as a repair. Per-child repair accounting
-is follow-up work; avoid sequential native-output delegates in the meantime.
+Plain non-`GalaxieModel` children and direct trusted `capabilities.call` can bypass
+the guard. The helper refuses a child whose selected model is not a `GalaxieModel`,
+including a non-`GalaxieModel` `model=` override. SDK-controlled budgets and label checks cover bridged calls, not
+arbitrary trusted Python code. The guard is accident-proofing, not an isolation
+boundary; ADR-0012 controls remain in JavaScript. Direct model/helper use outside
+an `Executor` has no active-run guard.
+
+Unit tests also cover non-bridge models selected through agent overrides,
+capabilities and request hooks; implicit child streaming from handlers and
+capabilities; background delegation after parent completion, failure or
+cancellation; and cancellation cleanup of an in-flight child. These paths are
+checked before new bridge traffic. Cleanup preserves child cancellation, and
+parent exit revokes inherited run IDs.
 
 ### Author guidance
 
-Prefer flattening into one agent with capability-backed tools until an
-executor-owned helper and guard ship. The spike adds neither to the shipped
-source: delegating shapes are currently accepted without a nested-run guard.
-For experiments with the measured helper, forward `usage=ctx.usage` and
-`usage_limits=ctx.usage_limits`, derive a stable, distinct child conversation ID
-from the parent's conversation and tool-call IDs, and keep deterministic call
-order and stable delegate tool-call IDs across parent model replay. Regenerating
-a delegate ID changes the child scope and can repeat a write; that variant was
-not measured. A new random child ID defeats write replay; simply forwarding the
-parent's ID collides with its index space. Writes still need host confirmation, broker
-recovery and the same scoped checkpoint/recovery store. The public guard must
-check model and capability boundaries: an approved child tool can execute before
-its next model request. The measured hoist and guard are test fixtures, not a
-public library API or a general nested checkpoint contract.
+Import `run_child` from `galaxie.pydantic_ai` and await it from a tool with that
+tool's `RunContext`. It returns the child's `AgentRunResult`, defaults dependencies
+to `ctx.deps` and shares usage and limits. An explicit `deps` override is allowed.
+Child identity hashes a domain tag, parent conversation ID, message position,
+part index and `key`, excluding the provider's tool-call ID. Preserve deterministic
+call order and structure on replay; use distinct keys for several children in one
+tool body. Duplicate identity within one executor run fails `invalid`.
+
+The helper reserves `usage`, `usage_limits`, `conversation_id`, `run_id`,
+`infer_name` and `metadata`; supplying any fails `invalid`. It retains existing
+instrumentation, native-tool and model-setting refusals. Each child starts a fresh
+native repair counter, leaving the parent and siblings unchanged. A permitted
+retry still consumes the route and shared run repair budgets.
+
+The guard checks public run IDs at model and capability boundaries and refuses a
+nested `Executor.run`. A non-streamed request is authorized by the
+capability of the run that makes it; message-history `run_id` stamps are not trusted,
+so a prompt-less nested run that inherits the parent's history fails `unsupported`
+(regression test `test_prompt_less_nested_run_inheriting_parent_history_is_refused_before_transport`).
+Normal retries, resume and parallel tools pass the measured
+checks. Writes still require host confirmation and matching scoped checkpoint and
+recovery stores. For gated child workflows, flatten into one agent unless the
+probe-local child-state hoisting and validation are needed.
+
+The changed-ID probe measures sensitivity to a scripted regenerated ID. It does
+not establish whether a real provider regenerates IDs. The helper preserves its
+child scope and effect ID in that probe; the registered ID-sensitive control
+repeats the write. No JavaScript runtime or bridge protocol change was required, and the
+JavaScript entry size budget covers neither the adapter nor the Python wheel.
 
 ### Not measured
 
-- Delegation in Chromium, Firefox or WebKit: this spike measures CPython and Node
-  Pyodide semantics; no browser delegation harness was added.
-- Real providers, network reachability from the Worker, latency, cost or device
-  performance. Fixture cost units only test the core accounting boundary.
+- Delegation in Chromium, Firefox or WebKit: this work measures CPython and Node
+  Pyodide only; the new suite is not added to `pydanticCases` or the Chromium lane.
+- Real providers, actual provider ID regeneration, Worker network reachability,
+  latency, cost or device performance. Fixture cost units test accounting only.
 - Arbitrary mid-run continuation without an earlier committed parent pause,
-  regenerated delegate tool-call IDs, general nested graphs, deeper delegation
-  trees and scheduler interleavings. D5 replays a fixed scripted delegate ID.
-- Composition of the successful helper and refusal guard in one shipped API.
-  Guard probes cover wrapped `GalaxieModel` and `capability_tool` boundaries;
-  direct trusted `capabilities.call` and non-bridge models are outside that guard.
-- The prepared flag in CPython: it belongs to the JavaScript adapter, so S2 is
-  measured in Node instead. All required probes ran in their applicable lanes.
+  general nested graphs, deeper delegation trees and scheduler interleavings.
+- The prepared flag in CPython: it belongs to the JavaScript adapter and is measured
+  in Node instead.
 
-Reproduce with:
+Reproduce without rewriting existing goldens:
 
 ```sh
 node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation
-pnpm exec vitest run --project node tests/conformance/pydantic-ai-delegation.node.test.ts
+node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation-suite
+# Rebuild after Python library edits before running Node Pyodide.
+node scripts/build-python-wheels.ts
+pnpm exec vitest run --project node tests/conformance/pydantic-ai-delegation.node.test.ts tests/conformance/pydantic-ai-delegation-conformance.node.test.ts tests/conformance/pydantic-ai.node.test.ts tests/conformance/pydantic-ai-restore.node.test.ts
+# From python/:
+uv run --locked --offline python -I ../scripts/record-pydantic-ai-delegation-conformance.py --check
+uv run --locked --offline python -I ../scripts/record-pydantic-ai-conformance.py --check
 ```
 
-These are characterization probes rather than additions to the compatibility
-matrix. Existing cases, goldens, matrices, locks and shipped source stay unchanged.
+Existing goldens, matrices, locks and core contracts remain unchanged; only the
+separate delegation suite adds new goldens and a new matrix. The new recorder's
+`--check` also rejects an edited golden, and restoring its original bytes returns
+the check to green.
 
 ## pydantic-ai native tool refusal probes
 
@@ -657,6 +694,7 @@ pnpm run test:go
 - `pnpm check` runs the repository's license, lint, both TypeScript compilers, Node/Chromium tests, build and dependency checks.
 - `CI=true pnpm test` runs both test projects without writing missing goldens.
 - `pnpm test tests/conformance/galaxie.test.ts` runs the twelve parity cases on both galaxie lanes.
+- `node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation-suite` checks the new delegation goldens and native approval reload. Rebuild with `node scripts/build-python-wheels.ts` before `pnpm exec vitest run --project node tests/conformance/pydantic-ai-delegation-conformance.node.test.ts`; the new suite runs on Node Pyodide only. From `python/`, `uv run --locked --offline python -I ../scripts/record-pydantic-ai-delegation-conformance.py --check` verifies its three goldens without writing them.
 - CI runs the suite as separate jobs. `GALAXIE_TEST_GROUP` selects a file group for one `pnpm test` run: `general` (everything that does not load the Pyodide wheels, including the Go tests), `python-dspy`, `python-pydantic`, `python-adk` and `python-rest` (the rest of the wheel-loading tests); `python` is the four Python groups together. The groups share no file and together hold every file, so unset runs the whole suite as before. A pull request that changes only documents, Go, or packages no Python test reads skips the Python jobs (`scripts/ci-scope.ts`); a push to `main` always runs all of them.
 
 Goldens are updated only by the native Node snapshot command, `pnpm conformance:update`, when intentionally changing the baseline. Review any resulting diff. Runtime control work must leave the existing goldens and compatibility matrix unchanged.
