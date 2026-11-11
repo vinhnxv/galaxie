@@ -1210,8 +1210,8 @@ thrown before the sync-only author's body executes.
 
 No prediction diverged. All six sync shapes decide refusal; the async control
 is excluded. `rt-sync-swallowed` and `rt-opt-bootstrap` establish that catching
-`Exception` cannot hide the recorded failure. MIPROv2 reaches its sequential
-evaluation refusal before optional `optuna` is needed; COPRO reaches sync prompt
+`Exception` cannot hide the recorded failure. MIPROv2 ends `unsupported`
+before optional `optuna` is needed; COPRO reaches sync prompt
 generation. GEPA uses a tiny metric-call budget and a network-denied native
 subprocess bounded to 120 seconds. Nothing here installs optional dependencies.
 

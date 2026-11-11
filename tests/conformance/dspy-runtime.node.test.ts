@@ -81,7 +81,15 @@ test.each(singleScenarios)(
     const worker = await fixture(name);
     try {
       const result = await executeDspyReloadStep(worker.options, worker.agent, stores(), { name });
-      console.info(JSON.stringify({ scenario: name, lane: 'node', ...result }));
+      console.info(
+        JSON.stringify({
+          scenario: name,
+          lane: 'node',
+          requests: result.requests,
+          capabilities: result.calls.length,
+          code: (result.error as { code: string } | undefined)?.code,
+        }),
+      );
       expect(result.calls).toEqual([]);
       expect(result.pending).toBeUndefined();
       if (name === 'rt-sync-acall-control' || name === 'rt-opt-labeled') {
@@ -168,7 +176,16 @@ test(
           sessionId: first.sessionId,
         },
       );
-      console.info(JSON.stringify({ scenario: name, lane: 'node', first, restored }));
+      console.info(
+        JSON.stringify({
+          scenario: name,
+          lane: 'node',
+          firstRequests: first.requests,
+          restoredRequests: restored.requests,
+          capabilities: restored.calls.length,
+          code: (restored.error as { code: string } | undefined)?.code,
+        }),
+      );
       expect(restored.error).toBeUndefined();
       expect(restored.restored).toEqual(first.pending);
       expect(restored.pending).toBeUndefined();

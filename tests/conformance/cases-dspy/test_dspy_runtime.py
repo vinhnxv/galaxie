@@ -211,7 +211,10 @@ def test_native_runtime_entry_points_and_optimizers(name):
     if observed.get('status') == 'native-unmeasured':
         print(json.dumps({'scenario': name, **observed}))
         return
-    print(json.dumps({'scenario': name, **{key: value for key, value in observed.items() if key != 'payloads'}}))
+    print(json.dumps({
+        'scenario': name, 'ok': observed['result']['ok'], 'code': observed['result'].get('code'),
+        **{key: observed[key] for key in ('requests', 'capabilities', 'orphans', 'afterTermination')},
+    }))
     assert observed['capabilities'] == observed['orphans'] == observed['afterTermination'] == 0
     if name == 'rt-sync-acall-control':
         assert observed['result'] == {'ok': True, 'output': {'answer': 'done'}}
