@@ -738,7 +738,8 @@ generation; broker grants, destination policy, budgets and labels apply there.
 an author's local corpus. `pe-retrieve-colbert` ends `executor_error` without
 bridge requests; native `requests` attempts one rejected loopback connection,
 while Node records zero fetch attempts locally on macOS and one rejected
-`127.0.0.1:9` fetch in Ubuntu CI. Both end with the same fixed code and no
+`127.0.0.1:9` fetch in Ubuntu 24.04 CI (Node 24.22.2; CPython 3.14.6 for native
+references, versus Node 24.15.0/CPython 3.14.5 locally). Both end with the same fixed code and no
 unexpected target. The exact transport difference is unmeasured. Direct service
 access is outside the broker; the Worker attempt requires a follow-up decision
 on fail-closed handling under ADR-0018 decision 9. This probe does not establish

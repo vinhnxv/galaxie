@@ -1299,7 +1299,9 @@ silent success, non-fixed code, late request or Worker error would trigger the
 conditional refusal procedure before assigning an outcome.
 
 New evidence uses DSPy **3.4.1**, CPython **3.14.5**, Node **24.15.0**, Pyodide
-**314.0.7** and scripted replies only. Native programs run through the real DSPy
+**314.0.7** and scripted replies only. Local measurements use macOS; Ubuntu
+24.04 CI uses Node **24.22.2** and CPython **3.14.6** for native references, with
+the same DSPy/Pyodide pins. Native programs run through the real DSPy
 driver; the Node lane uses one fresh Worker per scenario and the existing reload
 runner. Model replies are the constant `done` answer. `M` counts model requests,
 `E` counts rejected egress attempts. Every driver scenario has zero capability

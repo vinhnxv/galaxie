@@ -11,7 +11,8 @@ transport is sockets. Both end `executor_error`. Typed signatures match plain
 DSPy without provider constraints; an invalid typed reply fails after one request.
 The host-bound RAG retrieval replacement reuses existing evidence. ColBERT records
 zero Node fetch attempts locally on macOS and one rejected loopback fetch in
-Ubuntu CI, with the same fixed failure and zero bridge requests. The exact
+Ubuntu CI (Node 24.22.2; CPython 3.14.6 references), with the same fixed failure
+and zero bridge requests. The exact
 transport difference is unmeasured; a Worker egress decision remains follow-up
 work under ADR-0018 decision 9. The Worker has `requests` but no `httpx`, `openai`,
 `litellm`, `numpy` or `faiss`. No shipped

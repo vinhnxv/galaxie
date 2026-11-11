@@ -540,7 +540,8 @@ router feature remain follow-up work. `pe-embed-*` fail without requests:
 LiteLLM and NumPy are absent, there is no embedding role, and retrieval returns
 passages, not vectors. `pe-retrieve-colbert` is outside the broker and fails;
 it records zero Node fetch attempts locally on macOS and one rejected loopback
-fetch in Ubuntu CI, without an unexpected target or bridge request. The exact
+fetch in Ubuntu 24.04 CI (Node 24.22.2; CPython 3.14.6 native references),
+without an unexpected target or bridge request. The exact
 transport difference is unmeasured. This observed Worker path calls for a
 follow-up decision on fail-closed handling under decision 9, not a changed outcome.
 `pe-retrieve-local-rm` works on bundled passages. Use the existing host-bound RAG
