@@ -31,9 +31,10 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph/web';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 import { z } from 'zod';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
+import { waitForRunStatus } from './support/run-status.js';
 import type { ConformanceGraph } from './support/transcript.js';
 
 function sync(schema: z.ZodType): SyncSchema {
@@ -231,7 +232,7 @@ function event(
 }
 async function paused(instance: AgentInstance<unknown, unknown>): Promise<PendingInteraction> {
   await instance.start({});
-  await vi.waitFor(() => expect(instance.getSnapshot().run?.status).toBe('waiting_input'));
+  await waitForRunStatus(instance, 'waiting_input');
   const pending = instance.getSnapshot().run?.pending;
   if (pending === undefined) throw new Error('The test interaction is missing.');
   return pending;
@@ -288,7 +289,7 @@ test('reload restores the same materialized checkpoint and dispatches against it
   ).toMatchObject({ error: { code: 'invalid' } });
   expect(await restored.instance.dispatch(action)).toMatchObject({ status: 'accepted' });
   expect(await restored.instance.dispatch(action)).toMatchObject({ error: { code: 'duplicate' } });
-  await vi.waitFor(() => expect(restored.instance.getSnapshot().run?.status).toBe('succeeded'));
+  await waitForRunStatus(restored.instance, 'succeeded');
   const finished = await restored.graph.getState({
     configurable: { thread_id: restored.instance.sessionId },
   });
@@ -310,7 +311,7 @@ test('accepted surface replay validates any registered component action without 
     sessionId: first.instance.sessionId,
   });
   await restored.instance.restore();
-  await vi.waitFor(() => expect(restored.instance.getSnapshot().run?.status).toBe('succeeded'));
+  await waitForRunStatus(restored.instance, 'succeeded');
   const state = await restored.graph.getState({
     configurable: { thread_id: restored.instance.sessionId },
   });
@@ -322,7 +323,8 @@ test('unknown stored pins are refused on restore without publication', async () 
   const old = { ...surface(), specRevision: 'unknown-spec' };
   const first = await fixture(store.saver, store.recovery, { record: old });
   await first.instance.start({});
-  await vi.waitFor(() => expect(first.instance.getSnapshot().run?.error?.code).toBe('unsupported'));
+  await waitForRunStatus(first.instance, 'failed');
+  expect(first.instance.getSnapshot().run?.error?.code).toBe('unsupported');
   await first.runtime.dispose();
   const reopened = await store.reopen();
   const restored = await fixture(reopened.saver, reopened.recovery, {
@@ -350,7 +352,7 @@ test('the four-field requestInteraction checkpoint and domain submission remain 
     }),
   ).toMatchObject({ error: { code: 'invalid' } });
   expect(await first.instance.dispatch(action)).toMatchObject({ status: 'accepted' });
-  await vi.waitFor(() => expect(first.instance.getSnapshot().run?.status).toBe('succeeded'));
+  await waitForRunStatus(first.instance, 'succeeded');
 });
 
 test('accepted replay rejects a domain payload unsupported by every surface component', async () => {

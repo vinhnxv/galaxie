@@ -15,7 +15,9 @@ import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { z } from 'zod';
+import { waitForAbort } from './support/abort-signal.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 
 const runtimes: Array<{ dispose(): Promise<void> }> = [];
@@ -135,7 +137,7 @@ async function fixture(
 }
 async function pause(instance: AgentInstance<unknown, unknown>): Promise<UserInteractionEvent> {
   const { runId } = await instance.start({});
-  await vi.waitFor(() => expect(instance.getSnapshot().run?.status).toBe('waiting_input'));
+  await waitForRunStatus(instance, 'waiting_input');
   const pending = instance.getSnapshot().run?.pending;
   if (pending === undefined) throw new Error('The ownership graph did not pause.');
   return {
@@ -170,6 +172,7 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-18 app ownership', () => {
       status: 'dispatched',
     });
     const checkpointFailures: unknown[] = [];
+    const checkpointFailed = Promise.withResolvers<void>();
     const put = a.put.bind(a);
     const putWrites = a.putWrites.bind(a);
     vi.spyOn(a, 'put').mockImplementation(async (...args) => {
@@ -177,6 +180,7 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-18 app ownership', () => {
         return await put(...args);
       } catch (error) {
         checkpointFailures.push(error);
+        checkpointFailed.resolve();
         throw error;
       }
     });
@@ -185,11 +189,13 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-18 app ownership', () => {
         await putWrites(...args);
       } catch (error) {
         checkpointFailures.push(error);
+        checkpointFailed.resolve();
         throw error;
       }
     });
     const ownerB = await own(appId, b, () => {}, true, 25);
-    await vi.waitFor(() => expect(ownerA.lostReason).toBe('stolen'));
+    await waitForAbort(ownerA.signal);
+    expect(ownerA.lostReason).toBe('stolen');
     expect(await ownerB.verify()).toBe(true);
     const restored = await fixture(
       appId,
@@ -200,9 +206,8 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-18 app ownership', () => {
     );
     const resumed = await restored.instance.restore();
     expect(resumed).toBeDefined();
-    await vi.waitFor(() =>
-      expect(restored.instance.getSnapshot().run?.error?.code).toBe('outcome_unknown'),
-    );
+    await waitForRunStatus(restored.instance, 'failed');
+    expect(restored.instance.getSnapshot().run?.error?.code).toBe('outcome_unknown');
     expect(restored.calls).toHaveLength(0);
     const unknown = await b.recovery.effect(first.instance.sessionId, effectId);
     expect(unknown?.status).toBe('outcome_unknown');
@@ -219,8 +224,10 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-18 app ownership', () => {
       a.recovery.consumeSubmission(first.instance.sessionId, submitted.interactionId),
     ).rejects.toMatchObject({ code: 'fenced' });
     finish.resolve();
-    await vi.waitFor(() => expect(first.instance.getSnapshot().run?.error?.code).toBe('fenced'));
-    await vi.waitFor(() => expect(checkpointFailures.length).toBeGreaterThan(0));
+    await waitForRunStatus(first.instance, 'failed');
+    expect(first.instance.getSnapshot().run?.error?.code).toBe('fenced');
+    await checkpointFailed.promise;
+    expect(checkpointFailures.length).toBeGreaterThan(0);
     for (const error of checkpointFailures) expect(error).toMatchObject({ code: 'fenced' });
     expect(first.calls).toHaveLength(1);
     expect(await b.recovery.effect(first.instance.sessionId, effectId)).toEqual(unknown);
@@ -263,7 +270,7 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-18 app ownership', () => {
     expect(ownerA.lostReason).toBe('handover');
     const restored = await fixture(appId, b, 'idempotency-key', save, first.instance.sessionId);
     await restored.instance.restore();
-    await vi.waitFor(() => expect(restored.instance.getSnapshot().run?.status).toBe('succeeded'));
+    await waitForRunStatus(restored.instance, 'succeeded');
     expect(first.calls).toHaveLength(1);
     expect(restored.calls).toHaveLength(1);
     expect(restored.calls[0]?.effectId).toBe(first.calls[0]?.effectId);
@@ -283,7 +290,8 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-18 app ownership', () => {
     const ownerA = await own(appId, a, () => {});
     await b.fencing.claim();
     globalThis.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-    await vi.waitFor(() => expect(ownerA.lostReason).toBe('stale'));
+    await waitForAbort(ownerA.signal);
+    expect(ownerA.lostReason).toBe('stale');
     expect(ownerA.signal.reason).toBe('stale');
     expect(await ownerA.verify()).toBe(false);
   });

@@ -35,6 +35,9 @@ import {
 let fixture: McpFixture;
 let local: McpControl | undefined;
 let admin: (action: McpAction) => Promise<McpAdminState>;
+// The server records rejections from a separate HTTP request; only its admin command
+// exposes that state, so there is no client run status or event to await.
+const adminStateBudgetMs = 10_000;
 const clients: McpServer[] = [];
 beforeAll(async () => {
   if (typeof window === 'undefined') {
@@ -311,13 +314,15 @@ test('AT-33 rejects sampling on the call SSE stream', async () => {
   const { bindings, events } = client();
   await admin('sampling');
   expect((await run(bindings)).error).toBeUndefined();
-  await expect.poll(async () => (await admin('state')).samplingCode).toBe(-32601);
+  await expect
+    .poll(async () => (await admin('state')).samplingCode, { timeout: adminStateBudgetMs })
+    .toBe(-32601);
   expect(events).toContainEqual({
     code: 'mcp_server_request_rejected',
     server: 'lessons',
     method: 'sampling/createMessage',
   });
-});
+}, 20_000);
 
 test('AT-33 rejects elicitation on the call SSE stream without exposing its prompt', async () => {
   function serialize(value: unknown): string {
@@ -335,7 +340,9 @@ test('AT-33 rejects elicitation on the call SSE stream without exposing its prom
   const result = await run(bindings);
   expect(result.error).toBeUndefined();
   expect(result.answer).toEqual({ lessonId: 'lesson-1', title: 'Practice lesson' });
-  await expect.poll(async () => (await admin('state')).elicitationCode).toBe(-32601);
+  await expect
+    .poll(async () => (await admin('state')).elicitationCode, { timeout: adminStateBudgetMs })
+    .toBe(-32601);
   expect(initializationCapabilities).toEqual([{}]);
   expect(events).toContainEqual({
     code: 'mcp_server_request_rejected',
@@ -353,7 +360,7 @@ test('AT-33 rejects elicitation on the call SSE stream without exposing its prom
       String(result.error),
     ]),
   ).not.toContain('Probe.');
-});
+}, 20_000);
 
 test('AT-33 rejects a bad Origin with 403; browsers observe the CORS failure', async () => {
   expect((await admin('bad-origin')).badOriginStatus).toBe(403);

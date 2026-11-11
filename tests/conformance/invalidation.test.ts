@@ -6,7 +6,7 @@ import { createRuntime } from '@galaxie-ai/core';
 import { acquireOwnership, type Ownership, watchInvalidation } from '@galaxie-ai/core/browser';
 import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph/web';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { prefixRange } from '../../packages/storage-indexeddb/src/keys.js';
 import {
@@ -14,7 +14,9 @@ import {
   requestResult,
   transact,
 } from '../../packages/storage-indexeddb/src/schema.js';
+import { waitForAbort } from './support/abort-signal.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 
 const runtimes: Array<{ dispose(): Promise<void> }> = [];
@@ -88,7 +90,7 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-13 principal logout', () =
       owners.push(owner);
       await instance.prepare();
       const { runId } = await instance.start({});
-      await vi.waitFor(() => expect(instance.getSnapshot().run?.status).toBe('waiting_input'));
+      await waitForRunStatus(instance, 'waiting_input');
       const pending = instance.getSnapshot().run?.pending;
       if (!pending) throw new Error('The graph did not pause.');
       await a.recovery.acceptSubmission(instance.sessionId, {
@@ -104,7 +106,8 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-13 principal logout', () =
       await b.invalidatePrincipal();
       if (deliver) {
         noticeB.announce();
-        await vi.waitFor(() => expect(noticeA.signal.reason).toBe('invalidated'));
+        await waitForAbort(noticeA.signal);
+        expect(noticeA.signal.reason).toBe('invalidated');
       } else expect(noticeA.signal.aborted).toBe(false);
       await expect(
         a.recovery.recordEffect(instance.sessionId, 'late-effect', {
@@ -123,7 +126,8 @@ describe.skipIf(typeof indexedDB === 'undefined')('AT-13 principal logout', () =
         }),
       ).toMatchObject({ status: 'rejected', error: { code: 'stale' } });
       globalThis.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-      await vi.waitFor(() => expect(owner.signal.reason).toBe('stale'));
+      await waitForAbort(owner.signal);
+      expect(owner.signal.reason).toBe('stale');
       await instance.dispose();
       await runtime.dispose();
       const db = await openDatabase(databaseName, appId, 'learner');
