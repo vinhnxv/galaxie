@@ -1,0 +1,110 @@
+{
+  "rule": {
+    "requiredLanes": ["native", "node"],
+    "unmeasuredFails": true,
+    "supported": "Every verbatim member completes with native output and request parity in both required lanes; LabeledFewShot also requires replay and deterministic demos, using the documented LM rebind. The async control is excluded from the sync feature.",
+    "alternative": "If support fails, every measured model-calling optimizer must tidy-refuse in Node and in native when it finishes, and unchanged offline-state regression evidence must pass for at least BootstrapFewShot. A timed-out native optimizer is unmeasured. List unverified offline optimizers by name.",
+    "refused": "Otherwise record the failing probes and reason. Sync entry points are refused when tidy: aforward and acall are migration guidance, not an alternative procedure. A completing sync member is a finding, not uniform sync support.",
+    "workerHazard": "A Node silent success, unfixed code, post-termination request or hang triggers the conditional fixed-refusal unit. Rerun affected probes once; stop without an outcome if this would change a locked artifact or wheel manifest hash.",
+    "nativeThreads": "A native-only failure caused by an extra thread is recorded and linked to galaxie-fv4.3.18; it does not trigger the Worker-only conditional unit or change the outcome."
+  },
+  "criteria": {
+    "T1": "Fixed error code; zero model/capability requests for refused shapes, no surviving tasks or requests after termination, no Worker errors and only loopback fixture requests.",
+    "T2": "Author/library except Exception cannot turn a recorded sync failure into success.",
+    "Q1": "Output and multiset of model request payloads equal plain DSPy with the same scripted replies.",
+    "Q2": "Fresh-executor restore equals uninterrupted completion, emits one replay event, dispatches nothing during replay and exactly one second-stage model request.",
+    "Q3": "Seeded LabeledFewShot demos are equal in native and Node.",
+    "O1": "Existing offline-state native, recorder --check and Node regression tests pass unchanged."
+  },
+  "predictions": {
+    "P1": {
+      "scenario": "rt-sync-forward-only",
+      "code": "unsupported",
+      "requests": 0,
+      "phase": "prepare"
+    },
+    "P2": { "scenario": "rt-sync-module-call", "code": "unsupported", "requests": 0 },
+    "P3": { "scenario": "rt-sync-forward-call", "code": "unsupported", "requests": 0 },
+    "P4": { "scenario": "rt-sync-lm-call", "code": "unsupported", "requests": 0 },
+    "P5": { "scenario": "rt-sync-swallowed", "code": "unsupported", "requests": 0 },
+    "P6": { "scenario": "rt-sync-to-thread", "code": "unsupported", "requests": 0 },
+    "P7": { "scenario": "rt-sync-acall-control", "output": { "answer": "done" }, "requests": 1 },
+    "P8": { "scenario": "rt-opt-bootstrap", "code": "unsupported", "requests": 0 },
+    "P9": {
+      "scenario": "rt-opt-mipro",
+      "code": "unsupported",
+      "alsoTidy": "executor_error",
+      "requests": 0
+    },
+    "P10": { "scenario": "rt-opt-copro", "code": "unsupported", "requests": 0 },
+    "P11": {
+      "scenario": "rt-opt-gepa",
+      "nodeCode": "executor_error",
+      "native": "fixed non-success or native-unmeasured after 120 seconds",
+      "requests": 0
+    },
+    "P12": {
+      "scenario": "rt-opt-labeled",
+      "result": "output, payload and demos parity",
+      "requests": 1
+    },
+    "P13": { "scenario": "rt-opt-labeled-naive", "code": "executor_error", "requests": 0 },
+    "P14": {
+      "scenario": "rt-opt-labeled-two-stage",
+      "result": "pause, restore, replay without dispatch, output parity",
+      "requests": 2
+    },
+    "outcomes": {
+      "syncEntryPoints": "refused",
+      "modelCallingOptimizers": "alternative",
+      "labeledFewShot": "supported"
+    }
+  },
+  "scenarios": [
+    "rt-sync-forward-only",
+    "rt-sync-module-call",
+    "rt-sync-forward-call",
+    "rt-sync-lm-call",
+    "rt-sync-swallowed",
+    "rt-sync-to-thread",
+    "rt-sync-acall-control",
+    "rt-opt-bootstrap",
+    "rt-opt-mipro",
+    "rt-opt-copro",
+    "rt-opt-gepa",
+    "rt-opt-labeled",
+    "rt-opt-labeled-naive",
+    "rt-opt-labeled-two-stage"
+  ],
+  "trainset": [
+    { "question": "Capital of France?", "answer": "Paris" },
+    { "question": "Capital of Japan?", "answer": "Tokyo" },
+    { "question": "Capital of Italy?", "answer": "Rome" }
+  ],
+  "reused": [
+    {
+      "source": "python/galaxie/tests/test_dspy.py",
+      "evidence": "No-run sync LM refusal and sync-only module refusal",
+      "lanes": ["native"]
+    },
+    {
+      "source": "PR #214 parallel-fixtures.json",
+      "evidence": "Sequential Parallel/Evaluate unsupported; Worker thread/pool RuntimeError; native silent-swallow finding galaxie-fv4.3.18",
+      "lanes": ["native", "node"]
+    },
+    {
+      "source": "PR #196 state-fixtures.json",
+      "evidence": "Seven offline-state cases: LabeledFewShot, scripted BootstrapFewShot, ReAct demos and instructions-only stand-in",
+      "lanes": ["native", "node", "chromium"]
+    },
+    {
+      "source": "PR #213 state binding",
+      "evidence": "Changed descriptor JSON refuses paused restore before dispatch",
+      "lanes": ["native", "node", "chromium"]
+    }
+  ],
+  "notes": [
+    "Source rechecked on 2026-11-11 at main 049ed0d. No prerequisite source difference found. Native and Worker observations will be recorded beside these immutable predictions in the conformance README.",
+    "Scripted replies only. No golden, compatibility matrix, lock, existing fixture or recorder changes. Chromium/Firefox/WebKit runtime probes are unmeasured."
+  ]
+}
