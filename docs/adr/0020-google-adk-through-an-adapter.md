@@ -63,3 +63,39 @@ ADR-0017 asks each framework to arrive as its own executor adapter without a cor
   - **Effects.** Position-derived scopes replay a write receipt after a crash, including for two parallel branches re-dispatched with reversed arrival.
 - **Still unmeasured:** Worker-hosted runs, real model providers, the example host and the real-device checks every executor lists as open.
 - **Required before Accepted:** a conformance lane comparing native ADK runs with galaxie runs for text, tool calls, streaming, confirmations, long-running tools, restore and fatal errors; a credential scan and a span-content scan over those runs; fault tests for the byte-record port with the `adk-js` tag; and the real-device or real-model checks that every other executor still lists as open.
+
+### AgentTool spike (2026-11)
+
+#### Outcome rule registered before measurement (2026-11-12)
+
+The candidate is an adapter-owned `AgentTool` subclass that starts an isolated inner
+Runner while sharing the outer run's routing, step counter, failure slot and abort
+signal. The base shape has a string request, no inner schemas, one tool-wrapper
+level, read-only inner capabilities and an inner root with its own host-created
+model. Inner agent classes stay within the existing allow-list.
+
+The prediction is **SUPPORTED**, subject to all seven gates below passing on Node
+and Chromium with scripted models. Every base-shape gate is mandatory: any failure,
+including result/state parity or pause refusal, makes the outcome **REFUSED**.
+Unmeasured evidence is never a pass. Once a base-shape gate fails, later gates may
+be recorded as unmeasured without changing that outcome. A failing optional shape
+can be excluded only if the remaining base shape passes every gate and the excluded
+shape has an executable refusal test. No shipped adapter changes precede that
+SUPPORTED decision; prototype changes stay in the test tree.
+
+| Gate | Required evidence | Prediction |
+| --- | --- | --- |
+| G1: native premise | Native request order is outer, inner, outer; final inner text is the tool result; declaration and subclassing work. | Pass |
+| G2: routing | Every model call leases the router, shares steps, checks output, and later outer leases enforce inner capability labels. | Pass |
+| G3: isolation and IDs | Separate inner sessions and fresh integrity keys; no inner events in outer storage or stream; no ID reuse after reload or retry. A test-local maximum-ID seed may model the proposed seed fix. | Pass |
+| G4: state and result | Copied state, non-temporary state deltas and final text match native behavior. | Pass |
+| G5: failure | Inner fatal errors and cancellation end the whole run with the expected code before any tool result reaches the next outer model call. Capability denial and invalid input remain model-visible. | Pass |
+| G6: refusal | Prepare rejects pausing tools, writes, nested wrappers, schemas, Workflow, foreign classes, a model-less inner root and raw AgentTool. A runtime pause backstop also fails closed. Test-local validation may model the proposed registry additions. | Pass |
+| G7: durability | Outer history survives save/reload/continue; a failed outer turn rolls back all of that turn's events. | Pass |
+
+Nested pauses, nested wrappers, inner schemas, pausing or write tools, Workflow and
+raw ADK AgentTool are predicted to remain refused. Two simultaneous wrapper calls
+are an optional shape to measure separately. An inner fatal failure must end the
+run, even if native ADK instead returns an empty tool result. No real endpoint or
+credential is part of this experiment. Python and Go extension decisions await the
+recorded outcome; neither executor changes in this spike.
