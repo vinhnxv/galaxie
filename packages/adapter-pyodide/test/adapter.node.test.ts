@@ -188,7 +188,8 @@ def create_dspy_agent():
       await fixture.cleanup();
     }
   },
-  60000,
+  // Multiple framework cold starts and cancellation replacements need room on shared CI runners.
+  900000,
 );
 
 test.skipIf(!pythonWheelsAvailable)(
