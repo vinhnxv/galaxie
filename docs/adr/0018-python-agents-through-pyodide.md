@@ -24,6 +24,8 @@
   2026-11-11: recorded alternative outcomes for DSPy Parallel and threaded Evaluate, with a test-only branch journal design; status stays Proposed.
   2026-11-11: recorded DSPy sync entry point refusal, offline alternatives for model-calling runtime optimizers and measured runtime LabeledFewShot support; status stays Proposed.
 
+  2026-11-11: recorded provider-string LM, schema-output and service-retrieval alternatives and embedding refusal; status stays Proposed.
+
 ## Context
 
 Agent authors ask for Python frameworks: LangChain and LangGraph for Python, pydantic-ai, DSPy, CrewAI and others. Brief §7.4 places Python in the Experimental tier, and §16.7 gates it on a use case strong enough to pay the compatibility cost. This ADR fixes the boundary a Python executor would use, so that a spike can test it and the gate decision can be made with evidence.
@@ -514,3 +516,41 @@ DSPy versions, offline MIPROv2/COPRO/GEPA output, KNNFewShot/Ensemble/SIMBA/
 BetterTogether/fine-tuning optimizers and optimizers given an in-Worker plain
 `dspy.LM` remain unmeasured. Shipped source, goldens, matrices, locks and Decision
 text are unchanged. ADR-0012 controls are unchanged; this ADR stays Proposed.
+
+### DSPy provider strings, schema output, embeddings and retrievers spike (2026-11)
+
+The [provider probes](../../tests/conformance/README.md#dspy-provider-strings-schema-output-embeddings-and-retrievers-spike)
+record provider-string LMs **alternative**, native provider schema output
+**alternative**, embeddings **refused** and service retrievers **alternative**.
+Scripted native/Node evidence uses DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and
+Pyodide 314.0.7; no shipped source or core contract changes.
+
+`pe-lm-runtime-set` and `pe-lm-runtime-context` each attempt one rejected loopback
+connection natively, outside the router; Node ends `executor_error` with no fetch
+attempts. lm15 defaults to sockets, not LiteLLM or automatic FetchTransport.
+Prepare validation and syntax-only lint do not block runtime construction, as
+decision 9 permits trusted code to bypass the bridge. Use a host-mapped
+`GalaxieLM(role)`; `pe-control-routed` proves payload parity and `pe-lm-kwargs`
+refuses per-call sampling parameters. Host configuration owns those parameters.
+
+`pe-schema-response-format` refuses before a request. Typed-field replacements
+have parity without `jsonSchema`; invalid typed output ends `executor_error`
+after one response without retry. Provider constraints through the existing
+router feature remain follow-up work. `pe-embed-*` fail without requests:
+LiteLLM and NumPy are absent, there is no embedding role, and retrieval returns
+passages, not vectors. `pe-retrieve-colbert` is outside the broker and fails;
+it records zero Node fetch attempts locally on macOS and one rejected loopback
+fetch in Ubuntu 24.04 CI (Node 24.22.2; CPython 3.14.6 native references),
+without an unexpected target or bridge request. The exact
+transport difference is unmeasured. This observed Worker path calls for a
+follow-up decision on fail-closed handling under decision 9, not a changed outcome.
+`pe-retrieve-local-rm` works on bundled passages. Use the existing host-bound RAG
+capability replacement and the [author recipes](../../packages/adapter-pyodide/README.md#provider-strings-schema-output-embeddings-and-retrievers).
+
+The Worker package probe finds `requests` but not `httpx`; native CPython has
+both. The committed predictions remain unchanged beside these differences.
+New Chromium, Firefox/WebKit probes, real models/services, other DSPy versions,
+LiteLLM/declared-provider routes, Databricks/Weaviate, vector capabilities,
+undeclared roles and multimodal shapes remain unmeasured. Prior Chromium evidence
+is reused only for existing goldens/RAG cases. ADR-0012 controls and Decision text
+are unchanged; this ADR remains Proposed.

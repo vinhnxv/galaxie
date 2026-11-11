@@ -1,5 +1,26 @@
 # Project status
 
+On 2026-11-11, the DSPy provider spike records provider-string LMs **alternative**,
+native provider schema output **alternative**, embeddings **refused** and service
+retrievers **alternative**. Native CPython and Node Pyodide cover `pe-lm-*`,
+`pe-schema-*`, `pe-embed-*` and `pe-retrieve-*` with scripted models on DSPy 3.4.1,
+CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. Runtime-created provider LMs use
+lm15 outside the router: native set/context probes each attempt one rejected
+loopback connection; Node records zero fetch attempts because the default
+transport is sockets. Both end `executor_error`. Typed signatures match plain
+DSPy without provider constraints; an invalid typed reply fails after one request.
+The host-bound RAG retrieval replacement reuses existing evidence. ColBERT records
+zero Node fetch attempts locally on macOS and one rejected loopback fetch in
+Ubuntu CI (Node 24.22.2; CPython 3.14.6 references), with the same fixed failure
+and zero bridge requests. The exact
+transport difference is unmeasured; a Worker egress decision remains follow-up
+work under ADR-0018 decision 9. The Worker has `requests` but no `httpx`, `openai`,
+`litellm`, `numpy` or `faiss`. No shipped
+source, core contract, golden, matrix or lock changed; conditional refusal was
+unneeded. New Chromium, Firefox/WebKit probes, real services and the other
+[unmeasured shapes and predictions](../tests/conformance/README.md#dspy-provider-strings-schema-output-embeddings-and-retrievers-spike)
+remain unmeasured. See the [author recipes](../packages/adapter-pyodide/README.md#provider-strings-schema-output-embeddings-and-retrievers).
+
 On 2026-11-11, the DSPy sync/runtime optimizer spike records sync entry points
 **refused**, model-calling runtime optimizers **alternative** through offline JSON
 state, and rebound runtime `LabeledFewShot` **supported** in the measured shapes.

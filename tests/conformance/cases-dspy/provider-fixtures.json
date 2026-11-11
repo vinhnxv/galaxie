@@ -1,0 +1,217 @@
+{
+  "rule": {
+    "requiredLanes": ["native", "node"],
+    "unmeasuredFails": true,
+    "supported": "Every named verbatim member completes with output and model-payload parity in both lanes under shipped code; models use the router and data uses the broker.",
+    "alternative": "If support fails, every verbatim member tidy-refuses in both lanes or runs outside the bridge with recorded egress evidence and an explicit documented limit. A measured replacement in both lanes must deliver the goal, with its mapping step, host capability or weaker guarantee stated. Async migration alone is insufficient.",
+    "refused": "Otherwise, including when no measured replacement delivers the goal. Name the technical reason and failing probes.",
+    "workerHazard": "A Node silent success, unfixed code, hang, Worker error, post-termination request or foreign predictor LM passing prepare triggers the conditional fixed-refusal unit and one rerun. Stop without an outcome if a locked artifact or wheel manifest hash must change.",
+    "egress": "A rejected egress attempt is an informational trusted-code finding, not a tidy-refusal failure or a reason to change an outcome.",
+    "nativeThreads": "Record native-only extra-thread failures without changing the outcome or triggering a Worker fix.",
+    "namedMembers": {
+      "providerStrings": {
+        "verbatim": [
+          "pe-lm-runtime-set",
+          "pe-lm-runtime-context",
+          "pe-lm-runtime-nokey",
+          "refused-lm"
+        ],
+        "replacement": ["pe-control-routed", "pe-lm-kwargs"]
+      },
+      "schemaOutput": {
+        "verbatim": ["pe-schema-response-format"],
+        "replacement": [
+          "pe-schema-typed-ok",
+          "pe-schema-typed-violation",
+          "json-adapter",
+          "parse-failure"
+        ]
+      },
+      "embeddings": {
+        "verbatim": ["pe-embed-hosted-string", "pe-embed-callable", "pe-embed-retriever"],
+        "replacement": []
+      },
+      "serviceRetrievers": {
+        "verbatim": ["pe-retrieve-colbert"],
+        "replacement": ["pe-retrieve-local-rm", "rag-docs-search"]
+      }
+    }
+  },
+  "criteria": {
+    "T1": "Fixed content-free error, zero model and capability requests except the counted typed-violation response; no residual tasks, post-termination requests or Worker errors; fixture-origin URLs only.",
+    "Q1": "Output and multiset of model payloads equal plain DSPy with the same scripted reply.",
+    "C1": "Routed control returns done with one model request and no egress attempt.",
+    "E1": "Record and reject egress without forwarding; retain only host:port. Only 127.0.0.1:9 is permitted. Unavailable fetch instrumentation is unmeasured.",
+    "P1": "Record importability of litellm, openai, numpy, faiss, requests and httpx in each lane.",
+    "R1c": "Existing DSPy native, Node, RAG and read-only recorder checks pass unchanged."
+  },
+  "predictions": {
+    "P1": {
+      "scenario": "pe-control-routed",
+      "output": { "answer": "done" },
+      "requests": 1,
+      "attempts": 0,
+      "parity": true
+    },
+    "P2": {
+      "scenario": "pe-lm-runtime-set",
+      "code": "executor_error",
+      "requests": 0,
+      "attempts": "at least one in native and Node"
+    },
+    "P3": {
+      "scenario": "pe-lm-runtime-context",
+      "code": "executor_error",
+      "requests": 0,
+      "attempts": "at least one in native and Node"
+    },
+    "P4": {
+      "scenario": "pe-lm-runtime-nokey",
+      "code": "executor_error",
+      "requests": 0,
+      "attempts": 0
+    },
+    "P5": { "scenario": "pe-lm-kwargs", "code": "unsupported", "requests": 0, "attempts": 0 },
+    "P6": {
+      "scenario": "pe-schema-response-format",
+      "code": "unsupported",
+      "requests": 0,
+      "attempts": 0
+    },
+    "P7": {
+      "scenario": "pe-schema-typed-ok",
+      "output": { "answer": "done" },
+      "requests": 1,
+      "parity": true,
+      "jsonSchema": false
+    },
+    "P8": {
+      "scenario": "pe-schema-typed-violation",
+      "code": "fixed non-success",
+      "requests": 1,
+      "retry": false
+    },
+    "P9": {
+      "scenario": "pe-schema-candidate-shape",
+      "typed": "Pydantic class or object schema",
+      "mapping": { "type": "json_object" },
+      "lane": "native"
+    },
+    "P10": {
+      "scenario": "pe-env-facts",
+      "native": {
+        "litellm": false,
+        "openai": true,
+        "numpy": false,
+        "faiss": false,
+        "requests": true,
+        "httpx": true
+      },
+      "node": {
+        "litellm": false,
+        "openai": false,
+        "numpy": false,
+        "faiss": false,
+        "requests": true,
+        "httpx": true
+      }
+    },
+    "P11": {
+      "scenario": "pe-embed-hosted-string",
+      "code": "executor_error",
+      "requests": 0,
+      "attempts": 0,
+      "reason": "litellm ImportError"
+    },
+    "P12": {
+      "scenario": "pe-embed-callable",
+      "code": "executor_error",
+      "requests": 0,
+      "attempts": 0,
+      "reason": "numpy ImportError"
+    },
+    "P13": {
+      "scenario": "pe-embed-retriever",
+      "code": "executor_error",
+      "requests": 0,
+      "attempts": 0,
+      "reason": "numpy ImportError"
+    },
+    "P14": {
+      "scenario": "pe-retrieve-local-rm",
+      "output": { "passages": ["local a", "local b"] },
+      "requests": 0,
+      "attempts": 0
+    },
+    "P15": {
+      "scenario": "pe-retrieve-colbert",
+      "code": "executor_error",
+      "requests": 0,
+      "nativeAttempts": "at least one",
+      "nodeAttempts": "only if requests reaches fetch; XMLHttpRequest unmeasured"
+    },
+    "outcomes": {
+      "providerStrings": "alternative",
+      "schemaOutput": "alternative",
+      "embeddings": "refused",
+      "serviceRetrievers": "alternative"
+    }
+  },
+  "scenarios": [
+    "pe-control-routed",
+    "pe-env-facts",
+    "pe-lm-runtime-set",
+    "pe-lm-runtime-context",
+    "pe-lm-runtime-nokey",
+    "pe-lm-kwargs",
+    "pe-schema-response-format",
+    "pe-schema-typed-ok",
+    "pe-schema-typed-violation",
+    "pe-schema-candidate-shape",
+    "pe-embed-hosted-string",
+    "pe-embed-callable",
+    "pe-embed-retriever",
+    "pe-retrieve-local-rm",
+    "pe-retrieve-colbert"
+  ],
+  "nativeOnly": ["pe-schema-candidate-shape"],
+  "reused": [
+    {
+      "source": "golden-dspy/refused-lm.json and test_dspy.py",
+      "evidence": "Foreign predictor LM refused at prepare",
+      "lanes": ["native", "node", "chromium"]
+    },
+    {
+      "source": "test_dspy_lint.py",
+      "evidence": "Literal provider strings refused by syntax-only lint",
+      "lanes": ["native"]
+    },
+    {
+      "source": "golden-dspy predict, json-adapter, parse-failure",
+      "evidence": "Routed payload parity, prompted JSON and parse failure",
+      "lanes": ["native", "node", "chromium"]
+    },
+    {
+      "source": "_bridge.py, bridge.ts, adapter.ts, pydantic_ai.py",
+      "evidence": "Router structured-output feature exists; DSPy never sends jsonSchema",
+      "lanes": ["source"]
+    },
+    {
+      "source": "RAG DSPy agent and conformance suites; test_dspy.py capability_tool",
+      "evidence": "Host-bound docs.search@1 and routed generation",
+      "lanes": ["native", "node", "chromium"]
+    },
+    {
+      "source": "PRs #196, #213, #214, #215",
+      "evidence": "Offline state, binding, parallel and runtime regression evidence",
+      "lanes": ["native", "node"],
+      "browserLimit": "Only previously measured cases have Chromium evidence"
+    }
+  ],
+  "notes": [
+    "Rechecked at main 966ad59 on 2026-11-11. DSPy 3.4.1 selects native lm15 for openai/gpt-4o with api_key and api_base; explicit non-native settings or engine=litellm select the absent compatibility engine.",
+    "Source correction: lm15 router.py defaults to StdlibAsyncTransport even under Pyodide. FetchTransport exists but is not selected automatically; Node attempt predictions may diverge.",
+    "Context probe clears predictor.lm inside aforward after prepare so dspy.context(lm=...) actually supplies the effective LM; a bound placeholder otherwise wins.",
+    "No shipped changes, existing fixture, golden, matrix, lock, wheel inventory or recorder edits. New browser probes, real providers, other versions and vector capabilities are unmeasured."
+  ]
+}
