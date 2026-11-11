@@ -38,6 +38,7 @@
     "par-verbatim-evaluate-threads",
     "par-verbatim-evaluate-sequential",
     "par-verbatim-thread-start",
+    "par-refuse-context",
     "par-fan-single",
     "par-fan-write",
     "par-fan-multi",

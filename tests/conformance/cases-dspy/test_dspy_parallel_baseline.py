@@ -8,6 +8,7 @@ from collections import Counter
 import hashlib
 import importlib.util
 import json
+import logging
 from pathlib import Path
 import sys
 from types import ModuleType
@@ -222,19 +223,24 @@ def native_reference(shape='single', *, stage='before', evaluate=False, threads=
         return {'answers': [prediction.answer for prediction in result]}, requests
 
 
-@pytest.mark.parametrize('name', [name for name in FIXTURES['scenarios'] if name.startswith('par-verbatim-')])
-def test_verbatim_native_baseline(name):
+@pytest.mark.parametrize('name', [name for name in FIXTURES['scenarios'] if name.startswith(('par-verbatim-', 'par-refuse-'))])
+def test_verbatim_and_propagated_context_refusal(name, caplog):
     store = Store()
-    result = complete(store, name)
+    logger = logging.getLogger('dspy.utils.parallelizer')
+    logger.addHandler(caplog.handler)
+    try:
+        result = complete(store, name)
+    finally:
+        logger.removeHandler(caplog.handler)
     if name == 'par-verbatim-thread-start':
         assert result == {'ok': True, 'output': {'thread': 'started', 'pool': 'started'}}
-    elif name.endswith('sequential'):
-        assert result == {'ok': False, 'code': 'unsupported'}
-    elif 'parallel-' in name:
-        assert result == {'ok': True, 'output': {'answers': [None, None, None]}}
     else:
-        assert result == {'ok': True, 'output': {'score': 0.0, 'answers': [{}, {}, {}]}}
+        assert result == {'ok': False, 'code': 'unsupported'}
     assert store.requests == 0 and store.calls == []
+    assert store.orphans == 0 and store.after_termination == 0
+    if name == 'par-verbatim-parallel-threads':
+        records = [record for record in caplog.records if record.name == logger.name]
+        print(json.dumps({'scenario': name, 'parallelizerLogRecords': len(records), 'itemTextLogged': any('alpha:before' in record.getMessage() for record in records)}))
 
 
 @pytest.mark.parametrize('order', FIXTURES['orders'])

@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
+import contextvars
+import gc
 import json
 import subprocess
 import sys
+import threading
 
 import dspy
 import pytest
@@ -116,6 +119,146 @@ def test_synchronous_calls_are_unsupported_and_imports_have_no_provider():
         GalaxieLM('answer')('question')
     assert error.value.code == 'unsupported'
     subprocess.run([sys.executable, '-I', '-c', "import galaxie.dspy,sys; assert 'openai' not in sys.modules; assert 'litellm' not in sys.modules"], check=True)
+
+
+@pytest.mark.parametrize('kind,threads,caught,max_errors', [
+    ('parallel', 3, Exception, 10),
+    ('parallel', 3, BaseException, 10),
+    ('parallel', 3, BaseException, 1),
+    ('parallel', 1, Exception, 10),
+    ('parallel', None, BaseException, 10),
+    ('evaluate', 2, BaseException, 10),
+    ('evaluate', None, Exception, 10),
+    ('async', 2, BaseException, 10),
+])
+def test_thread_pool_refusal_survives_author_catches_and_cleans_up(kind, threads, caught, max_errors):
+    class Program(dspy.Module):
+        def __init__(self):
+            self.predict = dspy.Predict('question -> answer')
+            self.predict.set_lm(GalaxieLM('answer'))
+
+        async def aforward(self, question):
+            if question == 'supported':
+                return await self.predict.acall(question=question)
+            examples = [dspy.Example(question=str(index), answer='ok').with_inputs('question') for index in range(3)]
+            try:
+                if kind == 'evaluate':
+                    dspy.Evaluate(devset=examples, num_threads=threads, display_progress=False, display_table=False)(self.predict, metric=lambda *_: 1)
+                else:
+                    def call(question):
+                        return asyncio.run(self.predict.acall(question=question))
+                    dspy.Parallel(num_threads=threads, max_errors=max_errors, disable_progress_bar=True)([(call if kind == 'async' else self.predict, example) for example in examples])
+            except caught:
+                pass
+            return dspy.Prediction(answer='fallback')
+
+    seen = []
+    transport_for([], seen)
+    executor = Executor(Program())
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(executor.run({'question': 'refused'}, 'c', 5))
+    assert (error.value.code, str(error.value)) == ('unsupported', 'This operation is unsupported.')
+    assert seen == []
+    assert dspy.settings.get('galaxie_run') is None
+    transport_for([{'content': fields(answer='ok')}], seen)
+    assert asyncio.run(executor.run({'question': 'supported'}, 'c', 5)) == {'answer': 'ok'}
+    assert len(seen) == 1
+    assert dspy.settings.get('galaxie_run') is None
+
+
+@pytest.mark.parametrize('engine', ['complete', 'stream', 'sync'])
+def test_foreign_dspy_settings_refuse_engine_entry_before_dispatch(engine):
+    from dspy.dsp.utils.settings import dotdict, thread_local_overrides
+    from galaxie.dspy import _AsyncEngine, _SyncEngine
+
+    class Program(dspy.Module):
+        async def aforward(self):
+            parent = thread_local_overrides.get().copy()
+            async def foreign():
+                thread_local_overrides.set(dotdict(parent))
+                if engine == 'sync':
+                    _SyncEngine().complete(native_request())
+                elif engine == 'stream':
+                    async for _ in _AsyncEngine('answer', True).stream(native_request()):
+                        pass
+                else:
+                    await _AsyncEngine('answer', True).complete(native_request())
+            task = asyncio.create_task(foreign(), context=contextvars.Context())
+            try:
+                await task
+            except BaseException:
+                pass
+            return dspy.Prediction(answer='fallback')
+
+    seen = []
+    transport_for([], seen)
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(Program()).run({}, 'c', 5))
+    assert error.value.code == 'unsupported'
+    assert seen == []
+
+
+@pytest.mark.parametrize('grouped', [False, True])
+def test_failed_thread_start_is_unsupported_without_matching_error_text(monkeypatch, grouped):
+    def boom(*args, **kwargs):
+        raise RuntimeError('private thread failure')
+    monkeypatch.setattr(threading, '_start_joinable_thread', boom)
+
+    class Program(dspy.Module):
+        async def aforward(self):
+            try:
+                dspy.Parallel(num_threads=2, disable_progress_bar=True)([(lambda: None, {})])
+            except RuntimeError as error:
+                if grouped:
+                    raise ExceptionGroup('private group', [error])
+                raise
+
+    seen = []
+    transport_for([], seen)
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(Executor(Program()).run({}, 'c', 5))
+    assert (error.value.code, str(error.value)) == ('unsupported', 'This operation is unsupported.')
+    assert seen == []
+
+
+def test_documented_raw_thread_and_stale_settings_limits():
+    from dspy.dsp.utils.settings import thread_local_overrides
+    captured = []
+    failures = []
+
+    def worker(overrides=None):
+        if overrides is not None:
+            thread_local_overrides.set(overrides)
+        try:
+            GalaxieLM('answer')('q')
+        except dspy.LMError as error:
+            failures.append(error.code)
+
+    class Program(dspy.Module):
+        async def aforward(self):
+            captured.append(thread_local_overrides.get().copy())
+            thread = threading.Thread(target=worker)
+            thread.start()
+            thread.join()
+            return dspy.Prediction(answer='fallback')
+
+    seen = []
+    transport_for([], seen)
+    assert asyncio.run(Executor(Program()).run({}, 'c', 5)) == {'answer': 'fallback'}
+    gc.collect()
+    assert captured[0]['galaxie_run']() is None
+
+    class Later(dspy.Module):
+        async def aforward(self):
+            thread = threading.Thread(target=worker, args=(captured[0],))
+            thread.start()
+            thread.join()
+            return dspy.Prediction(answer='later')
+
+    assert asyncio.run(Executor(Later()).run({}, 'c', 5)) == {'answer': 'later'}
+    assert failures == ['unsupported', 'unsupported']
+    assert seen == []
+    assert dspy.settings.get('galaxie_run') is None
 
 
 SCHEMA = {'type': 'object', 'properties': {'query': {'type': 'string'}}, 'required': ['query'], 'additionalProperties': False}
@@ -795,3 +938,29 @@ def test_a_pause_beside_an_unfinished_write_reports_outcome_unknown():
     with pytest.raises(GalaxieError) as error:
         asyncio.run(Executor(Program()).run({}, 'c', 5))
     assert error.value.code == 'outcome_unknown'
+
+
+def test_supported_predict_pause_resume_snapshot_bytes_stay_identical():
+    from galaxie.dspy import request_interaction
+    class Program(dspy.Module):
+        def __init__(self):
+            self.predict = dspy.Predict('question -> answer')
+            self.predict.set_lm(GalaxieLM('answer'))
+
+        async def aforward(self, question):
+            prediction = await self.predict.acall(question=question)
+            answer = request_interaction(INTERACTION)
+            return dspy.Prediction(answer=prediction.answer, action=answer['action'])
+
+    seen = []
+    transport_for([{'content': fields(answer='Paris')}], seen)
+    executor = Executor(Program())
+    assert asyncio.run(executor.run({'question': 'France?'}, 'conversation', 5)) is None
+    assert executor._snapshot('conversation', 'session') == (b'{"conversation_id":"conversation","ordinal":1,"pauses":1,"input":{"question":"France?"},"journal":[{"kind":"model","digest":"0aaf48336f9b911a7b164c05b800c6b42aad36f6b2400c79c8790ae2a2ff698a","result":{"content":"[[ ## answer ## ]]\\nParis\\n[[ ## completed ## ]]"}},{"kind":"interaction","digest":"3f5624c30e141215bd65719f6e05a51f07c5e00e40bc14a039f7a63b922ea97c","request":{"surfaceId":"main","viewRevision":"review","component":"test.Review/v1","props":{}}}],"status":"paused"}', b'{"v":1,"dspy":"3.4.1","adapter":"ChatAdapter","session":"session"}')
+    pending = executor.pending('conversation')
+    assert pending is not None
+    assert asyncio.run(executor.run(None, 'conversation', 5, resume={
+        'interactionId': pending['id'], 'action': 'continue', 'payload': 'done',
+    })) == {'answer': 'Paris', 'action': 'continue'}
+    assert executor._snapshot('conversation', 'session') == (b'{"conversation_id":"conversation","ordinal":1,"pauses":1,"input":{"question":"France?"},"journal":[{"kind":"model","digest":"0aaf48336f9b911a7b164c05b800c6b42aad36f6b2400c79c8790ae2a2ff698a","result":{"content":"[[ ## answer ## ]]\\nParis\\n[[ ## completed ## ]]"}},{"kind":"interaction","digest":"3f5624c30e141215bd65719f6e05a51f07c5e00e40bc14a039f7a63b922ea97c","request":{"surfaceId":"main","viewRevision":"review","component":"test.Review/v1","props":{}},"result":{"action":"continue","payload":"done"}}],"status":"completed"}', b'{"v":1,"dspy":"3.4.1","adapter":"ChatAdapter","session":"session"}')
+    assert len(seen) == 1
