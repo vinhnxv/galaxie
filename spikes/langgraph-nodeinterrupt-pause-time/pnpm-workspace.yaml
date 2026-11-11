@@ -1,0 +1,4 @@
+# This spike is its own workspace, so the root install and CI never pull its dependencies.
+
+# Resolve only versions published at least 7 days ago, as the root workspace does.
+minimumReleaseAge: 10080
