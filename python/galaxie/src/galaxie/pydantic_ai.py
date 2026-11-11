@@ -385,6 +385,8 @@ def _pending_calls(requests: DeferredToolRequests, messages: list[ModelMessage],
     if any(call not in parts for call in calls):
         raise ValueError()
     if child:
+        if len({part.tool_call_id for part in parts}) != len(parts):
+            raise ValueError()
         trailing = messages[response_index + 1:]
         other_ids = {part.tool_call_id for part in parts} - ids
         if trailing and (
