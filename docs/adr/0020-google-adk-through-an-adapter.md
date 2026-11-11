@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established.
 
 ## Context
 
@@ -21,7 +21,7 @@ ADR-0017 asks each framework to arrive as its own executor adapter without a cor
 1. **A new package.** `@galaxie-ai/adapter-adk` implements `ExecutorAdapter` with id `adk-js`. Core keys executors by id and records `executorId` in `RecoverySession`, so core needs no change and never names ADK.
 2. **One bundle, one specifier.** The adapter imports `@google/adk` only. The `browser` export condition resolves it to `dist/web/index_web.js`. No `@google/adk/...` subpath is imported at runtime (`a2a`, `tools/mcp`, `tools/webmcp`, `sessions/database`, `artifacts/gcs`, `telemetry/gcp`, `agents/agent-engine`), and `@google/genai` is imported only as a type, because the bundle inlines its own copy. `scripts/check-dependencies.ts` enforces both rules. The peer and development dependency is exactly `@google/adk` 2.3.0, the newest release that satisfies the workspace `minimumReleaseAge` on the day this ADR was written. A bump is separate work that re-runs the symbol-presence and bundle-hash tests and the conformance lane.
 3. **The adapter owns the Runner.** The agent factory receives a host object with `capabilities.call` and ADK helpers: a router-backed model (`GalaxieLlm extends BaseLlm`) and capability-backed tools. The adapter builds the `Runner`, a session service, no-op artifact, memory and credential services, one `ToolCallIntegrityPlugin` and the `RunConfig`. Authors never see the Runner and cannot supply plugins, services or a `RunConfig`.
-4. **Fail-closed tree validation.** At prepare the adapter walks the agent tree against a closed allow-list of agent classes (`LlmAgent`, `SequentialAgent`, `ParallelAgent`, `LoopAgent`). Every model and tool must be a member of a module-private registry the host fills when it creates them. ADK's brand guards test a forgeable `Symbol.for` brand and are not used for trust. `RemoteAgent`, `LangGraphAgent`, `RoutedAgent`, `Workflow`, `AgentTool`, author `BaseAgent` subclasses, toolsets, code executors and string or `Gemini` models fail `unsupported`.
+4. **Fail-closed tree validation.** At prepare the adapter walks the agent tree against a closed allow-list of agent classes (`LlmAgent`, `SequentialAgent`, `ParallelAgent`, `LoopAgent`). Every model and tool must be a member of a module-private registry the host fills when it creates them. ADK's brand guards test a forgeable `Symbol.for` brand and are not used for trust. `RemoteAgent`, `LangGraphAgent`, `RoutedAgent`, `Workflow`, `AgentTool`, author `BaseAgent` subclasses, toolsets, code executors and string or `Gemini` models fail `unsupported`. The [AgentTool wrapper spike](#agenttool-spike-2026-11) also remains refused: the proposed optional-tool-flag registry cannot enforce a read-only inner tree at prepare.
 5. **Pauses end the run; resume is a new run.** ADK ends an invocation at a tool confirmation or a long-running tool and resumes when the next `runAsync` carries the matching `functionResponse`. The adapter maps one pause to one galaxie interaction whose ID is a digest of the conversation ID and the pause ordinal. The default resume fails closed: it confirms only on the exact action `approve`, denies only on `deny`, and fails `invalid` otherwise. ADK's confirmation processor and the integrity plugin stay enabled.
 6. **Effect scopes are positional.** Capability calls use `adk/<conversation-id>/<branch-or-root>/<branch-local-index>/<part-index>`. Function-call IDs never key an effect, because ADK invents IDs when a model omits them and local models reuse them. The adapter assigns every function-call ID itself.
 7. **Sessions are persisted through the byte-record port.** An in-memory `GalaxieSessionService` holds the event log. At each pause and at completion it writes one `adk.session/v1` record with an `__interrupt__` write through the existing scoped port, so fencing, retention, deletion and export rules apply. The saver's closed byte-executor set gains `adk-js`. A per-session random integrity key stored in that record lets restored events verify; it is never exported or logged.
@@ -99,3 +99,52 @@ are an optional shape to measure separately. An inner fatal failure must end the
 run, even if native ADK instead returns an empty tool result. No real endpoint or
 credential is part of this experiment. Python and Go extension decisions await the
 recorded outcome; neither executor changes in this spike.
+
+#### Measured outcome: REFUSED (2026-11-12)
+
+The rule was committed as `ef90a64` before any probe ran. Native evidence was
+committed as `cff169c`; test-local wrapper measurements and the gate table were
+committed as `83c814e`. The prototype was then removed. The retained
+[native tests](../../packages/adapter-adk/test/agent-tool-native.test.ts) and
+[refusal characterizations](../../packages/adapter-adk/test/agent-tool-measure.test.ts)
+run on Node and headless Chromium against the pinned ADK 2.3.0 web bundle. All models
+are scripted; no real endpoint or credential was used. Firefox and WebKit were not
+run for this spike.
+
+| Gate | Observed evidence | Result |
+| --- | --- | --- |
+| G1 | Subclass override, native declaration, outer/inner/outer request order, inner tool execution, copied state and ordinary state deltas, session keying, two tool results and cancellation passed. Native inner model errors and confirmations returned empty tool results. | PASS |
+| G2 | The prototype completed with three router leases. An inner call over the shared step limit failed `budget_exceeded`; blocked inner output failed `denied`. Inner capability labels reaching later outer leases were not measured. | UNMEASURED as a whole; partial evidence passed |
+| G3 | The prototype used a separate inner session service and integrity plugin; no inner event appeared in the outer events. Fresh-key comparisons, stream/storage isolation and reload/retry ID uniqueness were not measured. | UNMEASURED as a whole |
+| G4 | The prototype returned the same inner final text as native. Its copied state and forwarded state deltas were not measured. | UNMEASURED as a whole |
+| G5 | Inner step-budget and output-block failures set the shared failure slot before any tool response reached the next outer model call. Other fatal errors and prototype cancellation were not measured. | UNMEASURED as a whole |
+| G6 | An inner host tool for a write, with the optional `requireConfirmation` flag omitted, passed the proposed pause-set validation before any model call. Marking that same tool as pausing made the prototype refuse it, but the host does not infer that mark from the authoritative binding kind at prepare. | FAIL |
+| G7 | Save/reload/continue and failed-turn rollback were not measured after the decisive admission failure. | UNMEASURED |
+
+The predicted overall support and prepare-time write refusal did not hold. The
+existing host helper checks `capabilityBindingPolicy` on the run's broker port when
+the tool executes. It does **not** require the optional ADK `requireConfirmation`
+flag at construction. The executor's prepare contract supplies model preparation,
+not the run's capability port. A registry populated only by confirmation,
+long-running and request-input flags therefore cannot distinguish an unflagged
+read tool from an unflagged write tool. This fails the mandatory read-only admission
+gate; it is not evidence that an unconfirmed write can execute. The real broker
+still refused a confirmation-required write with no host confirmation coverage,
+and the binding was never invoked.
+
+The registered rule selects REFUSED after this base-shape failure; unmeasured gates
+are not passes. No adapter source, core contract, conformance case, golden, matrix
+or lock changed. Raw AgentTool still fails `unsupported` at prepare. Native ADK's
+empty-string swallow is unsuitable for a future wrapper: an inner fatal error must
+end the galaxie run with its fixed error code, as the measured output and step
+failures did. The experiment did not establish the full failure contract.
+
+**Extension decision:** do not port this candidate to adk-python or adk-go. First
+resolve how an adapter-owned inner runner can enforce the host's authoritative
+read-only binding policy before any inner work, then repeat all seven gates. A
+runtime-only non-read refusal would be a different admission design and needs its
+own rule and tests. Python and Go need independent designs and evidence after
+that decision; their current refusals remain. Nested pauses additionally require
+resumable inner state and branch-scoped effect scopes. Nested wrappers, inner
+schemas, pausing tools, Workflow and raw AgentTool remain refused. The native
+two-call result passed; concurrency of the proposed isolated wrapper is unmeasured.

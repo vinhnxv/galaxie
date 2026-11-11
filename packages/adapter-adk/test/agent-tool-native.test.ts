@@ -50,8 +50,8 @@ const call = (name: string, args: Record<string, unknown> = {}): LlmResponse => 
   content: { role: 'model', parts: [{ functionCall: { name, args } }] },
   turnComplete: true,
 });
-const responses = (request: LlmRequest): unknown[] =>
-  request.contents.flatMap((content) =>
+const responses = (request: LlmRequest | undefined): unknown[] =>
+  (request?.contents ?? []).flatMap((content) =>
     (content.parts ?? []).flatMap((part) =>
       part.functionResponse === undefined ? [] : [part.functionResponse.response],
     ),
@@ -107,7 +107,7 @@ test('native AgentTool declaration, request order, text result and subclass over
   expect(log).toEqual(['outer', 'inner', 'outer']);
   expect(tool.overrides).toBe(1);
   expect(innerModel.requests[0]?.contents).toEqual([{ role: 'user', parts: [{ text: 'r' }] }]);
-  expect(responses(root.model.requests[1]!)).toEqual([{ result: 'inner done' }]);
+  expect(responses(root.model.requests[1])).toEqual([{ result: 'inner done' }]);
   expect(root.model.requests[0]?.config?.tools).toEqual([
     {
       functionDeclarations: [
@@ -163,9 +163,9 @@ test('native inner tool executes once and forwards ordinary state but not tempor
     userId: 'user',
     sessionId: 'conversation',
   });
-  expect(stored?.state['changed']).toBe('yes');
+  expect(Reflect.get(stored?.state ?? {}, 'changed')).toBe('yes');
   expect(stored?.state['temp:hidden']).toBeUndefined();
-  expect(responses(root.model.requests.at(-1)!)).toEqual([{ result: 'inner done' }]);
+  expect(responses(root.model.requests.at(-1))).toEqual([{ result: 'inner done' }]);
 });
 
 test.each(['error', 'confirmation'] as const)(
@@ -191,7 +191,7 @@ test.each(['error', 'confirmation'] as const)(
     const { events } = await drive(root.agent);
     // Neither swallow is acceptable for a galaxie fatal error or nested pause.
     expect(log).toEqual(['outer', 'inner', 'outer']);
-    expect(responses(root.model.requests[1]!)).toEqual([{ result: '' }]);
+    expect(responses(root.model.requests[1])).toEqual([{ result: '' }]);
     expect(events.at(-1)?.content?.parts).toEqual([{ text: 'outer done' }]);
     expect(executions).toBe(0);
   },
@@ -225,7 +225,7 @@ test('native two AgentTool calls return both results in one outer response event
     new LlmAgent({ name: 'outer', model, tools: [new AgentTool({ agent: inner })] }),
   );
   expect(log).toEqual(['outer', 'inner', 'inner', 'outer']);
-  expect(responses(model.requests[1]!)).toEqual([{ result: 'one' }, { result: 'two' }]);
+  expect(responses(model.requests[1])).toEqual([{ result: 'one' }, { result: 'two' }]);
   expect(
     events.filter((event) => event.content?.parts?.some((part) => part.functionResponse)),
   ).toHaveLength(1);
