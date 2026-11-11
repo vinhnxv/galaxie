@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createHash } from 'node:crypto';
 import { expect, test } from 'vitest';
 import { createPythonFixture } from '../../examples/rag-browser/test/support/python.node.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
@@ -13,7 +12,7 @@ import {
 } from './support/dspy-restore.js';
 import { dspyStateCases } from './support/dspy-state.js';
 import { observeStateBind, stateBindScenarios } from './support/dspy-state-bind.js';
-import { stateBindSources } from './support/dspy-state-bind-sources.node.js';
+import { expectedBinding, readBinding, stripBinding } from './support/dspy-state-binding.js';
 import { stateRestoreScenarios } from './support/dspy-state-restore.js';
 import { stateRestoreSources } from './support/dspy-state-restore-sources.node.js';
 import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
@@ -27,7 +26,7 @@ test.each(stateBindScenarios.filter((scenario) => scenario.lanes.includes('node'
       const fixture = await createPythonFixture({
         framework: 'dspy',
         module: 'selected',
-        sources: await stateBindSources(scenario, phase),
+        sources: await stateRestoreSources({ ...scenario, outcome: scenario.predicted }, phase),
       });
       fixtures.push(fixture);
       const observed = observeStateBind(fixture.options);
@@ -43,6 +42,16 @@ test.each(stateBindScenarios.filter((scenario) => scenario.lanes.includes('node'
       expect(first.error).toBeUndefined();
       expect(first.calls).toEqual(['before']);
       expect(first.requests).toBe(scenario.program === 'state-durable-early-model' ? 1 : 0);
+      expect(readBinding(store.checkpoints.rows)).toMatch(/^[0-9a-f]{64}$/);
+      expect(readBinding(store.checkpoints.rows)).toBe(
+        expectedBinding(
+          await stateRestoreSources({ ...scenario, outcome: scenario.predicted }, 'pause'),
+        ),
+      );
+      if (scenario.pause === 'legacy') {
+        stripBinding(store.checkpoints.rows);
+        expect(readBinding(store.checkpoints.rows)).toBeUndefined();
+      }
       const saved = structuredClone({
         rows: store.checkpoints.rows,
         writes: store.checkpoints.writes,
@@ -62,7 +71,10 @@ test.each(stateBindScenarios.filter((scenario) => scenario.lanes.includes('node'
         }).toEqual(saved);
       } else {
         const restored = await resumed.result;
-        const sources = await stateBindSources(scenario, 'resume');
+        const sources = await stateRestoreSources(
+          { ...scenario, outcome: scenario.predicted },
+          'resume',
+        );
         const state = JSON.parse(sources['state.json'] ?? '');
         expect(restored.restored).toEqual(first.pending);
         expect(restored.error).toBeUndefined();
@@ -108,17 +120,16 @@ test('Node state digest covers BOM-stripped Worker bytes', async () => {
   const served = `\uFEFF${visible}`;
   sources['state.json'] = served;
   const fixture = await createPythonFixture({ framework: 'dspy', module: 'selected', sources });
+  const store = { checkpoints: new MemoryByteCheckpoints(), recovery: new MemoryRecoveryStore() };
   try {
-    const first = await executeDspyReloadStep(
-      fixture.options,
-      fixture.agent,
-      { checkpoints: new MemoryByteCheckpoints(), recovery: new MemoryRecoveryStore() },
-      { name: scenario.program },
-    );
+    const first = await executeDspyReloadStep(fixture.options, fixture.agent, store, {
+      name: scenario.program,
+    });
     if (!first.pending) throw new Error('The fingerprint pause is missing.');
-    const digest = (first.pending.props as { stateDigest: string }).stateDigest;
-    expect(digest).toBe(createHash('sha256').update(visible).digest('hex'));
-    expect(digest).not.toBe(createHash('sha256').update(served).digest('hex'));
+    const digest = readBinding(store.checkpoints.rows);
+    expect(digest).toMatch(/^[0-9a-f]{64}$/);
+    expect(digest).toBe(expectedBinding({ ...sources, 'state.json': visible }));
+    expect(digest).not.toBe(expectedBinding(sources));
     expect(fixture.workerErrors).toEqual([]);
   } finally {
     await fixture.cleanup();

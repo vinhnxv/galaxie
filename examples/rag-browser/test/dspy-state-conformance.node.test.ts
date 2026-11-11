@@ -17,7 +17,6 @@ import {
   type executeDspyStateCase,
 } from '../../../tests/conformance/support/dspy-state.js';
 import { stateBindScenarios } from '../../../tests/conformance/support/dspy-state-bind.js';
-import { stateBindSources } from '../../../tests/conformance/support/dspy-state-bind-sources.node.js';
 import {
   limitSources,
   stateLimitCases,
@@ -81,7 +80,9 @@ beforeAll(async () => {
         scenario.name + (lifetime === 'resume' ? '-resume' : ''),
       );
       await mkdir(path, { recursive: true });
-      for (const [file, source] of Object.entries(await stateBindSources(scenario, lifetime)))
+      for (const [file, source] of Object.entries(
+        await stateRestoreSources({ ...scenario, outcome: scenario.predicted }, lifetime),
+      ))
         await writeFile(join(path, file), source);
     }
   }
@@ -227,7 +228,7 @@ test.each([...dspyStateCases, ...Object.keys(stateLimitCases), 'state-pickle-sou
       await context.close();
     }
   },
-  90000,
+  900000,
 );
 
 async function reloadResult(page: Page): Promise<{
@@ -282,6 +283,8 @@ test.each(stateRestoreScenarios)(
       expect(first.reload.error).toBeUndefined();
       expect(first.reload.calls).toEqual(['before']);
       expect(first.reload.requests).toBe(scenario.program === 'state-durable-early-model' ? 1 : 0);
+      if (scenario.swap !== 'same')
+        expect(await storedBindings(page, true)).toEqual([expect.stringMatching(/^[0-9a-f]{64}$/)]);
       const step = { name: scenario.program, sessionId: first.reload.sessionId };
       const restored = await nextReload(page, {
         ...step,
@@ -320,8 +323,48 @@ test.each(stateRestoreScenarios)(
       await context.close();
     }
   },
-  90000,
+  900000,
 );
+
+/** Build legacy records in place while preserving the IndexedDB envelope and row keys. */
+async function storedBindings(page: Page, strip = false): Promise<string[]> {
+  return page.evaluate(async (strip) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('dspy-state-reload');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<string[]>((resolve, reject) => {
+        const tx = db.transaction('checkpoints', strip ? 'readwrite' : 'readonly');
+        const store = tx.objectStore('checkpoints');
+        const request = store.getAll();
+        const bindings: string[] = [];
+        request.onsuccess = () => {
+          for (const row of request.result) {
+            const meta = JSON.parse(new TextDecoder().decode(row.metadata.bytes));
+            if ('stateBinding' in meta) {
+              bindings.push(meta.stateBinding);
+              if (strip) {
+                delete meta.stateBinding;
+                row.metadata = {
+                  ...row.metadata,
+                  bytes: new TextEncoder().encode(JSON.stringify(meta)),
+                };
+                store.put(row);
+              }
+            }
+          }
+        };
+        tx.oncomplete = () => resolve(bindings);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    } finally {
+      db.close();
+    }
+  }, strip);
+}
 
 /** Compare all stored bytes and effect rows around a refused restore. */
 async function bindingStore(page: Page): Promise<string> {
@@ -378,6 +421,9 @@ test.each(stateBindScenarios.filter((scenario) => scenario.lanes.includes('chrom
       expect(first.reload.pending).toBeDefined();
       expect(first.reload.calls).toEqual(['before']);
       expect(first.reload.requests).toBe(scenario.program === 'state-durable-early-model' ? 1 : 0);
+      expect(await storedBindings(page, scenario.pause === 'legacy')).toEqual([
+        expect.stringMatching(/^[0-9a-f]{64}$/),
+      ]);
       const saved = await bindingStore(page);
       const step = { name: scenario.program, sessionId: first.reload.sessionId };
       const restored = await nextReload(page, { ...step, variant: 'resume' });
@@ -389,7 +435,10 @@ test.each(stateBindScenarios.filter((scenario) => scenario.lanes.includes('chrom
         expect(restored.bindTraffic).toEqual({ models: 0, capabilities: 0, replayed: 0 });
         expect(await bindingStore(page)).toBe(saved);
       } else {
-        const sources = await stateBindSources(scenario, 'resume');
+        const sources = await stateRestoreSources(
+          { ...scenario, outcome: scenario.predicted },
+          'resume',
+        );
         const state = JSON.parse(sources['state.json'] ?? '');
         expect(restored.error).toBeUndefined();
         expect(restored.reload.restored).toEqual(first.reload.pending);

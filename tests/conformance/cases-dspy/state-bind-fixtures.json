@@ -6,8 +6,6 @@
       "program": "state-durable-early-model",
       "swap": "same",
       "pause": "bound",
-      "pauseWith": "candidate",
-      "resumeWith": "candidate",
       "predicted": "completes",
       "lanes": ["native", "node", "chromium"]
     },
@@ -16,8 +14,6 @@
       "program": "state-durable-early-model",
       "swap": "inert",
       "pause": "bound",
-      "pauseWith": "candidate",
-      "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
       "lanes": ["native", "node", "chromium"]
@@ -27,8 +23,6 @@
       "program": "state-durable-late-model",
       "swap": "same",
       "pause": "bound",
-      "pauseWith": "candidate",
-      "resumeWith": "candidate",
       "predicted": "completes",
       "lanes": ["native", "node", "chromium"]
     },
@@ -37,8 +31,6 @@
       "program": "state-durable-late-model",
       "swap": "prompt",
       "pause": "bound",
-      "pauseWith": "candidate",
-      "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
       "lanes": ["native", "node", "chromium"]
@@ -48,8 +40,6 @@
       "program": "state-durable-late-model",
       "swap": "inert",
       "pause": "bound",
-      "pauseWith": "candidate",
-      "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
       "lanes": ["native", "node", "chromium"]
@@ -59,8 +49,6 @@
       "program": "state-durable-early-model",
       "swap": "prompt",
       "pause": "bound",
-      "pauseWith": "candidate",
-      "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
       "lanes": ["native", "node", "chromium"]
@@ -70,8 +58,6 @@
       "program": "state-durable-fingerprint",
       "swap": "inert",
       "pause": "bound",
-      "pauseWith": "candidate",
-      "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
       "lanes": ["native"]
@@ -81,8 +67,6 @@
       "program": "state-durable-late-model",
       "swap": "prompt",
       "pause": "legacy",
-      "pauseWith": "plain",
-      "resumeWith": "candidate",
       "predicted": "completes",
       "lanes": ["native", "node", "chromium"]
     }
