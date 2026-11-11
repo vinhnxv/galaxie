@@ -22,6 +22,7 @@
 
   2026-11-11: recorded the DSPy state-binding spike and shipped its optional paused-record metadata key; status stays Proposed.
   2026-11-11: recorded alternative outcomes for DSPy Parallel and threaded Evaluate, with a test-only branch journal design; status stays Proposed.
+  2026-11-11: recorded DSPy sync entry point refusal, offline alternatives for model-calling runtime optimizers and measured runtime LabeledFewShot support; status stays Proposed.
 
 ## Context
 
@@ -479,3 +480,37 @@ WebKit, real models and other DSPy versions remain unmeasured here. Successful
 streaming fan-out, nested groups, pauses inside branches and ReAct branches are
 not established; the candidate only measures fixed refusals for the first three.
 ADR-0012 controls are unchanged and this ADR remains Proposed.
+
+### DSPy sync entry points and runtime optimizers spike (2026-11)
+
+The [runtime probes](../../tests/conformance/README.md#dspy-sync-entry-points-and-runtime-optimizers-spike)
+apply a rule committed before measurement on DSPy 3.4.1, CPython 3.14.5,
+Node 24.15.0 and Pyodide 314.0.7. Sync entry points are **refused**:
+`rt-sync-forward-only` refuses at prepare, and the other five sync shapes end
+`unsupported` without requests, including swallowed failures and `to_thread`.
+The async `acall` control completes with one request in both required lanes.
+
+Model-calling runtime optimizers have an **alternative**: optimize offline and
+ship JSON state using the [recipe](../../packages/adapter-pyodide/README.md#runtime-optimizers-and-the-offline-recipe).
+`rt-opt-bootstrap`, `rt-opt-mipro` and `rt-opt-copro` end `unsupported` in both
+lanes; `rt-opt-gepa` ends `unsupported` natively and `executor_error` in the
+Worker without `gepa`. Each makes zero requests. The existing seven offline-state
+cases are unchanged; verified producers include LabeledFewShot, scripted-LM
+BootstrapFewShot, ReAct demos and an instructions-only stand-in.
+
+Runtime `LabeledFewShot` is **supported** in `rt-opt-labeled` and
+`rt-opt-labeled-two-stage`: after compile, rebind `GalaxieLM`, then use `acall`.
+Output, model payloads and seeded demos match plain DSPy; fresh-Worker replay
+sends nothing before the frontier and then makes one second-stage request.
+The naive copy without rebind ends `executor_error` with zero requests.
+All probes leave zero tasks and post-termination requests. No prediction diverged,
+so the conditional shipped refusal did not fire. No core contract change is needed.
+
+The earlier thread-start evidence is reused. Blocking the single Worker's bridge
+reply loop would starve cancellation and budget checks; that is reasoning, not
+a measured blocking bridge. Author code must be deterministic apart from
+journaled calls. Chromium, Firefox and WebKit runtime probes, real models, other
+DSPy versions, offline MIPROv2/COPRO/GEPA output, KNNFewShot/Ensemble/SIMBA/
+BetterTogether/fine-tuning optimizers and optimizers given an in-Worker plain
+`dspy.LM` remain unmeasured. Shipped source, goldens, matrices, locks and Decision
+text are unchanged. ADR-0012 controls are unchanged; this ADR stays Proposed.

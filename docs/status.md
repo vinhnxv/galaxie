@@ -1,5 +1,22 @@
 # Project status
 
+On 2026-11-11, the DSPy sync/runtime optimizer spike records sync entry points
+**refused**, model-calling runtime optimizers **alternative** through offline JSON
+state, and rebound runtime `LabeledFewShot` **supported** in the measured shapes.
+`rt-sync-*` refusals and `rt-opt-bootstrap`/`mipro`/`copro` end `unsupported`
+without requests in native CPython and Node Pyodide; `rt-opt-gepa` is
+`unsupported` natively and `executor_error` in the Worker without `gepa`.
+`rt-opt-labeled` and `rt-opt-labeled-two-stage` match native output, payloads,
+seeded demos and replay without redispatch; omitting the rebind ends
+`executor_error`. All measured shapes leave no tasks or post-termination requests.
+Evidence uses DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7;
+no shipped source or core contract changed. Chromium, Firefox, WebKit runtime
+probes, real models, other DSPy versions, offline MIPROv2/COPRO/GEPA output,
+KNNFewShot/Ensemble/SIMBA/BetterTogether/fine-tuning optimizers and optimizers
+given an in-Worker plain `dspy.LM` remain unmeasured. See the
+[predictions and observations](../tests/conformance/README.md#dspy-sync-entry-points-and-runtime-optimizers-spike)
+and [offline recipe](../packages/adapter-pyodide/README.md#runtime-optimizers-and-the-offline-recipe).
+
 On 2026-11-11, the DSPy parallel and threaded Evaluate spike recorded
 **alternative** for `dspy.Parallel` and **alternative** for threaded `Evaluate`,
 with a proven test-only branch journal design. Neither API gains shipped support.

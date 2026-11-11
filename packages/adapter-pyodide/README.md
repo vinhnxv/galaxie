@@ -437,10 +437,13 @@ and arguments before ChatAdapter, JSONAdapter or ReAct parses them.
 
 `streaming`, `interrupts`, `resume` and `checkpoints` are true; `subgraphs` is
 false. Nested modules have no checkpoint namespaces, interrupt propagation or
-nested stream paths: a pause unwinds the whole program. Sync entry points,
-optimizers, multimodal inputs, embeddings, service retrievers and provider-string
-LMs are unsupported. Offline-optimized JSON state has the scripted evidence and
-limits [below](#offline-optimized-program-state).
+nested stream paths: a pause unwinds the whole program. Sync entry points are
+**refused**; model-calling runtime optimizers have an **alternative** through
+offline JSON state; runtime `LabeledFewShot` is **supported** with an LM rebind in
+the measured native/Node shapes. See the [runtime recipe and limits](#runtime-optimizers-and-the-offline-recipe).
+Multimodal inputs, embeddings, service retrievers and provider-string LMs remain
+unsupported. Offline-optimized JSON state has the scripted evidence and limits
+[below](#offline-optimized-program-state).
 
 The parallel spike records **alternative** for `dspy.Parallel` and **alternative**
 for threaded `Evaluate`: use a sequential loop of `await module.acall(...)` today.
@@ -593,6 +596,60 @@ The executable round-trip catalog matches on all three lanes:
 | Pickle | `Module.load` of a `.pkl` path raises `ValueError` without `allow_pickle`; an agent descriptor listing `.pkl` fails `invalid` before fetching. `save_program=True` and `dspy.load` are outside this JSON path. |
 
 Other DSPy versions and real-model optimizer output remain untested.
+
+### Runtime optimizers and the offline recipe
+
+The 2026-11-11 [runtime spike](../../tests/conformance/README.md#dspy-sync-entry-points-and-runtime-optimizers-spike)
+records three outcomes on DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide
+314.0.7, with scripted models only:
+
+- Sync entry points: **refused**. `rt-sync-forward-only` refuses at prepare;
+  `rt-sync-module-call`, `rt-sync-forward-call`, `rt-sync-lm-call`,
+  `rt-sync-swallowed` and `rt-sync-to-thread` end `unsupported`, with zero model
+  or capability requests in both lanes. Use `aforward` and `await module.acall(...)`.
+- Model-calling runtime optimizers: **alternative**. `rt-opt-bootstrap`,
+  `rt-opt-mipro` and `rt-opt-copro` end `unsupported` in both lanes.
+  `rt-opt-gepa` ends `unsupported` natively and `executor_error` in the Worker,
+  where `gepa` is absent. All make zero requests; optimize offline instead.
+- Runtime `LabeledFewShot`: **supported** for `rt-opt-labeled` and
+  `rt-opt-labeled-two-stage`. Rebind `compiled.set_lm(GalaxieLM('answer'))` after
+  `dspy.LabeledFewShot(k=2).compile(...)`, then `await compiled.acall(...)`.
+  Output, request payloads, seeded demos and fresh-Worker replay match the native
+  reference. `rt-opt-labeled-naive` omits the rebind and ends `executor_error`
+  with zero requests: `reset_copy` clears the predictor LM.
+
+The sync refusal remains terminal even when author or optimizer code catches
+`Exception`. The earlier parallel spike measured that the Worker cannot start
+threads. A blocking bridge call would stall the event loop that delivers its
+reply and handles cancellation and budgets; that consequence is reasoning,
+not a new measurement. No core contract change or shipped source edit was needed.
+Author code must be deterministic apart from journaled calls.
+
+For model-calling optimizers, or to avoid shipping a large runtime trainset:
+
+1. Build the same program with `aforward` and its predictors.
+2. On native CPython, optimize offline with your own LM and trainset. The verified
+   examples use scripted models; real-model quality is unmeasured.
+3. Call `module.set_lm(None)`, then `module.save('state.json')`. Use JSON state
+   only, never `save_program=True`.
+4. Review the JSON as a public build asset: include no private data or credentials.
+   Keep within the [per-file and boot-frame bounds](#offline-optimized-program-state).
+5. List the state file in the agent descriptor's `files`.
+6. Construct the same program in the entry, `module.load(...)`, then
+   `module.set_lm(GalaxieLM('answer'))`, as in the load snippet above.
+7. Ship a new file after re-optimization. Paused sessions bound to the old JSON
+   bytes [refuse restore before requests](#paused-sessions-and-a-changed-state-file).
+8. Compare the shipped program with a native run using scripted replies.
+
+| Offline state producer | Verification |
+| --- | --- |
+| `LabeledFewShot`, scripted-LM `BootstrapFewShot`, ReAct demos, instructions-only stand-in | Existing seven state cases on native CPython, Node Pyodide and headless Chromium; native/Node regression gates rerun here. |
+| `MIPROv2`, `COPRO`, `GEPA` | Offline output unmeasured; the runtime refusals above do not establish state round trips. |
+| `KNNFewShot`, `Ensemble`, `SIMBA`, `BetterTogether`, fine-tuning optimizers | Runtime and offline output unmeasured. |
+
+Chromium, Firefox and WebKit runtime probes, real models, other DSPy versions and
+optimizers given an in-Worker plain `dspy.LM` remain unmeasured. Runtime support
+here is measured shipped behavior, not a new golden conformance family.
 
 ### Paused sessions and a changed state file
 
