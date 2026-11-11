@@ -19,7 +19,7 @@ import { readIdlessPending } from '../../../packages/adapter-langgraph/src/idles
 import { requestInteraction } from '../../../packages/adapter-langgraph/src/interaction.js';
 
 export const VALUE_MARKER = 'galaxie.requestInteraction/v1';
-export const RESPONSE_SCHEMA = { type: 'object', $comment: VALUE_MARKER } as const;
+export const RESPONSE_SCHEMA = { type: 'null', $comment: VALUE_MARKER } as const;
 export type Candidate = 'D1' | 'D2' | 'D3' | 'D4';
 const liveMarks = new WeakSet<object>();
 

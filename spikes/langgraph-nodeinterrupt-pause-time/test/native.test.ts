@@ -164,6 +164,7 @@ test.each(DURABILITIES)('candidate discriminators (%s)', async (mode) => {
     expect(strictValue).toBe(candidate !== 'D1');
     expect(streamMatchesBare).toBe(candidate === 'D3');
     if (candidate === 'D2') expect(toJsonSchema(RESPONSE_SCHEMA)).toEqual(RESPONSE_SCHEMA);
+    const resumed = await resumes(f);
     record(
       probe,
       {
@@ -179,7 +180,15 @@ test.each(DURABILITIES)('candidate discriminators (%s)', async (mode) => {
           f.observer.errors.flatMap((error) => (isGraphInterrupt(error) ? error.interrupts : [])),
         ).size,
         interruptingRootTasks: f.snapshot.tasks.filter((task) => task.interrupts.length > 0).length,
-        resumed: await resumes(f),
+        ...(candidate === 'D2'
+          ? {
+              plainSchemaResume: {
+                declaredType: RESPONSE_SCHEMA.type,
+                returnedType: typeof resumed.output.answer,
+              },
+            }
+          : {}),
+        resumed,
       },
       live && persisted && strictValue && streamMatchesBare,
     );

@@ -65,7 +65,7 @@ unused. Every listed row runs under all three durability modes.
 | P4 | pass | pass | pass | Bare stripped-namespace interrupt has identical surfaces to P1, including callback observations. |
 | P6 | fail | fail | fail | No free persisted discriminator: P2/P3/P4 tasks, writes and reopened state equal P1 after serialization. |
 | P7 | fail | fail | fail | D1 extra constant value field persists, but strict parseInteractionRequest rejects it and the stream differs. Native bare resume still applies once. |
-| P8 | fail | fail | fail | D2 constant responseSchema becomes response_schema in stream, tasks and writes. A plain JSON Schema passes toJsonSchema unchanged and does not transform the answer, but breaks stream parity. |
+| P8 | fail | fail | fail | D2 constant responseSchema becomes response_schema in stream, tasks and writes. The plain JSON Schema declares null but the object answer returns unchanged, proving no resume validation here; the schema still breaks stream parity. |
 | P9 | fail | fail | fail | D3 WeakSet marks are visible to callbacks and the streamed interrupt is the same object; the single root task is correlatable live. Serialized/reopened interrupts have no mark. |
 | P10 | fail | fail | fail | D4 sees NodeInterrupt.name and the helper's own undefined id key live, but neither is a persisted helper-origin contract. |
 | P11 | fail | fail | fail | Forged D2/D3 markers publish once, fail unsupported on the first answer, apply nothing and retain the accepted inbox. D1 fails strict parsing before publication. |

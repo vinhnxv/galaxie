@@ -2391,7 +2391,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2440,7 +2440,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2461,7 +2461,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
@@ -2483,7 +2483,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2504,7 +2504,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
@@ -2519,6 +2519,10 @@
         "snapshotMark": false,
         "uniqueObservedInterrupts": 1,
         "interruptingRootTasks": 1,
+        "plainSchemaResume": {
+          "declaredType": "null",
+          "returnedType": "object"
+        },
         "resumed": {
           "output": {
             "answer": {
@@ -2555,7 +2559,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2604,7 +2608,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2625,7 +2629,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
@@ -2647,7 +2651,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2668,7 +2672,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
@@ -2683,6 +2687,10 @@
         "snapshotMark": false,
         "uniqueObservedInterrupts": 1,
         "interruptingRootTasks": 1,
+        "plainSchemaResume": {
+          "declaredType": "null",
+          "returnedType": "object"
+        },
         "resumed": {
           "output": {
             "answer": {
@@ -2719,7 +2727,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2768,7 +2776,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2789,7 +2797,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
@@ -2811,7 +2819,7 @@
                     }
                   },
                   "response_schema": {
-                    "type": "object",
+                    "type": "null",
                     "$comment": "galaxie.requestInteraction/v1"
                   }
                 }
@@ -2832,7 +2840,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
@@ -2847,6 +2855,10 @@
         "snapshotMark": false,
         "uniqueObservedInterrupts": 1,
         "interruptingRootTasks": 1,
+        "plainSchemaResume": {
+          "declaredType": "null",
+          "returnedType": "object"
+        },
         "resumed": {
           "output": {
             "answer": {
@@ -4372,7 +4384,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
@@ -4426,7 +4438,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
@@ -4480,7 +4492,7 @@
                   }
                 },
                 "response_schema": {
-                  "type": "object",
+                  "type": "null",
                   "$comment": "galaxie.requestInteraction/v1"
                 }
               }
