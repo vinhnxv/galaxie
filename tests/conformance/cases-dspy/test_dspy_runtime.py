@@ -211,8 +211,10 @@ def test_native_runtime_entry_points_and_optimizers(name):
     if observed.get('status') == 'native-unmeasured':
         print(json.dumps({'scenario': name, **observed}))
         return
+    result = observed['result']
+    assert isinstance(result, dict)
     print(json.dumps({
-        'scenario': name, 'ok': observed['result']['ok'], 'code': observed['result'].get('code'),
+        'scenario': name, 'ok': result['ok'], 'code': result.get('code'),
         **{key: observed[key] for key in ('requests', 'capabilities', 'orphans', 'afterTermination')},
     }))
     assert observed['capabilities'] == observed['orphans'] == observed['afterTermination'] == 0
