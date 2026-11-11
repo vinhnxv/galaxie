@@ -633,6 +633,24 @@ It does not add an independent integrity check to the public build assets. These
 results cover DSPy 3.4.1 and scripted models only; Firefox, WebKit and real-model
 behavior remain unmeasured.
 
+The 2026-11-11 automatic-binding spike outcome is **supported**: a test-only
+JSON descriptor binding refused swaps before replay, left stored records untouched
+and allowed rollback to the original bytes on native CPython, Node Pyodide and
+Chromium reload through IndexedDB. This proves a design; implementation is pending.
+The journal does not fingerprint the state file automatically, so keep the recipe
+above. The follow-up draft is **Bind paused DSPy sessions to the loaded offline
+state files automatically** (parent `galaxie-fv4.3`, not filed).
+
+The candidate binds all descriptor JSON paths and Python-visible bytes, including
+whitespace and unused JSON; Python source edits are excluded. BOM stripping means
+served bytes can differ from those Python loads. New code accepts old unbound
+records, while old code refuses bound records unchanged; the metadata format needs
+an implementation decision under ADR-0018 decision 7. This is a consistency check
+against accidental swaps, not integrity protection. Firefox, WebKit, real models,
+other DSPy versions, concurrent tabs, legacy sessions that pause again, forged
+metadata and large many-file descriptors remain unmeasured. See the
+[probe results and comparisons](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
+
 ## Google ADK (Python) agents
 
 Select `framework: 'adk'` and executor `adk-python`, pinned to `google-adk` 2.12.0

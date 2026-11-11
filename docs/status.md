@@ -1,5 +1,17 @@
 # Project status
 
+On 2026-11-11, the DSPy paused-session automatic state-binding spike recorded
+**supported** (design proven; implementation pending). A test-only descriptor JSON
+binding passed native CPython, Node Pyodide and Chromium IndexedDB reload probes:
+changed bytes refused before live requests or replay, stored records remained
+unchanged, and original bytes resumed. Old unbound records still completed; old
+code refused bound records without writing. No core contract change was needed.
+Shipped code is unchanged and the author fingerprint recipe remains necessary.
+The implementation follow-up draft, **Bind paused DSPy sessions to the loaded
+offline state files automatically** (parent `galaxie-fv4.3`), is for the orchestrator
+to file. This is a consistency check against accidental swaps, not integrity
+protection. See the [scope, compatibility findings and unmeasured cases](../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
+
 On 2026-11-11, the LangGraph adapter gained a strict single ID-less
 `requestInteraction` path: task-derived identity, bare resume and restored-value
 registration. Native Node, galaxie Node and Chromium have zero differences for
