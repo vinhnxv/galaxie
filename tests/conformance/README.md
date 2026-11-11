@@ -316,6 +316,13 @@ arbitrary trusted Python code. The guard is accident-proofing, not an isolation
 boundary; ADR-0012 controls remain in JavaScript. Direct model/helper use outside
 an `Executor` has no active-run guard.
 
+Unit tests also cover non-bridge models selected through agent overrides,
+capabilities and request hooks; implicit child streaming from handlers and
+capabilities; background delegation after parent completion, failure or
+cancellation; and cancellation cleanup of an in-flight child. These paths are
+checked before new bridge traffic. Cleanup preserves child cancellation, and
+parent exit revokes inherited run IDs.
+
 ### Author guidance
 
 Import `run_child` from `galaxie.pydantic_ai` and await it from a tool with that

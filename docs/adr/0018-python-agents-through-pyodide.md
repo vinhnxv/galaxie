@@ -147,6 +147,7 @@ call order and structure, host confirmations and matching checkpoint/recovery
 stores.
 
 `Executor.run` registers its fresh run ID and helper children for that execution.
+It revokes those IDs at exit, including in contexts inherited by background tasks.
 `GalaxieModel.request`, `request_stream` and `capability_tool` refuse an absent or
 unregistered run ID before bridge work; a nested `Executor.run` also fails
 `unsupported`. Only public pydantic-ai APIs are used. Direct model/helper use
@@ -161,6 +162,10 @@ child whose selected model, including a `model=` override, is not a
 `GalaxieModel`, and retains the existing native-tool,
 instrumentation and model-setting validation. ADR-0012 controls remain enforced
 in JavaScript.
+
+Public run and request hooks check the actual selected child model, including
+agent overrides and capability model selection or replacement. They also refuse
+child streaming enabled by event handlers or capabilities before bridge traffic.
 
 Sequential native-output helper children begin at repair indices `[0, 0]`, even
 with no repair allowance; retries within a child still use the host route and

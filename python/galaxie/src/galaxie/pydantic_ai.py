@@ -18,14 +18,14 @@ from typing import Any, TypeVar
 from uuid import uuid4
 
 from pydantic_ai import Agent, AgentRunResult, Conversation, ConversationTypeAdapter, DeferredToolRequests, DeferredToolResults, NativeOutput, RunContext, Tool, capture_run_messages
-from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai.capabilities import AbstractCapability, Instrumentation
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (
     ModelMessage, ModelRequest, ModelResponse, ModelResponsePart, ModelResponseStreamEvent,
     PartStartEvent, PartDeltaEvent, RetryPromptPart, SystemPromptPart, TextPart, TextPartDelta,
     ToolCallPart, ToolReturnPart, UserPromptPart,
 )
-from pydantic_ai.models import Model, ModelRequestParameters, StreamedResponse
+from pydantic_ai.models import Model, ModelRequestContext, ModelRequestParameters, StreamedResponse
 from pydantic_ai.models.instrumented import InstrumentedModel
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.toolsets import FunctionToolset
@@ -346,6 +346,19 @@ def _call_position(ctx: RunContext) -> tuple[int, int]:
     raise GalaxieError('invalid')
 
 
+class _ChildRunGuard(AbstractCapability[Any]):
+    async def before_run(self, ctx: RunContext[Any]) -> None:
+        if not isinstance(ctx.model, GalaxieModel):
+            raise GalaxieError('unsupported')
+
+    async def before_model_request(
+        self, ctx: RunContext[Any], request_context: ModelRequestContext,
+    ) -> ModelRequestContext:
+        if not isinstance(request_context.model, GalaxieModel) or request_context.streaming:
+            raise GalaxieError('unsupported')
+        return request_context
+
+
 async def run_child(
     ctx: RunContext, agent: Agent[Any, _OutputT], prompt: str | None, *, key: str = '', **options: Any,
 ) -> AgentRunResult[_OutputT]:
@@ -377,6 +390,7 @@ async def run_child(
         active.run_ids.add(run_id)
     native_token = _native_requests.set([0])
     try:
+        options['capabilities'] = [*(options.get('capabilities') or []), _ChildRunGuard()]
         return await agent.run(
             prompt, **{'deps': ctx.deps, **options}, usage=ctx.usage, usage_limits=ctx.usage_limits,
             conversation_id=identifier, run_id=run_id, infer_name=False,
@@ -384,7 +398,7 @@ async def run_child(
     finally:
         _native_requests.reset(native_token)
         if active is not None:
-            active.run_ids.remove(run_id)
+            active.run_ids.discard(run_id)
 
 
 def capability_tool(
@@ -672,7 +686,8 @@ class Executor:
         state.pending = None
         token = _positions.set(position)
         native_token = _native_requests.set([0])
-        active_token = _active.set(_ActiveRun({run_id}, set()))
+        active = _ActiveRun({run_id}, set())
+        active_token = _active.set(active)
         with capture_run_messages() as messages:
             try:
                 if on_stream is None:
@@ -684,6 +699,7 @@ class Executor:
             except UnexpectedModelBehavior:
                 raise GalaxieError('executor_error') from None
             finally:
+                active.run_ids.clear()
                 state.position = position + len(messages)
                 _positions.reset(token)
                 _native_requests.reset(native_token)

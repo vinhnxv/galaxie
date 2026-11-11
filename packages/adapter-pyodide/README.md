@@ -211,12 +211,17 @@ one tool body. Reusing a child identity within one executor run fails `invalid`.
 The helper reserves `usage`, `usage_limits`, `conversation_id`, `run_id`,
 `infer_name` and `metadata`; passing any of them fails `invalid`. The child model,
 including a `model=` override, must be a `GalaxieModel`, or it fails `unsupported`.
+Agent overrides and capability model selections are checked at run and request
+time. Child streaming enabled by event handlers or capabilities is also refused
+before a child model request reaches the bridge.
 The existing instrumentation, native-tool and model-setting refusals also apply.
 
 During an `Executor` run, the guard accepts the parent and registered helper
 children. Plain nested `child.run`, `child.run_stream`, capability tools from an
 unregistered run and nested `Executor.run` fail `unsupported` before bridge work.
-The checks use public pydantic-ai run IDs only. Non-streamed request history must
+The checks use public pydantic-ai run and request contexts. Run IDs are revoked
+when the parent finishes, fails or is cancelled, including in inherited background
+task contexts. Non-streamed request history must
 preserve `run_id`: if history processing or upstream merging of adjacent
 `ModelRequest` objects leaves the model request without it, the request fails closed.
 Keep the current attributed request when trimming history. Ordinary retries,

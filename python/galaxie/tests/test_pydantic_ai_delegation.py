@@ -11,9 +11,9 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 from pydantic_ai import Agent, DeferredToolRequests, NativeOutput, RunContext
-from pydantic_ai.capabilities import NativeTool, ProcessHistory, WebSearch
+from pydantic_ai.capabilities import AbstractCapability, NativeTool, ProcessEventStream, ProcessHistory, WebSearch
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, ToolCallPart, UserPromptPart
-from pydantic_ai.models import ModelRequestParameters
+from pydantic_ai.models import ModelRequestContext, ModelRequestParameters
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.output import OutputObjectDefinition
 from pydantic_ai.usage import RunUsage, UsageLimits
@@ -464,3 +464,165 @@ def test_delegation_uses_no_private_pydantic_ai_module_imports():
             imports.extend(alias.name for alias in node.names)
     assert not [module for module in imports if module and module.startswith('pydantic_ai.')
                 and any(part.startswith('_') for part in module.split('.')[1:])]
+
+
+@pytest.mark.parametrize('selection', ['override', 'agent-capability', 'run-capability', 'request-hook'])
+def test_child_rejects_the_selected_non_bridge_model_before_it_runs(selection):
+    seen = []
+    foreign_calls = []
+    install_replies([{'content': 'unexpected'}], seen)
+
+    def foreign_reply(messages, info):
+        foreign_calls.append('called')
+        return ModelResponse(parts=[TextPart('bypassed')])
+
+    foreign = FunctionModel(foreign_reply)
+
+    class SelectForeign(AbstractCapability[Any]):
+        def get_model(self) -> FunctionModel:
+            return foreign
+
+    class ReplaceModel(AbstractCapability[Any]):
+        async def before_model_request(self, ctx: RunContext[Any], request_context: ModelRequestContext) -> ModelRequestContext:
+            return replace(request_context, model=foreign)
+
+    configured = [SelectForeign()] if selection == 'agent-capability' else [ReplaceModel()] if selection == 'request-hook' else []
+    child = Agent(GalaxieModel('child'), capabilities=configured)
+    options: dict[str, Any] = {'capabilities': [SelectForeign()]} if selection == 'run-capability' else {}
+
+    async def run():
+        if selection == 'override':
+            with child.override(model=foreign):
+                await run_child(tool_context(), child, 'child')
+        else:
+            await run_child(tool_context(), child, 'child', **options)
+
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(run())
+    assert error.value.code == 'unsupported'
+    assert foreign_calls == []
+    assert seen == []
+
+
+@pytest.mark.parametrize('streaming', ['option-handler', 'agent-handler', 'capability'])
+def test_child_refuses_implicit_streaming_before_bridge_traffic(streaming):
+    seen = []
+    install_replies([{'content': 'unexpected'}], seen)
+
+    async def handler(ctx, events):
+        async for _ in events:
+            pass
+
+    class HandlerAgent(Agent):
+        @property
+        def event_stream_handler(self):
+            return handler
+
+    if streaming == 'agent-handler':
+        child = HandlerAgent(GalaxieModel('child'))
+    else:
+        child = Agent(GalaxieModel('child'), capabilities=[ProcessEventStream(handler)] if streaming == 'capability' else [])
+    options: dict[str, Any] = {'event_stream_handler': handler} if streaming == 'option-handler' else {}
+    with pytest.raises(GalaxieError) as error:
+        asyncio.run(run_child(tool_context(), child, 'child', **options))
+    assert error.value.code == 'unsupported'
+    assert seen == []
+
+
+@pytest.mark.parametrize('ending', ['complete', 'error', 'cancel'])
+def test_background_child_cannot_use_an_ended_parents_run_during_the_next_run(ending):
+    roles = []
+    children = []
+
+    async def run():
+        second_started = asyncio.Event()
+        late_finished = asyncio.Event()
+
+        async def transport(raw):
+            message = json.loads(raw)
+            role = message['payload']['role']
+            roles.append(role)
+            if role == 'second':
+                second_started.set()
+                await late_finished.wait()
+                reply = {'content': 'done'}
+            elif role == 'first' and roles.count('first') == 1:
+                reply = {'content': '', 'toolCalls': [call('delegate')]}
+            else:
+                reply = {'content': 'done'}
+            return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
+
+        _bridge.install_transport(transport)
+        parent = Agent(GalaxieModel('first'))
+        child = Agent(GalaxieModel('child'))
+
+        async def later(ctx):
+            await second_started.wait()
+            try:
+                return (await run_child(ctx, child, 'child')).output
+            except GalaxieError as error:
+                return error.code
+            finally:
+                late_finished.set()
+
+        @parent.tool
+        async def delegate(ctx: RunContext) -> str:
+            children.append(asyncio.create_task(later(ctx)))
+            if ending == 'error':
+                raise GalaxieError('invalid')
+            if ending == 'cancel':
+                raise asyncio.CancelledError
+            return 'delegated'
+
+        executor = Executor(parent)
+        if ending == 'complete':
+            assert await executor.run({'prompt': 'first'}, 'first', 5) == 'done'
+        else:
+            with pytest.raises(asyncio.CancelledError if ending == 'cancel' else GalaxieError):
+                await executor.run({'prompt': 'first'}, 'first', 5)
+        assert await Executor(Agent(GalaxieModel('second'))).run({'prompt': 'second'}, 'second', 5) == 'done'
+        assert await children[0] == 'unsupported'
+
+    asyncio.run(run())
+    assert roles == (['first', 'first'] if ending == 'complete' else ['first']) + ['second']
+
+
+def test_cancelled_parent_revokes_in_flight_children_without_masking_their_cancellation():
+    roles = []
+    children = []
+
+    async def run():
+        child_started = asyncio.Event()
+
+        async def transport(raw):
+            message = json.loads(raw)
+            role = message['payload']['role']
+            roles.append(role)
+            if role == 'child':
+                child_started.set()
+                await asyncio.Event().wait()
+            reply = {'content': '', 'toolCalls': [call('delegate')]}
+            return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
+
+        _bridge.install_transport(transport)
+        parent = Agent(GalaxieModel('parent'))
+        child = Agent(GalaxieModel('child'))
+
+        @parent.tool
+        async def delegate(ctx: RunContext) -> str:
+            children.append(asyncio.create_task(run_child(ctx, child, 'child')))
+            await asyncio.Event().wait()
+            return 'unreachable'
+
+        running = asyncio.create_task(Executor(parent).run({'prompt': 'parent'}, 'fixed', 5))
+        await child_started.wait()
+        running.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await running
+        assert not children[0].done()
+        children[0].cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await children[0]
+
+    asyncio.run(run())
+    assert roles == ['parent', 'child']
