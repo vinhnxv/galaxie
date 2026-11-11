@@ -20,7 +20,7 @@
   2026-11-11: added the public delegation helper, fail-closed nested-run guard, per-child repair accounting and scripted changed-ID recovery evidence; status stays Proposed.
   2026-11-11: added executor-owned child approval hoisting, required child-call display, reserved-state validation and scripted approve/reject/reload evidence; status stays Proposed.
 
-  2026-11-11: recorded the test-only DSPy paused-session state-binding spike; implementation pending, status stays Proposed.
+  2026-11-11: recorded the DSPy state-binding spike and shipped its optional paused-record metadata key; status stays Proposed.
 
 ## Context
 
@@ -67,7 +67,7 @@ Every galaxie guarantee is enforced in `@galaxie-ai/core` and the JavaScript pro
 8. **Interrupts.** `request_interaction(request, config)` wraps LangGraph Python's `interrupt()` with the same four-field request. The adapter's `pending()` reads it through `get_state` over the bridge. The LangGraph.js limits still apply: one interrupt ID per pending state, no parallel interrupts, no static breakpoints.
 9. **Trust.** Python agent code is trusted, as JavaScript agent code is (ADR-0002). Python can still import `js` and call `fetch` from the worker. The worker has no DOM, but that is not an isolation boundary. Removing network globals after packages load is a mitigation only. A Python lint aid flags `import js`, `pyodide.http`, `urllib`, `socket`, direct provider SDKs and provider-prefixed model strings such as `Agent('openai:…')`, with the same limits as the ESLint plugin.
 10. **Packages.** A Python agent ships its wheels and a hash-locked lockfile, and the generated manifest's SHA-256 inventory covers them. Missing compiled dependencies get either Pyodide wheels built with `pyodide-build` and hosted with pinned hashes, or same-name pure-Python stand-ins. Both are pinned to exact upstream versions. For DSPy custom engines, the Worker omits the non-imported hard dependencies `litellm`, `openai`, `gepa`, `tenacity`, `diskcache` and `cachetools`. CPython uses a same-name workspace `litellm==1.106.2` member with metadata only and no importable module; accidental provider use fails closed. The existing release cutoff and all existing pins remain fixed. galaxie does not fork Pyodide.
-11. **Framework order.** LangGraph Python with LangChain models and tools comes first. pydantic-ai comes second, pinned as `pydantic-ai-slim==2.60.0` with `pydantic-graph==2.60.0`, without provider SDKs in its Worker wheel set. Its tools wrap `host.capabilities.call`, and structured output is validated in Python after JavaScript checks the raw text. Tool-less `NativeOutput` sends the schema as a routed `jsonSchema` constraint without prompt text, with native validation retries charged through `ModelRoute.repairAttempts` and the shared run repair budget. Deferred tool requests end the agent run and become one author-mapped galaxie interaction; resume supplies complete `DeferredToolResults` to a new run. At each pause and completion, pinned `ConversationTypeAdapter` bytes preserve messages, usage, conversation identity and deferred requests through the existing scoped byte-record port. Pause ordinals and effect positions also persist. The port accepts only `langgraph-python | pydantic-ai-python | dspy-python` byte-row tags; exports copy the stored tag. With matching recovery, accepted answers reconcile and succeeded write receipts replay after reload. It declares `streaming`, `interrupts`, `resume` and `checkpoints` true. Without the port, cancellation or Worker loss still discards pending state. Snapshots do not journal every in-flight model call. `subgraphs` remains false: measured child streams have no host child events or paths. `galaxie.pydantic_ai.run_child` shares the parent's usage and limits, derives distinct child identity from message position and key, and resets native repair accounting per child. A public-only guard refuses plain nested model/capability work and nested `Executor.run` before bridge requests. It fails closed when request attribution is missing; it is accident-proofing, while ADR-0012 controls stay in JavaScript. Opt-in `run_child(..., hoist_approvals=True)` carries one child approval through the parent pause, with executor-owned validation and required child-call display; see the delegation verification below. The maintained RAG example offers it for mock tool-calling models, with cited text output and optional passage review through deferred approval metadata. Its scoped byte records, recovery store and fenced ownership restore the pending review after reload; Start over deletes it. The default question flow stays in memory. The built-in browser providers do not declare tool calling, so default mode omits this executor. DSPy comes third, pinned to 3.4.1 with custom-engine `GalaxieLM(role)`, asynchronous module execution and capability-backed tools over bridge v2. It declares `streaming`, `interrupts`, `resume` and `checkpoints` true, and `subgraphs` false: nested modules have no checkpoint namespace, interrupt propagation or stream paths, and a pause unwinds the whole program. `request_interaction` pauses module or tool code; resume re-executes against digests and recorded results of completed model, capability and interaction calls. Author code must be deterministic apart from those calls; divergence fails `unrecoverable` before later live calls. Replayed calls are silent and uncharged. Session-bound journals and counters persist through the byte-record port with recovery, refuse a different DSPy version or journal format, and must fit the 1 MiB bridge bound before a pause publishes. Completion keeps compact counters; work after the last committed pause can repeat after Worker loss, with broker receipts preventing repeated writes when recovery and stable call order apply. DSPy's RAG program retrieves from run input, optionally pauses before any model request, then answers from kept passages with `ChainOfThought`. It requires no model tool calling and is offered whenever the answer role has a configured provider. Real-model format reliability remains unmeasured. CrewAI stays in the Remote tier.
+11. **Framework order.** LangGraph Python with LangChain models and tools comes first. pydantic-ai comes second, pinned as `pydantic-ai-slim==2.60.0` with `pydantic-graph==2.60.0`, without provider SDKs in its Worker wheel set. Its tools wrap `host.capabilities.call`, and structured output is validated in Python after JavaScript checks the raw text. Tool-less `NativeOutput` sends the schema as a routed `jsonSchema` constraint without prompt text, with native validation retries charged through `ModelRoute.repairAttempts` and the shared run repair budget. Deferred tool requests end the agent run and become one author-mapped galaxie interaction; resume supplies complete `DeferredToolResults` to a new run. At each pause and completion, pinned `ConversationTypeAdapter` bytes preserve messages, usage, conversation identity and deferred requests through the existing scoped byte-record port. Pause ordinals and effect positions also persist. The port accepts only `langgraph-python | pydantic-ai-python | dspy-python` byte-row tags; exports copy the stored tag. With matching recovery, accepted answers reconcile and succeeded write receipts replay after reload. It declares `streaming`, `interrupts`, `resume` and `checkpoints` true. Without the port, cancellation or Worker loss still discards pending state. Snapshots do not journal every in-flight model call. `subgraphs` remains false: measured child streams have no host child events or paths. `galaxie.pydantic_ai.run_child` shares the parent's usage and limits, derives distinct child identity from message position and key, and resets native repair accounting per child. A public-only guard refuses plain nested model/capability work and nested `Executor.run` before bridge requests. It fails closed when request attribution is missing; it is accident-proofing, while ADR-0012 controls stay in JavaScript. Opt-in `run_child(..., hoist_approvals=True)` carries one child approval through the parent pause, with executor-owned validation and required child-call display; see the delegation verification below. The maintained RAG example offers it for mock tool-calling models, with cited text output and optional passage review through deferred approval metadata. Its scoped byte records, recovery store and fenced ownership restore the pending review after reload; Start over deletes it. The default question flow stays in memory. The built-in browser providers do not declare tool calling, so default mode omits this executor. DSPy comes third, pinned to 3.4.1 with custom-engine `GalaxieLM(role)`, asynchronous module execution and capability-backed tools over bridge v2. It declares `streaming`, `interrupts`, `resume` and `checkpoints` true, and `subgraphs` false: nested modules have no checkpoint namespace, interrupt propagation or stream paths, and a pause unwinds the whole program. `request_interaction` pauses module or tool code; resume re-executes against digests and recorded results of completed model, capability and interaction calls. Author code must be deterministic apart from those calls; divergence fails `unrecoverable` before later live calls. Replayed calls are silent and uncharged. Session-bound journals and counters persist through the byte-record port with recovery, refuse a different DSPy version or journal format, and must fit the 1 MiB bridge bound before a pause publishes. Completion keeps compact counters; work after the last committed pause can repeat after Worker loss, with broker receipts preventing repeated writes when recovery and stable call order apply. DSPy's RAG program retrieves from run input, optionally pauses before any model request, then answers from kept passages with `ChainOfThought`. It requires no model tool calling and is offered whenever the answer role has a configured provider. Real-model format reliability remains unmeasured. Durable DSPy pauses also bind descriptor JSON at boot; see the shipped state-binding decision below. CrewAI stays in the Remote tier.
    An `Executor` with `stream_fields` always streams in the Worker and requires a provider declaring streaming. Declared fields must belong to exactly one predictor with a plain `str` output annotation. Streaming ReActV2 requires `next_thought` annotated as `str`; a field header indented on its line is not streamed, though final parsing still supplies its value. JSONAdapter is non-streaming only: the Worker excludes `jiter`. Native provider schema mode is unsupported, and ChatAdapter JSON fallback is disabled to keep call sequences deterministic.
 
    ReAct turns an ordinary exception from author tool code into an observation containing a five-frame traceback, including file paths and source lines; the next routed model call carries it. Authors must keep sensitive details out of those exceptions. Galaxie failures end the run before another model call and retain fixed codes instead of travelling as observations.
@@ -361,8 +361,8 @@ source are unchanged. This ADR stays Proposed.
 
 ### DSPy paused-session state binding spike (2026-11)
 
-On 2026-11-11 the recorded outcome is **supported**: design proven, implementation
-pending. The state-only candidate passed every required criterion on DSPy 3.4.1,
+On 2026-11-11 the recorded outcome is **supported**; the design is now shipped
+as described below. The state-only candidate passed every required criterion on DSPy 3.4.1,
 CPython 3.14.5, Node 24.15.0 with Pyodide 314.0.7 and Playwright 1.64.1
 Chromium 156.0.8078.4 reload through IndexedDB. The [evidence table](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike)
 records predictions, observations and commands. `bind-early-inert`,
@@ -375,9 +375,7 @@ No prediction diverged. Existing #203 author-recipe cases remain unchanged and p
 The test-only patch adds one optional 64-hex metadata key (82 bytes), on paused
 records only, with no checkpoint/journal change. New code accepts old unbound
 records; old code refuses bound records without writing. No core contract change
-was needed: the driver and adapter already transport opaque metadata. A shipped
-implementation must settle optional-key versus version-bump handling under decision
-7; this record changes no Decision text. Completed sessions still accept new runs
+was needed: the driver and adapter already transport opaque metadata. The shipped subsection below settles optional-key handling under decision 7. Completed sessions still accept new runs
 under changed state, and programs without JSON have byte-identical metadata.
 
 The candidate freezes a sorted manifest of descriptor JSON paths and byte digests
@@ -392,8 +390,50 @@ restored. Descriptor enumeration avoids that global DSPy-version-specific hook.
 This is a consistency check against accidental swaps, not integrity protection;
 checkpoint metadata is unauthenticated. Firefox, WebKit, real models, other DSPy
 versions, concurrent tabs, legacy sessions that pause again, forged metadata and
-large many-file descriptors remain unmeasured. Shipped code, existing goldens,
-matrices, locks and recorders are unchanged, and authors still need the fingerprint
-recipe. The implementation follow-up draft is **Bind paused DSPy sessions to the
-loaded offline state files automatically**, parent `galaxie-fv4.3`, for the
-orchestrator to file. No Beads issue was created or edited. Status stays Proposed.
+large many-file descriptors remained unmeasured by the spike. Its candidate stays
+uninstalled, used only for native digest and `Module.load` scope comparisons.
+Existing goldens, matrices, locks and recorders remain unchanged. Status stays Proposed.
+
+### DSPy paused-session state binding (2026-11, shipped)
+
+Durable DSPy Workers compute a JSON-only descriptor binding before importing the
+author's entry and pass it explicitly to `prepare_executor`. The SHA-256 covers
+canonical JSON pairs of POSIX relative path and SHA-256 of Python-visible bytes,
+sorted by path, excluding `__pycache__`. No JSON means no binding. BOM stripping
+binds decoded Worker bytes. Direct executor users stay unbound unless they supply
+a digest, and non-durable Workers do not scan the descriptor. Preparation rejects
+non-None digests that are not lowercase 64-hex strings with `unsupported` before
+they can produce an unreadable paused record.
+
+The metadata version remains `v: 1`, with the existing journal and checkpoint type
+tags. Only paused records gain the optional `stateBinding` key. Its fixed lowercase
+64-hex digest adds exactly 82 JSON bytes, about 110 base64 characters. The previous
+exact key-set check already refuses such records without writing; a version bump
+would add no rollback benefit and would require another legacy version path.
+Rolling the library back therefore leaves bound pauses unreadable until newer
+code returns. New code accepts records without the key.
+
+Restore accepts exactly the original key set or that set plus `stateBinding`.
+A present key requires paused status, a lowercase 64-hex string and an equal frozen
+executor digest, before registering the session. Unknown keys, malformed values,
+a key on another status or a missing live manifest fail with the fixed
+`unrecoverable` error. No live calls, replay or writes follow a refused restore;
+the original bytes can resume later. Completed and unrecoverable snapshots never
+carry the key. Input, journal and interaction props cannot accidentally insert
+metadata keys.
+
+The existing pause-size check counts the extra bytes, reducing headroom by about
+110 bytes near the 1 MiB bridge limit. An unreadable JSON file fails durable boot
+with `unsupported` rather than binding a partial manifest. No additional count or
+byte cap is imposed. Any descriptor JSON edit, including unused data or whitespace,
+refuses earlier bound pauses. Python sources stay outside the manifest; the author
+fingerprint recipe covers them and other files.
+
+This is a consistency check against accidental swaps, not integrity protection:
+metadata is unauthenticated. The shipped native, Node Pyodide and Chromium reload
+probes retain the spike's refusal, unchanged-row, rollback and legacy outcomes.
+Native CPython also measures a legacy session gaining the binding at its next
+pause. Firefox, WebKit, real models, other DSPy versions, concurrent tabs, forged
+metadata, large many-file descriptors and legacy sessions that pause again outside
+native CPython remain unmeasured. ADR-0012 guarantees are unchanged; this ADR stays
+Proposed. See the [shipped evidence](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
