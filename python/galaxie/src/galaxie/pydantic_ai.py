@@ -13,12 +13,13 @@ from copy import deepcopy
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, TypeVar
+from types import UnionType
+from typing import Any, TypeVar, Union, get_args, get_origin
 from uuid import uuid4
 
-from pydantic_ai import Agent, AgentRunResult, Conversation, ConversationTypeAdapter, DeferredToolRequests, DeferredToolResults, NativeOutput, RunContext, Tool, capture_run_messages
+from pydantic_ai import Agent, AgentRunResult, ApprovalRequired, Conversation, ConversationTypeAdapter, DeferredToolRequests, DeferredToolResults, NativeOutput, RunContext, Tool, ToolApproved, capture_run_messages
 from pydantic_ai.capabilities import AbstractCapability, Instrumentation
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (
@@ -46,6 +47,7 @@ _native_requests: ContextVar[list[int] | None] = ContextVar('galaxie_pydantic_na
 class _ActiveRun:
     run_ids: set[str]
     child_ids: set[str]
+    hoisted: set[tuple[str, int, int]] = field(default_factory=set)
 
 
 _active: ContextVar[_ActiveRun | None] = ContextVar('galaxie_pydantic_active', default=None)
@@ -53,6 +55,8 @@ _active: ContextVar[_ActiveRun | None] = ContextVar('galaxie_pydantic_active', d
 # another run's stamp (a prompt-less resume keeps it), so the stamp is never used to authorize.
 _authorized: ContextVar[str | None] = ContextVar('galaxie_pydantic_authorized', default=None)
 _OutputT = TypeVar('_OutputT')
+_CHILD_APPROVAL = 'galaxie.child-approval'
+_CHILD_STATE_BYTES = 128 * 1024
 
 
 def _check_run(run_id: str | None) -> None:
@@ -341,6 +345,163 @@ class _GalaxieStream(StreamedResponse):
         return self._timestamp
 
 
+def _child_identity(parent: str, position: int, part: int, key: str) -> str:
+    return hashlib.sha256(json.dumps([
+        'galaxie.pydantic-ai.child', parent, position, part, key,
+    ], ensure_ascii=False).encode()).hexdigest()
+
+
+def _pending_position(messages: list[ModelMessage], base: int, identifier: str) -> tuple[int, int]:
+    for index, message in reversed(list(enumerate(messages))):
+        if isinstance(message, ModelResponse):
+            for part_index, part in enumerate(message.parts):
+                if isinstance(part, ToolCallPart) and part.tool_call_id == identifier:
+                    return base + index, part_index
+            break
+    raise ValueError()
+
+
+def _pending_ids(requests: DeferredToolRequests) -> set[str]:
+    calls = requests.calls + requests.approvals
+    ids = [call.tool_call_id for call in calls]
+    if (
+        not calls or len(set(ids)) != len(ids) or any(not 0 < len(identifier) <= 128 for identifier in ids)
+        or not set(requests.metadata) <= set(ids)
+    ):
+        raise ValueError()
+    return set(ids)
+
+
+def _pending_calls(requests: DeferredToolRequests, messages: list[ModelMessage], *, child: bool = False) -> None:
+    ids = _pending_ids(requests)
+    calls = requests.calls + requests.approvals
+    response_index = next((index for index in range(len(messages) - 1, -1, -1)
+                           if isinstance(messages[index], ModelResponse)), None)
+    if response_index is None:
+        raise ValueError()
+    response = messages[response_index]
+    assert isinstance(response, ModelResponse)
+    parts = [part for part in response.parts if isinstance(part, ToolCallPart)]
+    if any(call not in parts for call in calls):
+        raise ValueError()
+    if child:
+        trailing = messages[response_index + 1:]
+        other_ids = {part.tool_call_id for part in parts} - ids
+        if trailing and (
+            len(trailing) != 1 or not isinstance(trailing[0], ModelRequest) or not trailing[0].parts
+            or any(not isinstance(part, (ToolReturnPart, RetryPromptPart)) or part.tool_call_id not in other_ids
+                   for part in trailing[0].parts)
+        ):
+            raise ValueError()
+
+
+@dataclass
+class _HoistedChild:
+    entry: dict[str, Any]
+    conversation: Conversation
+
+
+def _child_payload(value: Any) -> _HoistedChild:
+    if (
+        type(value) is not dict or set(value) != {'v', 'key', 'identity', 'state'}
+        or type(value['v']) is not int or value['v'] != 1
+        or type(value['key']) is not str or len(value['key']) > 128
+        or type(value['identity']) is not str or re.fullmatch(r'[0-9a-f]{64}', value['identity']) is None
+        or type(value['state']) is not str or len(value['state'].encode('utf-8')) > _CHILD_STATE_BYTES
+    ):
+        raise ValueError()
+    raw = json.loads(value['state'])
+    if type(raw) is not dict or set(raw) != {'messages', 'usage', 'conversation_id', 'deferred_tool_requests'}:
+        raise ValueError()
+    _json(raw)
+    conversation = ConversationTypeAdapter.validate_json(value['state'])
+    requests = conversation.deferred_tool_requests
+    if (
+        conversation.conversation_id != value['identity'] or requests is None
+        or requests.calls or len(requests.approvals) != 1
+        or any(_CHILD_APPROVAL in metadata for metadata in requests.metadata.values())
+    ):
+        raise ValueError()
+    _pending_calls(requests, conversation.messages, child=True)
+    return _HoistedChild(deepcopy(value), conversation)
+
+
+def _hoisted_children(
+    requests: DeferredToolRequests, code: str, *, parent: str | None = None,
+    messages: list[ModelMessage] | None = None, base: int = 0,
+) -> dict[str, _HoistedChild]:
+    try:
+        children = {}
+        approvals = {call.tool_call_id for call in requests.approvals}
+        for identifier, metadata in requests.metadata.items():
+            if _CHILD_APPROVAL not in metadata:
+                continue
+            if identifier not in approvals or children:
+                raise ValueError()
+            child = _child_payload(metadata[_CHILD_APPROVAL])
+            if parent is not None and messages is not None:
+                position, part = _pending_position(messages, base, identifier)
+                if child.entry['identity'] != _child_identity(parent, position, part, child.entry['key']):
+                    raise ValueError()
+            children[identifier] = child
+        if children:
+            _pending_ids(requests)
+            if messages is not None:
+                _pending_calls(requests, messages)
+        return children
+    except Exception:
+        raise GalaxieError(code) from None
+
+
+def hoisted_child_requests(requests: DeferredToolRequests) -> dict[str, DeferredToolRequests]:
+    """Read validated child approvals, keyed by their parent delegate call id.
+
+    Interaction props must contain each child's id, name and JSON arguments together
+    in one object. Arguments may be a JSON string or an object. The executor checks
+    this display requirement before publishing or restoring the interaction.
+    """
+    children = _hoisted_children(requests, 'invalid')
+    result = {}
+    for identifier, child in children.items():
+        pending = child.conversation.deferred_tool_requests
+        assert pending is not None
+        result[identifier] = pending
+    return result
+
+
+def _child_displayed(props: Any, call: ToolCallPart) -> bool:
+    if isinstance(props, dict):
+        if props.get('id') == call.tool_call_id and props.get('name') == call.tool_name and 'arguments' in props:
+            arguments = props['arguments']
+            try:
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+                if json.dumps(arguments, sort_keys=True, allow_nan=False) == json.dumps(call.args_as_dict(), sort_keys=True, allow_nan=False):
+                    return True
+            except (ValueError, TypeError):
+                pass
+        return any(_child_displayed(value, call) for value in props.values())
+    return isinstance(props, list) and any(_child_displayed(value, call) for value in props)
+
+
+def _validate_child_display(value: dict[str, Any], children: dict[str, _HoistedChild]) -> None:
+    for child in children.values():
+        pending = child.conversation.deferred_tool_requests
+        assert pending is not None
+        if not _child_displayed(value['props'], pending.approvals[0]):
+            raise ValueError()
+
+
+def _allows_child_approval(output: Any) -> bool:
+    if output is DeferredToolRequests:
+        return True
+    if get_origin(output) in (Union, UnionType):
+        return any(_allows_child_approval(item) for item in get_args(output))
+    if isinstance(output, Sequence) and not isinstance(output, (str, bytes)):
+        return any(_allows_child_approval(item) for item in output)
+    return False
+
+
 def _call_position(ctx: RunContext) -> tuple[int, int]:
     for response_index, message in reversed(list(enumerate(ctx.messages))):
         if isinstance(message, ModelResponse):
@@ -375,30 +536,62 @@ class _ChildRunGuard(_RunAuthority):
 
 
 async def run_child(
-    ctx: RunContext, agent: Agent[Any, _OutputT], prompt: str | None, *, key: str = '', **options: Any,
+    ctx: RunContext, agent: Agent[Any, _OutputT], prompt: str | None, *, key: str = '',
+    hoist_approvals: bool = False, **options: Any,
 ) -> AgentRunResult[_OutputT]:
     """Delegate from a tool with shared usage and a replay-stable positional identity.
 
-    Use distinct keys for several children in one tool call. Replay must preserve
-    call order and structure. Child approval hoisting and streaming are not provided.
+    Replay must preserve call order and structure. With hoist_approvals, exactly one
+    pending child approval pauses the parent and resumes through this helper. Include
+    the child's call from hoisted_child_requests in interaction props. Use at most one
+    hoisting child per tool body, as its first child; a second is refused before its
+    own work, although an earlier approved child may already have written. Nested
+    hoists, external child calls and child streaming are refused.
     """
     reserved = {'usage', 'usage_limits', 'conversation', 'conversation_id', 'run_id', 'infer_name', 'metadata', 'workspace', 'spec'}
     if set(options) & reserved or not set(options) <= set(inspect.signature(Agent.run).parameters):
         raise GalaxieError('invalid')
-    if not isinstance(key, str) or not isinstance(ctx.conversation_id, str) or not ctx.conversation_id:
+    if not isinstance(key, str) or not isinstance(ctx.conversation_id, str) or not ctx.conversation_id or type(hoist_approvals) is not bool:
         raise GalaxieError('invalid')
     _check_run(ctx.run_id)
+    active = _active.get()
+    if hoist_approvals and (active is None or ctx.conversation_id in active.child_ids):
+        raise GalaxieError('unsupported')
     model = options.get('model')
     if not isinstance(agent, Agent) or not isinstance(agent.model if model is None else model, GalaxieModel):
         raise GalaxieError('unsupported')
     _uninstrumented(agent)
     _validate_agent(agent)
     position, part = _call_position(ctx)
-    identifier = hashlib.sha256(json.dumps([
-        'galaxie.pydantic-ai.child', ctx.conversation_id, position, part, key,
-    ], ensure_ascii=False).encode()).hexdigest()
+    identifier = _child_identity(ctx.conversation_id, position, part, key)
     run_id = uuid4().hex
-    active = _active.get()
+    if hoist_approvals:
+        assert active is not None
+        output_type = options.get('output_type')
+        if (
+            len(key) > 128 or set(options) & {'message_history', 'deferred_tool_results'}
+            or not _allows_child_approval(agent.output_type if output_type is None else output_type)
+            or (ctx.conversation_id, position, part) in active.hoisted
+        ):
+            raise GalaxieError('invalid')
+        active.hoisted.add((ctx.conversation_id, position, part))
+        metadata = ctx.tool_call_metadata
+        if isinstance(metadata, dict) and _CHILD_APPROVAL in metadata:
+            try:
+                if not ctx.tool_call_approved:
+                    raise ValueError()
+                child = _child_payload(metadata[_CHILD_APPROVAL])
+                if child.entry['key'] != key or child.entry['identity'] != identifier:
+                    raise ValueError()
+                requests = child.conversation.deferred_tool_requests
+                assert requests is not None
+                options['message_history'] = child.conversation.messages
+                options['deferred_tool_results'] = requests.build_results(
+                    approve_all=True, metadata=requests.metadata,
+                )
+                prompt = None
+            except Exception:
+                raise GalaxieError('invalid') from None
     if active is not None:
         if identifier in active.child_ids:
             raise GalaxieError('invalid')
@@ -407,10 +600,21 @@ async def run_child(
     native_token = _native_requests.set([0])
     try:
         options['capabilities'] = [*(options.get('capabilities') or []), _ChildRunGuard()]
-        return await agent.run(
+        result = await agent.run(
             prompt, **{'deps': ctx.deps, **options}, usage=ctx.usage, usage_limits=ctx.usage_limits,
             conversation_id=identifier, run_id=run_id, infer_name=False,
         )
+        if hoist_approvals and isinstance(result.output, DeferredToolRequests):
+            try:
+                entry = {
+                    'v': 1, 'key': key, 'identity': identifier,
+                    'state': ConversationTypeAdapter.dump_json(result.conversation).decode(),
+                }
+                _child_payload(entry)
+            except Exception:
+                raise GalaxieError('unsupported') from None
+            raise ApprovalRequired(metadata={_CHILD_APPROVAL: entry})
+        return result
     finally:
         _native_requests.reset(native_token)
         if active is not None:
@@ -584,22 +788,14 @@ class Executor:
                     or pause['interaction']['id'] != hashlib.sha256(json.dumps([identifier, state.pauses - 1]).encode()).hexdigest()
                 ):
                     raise ValueError()
+                _pending_calls(requests, conversation.messages)
+                children = _hoisted_children(
+                    requests, 'unrecoverable', parent=identifier, messages=conversation.messages, base=pause['position'],
+                )
                 value = _interaction(pause['interaction']['value'])
+                _validate_child_display(value, children)
                 # Stored props must be what this agent's interaction factory derives from the requests.
-                if self.interaction is None or _interaction(self.interaction(requests)) != value:
-                    raise ValueError()
-                calls = requests.calls + requests.approvals
-                ids = [call.tool_call_id for call in calls]
-                if (
-                    len(set(ids)) != len(ids) or any(not 0 < len(call_id) <= 128 for call_id in ids)
-                    or not set(requests.metadata) <= set(ids)
-                ):
-                    raise ValueError()
-                responses = [message for message in conversation.messages if isinstance(message, ModelResponse)]
-                if not responses:
-                    raise ValueError()
-                parts = [part for part in responses[-1].parts if isinstance(part, ToolCallPart)]
-                if any(call not in parts for call in calls):
+                if self.interaction is None or _interaction(self.interaction(deepcopy(requests) if children else requests)) != value:
                     raise ValueError()
                 state.pending = _Pause(pause['position'], conversation.messages, requests, pause['interaction'])
             self._conversations[identifier] = state
@@ -607,12 +803,16 @@ class Executor:
         except Exception:
             raise GalaxieError('unrecoverable') from None
 
-    def _results(self, requests: DeferredToolRequests, action: str, payload: Any) -> DeferredToolResults:
+    def _results(
+        self, requests: DeferredToolRequests, action: str, payload: Any, *, parent: str,
+        messages: list[ModelMessage], base: int,
+    ) -> DeferredToolResults:
         approvals = {call.tool_call_id for call in requests.approvals}
         calls = {call.tool_call_id for call in requests.calls}
         try:
+            children = _hoisted_children(requests, 'invalid', parent=parent, messages=messages, base=base)
             if self.resume is not None:
-                results = self.resume(requests, action, payload)
+                results = self.resume(deepcopy(requests) if children else requests, action, payload)
             else:
                 if (
                     action not in ('approve', 'deny') or calls
@@ -630,7 +830,15 @@ class Executor:
                 or not set(results.metadata) <= approvals | calls
             ):
                 raise GalaxieError('invalid')
-            results.to_tool_call_results()
+            normalized = results.to_tool_call_results()
+            for identifier, child in children.items():
+                if isinstance(normalized[identifier], ToolApproved):
+                    metadata = results.metadata.get(identifier)
+                    results.metadata[identifier] = {
+                        **(metadata if isinstance(metadata, dict) else {}), _CHILD_APPROVAL: child.entry,
+                    }
+                else:
+                    results.metadata.pop(identifier, None)
             return results
         except Exception:
             raise GalaxieError('invalid') from None
@@ -687,7 +895,10 @@ class Executor:
                 raise GalaxieError('stale')
             if set(resume) != {'interactionId', 'action', 'payload'} or not isinstance(resume['action'], str):
                 raise GalaxieError('invalid')
-            options['deferred_tool_results'] = self._results(pause.requests, resume['action'], resume['payload'])
+            options['deferred_tool_results'] = self._results(
+                pause.requests, resume['action'], resume['payload'], parent=conversation_id,
+                messages=pause.messages, base=pause.position,
+            )
             options['message_history'] = pause.messages
             if state.conversation is not None:
                 options['usage'] = deepcopy(state.conversation.usage)
@@ -728,7 +939,11 @@ class Executor:
             try:
                 if self.interaction is None:
                     raise GalaxieError('unsupported')
-                value = _interaction(self.interaction(result.output))
+                children = _hoisted_children(
+                    result.output, 'unsupported', parent=conversation_id, messages=result.all_messages(), base=position,
+                )
+                value = _interaction(self.interaction(deepcopy(result.output) if children else result.output))
+                _validate_child_display(value, children)
             except Exception:
                 raise GalaxieError('unsupported') from None
             identifier = hashlib.sha256(json.dumps([conversation_id, state.pauses]).encode()).hexdigest()
