@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import type { RunStatus } from '@galaxie-ai/core';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { App, GatewayStatus } from '../src/app.js';
 import { gatewayStateForStatus, gatewayStates } from '../src/gateway-state.js';
-import { createHybridHost, type HybridHost } from '../src/runtime.js';
+import { createHybridHost, type HybridHost, type HybridInstance } from '../src/runtime.js';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root | undefined;
@@ -20,12 +21,38 @@ afterEach(async () => {
   container = undefined;
   await host?.dispose();
   host = undefined;
+  vi.restoreAllMocks();
 });
 
 function mount(): void {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
+}
+
+function waitForRunStatus(instance: HybridInstance, target: RunStatus): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const check = (): void => {
+      const run = instance.getSnapshot().run;
+      if (run?.status === target) {
+        unsubscribe();
+        resolve();
+      } else if (
+        run?.status === 'succeeded' ||
+        run?.status === 'failed' ||
+        run?.status === 'cancelled'
+      ) {
+        unsubscribe();
+        reject(
+          new Error(
+            `Expected run status ${target}, observed ${run.status}${run.error === undefined ? '' : ` (${run.error.code})`}.`,
+          ),
+        );
+      }
+    };
+    const unsubscribe = instance.subscribe(check);
+    check();
+  });
 }
 
 it.each([200, 401, 403, 429, 503])(
@@ -77,9 +104,16 @@ it.each([401, 429, 503])(
         );
       },
     });
+    const createInstance = vi.spyOn(host, 'createInstance');
     await act(async () => root?.render(createElement(App, { host: host as HybridHost })));
     expect(modelCalls).toBe(0);
     await act(async () => container?.querySelector<HTMLButtonElement>('button')?.click());
+    const firstCreated = createInstance.mock.results[0];
+    if (firstCreated?.type !== 'return')
+      throw new Error('The first question instance was not created.');
+    const first = await firstCreated.value;
+    await waitForRunStatus(first, 'waiting_input');
+    await act(async () => {});
     await expect
       .poll(async () => {
         await act(async () => {});
@@ -93,6 +127,8 @@ it.each([401, 429, 503])(
       (button) => button.textContent === 'Submit answers',
     );
     await act(async () => submit?.click());
+    await waitForRunStatus(first, 'failed');
+    await act(async () => {});
     await expect
       .poll(async () => {
         await act(async () => {});
@@ -108,6 +144,12 @@ it.each([401, 429, 503])(
     );
     expect(retry?.textContent).toBe('Retry');
     await act(async () => retry?.click());
+    const secondCreated = createInstance.mock.results[1];
+    if (secondCreated?.type !== 'return')
+      throw new Error('The retry question instance was not created.');
+    const second = await secondCreated.value;
+    await waitForRunStatus(second, 'waiting_input');
+    await act(async () => {});
     await expect
       .poll(async () => {
         await act(async () => {});

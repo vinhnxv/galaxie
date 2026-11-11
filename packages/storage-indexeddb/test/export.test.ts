@@ -501,15 +501,15 @@ describe.skipIf(typeof indexedDB === 'undefined')('session export', () => {
     const paused = new Promise<void>((resolve) => {
       release = resolve;
     });
-    let entered = false;
+    const entered = Promise.withResolvers<void>();
     vi.spyOn(saver.serde, 'loadsTyped').mockImplementation(async (type, bytes) => {
-      entered = true;
+      entered.resolve();
       await paused;
       return native(type, bytes);
     });
     const exporting = saver.exportSession('session', { personalContent: true });
     const rejection = expect(exporting).rejects.toMatchObject({ code: 'invalidated' });
-    await expect.poll(() => entered).toBe(true);
+    await entered.promise;
     await saver.invalidatePrincipal();
     release?.();
     await rejection;

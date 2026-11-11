@@ -25,6 +25,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 import type { ConformanceGraph } from './support/transcript.js';
 
@@ -177,12 +178,12 @@ function event(instance: AgentInstance<unknown, unknown>): UserInteractionEvent 
 
 async function paused(fixture: Fixture): Promise<UserInteractionEvent> {
   await fixture.instance.start({});
-  await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('waiting_input'));
+  await waitForRunStatus(fixture.instance, 'waiting_input');
   return event(fixture.instance);
 }
 
 async function finished(fixture: Fixture): Promise<void> {
-  await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('succeeded'));
+  await waitForRunStatus(fixture.instance, 'succeeded');
   await fixture.runtime.dispose();
   const state = await fixture.graph.getState({
     configurable: { thread_id: fixture.instance.sessionId },
@@ -411,9 +412,8 @@ test.each(
   const restored = await fixture(mode, saver, store, { retry }, first.instance.sessionId);
   await restored.instance.restore();
   if (retry === 'none') {
-    await vi.waitFor(() =>
-      expect(restored.instance.getSnapshot().run?.error?.code).toBe('outcome_unknown'),
-    );
+    await waitForRunStatus(restored.instance, 'failed');
+    expect(restored.instance.getSnapshot().run?.error?.code).toBe('outcome_unknown');
     expect(restored.writes).toHaveLength(0);
     expect(restored.diagnostics).toContainEqual(
       expect.objectContaining({
@@ -439,7 +439,7 @@ test.each(modes)('%s repeats reads while reusing writes after a failed resume', 
     },
   });
   await first.instance.dispatch(await paused(first));
-  await vi.waitFor(() => expect(first.instance.getSnapshot().run?.status).toBe('failed'));
+  await waitForRunStatus(first.instance, 'failed');
   await first.runtime.dispose();
   expect((await store.submissions(first.instance.sessionId))[0]?.status).toBe('accepted');
   expect([...store.journal.values()]).toHaveLength(1);
@@ -464,7 +464,7 @@ test.each(modes)('%s refuses changed write order on replay', async (mode) => {
     },
   });
   await first.instance.dispatch(await paused(first));
-  await vi.waitFor(() => expect(first.instance.getSnapshot().run?.status).toBe('failed'));
+  await waitForRunStatus(first.instance, 'failed');
   await first.runtime.dispose();
   const restored = await fixture(
     mode,
@@ -474,9 +474,8 @@ test.each(modes)('%s refuses changed write order on replay', async (mode) => {
     first.instance.sessionId,
   );
   await restored.instance.restore();
-  await vi.waitFor(() =>
-    expect(restored.instance.getSnapshot().run?.error?.code).toBe('unrecoverable'),
-  );
+  await waitForRunStatus(restored.instance, 'failed');
+  expect(restored.instance.getSnapshot().run?.error?.code).toBe('unrecoverable');
   expect(first.writes).toHaveLength(2);
   expect(restored.writes).toHaveLength(0);
 });

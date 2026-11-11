@@ -32,6 +32,7 @@ import {
   type HttpFixture,
 } from './support/http-context.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 
 let fixture: HttpFixture;
 let local: HttpControl | undefined;
@@ -435,7 +436,7 @@ test.each([false, true])(
 
     const first = await create(true);
     const { runId } = await first.instance.start({});
-    await expect.poll(() => first.instance.getSnapshot().run?.status).toBe('waiting_input');
+    await waitForRunStatus(first.instance, 'waiting_input');
     const pending = first.instance.getSnapshot().run?.pending;
     if (pending === undefined) throw new Error('Expected the write interaction.');
     expect(

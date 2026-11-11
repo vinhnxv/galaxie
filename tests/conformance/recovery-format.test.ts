@@ -22,7 +22,7 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph/web';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import {
@@ -31,6 +31,7 @@ import {
   transact,
 } from '../../packages/storage-indexeddb/src/schema.js';
 import { assistantRoles, assistantRouting } from './support/routing.js';
+import { waitForRunStatus } from './support/run-status.js';
 import { ScriptedChatModel } from './support/scripted-chat-model.js';
 import type { ConformanceGraph } from './support/transcript.js';
 
@@ -257,12 +258,12 @@ function event(instance: AgentInstance<unknown, unknown>): UserInteractionEvent 
 
 async function paused(fixture: Fixture): Promise<UserInteractionEvent> {
   await fixture.instance.start({});
-  await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('waiting_input'));
+  await waitForRunStatus(fixture.instance, 'waiting_input');
   return event(fixture.instance);
 }
 
 async function finished(fixture: Fixture, saved = 'first'): Promise<void> {
-  await vi.waitFor(() => expect(fixture.instance.getSnapshot().run?.status).toBe('succeeded'));
+  await waitForRunStatus(fixture.instance, 'succeeded');
   await fixture.runtime.dispose();
   const state = await fixture.graph.getState({
     configurable: { thread_id: fixture.instance.sessionId },
@@ -290,7 +291,7 @@ for (const kind of ['memory', 'indexeddb'] as const) {
           const submitted = await paused(first);
           if (hasReceipt) {
             expect(await first.instance.dispatch(submitted)).toMatchObject({ status: 'accepted' });
-            await vi.waitFor(() => expect(first.instance.getSnapshot().run?.status).toBe('failed'));
+            await waitForRunStatus(first.instance, 'failed');
           }
           await first.runtime.dispose();
           expect(first.writes).toHaveLength(hasReceipt ? 1 : 0);
@@ -399,7 +400,7 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const first = await fixture(store, undefined, true);
     const submitted = await paused(first);
     expect(await first.instance.dispatch(submitted)).toMatchObject({ status: 'accepted' });
-    await vi.waitFor(() => expect(first.instance.getSnapshot().run?.status).toBe('failed'));
+    await waitForRunStatus(first.instance, 'failed');
     await first.runtime.dispose();
     expect(first.writes).toHaveLength(1);
     const effectId = first.writes[0]?.effectId;
@@ -422,7 +423,7 @@ test.skipIf(typeof indexedDB === 'undefined')(
     });
     const restored = await fixture(reopened, sessionId);
     expect(await restored.instance.restore()).toBeDefined();
-    await vi.waitFor(() => expect(restored.instance.getSnapshot().run?.status).toBe('failed'));
+    await waitForRunStatus(restored.instance, 'failed');
     expect(restored.instance.getSnapshot().run?.error).toMatchObject({ code: 'unavailable' });
     expect(restored.writes).toHaveLength(0);
     await restored.runtime.dispose();
