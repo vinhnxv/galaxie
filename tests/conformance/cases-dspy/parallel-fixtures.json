@@ -13,13 +13,22 @@
     "rotated": ["beta", "gamma", "alpha"]
   },
   "predictions": {
-    "nativeParallelThreads": { "ok": true, "output": { "answers": [null, null, null] }, "requests": 0 },
+    "nativeParallelThreads": {
+      "ok": true,
+      "output": { "answers": [null, null, null] },
+      "requests": 0
+    },
     "nativeParallelSequential": { "ok": false, "code": "unsupported", "requests": 0 },
     "nativeEvaluateThreads": { "ok": true, "score": 0.0, "requests": 0 },
     "nativeEvaluateSequential": { "ok": false, "code": "unsupported", "requests": 0 },
     "singleCallGather": "Result parity, replay, write identity and divergence-before-dispatch pass in every arrival order under shipped code.",
     "multiCallGather": "Shipped replay or re-dispatch fails unrecoverable in another order; the branch journal passes.",
-    "nodeThreads": { "thread": "RuntimeError", "pool": "RuntimeError", "threadedCode": "executor_error", "sequentialCode": "unsupported" },
+    "nodeThreads": {
+      "thread": "RuntimeError",
+      "pool": "RuntimeError",
+      "threadedCode": "executor_error",
+      "sequentialCode": "unsupported"
+    },
     "pauseInBranch": "Shipped code may leave an unfinished journal or orphan sibling; the branch journal ends unsupported and drains siblings.",
     "outcomes": { "parallel": "alternative", "threadedEvaluate": "alternative" }
   },
