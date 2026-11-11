@@ -243,8 +243,10 @@ The [CPython probes](cases-pydantic-ai-delegation/test_delegation_probes.py) and
 [Node Pyodide probes](pydantic-ai-delegation.node.test.ts) now exercise the shipped
 `galaxie.pydantic_ai.run_child` and nested-run guard with the same
 [scripted replies](cases-pydantic-ai-delegation/fixtures.json). The original spike
-outcome rule remains in the fixture docstring for comparison; the tables below
-record the shipped behavior. A green characterization test can still pin a limit.
+outcome rule remains in the fixture docstring for comparison. The tables below
+record the helper and guard behavior alongside the original probe-local hoist
+pattern. The [shipped child approval hoist](#pydantic-ai-child-approval-hoist) has
+its own conformance suite. A green characterization test can still pin a limit.
 
 Versions: pydantic-ai-slim 2.60.0, pydantic-graph 2.60.0, CPython 3.14.5,
 Pyodide 314.0.7, Node 24.15.0 and pnpm 11.21.0. Re-run these probes on every
@@ -269,10 +271,10 @@ All evidence below is scripted.
 | D8 non-bridge child | P1 | A plain FunctionModel child remains invisible to the bridge: only two parent requests. The helper and `model=` override validation refuse that child with `unsupported` before transport. | Not applicable |
 | P1 excluded deferred output | P0 | Native `UserError`, two requests, zero gated bodies. | Not applicable |
 | P2 deferral returned as data | P0 | Three requests, zero gated bodies; parent completes without a host pause. | Same. |
-| P3 hoisted approval | P0 | Probe-local metadata forwarding or `ToolApproved.override_args` resumes a helper child; five requests, writes 2 and 3 once each. Default resume loses child metadata. | Explicit metadata forwarding: one pause, five requests, writes 2 and 3 once each. |
-| P4 hoist snapshot/reload | P0 | Not applicable | Identical restored pending interaction; writes 2 and 3 once each across fresh Workers. |
-| P5 parallel pauses | P1 | One pending parent interaction contains two delegate approvals; three requests, zero gated bodies. | Not applicable |
-| P6 answer/state validation | P1 | Explicit resume schema rejects extra answer fields, but outer restore accepts corrupt child metadata. Child validation becomes parent tool retry data; parent completes without the gated write. | Not applicable |
+| P3 probe-local hoisted approval | P0 | Probe-local metadata forwarding or `ToolApproved.override_args` resumes a helper child; five requests, writes 2 and 3 once each. Default resume loses child metadata. | Explicit metadata forwarding: one pause, five requests, writes 2 and 3 once each. |
+| P4 probe-local hoist snapshot/reload | P0 | Not applicable | Identical restored pending interaction; writes 2 and 3 once each across fresh Workers. |
+| P5 probe-local parallel pauses | P1 | The original pattern puts two delegate approvals in one parent interaction; three requests, zero gated bodies. The shipped hoist refuses this shape. | Not applicable |
+| P6 probe-local answer/state validation | P1 | Explicit resume schema rejects extra answer fields, but outer restore accepts corrupt author metadata outside the reserved hoist entry. Native validation becomes parent retry data; parent completes without the gated write. | Not applicable |
 | S1 child stream paths | P0 | Not applicable | No child stream paths ship; plain child streams are refused. |
 | S2 capability flag | P1 | Not exposed by the Python Executor | Actual prepared adapter advertises `subgraphs: false`. |
 | G1 public nested-run detection | P0 | Public message `run_id`, streamed `run_context` and tool `RunContext` distinguish registered work from plain nested runs. Top-level retries, resume, sequential runs and parallel tools pass. | Not applicable |
@@ -282,7 +284,7 @@ All evidence below is scripted.
 | Gap | Shipped outcome | Evidence and limits |
 | --- | --- | --- |
 | Delegation without child pauses | **Supported through `run_child`; plain nested runs refused** | Shared budgets, positional identity, per-child repairs and public-only refusal checks pass. Three new conformance cases match native CPython on Node Pyodide. |
-| Child pause propagation | **Supported by the probe-local hoist pattern** | P1/P2 execute no unapproved gated bodies; P3/P4 complete and restore the explicitly hoisted child. No hoist API ships. |
+| Child pause propagation | **Supported through `run_child(..., hoist_approvals=True)`** | The [new suite](#pydantic-ai-child-approval-hoist) covers approve, reject and restore with validated state and required child-call display. P3–P6 retain the original probe-local pattern as comparison evidence. |
 | Subgraphs flag and stream paths | **Refused** | No child stream paths exist; `subgraphs` remains false. |
 
 The separate [delegation matrix](compatibility-matrix-pydantic-ai-delegation.json)
@@ -298,16 +300,15 @@ budgets and native repair indices are Node-only assertions, outside the goldens.
 
 ### Where native behavior cannot be matched
 
-A child's `DeferredToolRequests` remains tool data until the parent explicitly
-hoists it into `ApprovalRequired` metadata. Excluding it from the child output
-types raises native `UserError`. Neither form publishes a child host interaction
-by itself. The probe-local hoist serializes the child conversation, then resumes
-with its history and deferred results through `run_child`; the parent's
-synchronous resume callback must preserve that state. The shipped default callback
-forwards approvals only. Outer snapshot validation does not validate author-owned
-child metadata; authors must validate it and must not treat parent completion as
-proof that the child completed. Parallel answers, reject/CallDeferred hoists and
-broader child-state tampering remain unmeasured.
+Without `hoist_approvals=True`, a child's `DeferredToolRequests` remains tool
+data; excluding it from the child output types retains the native `UserError`.
+Neither form publishes a child host interaction by itself. With the flag, the
+helper requires a known output type containing `DeferredToolRequests` and the
+executor preserves the reserved child state through approval and reload. Several
+hoisted children, several child approvals, external child calls and nested hoists
+remain refused under the single-pending-interaction contract. Unrelated author
+metadata, including the original probe-local hoist metadata, stays unvalidated.
+Snapshot bytes are not authenticated.
 
 Plain non-`GalaxieModel` children and direct trusted `capabilities.call` can bypass
 the guard. The helper refuses a child whose selected model is not a `GalaxieModel`,
@@ -346,8 +347,11 @@ so a prompt-less nested run that inherits the parent's history fails `unsupporte
 (regression test `test_prompt_less_nested_run_inheriting_parent_history_is_refused_before_transport`).
 Normal retries, resume and parallel tools pass the measured
 checks. Writes still require host confirmation and matching scoped checkpoint and
-recovery stores. For gated child workflows, flatten into one agent unless the
-probe-local child-state hoisting and validation are needed.
+recovery stores. For gated child workflows, use `hoist_approvals=True` and include
+the calls from `hoisted_child_requests` in interaction props as described below.
+Use only one hoisting child over the tool body's whole execution, as its first
+child. A second is refused before its own work; an earlier approved child may
+already have written when that second call is reached after resume.
 
 The changed-ID probe measures sensitivity to a scripted regenerated ID. It does
 not establish whether a real provider regenerates IDs. The helper preserves its
@@ -371,18 +375,87 @@ Reproduce without rewriting existing goldens:
 ```sh
 node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation
 node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation-suite
+node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-child-approval
+node scripts/test-python.ts galaxie/tests/test_pydantic_ai_child_approval.py
 # Rebuild after Python library edits before running Node Pyodide.
 node scripts/build-python-wheels.ts
-pnpm exec vitest run --project node tests/conformance/pydantic-ai-delegation.node.test.ts tests/conformance/pydantic-ai-delegation-conformance.node.test.ts tests/conformance/pydantic-ai.node.test.ts tests/conformance/pydantic-ai-restore.node.test.ts
+pnpm exec vitest run --project node tests/conformance/pydantic-ai-child-approval-conformance.node.test.ts tests/conformance/pydantic-ai-delegation.node.test.ts tests/conformance/pydantic-ai-delegation-conformance.node.test.ts tests/conformance/pydantic-ai.node.test.ts tests/conformance/pydantic-ai-restore.node.test.ts
 # From python/:
 uv run --locked --offline python -I ../scripts/record-pydantic-ai-delegation-conformance.py --check
+uv run --locked --offline python -I ../scripts/record-pydantic-ai-child-approval-conformance.py --check
 uv run --locked --offline python -I ../scripts/record-pydantic-ai-conformance.py --check
 ```
 
-Existing goldens, matrices, locks and core contracts remain unchanged; only the
-separate delegation suite adds new goldens and a new matrix. The new recorder's
-`--check` also rejects an edited golden, and restoring its original bytes returns
-the check to green.
+Existing goldens, matrices, locks and core contracts remain unchanged. Separate
+delegation and child approval suites add their own goldens and matrices. Both
+recorders' `--check` modes reject an edited golden; restoring its original bytes
+returns the check to green.
+
+## pydantic-ai child approval hoist
+
+`run_child(..., hoist_approvals=True)` now carries a child's gated call through the
+parent's one pending interaction. The [shared suite](cases-pydantic-ai-child-approval/child_approval_suite.py)
+uses the same scripted replies for the [independent native reference](cases-pydantic-ai-child-approval/child_approval_native.py)
+and [Node Pyodide lane](pydantic-ai-child-approval-conformance.node.test.ts).
+The [matrix](compatibility-matrix-pydantic-ai-child-approval.json) records these
+three new goldens; the original delegation probes and evidence remain unchanged.
+
+| Case | Model requests | Capability writes | Result |
+| --- | --- | --- | --- |
+| `child-approval-approve` | 4 | 1 | One parent interaction includes the child's `save` call; approval finishes with `parent-done`. |
+| `child-approval-reject` | 3 | 0 | Denial abandons the child and gives the parent the standard denial; output is `parent-done`. |
+| `child-approval-restore` | 4 | 1 | A fresh Worker restores the identical interaction; the write happens only in the second lifetime and output is `parent-done`. |
+
+Each case has one interaction. The native hoist independently serializes and
+resumes public pydantic-ai conversations; it does not call the galaxie helper.
+The native reload variant also reconstructs the parent agent and checks its
+restored interaction. Node checks the parent/child request order, child effect
+scope, one write journal entry for approve/restore and none for rejection,
+`subgraphs: false`, and no Worker errors. One fixture shares its server, sources
+and bundle across all cases: approve and reject use one Worker each, restore uses
+two. Tests and fixture hooks carry explicit 900,000 ms timeouts; no extra Worker
+is started for these assertions.
+
+The executor owns `galaxie.child-approval` metadata. The
+[Python unit tests](../../python/galaxie/tests/test_pydantic_ai_child_approval.py)
+exercise the validation boundaries and refusal paths:
+
+| Check | Evidence |
+| --- | --- |
+| Entry and conversation shape | Missing/extra fields, version, bounded key, hexadecimal identity, JSON projection, 128 KiB UTF-8 state bound and matching conversation ID. |
+| Child pending call | Exactly one approval, no external calls, bounded unique IDs, metadata confined to pending IDs and matching calls in the last response. Duplicate response IDs, nested hoist metadata and invalid trailing messages are refused. A plain sibling's return is preserved without replay. |
+| Delegate binding | The child identity matches the parent conversation, message position, part and key; re-entry also compares the code-side key. A foreign valid pause is refused. |
+| Display binding | One object under interaction props must contain the child's `id`, `name` and matching `arguments` together. Missing, scattered or changed fields and changed restored arguments are refused. |
+| Callback control | Dropped, replaced or mutated callback state cannot replace the validated entry. Denial drops child state without re-entry; unrelated author metadata remains author-owned. |
+
+Publish validation fails fixed `unsupported` before an interaction is pending;
+restore validation fails fixed `unrecoverable`; re-entry misuse fails fixed
+`invalid` before the gated body. No child content appears in these errors.
+Tests also pin registration of the fresh resumed child, refusal of unregistered
+resumes and borrowed history stamps, shared usage and step limits, parent
+streaming, and equal effect scopes when replaying the same snapshot twice.
+Sequential child approvals produce distinct interaction IDs. If the delegate tool
+itself requires approval, its own gate precedes the child's gate, with no child
+write until both approvals have been answered.
+
+The shipped hoist refuses two parallel delegate pauses, several child approvals,
+external child calls, nested hoists and oversize state. Only one hoisting child
+may run per tool body over its whole execution. A second fails before its own
+request or write; the first approved child may already have written when code
+reaches the second after resume. This keeps the existing one-interaction contract;
+[ADR-0030](../../docs/adr/0030-several-engine-pauses-published-one-at-a-time.md)
+remains Proposed. Put the hoisting child first, because earlier children can
+replay when the tool re-enters.
+
+**Not measured.** The new hoist has no Chromium, Firefox or WebKit lane, real
+provider evidence, child stream paths or general nested checkpoints. A Node
+crash-after-write replay of the hoisted resume remains unmeasured; CPython proves
+scope equality across attempts, and the existing D5 probe measures broker receipt
+replay for the same scope construction. Snapshot bytes are not authenticated, so
+checkpoint-store writers can forge parent and child state. Unrelated author
+metadata remains unvalidated. The 128 KiB child-state bound does not remove the
+1 MiB bound on the encoded parent checkpoint and display frames; an oversized
+checkpoint frame is refused before transport.
 
 ## pydantic-ai native tool refusal probes
 
@@ -695,6 +768,7 @@ pnpm run test:go
 - `CI=true pnpm test` runs both test projects without writing missing goldens.
 - `pnpm test tests/conformance/galaxie.test.ts` runs the twelve parity cases on both galaxie lanes.
 - `node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation-suite` checks the new delegation goldens and native approval reload. Rebuild with `node scripts/build-python-wheels.ts` before `pnpm exec vitest run --project node tests/conformance/pydantic-ai-delegation-conformance.node.test.ts`; the new suite runs on Node Pyodide only. From `python/`, `uv run --locked --offline python -I ../scripts/record-pydantic-ai-delegation-conformance.py --check` verifies its three goldens without writing them.
+- `node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-child-approval` checks the three child approval goldens and native reload. Rebuild the wheel before `pnpm exec vitest run --project node tests/conformance/pydantic-ai-child-approval-conformance.node.test.ts`. From `python/`, `uv run --locked --offline python -I ../scripts/record-pydantic-ai-child-approval-conformance.py --check` verifies its goldens without writing them.
 - CI runs the suite as separate jobs. `GALAXIE_TEST_GROUP` selects a file group for one `pnpm test` run: `general` (everything that does not load the Pyodide wheels, including the Go tests), `python-dspy`, `python-pydantic`, `python-adk` and `python-rest` (the rest of the wheel-loading tests); `python` is the four Python groups together. The groups share no file and together hold every file, so unset runs the whole suite as before. A pull request that changes only documents, Go, or packages no Python test reads skips the Python jobs (`scripts/ci-scope.ts`); a push to `main` always runs all of them.
 
 Goldens are updated only by the native Node snapshot command, `pnpm conformance:update`, when intentionally changing the baseline. Review any resulting diff. Runtime control work must leave the existing goldens and compatibility matrix unchanged.

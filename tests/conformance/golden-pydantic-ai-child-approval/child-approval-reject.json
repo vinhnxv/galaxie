@@ -1,0 +1,152 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "parent"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "delegate",
+            "description": "Delegate to the child.",
+            "parameters": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "child"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "save",
+            "description": "Save a doubled integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "parent"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "delegate",
+              "type": "function",
+              "function": {
+                "name": "delegate",
+                "arguments": "{}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "delegate",
+          "content": "The tool call was denied."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "delegate",
+            "description": "Delegate to the child.",
+            "parameters": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "toolChoice": "auto"
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "delegate",
+          "name": "delegate",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "save",
+          "name": "save",
+          "args": {
+            "value": 2
+          }
+        }
+      ]
+    },
+    {
+      "content": "parent-done",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [
+    {
+      "interactionId": "pause-0",
+      "surfaceId": "main",
+      "viewRevision": "approval-1",
+      "component": "tests.Approval/v1",
+      "props": {
+        "calls": [
+          {
+            "id": "delegate",
+            "name": "delegate",
+            "arguments": "{}",
+            "child": [
+              {
+                "id": "save",
+                "name": "save",
+                "arguments": "{\"value\":2}"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "output": "parent-done",
+  "error": null
+}

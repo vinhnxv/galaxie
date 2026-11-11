@@ -239,15 +239,103 @@ covers CPython and Node Pyodide. After a crash following a child write, a script
 changed delegate ID preserves the helper's child scope and effect ID, so the write
 runs once; the ID-sensitive control writes twice. This measures sensitivity to ID
 changes, not whether a real provider regenerates IDs. Writes still require host
-confirmation and matching checkpoint/recovery stores. Explicit child-approval
-hoisting remains probe-local and needs an author resume callback that preserves
-child state; outer snapshots do not validate that author-owned metadata. Flatten
-gated tools into one agent when that state handling is unnecessary. `subgraphs`
-stays false: there is no helper child streaming or host child stream path, and
-plain child streams are refused. Chromium delegation, real providers, arbitrary
-mid-run continuation and general nested checkpoints remain unmeasured. The size
-budget covers JavaScript package entries; neither this adapter nor the Python
-wheel has a size budget.
+confirmation and matching checkpoint/recovery stores. `subgraphs` stays false:
+there is no helper child streaming or host child stream path, and plain child
+streams are refused. Chromium delegation, real providers, arbitrary mid-run
+continuation and general nested checkpoints remain unmeasured. The size budget
+covers JavaScript package entries; neither this adapter nor the Python wheel has
+a size budget.
+
+**Child approvals.** Set `hoist_approvals=True` to pause the parent when a child
+needs approval. Both agents must allow `DeferredToolRequests` in their output
+types, for example `[str, DeferredToolRequests]` or `str | DeferredToolRequests`.
+The child uses ordinary `requires_approval` tools. The helper returns its usual
+`AgentRunResult` after the child finishes; with the flag set, its output is never
+`DeferredToolRequests`. Without the flag, a returned deferral remains tool data.
+
+For a parent and child configured with `[str, DeferredToolRequests]`, wire the
+parent tool and interaction factory as follows:
+
+```python
+from pydantic_ai import DeferredToolRequests, RunContext
+from galaxie.pydantic_ai import Executor, hoisted_child_requests, run_child
+
+@parent.tool
+async def delegate(ctx: RunContext) -> str:
+    result = await run_child(ctx, child, 'Save the requested record.', hoist_approvals=True)
+    assert not isinstance(result.output, DeferredToolRequests)
+    return result.output
+
+def interaction(requests):
+    children = hoisted_child_requests(requests)
+    def show(call):
+        return {'id': call.tool_call_id, 'name': call.tool_name,
+                'arguments': call.args_as_json_str()}
+    return {
+        'surfaceId': 'main', 'viewRevision': 'approval-1',
+        'component': 'app.Approval/v1',
+        'props': {'calls': [{
+            **show(call),
+            'child': [show(pending) for pending in children[call.tool_call_id].approvals]
+                     if call.tool_call_id in children else [],
+        } for call in requests.approvals]},
+    }
+
+executor = Executor(parent, interaction=interaction)
+```
+
+`hoisted_child_requests` returns the validated child requests keyed by the parent
+delegate's tool-call ID. Props must contain the child's `id`, `name` and matching
+`arguments` together in one object, nested anywhere under `props`. Arguments may
+be a JSON string or JSON object; render them as data. The executor refuses a
+missing or changed child call before publishing or restoring an interaction.
+The host's component must display those fields to the user. The child's broker
+write confirmation remains a separate host gate at execution.
+
+The default answer still names the parent's approval IDs:
+`{ "toolCallIds": ["delegate-call-id"] }`, with action `approve` or `deny`.
+Approval re-enters the tool and resumes the saved child using its own registered
+run and shared usage and limits. Denial returns `The tool call was denied.` for
+the delegate without running the child again. No custom resume callback is
+needed. If one is supplied, the executor overwrites its hoisted state with the
+validated state for approved calls and drops that state on denial. A child that
+asks again produces a new interaction. If the delegate tool itself has
+`requires_approval=True`, there are two pauses: approve the delegate first, then
+approve the child's call; neither pause executes the child's gated body.
+Interaction and resume callbacks receive copies of requests. A resume callback
+that adds reserved child metadata to a call without a validated hoist fails
+`invalid`.
+
+A child pending call ID that equals a pending ID of the parent fails `unsupported`.
+A plain child sibling tool that returns extra user content (`ToolReturn` with `content`)
+is also refused after it ran, because its trailing request is not an accepted shape.
+A pause supports one hoisted child with exactly one pending approval and no
+external calls. Several hoisted children, several child approvals, `CallDeferred`
+child calls, nested hoists and child state over 128 KiB fail `unsupported` without
+publishing an interaction. Hoisting outside an executor also fails `unsupported`.
+The flag reserves `message_history` and `deferred_tool_results`, requires a known
+output type containing `DeferredToolRequests`, and limits `key` to 128 characters;
+misuse fails `invalid` before child work.
+
+Use at most one hoisting child over a tool body's whole execution, and put it
+first. A second is refused with `invalid` before that second child's request or
+write. When code reaches it only after the first child resumes, the first
+approved write may already have happened. Children run before a hoist can replay
+when the tool re-enters. Keep all call order and structure deterministic.
+
+The executor validates the reserved `galaxie.child-approval` entry at publication,
+restore and re-entry, including its positional identity, code-side key and pending
+call. Failures use fixed `unsupported`, `unrecoverable` and `invalid` errors,
+respectively. Unrelated author metadata is not validated. Snapshots are not
+authenticated: a checkpoint-store writer can forge parent or child state. The
+parent checkpoint and pending display must still fit one 1 MiB bridge frame after
+encoding; the 128 KiB child-state cap does not bound arbitrary parent history.
+
+The [child approval evidence](../../tests/conformance/README.md#pydantic-ai-child-approval-hoist)
+uses scripted CPython and Node Pyodide cases for approve, reject and fresh-Worker
+restore. Each approved fixture writes once and rejection writes nothing. CPython
+compares effect scopes across replay attempts; a Node crash-after-write replay
+of the hoisted resume remains unmeasured. ADR-0012 controls stay in JavaScript.
 
 Include `DeferredToolRequests` in the agent's output types to pause on
 `requires_approval`, `ApprovalRequired` or `CallDeferred`. Wrap the agent in `Executor(agent,

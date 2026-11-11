@@ -1,0 +1,22 @@
+{
+  "framework": "pydantic-ai 2.60.0",
+  "lanes": ["CPython", "Node Pyodide"],
+  "cases": [
+    {
+      "name": "child-approval-approve",
+      "outcome": "supported",
+      "normalization": "Interaction IDs become pause-N; one child approval resumes after approving its parent delegate."
+    },
+    {
+      "name": "child-approval-reject",
+      "outcome": "supported",
+      "normalization": "Interaction IDs become pause-N; denying the parent delegate abandons the child without a write."
+    },
+    {
+      "name": "child-approval-restore",
+      "outcome": "supported",
+      "normalization": "Interaction IDs become pause-N; native reload serializes Conversation and Node uses two Worker lifetimes."
+    }
+  ],
+  "limits": "Scripted replies only. One hoisted child with one approval and no external calls; child calls must be present in interaction props. Nested hoists, several hoisting children in a tool body, child streams and Chromium are outside this suite. Node crash-after-write replay of a hoisted resume is unmeasured."
+}
