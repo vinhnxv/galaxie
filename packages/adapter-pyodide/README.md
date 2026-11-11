@@ -235,15 +235,18 @@ can bypass it. ADR-0012
 controls remain in the JavaScript bridge and broker.
 
 The [delegation evidence](../../tests/conformance/README.md#pydantic-ai-agent-delegation-probes)
-covers CPython and Node Pyodide. After a crash following a child write, a scripted
-changed delegate ID preserves the helper's child scope and effect ID, so the write
+covers CPython and Node Pyodide probes plus six headless Chromium conformance cases
+with scripted models. In the Node recovery probe, after a crash following a child
+write, a scripted changed delegate ID preserves the helper's child scope and effect ID, so the write
 runs once; the ID-sensitive control writes twice. This measures sensitivity to ID
 changes, not whether a real provider regenerates IDs. Writes still require host
-confirmation and matching checkpoint/recovery stores. `subgraphs` stays false:
+confirmation and matching checkpoint/recovery stores. `subgraphs` stays false (probe S1):
 there is no helper child streaming or host child stream path, and plain child
-streams are refused. Chromium delegation, real providers, arbitrary mid-run
-continuation and general nested checkpoints remain unmeasured. The size budget
-covers JavaScript package entries; neither this adapter nor the Python wheel has
+streams are refused; Python wire tests, a driver tripwire and Node stream assertions
+pin this rule. Delegation and child approval are measured in headless Chromium,
+including real reloads with reopened IndexedDB. Firefox, WebKit, real providers,
+arbitrary mid-run continuation and general nested checkpoints remain unmeasured.
+The size budget covers JavaScript package entries; neither this adapter nor the Python wheel has
 a size budget.
 
 **Child approvals.** Set `hoist_approvals=True` to pause the parent when a child

@@ -215,7 +215,8 @@ byte-record port, pending state remains in Worker memory only.
 
 Run the focused Node lane with
 `pnpm exec vitest run --project node tests/conformance/pydantic-ai.node.test.ts tests/conformance/pydantic-ai-restore.node.test.ts`.
-The built Chromium lane is
+The built Chromium lane also runs the six delegation and child-approval cases below.
+Its command is
 `pnpm exec vitest run --project node examples/rag-browser/test/pydantic-ai-conformance.node.test.ts`.
 `pnpm test:python` checks native transcripts and snapshot validation;
 `uv run --locked --offline python -I ../scripts/record-pydantic-ai-conformance.py --check`
@@ -275,7 +276,7 @@ All evidence below is scripted.
 | P4 probe-local hoist snapshot/reload | P0 | Not applicable | Identical restored pending interaction; writes 2 and 3 once each across fresh Workers. |
 | P5 probe-local parallel pauses | P1 | The original pattern puts two delegate approvals in one parent interaction; three requests, zero gated bodies. The shipped hoist refuses this shape. | Not applicable |
 | P6 probe-local answer/state validation | P1 | Explicit resume schema rejects extra answer fields, but outer restore accepts corrupt author metadata outside the reserved hoist entry. Native validation becomes parent retry data; parent completes without the gated write. | Not applicable |
-| S1 child stream paths | P0 | Not applicable | No child stream paths ship; plain child streams are refused. |
+| S1 child stream paths | P0 | [Stream tests](../../python/galaxie/tests/test_pydantic_ai_subgraphs.py) pin parent-only wire notifications for plain delegation and a hoisted pause; controls detect child text and paths. | D1 asserts empty parent stream paths and no child text. Routed child replies still pass output safety. Plain child streams are refused. |
 | S2 capability flag | P1 | Not exposed by the Python Executor | Actual prepared adapter advertises `subgraphs: false`. |
 | G1 public nested-run detection | P0 | Public message `run_id`, streamed `run_context` and tool `RunContext` distinguish registered work from plain nested runs. Top-level retries, resume, sequential runs and parallel tools pass. | Not applicable |
 | G2 guard before bridge | P0 | `unsupported` before child model/capability requests, including an approved child capability before its next model request. | Nested ordinary/streaming model requests never reach the bridge; the restored approved plain child capability is refused before live work. |
@@ -285,7 +286,7 @@ All evidence below is scripted.
 | --- | --- | --- |
 | Delegation without child pauses | **Supported through `run_child`; plain nested runs refused** | Shared budgets, positional identity, per-child repairs and public-only refusal checks pass. Three new conformance cases match native CPython on Node Pyodide. |
 | Child pause propagation | **Supported through `run_child(..., hoist_approvals=True)`** | The [new suite](#pydantic-ai-child-approval-hoist) covers approve, reject and restore with validated state and required child-call display. P3–P6 retain the original probe-local pattern as comparison evidence. |
-| Subgraphs flag and stream paths | **Refused** | No child stream paths exist; `subgraphs` remains false. |
+| Subgraphs flag and stream paths | **Refused** | Probe S1 is pinned by the Python wire tests, the adapter driver empty-path tripwire and Node D1 stream assertions. No child stream paths exist; `subgraphs` remains false, including on prepared delegating adapters in Chromium. |
 
 The separate [delegation matrix](compatibility-matrix-pydantic-ai-delegation.json)
 and [native suite](cases-pydantic-ai-delegation-suite/delegation_native.py) add
@@ -359,16 +360,40 @@ child scope and effect ID in that probe; the registered ID-sensitive control
 repeats the write. No JavaScript runtime or bridge protocol change was required, and the
 JavaScript entry size budget covers neither the adapter nor the Python wheel.
 
+### Chromium results
+
+The existing built Chromium fixture runs the six shipped cases against their
+unchanged CPython goldens. The two reload cases reopen the scoped IndexedDB saver
+and recovery store after a real page reload, preserve the pending interaction and
+write exactly once.
+
+| Case | Page loads | Writes per load | Final effect count | Equal to golden | Differences from Node |
+| --- | --- | --- | --- | --- | --- |
+| `delegation-reload-write` | 2 | `[0, 1]` | 1 | Yes | None |
+| `delegation-shared-budgets` | 1 | `[0]` | 0 | Yes | None |
+| `delegation-nested-plain-refused` | 1 | `[0]` | 0 | Yes | None |
+| `child-approval-approve` | 1 | `[1]` | 1 | Yes | None |
+| `child-approval-reject` | 1 | `[0]` | 0 | Yes | None |
+| `child-approval-restore` | 2 | `[0, 1]` | 1 | Yes | None |
+
+These cases add eight Worker lifetimes using the same page fixture, Vite build,
+preview server and browser as the conversation cases. Each test has an explicit
+900000 ms timeout, with a 600000 ms page wait. Assertions cover one Worker created
+and terminated per load, observed Worker errors, empty stream paths, the prepared
+`subgraphs: false` flag, model roles, child effect scopes and durable effect counts.
+The unchanged strict CSP header is checked on every response, CSP violations are
+observed and external requests are blocked and recorded.
+
 ### Not measured
 
-- Delegation in Chromium, Firefox or WebKit: this work measures CPython and Node
-  Pyodide only; the new suite is not added to `pydanticCases` or the Chromium lane.
+- Firefox and WebKit: these tests run in the `node` project, outside the CI jobs
+  that run the `browser` project on those engines.
 - Real providers, actual provider ID regeneration, Worker network reachability,
   latency, cost or device performance. Fixture cost units test accounting only.
 - Arbitrary mid-run continuation without an earlier committed parent pause,
   general nested graphs, deeper delegation trees and scheduler interleavings.
 - The prepared flag in CPython: it belongs to the JavaScript adapter and is measured
-  in Node instead.
+  in Node and Chromium instead.
 
 Reproduce without rewriting existing goldens:
 
@@ -377,9 +402,11 @@ node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation
 node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-delegation-suite
 node scripts/test-python.ts ../tests/conformance/cases-pydantic-ai-child-approval
 node scripts/test-python.ts galaxie/tests/test_pydantic_ai_child_approval.py
+node scripts/test-python.ts galaxie/tests/test_pydantic_ai_subgraphs.py
 # Rebuild after Python library edits before running Node Pyodide.
 node scripts/build-python-wheels.ts
 pnpm exec vitest run --project node tests/conformance/pydantic-ai-child-approval-conformance.node.test.ts tests/conformance/pydantic-ai-delegation.node.test.ts tests/conformance/pydantic-ai-delegation-conformance.node.test.ts tests/conformance/pydantic-ai.node.test.ts tests/conformance/pydantic-ai-restore.node.test.ts
+pnpm exec vitest run --project node examples/rag-browser/test/pydantic-ai-conformance.node.test.ts
 # From python/:
 uv run --locked --offline python -I ../scripts/record-pydantic-ai-delegation-conformance.py --check
 uv run --locked --offline python -I ../scripts/record-pydantic-ai-child-approval-conformance.py --check
@@ -447,9 +474,11 @@ reaches the second after resume. This keeps the existing one-interaction contrac
 remains Proposed. Put the hoisting child first, because earlier children can
 replay when the tool re-enters.
 
-**Not measured.** The new hoist has no Chromium, Firefox or WebKit lane, real
-provider evidence, child stream paths or general nested checkpoints. A Node
-crash-after-write replay of the hoisted resume remains unmeasured; CPython proves
+**Measured browser scope.** Approve, reject and restore match their goldens in
+headless Chromium with scripted models (see [Chromium results](#chromium-results)).
+Firefox, WebKit, real providers, child stream paths and general nested checkpoints
+remain unmeasured. A Node crash-after-write replay of the hoisted resume remains
+unmeasured; CPython proves
 scope equality across attempts, and the existing D5 probe measures broker receipt
 replay for the same scope construction. Snapshot bytes are not authenticated, so
 checkpoint-store writers can forge parent and child state. Unrelated author

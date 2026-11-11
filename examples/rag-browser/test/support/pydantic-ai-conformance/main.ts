@@ -17,11 +17,13 @@ import {
   type PydanticReloadStep,
 } from '../../../../../tests/conformance/support/pydantic-ai-restore.js';
 import workerUrl from '../python-parity/pyodide-worker.ts?worker&url';
+import { runSuiteStep, type SuiteObservations, type SuiteResult } from './suites.js';
 
 declare const PYTHON_LOCAL_WHEELS: PyodideAdapterOptions['localWheels'];
 const result: {
   transcript?: PydanticTranscript;
   reload?: PydanticReloadResult;
+  suite?: SuiteResult;
   error?: string;
   errorCode?: string;
   storageEmpty?: boolean;
@@ -30,8 +32,9 @@ const result: {
   exportPendingCount?: number;
   exportExecutor?: string;
   violations: string[];
+  workerErrors: string[];
   done: boolean;
-} = { violations: [], done: false };
+} = { violations: [], workerErrors: [], done: false };
 Object.assign(globalThis, { pydanticConformance: result });
 addEventListener('securitypolicyviolation', (event) =>
   result.violations.push(event.effectiveDirective),
@@ -51,27 +54,56 @@ void (async () => {
     const parameters = new URLSearchParams(location.search);
     const name = parameters.get('case') ?? '';
     const reload = parameters.has('reload');
-    if (
-      !(pydanticCases as readonly string[]).includes(name) &&
-      !(reload && ['approved-write', 'resumed-write'].includes(name))
-    )
-      throw new Error('The conformance case is unknown.');
+    const suite: SuiteObservations | undefined = parameters.has('suite')
+      ? { bridge: [], workers: { created: 0, terminated: 0 } }
+      : undefined;
     const options: PyodideAdapterOptions = {
       runtimeUrl: new URL('/python/runtime/', location.href).href,
       wheelsUrl: new URL('/python/wheels/', location.href).href,
       localWheels: PYTHON_LOCAL_WHEELS,
       createWorker() {
         const worker = new Worker(url, { type: 'module' });
+        worker.addEventListener('error', (event) =>
+          result.workerErrors.push(event.message || 'The conformance Worker failed.'),
+        );
+        if (suite) {
+          suite.workers.created++;
+          const terminate = worker.terminate.bind(worker);
+          worker.terminate = () => {
+            suite.workers.terminated++;
+            terminate();
+          };
+        }
         worker.addEventListener('message', (event) => {
           const message = JSON.parse(event.data as string) as {
             type?: string;
             directive?: string;
+            kind?: string;
+            op: string;
+            payload?: { role?: string; effectScope?: string };
           };
           if (message.type === 'violation') result.violations.push(message.directive ?? 'unknown');
+          if (suite && message.kind === 'request')
+            suite.bridge.push({
+              op: message.op,
+              ...(message.payload?.role === undefined ? {} : { role: message.payload.role }),
+              ...(message.payload?.effectScope === undefined
+                ? {}
+                : { effectScope: message.payload.effectScope }),
+            });
         });
         return worker;
       },
     };
+    if (suite) {
+      result.suite = await runSuiteStep(options, parameters, suite);
+      return;
+    }
+    if (
+      !(pydanticCases as readonly string[]).includes(name) &&
+      !(reload && ['approved-write', 'resumed-write'].includes(name))
+    )
+      throw new Error('The conformance case is unknown.');
     const agent = {
       baseUrl: new URL(`/conformance/${name}/`, location.href).href,
       module: 'selected',

@@ -16,6 +16,7 @@ import {
   parseBridge,
   success,
 } from '../src/bridge.js';
+import { pydanticAiDriver } from '../src/pydantic-ai-driver.js';
 
 type MessageListener = (event: { readonly data: unknown }) => void;
 class FixtureWorker implements PyodideWorkerPort {
@@ -292,6 +293,12 @@ test('framework selection declares only the implemented features and selects the
   );
   expect(workers[0]?.sent[0]).toMatchObject({ op: 'boot', payload: { framework: 'pydantic-ai' } });
   await executor.dispose();
+});
+
+test('pydantic-ai driver forwards streams only through one literal empty path', () => {
+  const message = 'Re-derive the stream-path rule and revise ADR-0018 when changing the driver.';
+  expect(pydanticAiDriver.match(/\bnotify_stream\s*\(/g), message).toHaveLength(1);
+  expect(pydanticAiDriver, message).toMatch(/\bnotify_stream\s*\(\s*\[\s*\]\s*,/);
 });
 
 test('DSPy model steps stop in JavaScript before another lease or provider call', async () => {
