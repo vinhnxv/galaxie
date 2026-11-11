@@ -15,7 +15,7 @@ import {
 import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { LlmAgent, SequentialAgent } from '@google/adk';
 import { AIMessage } from '@langchain/core/messages';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 import { z } from 'zod';
 import {
   type AdkAgent,
@@ -25,6 +25,7 @@ import {
 import { FakeChatModel, type Reply } from '../../packages/adapter-adk/test/support/fixtures.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
+import { waitForRunStatus } from './support/run-status.js';
 
 /** Node has no IndexedDB, so its lane keeps the byte records and the journal in memory. */
 const durable = typeof indexedDB !== 'undefined';
@@ -196,10 +197,8 @@ async function life(
   return { runtime, instance, model, writes, sessionId: instance.sessionId };
 }
 
-const status = (life: Life) => life.instance.getSnapshot().run?.status;
-
 async function approval(life: Life): Promise<UserInteractionEvent> {
-  await vi.waitFor(() => expect(status(life)).toBe('waiting_input'));
+  await waitForRunStatus(life.instance, 'waiting_input');
   const run = life.instance.getSnapshot().run;
   if (run?.pending === undefined) throw new Error('The run did not pause.');
   return {
@@ -225,7 +224,7 @@ test('a pause survives a reload and resumes to completion with its integrity sta
   expect(restored.interactionId).toBe(submitted.interactionId);
   expect(restored.surfaceId).toBe('main');
   expect((await second.instance.dispatch(restored)).status).toBe('accepted');
-  await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
+  await waitForRunStatus(second.instance, 'succeeded');
   expect(second.writes).toEqual([{ q: 'note' }]);
   // The restored conversation was registered as private before the resumed run replayed it.
   expect(second.instance.getSnapshot().run?.labels).toContain('private-user');
@@ -254,14 +253,14 @@ test('a write approved before a crash replays its receipt after the restore', as
   const first = await life(await source.open(), crashing);
   await first.instance.start({ prompt: 'go' });
   await first.instance.dispatch(await approval(first));
-  await vi.waitFor(() => expect(status(first)).toBe('failed'));
+  await waitForRunStatus(first.instance, 'failed');
   expect(calls).toBeGreaterThan(0);
   expect(first.writes).toHaveLength(1);
   await first.runtime.dispose();
 
   const second = await life(await source.open(), saving, { sessionId: first.sessionId });
   expect(await second.instance.restore()).toBeDefined();
-  await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
+  await waitForRunStatus(second.instance, 'succeeded');
   expect(second.writes).toHaveLength(0);
 });
 
@@ -275,7 +274,7 @@ test('a failed run writes nothing, so a restore returns to the last stored pause
   await first.instance.start({ prompt: 'go' });
   const submitted = await approval(first);
   await first.instance.dispatch(submitted);
-  await vi.waitFor(() => expect(status(first)).toBe('failed'));
+  await waitForRunStatus(first.instance, 'failed');
   await first.runtime.dispose();
   const second = await life(await source.open(), saving, {
     sessionId: first.sessionId,
@@ -322,7 +321,7 @@ test.skipIf(durable)('a tampered stored call fails before any tool runs', async 
   const second = await life(store, saving, { sessionId: first.sessionId });
   await second.instance.restore();
   await second.instance.dispatch(await approval(second));
-  await vi.waitFor(() => expect(status(second)).toBe('failed'));
+  await waitForRunStatus(second.instance, 'failed');
   expect(second.writes).toHaveLength(0);
   expect(second.instance.getSnapshot().run?.error?.code).toBe('invalid');
 });
@@ -433,7 +432,7 @@ test('a run without checkpoints keeps working in memory', async () => {
   });
   await instance.prepare();
   await instance.start({ prompt: 'hi' });
-  await vi.waitFor(() => expect(instance.getSnapshot().run?.status).toBe('succeeded'));
+  await waitForRunStatus(instance, 'succeeded');
 });
 
 test.skipIf(durable)(
@@ -503,7 +502,7 @@ test('a confirmation raised inside the first sub-agent survives a reload and res
   const restored = await approval(second);
   expect(restored.interactionId).toBe(submitted.interactionId);
   await second.instance.dispatch(restored);
-  await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
+  await waitForRunStatus(second.instance, 'succeeded');
   expect(second.writes).toEqual([{ q: 'note' }]);
   const systems = second.model.seen.map((call) => JSON.stringify(call.messages[0]?.content));
   expect(systems.at(-1)).toContain('role=second;');
@@ -562,7 +561,7 @@ test('a confirmation raised by a sub-agent reached by transfer survives a reload
   const restored = await approval(second);
   expect(restored.interactionId).toBe(submitted.interactionId);
   await second.instance.dispatch(restored);
-  await vi.waitFor(() => expect(status(second)).toBe('succeeded'));
+  await waitForRunStatus(second.instance, 'succeeded');
   expect(second.writes).toEqual([{ q: 'note' }]);
   // The parent did not decide again: only the paused child asked the model after the resume.
   const systems = second.model.seen.map((call) => JSON.stringify(call.messages[0]?.content));
