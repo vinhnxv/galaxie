@@ -9,8 +9,7 @@ export interface StateBindScenario {
   readonly name: string;
   readonly program: StateRestoreScenario['program'];
   readonly swap: StateRestoreScenario['swap'];
-  readonly pauseWith: 'plain' | 'candidate';
-  readonly resumeWith: 'plain' | 'candidate';
+  readonly pause: 'bound' | 'legacy';
   readonly predicted: 'completes' | 'unrecoverable';
   readonly then?: 'original';
   readonly lanes: readonly string[];

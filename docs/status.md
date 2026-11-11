@@ -1,16 +1,26 @@
 # Project status
 
-On 2026-11-11, the DSPy paused-session automatic state-binding spike recorded
-**supported** (design proven; implementation pending). A test-only descriptor JSON
-binding passed native CPython, Node Pyodide and Chromium IndexedDB reload probes:
-changed bytes refused before live requests or replay, stored records remained
-unchanged, and original bytes resumed. Old unbound records still completed; old
-code refused bound records without writing. No core contract change was needed.
-Shipped code is unchanged and the author fingerprint recipe remains necessary.
-The implementation follow-up draft, **Bind paused DSPy sessions to the loaded
-offline state files automatically** (parent `galaxie-fv4.3`), is for the orchestrator
-to file. This is a consistency check against accidental swaps, not integrity
-protection. See the [scope, compatibility findings and unmeasured cases](../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
+On 2026-11-11, durable DSPy paused sessions gained automatic descriptor JSON
+binding, frozen before the author's entry imports. Changed paths or Python-visible
+bytes refuse restore before requests or replay, leave stored rows unchanged and
+allow original-byte rollback. One optional `stateBinding` key adds 82 JSON bytes
+under metadata `v: 1`; completed and unrecoverable records and programs without JSON
+stay unbound. Old unbound records still resume, and the legacy swap family keeps
+its outcomes. Old library code refuses bound records until newer code returns.
+The author fingerprint recipe covers Python sources and other files outside JSON.
+This is a consistency check against accidental swaps, not integrity protection;
+metadata is unauthenticated. Scripted native CPython, Node Pyodide and Chromium
+IndexedDB reload tests cover the binding. Native CPython also measures an unbound
+session gaining a binding at its next pause. Firefox, WebKit, real models, other
+DSPy versions, concurrent tabs, forged metadata, large many-file descriptors and
+legacy sessions that pause again outside native CPython remain unmeasured. See
+[shipped evidence and the spike record](../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
+
+Earlier on 2026-11-11, the automatic-binding spike recorded **supported** (design
+proven). Its test-only candidate established changed-byte refusal, unchanged rows,
+original-byte rollback, legacy acceptance and old-code refusal in all three lanes.
+The implementation above ships that JSON-only design; the historical measurements
+and the uninstalled candidate remain available for comparison.
 
 On 2026-11-11, the LangGraph adapter gained a strict single ID-less
 `requestInteraction` path: task-derived identity, bare resume and restored-value

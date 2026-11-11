@@ -846,13 +846,14 @@ pnpm exec vitest run --project 'browser (chromium)' tests/conformance/idless.tes
 The outcome rule and predictions were fixed before the Node and Chromium runs
 (2026-11-11). Supported only if the state-only candidate passes every detection, identical-byte replay, non-sticky rollback, legacy acceptance, old-code refusal, untouched-surface and bounded-metadata criterion in every required lane. Unmeasured counts as failed. Otherwise alternative if all unchanged fingerprint recipe cases pass, else refused. If only unrelated JSON causes an identical-byte failure, measure the Module.load candidate in all lanes before selecting alternative.
 
-The candidate is test-only; shipped code remains unchanged. Native baseline:
+**Status: shipped (2026-11-11).** The table below preserves the test-only spike
+observations; shipped-code observations follow it. Native spike baseline:
 `test_dspy_state_durable.py` and `test_dspy_durable.py`: 25 passed, matching #203.
 
-**Outcome: supported (design proven; implementation pending).** All required
-criteria passed. The shipped journal does not fingerprint the state file
-automatically; the [author recipe](../../packages/adapter-pyodide/README.md#paused-sessions-and-a-changed-state-file)
-remains necessary until the implementation follow-up lands.
+**Spike outcome: supported (design proven).** All required criteria passed.
+The implementation now binds JSON automatically; the
+[author recipe](../../packages/adapter-pyodide/README.md#paused-sessions-and-a-changed-state-file)
+covers Python sources and files outside JSON.
 
 | Scenario | Prediction | Native observation | Node observation | Chromium observation |
 | --- | --- | --- | --- | --- |
@@ -877,8 +878,8 @@ The native author-recipe same-byte probe and all unchanged #203 cases passed.
 No prediction diverged. Chromium also measures `bind-early-prompt`, which the
 plan's browser unit omitted although its detection criterion required it.
 
-The test-only [candidate](cases-dspy/state_bind_candidate.py) is imported from the
-agent descriptor and patches `Executor._snapshot` and `_restore` in memory. It
+The test-only [candidate](cases-dspy/state_bind_candidate.py) was imported from the
+spike agent descriptor and patched `Executor._snapshot` and `_restore` in memory. It
 freezes a SHA-256 over canonical JSON pairs of relative path and file-byte digest,
 sorted by path, for all regular descriptor `.json` files outside `__pycache__`.
 Only paused records gain one `stateBinding` metadata key with a 64-hex value
@@ -891,8 +892,8 @@ Findings:
 
 - **Metadata format changes.** The candidate keeps `v: 1` and adds an optional
   key. New code reads old unbound records; old code refuses bound records without
-  writing. A shipped implementation must settle optional-key versus version-bump
-  handling under ADR-0018 decision 7. Legacy sessions that pause again are unmeasured.
+  writing. The shipped decision below retains the optional key under ADR-0018
+  decision 7. The spike did not measure legacy sessions that pause again.
 - **No core contract change was needed.** The shipped driver and adapter carry
   opaque metadata unchanged. Core never reads this framework-specific binding.
 - **JSON-only scope fits the measured state.** A Python comment edit changes the
@@ -915,15 +916,14 @@ Snapshots remain unauthenticated. Measured versions: DSPy 3.4.1, CPython 3.14.5,
 Pyodide 314.0.7, Node 24.15.0 and Playwright 1.64.1 Chromium 156.0.8078.4.
 Unmeasured: Firefox,
 WebKit, real models, other DSPy versions, concurrent tabs, a legacy session that
-pauses again, forged checkpoint metadata and large many-file descriptors.
-Shipped Python/TypeScript, existing goldens, matrices, locks and recorders are
-unchanged.
+pauses again, forged checkpoint metadata and large many-file descriptors were
+unmeasured by the spike. Existing goldens, matrices, locks and recorders remain
+unchanged by the shipped implementation.
 
-The implementation follow-up draft is **Bind paused DSPy sessions to the loaded
-offline state files automatically**, for parent `galaxie-fv4.3`; it is included in
-the PR body for the orchestrator to file. No Beads issue was created or edited.
+The candidate remains uninstalled and is used only by the native descriptor-scope
+and `Module.load` comparison test; Worker descriptors no longer serve it.
 
-Verification (all passed):
+Historical spike verification (all passed):
 
 - `node scripts/test-python.ts ../tests/conformance/cases-dspy/test_dspy_state_bind.py`
   — 15 candidate probes.
@@ -947,3 +947,67 @@ Verification (all passed):
   Go, build, license, dependency, documentation and size gates.
 - `git diff --stat main -- python/galaxie/src 'packages/*/src' 'tests/conformance/golden*' 'tests/conformance/compatibility-matrix*' pnpm-lock.yaml python/uv.lock python/requirements.lock scripts`
   — empty; original state fixtures and #203 source/support files also unchanged.
+
+### Shipped binding evidence
+
+The shipped driver freezes the JSON manifest before importing the author entry,
+only for durable Workers. Paused metadata gains `stateBinding` under `v: 1`;
+completed and unrecoverable records never carry it. Old code's exact key-set check
+refuses bound records, so a library rollback leaves them unreadable until newer
+code returns. The frozen check from commit `3731271` is covered natively. Every
+malformed stored binding refuses before a session is registered. Direct callers
+with malformed preparation bindings fail `unsupported` before publishing a record. Unreadable JSON fails
+durable boot with `unsupported`; non-durable boot skips the scan. The 82-byte JSON
+key consumes about 110 base64 characters of the existing 1 MiB pause headroom.
+
+| Scenario | Native CPython | Node Pyodide | Chromium IndexedDB reload |
+| --- | --- | --- | --- |
+| `bind-early-same` | completes; one replay | completes; one replay | completes; one replay |
+| `bind-early-inert` | refuses; original bytes resume | refuses; original bytes resume | refuses; original bytes resume |
+| `bind-late-same` | completes; one replay | completes; one replay | completes; one replay |
+| `bind-late-prompt` | refuses; original bytes resume | refuses; original bytes resume | refuses; original bytes resume |
+| `bind-late-inert` | refuses; original bytes resume | refuses; original bytes resume | refuses; original bytes resume |
+| `bind-early-prompt` | refuses; original bytes resume | refuses; original bytes resume | refuses; original bytes resume |
+| `bind-fingerprint-inert` | refuses; original bytes resume | Unmeasured (native only) | Unmeasured (native only) |
+| `bind-legacy-late-prompt` | completes under new state | completes under new state | completes under new state |
+| Legacy session pauses again | second pause gains binding; changed JSON then refuses | Unmeasured | Unmeasured |
+
+Every refusal above returns `unrecoverable`, with zero live model/capability
+requests, no replay notification and unchanged checkpoint, pending-write and
+effect rows. Rollback completes with one replay and no repeated capability effect.
+Same-byte cases preserve baseline output and counters. Node compares each freshly
+paused binding with an independent manifest oracle; its BOM probe matches decoded
+bytes and differs from served bytes. Chromium checks a fresh 64-hex key before
+building legacy records by removing only that key from IndexedDB metadata.
+The earlier eight-scenario swap family keeps all outcomes: changed-state cases
+use legacy unbound rows, while identical-state cases also exercise bound rows.
+
+Any descriptor JSON edit counts, even unused JSON or whitespace. Python sources
+remain outside the manifest. This is a consistency check against accidental swaps,
+not integrity protection: metadata is unauthenticated. Firefox, WebKit, real models,
+other DSPy versions, concurrent tabs, forged metadata, large many-file descriptors
+and legacy sessions that pause again outside native CPython remain unmeasured.
+
+Shipped verification:
+
+- `node scripts/test-python.ts galaxie/tests/test_dspy_state_binding.py galaxie/tests/test_dspy.py`
+  — 115 passed; pinned manifest vector independently cross-checked with Node crypto.
+- `node scripts/test-python.ts ../tests/conformance/cases-dspy/test_dspy_state_bind.py ../tests/conformance/cases-dspy/test_dspy_state_bind_spike.py ../tests/conformance/cases-dspy/test_dspy_state_durable.py ../tests/conformance/cases-dspy/test_dspy_durable.py`
+  — 41 passed, including all 25 baseline probes.
+- `pnpm run typecheck:python` — passed.
+- `python/.venv/bin/python -I scripts/record-dspy-conformance.py --check` — 38 cases.
+- `python/.venv/bin/python -I scripts/record-dspy-state-conformance.py --check`
+  — 5 states and 7 cases.
+- `node scripts/build-python-wheels.ts` — passed before Node and browser tests.
+- `pnpm exec vitest run --project node tests/conformance/dspy-state-bind.node.test.ts tests/conformance/dspy-state-restore.node.test.ts examples/rag-browser/test/dspy-state-conformance.node.test.ts`
+  — 44 passed, retaining CSP, external-request and response-header assertions.
+- `pnpm exec vitest run --project node tests/conformance/dspy.node.test.ts tests/conformance/dspy-restore.node.test.ts tests/conformance/dspy-state.node.test.ts tests/conformance/dspy-state-limits.node.test.ts examples/rag-browser/test/dspy-conformance.node.test.ts packages/adapter-pyodide/test/dspy-gate.node.test.ts`
+  — 140 passed, one pre-existing skip.
+- `pnpm format`, `pnpm lint`, `pnpm typecheck`, `pnpm typecheck:ts6`,
+  `pnpm check:docs` — passed; unrelated formatter changes reverted.
+- `VITEST_MAX_WORKERS=4 pnpm check` — passed after the preparation-validation
+  review fix: 6,259 Node/Chromium tests passed, 162 skipped; 1,104 native Python
+  tests passed; Go, build, license, dependency, documentation and size gates passed.
+- `git diff --stat main -- 'tests/conformance/golden*' 'tests/conformance/compatibility-matrix*' pnpm-lock.yaml python/uv.lock python/requirements.lock`
+  and `git diff --stat main -- packages/core` — empty; protected files remain
+  byte-identical. Recorders are unchanged.

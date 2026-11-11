@@ -30,7 +30,7 @@ FIXTURES = json.loads(Path(__file__).with_name('state-durable-fixtures.json').re
 
 
 class Store(native.Store):
-    def boot(self, name, state_path):
+    def boot(self, name, state_path, *, bind=None):
         transport = ModuleType('_galaxie_transport')
         setattr(transport, 'request', self.request)
         setattr(transport, 'notify', self.notify)
@@ -39,6 +39,8 @@ class Store(native.Store):
         setattr(selected, 'create_agent', lambda: programs.factory(name, state_path))
         sys.modules[selected.__name__] = selected
         context = {'_galaxie_module': selected.__name__, '_galaxie_entry': 'create_agent', '_galaxie_durable': True}
+        if bind is not None:
+            context['_galaxie_state_root'] = bind
         exec(native.DRIVER, context)
         assert context['_galaxie_ready'] == {'ok': True}
         return context

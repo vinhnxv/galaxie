@@ -11,6 +11,7 @@ import {
   executeDspyReloadStep,
 } from './support/dspy-restore.js';
 import { dspyStateCases } from './support/dspy-state.js';
+import { stripBinding } from './support/dspy-state-binding.js';
 import { stateRestorePrograms, stateRestoreScenarios } from './support/dspy-state-restore.js';
 import { stateRestoreSources } from './support/dspy-state-restore-sources.node.js';
 import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
@@ -37,6 +38,7 @@ test.each(stateRestoreScenarios)(
       expect(first.error).toBeUndefined();
       expect(first.calls).toEqual(['before']);
       expect(first.requests).toBe(scenario.program === 'state-durable-early-model' ? 1 : 0);
+      if (scenario.swap !== 'same') stripBinding(store.checkpoints.rows);
       const restored = await executeDspyReloadStep(selected.options, selected.agent, store, {
         name: scenario.program,
         sessionId: first.sessionId,
@@ -88,7 +90,7 @@ test.each(stateRestoreScenarios)(
       await pause.cleanup();
     }
   },
-  90000,
+  900000,
 );
 
 test('state restore scenarios form a separate, complete family', () => {

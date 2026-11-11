@@ -584,72 +584,84 @@ Other DSPy versions and real-model optimizer output remain untested.
 
 ### Paused sessions and a changed state file
 
-The replay journal compares a digest of each model request, capability call and
-interaction request made before the pause. A changed state file fails
-`unrecoverable` before any live model or capability call if it changes a journaled
-request. The session then stays unrecoverable, including after restoring the
-original file. A changed `state.json` is otherwise not detected: this guard belongs
-to the journal, which does not fingerprint the state file automatically.
+Durable DSPy Workers automatically bind paused sessions to the descriptor's JSON
+files. Before importing the author's entry, the driver freezes a SHA-256 manifest
+of sorted relative JSON paths and the bytes Python can read. Only paused records
+carry the optional `stateBinding` metadata key. Changed or removed JSON refuses
+restore with `unrecoverable` before any live model call, capability call or replay;
+checkpoint rows, pending writes and effects stay unchanged. Restoring the original
+bytes lets the session resume with one replay notification and no repeated effect.
+This is a consistency check against accidental swaps, not integrity protection:
+checkpoint metadata is unauthenticated and can be forged or stripped by a writer.
 
-Eight scripted scenarios verify this on native CPython, Node Pyodide and headless
-Chromium, with a page reload through IndexedDB in Chromium. Each program calls
-`docs.lookup@1`, pauses for review, then calls `Predict`; `state-durable-early-model`
-also calls `Predict` before the pause, `state-durable-late-model` does not, and
-`state-durable-fingerprint` adds the file digest to the review props. The swaps use
-`state-predict-demos` unchanged (`same`), `state-instructions-only` with changed
-demos, instructions and field text (`prompt`), or `state-predict-demos` with changed
-saved `train` examples and an identical prompt (`inert`).
+Every descriptor `.json` file counts, including whitespace and unused training or
+configuration data; paths with a `__pycache__` component are ignored. An edit to
+any descriptor JSON file refuses earlier bound pauses until the original bytes
+return. Keep volatile non-state data outside descriptor JSON. Python sources are
+excluded. The Worker strips a UTF-8 BOM when decoding sources, so the digest covers
+those decoded bytes rather than the bytes served over HTTP. The digest stays
+frozen for the Worker lifetime.
 
-All three `same` cases complete without repeating the earlier calls. `early-prompt`
-fails `unrecoverable` and remains refused under the original state. `early-inert`
-completes because the model request digest is unchanged. `late-prompt` also
-completes: no journaled call depends on the old state, and the post-pause model call
-uses the new state (zero demos and the saved offline instructions).
+Programs without JSON keep byte-identical metadata and checkpoints. Completed
+(compact) and unrecoverable records never carry the key; a completed session can
+start a new run under changed state. New code accepts legacy unbound records. The
+metadata version stays `v: 1` and the byte type tags stay unchanged. Older library
+code refuses bound records without writing; rolling back the library leaves those
+pauses unreadable until the newer code returns. A legacy session that pauses again
+gains the current binding (measured natively only).
 
-To bind a paused session to the exact state bytes, compute SHA-256 from the file
-loaded at Worker boot and include it in the interaction props on every replay:
+The key adds exactly 82 JSON bytes, about 110 base64 characters, to a paused row.
+The existing 1 MiB bridge check counts it, leaving about 110 bytes less pause
+headroom; an oversized pause fails `unsupported` before publication. An unreadable
+descriptor JSON file fails durable boot with `unsupported` instead of binding a
+partial manifest. Non-durable Workers do not scan or bind files. No extra file-count
+or byte cap is imposed; large many-file descriptors remain unmeasured.
+
+Eight earlier scripted swap scenarios retain their outcomes on native CPython,
+Node Pyodide and headless Chromium, with IndexedDB page reloads in Chromium.
+Changed-state cases run on legacy, unbound records; identical-state cases also
+exercise bound records on Node and Chromium.
+Each calls `docs.lookup@1`, pauses, then calls `Predict`. The early-model program
+also calls `Predict` before the pause; the fingerprint program adds a file digest
+to review props. All three `same` cases complete. `early-prompt` fails and poisons
+later restores, even under the original state; `early-inert` and `late-prompt`
+complete because the journaled requests are unchanged. The author fingerprint
+refuses both prompt and byte-only changes. These legacy outcomes remain unchanged.
+Automatic-binding probes separately cover identical bytes, changed prompts, unused
+JSON changes, legacy acceptance and non-sticky original-byte rollback.
+
+#### Author fingerprint for Python sources and other files
+
+To bind Python sources or anything outside descriptor JSON, compute a fingerprint
+at boot and include it in interaction props on every replay. Choose the file or
+manifest the program depends on; this example fingerprints its own Python source:
 
 ```python
 import hashlib
 from pathlib import Path
 from galaxie.dspy import request_interaction
 
-state_path = Path(__file__).with_name('state.json')
-state_digest = hashlib.sha256(state_path.read_bytes()).hexdigest()
-# Load this file and rebind the LM when constructing the program.
-# Inside the program, publish the digest with the review request:
+source_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+# Inside the program, publish the fingerprint with the review request:
 answer = request_interaction({
     'surfaceId': 'main',
     'viewRevision': 'first',
     'component': 'test.Review/v1',
-    'props': {'stateDigest': state_digest},
+    'props': {'stateDigest': source_digest},
 })
 ```
 
-This author pattern makes a changed file a journaled interaction difference.
-`fingerprint-prompt` and `fingerprint-inert` both fail `unrecoverable` without live
-calls and stay refused under the original state; `fingerprint-same` completes.
-It does not add an independent integrity check to the public build assets. These
-results cover DSPy 3.4.1 and scripted models only; Firefox, WebKit and real-model
-behavior remain unmeasured.
+This makes a changed file a journaled interaction difference. The native state-file
+recipe still completes with identical bytes under automatic binding; the legacy
+`fingerprint-prompt` and `fingerprint-inert` cases refuse without live calls and
+remain refused under the original state. The recipe adds no independent integrity
+check to public build assets.
 
-The 2026-11-11 automatic-binding spike outcome is **supported**: a test-only
-JSON descriptor binding refused swaps before replay, left stored records untouched
-and allowed rollback to the original bytes on native CPython, Node Pyodide and
-Chromium reload through IndexedDB. This proves a design; implementation is pending.
-The journal does not fingerprint the state file automatically, so keep the recipe
-above. The follow-up draft is **Bind paused DSPy sessions to the loaded offline
-state files automatically** (parent `galaxie-fv4.3`, not filed).
-
-The candidate binds all descriptor JSON paths and Python-visible bytes, including
-whitespace and unused JSON; Python source edits are excluded. BOM stripping means
-served bytes can differ from those Python loads. New code accepts old unbound
-records, while old code refuses bound records unchanged; the metadata format needs
-an implementation decision under ADR-0018 decision 7. This is a consistency check
-against accidental swaps, not integrity protection. Firefox, WebKit, real models,
-other DSPy versions, concurrent tabs, legacy sessions that pause again, forged
-metadata and large many-file descriptors remain unmeasured. See the
-[probe results and comparisons](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
+Measured with DSPy 3.4.1 and scripted models on CPython, Node Pyodide and Chromium.
+Firefox, WebKit, real models, other DSPy versions, concurrent tabs, forged metadata,
+large many-file descriptors and legacy sessions that pause again outside native
+CPython remain unmeasured. See the
+[spike record and shipped evidence](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
 
 ## Google ADK (Python) agents
 

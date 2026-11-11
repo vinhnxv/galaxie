@@ -95,12 +95,7 @@ try {
             `/conformance/${name}${step.variant === 'resume' ? '-resume' : ''}/`,
             location.href,
           ).href,
-          files: [
-            'state_durable.py',
-            'state.json',
-            'selected.py',
-            ...(bindScenario ? ['state_bind_candidate.py'] : []),
-          ],
+          files: ['state_durable.py', 'state.json', 'selected.py'],
           module: 'selected',
           entry: 'create_agent',
         },
