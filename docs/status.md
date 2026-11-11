@@ -1,5 +1,21 @@
 # Project status
 
+On 2026-11-11, the DSPy parallel and threaded Evaluate spike recorded
+**alternative** for `dspy.Parallel` and **alternative** for threaded `Evaluate`,
+with a proven test-only branch journal design. Neither API gains shipped support.
+Native thread-pool calls silently return `None` entries or score 0.0; the Node
+Pyodide Worker ends them with `executor_error`, and single-thread synchronous
+calls end `unsupported` in both lanes. Plain single-call `asyncio.gather` replay
+passed in Node but failed natively because DSPy can suspend before journal entry;
+multi-call re-dispatch can repeat a write before `unrecoverable`. Use a sequential
+loop of `await module.acall(...)` today. The candidate passes the measured parity,
+restore, write-receipt, divergence, refusal, compatibility and bound checks on the
+required native/Node lanes, with no shipped source or core contract change.
+Chromium, Firefox, WebKit, real models and other DSPy versions remain unmeasured
+for this spike. Successful streaming fan-out, nested groups, pauses inside branches
+and ReAct branches are not established. See the
+[predictions, observations and limits](../tests/conformance/README.md#dspy-parallel-and-threaded-evaluate-spike).
+
 On 2026-11-11, durable DSPy paused sessions gained automatic descriptor JSON
 binding, frozen before the author's entry imports. Changed paths or Python-visible
 bytes refuse restore before requests or replay, leave stored rows unchanged and
