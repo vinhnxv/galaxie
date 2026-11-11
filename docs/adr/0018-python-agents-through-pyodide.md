@@ -20,6 +20,8 @@
   2026-11-11: added the public delegation helper, fail-closed nested-run guard, per-child repair accounting and scripted changed-ID recovery evidence; status stays Proposed.
   2026-11-11: added executor-owned child approval hoisting, required child-call display, reserved-state validation and scripted approve/reject/reload evidence; status stays Proposed.
 
+  2026-11-11: recorded the test-only DSPy paused-session state-binding spike; implementation pending, status stays Proposed.
+
 ## Context
 
 Agent authors ask for Python frameworks: LangChain and LangGraph for Python, pydantic-ai, DSPy, CrewAI and others. Brief §7.4 places Python in the Experimental tier, and §16.7 gates it on a use case strong enough to pay the compatibility cost. This ADR fixes the boundary a Python executor would use, so that a spike can test it and the gate decision can be made with evidence.
@@ -356,3 +358,42 @@ measured. Existing goldens, matrices, locks, decision 11 and JavaScript package
 source are unchanged. This ADR stays Proposed.
 
 [S4]: https://pyodide.org/en/stable/usage/packages-in-pyodide.html
+
+### DSPy paused-session state binding spike (2026-11)
+
+On 2026-11-11 the recorded outcome is **supported**: design proven, implementation
+pending. The state-only candidate passed every required criterion on DSPy 3.4.1,
+CPython 3.14.5, Node 24.15.0 with Pyodide 314.0.7 and Playwright 1.64.1
+Chromium 156.0.8078.4 reload through IndexedDB. The [evidence table](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike)
+records predictions, observations and commands. `bind-early-inert`,
+`bind-late-prompt`, `bind-late-inert`, `bind-early-prompt` and native-only
+`bind-fingerprint-inert` decided detection: restore refused before model/capability
+requests or replay, stored records were unchanged, and original bytes resumed.
+Same-byte cases completed with one replay notification and unchanged counters.
+No prediction diverged. Existing #203 author-recipe cases remain unchanged and pass.
+
+The test-only patch adds one optional 64-hex metadata key (82 bytes), on paused
+records only, with no checkpoint/journal change. New code accepts old unbound
+records; old code refuses bound records without writing. No core contract change
+was needed: the driver and adapter already transport opaque metadata. A shipped
+implementation must settle optional-key versus version-bump handling under decision
+7; this record changes no Decision text. Completed sessions still accept new runs
+under changed state, and programs without JSON have byte-identical metadata.
+
+The candidate freezes a sorted manifest of descriptor JSON paths and byte digests
+at boot. A Python comment edit changed the all-files digest and left the
+JSON-only digest unchanged. Both detect JSON whitespace, renaming and additions and ignore
+`__pycache__` and directory enumeration order. This includes unused JSON, and does
+not solve Python-source drift. A Node BOM probe binds Python-visible decoded bytes,
+which differ from served bytes. A native global `BaseModule.load` wrapper matched
+the single-file manifest but missed `load_state(dict)`; the original method was
+restored. Descriptor enumeration avoids that global DSPy-version-specific hook.
+
+This is a consistency check against accidental swaps, not integrity protection;
+checkpoint metadata is unauthenticated. Firefox, WebKit, real models, other DSPy
+versions, concurrent tabs, legacy sessions that pause again, forged metadata and
+large many-file descriptors remain unmeasured. Shipped code, existing goldens,
+matrices, locks and recorders are unchanged, and authors still need the fingerprint
+recipe. The implementation follow-up draft is **Bind paused DSPy sessions to the
+loaded offline state files automatically**, parent `galaxie-fv4.3`, for the
+orchestrator to file. No Beads issue was created or edited. Status stays Proposed.

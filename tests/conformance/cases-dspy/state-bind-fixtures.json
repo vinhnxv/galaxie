@@ -8,11 +8,7 @@
       "pauseWith": "candidate",
       "resumeWith": "candidate",
       "predicted": "completes",
-      "lanes": [
-        "native",
-        "node",
-        "chromium"
-      ]
+      "lanes": ["native", "node", "chromium"]
     },
     {
       "name": "bind-early-inert",
@@ -22,11 +18,7 @@
       "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
-      "lanes": [
-        "native",
-        "node",
-        "chromium"
-      ]
+      "lanes": ["native", "node", "chromium"]
     },
     {
       "name": "bind-late-same",
@@ -35,11 +27,7 @@
       "pauseWith": "candidate",
       "resumeWith": "candidate",
       "predicted": "completes",
-      "lanes": [
-        "native",
-        "node",
-        "chromium"
-      ]
+      "lanes": ["native", "node", "chromium"]
     },
     {
       "name": "bind-late-prompt",
@@ -49,11 +37,7 @@
       "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
-      "lanes": [
-        "native",
-        "node",
-        "chromium"
-      ]
+      "lanes": ["native", "node", "chromium"]
     },
     {
       "name": "bind-late-inert",
@@ -63,11 +47,7 @@
       "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
-      "lanes": [
-        "native",
-        "node",
-        "chromium"
-      ]
+      "lanes": ["native", "node", "chromium"]
     },
     {
       "name": "bind-early-prompt",
@@ -77,11 +57,7 @@
       "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
-      "lanes": [
-        "native",
-        "node",
-        "chromium"
-      ]
+      "lanes": ["native", "node", "chromium"]
     },
     {
       "name": "bind-fingerprint-inert",
@@ -91,9 +67,7 @@
       "resumeWith": "candidate",
       "predicted": "unrecoverable",
       "then": "original",
-      "lanes": [
-        "native"
-      ]
+      "lanes": ["native"]
     },
     {
       "name": "bind-legacy-late-prompt",
@@ -102,11 +76,7 @@
       "pauseWith": "plain",
       "resumeWith": "candidate",
       "predicted": "completes",
-      "lanes": [
-        "native",
-        "node",
-        "chromium"
-      ]
+      "lanes": ["native", "node", "chromium"]
     }
   ]
 }

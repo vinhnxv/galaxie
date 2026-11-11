@@ -849,13 +849,101 @@ The outcome rule and predictions were fixed before the Node and Chromium runs
 The candidate is test-only; shipped code remains unchanged. Native baseline:
 `test_dspy_state_durable.py` and `test_dspy_durable.py`: 25 passed, matching #203.
 
-| Scenario | Prediction | Observation |
-| --- | --- | --- |
-| `bind-early-same` | completes | Pending measurement |
-| `bind-early-inert` | unrecoverable | Pending measurement |
-| `bind-late-same` | completes | Pending measurement |
-| `bind-late-prompt` | unrecoverable | Pending measurement |
-| `bind-late-inert` | unrecoverable | Pending measurement |
-| `bind-early-prompt` | unrecoverable | Pending measurement |
-| `bind-fingerprint-inert` | unrecoverable | Pending measurement |
-| `bind-legacy-late-prompt` | completes | Pending measurement |
+**Outcome: supported (design proven; implementation pending).** All required
+criteria passed. The shipped journal does not fingerprint the state file
+automatically; the [author recipe](../../packages/adapter-pyodide/README.md#paused-sessions-and-a-changed-state-file)
+remains necessary until the implementation follow-up lands.
+
+| Scenario | Prediction | Native observation | Node observation | Chromium observation |
+| --- | --- | --- | --- | --- |
+| `bind-early-same` | completes | completes | completes | completes |
+| `bind-early-inert` | unrecoverable | unrecoverable; original bytes resume | unrecoverable; original bytes resume | unrecoverable; original bytes resume |
+| `bind-late-same` | completes | completes | completes | completes |
+| `bind-late-prompt` | unrecoverable | unrecoverable; original bytes resume | unrecoverable; original bytes resume | unrecoverable; original bytes resume |
+| `bind-late-inert` | unrecoverable | unrecoverable; original bytes resume | unrecoverable; original bytes resume | unrecoverable; original bytes resume |
+| `bind-early-prompt` | unrecoverable | unrecoverable; original bytes resume | unrecoverable; original bytes resume | unrecoverable; original bytes resume |
+| `bind-fingerprint-inert` | unrecoverable | unrecoverable; original bytes resume | Unmeasured (native only) | Unmeasured (native only) |
+| `bind-legacy-late-prompt` | completes | completes | completes | completes |
+
+The deciding probes are `bind-early-inert`, `bind-late-prompt`, `bind-late-inert`
+and `bind-early-prompt` in all three lanes, plus `bind-fingerprint-inert` natively.
+Each refused at restore with fixed `unrecoverable` text, zero model/capability
+requests and no `replayed` event. Checkpoint rows, pending writes and effect rows
+were unchanged. Every refused session completed after restoring the original
+bytes, with one replay notification and no repeated capability effect. Both
+`same` cases matched the baseline output and counters with one replay notification.
+`bind-legacy-late-prompt` accepted the old unbound record and used the new state.
+The native author-recipe same-byte probe and all unchanged #203 cases passed.
+No prediction diverged. Chromium also measures `bind-early-prompt`, which the
+plan's browser unit omitted although its detection criterion required it.
+
+The test-only [candidate](cases-dspy/state_bind_candidate.py) is imported from the
+agent descriptor and patches `Executor._snapshot` and `_restore` in memory. It
+freezes a SHA-256 over canonical JSON pairs of relative path and file-byte digest,
+sorted by path, for all regular descriptor `.json` files outside `__pycache__`.
+Only paused records gain one `stateBinding` metadata key with a 64-hex value
+(82 bytes of JSON overhead); checkpoint and journal bytes are unchanged. Native
+probes also show malformed bindings and removed JSON files fail closed, no-state
+metadata remains byte-identical, and compact completed sessions accept a new run
+under changed state with distinct capability effects.
+
+Findings:
+
+- **Metadata format changes.** The candidate keeps `v: 1` and adds an optional
+  key. New code reads old unbound records; old code refuses bound records without
+  writing. A shipped implementation must settle optional-key versus version-bump
+  handling under ADR-0018 decision 7. Legacy sessions that pause again are unmeasured.
+- **No core contract change was needed.** The shipped driver and adapter carry
+  opaque metadata unchanged. Core never reads this framework-specific binding.
+- **JSON-only scope fits the measured state.** A Python comment edit changes the
+  all-files digest but leaves the state-only digest unchanged. JSON whitespace,
+  renaming and addition change both. Directory iteration order and `__pycache__`
+  distractors do not affect them. Python code drift remains guarded only where it
+  changes journaled requests. Even unused descriptor JSON and whitespace count
+  as changed bytes, so this can refuse an otherwise equivalent deployment.
+- **Hash what Python reads.** The Node BOM probe shows the Worker fingerprint
+  equals SHA-256 of the BOM-stripped UTF-8 bytes and differs from the served bytes.
+  Fatal UTF-8 decoding remains unchanged.
+- **Module.load comparison.** A native global wrapper of DSPy 3.4.1
+  `BaseModule.load` produced the same one-file manifest digest, then restored the
+  original method. `load_state(dict)` bypassed it while descriptor enumeration
+  still found the file. Its global, version-specific hook misses that loading
+  path, so it is not preferred over descriptor JSON enumeration.
+
+This is a consistency check against accidental swaps, not integrity protection.
+Snapshots remain unauthenticated. Measured versions: DSPy 3.4.1, CPython 3.14.5,
+Pyodide 314.0.7, Node 24.15.0 and Playwright 1.64.1 Chromium 156.0.8078.4.
+Unmeasured: Firefox,
+WebKit, real models, other DSPy versions, concurrent tabs, a legacy session that
+pauses again, forged checkpoint metadata and large many-file descriptors.
+Shipped Python/TypeScript, existing goldens, matrices, locks and recorders are
+unchanged.
+
+The implementation follow-up draft is **Bind paused DSPy sessions to the loaded
+offline state files automatically**, for parent `galaxie-fv4.3`; it is included in
+the PR body for the orchestrator to file. No Beads issue was created or edited.
+
+Verification (all passed):
+
+- `node scripts/test-python.ts ../tests/conformance/cases-dspy/test_dspy_state_bind.py`
+  — 15 candidate probes.
+- `node scripts/test-python.ts ../tests/conformance/cases-dspy/test_dspy_state_durable.py ../tests/conformance/cases-dspy/test_dspy_durable.py`
+  — 25 unchanged baseline probes.
+- `python/.venv/bin/python -I scripts/record-dspy-conformance.py --check` — 38 cases.
+- `python/.venv/bin/python -I scripts/record-dspy-state-conformance.py --check`
+  — 5 states and 7 cases.
+- `node scripts/build-python-wheels.ts` before Node and browser runs.
+- `pnpm exec vitest run --project node tests/conformance/dspy-state-bind.node.test.ts`
+  — 9 tests, including the BOM and scenario-family probes.
+- `pnpm exec vitest run --project node tests/conformance/dspy-state-restore.node.test.ts examples/rag-browser/test/dspy-state-conformance.node.test.ts`
+  — 35 existing and new tests, including Chromium page reload through IndexedDB
+  with unchanged CSP, external-request and response-header assertions.
+- `pnpm exec vitest run --project node tests/conformance/dspy.node.test.ts tests/conformance/dspy-restore.node.test.ts tests/conformance/dspy-state.node.test.ts tests/conformance/dspy-state-limits.node.test.ts examples/rag-browser/test/dspy-conformance.node.test.ts`
+  — 139 passed, one pre-existing skip.
+- `pnpm format`, `pnpm lint`, `pnpm typecheck`, `pnpm typecheck:ts6`,
+  `pnpm typecheck:python`, `pnpm check:docs` — passed. An initial new-test
+  optional-chain lint error was fixed; unrelated formatter edits were reverted.
+- `VITEST_MAX_WORKERS=4 pnpm check` — passed, including Node/Chromium, Python,
+  Go, build, license, dependency, documentation and size gates.
+- `git diff --stat main -- python/galaxie/src 'packages/*/src' 'tests/conformance/golden*' 'tests/conformance/compatibility-matrix*' pnpm-lock.yaml python/uv.lock python/requirements.lock scripts`
+  — empty; original state fixtures and #203 source/support files also unchanged.
