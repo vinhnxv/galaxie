@@ -46,6 +46,7 @@ function defaultsOnly(agent: LlmAgent, field: ProcessorField): boolean {
 
 export function validateAgentTree(root: unknown, registry: HostRegistry): void {
   let visited = 0;
+  const names = new Map<unknown, number>();
   const walk = (
     agent: unknown,
     inheritedModel: boolean,
@@ -55,6 +56,7 @@ export function validateAgentTree(root: unknown, registry: HostRegistry): void {
     if (!object(agent)) throw failure('invalid');
     if (depth > MAX_DEPTH || ++visited > MAX_AGENTS || path.has(agent)) throw failure('invalid');
     if (!ALLOWED.has(Object.getPrototypeOf(agent) as object)) throw failure('unsupported');
+    names.set(agent['name'], (names.get(agent['name']) ?? 0) + 1);
     let modelKnown = inheritedModel;
     if (agent instanceof LlmAgent) {
       if (agent.model !== undefined) {
@@ -80,4 +82,5 @@ export function validateAgentTree(root: unknown, registry: HostRegistry): void {
     path.delete(agent);
   };
   walk(root, false, 0, new Set());
+  if ([...names.values()].some((count) => count > 1)) throw failure('unsupported');
 }

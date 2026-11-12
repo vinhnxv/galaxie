@@ -100,7 +100,6 @@ interface Options {
   output?: boolean;
   bytes?: MemoryByteCheckpoints;
   sessionId?: SessionId;
-  partialOnly?: boolean;
 }
 
 async function life(shape = 'sequential', options: Options = {}) {
@@ -172,16 +171,6 @@ async function life(shape = 'sequential', options: Options = {}) {
     agent: (host: AdkHost) => {
       const leaf = (name: string, tag = name): LlmAgent => {
         const model = host.adk.llm('agent');
-        if (options.partialOnly && tag === 'first') {
-          const generate = model.generateContentAsync.bind(model);
-          let omitted = false;
-          model.generateContentAsync = async function* (request, stream, signal) {
-            const drop = !omitted;
-            for await (const response of generate(request, stream, signal))
-              if (!drop || response.partial) yield response;
-            omitted = true;
-          };
-        }
         return new LlmAgent({
           name,
           model,
@@ -251,6 +240,37 @@ async function life(shape = 'sequential', options: Options = {}) {
           name: 'root',
           subAgents: options.pause ? [leaf('gate'), ...branches] : branches,
         });
+      if (shape === 'root-duplicate')
+        root = new SequentialAgent({ name: 'worker', subAgents: [leaf('worker')] });
+      if (shape === 'shared') {
+        const shared = leaf('worker');
+        const first = new SequentialAgent({ name: 'first', subAgents: [shared] });
+        const second = new SequentialAgent({ name: 'second', subAgents: [] });
+        second.subAgents.push(shared);
+        root = new SequentialAgent({ name: 'root', subAgents: [first, second] });
+      }
+      if (shape === 'malformed') {
+        const bad = leaf('bad');
+        Reflect.set(bad, 'subAgents', {});
+        root.subAgents.push(bad);
+      }
+      if (shape === 'distinct')
+        root = new SequentialAgent({
+          name: 'root',
+          subAgents: ['Worker', 'worker', '\u00e9', 'e\u0301'].map((name, index) =>
+            leaf(name, `name${index}`),
+          ),
+        });
+      if (shape === 'size-limit')
+        root = new SequentialAgent({
+          name: 'root',
+          subAgents: Array.from({ length: 255 }, (_, index) => leaf(`leaf${index}`)),
+        });
+      if (shape === 'depth-limit') {
+        root = leaf('bottom');
+        for (let depth = 15; depth >= 0; depth--)
+          root = new SequentialAgent({ name: `level${depth}`, subAgents: [root] });
+      }
       return defineAdkEntry({
         agent: root,
         interaction: () => ({
@@ -311,68 +331,36 @@ async function life(shape = 'sequential', options: Options = {}) {
   };
 }
 
-for (const [script, shape, tools, oracle] of [
-  [
-    'S1',
-    'sequential',
-    false,
-    [
-      ['first', 'worker'],
-      ['second', 'worker'],
-    ],
-  ],
-  [
-    'S2',
-    'sequential',
-    true,
-    [
-      ['first', 'worker'],
-      ['first', 'worker'],
-      ['second', 'worker'],
-      ['second', 'worker'],
-    ],
-  ],
-  [
-    'S3',
-    'loop',
-    false,
-    [
-      ['first', 'worker'],
-      ['second', 'worker'],
-      ['first', 'worker'],
-      ['second', 'worker'],
-    ],
-  ],
-] as const) {
-  test(`${script}: DC1 matches the authored oracle`, async () => {
-    const l = await life(shape, { tools });
+for (const shape of [
+  'sequential',
+  'parallel',
+  'loop',
+  'transfer',
+  'root-duplicate',
+  'shared',
+  'tools',
+  'output',
+  'pause',
+]) {
+  test(`RF2/RF5: ${shape} duplicates fail at prepare before model or store access`, async () => {
+    const l = await life(shape, {
+      tools: shape === 'tools',
+      output: shape === 'output',
+      pause: shape === 'pause',
+    });
     try {
-      await l.instance.prepare();
-      expect((await l.segment()).at(-1)?.type).toBe('output');
-      expect(derive(l.stored(), l.root)).toEqual(oracle);
+      await expect(l.instance.prepare()).rejects.toMatchObject({
+        code: 'unsupported',
+        message: 'This operation is unsupported.',
+      });
+      expect(l.requests).toEqual([]);
+      expect(l.storeRequests).toBe(0);
+      expect(l.bytes.rows.size).toBe(0);
     } finally {
       await l.runtime.dispose();
     }
   });
 }
-
-test('S5: DC1 over two user turns', async () => {
-  const l = await life();
-  try {
-    await l.instance.prepare();
-    await l.segment();
-    await l.segment();
-    expect(l.requests).toEqual(['first', 'second', 'first', 'second']);
-    expect(derive(l.stored(), l.root)).toEqual([
-      ['first', 'worker'],
-      ['second', 'worker'],
-      ['first', 'worker'],
-      ['second', 'worker'],
-    ]);
-  } finally {
-    await l.runtime.dispose();
-  }
-});
 
 for (const [shape, oracle] of [
   ['unique-sequential', [['drafter'], ['reviewer']]],
@@ -390,7 +378,9 @@ for (const [shape, oracle] of [
           const events = await l.segment();
           expect(events.at(-1)?.type).toBe('output');
           const expected = Array.from({ length: turn + 1 }, () => [...oracle]).flat();
-          expect(derive(l.stored().filter(isFinalResponse), l.root).sort()).toEqual(expected.sort());
+          expect(derive(l.stored().filter(isFinalResponse), l.root).sort()).toEqual(
+            expected.sort(),
+          );
           for (const event of events)
             if (event.type === 'stream') {
               expect(event.path).toEqual([]);
@@ -411,60 +401,56 @@ for (const [shape, oracle] of [
   });
 }
 
-test('S4/DA3: stored pause rebuild reproduces the live derivation', async () => {
-  let l = await life('sequential', { pause: true });
+test('RF4: unique pause bytes restore unchanged; a duplicate tree fails before reading them', async () => {
+  let l = await life('unique-pause');
   try {
     await l.instance.prepare();
     expect((await l.segment()).some((event) => event.type === 'interaction')).toBe(true);
-    const before = l.stored();
-    const expected = derive(before, l.root);
+    const before = structuredClone([...l.bytes.rows]);
     const bytes = l.bytes;
     const sessionId = l.instance.sessionId;
+    const pending = l.instance.getSnapshot().run?.pending;
     await l.runtime.dispose();
-    l = await life('sequential', { pause: true, bytes, sessionId });
+    l = await life('unique-pause', { bytes, sessionId });
     await l.instance.prepare();
     await l.instance.restore();
-    expect(l.stored()).toEqual(before);
-    expect(derive(l.stored(), l.root)).toEqual(expected);
+    expect(l.instance.getSnapshot().run?.pending).toEqual(pending);
+    expect([...bytes.rows]).toEqual(before);
     expect((await l.segment(true)).at(-1)?.type).toBe('output');
-    expect(l.requests).toEqual(['gate', 'first', 'second']);
+    await l.runtime.dispose();
+    const pausedBytes = new MemoryByteCheckpoints();
+    for (const [key, row] of before) pausedBytes.rows.set(key, row);
+    l = await life('sequential', { pause: true, bytes: pausedBytes, sessionId });
+    await expect(l.instance.prepare()).rejects.toMatchObject({ code: 'unsupported' });
+    expect(l.requests).toEqual([]);
+    expect(l.storeRequests).toBe(0);
+    expect([...pausedBytes.rows]).toEqual(before);
+    expect(l.instance.getSnapshot().run?.pending).toBeUndefined();
   } finally {
     await l.runtime.dispose();
   }
 });
 
-test('DA4: duplicate output keys resolve to the first agent', async () => {
-  const l = await life('sequential', { output: true });
-  try {
-    await l.instance.prepare();
-    const events = await l.segment();
-    expect(events.at(-1)).toMatchObject({ type: 'output', output: '{"position":"second"}' });
-    const last = l.stored().at(-1);
-    expect(last?.actions?.stateDelta).toEqual({ second_key: { position: 'second' } });
-  } finally {
-    await l.runtime.dispose();
-  }
-});
+for (const shape of ['distinct', 'depth-limit', 'size-limit']) {
+  test(`RF5/RF6: ${shape} runs with exactly one path per name`, async () => {
+    const l = await life(shape);
+    try {
+      await l.instance.prepare();
+      for (const positions of pathsOf(l.root).values()) expect(positions).toHaveLength(1);
+      expect((await l.segment()).at(-1)?.type).toBe('output');
+      expect(l.requests.length).toBe(shape === 'size-limit' ? 255 : shape === 'distinct' ? 4 : 1);
+    } finally {
+      await l.runtime.dispose();
+    }
+  });
+}
 
-test('S5: a partial-only first worker makes stored-log DC1 misattribute the second', async () => {
-  const l = await life('sequential', { partialOnly: true });
+test('RF2: a later malformed child keeps invalid precedence over duplicate names', async () => {
+  const l = await life('malformed');
   try {
-    await l.instance.prepare();
-    expect((await l.segment()).at(-1)?.type).toBe('output');
-    expect((await l.segment()).at(-1)?.type).toBe('output');
-    const oracle = [
-      ['second', 'worker'],
-      ['first', 'worker'],
-      ['second', 'worker'],
-    ];
-    const observed = derive(l.stored(), l.root);
-    expect(observed).toEqual([
-      ['first', 'worker'],
-      ['second', 'worker'],
-      ['first', 'worker'],
-    ]);
-    expect(observed).not.toEqual(oracle);
-    expect(l.requests).toEqual(['first', 'second', 'first', 'second']);
+    await expect(l.instance.prepare()).rejects.toMatchObject({ code: 'invalid' });
+    expect(l.requests).toEqual([]);
+    expect(l.storeRequests).toBe(0);
   } finally {
     await l.runtime.dispose();
   }
