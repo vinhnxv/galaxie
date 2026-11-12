@@ -8,6 +8,14 @@ The helper was withdrawn; production source and existing goldens, matrices and
 locks are unchanged. Sequential `await module.acall(...)` remains the supported
 alternative. See the [refusal evidence and limits](../tests/conformance/README.md#async-branch-helper-shipping-refusal).
 
+On 2026-11-13, the DSPy divergence-persistence decision accepts the existing
+compact poison checkpoint after runtime replay divergence and revises the gate
+for a later helper. Native sequential and branch tests and Node Pyodide branch
+tests pin unchanged earlier records, zero further requests, one appended marker
+and refused later restores. Restore-time refusals still write no row. The helper
+remains unshipped; a retry is separately scoped. No production source or existing
+golden, matrix or lock changed. See the [decision and limits](../tests/conformance/README.md#divergence-persistence-decision).
+
 On 2026-11-12, the LangGraph Python tool-call replies spike records **alternative**
 for binding/replies, streaming, confirmed writes, the safety floor and durable
 replay, and **refused** for neighbouring binding/message shapes: scripted CPython

@@ -27,6 +27,7 @@
   2026-11-11: recorded provider-string LM, schema-output and service-retrieval alternatives and embedding refusal; status stays Proposed.
   2026-11-12: shipped fixed `unsupported` refusal for DSPy thread-pool fan-out; status stays Proposed.
   2026-11-13: refused shipping the DSPy async branch helper after measuring its conflict with persistent divergence markers; no production source or checkpoint format change, status stays Proposed.
+  2026-11-13: accepted the existing DSPy runtime divergence poison checkpoint and revised the gate for a separately scoped helper retry, with sequential and branch persistence pins; status stays Proposed.
 
   2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement; subsequent evidence records five text-protocol alternatives and neighbouring-shape refusal, with no production source shipped.
 
@@ -509,6 +510,56 @@ Code outside journaled calls must be deterministic. New Chromium fan-out probes,
 Firefox, WebKit, real models and other DSPy versions remain unmeasured. Checkpoint
 validation establishes consistency, not integrity: metadata is unauthenticated.
 ADR-0012 controls and Decision text are unchanged; this ADR remains Proposed.
+
+### DSPy divergence persistence decision (2026-11)
+
+On 2026-11-13, the divergence-persistence outcome is **accepted**: keep the
+existing compact poison checkpoint and change the acceptance gate for any later
+async branch helper. This decision ships tests and documentation only; the
+helper remains unshipped. The [retained evidence](../../tests/conformance/README.md#divergence-persistence-decision)
+pins the same recovery rule for sequential and test-only keyed programs.
+
+The poison marker prevents later retries of a program that has diverged from
+its recorded journal. The earlier unkeyed multi-call crash probe repeated
+`alpha` under a new scope before `unrecoverable` propagated; leaving that stored
+session resumable would permit repeated side effects on later retries. An
+unchanged-row requirement adds no protection beyond the marker. It buys only
+availability: rolling back the program could resume the old pause. Sequential
+programs already lose that rollback resumability after runtime divergence.
+
+The [driver](../../packages/adapter-pyodide/src/dspy-driver.ts) separates two paths.
+An unknown journal key, malformed record, metadata mismatch or state-binding
+mismatch is refused during restore before session registration, writing no row.
+At runtime, `_Run.begin` or `_Run.frontier` detects replay mismatch before further
+dispatch; `Executor.run` marks the session unrecoverable and clears its pending
+interaction, journal and input value. The registered driver saves a new compact
+`unrecoverable` checkpoint, parented to the previous latest revision. Even the
+original unchanged program then restores as `unrecoverable` without requests.
+
+The revised helper gate requires zero further model or capability requests,
+byte-identical earlier rows and writes, exactly one compact `unrecoverable`
+checkpoint appended by the divergent execution, and later restores remaining
+`unrecoverable` without another row. Restore-time refusals must still leave all
+rows unchanged. The marker has null input, an empty journal, compact metadata
+and one null `__interrupt__` write. A helper retry needs its own plan and must
+settle optional-key versus version-bump handling under decision 7.
+
+Changing the driver rule for branch divergence is rejected: it needs production
+source and new session state to distinguish branches, leaves divergence
+retryable, and gives branches rollback recovery that sequential programs lack.
+The cost of retaining the marker is explicit: a divergent session cannot resume,
+even after rollback, and the user must start over. Repeated execute calls on an
+already poisoned session are characterized separately; their marker count is
+not part of this gate.
+
+Evidence uses scripted models in native CPython and Node Pyodide on DSPy 3.4.1,
+CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. The new sequential pin is
+native-only; both lanes execute the same driver string. Chromium, Firefox,
+WebKit, real models and other DSPy versions remain unmeasured for this decision.
+Checkpoint validation shows consistency, not integrity; metadata is
+unauthenticated. No production source, checkpoint format, metadata key, error
+code or public symbol changes. ADR-0012 controls and Decision text are unchanged;
+this ADR remains Proposed.
 
 ### DSPy thread-pool fan-out refusal (2026-11, shipped)
 
