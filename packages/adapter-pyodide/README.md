@@ -509,7 +509,13 @@ unsupported. See the [provider recipes and limits](#provider-strings-schema-outp
 
 The parallel spike records **alternative** for `dspy.Parallel` and **alternative**
 for threaded `Evaluate`: use a sequential loop of `await module.acall(...)` today.
-The branch-keyed replacement is a proven test-only design awaiting implementation.
+The branch-keyed replacement remains test-only. Its 2026-11-13 shipping attempt
+is **refused**: changed-branch replay ends `unrecoverable` without further model
+or capability requests, but the driver commits a poison checkpoint to prevent
+retrying the divergent program. That changes the stored row set and cannot meet
+the required unchanged-row outcome while retaining the current recovery rule.
+No public `galaxie.dspy.branches` helper ships. See the
+[refusal evidence](../../tests/conformance/README.md#async-branch-helper-shipping-refusal).
 Threaded verbatim calls, including the default thread count, now end fixed
 `unsupported` in native CPython and Node Pyodide, with zero model or capability
 requests. With one thread both still end `unsupported`. Raw author-created threads

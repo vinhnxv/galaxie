@@ -26,6 +26,7 @@
 
   2026-11-11: recorded provider-string LM, schema-output and service-retrieval alternatives and embedding refusal; status stays Proposed.
   2026-11-12: shipped fixed `unsupported` refusal for DSPy thread-pool fan-out; status stays Proposed.
+  2026-11-13: refused shipping the DSPy async branch helper after measuring its conflict with persistent divergence markers; no production source or checkpoint format change, status stays Proposed.
 
   2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement; subsequent evidence records five text-protocol alternatives and neighbouring-shape refusal, with no production source shipped.
 
@@ -485,6 +486,29 @@ WebKit, real models and other DSPy versions remain unmeasured here. Successful
 streaming fan-out, nested groups, pauses inside branches and ReAct branches are
 not established; the candidate only measures fixed refusals for the first three.
 ADR-0012 controls are unchanged and this ADR remains Proposed.
+
+### DSPy async branch-helper shipping refusal (2026-11)
+
+The 2026-11-13 shipping attempt is **refused**. The native keyed-helper experiment
+replayed with deterministic scopes across thread hops and reversed arrivals,
+but failed the required unchanged-row check on divergence. The driver deliberately
+appends a compact unrecoverable checkpoint after a runtime replay mismatch,
+preventing retry of the divergent program. The paused row is unchanged; its
+replacement as the latest revision is observable storage mutation.
+
+The [retained native and Node Pyodide tests](../../tests/conformance/README.md#async-branch-helper-shipping-refusal)
+exercise the existing test-only branch journal and assert the poison marker,
+unchanged prior rows and zero further model or capability requests. Unknown-key
+rejection during restore remains a different path: it occurs before registration
+and changes no rows. Suppressing runtime poison persistence would change the
+recovery rule, so the helper was withdrawn instead. No optional `fanout` entry
+key or metadata change ships under decision 7; `v: 1` keeps its existing meaning.
+
+Sequential `await module.acall(...)` loops remain the supported alternative.
+Code outside journaled calls must be deterministic. New Chromium fan-out probes,
+Firefox, WebKit, real models and other DSPy versions remain unmeasured. Checkpoint
+validation establishes consistency, not integrity: metadata is unauthenticated.
+ADR-0012 controls and Decision text are unchanged; this ADR remains Proposed.
 
 ### DSPy thread-pool fan-out refusal (2026-11, shipped)
 

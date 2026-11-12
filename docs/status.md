@@ -1,5 +1,13 @@
 # Project status
 
+On 2026-11-13, the DSPy async branch-helper shipping attempt records **refused**.
+Native replay detects changed branch identity before further model or capability
+requests, but the existing driver then commits an unrecoverable checkpoint marker.
+The required unchanged-row outcome conflicts with that deliberate retry protection.
+The helper was withdrawn; production source and existing goldens, matrices and
+locks are unchanged. Sequential `await module.acall(...)` remains the supported
+alternative. See the [refusal evidence and limits](../tests/conformance/README.md#async-branch-helper-shipping-refusal).
+
 On 2026-11-12, the LangGraph Python tool-call replies spike records **alternative**
 for binding/replies, streaming, confirmed writes, the safety floor and durable
 replay, and **refused** for neighbouring binding/message shapes: scripted CPython
@@ -56,7 +64,7 @@ turn an attributed LM refusal into a successful fallback. Supported programs kee
 their snapshot bytes, replay and outputs. Chromium, Firefox, WebKit, real models
 and other DSPy versions remain unmeasured. Raw author-created threads remain
 unattributed natively; a caught thread-start error is invisible to the executor.
-`galaxie-fv4.3.17` remains the path to supported async fan-out. See the
+The later async-helper shipping attempt is refused as recorded above. See the
 [refusal evidence and limits](../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
 
 On 2026-11-11, the DSPy parallel and threaded Evaluate spike recorded
