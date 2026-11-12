@@ -261,3 +261,37 @@ def test_an_added_silent_branch_is_not_divergence(monkeypatch):
     assert {key: store.rows[key] for key in rows} == rows
     assert {key: store.writes[key] for key in writes} == writes
     assert all(json.loads(base64.b64decode(row['checkpoint']['bytes']))['status'] != 'unrecoverable' for row in store.rows.values())
+
+
+def test_cancelling_a_replayed_group_preserves_the_pause_for_retry(monkeypatch):
+    store = Store()
+    name = 'par-fan-two-stage-single'
+    context = store.boot(name, candidate=True)
+    assert store.execute(context) == {'ok': True, 'interrupted': True}
+    before = native.pending(context)
+    rows, writes = copy.deepcopy(store.rows), copy.deepcopy(store.writes)
+    requests, calls = store.requests, list(store.calls)
+    original = shipped_branches.branches
+    restored = store.boot(name, candidate=True)
+    assert native.pending(restored) == before
+    async def cancel_replay():
+        entered = asyncio.Event()
+        async def delayed(group):
+            async def wait_then_call(call):
+                entered.set()
+                await asyncio.Event().wait()
+                return await call()
+            return await original({key: lambda call=call: wait_then_call(call) for key, call in group.items()})
+        monkeypatch.setattr(shipped_branches, 'branches', delayed)
+        task = asyncio.create_task(store.execute_async(restored, before))
+        await entered.wait()
+        task.cancel()
+        return await task
+    assert asyncio.run(cancel_replay()) == {'ok': False, 'code': 'cancelled'}
+    assert (store.requests, store.calls) == (requests, calls)
+    assert store.rows == rows and store.writes == writes
+    assert store.orphans == store.after_termination == 0
+    monkeypatch.setattr(shipped_branches, 'branches', original)
+    expected, _ = native_reference()
+    after, _ = native_reference(stage='after')
+    assert store.execute(store.boot(name, candidate=True), before) == {'ok': True, 'output': {'before': expected['answers'], 'answers': after['answers']}}

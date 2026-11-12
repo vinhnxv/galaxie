@@ -407,3 +407,81 @@ test.each(['par-fan-pause-in-branch', 'par-fan-concurrent-pauses'])(
   },
   900000,
 );
+
+test('cancelling branch replay keeps the persisted pause retryable in a fresh Worker', async () => {
+  const name = 'par-fan-two-stage-single';
+  const store = { checkpoints: new MemoryByteCheckpoints(), recovery: new MemoryRecoveryStore() };
+  let sessionId = '';
+  const first = await createPythonFixture({
+    framework: 'dspy',
+    module: 'selected',
+    sources: await branchSources(name),
+  });
+  try {
+    const result = await executeDspyParallelStep(first.options, first.agent, store, { name });
+    expect(result.pending).toBeDefined();
+    sessionId = result.sessionId;
+  } finally {
+    await first.cleanup();
+  }
+  const rows = structuredClone(store.checkpoints.rows),
+    writes = structuredClone(store.checkpoints.writes);
+  const sources = await branchSources(name);
+  sources['parallel_candidate.py'] += `
+import asyncio
+from galaxie.dspy import branches as join
+async def branches(group):
+    owner = asyncio.current_task()
+    scheduled = False
+    async def blocked():
+        nonlocal scheduled
+        if not scheduled:
+            scheduled = True
+            asyncio.get_running_loop().call_soon(owner.cancel)
+        await asyncio.Event().wait()
+    return await join({key: blocked for key in group})
+`;
+  const cancelledWorker = await createPythonFixture({
+    framework: 'dspy',
+    module: 'selected',
+    sources,
+  });
+  try {
+    const cancelled = await executeDspyParallelStep(
+      cancelledWorker.options,
+      cancelledWorker.agent,
+      store,
+      { name, sessionId },
+    );
+    expect(cancelled.error).toEqual({ code: 'cancelled', message: 'The operation was cancelled.' });
+    expect(cancelled.calls).toEqual([]);
+    expect(cancelled.modelLabels).toEqual([]);
+    expect(cancelled.streams).toContainEqual({ kind: 'spike-tasks', count: 0 });
+    expect(store.checkpoints.rows).toEqual(rows);
+    expect(store.checkpoints.writes).toEqual(writes);
+    expect(cancelledWorker.workerErrors).toEqual([]);
+  } finally {
+    await cancelledWorker.cleanup();
+  }
+  const retry = await createPythonFixture({
+    framework: 'dspy',
+    module: 'selected',
+    sources: await branchSources(name),
+  });
+  try {
+    const resumed = await executeDspyParallelStep(retry.options, retry.agent, store, {
+      name,
+      sessionId,
+    });
+    expect(resumed.error).toBeUndefined();
+    expect(resumed.output).toEqual({
+      before: parallelAnswers('single'),
+      answers: parallelAnswers('single', 'after'),
+    });
+    expect(resumed.modelLabels.sort()).toEqual(['alpha:after', 'beta:after', 'gamma:after']);
+    expect(resumed.calls).toEqual([]);
+    expect(retry.workerErrors).toEqual([]);
+  } finally {
+    await retry.cleanup();
+  }
+}, 900000);

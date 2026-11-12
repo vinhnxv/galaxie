@@ -307,8 +307,8 @@ async def branches(group: Mapping[str, Callable[[], Awaitable[Any]]]) -> dict[st
         except BaseException as error:
             if isinstance(error, (GalaxieError, _LMError, _Termination)):
                 run.record(error_code(error))
-            # Ending early is divergence even when the author catches it.
-            if any(mark.split('/')[1] == key for mark in remaining):
+            # Cancellation does not claim the replayed branch finished.
+            if not isinstance(error, asyncio.CancelledError) and any(mark.split('/')[1] == key for mark in remaining):
                 run.record('unrecoverable')
             return None, error
         finally:
