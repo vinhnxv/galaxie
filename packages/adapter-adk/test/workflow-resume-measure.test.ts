@@ -159,7 +159,12 @@ type Store = Awaited<ReturnType<Awaited<ReturnType<typeof source>>['open']>>;
 async function life(
   shape: Shape,
   store: Store,
-  options: { sessionId?: SessionId; crash?: boolean; ungated?: boolean } = {},
+  options: {
+    sessionId?: SessionId;
+    crash?: boolean;
+    ungated?: boolean;
+    duplicatePrepare?: boolean;
+  } = {},
 ) {
   const requests: string[] = [];
   const writes: string[] = [];
@@ -300,7 +305,9 @@ async function life(
     },
     models: routing,
   });
-  await instance.prepare();
+  if (options.duplicatePrepare)
+    await expect(instance.prepare()).rejects.toMatchObject({ code: 'unsupported' });
+  else await instance.prepare();
   const timer = setInterval(() => {
     for (const pending of instance.getSnapshot().confirmations ?? [])
       instance.respond(pending.id, 'approve');
@@ -569,9 +576,13 @@ test.each([
         });
       }
       const before = structuredClone([...bytes.rows]);
-      l = await life({ id, tree, paused: ['b'] }, store, { sessionId });
+      l = await life({ id, tree, paused: ['b'] }, store, {
+        sessionId,
+        duplicatePrepare: id === 'duplicate',
+      });
       if (id !== 'first') {
-        await expect(l.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
+        if (id !== 'duplicate')
+          await expect(l.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
         expect(l.requests).toEqual([]);
         expect(l.writes).toEqual([]);
         expect(l.instance.getSnapshot().run?.pending).toBeUndefined();

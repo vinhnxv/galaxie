@@ -175,3 +175,17 @@ test('context compactors and request or response processors fail unsupported', (
       expect.objectContaining({ code: 'unsupported' }),
     );
 });
+
+test('whole-tree names include the root and duplicates do not hide later walk errors', () => {
+  const { registry, agent } = setup();
+  const duplicate = new SequentialAgent({ name: 'a', subAgents: [agent('a')] });
+  expect(() => validates(duplicate, registry)).toThrow(
+    expect.objectContaining({ code: 'unsupported' }),
+  );
+  const invalid = agent('bad');
+  Reflect.set(invalid, 'subAgents', {});
+  duplicate.subAgents.push(invalid);
+  expect(() => validates(duplicate, registry)).toThrow(
+    expect.objectContaining({ code: 'invalid' }),
+  );
+});

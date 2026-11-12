@@ -81,6 +81,7 @@
     ],
     "pausing": "A confirmation or long-running tool can pause in a uniquely named leaf under SequentialAgent ancestors, including first, middle and nested children. One confirmation-only pausing agent is also accepted beneath each ParallelAgent, including a fan-out followed by later sequence stages. Newly enabled shapes use ADK resumable invocations; existing last-child sequences keep the non-resumable runner. All six new workflow-pause cases also reload while paused in tests/conformance/adk-python-restore.node.test.ts.",
     "refusedAtPrepare": {
+      "duplicate agent names anywhere": "D-py REFUSED (2026-11-13), superseding the earlier accepted-duplicate ambiguity limit: exact repeated names including the root fail unsupported before model or store access; rename agents for fresh trees. Case/NFC/NFD distinctions and unique-name restore bytes are preserved. CPython measurement plus Node Worker duplicate_names refusal; subgraphs stays false.",
       "Workflow": "Native ADK 2.12.0 runs it (final text 'step done'); the executor fails unsupported at prepare.",
       "AgentTool": "Native ADK runs the nested agent (root, worker, root); the executor fails unsupported at prepare.",
       "pause inside LoopAgent": "A bare resumable loop continues, but a loop with an earlier writer repeats that finished tool on resume; the general shape stays unsupported at prepare.",

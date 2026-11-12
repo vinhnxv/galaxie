@@ -22,6 +22,7 @@ import { FakeChatModel, wordChunks } from './support/fixtures.js';
  * AL1 uses real host-visible messages for all five unique-name trees.
  * AL2 changes no API/bridge/record; AL3 limits are in the README.
  * C-js ALTERNATIVE by GF2; the descriptor remains false in both lanes.
+ * Duplicate refusal now supersedes GA3; see duplicate-identity-measure.test.ts.
  */
 const definition = defineAgentDefinition({
   id: 'tests/adk-stream-namespaces',
@@ -133,6 +134,9 @@ async function measure(shape: string) {
     );
     for (const event of messages) expect(event.path).toEqual([]);
     return { paths, messages };
+  } catch (error) {
+    if (shape === 'duplicate') expect(model.seen).toEqual([]);
+    throw error;
   } finally {
     await runtime.dispose();
   }
@@ -156,14 +160,6 @@ for (const [shape, expected] of [
   });
 }
 
-test('accepted duplicate leaves have indistinguishable host message identities', async () => {
-  const { paths, messages } = await measure('duplicate');
-  expect(paths.get('worker')).toEqual([
-    ['first', 'worker'],
-    ['second', 'worker'],
-  ]);
-  expect(messages.map((event) => event.data)).toEqual([
-    { author: 'worker', text: 'worker' },
-    { author: 'worker', text: 'worker' },
-  ]);
+test('duplicate leaves fail unsupported at prepare before any model call', async () => {
+  await expect(measure('duplicate')).rejects.toMatchObject({ code: 'unsupported' });
 });

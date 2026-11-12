@@ -97,6 +97,12 @@ def sequence_write_pause():
 def parallel_write_pause():
     fanout = ParallelAgent(name='fanout', sub_agents=[branch('left', True), branch('right')])
     return paused(SequentialAgent(name='pipeline', sub_agents=[fanout, plain('merger')]))
+
+def duplicate_names():
+    return Executor(SequentialAgent(name='root', sub_agents=[
+        SequentialAgent(name='first', sub_agents=[plain('worker')]),
+        SequentialAgent(name='second', sub_agents=[plain('worker')]),
+    ]))
 `;
 
 const definition = defineAgentDefinition({
@@ -251,6 +257,7 @@ test.skipIf(!pythonWheelsAvailable)(
         await accepted.prepare();
       }
       for (const entry of [
+        'duplicate_names',
         'loop_pause',
         'transfer_pause',
         'agent_tool',

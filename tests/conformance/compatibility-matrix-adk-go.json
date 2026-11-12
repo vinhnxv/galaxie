@@ -38,6 +38,7 @@
   ],
   "differences": [],
   "refusedShapes": [
+    "Duplicate agent names anywhere, including the root: D-go REFUSED by the existing native runner.New rule, mapped to unsupported at Execute before any model dispatch (2026-11-13 duplicate-identity assessment; Go source/tests unchanged). Rename agents for a fresh tree; subgraphs stays false.",
     "A tool made by `agenttool` wrapping an agent",
     "An agent made directly with `llmagent.New`, `agent.New` or another ADK constructor instead of the galaxie constructors",
     "A function tool or toolset made directly with ADK instead of a galaxie capability tool",
