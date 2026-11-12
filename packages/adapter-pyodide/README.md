@@ -38,7 +38,7 @@ the provider descriptor requires per-call credentials. Implementations are check
 against core's preparation requirements. Credentials remain in JavaScript.
 
 Every provider invoke and stream receives the lease's `maxTokens` output limit,
-including tool-bound and schema calls. The closed Python bridge has no caller
+including other Python frameworks' tool-bound calls and schema calls. The closed Python bridge has no caller
 token-limit option. Supported providers retain any lower constructor limit;
 Built-in AI has no output-token limit and ignores the value. Actual usage may
 still differ from the reservation. Coverage uses mocks and injected provider
@@ -83,6 +83,61 @@ reads committed state, and resume sends `{action, payload}` by interrupt ID. Com
 nodes do not re-run; the interrupted node does. Parallel or ID-less interrupts,
 static breakpoints and reusing an answered interaction fail `unsupported`.
 
+### LangGraph Python model-chosen calls through text
+
+The November 2026 spike records **alternative** for binding/replies, streamed
+replies, confirmed writes, the safety floor and durable replay. It ships no
+`galaxie.langchain.capability_tool` or `bind_tools` implementation. A test-local
+candidate could not preserve terminal broker failures across explicit `ToolNode`
+error handlers: task namespaces differ between tools and models, while `thread_id`
+repeats across runs. A thread-keyed latch would affect later runs. The unchanged
+proxy refuses tool history as `unsupported` and reply tool parts as `invalid`;
+inherited `bind_tools` raises `NotImplementedError` in CPython. The Worker maps an
+uncaught bind failure at boot to `unavailable`, or during a run to `executor_error`.
+
+Use an ordinary node with a routed text model, validate a small JSON request
+against author-owned names and argument shapes, then await the broker directly:
+
+```python
+import json
+from galaxie import GalaxieError, capabilities
+from galaxie.langchain import GalaxieChatModel
+
+async def choose_and_read(state, config):
+    reply = await GalaxieChatModel(role='answer').ainvoke(state['prompt'], config)
+    try:
+        request = json.loads(reply.content)
+        if (not isinstance(request, dict) or set(request) != {'name', 'value'}
+            or request['name'] != 'read' or type(request['value']) is not int):
+            raise ValueError()
+    except (TypeError, ValueError):
+        raise GalaxieError('invalid') from None
+    result = await capabilities.call('read@1', {'value': request['value']}, config)
+    return {'result': result}
+```
+
+Keep terminal failures uncaught. Bind significant writes with `approval: 'confirm'`
+and host confirmation coverage; the broker still freezes arguments and waits for
+host approval. In this recipe a decline ends `denied`, rather than returning the
+candidate helper's fixed denial text to a model loop. No `ToolNode`,
+schema-constrained tool choice or streamed tool deltas are supplied. For streamed
+JSON text, collect the checked text before parsing. Persist plain JSON strings;
+convert LangChain's `message.text` accessor with `str(...)` before storing it.
+Calls in one JSON request run sequentially. Pass full node config and keep call
+order deterministic for recovery; the measured write-node replay runs the host
+write once across a fresh Worker restore with byte checkpoints and recovery.
+
+Direct calls omit the helper's `tool: true` binding-policy check. Trusted authors
+own the static allowlist and write-binding setup; grants, validation, labels,
+budgets, output checks, host confirmations and the effect journal remain in
+JavaScript. Plain native models and direct trusted capability calls are outside
+the candidate guard. Plain tools, arbitrary binding forms and multimodal/tool
+message neighbours remain **refused** on this proxy. Scripted CPython and Node
+Pyodide evidence covers the replacement, budget termination and private-result
+destination refusal; new Chromium reload, Firefox, WebKit and real models are
+unmeasured. See the [gate record](../../docs/adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-replies-spike-2026-11)
+and [executable evidence](../../tests/conformance/README.md#langgraph-python-tool-call-replies-spike).
+
 For LangGraph Python, `interrupts`, `resume`, `checkpoints`, `streaming` and
 `subgraphs` are true. For durable sessions, supply
 `services: { chatModels, checkpoints: saver.byteRecords }` and
@@ -121,7 +176,8 @@ streaming can select this path even for Python `ainvoke`. JavaScript checks each
 growing reply before sending its delta to Python, then checks the complete text and
 settles usage before the terminal response. A block fails `denied` and stops later
 deltas; previously allowed text cannot be retracted. The final Python chunk carries
-usage without repeating text. Tool calls and multimodal messages remain unsupported.
+usage without repeating text. Native LangGraph Python tool-call parts and multimodal
+messages remain unsupported; the text-protocol replacement below is measured.
 Raw graph streams can contain working state and bypass routed-model output checks;
 hosts must select the checked message projection before rendering text. The RAG
 application renders checked answer-node messages and its final result as React

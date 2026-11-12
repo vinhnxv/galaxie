@@ -27,7 +27,7 @@
   2026-11-11: recorded provider-string LM, schema-output and service-retrieval alternatives and embedding refusal; status stays Proposed.
   2026-11-12: shipped fixed `unsupported` refusal for DSPy thread-pool fan-out; status stays Proposed.
 
-  2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement.
+  2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement; subsequent evidence records five text-protocol alternatives and neighbouring-shape refusal, with no production source shipped.
 
 ## Context
 
@@ -674,3 +674,79 @@ Predictions (registered with the rule; U6 restates them beside the measured resu
 
 
 Additive entries in the Python compatibility matrix and conformance case lists, separate tool-case projections and new native-recorded goldens are permitted; existing entries, fixtures, case names, golden bytes, locks and other executors remain unchanged.
+
+#### Measured outcome (2026-11-12)
+
+The rule was committed before probes in `aa1dd896e8dc8a7230b50db0439f0167fba70069`.
+Native evidence is in `2db3ae2`, the CPython candidate in `78f0434`, and real
+Node Pyodide/core evidence in `84c6638`. No candidate is promoted: the
+swallowed-failure floor failed. No production source, existing golden, case list,
+stored format, identity derivation or lock changed; no wheel rebuild was needed.
+
+| Cell | Outcome | Measured replacement or refusal |
+| --- | --- | --- |
+| C1 bind and non-streaming reply | ALTERNATIVE | A node validates a JSON text request and awaits direct broker calls. Read and ordered read/write requests match native ordered host calls, final text and write count. |
+| C2 streamed reply | ALTERNATIVE | Collect checked JSON text before parsing; the read scenario matches native calls and final text. No streamed tool deltas are provided. |
+| C3 confirmed write | ALTERNATIVE | Direct calls still wait for a host confirmation on frozen arguments; approval writes once, decline writes nothing and ends `denied`. |
+| C4 safety floor | ALTERNATIVE | Plain nodes let terminal failures escape. The replacement ends `budget_exceeded` before host dispatch and refuses a subsequent host-server model dispatch after reading `private-user` data. The helper candidate fails containment below. |
+| C5 durability and effect identity | ALTERNATIVE | With byte checkpoints and recovery, both a completed write followed by a pause and a writing node replayed after its pause restore through a fresh Worker with one host write overall. Ordered host calls and final text match the native tool-call reference. |
+| C6 refused neighbours | REFUSED | The candidate refuses ordinary binding forms and unsupported message shapes before transport. Shipped native binding remains unimplemented; its exception-code discrepancy is recorded below. |
+
+Gate results distinguish candidate measurements from replacement measurements:
+
+| Cell | Gate | Observed fact | Result |
+| --- | --- | --- | --- |
+| C1 | N1 | Prebuilt and hand-written native loops preserve call order and IDs; async tools receive config. The pinned prebuilt wheel also imports and runs in the Node Worker. Default `ToolNode` rethrows ordinary exceptions. | Pass |
+| C1 | G1.1 | CPython candidate carries declarations in order, maps all four choices, retains call IDs/arguments and emits tool-role history. | Pass in CPython only |
+| C1 | G1.2–G1.5 | Full routing, projection parity, malformed-reply and unchanged-behavior candidate gates were not completed. Unchanged shipped tests were run separately. | Not measured: outcome fixed by G4.5 |
+| C2 | N2 | Two scripted argument fragments merge to the non-streaming native call, including its ID and JSON arguments. | Pass in CPython |
+| C2 | G2.1–G2.4 | Candidate delta mapping, growing checks, feature requirements, projection and close/cancel gates were not run. | Not measured: outcome fixed by G4.5 |
+| C3 | G3.1–G3.5 | Candidate confirmation, binding refusals, schema-invalid mapping and cancellation gates were not run. Replacement confirmation tests do not establish these helper gates. | Not measured: outcome fixed by G4.5 |
+| C4 | G4.1–G4.4 | Candidate output-check, tool/step-budget and label gates were not run. Replacement budget/label tests do not count as candidate floor passes. | Not measured: outcome fixed by G4.5 |
+| C4 | G4.6 | No latch exists, so isolation of a latched failure cannot be measured. A subsequent successful run on the same prepared Worker is a separate observation. | Not applicable: latch not built |
+| C4 | G4.5 | Public model/tool task namespaces differ; removing task components leaves an empty root. `thread_id` repeats across executions; the driver supplies no public execution ID. Explicit boolean/callable handlers turn a terminal failure into an error-status `ToolMessage`. The candidate refuses that history as `unsupported`, losing the original code, and a later helper still reaches the bridge. | Fail |
+| C5 | G5.1–G5.4 | Candidate parallel identity, crash-after-write, tool-message restore/serialization and oversized-result gates were not run. Parallel native calls share one tools namespace. | Not measured: outcome fixed by G4.5 |
+| C6 | G6.1 | Candidate rejects plain tools, callables, OpenAI dicts, pydantic classes, function output, unknown kwargs/choices, duplicate/invalid names and oversized schemas before transport. | Pass for candidate; shipped bind-code discrepancy below |
+| C6 | G6.2 | Candidate rejects multimodal human/AI/tool content, non-string tool content, artifacts, error status and orphan IDs before transport, with fixed content-free codes. | Pass for candidate |
+| C6 | G6.3 | Native model binding remains outside this proxy. Replacement tests exercise direct trusted capabilities with no helper `tool` flag. | Boundary retained |
+| C1–C5 | AL | Four CPython replacement scenarios and Node read/text-stream/write, budget/label and fresh-Worker restore/replay scenarios run as described above. | Pass for the listed scenarios |
+
+The CPython failure matrix covers `budget_exceeded`, `cancelled`, `timeout`,
+`unavailable`, `outcome_unknown` and `unrecoverable` under both explicit handlers;
+Node reproduces `unavailable` under both and demonstrates a later host capability
+dispatch. No module-global or child-task `ContextVar` latch was substituted. The
+residual graph that swallows a failure and makes no further proxy request remains
+outside any proxy latch's observation; it is not claimed as contained.
+
+Premise verification passed 63 unchanged CPython tests and 127 Node
+adapter/Pyodide/JavaScript-tool tests. The proxy has no binding implementation,
+rejects tool history as `unsupported` and reply `toolCalls` as `invalid`; the
+adapter refuses an unsolicited tool reply. One premise prediction was too broad:
+inherited `bind_tools` raises `NotImplementedError`, not fixed Python
+`unsupported`/`invalid`. The Worker maps uncaught construction failure to
+`unavailable` and run failure to `executor_error`. This existing normalization
+gap is retained and handed off, rather than changing source after the veto.
+No pre-existing LangGraph Python binding or ToolNode fixture was found. Graphs
+are constructed at Worker boot, so host prepare never sees their tool list.
+
+| Prediction | Observation |
+| --- | --- |
+| P1 native facts | Held: prebuilt inventory, config injection and default rethrow confirmed. Parallel calls share the tools task namespace. |
+| P2 C1 supported | Did not hold: floor veto; text-protocol alternative only. |
+| P3 C2 supported | Did not hold: floor veto; checked text streaming alternative only. |
+| P4 C3 supported with mapping difference | Did not hold: floor veto; candidate schema-invalid mapping is unmeasured. |
+| P5 floor passes with a run-scoped latch | Did not hold: no common execution key was established under the permitted public config fields; G4.5 failed and no latch was built. |
+| P6 C5 supported | Did not hold: floor veto; direct-call restore/replay alternative only. Chromium reload remains unmeasured. |
+| P7 neighbours refused | Refusal held for measured shapes. Shipped binding lacks the predicted fixed Python error code. |
+| P8 at least one supported cell | Did not hold: no source shipped; the registered fallback branch was taken. |
+
+All six cells were reached; the unmeasured support-family gates above are
+intentional early stops, not passes. Evidence uses LangGraph 1.2.16,
+langgraph-prebuilt 1.1.1, langchain-core 1.7.0, CPython 3.14.5, Node 24.15.0
+and Pyodide 314.0.7, with scripted models only. New Chromium reload, Firefox,
+WebKit, real models, other framework versions and other executors are unmeasured.
+No new goldens are awarded to alternatives. The adapter
+[author recipe](../../packages/adapter-pyodide/README.md#langgraph-python-model-chosen-calls-through-text)
+states the missing ToolNode/schema-choice/tool-delta behavior, sequential calls,
+uncaught-error requirement and direct-call tool-policy limit. Decision 3 and
+ADR-0012 remain unchanged; this ADR stays Proposed.

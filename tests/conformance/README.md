@@ -1584,3 +1584,51 @@ pnpm run test:python galaxie/tests/test_adk_model_strings.py galaxie/tests/test_
 pnpm exec vitest run packages/adapter-adk/test/model-strings-native.test.ts packages/adapter-adk/test/model-strings-measure.test.ts packages/adapter-adk/test/toolsets-builtin-native.test.ts packages/adapter-adk/test/toolsets-builtin-measure.test.ts
 pnpm run test:go
 ```
+
+
+## LangGraph Python tool-call replies spike
+
+The [pre-registered rule and results](../../docs/adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-replies-spike-2026-11)
+record five **alternative** cells (binding/replies, streaming, confirmed writes,
+safety floor, durability) and **refused** neighbours. No production proxy change
+or new golden ships. The original `CASE_NAMES`, twelve-case counts, projections,
+goldens and Chromium load budget are unchanged.
+
+- [`test_tool_call_replies_native.py`](cases-python/test_tool_call_replies_native.py)
+  has nine native CPython tests for prebuilt/manual loops, ordered messages and
+  call IDs, config injection, parallel namespaces, default/explicit error handlers
+  and streaming argument merge.
+- [`test_langchain_tool_calls.py`](../../python/galaxie/tests/test_langchain_tool_calls.py)
+  has 37 candidate/premise tests. The six terminal codes under both explicit
+  handlers lose their code at the error-status history refusal; later helpers
+  still cross the bridge. No permitted shared execution key was established.
+- [`test_tool_call_replies_alternative.py`](cases-python/test_tool_call_replies_alternative.py)
+  has four CPython text-protocol comparisons against the native tool-call oracle.
+- [`pyodide-tool-calls.node.test.ts`](pyodide-tool-calls.node.test.ts) has 12 tests
+  through real core and Node Pyodide: read/text-stream and ordered read/write
+  replacements; host write approval/decline; fatal budget and private-result
+  destination refusal; both explicit candidate error handlers; completed-node
+  restore and writing-node replay with one host write; unlisted-name refusal.
+  Native expected calls, final text and write counts come from CPython at test
+  time, never a hand-written golden. Each long test has a 900000 ms timeout.
+
+The helper candidate is confined to measurement files. A fresh run can succeed on
+its prepared Worker after failure, but this is not proof of a latch: none was
+built. Inherited shipped `bind_tools` raises `NotImplementedError` in CPython;
+Worker normalization is `unavailable` at boot or `executor_error` during a run.
+Native model binding and direct trusted capability calls remain outside the
+candidate guard. The [author recipe](../../packages/adapter-pyodide/README.md#langgraph-python-model-chosen-calls-through-text)
+uses plain JSON text and direct broker calls, retains host-confirmed write setup
+and lets terminal errors escape. It supplies no ToolNode, schema-constrained
+choice or streamed tool deltas, and omits the helper tool-policy flag.
+
+New Chromium reload, Firefox, WebKit, real models, other versions and other
+executors remain unmeasured. Existing Chromium coverage remains unchanged.
+
+```sh
+pnpm run test:python ../tests/conformance/cases-python/test_tool_call_replies_native.py
+pnpm run test:python galaxie/tests/test_langchain_tool_calls.py
+pnpm run test:python ../tests/conformance/cases-python/test_tool_call_replies_alternative.py
+pnpm exec vitest run --project node tests/conformance/pyodide-tool-calls.node.test.ts --testTimeout 900000
+python/.venv/bin/python -I scripts/record-python-conformance.py --check
+```
