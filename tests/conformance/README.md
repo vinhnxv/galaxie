@@ -1025,6 +1025,53 @@ Shipped verification:
 
 ## DSPy parallel and threaded Evaluate spike
 
+### Async branch-helper shipping refusal
+
+On 2026-11-13, the attempt to ship a keyed async helper records **refused**.
+The proposed helper was withdrawn; no public `galaxie.dspy.branches` API ships.
+Use a sequential loop of `await module.acall(...)` and keep code outside
+journaled calls deterministic. Thread-pool `Parallel` and `Evaluate` retain their
+fixed `unsupported` refusal.
+
+The native implementation experiment passed reverse-arrival scope and checkpoint
+byte comparisons with real and inlined thread hops, fresh-driver replay, silent
+groups, caught author exceptions and a lost third-write receipt. It failed the
+stored-row acceptance check: renaming a recorded key returned `unrecoverable`
+with zero further model or capability requests, but added revision
+`00000000000000000002`, a compact checkpoint with `status: unrecoverable`,
+`input: null` and `journal: []`. The original paused row stayed byte-identical;
+the complete row set did not. Earlier live Node Pyodide comparisons passed, but
+durable shipping support was not established.
+
+The cause is the existing driver's deliberate poison-marker write after runtime
+divergence, in `packages/adapter-pyodide/src/dspy-driver.ts`. It prevents later
+restores from retrying a divergent program. Preserving the complete row set would
+require revising that recovery contract or suppressing its protection. Neither
+is part of this change. This differs from restore-time rejection of an unknown
+entry key, which happens before session registration and writes no marker.
+
+The retained tests reproduce the same storage conflict using the existing
+test-only branch journal, without a production helper:
+
+```sh
+cd python
+.venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_fanout.py -q
+cd ..
+pnpm exec vitest run --project node tests/conformance/dspy-fanout.node.test.ts
+```
+
+Native tests cover both a changed request and a removed branch. Node Pyodide
+covers a removed branch in a fresh Worker. Both assert zero further model or
+capability requests, unchanged earlier rows and the added poison marker. Native
+also verifies that a subsequent restore stays unrecoverable. These are scripted
+tests on DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7.
+New Chromium fan-out live/reload probes, Firefox, WebKit, real models and other
+DSPy versions remain unmeasured. Existing goldens, matrices, recorders, locks and
+production source are unchanged. A supported helper needs a separately scoped
+decision about divergence persistence before another shipping attempt.
+
+### Original spike record
+
 On 2026-11-11 the recorded outcome is **alternative** for `dspy.Parallel` and
 **alternative** for threaded `dspy.Evaluate`, with a replacement proven as a
 test-only design. Use a sequential loop of `await module.acall(...)` today.
