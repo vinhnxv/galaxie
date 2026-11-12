@@ -1176,8 +1176,11 @@ replayed group preserves its stored pause for retry, proven natively and in a
 fresh Node Worker; unconsumed entries on cancellation are not divergence.
 Cancellation is recorded before cleanup, so a branch that catches it cannot
 dispatch a model or capability request. Native and Node tests cover this guard.
-Branch pauses, nested groups, streaming, concurrent calls inside one branch and
-root journaled calls during a group remain fixed `unsupported`. Thread-pool APIs stay refused.
+Branch pauses, nested groups and streaming remain fixed `unsupported`. Concurrent
+calls inside one branch and root journaled calls during a group are refused only
+when observed in flight; an unobserved overlap records arrival order and a later
+resume can end `unrecoverable` (reproduced by the adversarial review; a
+task-identity guard is a follow-up). Thread-pool APIs stay refused.
 No partial group is persisted.
 
 The optional `fanout` entry key stays under metadata `v: 1`; old readers already

@@ -594,10 +594,13 @@ no journal. Unknown keys, malformed markers, duplicate markers, broken group
 order, non-contiguous call ordinals and over-wide recorded groups fail restore
 before registration, with no write.
 
-Pause inside a branch, nested groups, streaming with branches, root journaled
-calls during a group, overlapping journaled calls in one branch, malformed keys
+Pause inside a branch, nested groups, streaming with branches, malformed keys
 and exceeded bounds end fixed `unsupported`, even if author code catches the
-exception. Persisted groups therefore contain completed calls only. A replayed
+exception. Root journaled calls during a group and overlapping journaled calls in
+one branch are refused only when the overlap is observed in flight (`busy` guard);
+an overlap that is not observed records calls in arrival order, so a later resume
+with different timing can end `unrecoverable` (measured by the review of this
+change). A task-identity guard is a recorded follow-up. Persisted groups therefore contain completed calls only. A replayed
 group precedes the recorded root frontier, so a missing branch-call marker is
 `unrecoverable` before dispatch, regardless of arrival order. Removing or renaming
 a recorded key, changing a request, adding a journaled call or ending a branch

@@ -530,8 +530,10 @@ ordinal. Replay after a pause matches those markers without new requests for
 the joined group, independent of arrival order and DSPy's thread hops. Branch
 capability calls keep distinct effect scopes and can reuse host write receipts
 after Worker loss. Pause only after the join: interaction requests inside branches,
-nested groups, streaming with branches, root journaled calls during a group and
-overlapping journaled calls inside one branch end fixed `unsupported`.
+nested groups and streaming with branches end fixed `unsupported`. Root journaled
+calls during a group and overlapping journaled calls inside one branch are refused
+only when the overlap is observed in flight; otherwise a later resume can end
+`unrecoverable`, so await each branch's calls sequentially.
 
 Removing/renaming a recorded key, changing a request or adding a journaled call
 on replay ends `unrecoverable` before dispatch. Earlier rows stay unchanged and
