@@ -209,7 +209,34 @@ async function life(shape = 'sequential', options: Options = {}) {
             subAgents: [leaf(shape === 'transfer' ? 'specialist' : 'worker', name)],
           }),
       );
-      if (shape === 'parallel') root = new ParallelAgent({ name: 'root', subAgents: branches });
+      if (shape === 'unique-sequential')
+        root = new SequentialAgent({
+          name: 'root',
+          subAgents: [leaf('drafter'), leaf('reviewer')],
+        });
+      else if (shape === 'unique-parallel')
+        root = new ParallelAgent({ name: 'root', subAgents: [leaf('left'), leaf('right')] });
+      else if (shape === 'unique-nested')
+        root = new ParallelAgent({
+          name: 'root',
+          subAgents: [
+            new SequentialAgent({ name: 'sequence', subAgents: [leaf('a'), leaf('b')] }),
+            leaf('c'),
+          ],
+        });
+      else if (shape === 'unique-loop')
+        root = new LoopAgent({ name: 'root', maxIterations: 2, subAgents: [leaf('worker')] });
+      else if (shape === 'unique-transfer')
+        root = new LlmAgent({
+          name: 'root',
+          model: host.adk.llm('agent'),
+          instruction: 'tag:router',
+          subAgents: [leaf('specialist')],
+        });
+      else if (shape === 'unique-pause')
+        root = new SequentialAgent({ name: 'root', subAgents: [leaf('gate'), leaf('tail')] });
+      else if (shape === 'parallel')
+        root = new ParallelAgent({ name: 'root', subAgents: branches });
       else if (shape === 'loop')
         root = new LoopAgent({ name: 'root', maxIterations: 2, subAgents: branches });
       else if (shape === 'transfer')
@@ -346,6 +373,43 @@ test('S5: DC1 over two user turns', async () => {
     await l.runtime.dispose();
   }
 });
+
+for (const [shape, oracle] of [
+  ['unique-sequential', [['drafter'], ['reviewer']]],
+  ['unique-parallel', [['left'], ['right']]],
+  ['unique-nested', [['sequence', 'a'], ['sequence', 'b'], ['c']]],
+  ['unique-loop', [['worker'], ['worker']]],
+  ['unique-transfer', [['specialist']]],
+] as const) {
+  test(`GA1/GA2/GA4/GA5: ${shape} recipe survives runs and rebuilt trees`, async () => {
+    for (let rebuild = 0; rebuild < 2; rebuild++) {
+      const l = await life(shape);
+      try {
+        await l.instance.prepare();
+        for (let turn = 0; turn < 2; turn++) {
+          const events = await l.segment();
+          expect(events.at(-1)?.type).toBe('output');
+          const expected = Array.from({ length: turn + 1 }, () => [...oracle]).flat();
+          expect(derive(l.stored().filter(isFinalResponse), l.root).sort()).toEqual(expected.sort());
+          for (const event of events)
+            if (event.type === 'stream') {
+              expect(event.path).toEqual([]);
+              if (event.mode === 'messages') {
+                const author = (event.data as { author: string }).author;
+                const positions = pathsOf(l.root).get(author);
+                expect(positions).toHaveLength(1);
+                expect(positions?.[0]?.length).toBeLessThanOrEqual(16);
+                expect(JSON.stringify(positions)).not.toContain('content-canary');
+              }
+            }
+        }
+        expect(createAdkAdapter().features.subgraphs).toBe(false);
+      } finally {
+        await l.runtime.dispose();
+      }
+    }
+  });
+}
 
 test('S4/DA3: stored pause rebuild reproduces the live derivation', async () => {
   let l = await life('sequential', { pause: true });

@@ -80,6 +80,18 @@ def tree(shape='sequential', tools=False, pause=False, output=False, partial_onl
             object.__setattr__(model, 'generate_content_async', partial)
         return LlmAgent(name=name, model=model, tools=[tool] if tools or role == 'gate' else [], **extras)
 
+    if shape == 'unique-sequential':
+        return SequentialAgent(name='root', sub_agents=[leaf('drafter', 'drafter'), leaf('reviewer', 'reviewer')])
+    if shape == 'unique-parallel':
+        return ParallelAgent(name='root', sub_agents=[leaf('left', 'left'), leaf('right', 'right')])
+    if shape == 'unique-nested':
+        return ParallelAgent(name='root', sub_agents=[SequentialAgent(name='sequence', sub_agents=[leaf('a', 'a'), leaf('b', 'b')]), leaf('c', 'c')])
+    if shape == 'unique-loop':
+        return LoopAgent(name='root', max_iterations=2, sub_agents=[leaf('worker', 'worker')])
+    if shape == 'unique-transfer':
+        return LlmAgent(name='root', model=llm('router'), sub_agents=[leaf('specialist', 'specialist')])
+    if shape == 'unique-pause':
+        return SequentialAgent(name='root', sub_agents=[leaf('head', 'head'), leaf('gate', 'gate')])
     branches = [SequentialAgent(name=name, sub_agents=[leaf('specialist' if shape == 'transfer' else 'worker', name)]) for name in ('first', 'second')]
     if shape == 'loop':
         return LoopAgent(name='root', max_iterations=2, sub_agents=branches)
@@ -232,3 +244,27 @@ def test_da4_parallel_duplicates_mix_surrogate_buffers():
         return events
 
     assert asyncio.run(go()) == ['x', '\ud83dy', '\ude00']
+
+
+@pytest.mark.parametrize(('shape', 'oracle'), [
+    ('unique-sequential', [['drafter'], ['reviewer']]),
+    ('unique-parallel', [['left'], ['right']]),
+    ('unique-nested', [['sequence', 'a'], ['sequence', 'b'], ['c']]),
+    ('unique-loop', [['worker'], ['worker']]),
+    ('unique-transfer', [['specialist']]),
+])
+def test_namespace_recipe_is_deterministic_content_free_and_uses_no_stored_field(shape, oracle):
+    for _ in range(2):
+        install()
+        root = tree(shape)
+        executor = Executor(root)
+        executor.durable = True
+        for turn in range(2):
+            _, events = run(executor)
+            assert sorted(derive([event for event in stored(executor) if event.is_final_response()], root)) == sorted(oracle * (turn + 1))
+            for mode, data in events:
+                if mode == 'messages':
+                    positions = paths_of(root)[data['author']]
+                    assert len(positions) == 1
+                    assert len(positions[0]) <= 16
+                    assert 'content-canary' not in json.dumps(positions)
