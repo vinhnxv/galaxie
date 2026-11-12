@@ -40,7 +40,7 @@ class ToolReplyModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=reply)])
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
-        return self._generate(messages, stop, run_manager, **kwargs)
+        return self._generate(messages, stop, **kwargs)
 
     async def _astream(self, messages, stop=None, run_manager=None, **kwargs):
         yield ChatGenerationChunk(message=AIMessageChunk(content='', tool_call_chunks=[{
@@ -138,7 +138,8 @@ def test_node_namespaces_change_at_every_node_but_thread_id_repeats_between_runs
         model = ToolReplyModel(calls=[{'name': 'inspect', 'args': {}, 'id': 'inspect-1'}])
         graph = loop(model, [tool], observations=seen)
         for _ in range(2):
-            await graph.ainvoke({'messages': [RemoveMessage(id=REMOVE_ALL_MESSAGES), HumanMessage('request')]},
+            value: MessagesState = {'messages': [RemoveMessage(id=REMOVE_ALL_MESSAGES), HumanMessage('request')]}
+            await graph.ainvoke(value,
                                {'configurable': {'thread_id': 'same-session'}, 'recursion_limit': 12})
         assert len(seen) == 6
         scopes = [config['metadata']['langgraph_checkpoint_ns'] for _, config in seen]
@@ -161,7 +162,7 @@ def test_default_toolnode_reraises_ordinary_failures_and_explicit_handlers_swall
     async def exercise():
         tool = StructuredTool.from_function(coroutine=fail, name='fail', description='Fail.')
         graph = loop(ToolReplyModel(calls=[{'name': 'fail', 'args': {}, 'id': 'failure'}]), [tool], handler=handler)
-        value = {'messages': [HumanMessage('request')]}
+        value: MessagesState = {'messages': [HumanMessage('request')]}
         config: RunnableConfig = {'configurable': {'thread_id': 'errors'}}
         if handler is None:
             with pytest.raises(NativeFailure) as error:
