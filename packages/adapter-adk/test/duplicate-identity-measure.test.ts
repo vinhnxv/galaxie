@@ -1,0 +1,407 @@
+// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+// SPDX-License-Identifier: Apache-2.0
+
+import './support/adk-env.js';
+import {
+  createRuntime,
+  defineAgentDefinition,
+  type ExecutorAdapter,
+  type ModelRouting,
+  type RunEvent,
+  type SessionId,
+} from '@galaxie-ai/core';
+import {
+  type BaseAgent,
+  type Event,
+  isFinalResponse,
+  LlmAgent,
+  LoopAgent,
+  ParallelAgent,
+  SequentialAgent,
+} from '@google/adk';
+import { AIMessage } from '@langchain/core/messages';
+import { expect, test } from 'vitest';
+import { z } from 'zod';
+import { MemoryByteCheckpoints } from '../../../tests/conformance/support/memory-byte-checkpoints.js';
+import { createAdkAdapter } from '../src/adapter.js';
+import type { AdkHost } from '../src/host.js';
+import { defineAdkEntry } from '../src/interaction.js';
+import { FakeChatModel, wordChunks } from './support/fixtures.js';
+
+/* DA1 FAIL: native Sequential/Loop fields collide.
+ * DA2 FAIL S5: partial-only first worker is missing from the stored log;
+ * DC1 attributes second/first/second to first/second/first.
+ * S1-S3 and ordinary two-turn baseline PASS; S6-S8 not measured: fixed by S5.
+ * DA3 PASS S4: rebuilt pause log and live derivation agree.
+ * DA4: first-match output key loses structured output; Python additionally
+ * mixes Parallel surrogate buffers. Native transfer prediction did not hold.
+ * D-js/D-py select the refusal candidate, conditional on RF1-RF8 and shipping.
+ * RF1 census PASS; RF2-RF8 pending shipped candidate verification.
+ * GA6/GA8 not measured: carriage not shipped; GF1-GF5 fixed by GF2.
+ * No public path, stored format or effect scope changes.
+ */
+const definition = defineAgentDefinition({
+  id: 'tests/adk-duplicate-identity',
+  version: '1.0.0',
+  executor: 'adk-js',
+  input: z.object({ prompt: z.string() }),
+  models: { agent: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' } },
+  capabilities: {
+    required: {
+      'test.echo@1': { kind: 'read', input: z.object({}), output: z.object({ text: z.string() }) },
+    },
+  },
+});
+const routing: ModelRouting = {
+  providers: {
+    mock: {
+      destination: 'in-browser',
+      modality: 'text',
+      languages: ['en'],
+      features: ['streaming', 'tool-calling', 'structured-output'],
+      pricing: { inputPerToken: 0, outputPerToken: 0 },
+    },
+  },
+  roles: { agent: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
+};
+
+function pathsOf(root: BaseAgent): Map<string, string[][]> {
+  const paths = new Map<string, string[][]>();
+  const visit = (agent: BaseAgent, path: string[]): void => {
+    paths.set(agent.name, [...(paths.get(agent.name) ?? []), path]);
+    for (const child of agent.subAgents) visit(child, [...path, child.name]);
+  };
+  visit(root, []);
+  return paths;
+}
+
+/** Registered DC1: completed runs per author/branch over the complete event log. */
+function derive(events: readonly Event[], root: BaseAgent): string[][] {
+  const paths = pathsOf(root);
+  const counts = new Map<string, number>();
+  return events.flatMap((event) => {
+    if (event.content?.role !== 'model' || !event.author) return [];
+    const positions = paths.get(event.author) ?? [];
+    const candidates = event.branch
+      ? positions.filter((path) => event.branch === `root.${path[0]}`)
+      : positions;
+    const key = JSON.stringify([event.author, event.branch ?? '']);
+    const count = counts.get(key) ?? 0;
+    const path = candidates[count % candidates.length];
+    if (!event.partial && isFinalResponse(event)) counts.set(key, count + 1);
+    if (!path) throw new Error('No candidate position.');
+    return [path];
+  });
+}
+
+interface Options {
+  tools?: boolean;
+  pause?: boolean;
+  output?: boolean;
+  bytes?: MemoryByteCheckpoints;
+  sessionId?: SessionId;
+  partialOnly?: boolean;
+}
+
+async function life(shape = 'sequential', options: Options = {}) {
+  const bytes = options.bytes ?? new MemoryByteCheckpoints();
+  const requests: string[] = [];
+  const turns = new Map<string, number>();
+  let storeRequests = 0;
+  const model = new FakeChatModel(
+    (seen) => {
+      const tag = /tag:(\w+)/.exec(seen.messages[0]?.text ?? '')?.[1];
+      if (!tag) throw new Error('Missing scripted position.');
+      requests.push(tag);
+      const turn = turns.get(tag) ?? 0;
+      turns.set(tag, turn + 1);
+      const tools = seen.messages.filter((message) => message.type === 'tool');
+      if (tag === 'router')
+        return new AIMessage({
+          content: '',
+          tool_calls: [
+            { id: 'transfer', name: 'transfer_to_agent', args: { agent_name: 'specialist' } },
+          ],
+        });
+      if (
+        (options.tools && turn === 0) ||
+        (tag === 'gate' && !tools.some((message) => message.name === 'echo'))
+      )
+        return new AIMessage({
+          content: '',
+          tool_calls: [{ id: `call-${tag}`, name: 'echo', args: {} }],
+        });
+      return new AIMessage({ content: options.output ? `{"position":"${tag}"}` : tag });
+    },
+    undefined,
+    wordChunks,
+  );
+  const runtime = createRuntime({
+    appId: 'duplicate-identity',
+    executors: [createAdkAdapter() as ExecutorAdapter<unknown, unknown>],
+    budgets: { steps: 600, tokens: 100000 },
+  });
+  let root: BaseAgent | undefined;
+  const instance = await runtime.create(definition, {
+    principalScope: 'user',
+    models: routing,
+    ...(options.sessionId === undefined ? {} : { sessionId: options.sessionId }),
+    services: {
+      chatModels: { mock: model },
+      checkpoints: {
+        request: async (value: unknown) => {
+          storeRequests++;
+          return bytes.request(value);
+        },
+      },
+    },
+    bindings: {
+      'test.echo@1': {
+        kind: 'read',
+        destination: 'in-browser',
+        timeoutMs: 1000,
+        concurrency: 2,
+        grantScope: 'instance',
+        approval: 'none',
+        retry: 'none',
+        async invoke() {
+          return { text: 'content-canary' };
+        },
+      },
+    },
+    agent: (host: AdkHost) => {
+      const leaf = (name: string, tag = name): LlmAgent => {
+        const model = host.adk.llm('agent');
+        if (options.partialOnly && tag === 'first') {
+          const generate = model.generateContentAsync.bind(model);
+          let omitted = false;
+          model.generateContentAsync = async function* (request, stream, signal) {
+            const drop = !omitted;
+            for await (const response of generate(request, stream, signal))
+              if (!drop || response.partial) yield response;
+            omitted = true;
+          };
+        }
+        return new LlmAgent({
+          name,
+          model,
+          instruction: `tag:${tag}`,
+          ...(options.output
+            ? { outputKey: `${tag}_key`, outputSchema: z.object({ position: z.string() }) }
+            : {}),
+          tools:
+            options.tools || tag === 'gate'
+              ? [
+                  host.adk.capabilityTool('test.echo@1', {
+                    toolName: 'echo',
+                    description: 'Echo.',
+                    parameters: z.object({}),
+                    ...(tag === 'gate' ? { requireConfirmation: true } : {}),
+                  }),
+                ]
+              : [],
+        });
+      };
+      const branches = ['first', 'second'].map(
+        (name) =>
+          new SequentialAgent({
+            name,
+            subAgents: [leaf(shape === 'transfer' ? 'specialist' : 'worker', name)],
+          }),
+      );
+      if (shape === 'parallel') root = new ParallelAgent({ name: 'root', subAgents: branches });
+      else if (shape === 'loop')
+        root = new LoopAgent({ name: 'root', maxIterations: 2, subAgents: branches });
+      else if (shape === 'transfer')
+        root = new LlmAgent({
+          name: 'root',
+          model: host.adk.llm('agent'),
+          instruction: 'tag:router',
+          subAgents: branches,
+        });
+      else
+        root = new SequentialAgent({
+          name: 'root',
+          subAgents: options.pause ? [leaf('gate'), ...branches] : branches,
+        });
+      return defineAdkEntry({
+        agent: root,
+        interaction: () => ({
+          surfaceId: 'main',
+          viewRevision: 'r1',
+          component: 'tests.Approval/v1',
+          props: {},
+        }),
+      });
+    },
+  });
+  const segment = async (resume = false): Promise<RunEvent[]> => {
+    if (resume) {
+      const run = instance.getSnapshot().run;
+      if (!run?.pending) throw new Error('Missing pause.');
+      const receipt = await instance.dispatch({
+        instanceId: instance.instanceId,
+        runId: run.runId,
+        ...run.pending,
+        action: 'approve',
+        payload: { indexes: [0] },
+      });
+      expect(receipt.status).toBe('accepted');
+    } else await instance.start({ prompt: 'content-canary' });
+    const runId = instance.getSnapshot().run?.runId;
+    if (!runId) throw new Error('Missing run.');
+    const events: RunEvent[] = [];
+    for await (const event of instance.events(runId)) {
+      events.push(event);
+      if (
+        event.type === 'interaction' &&
+        instance.getSnapshot().run?.pending?.interactionId === event.interaction.interactionId
+      )
+        break;
+    }
+    return events;
+  };
+  const stored = (): Event[] => {
+    const row = [...bytes.rows.values()].at(-1);
+    if (!row) throw new Error('No stored record.');
+    return (JSON.parse(new TextDecoder().decode(row.checkpoint.bytes)) as { events: Event[] })
+      .events;
+  };
+  return {
+    instance,
+    runtime,
+    bytes,
+    requests,
+    segment,
+    stored,
+    get root() {
+      if (!root) throw new Error('Not prepared.');
+      return root;
+    },
+    get storeRequests() {
+      return storeRequests;
+    },
+  };
+}
+
+for (const [script, shape, tools, oracle] of [
+  [
+    'S1',
+    'sequential',
+    false,
+    [
+      ['first', 'worker'],
+      ['second', 'worker'],
+    ],
+  ],
+  [
+    'S2',
+    'sequential',
+    true,
+    [
+      ['first', 'worker'],
+      ['first', 'worker'],
+      ['second', 'worker'],
+      ['second', 'worker'],
+    ],
+  ],
+  [
+    'S3',
+    'loop',
+    false,
+    [
+      ['first', 'worker'],
+      ['second', 'worker'],
+      ['first', 'worker'],
+      ['second', 'worker'],
+    ],
+  ],
+] as const) {
+  test(`${script}: DC1 matches the authored oracle`, async () => {
+    const l = await life(shape, { tools });
+    try {
+      await l.instance.prepare();
+      expect((await l.segment()).at(-1)?.type).toBe('output');
+      expect(derive(l.stored(), l.root)).toEqual(oracle);
+    } finally {
+      await l.runtime.dispose();
+    }
+  });
+}
+
+test('S5: DC1 over two user turns', async () => {
+  const l = await life();
+  try {
+    await l.instance.prepare();
+    await l.segment();
+    await l.segment();
+    expect(l.requests).toEqual(['first', 'second', 'first', 'second']);
+    expect(derive(l.stored(), l.root)).toEqual([
+      ['first', 'worker'],
+      ['second', 'worker'],
+      ['first', 'worker'],
+      ['second', 'worker'],
+    ]);
+  } finally {
+    await l.runtime.dispose();
+  }
+});
+
+test('S4/DA3: stored pause rebuild reproduces the live derivation', async () => {
+  let l = await life('sequential', { pause: true });
+  try {
+    await l.instance.prepare();
+    expect((await l.segment()).some((event) => event.type === 'interaction')).toBe(true);
+    const before = l.stored();
+    const expected = derive(before, l.root);
+    const bytes = l.bytes;
+    const sessionId = l.instance.sessionId;
+    await l.runtime.dispose();
+    l = await life('sequential', { pause: true, bytes, sessionId });
+    await l.instance.prepare();
+    await l.instance.restore();
+    expect(l.stored()).toEqual(before);
+    expect(derive(l.stored(), l.root)).toEqual(expected);
+    expect((await l.segment(true)).at(-1)?.type).toBe('output');
+    expect(l.requests).toEqual(['gate', 'first', 'second']);
+  } finally {
+    await l.runtime.dispose();
+  }
+});
+
+test('DA4: duplicate output keys resolve to the first agent', async () => {
+  const l = await life('sequential', { output: true });
+  try {
+    await l.instance.prepare();
+    const events = await l.segment();
+    expect(events.at(-1)).toMatchObject({ type: 'output', output: '{"position":"second"}' });
+    const last = l.stored().at(-1);
+    expect(last?.actions?.stateDelta).toEqual({ second_key: { position: 'second' } });
+  } finally {
+    await l.runtime.dispose();
+  }
+});
+
+test('S5: a partial-only first worker makes stored-log DC1 misattribute the second', async () => {
+  const l = await life('sequential', { partialOnly: true });
+  try {
+    await l.instance.prepare();
+    expect((await l.segment()).at(-1)?.type).toBe('output');
+    expect((await l.segment()).at(-1)?.type).toBe('output');
+    const oracle = [
+      ['second', 'worker'],
+      ['first', 'worker'],
+      ['second', 'worker'],
+    ];
+    const observed = derive(l.stored(), l.root);
+    expect(observed).toEqual([
+      ['first', 'worker'],
+      ['second', 'worker'],
+      ['first', 'worker'],
+    ]);
+    expect(observed).not.toEqual(oracle);
+    expect(l.requests).toEqual(['first', 'second', 'first', 'second']);
+  } finally {
+    await l.runtime.dispose();
+  }
+});
