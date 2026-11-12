@@ -43,6 +43,7 @@ class Scripted extends BaseLlm {
         ],
       },
       turnComplete: true,
+      ...(this.model === 'partial_only' ? { partial: true, turnComplete: false } : {}),
     };
   }
   override async connect(): Promise<never> {
@@ -173,4 +174,29 @@ test('native shared instance cannot have two parents', () => {
   const shared = new LlmAgent({ name: 'worker', model: new Scripted('shared', []) });
   new SequentialAgent({ name: 'first', subAgents: [shared] });
   expect(() => new SequentialAgent({ name: 'second', subAgents: [shared] })).toThrow(/parent/);
+});
+
+test('native no-final worker lets the next duplicate sibling complete', async () => {
+  const root = new SequentialAgent({
+    name: 'root',
+    subAgents: ['first', 'second'].map(
+      (name) =>
+        new SequentialAgent({
+          name,
+          subAgents: [
+            new LlmAgent({
+              name: 'worker',
+              model: new Scripted(name === 'first' ? 'partial_only' : 'second', []),
+            }),
+          ],
+        }),
+    ),
+  });
+  const events = await collect(root);
+  expect(
+    events.map((event) => [event.author, event.partial ?? false, isFinalResponse(event)]),
+  ).toEqual([
+    ['worker', true, false],
+    ['worker', false, true],
+  ]);
 });

@@ -27,7 +27,7 @@ class Scripted(BaseLlm):
         if self.delay:
             await asyncio.sleep(0.01)
         part = types.Part(function_call=types.FunctionCall(name='transfer_to_agent', args={'agent_name': 'specialist'})) if self.model == 'router' else types.Part(text=self.model)
-        yield LlmResponse(content=types.Content(role='model', parts=[part]), turn_complete=True)
+        yield LlmResponse(content=types.Content(role='model', parts=[part]), turn_complete=self.model != 'partial_only', partial=self.model == 'partial_only')
 
 
 def tree(shape, reverse=False):
@@ -100,3 +100,11 @@ def test_native_shared_instance_is_refused_but_sibling_duplicates_only_warn(capl
     siblings = SequentialAgent(name='root', sub_agents=[LlmAgent(name='worker'), LlmAgent(name='worker')])
     assert len(siblings.sub_agents) == 2
     assert 'Found duplicate sub-agent names' in caplog.text
+
+
+def test_native_no_final_worker_allows_next_duplicate_sibling():
+    root = SequentialAgent(name='root', sub_agents=[SequentialAgent(name=name, sub_agents=[
+        LlmAgent(name='worker', model=Scripted(model='partial_only' if name == 'first' else 'second', calls=[])),
+    ]) for name in ('first', 'second')])
+    events = asyncio.run(collect(root))
+    assert [(e.author, bool(e.partial), e.is_final_response()) for e in events] == [('worker', True, False), ('worker', False, True)]
