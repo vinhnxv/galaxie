@@ -1108,6 +1108,15 @@ replacement. Multi-call branches can allocate another branch's scope, and the
 native crash probe actually repeated `alpha` before `unrecoverable` propagated.
 Multi-call work should remain sequential until the follow-up ships.
 
+The native crash-redispatch probe's exact write sequence depends on DSPy's
+`asyncio.to_thread` hops; the pinned shipped-code test inlines those hops to
+deterministically record `unrecoverable` with a repeated `alpha`. Under natural
+thread scheduling, the reversed run can instead allocate the original scopes
+and complete `ok` with each write once, which a separate test accepts while
+checking output and receipt identity. Both outcomes preserve the ADR-0012
+controls; the repeat remains the documented hazard for the branch journal
+follow-up to address.
+
 ```python
 answers = []
 for label in ('alpha', 'beta', 'gamma'):

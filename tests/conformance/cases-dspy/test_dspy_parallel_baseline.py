@@ -5,6 +5,8 @@
 
 import asyncio
 from collections import Counter
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 import hashlib
 import importlib.util
 import json
@@ -12,7 +14,7 @@ import logging
 from pathlib import Path
 import sys
 from types import ModuleType
-from typing import Any
+from typing import Any, TypeVar
 from unittest.mock import patch
 
 import dspy
@@ -34,6 +36,21 @@ native = load_module('parallel_native_driver', 'test_dspy_durable.py')
 programs = load_module('parallel_programs', 'parallel_programs.py')
 FIXTURES = json.loads(Path(__file__).with_name('parallel-fixtures.json').read_text())
 LABELS = programs.LABELS
+T = TypeVar('T')
+
+
+@contextmanager
+def inline_thread_hops() -> Iterator[None]:
+    # DSPy hops through the default thread pool before and after model calls.
+    # OS thread completion order decides which branch reaches its tool first
+    # and gets each effect scope. Inline only where an exact outcome is pinned
+    # so scope allocation follows the fixture gates.
+    async def to_thread(function: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:
+        await asyncio.sleep(0)
+        return function(*args, **kwargs)
+
+    with patch('asyncio.to_thread', to_thread):
+        yield
 
 
 def payloads(values):
@@ -339,8 +356,7 @@ def test_shipped_divergence_is_refused_before_dispatch(changed):
     assert store.requests == requests and store.calls == []
 
 
-@pytest.mark.parametrize('name', ['par-fan-write', 'par-fan-multi'])
-def test_shipped_crash_redispatch_records_receipt_identity(name):
+def crash_then_reverse(name: str) -> tuple[Store, dict[str, Any]]:
     store = Store('forward')
     context = store.boot(name)
     assert store.execute(context) == {'ok': True, 'interrupted': True}
@@ -355,6 +371,13 @@ def test_shipped_crash_redispatch_records_receipt_identity(name):
     context = store.boot(name)
     assert native.pending(context) == before
     result = store.execute(context, before)
+    return store, result
+
+
+@pytest.mark.parametrize('name', ['par-fan-write', 'par-fan-multi'])
+def test_shipped_crash_redispatch_records_receipt_identity(name):
+    with inline_thread_hops():
+        store, result = crash_then_reverse(name)
     print(json.dumps({'scenario': name, 'result': result, 'writes': store.calls, 'effects': store.effects}, sort_keys=True))
     if name == 'par-fan-write':
         expected, _ = native_reference('write')
@@ -362,7 +385,31 @@ def test_shipped_crash_redispatch_records_receipt_identity(name):
         assert Counter(store.calls) == Counter(f'{label}:before' for label in LABELS)
     else:
         assert result == {'ok': False, 'code': 'unrecoverable'}
-        # A sibling may commit under a newly allocated scope before the host's
-        # mismatched receipt reaches the executor. Preserve this shipped hazard.
-        assert 2 <= len(store.calls) <= 3
+        # The forward run allocates alpha:0, beta:1, gamma:2 and writes alpha
+        # and beta. Reversed replay allocates gamma:0, whose changed digest is
+        # refused, while alpha is already in flight under the new scope 2 and
+        # writes again: the documented ADR-0018 multi-call fan-out hazard.
+        assert store.calls == ['alpha:before', 'beta:before', 'alpha:before']
+
+
+@pytest.mark.parametrize('name', ['par-fan-multi'])
+def test_shipped_crash_redispatch_natural_scheduling_stays_safe(name: str) -> None:
+    store, result = crash_then_reverse(name)
+    # Both outcomes preserve ADR-0012: a receipt is reused only for the same
+    # scope and digest. Success occurs when replay allocates the original scopes.
+    if result['ok']:
+        assert result == {'ok': True, 'output': native_reference('multi')[0]}
+        assert Counter(store.calls) == Counter(f'{label}:before' for label in LABELS)
+    else:
+        assert result == {'ok': False, 'code': 'unrecoverable'}
         assert store.calls[:2] == ['alpha:before', 'beta:before']
+        assert 2 <= len(store.calls) <= 3
+    expected_receipts = {
+        hashlib.sha256(json.dumps({'query': f'{label}:before'}, sort_keys=True).encode()).hexdigest(): f'receipt:{label}:before'
+        for label in LABELS
+    }
+    assert len(store.effects) == len(store.calls)
+    for effect in store.effects.values():
+        assert effect['digest'] in expected_receipts
+        assert effect['status'] == 'succeeded'
+        assert effect['output'] == expected_receipts[effect['digest']]
