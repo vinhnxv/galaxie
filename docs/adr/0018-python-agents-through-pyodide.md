@@ -600,7 +600,13 @@ exception. Root journaled calls during a group and overlapping journaled calls i
 one branch are refused only when the overlap is observed in flight (`busy` guard);
 an overlap that is not observed records calls in arrival order, so a later resume
 with different timing can end `unrecoverable` (measured by the review of this
-change). A task-identity guard is a recorded follow-up. Persisted groups therefore contain completed calls only. A replayed
+change). A task-identity guard was measured and refused: the first-caller rule
+allows a write before refusal and a reversed retry can end `unrecoverable`;
+capturing the branch task prevents that dispatch but falsely refuses a branch
+whose sequential calls all run in one awaited helper task. The
+[guard refusal evidence](../../tests/conformance/README.md#branch-task-identity-guard-refusal)
+records both outcomes. Production source is unchanged. Persisted groups
+therefore contain completed calls only. A replayed
 group precedes the recorded root frontier, so a missing branch-call marker is
 `unrecoverable` before dispatch, regardless of arrival order. Removing or renaming
 a recorded key, changing a request, adding a journaled call or ending a branch

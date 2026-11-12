@@ -6,7 +6,14 @@ import { parallelGuardSources, parallelSources } from './dspy-parallel-sources.n
 
 export async function branchSources(
   name: string,
-  changed: boolean | 'removed' | 'renamed' | 'extra' | 'extra-key-first' | 'extra-key-last' = false,
+  changed:
+    | boolean
+    | 'removed'
+    | 'renamed'
+    | 'fewer'
+    | 'extra'
+    | 'extra-key-first'
+    | 'extra-key-last' = false,
 ): Promise<Record<string, string>> {
   const sources = await parallelSources(
     name,
@@ -19,12 +26,15 @@ export async function branchSources(
   );
   if (typeof changed === 'string' && changed !== 'removed') {
     sources['parallel_candidate.py'] += `
+import asyncio
 from galaxie import capabilities
 from galaxie.dspy import branches as join
 async def branches(group):
     group = dict(group)
     if ${JSON.stringify(changed)} == 'renamed':
         group['renamed'] = group.pop('before.alpha')
+    elif ${JSON.stringify(changed)} == 'fewer':
+        group['before.alpha'] = lambda: asyncio.sleep(0, result='silent')
     else:
         original = group['before.alpha']
         async def added():

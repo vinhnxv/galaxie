@@ -9,7 +9,15 @@ import { parallelAnswers } from './support/dspy-parallel.js';
 import { executeDspyParallelStep, type ParallelResult } from './support/dspy-parallel-step.js';
 import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
 
-test.each([true, 'removed', 'renamed', 'extra', 'extra-key-first', 'extra-key-last'] as const)(
+test.each([
+  true,
+  'removed',
+  'renamed',
+  'fewer',
+  'extra',
+  'extra-key-first',
+  'extra-key-last',
+] as const)(
   'shipped branch divergence poisons once and later restore adds nothing: %s',
   async (changed) => {
     const name = 'par-fan-diverge';

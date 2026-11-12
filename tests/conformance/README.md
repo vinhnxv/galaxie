@@ -1179,8 +1179,10 @@ dispatch a model or capability request. Native and Node tests cover this guard.
 Branch pauses, nested groups and streaming remain fixed `unsupported`. Concurrent
 calls inside one branch and root journaled calls during a group are refused only
 when observed in flight; an unobserved overlap records arrival order and a later
-resume can end `unrecoverable` (reproduced by the adversarial review; a
-task-identity guard is a follow-up). Thread-pool APIs stay refused.
+resume can end `unrecoverable` (reproduced by the adversarial review). A
+task-identity guard was measured and refused: first-caller identity leaves a
+retry hazard, while branch-task identity falsely refuses a sequential helper
+task, as recorded below. Thread-pool APIs stay refused.
 No partial group is persisted.
 
 The optional `fanout` entry key stays under metadata `v: 1`; old readers already
@@ -1213,6 +1215,60 @@ DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. Chromium divergenc
 reload, Firefox, WebKit, real models, other DSPy versions and ReAct branches remain
 unmeasured. Pauses within groups require a new partial-group design. No core,
 bridge, driver, lock or third-party wheel input changed.
+
+#### Branch task-identity guard refusal
+
+On 2026-11-13, the guard attempt records **refused** and leaves the shipped
+helper unchanged. Scripted CPython 3.14.5 tests on DSPy 3.4.1 measure these
+identities with both real and inlined DSPy thread hops:
+
+| Sequential branch shape | Calling task observed at journal entry |
+| --- | --- |
+| Three `Predict.acall` calls | The branch task for all three calls |
+| `ReAct` with one `capability_tool` call | The branch task for both model calls and the capability call; identity only, no replay claim |
+| Three `asyncio.wait_for(acall, 60)` calls | The branch task for all three calls |
+| Three calls inside `asyncio.timeout(60)` | The branch task for all three calls |
+| All calls inside one awaited `create_task(inner())` | One child task, distinct from the branch task; live and restored replay succeed without redispatch |
+
+The first-calling-task proposal accepts these sequential shapes and refuses the
+second task of an immediate two-call `gather`, even after an author catch. In
+forward and reversed order, however, the first-arriving write already dispatches
+before that refusal. The committed test-local proposal reproduces the retry
+hazard: restore one pause, run two gathered writes reached after real model hops,
+then restore the same bytes and reverse arrival. The first resume ends
+`unsupported`; the retry ends `unrecoverable`. A fake effect journal rejects
+different input digests at the same `dspy/c/1/0/a/1` scope. Only the first write
+succeeds, and the second attempt marks the executor unrecoverable. This measures
+the executor and effect-scope collision, not a new driver poison-row test.
+
+The stricter experiment captures the task at branch invocation and blocks both
+gathered calls before dispatch; the reversed retry stays `unsupported`. The
+four sequential DSPy shapes above still pass, but the single-helper-task test
+fails with `unsupported` before its first request. That false refusal fails the
+compatibility gate, so neither guard ships. Root-task guards were not built or
+measured in this attempt. Existing timing-dependent refusal wording remains.
+
+Residue tests of the first-caller proposal observe one parked author child after
+refusal, both when `gather` owns it and when a branch starts a bare `create_task`.
+Over three loop turns there is one earlier request and no further request. When
+released, that child attempts a capability call, receives the recorded
+`unsupported`, and dispatches nothing. The tests explicitly drain the child.
+The helper drains its own branch tasks; it does not drain arbitrary author tasks.
+
+The Node Pyodide lane adds the fewer-calls divergence case: a recorded branch
+becomes silent, ends `unrecoverable` before any model or capability request,
+preserves earlier rows and writes, appends one compact poison row, and refuses a
+later restore without another row. No task-identity guard is present in that lane.
+The native identity measurements above do not establish Worker identity parity.
+
+Use one task for each branch's sequential journaled calls and deterministic code
+outside those calls. Overlapping root calls that finish before the first group
+remain unguarded. Other DSPy shapes, including `Refine` and `BestOfN`, were not
+measured here. ReAct replay, Chromium divergence reload, Firefox, WebKit, real
+models and other DSPy versions remain unmeasured. Production source, existing
+goldens, fixtures, matrices, locks and record formats are unchanged. Reproduce
+with the focused commands above; the proposal and identity tests live in
+`python/galaxie/tests/test_dspy_branches.py`.
 
 ### Original spike record
 
