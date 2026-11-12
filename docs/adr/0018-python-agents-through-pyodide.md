@@ -25,6 +25,7 @@
   2026-11-11: recorded DSPy sync entry point refusal, offline alternatives for model-calling runtime optimizers and measured runtime LabeledFewShot support; status stays Proposed.
 
   2026-11-11: recorded provider-string LM, schema-output and service-retrieval alternatives and embedding refusal; status stays Proposed.
+  2026-11-12: shipped fixed `unsupported` refusal for DSPy thread-pool fan-out; status stays Proposed.
 
 ## Context
 
@@ -482,6 +483,42 @@ WebKit, real models and other DSPy versions remain unmeasured here. Successful
 streaming fan-out, nested groups, pauses inside branches and ReAct branches are
 not established; the candidate only measures fixed refusals for the first three.
 ADR-0012 controls are unchanged and this ADR remains Proposed.
+
+### DSPy thread-pool fan-out refusal (2026-11, shipped)
+
+Threaded `dspy.Parallel` and `dspy.Evaluate`, including their default thread
+count, now end with the existing fixed `unsupported` code and message in native
+CPython and Node Pyodide, with zero model or capability requests. This supersedes
+the preceding spike's verbatim threaded results; it does not enable fan-out.
+
+The existing DSPy context carries a private settings key with a weak reference to
+the run. DSPy's pool propagates that settings context to workers. An LM entry
+that lost the run ContextVar but retains the reference records a terminal refusal
+and raises a `BaseException` that bypasses DSPy's item-error handler. The run
+state preserves refusal even if author code catches that exception. Async engine
+completion and streaming use the same guard before any bridge request. The weak
+reference does not keep a run alive in stale worker settings.
+
+In the Worker's error path, a `RuntimeError` with a traceback frame whose code is
+`threading.Thread.start.__code__` becomes `unsupported`. No exception-message
+matching or global thread patch is used. Any such thread-start misuse is classified
+the same way. Supported tasks keep their ContextVar and follow the existing path;
+no journal format, metadata field, error text, public symbol or core contract
+changes. ADR-0012 controls remain in JavaScript and are unchanged.
+
+Raw author-created threads without DSPy's settings remain unattributed natively;
+a thread-start error caught by author code is invisible to the executor. DSPy's
+own logger is unchanged: the threaded refusal produced no per-item records in the
+measured native probe, while sequential refusal and an `n > 1` async call from a
+worker thread can still log item text. Items already queued in a native pool may
+keep running author callables after the run ended; their LM calls stay refused. An
+author's own `await asyncio.to_thread(...)` that fails to start a thread in the
+Worker is also reported as `unsupported`, and an error re-raised or wrapped
+without the `Thread.start` frame still ends `executor_error`.
+Chromium, Firefox, WebKit, real models and other DSPy versions are unmeasured.
+Use sequential `await module.acall(...)` loops; the branch journal remains a
+separate follow-up. See the [tests and limits](../../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
+This ADR remains Proposed.
 
 ### DSPy sync entry points and runtime optimizers spike (2026-11)
 

@@ -38,12 +38,22 @@ given an in-Worker plain `dspy.LM` remain unmeasured. See the
 [predictions and observations](../tests/conformance/README.md#dspy-sync-entry-points-and-runtime-optimizers-spike)
 and [offline recipe](../packages/adapter-pyodide/README.md#runtime-optimizers-and-the-offline-recipe).
 
+On 2026-11-12, DSPy thread-pool fan-out gained fixed `unsupported` refusal in
+native CPython and Node Pyodide. `Parallel` and `Evaluate`, including their default
+thread count, end without model or capability requests; author catches cannot
+turn an attributed LM refusal into a successful fallback. Supported programs keep
+their snapshot bytes, replay and outputs. Chromium, Firefox, WebKit, real models
+and other DSPy versions remain unmeasured. Raw author-created threads remain
+unattributed natively; a caught thread-start error is invisible to the executor.
+`galaxie-fv4.3.17` remains the path to supported async fan-out. See the
+[refusal evidence and limits](../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
+
 On 2026-11-11, the DSPy parallel and threaded Evaluate spike recorded
 **alternative** for `dspy.Parallel` and **alternative** for threaded `Evaluate`,
 with a proven test-only branch journal design. Neither API gains shipped support.
-Native thread-pool calls silently return `None` entries or score 0.0; the Node
-Pyodide Worker ends them with `executor_error`, and single-thread synchronous
-calls end `unsupported` in both lanes. Plain single-call `asyncio.gather` replay
+Its native silent `None`/score 0.0 results and Node `executor_error` observations
+are superseded by the fixed refusal above; single-thread synchronous calls still
+end `unsupported` in both lanes. Plain single-call `asyncio.gather` replay
 passed in Node but failed natively because DSPy can suspend before journal entry;
 multi-call re-dispatch can repeat a write before `unrecoverable`. Use a sequential
 loop of `await module.acall(...)` today. The candidate passes the measured parity,

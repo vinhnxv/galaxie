@@ -109,10 +109,12 @@ test(
 
 test.each(
   parallelScenarios.filter(
-    (name) => name.startsWith('par-verbatim-') && name !== 'par-verbatim-thread-start',
+    (name) =>
+      (name.startsWith('par-verbatim-') && name !== 'par-verbatim-thread-start') ||
+      name.startsWith('par-refuse-'),
   ),
 )(
-  'Node Pyodide characterizes the verbatim API: %s',
+  'Node Pyodide refuses verbatim fan-out and propagated contexts: %s',
   async (name) => {
     const worker = await fixture(name);
     try {
@@ -121,10 +123,8 @@ test.each(
       });
       observe(name, 'shipped', result);
       expect(result.error).toEqual({
-        code: name.endsWith('sequential') ? 'unsupported' : 'executor_error',
-        message: name.endsWith('sequential')
-          ? 'This operation is unsupported.'
-          : 'The executor or agent code failed.',
+        code: 'unsupported',
+        message: 'This operation is unsupported.',
       });
       expect(result.modelLabels).toEqual([]);
       expect(result.calls).toEqual([]);

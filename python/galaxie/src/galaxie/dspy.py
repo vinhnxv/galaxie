@@ -9,6 +9,8 @@ import json
 import math
 import os
 import re
+import threading
+import weakref
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import aclosing
 from contextvars import ContextVar
@@ -25,6 +27,7 @@ from ._bridge import ERROR_MESSAGES, MAX_BYTES, GalaxieError, _model_reply, requ
 
 
 _STATE_BINDING = 'stateBinding'
+_RUN_KEY = 'galaxie_run'
 
 
 def state_binding(root: str | Path) -> str | None:
@@ -182,6 +185,18 @@ class _Run:
 
 _run: ContextVar[_Run | None] = ContextVar('galaxie_dspy_run', default=None)
 _tool_name: ContextVar[str | None] = ContextVar('galaxie_dspy_tool_name', default=None)
+
+
+def _foreign_run() -> _Run | None:
+    handle = dspy.settings.get(_RUN_KEY)
+    return handle() if handle is not None else None
+
+
+def _refuse_foreign() -> None:
+    # DSPy's pool copies its settings, but not the run ContextVar.
+    if _run.get() is None and (run := _foreign_run()) is not None:
+        run.record('unsupported')
+        raise _Termination('unsupported')
 
 
 def _json(value: Any) -> Any:
@@ -383,6 +398,7 @@ class _TextFramer:
 
 class _SyncEngine:
     def complete(self, value: Request) -> Response:
+        _refuse_foreign()
         raise _LMError('unsupported')
 
 
@@ -391,6 +407,7 @@ class _AsyncEngine:
         self.role, self.native = role, native
 
     async def complete(self, value: Request) -> Response:
+        _refuse_foreign()
         run = _run.get()
         try:
             options = _options(value, self.native)
@@ -414,6 +431,7 @@ class _AsyncEngine:
             raise _LMError(error.code) from None
 
     async def stream(self, value: Request) -> AsyncIterator[Any]:
+        _refuse_foreign()
         run = _run.get()
         task = None
         try:
@@ -513,6 +531,7 @@ class GalaxieLM(dspy.LM):
         return {'stop', 'tool_choice'} if self.native_tools else {'stop'}
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        _refuse_foreign()
         run = _run.get()
         if run is not None:
             run.check()
@@ -520,6 +539,7 @@ class GalaxieLM(dspy.LM):
         raise _LMError('unsupported')
 
     async def acall(self, prompt: Any = None, *, messages: Any = None, **kwargs: Any) -> Any:
+        _refuse_foreign()
         run = _run.get()
         if run is not None:
             run.check()
@@ -575,6 +595,17 @@ def _exception_leaves(error: BaseException) -> list[BaseException]:
     if isinstance(error, BaseExceptionGroup):
         return [leaf for child in error.exceptions for leaf in _exception_leaves(child)]
     return [error]
+
+
+def _thread_start_failed(error: BaseException) -> bool:
+    for leaf in _exception_leaves(error):
+        if isinstance(leaf, RuntimeError):
+            traceback = leaf.__traceback__
+            while traceback is not None:
+                if traceback.tb_frame.f_code is threading.Thread.start.__code__:
+                    return True
+                traceback = traceback.tb_next
+    return False
 
 
 def error_code(error: BaseException) -> str:
@@ -827,7 +858,7 @@ class Executor:
             inputs = self.input(value) if self.input else value
             if not isinstance(inputs, dict):
                 raise GalaxieError('unsupported')
-            with dspy.context(lm=self.lm, adapter=self.adapter, disable_history=True, trace=None, callbacks=[]):
+            with dspy.context(lm=self.lm, adapter=self.adapter, disable_history=True, trace=None, callbacks=[], **{_RUN_KEY: weakref.ref(run)}):
                 if streaming:
                     result = await self._stream_prediction(inputs, run)
                 else:
@@ -854,6 +885,8 @@ class Executor:
                     run.check()
                     return None
                 code = error_code(error)
+                if code == 'executor_error' and _thread_start_failed(error):
+                    code = 'unsupported'
             except BaseException as terminal:
                 code = run.failure or error_code(terminal)
             state.pending = None

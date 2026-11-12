@@ -4,11 +4,13 @@
 """Scripted fan-out programs shared by native and Worker spike lanes."""
 
 import asyncio
+import contextvars
 from concurrent.futures import ThreadPoolExecutor
 import threading
 from typing import Any
 
 import dspy
+from dspy.dsp.utils.settings import dotdict, thread_local_overrides
 from galaxie.dspy import Executor, GalaxieLM, capability_tool, request_interaction
 
 LABELS = ('alpha', 'beta', 'gamma')
@@ -80,6 +82,15 @@ def program(name: str, *, lm: Any = None, tool: Any = None, interaction: Any = N
         async def aforward(self, question: str) -> dspy.Prediction:
             if name == 'par-verbatim-thread-start':
                 return dspy.Prediction(**thread_probe())
+            if name == 'par-refuse-context':
+                parent = thread_local_overrides.get().copy()
+                def worker():
+                    thread_local_overrides.set(dotdict({**thread_local_overrides.get(), **parent}))
+                    return self.predict(question=question)
+                try:
+                    contextvars.Context().run(worker)
+                except BaseException:
+                    return dspy.Prediction(answers=['fallback'])
             if name.startswith('par-verbatim-'):
                 threads = 1 if name.endswith('sequential') else 3
                 examples = [dspy.Example(question=f'{label}:before', answer=f'{label}:before').with_inputs('question') for label in LABELS]

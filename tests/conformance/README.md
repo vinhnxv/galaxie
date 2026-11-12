@@ -1019,6 +1019,10 @@ On 2026-11-11 the recorded outcome is **alternative** for `dspy.Parallel` and
 test-only design. Use a sequential loop of `await module.acall(...)` today.
 Neither verbatim API nor the candidate gains shipped support in this spike.
 
+The R0 verbatim rows below were superseded on 2026-11-12 by the
+[shipped thread-pool refusal](#dspy-thread-pool-fan-out-refusal). The dated spike
+observations and predictions remain unchanged.
+
 The [fixed rule and predictions](cases-dspy/parallel-fixtures.json) were committed
 before Node measurements. An unmeasured required criterion fails. Per gap, the
 rule chooses verbatim support only after parity, replay, writes once,
@@ -1164,6 +1168,82 @@ DSPy folder passes 172 tests. The new Node lane passes 31 tests, and the six
 existing Node suites pass 94 with one opt-in measurement skipped. Both recorder
 checks pass (38 native cases; five states and seven native state cases).
 
+## DSPy thread-pool fan-out refusal
+
+On 2026-11-12, threaded `dspy.Parallel` and `dspy.Evaluate`, including the default
+thread count, gained fixed `unsupported` refusal. They no longer quietly return
+`None` entries or score 0.0 natively, or the generic `executor_error` in the Worker.
+The error message is exactly `This operation is unsupported.` All refusal rows
+below have zero model requests, capability calls, orphan tasks and requests after
+termination; Node also records zero Worker errors and only loopback asset requests.
+Evidence uses scripted replies on DSPy 3.4.1, CPython 3.14.5, Node 24.15.0,
+Pyodide 314.0.7 and pnpm 11.21.0.
+
+| Scenario | PR #214 native / Node observation | Current native observation | Current Node observation |
+| --- | --- | --- | --- |
+| `par-verbatim-parallel-threads` | Three `None` entries / `executor_error` | `unsupported` | `unsupported` |
+| `par-verbatim-evaluate-threads` | Score 0.0, three empty predictions / `executor_error` | `unsupported` | `unsupported` |
+| `par-verbatim-parallel-sequential` | `unsupported` / `unsupported` | `unsupported` | `unsupported` |
+| `par-verbatim-evaluate-sequential` | `unsupported` / `unsupported` | `unsupported` | `unsupported` |
+| `par-verbatim-thread-start` | Thread/pool both started / both `RuntimeError` | Both started; zero requests | Both `RuntimeError`; zero requests |
+| `par-refuse-context` | Not measured | `unsupported` despite author `except BaseException` | Same fixed refusal |
+
+`par-refuse-context` copies DSPy's settings into an empty Context without starting
+a thread, then swallows the LM exception. The run still ends `unsupported`.
+Native unit tests additionally cover real pools, default thread counts,
+`max_errors=1`, `Exception`/`BaseException` catches, async LM calls from DSPy pool
+workers, engine completion/streaming with lost context, grouped thread-start
+errors, cleanup and a second supported run on the same executor. An ordinary
+author `RuntimeError` keeps `executor_error`.
+
+The threaded Parallel probe captures logger `dspy.utils.parallelizer`: **zero
+records**, with **no example question text** logged. `_Termination` bypasses its
+`Exception` handler. The sequential control still logs item text through DSPy;
+galaxie neither adds diagnostic text nor suppresses DSPy logging.
+
+Two snapshot pairs captured twice before the source edit now pin literal paused
+and completed checkpoint/metadata bytes. Both recorder checks and the unchanged
+native candidate, async fan-out, runtime, state and Node regression suites protect
+supported behavior. No golden, matrix, lock, recorder, journal key or core contract
+changes. The fixture adds only the new scenario name; its spike predictions stay
+historical.
+
+Residual limits: raw author-created threads without DSPy's propagated settings are
+unattributed natively; a thread-start error caught by author code is invisible to
+the executor. Stale settings hold only a weak reference and cannot affect a later
+run. Any `RuntimeError` raised inside `Thread.start`, including misuse, maps to
+`unsupported` if it reaches the executor. Chromium, Firefox, WebKit, real models
+and other DSPy versions are **unmeasured** for these probes. Thread-pool fan-out
+remains unsupported; use sequential `await module.acall(...)` loops. Supported
+async fan-out remains follow-up `galaxie-fv4.3.17`. ADR-0012 controls are unchanged.
+
+### Reproduce the thread-pool refusal
+
+Run from the repository root except where `cd python` is shown. Rebuild the wheel
+before Node tests; recorder commands always require `--check`.
+
+```sh
+cd python
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest galaxie/tests/test_dspy.py galaxie/tests/test_dspy_state_binding.py galaxie/tests/test_dspy_gate.py galaxie/tests/test_dspy_lint.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_parallel_baseline.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_parallel_candidate.py ../tests/conformance/cases-dspy/test_dspy_runtime.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy -q
+cd ..
+python/.venv/bin/python scripts/record-dspy-conformance.py --check
+python/.venv/bin/python scripts/record-dspy-state-conformance.py --check
+pnpm run typecheck:python
+node scripts/build-python-wheels.ts
+pnpm exec vitest run --project node tests/conformance/dspy-parallel.node.test.ts
+pnpm exec vitest run --project node tests/conformance/dspy-runtime.node.test.ts tests/conformance/dspy.node.test.ts tests/conformance/dspy-restore.node.test.ts tests/conformance/dspy-state.node.test.ts tests/conformance/dspy-state-restore.node.test.ts tests/conformance/dspy-state-bind.node.test.ts tests/conformance/dspy-state-limits.node.test.ts
+pnpm run check:docs
+pnpm format
+pnpm lint
+pnpm typecheck
+pnpm typecheck:ts6
+VITEST_MAX_WORKERS=4 pnpm check
+git diff --name-status main
+```
+
 ## DSPy sync entry points and runtime optimizers spike
 
 The 2026-11-11 spike records sync entry points **refused**, model-calling runtime
@@ -1234,7 +1314,7 @@ measured behavior under shipped code; promotion to golden cases is separate work
 | Evidence | Reused or new | Lanes and scope |
 | --- | --- | --- |
 | No-run sync LM and sync-only module refusal, `python/galaxie/tests/test_dspy.py` | Reused | Native regression |
-| #214 sequential Parallel/Evaluate refusal; thread/pool errors and native silent-swallow finding | Reused | Native/Node; existing tests unchanged; follow-ups `galaxie-fv4.3.17` and `galaxie-fv4.3.18` |
+| #214 sequential Parallel/Evaluate refusal; thread/pool errors and native silent-swallow finding | Reused | Historical native/Node results; the two verbatim expectation tests were superseded on 2026-11-12 by the [thread-pool refusal](#dspy-thread-pool-fan-out-refusal). Async fan-out remains follow-up `galaxie-fv4.3.17`. |
 | #196 seven offline-state cases, size bounds and round-trip catalog | Reused | Native/Node regressions rerun; prior Chromium evidence, no new state cases |
 | #213 descriptor JSON binding of paused sessions | Reused | Prior native/Node/Chromium evidence; native/Node regressions rerun |
 | Fourteen `rt-*` scenarios above | New | Native and Node only |

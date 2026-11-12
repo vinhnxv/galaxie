@@ -435,6 +435,10 @@ JSON output. Bind predictors to `GalaxieLM(role)` and call capabilities through
 LM uses the existing bridge v2 text/tool-call fields; JavaScript checks raw text
 and arguments before ChatAdapter, JSONAdapter or ReAct parses them.
 
+Thread-pool fan-out through `dspy.Parallel` or `dspy.Evaluate` is refused with
+fixed `unsupported`: the Worker cannot start threads, and a synchronous LM entry
+cannot await the bridge. Use sequential `await module.acall(...)` calls instead.
+
 `streaming`, `interrupts`, `resume` and `checkpoints` are true; `subgraphs` is
 false. Nested modules have no checkpoint namespaces, interrupt propagation or
 nested stream paths: a pause unwinds the whole program. Sync entry points are
@@ -449,9 +453,12 @@ unsupported. See the [provider recipes and limits](#provider-strings-schema-outp
 The parallel spike records **alternative** for `dspy.Parallel` and **alternative**
 for threaded `Evaluate`: use a sequential loop of `await module.acall(...)` today.
 The branch-keyed replacement is a proven test-only design awaiting implementation.
-With several threads the verbatim APIs end `executor_error` in Node Pyodide;
-natively they can silently return `None` entries or score 0.0. With one thread
-both end `unsupported`. Plain single-call `asyncio.gather` replays in the measured
+Threaded verbatim calls, including the default thread count, now end fixed
+`unsupported` in native CPython and Node Pyodide, with zero model or capability
+requests. With one thread both still end `unsupported`. Raw author-created threads
+are not attributed natively, and a thread-start error caught by author code is
+invisible to the executor. See the [shipped refusal evidence](../../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
+Plain single-call `asyncio.gather` replays in the measured
 Node cases but fails natively; multi-call re-dispatch can repeat a write before
 `unrecoverable`. Author code must be deterministic apart from journaled calls.
 Chromium, Firefox, WebKit, real models, other DSPy versions and successful streaming,
