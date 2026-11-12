@@ -1034,6 +1034,8 @@ Shipped verification:
 
 ### Async branch-helper shipping refusal
 
+The gate question is decided in the [next subsection](#divergence-persistence-decision).
+
 On 2026-11-13, the attempt to ship a keyed async helper records **refused**.
 The proposed helper was withdrawn; no public `galaxie.dspy.branches` API ships.
 Use a sequential loop of `await module.acall(...)` and keep code outside
@@ -1076,6 +1078,77 @@ New Chromium fan-out live/reload probes, Firefox, WebKit, real models and other
 DSPy versions remain unmeasured. Existing goldens, matrices, recorders, locks and
 production source are unchanged. A supported helper needs a separately scoped
 decision about divergence persistence before another shipping attempt.
+
+### Divergence persistence decision
+
+On 2026-11-13, the outcome is **accepted** for the existing poison checkpoint
+and the revised acceptance gate for a later helper. The helper still does not
+ship; retrying it is separately scoped. [ADR-0018](../../docs/adr/0018-python-agents-through-pyodide.md#dspy-divergence-persistence-decision-2026-11)
+records the decision and rejected driver change.
+
+The native [sequential pin](cases-dspy/test_dspy_divergence_persistence.py)
+pauses after a capability call, then resumes with that call's input changed or
+the call removed. Both return fixed `unrecoverable` before any further model or
+capability request. Every earlier row and write stays byte-identical. Exactly
+one checkpoint is appended with the next 20-digit revision and the previous
+latest id as `parentId`: `status: unrecoverable`, `input: null`, `journal: []`,
+metadata keys `v`, `dspy`, `adapter`, `session`, and one `__interrupt__` write
+at index -3 whose JSON value is null. The stores do not retain `interruptIds`.
+A fresh driver with the original program refuses its pending read without
+requests or another write. An unchanged-program control resumes and completes
+without a poison checkpoint. This new sequential pin is native-only; the
+native and Pyodide lanes execute the same driver string.
+
+The [native branch pin](cases-dspy/test_dspy_fanout.py) asserts the same marker
+shape for a changed request and a removed branch. The
+[Node Pyodide pin](dspy-fanout.node.test.ts) removes a branch in a fresh Worker
+and checks the marker, earlier rows/writes and zero further requests. A third
+Worker using the original sources still gets `unrecoverable`, with no model or
+capability requests, post-termination requests or added row. Both lanes check
+that restoring the original program preserves the poisoned rows and writes.
+
+Runtime divergence and restore-time refusal have different persistence rules:
+`_Run.begin`/`_Run.frontier` refuse mismatched replay before further dispatch,
+then `Executor.run` clears the session and the registered
+[driver](../../packages/adapter-pyodide/src/dspy-driver.ts) commits the poison
+marker. Unknown entry keys, malformed records and metadata/binding mismatches
+fail before registration and write nothing. The unchanged
+`test_old_reader_refuses_branch_records_without_changing_stored_rows` in
+[the candidate tests](cases-dspy/test_dspy_parallel_candidate.py) pins the
+restore-time path; malformed-record tests in that file remain part of the run.
+
+The marker prevents later retry of a divergent program, including the earlier
+unkeyed crash probe's repeat-write class (`alpha` under another scope). Requiring
+the complete row set to stay unchanged adds no protection; it preserves rollback
+resumability, which sequential programs also lose after runtime divergence.
+Suppressing the marker for branches would require production changes and a
+branch-specific rule that leaves divergence retryable. That option is rejected.
+The cost is loss of the session even under the original program: the user must
+start over. The revised helper gate therefore requires zero further requests,
+unchanged earlier rows/writes, one compact marker after the divergent execution
+and refused later restores; restore-time refusals still require no new row.
+
+The sequential probe also observed a second compact marker after a second execute
+on the poisoned session in the same driver, with zero requests. Marker counts
+after repeated executes are deliberately not asserted. Hosts stop at the refused
+pending read; bounding repeated markers is a separate follow-up.
+
+Focused verification (give DSPy commands a timeout of at least 900000 ms):
+
+```sh
+cd python
+.venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_divergence_persistence.py -q
+.venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_fanout.py ../tests/conformance/cases-dspy/test_dspy_parallel_candidate.py -q
+cd ..
+pnpm exec vitest run --project node tests/conformance/dspy-fanout.node.test.ts
+```
+
+Evidence is scripted on DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide
+314.0.7. Chromium, Firefox, WebKit, real models and other DSPy versions remain
+unmeasured for this decision. Checkpoint validation establishes consistency,
+not integrity; metadata is unauthenticated. ADR-0012 controls, production source,
+checkpoint formats and existing goldens, matrices, fixtures, recorders and locks
+are unchanged.
 
 ### Original spike record
 
