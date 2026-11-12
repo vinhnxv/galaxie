@@ -1537,3 +1537,41 @@ These characterization tests add no golden cases, so all existing case counts,
 golden bytes and restore assertions remain unchanged. New Python and Go browser
 behavior, full routed Workflow replacement, Firefox, WebKit and real models are
 unmeasured; the fixed-rule table distinguishes skipped gates from passes.
+
+### ADK model, toolset and built-in tool measurements
+
+The [pre-registered rule and measured gate table](../../docs/adr/0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11)
+record model and static-toolset **ALTERNATIVE** outcomes on all three executors,
+with network built-ins, code executors and planners **REFUSED**. No runtime source,
+public API or stored format changes, and no golden cases are added: the existing
+12 JavaScript, 39 Python and 22 Go golden cases retain their bytes and registrations.
+
+Native Python evidence is `cases-adk-python/test_adk_python_models_toolsets_builtin.py`
+(nine tests). Executor evidence is `python/galaxie/tests/test_adk_model_strings.py`
+and `test_adk_toolsets_builtin_tools.py` (44 tests); the unchanged 208-test executor
+suite also passes. The new JavaScript files `model-strings-native.test.ts`,
+`model-strings-measure.test.ts`, `toolsets-builtin-native.test.ts` and
+`toolsets-builtin-measure.test.ts` run 60 executions across Node and Chromium;
+adding unchanged `validate.test.ts` gives 78. Go's `model_toolset_shapes_test.go`
+and `model_toolset_internal_test.go` cover native toolsets, explicit-model parity,
+provider-only tools, real refusal values, fixed-list expansion, confirmation,
+interaction identity and unchanged effect scopes; `pnpm run test:go` includes race
+checks and native conformance.
+
+Two predictions changed the outcome: JavaScript's second real prepare refuses a
+previously mapped shared tree, and Go's explicit-model replacement passes even
+though native strings do not exist. Every converter refuses provider tool config
+instead of silently dropping it. Python caches toolsets per invocation; JavaScript
+expands per request. Partial support gates are recorded as such and do not establish
+new-shape durability or full acceptance. No new Python/Go Worker-specific probe,
+Firefox, WebKit, real model or device measurement was run. External network
+toolsets and cloud/container execution remain unmeasured.
+
+Reproduce from the repository root:
+
+```sh
+pnpm run test:python ../tests/conformance/cases-adk-python/test_adk_python_models_toolsets_builtin.py
+pnpm run test:python galaxie/tests/test_adk_model_strings.py galaxie/tests/test_adk_toolsets_builtin_tools.py
+pnpm exec vitest run packages/adapter-adk/test/model-strings-native.test.ts packages/adapter-adk/test/model-strings-measure.test.ts packages/adapter-adk/test/toolsets-builtin-native.test.ts packages/adapter-adk/test/toolsets-builtin-measure.test.ts
+pnpm run test:go
+```

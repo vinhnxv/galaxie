@@ -20,6 +20,8 @@ Google modules), BSD-3-Clause modules (`golang.org/x/*`, protobuf, `wasm_exec.js
 BSD-2-Clause ones; `wasm.lock` has the license of each. Build with the command in the
 [adapter README](../packages/adapter-go/README.md#build-and-licenses).
 
+The [model/toolset porting recipes](../packages/adapter-go/README.md#porting-models-and-static-toolsets) describe the measured explicit-model and flat capability-list alternatives; no new constructor ships. Provider-native tools, planners and code executors remain refused or absent at the pinned version.
+
 ## Commands
 
 Install Go 1.27.3 (CI uses the version in `go.mod`). From the repository root:

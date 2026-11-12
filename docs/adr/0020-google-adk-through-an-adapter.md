@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes.
 
 ## Context
 
@@ -21,7 +21,7 @@ ADR-0017 asks each framework to arrive as its own executor adapter without a cor
 1. **A new package.** `@galaxie-ai/adapter-adk` implements `ExecutorAdapter` with id `adk-js`. Core keys executors by id and records `executorId` in `RecoverySession`, so core needs no change and never names ADK.
 2. **One bundle, one specifier.** The adapter imports `@google/adk` only. The `browser` export condition resolves it to `dist/web/index_web.js`. No `@google/adk/...` subpath is imported at runtime (`a2a`, `tools/mcp`, `tools/webmcp`, `sessions/database`, `artifacts/gcs`, `telemetry/gcp`, `agents/agent-engine`), and `@google/genai` is imported only as a type, because the bundle inlines its own copy. `scripts/check-dependencies.ts` enforces both rules. The peer and development dependency is exactly `@google/adk` 2.3.0, the newest release that satisfies the workspace `minimumReleaseAge` on the day this ADR was written. A bump is separate work that re-runs the symbol-presence and bundle-hash tests and the conformance lane.
 3. **The adapter owns the Runner.** The agent factory receives a host object with `capabilities.call` and ADK helpers: a router-backed model (`GalaxieLlm extends BaseLlm`) and capability-backed tools. The adapter builds the `Runner`, a session service, no-op artifact, memory and credential services, one `ToolCallIntegrityPlugin` and the `RunConfig`. Authors never see the Runner and cannot supply plugins, services or a `RunConfig`.
-4. **Fail-closed tree validation.** At prepare the adapter walks the agent tree against a closed allow-list of agent classes (`LlmAgent`, `SequentialAgent`, `ParallelAgent`, `LoopAgent`). Every model and tool must be a member of a module-private registry the host fills when it creates them. ADK's brand guards test a forgeable `Symbol.for` brand and are not used for trust. `RemoteAgent`, `LangGraphAgent`, `RoutedAgent`, `Workflow`, `AgentTool`, author `BaseAgent` subclasses, toolsets, code executors and string or `Gemini` models fail `unsupported`. The [AgentTool wrapper spike](#agenttool-spike-2026-11) also remains refused: the proposed optional-tool-flag registry cannot enforce a read-only inner tree at prepare.
+4. **Fail-closed tree validation.** At prepare the adapter walks the agent tree against a closed allow-list of agent classes (`LlmAgent`, `SequentialAgent`, `ParallelAgent`, `LoopAgent`). Every model and tool must be a member of a module-private registry the host fills when it creates them. ADK's brand guards test a forgeable `Symbol.for` brand and are not used for trust. `RemoteAgent`, `LangGraphAgent`, `RoutedAgent`, `Workflow`, `AgentTool`, author `BaseAgent` subclasses, toolsets, code executors and string or `Gemini` models fail `unsupported`. The [model/toolset/built-in spike](#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11) records explicit-model and static-list alternatives without lifting these raw-shape refusals. The [AgentTool wrapper spike](#agenttool-spike-2026-11) also remains refused: the proposed optional-tool-flag registry cannot enforce a read-only inner tree at prepare.
 5. **Pauses end the run; resume is a new run.** ADK ends an invocation at a tool confirmation or a long-running tool and resumes when the next `runAsync` carries the matching `functionResponse`. The adapter maps one pause to one galaxie interaction whose ID is a digest of the conversation ID and the pause ordinal. The default resume fails closed: it confirms only on the exact action `approve`, denies only on `deny`, and fails `invalid` otherwise. ADK's confirmation processor and the integrity plugin stay enabled.
 6. **Effect scopes are positional.** Capability calls use `adk/<conversation-id>/<branch-or-root>/<branch-local-index>/<part-index>`. Function-call IDs never key an effect, because ADK invents IDs when a model omits them and local models reuse them. The adapter assigns every function-call ID itself.
 7. **Sessions are persisted through the byte-record port.** An in-memory `GalaxieSessionService` holds the event log. At each pause and at completion it writes one `adk.session/v1` record with an `__interrupt__` write through the existing scoped port, so fencing, retention, deletion and export rules apply. The saver's closed byte-executor set gains `adk-js`. A per-session random integrity key stored in that record lets restored events verify; it is never exported or logged.
@@ -700,3 +700,177 @@ and native Go for Go. Existing Worker/browser conformance remains regression
 coverage only; no new Python or Go nested-path browser behavior is claimed.
 Firefox, WebKit, real models and device checks remain unmeasured. A pinned ADK
 version change must rerun the native and executor measurement files.
+
+### String models, toolsets, code executors, planners and built-in tools spike (2026-11)
+
+#### Outcome rule registered before measurement (2026-11-12)
+
+Cells are gap letter plus executor: M-js, M-py, M-go, T-js and so on. Today every cell is refused at prepare (U1 re-verifies). Each candidate is the smallest shape a host could own. Native means the language's own ADK with its own `Runner`; galaxie means the executor lane. Each scenario uses scripted models and counted capability tools.
+
+| Gap | Candidate to measure | Stays refused regardless |
+| --- | --- | --- |
+| M string and Gemini models | An `LlmAgent.model` string exactly equal to a role declared for the run is replaced, before validation, by that role's host-created model (the same object the `llm(role)` helper returns) | any other string, `Gemini` and foreign model instances, name-sniffing aliases |
+| T toolsets | A toolset created and registered by the host, with a list fixed at creation made only of registered capability tools and no context-dependent output (measured with a test-local registration, no shipped helper) | MCP, OpenAPI, ApiHub, WebMCP, BigQuery and every author-defined or dynamic toolset |
+| X code executors | None is a plausible candidate; the gap measures why none qualifies | all executors |
+| L planners | None is a plausible candidate for `BuiltInPlanner`; `PlanReActPlanner` is measured once as the only prompt-and-response planner | all planners unless the gates pass |
+| N built-in network tools | None is a plausible candidate; the gap measures the missing governance seam | all built-in tools, `load_web_page`, author-built network tools |
+
+Gates. They are measured in the order listed, per executor. A gate passes only when the favourable condition holds (the seam exists, parity holds, the field is carried). GN1, GN2, GX2 and GL1 state a fact that is expected to be the failing result; the gate table records `fail` when that fact is observed, never `pass`.
+
+Gap M:
+
+- NM1 (native facts and oracle): record on native ADK how a string resolves (JavaScript `LLMRegistry.register` with `supportedModels`; Python `LLMRegistry.register` with `supported_models()`), whether resolution is at construction or lazy, whether `model` can be assigned after construction and takes effect (Python `_resolved_model` cache), and that a test-registered scripted class under a regex matching the role string runs the tree natively. That registered class is the parity oracle for GM3. NM1 fails when assignment is rejected or ineffective; the galaxie gates are then not applicable and M is decided by AL-M.
+- GM1 (exact admission at prepare): an exact declared role is accepted. These fail `unsupported` at prepare with zero requests: an undeclared string, `gemini-2.5-flash` with no such role, a case variant, leading or trailing whitespace, the empty string with no model above it, the display names `galaxie:<role>` and `galaxie/<role>`, a non-string non-model object, a `Gemini` instance, a foreign `BaseLlm`. GM1 requires the executor to know the declared roles at prepare. An executor that cannot refuse an undeclared string at prepare fails GM1.
+- GM2 (no ADK registry): a decoy model class registered natively under a pattern that matches the role string is never constructed in the galaxie lane; a spy on registry resolution sees zero calls; the registry's contents are identical before and after prepare and run.
+- GM3 (routing equivalence): the string-mapped tree and the same tree built with the explicit helper produce identical ordered request digests, outputs, stream events, step and budget counters, output-check calls, labels and effect scopes, and match the native decoy run in the existing conformance comparison.
+- GM4 (tree rules): strings at the root, on a child, mixed with model objects, inherited by a child with no model, and under a transfer parent behave as the helper-built tree does; a model-less agent with no model ancestor stays `unsupported`; one unmappable string refuses the whole tree before any call; exact-class refusals keep their codes (the class check runs first).
+- GM5 (author-object effects): a second `prepare` of the same objects is idempotent; the only mutation is the `model` field of agents in the prepared tree; a tree shared by two hosts with different roles fails closed for the second host (record the result); the ADK registry and any module-level state are untouched.
+- GM6 (name sniffing): with a host role named `gemini-2.5-flash`, the mapped model's name never satisfies ADK's Gemini-name predicates, and `GoogleSearchTool`, a planner and a code executor in the same tree are still `unsupported` at prepare.
+- GM7 (identity and durability): stored bytes (`adk.session/v1`; the Python and Go records), effect scopes and interaction IDs of the mapped run equal the helper-built run's, across a reload.
+- GM8 (unchanged artifacts): every existing golden, matrix entry and refusal test passes unmodified; the existing `'gemini-2.5-flash'` refusal rows still refuse (no role of that name is declared there).
+- AL-M (alternative): a documented porting table (`model='x'` becomes `host.adk.llm('role')`, `llm('role')`, `galaxie.Model("role")`, with the host declaring the role) runs in an executable test under the same script and matches the native decoy run.
+
+Gap T:
+
+- NT1 (native facts): record for an author-defined static toolset: per-request `getTools` calls, `tool_filter` list and callable, name prefix, `close()` at runner close, and the function declarations in the model request. Network toolsets (MCP, OpenAPI, WebMCP) are recorded as source facts only; nothing connects.
+- GT1 (fixed list): the test-local registered toolset yields only registered capability tools, a list fixed at creation, with no callable filter and a no-op `close`.
+- GT2 (request surface): names, order, descriptions and schemas in the model request equal the flat-list equivalent and the native toolset run.
+- GT3 (pause scan and effects): the pause-position rules see through the toolset (a confirmation-gated or long-running tool inside it is subject to the same refusals as in a flat list); capability calls, effect scopes and write-once counts equal the flat list's.
+- GT4 (refused neighbours): an unregistered toolset, MCP, OpenAPI and WebMCP toolsets, a callable filter, a toolset that returns an unregistered tool, a nested toolset and a toolset whose `getTools` throws each fail `unsupported` before any model call.
+- GT5 (no new surface): SUPPORTED needs no new exported symbol, option, descriptor field or bridge field. Creating a registered toolset needs a helper, so GT5 is expected to fail and the cell is then ALTERNATIVE.
+- AL-T (alternative): the documented recipe builds a flat list of capability tools from a table in the agent factory (for MCP-backed tools, from the host's `tools-mcp` capability bindings); under the same script it produces the same request surface and results as the native toolset. The docs state what has no replacement: per-turn dynamic lists and network toolsets.
+
+Gap N:
+
+- NN1 (native facts): a built-in tool run natively with a scripted model that names itself like a Gemini model records: no function call is made, no ADK tool body runs, the request config gains the provider tool entry; with a non-Gemini name the tool throws (JavaScript) or errors (Python).
+- GN1 (carriage): the galaxie router request has no field for provider tool config, so the entry would be dropped silently (record the request digest with and without the tool).
+- GN2 (governance seam): no broker call, grant, destination class or data label applies to the provider's server-side work; nothing in the lane can enforce ADR-0012 on it.
+- GN3 (refusal tests): one executable refusal per built-in family, per executor, with zero requests: search, URL context, Vertex or Discovery search, maps grounding, enterprise web search, `load_web_page` and an author function tool that calls `fetch`.
+- AL-N: ALTERNATIVE requires a replacement that runs under the same unchanged script and matches the native outcome. A built-in makes no function call natively, so a capability-tool replacement needs a different script and cannot qualify. The docs still point to `capabilityTool` over a host-bound read capability as the general way to give an agent network data, labelled as guidance and not as this cell's outcome.
+
+Gap X:
+
+- NX1 (native facts): record, with a scripted model, what each executor does with a model reply holding a code block (extra model turn, result fed back), what `BuiltInCodeExecutor` adds to the request, and which executors need a subprocess, a container or a cloud service.
+- GX1 (isolation seam): a probe shows whether model-written code can reach author scope or host capabilities (a sentinel variable and the `js` bridge in the Worker, the page globals in JavaScript); the Worker lane records whether a subprocess can start at all.
+- GX2 (carriage): `BuiltInCodeExecutor` configuration is dropped by the router request (as GN1).
+- GX3 (refusal tests): one executable refusal per executor family, per executor, with zero requests; Go records the absence of any executor field in `llmagent.Config` and the refusal of a `geminitool` code-execution tool.
+- AL-X: no replacement can run under the same script without an isolation boundary, so ALTERNATIVE is not available unless GX1 finds one.
+
+Gap L:
+
+- NL1 (native facts): record `BuiltInPlanner` (thinking config on the request) and `PlanReActPlanner` (instruction text, tagged reply parts, thought-marked events) on scripted runs.
+- GL1 (carriage and parity): thinking config is dropped by the router request; for `PlanReActPlanner` the streamed text, the final event and the stored event differ from a planner-less run under the same script.
+- GL2 (stored schema and output check): the retagged parts fit the closed stored-record schema and the output check sees the text before the split, or the gate fails.
+- GL3 (refusal tests): one per planner per executor, zero requests; Go records the absent field.
+- AL-L: an instruction-text replacement qualifies only if it runs under the same script and matches the final text.
+
+Decision rule, per cell:
+
+- SUPPORTED iff every gate of its family passes, measured; no new public surface (R5); the shipped change, conformance cases and new goldens landed; prepare validation updated at every enforcement point.
+- ALTERNATIVE iff not SUPPORTED (including because the SUPPORTED candidate would need new public surface), the replacement itself needs no new public surface, and the family's AL gate passes: a documented replacement whose executable test runs the same scripted model script unchanged and matches the author-observable result (final text, tool-call sequence, write-once host invocation count).
+- REFUSED otherwise. A failed or unmeasured gate never yields SUPPORTED. The cell keeps (or gets) an executable refusal test and the record cites the failing gate.
+- A failing native gate makes the matching galaxie gates not applicable.
+- A shape inside a gap but outside its candidate keeps an executable refusal test and does not change the cell's outcome word.
+
+Predictions (registered with the rule; U7 restates them beside the measured results and names every one that did not hold):
+
+- P1. Native facts: strings resolve through each language's `LLMRegistry` and `model` is assignable after construction on JavaScript and Python; built-in tools, executors and planners only edit the request or the response; ADK Go v1.9.0 has no string model, planner or code-executor field.
+- P2. M-js is SUPPORTED: `options.models.roles` is available at prepare, so GM1 to GM8 pass. M-py is ALTERNATIVE: the Worker driver does not know the declared roles at prepare, so GM1 fails for an undeclared string and the fix needs a bridge field (R5). M-go is REFUSED: Go has no string form, and a foreign `model.LLM` is the bypass the type assertion closes.
+- P3. T-js, T-py and T-go are ALTERNATIVE: GT1 to GT4 pass on the test-local registration, GT5 fails (a helper is needed), and the flat-list recipe passes AL-T.
+- P4. N-js, N-py and N-go are REFUSED: GN1 and GN2 fail, AL-N cannot hold.
+- P5. X-js, X-py and X-go are REFUSED: GX1 finds no isolation boundary (and no subprocess in the Worker), GX2 drops `BuiltInCodeExecutor`; X-go is refused by source absence.
+- P6. L-js and L-py are REFUSED for both planners (thinking config dropped; `PlanReActPlanner` fails GL1 or GL2); L-go is REFUSED by source absence. A deviation is possible if an instruction-only replacement matches the final text (then ALTERNATIVE).
+- P7. Overall: at least one SUPPORTED (M-js) and several ALTERNATIVE, so U8 lists follow-ups. Firefox, WebKit, real models and Worker-hosted JavaScript stay unmeasured.
+
+Additive entries in measured executors' matrices and conformance case lists, new fixtures, registrations and golden files are permitted; existing entries, fixtures, goldens and locks stay byte-identical, with documentation of changed refusal reasons recorded separately.
+
+#### Measured outcome (2026-11-12)
+
+The outcome rule was committed as `53756d2` before any probe ran. Native Python
+measurements are in `2d79843`, Python executor measurements in `94ebad4`,
+JavaScript measurements in `688d41c`, and Go measurements in `8f180f0`.
+The rule and predictions above remain unchanged. All fifteen cells were reached,
+in Python, JavaScript, Go order; no cell established SUPPORTED. No runtime source,
+public API, bridge field, stored schema, identity derivation or feature flag changes.
+No new golden or conformance case is needed for these alternatives and refusals.
+
+| Gap | Python | JavaScript | Go |
+| --- | --- | --- | --- |
+| M: string and foreign models | **ALTERNATIVE**: explicit `llm(role)`; no prepare-time role inventory | **ALTERNATIVE**: explicit `host.adk.llm(role)` in a fresh factory; repeated prepare fails the candidate's idempotence gate | **ALTERNATIVE**: explicit `galaxie.Model(role)` matches the native foreign scripted model; native strings do not exist |
+| T: toolsets | **ALTERNATIVE**: flat capability list | **ALTERNATIVE**: flat capability list | **ALTERNATIVE**: flat capability list |
+| N: built-in network tools | **REFUSED**: provider tool config cannot cross the model boundary | **REFUSED**: provider tool config cannot cross the model boundary | **REFUSED**: provider tool config cannot cross the model boundary |
+| X: code executors | **REFUSED**: no established execution isolation | **REFUSED**: no established execution isolation in the web surface | **REFUSED**: no native executor field; provider code tool refused |
+| L: planners | **REFUSED**: thinking config lost; tagged final differs | **REFUSED**: thinking config lost; tagged final differs | **REFUSED**: no native planner field |
+
+Gate results below distinguish characterization evidence from complete acceptance
+proof. An observed fixed-list expansion is not a shipped toolset helper. A failed
+carriage gate is not permission to bypass the converter.
+
+| Executor / gates | Observed facts | Result |
+| --- | --- | --- |
+| Python NM1 | Native registry resolution is lazy, inherited and cached by string; changing the string or assigning a model object takes effect. An unregistered string fails at the first call. | Pass |
+| Python GM1 | `llm('undeclared')` prepares without any role inventory. A pre-pass cannot establish exact declared-role admission without a new bridge field. Unmapped strings and foreign models refuse with zero requests. | Fail |
+| Python GM2–GM8 | No string mapping ships; full registry, equivalence, tree, mutation, name, durability and acceptance gates are skipped. | Not measured: outcome fixed by GM1 |
+| Python AL-M | Explicit helper and native scripted model both finish `done` under the unchanged one-reply script, with one routed model request and no tool call. Independent name probe: `galaxie/gemini-2.5-flash` satisfies ADK's Gemini predicate. | Pass; choose non-provider role names |
+| JavaScript NM1 | Registry resolution is lazy; a model-less child inherits and assignment takes effect. The isolated decoy test restores both the registry and its resolution cache. | Pass |
+| JavaScript GM1, GM2 | Exact declared strings map to the host's own object. Unknown/case/space/display names, objects and foreign models refuse; the undeclared Gemini-looking string still refuses. Prepare and run make zero decoy constructions or registry calls and leave registry contents unchanged. | Pass for the measured candidate |
+| JavaScript GM3, GM4 | Mapped/helper checked streams, ordered text requests and leases agree. Root, child, mixed and inherited trees validate equally; a foreign subclass is not mutated, and one unknown child refuses the tree. Full conformance, budget/label and transfer-run coverage is not established by these focused checks. | Partial characterization; full acceptance not measured after GM5 |
+| JavaScript GM5 | A second real prepare of the same mapped agent objects fails `unsupported`: each prepare creates a fresh registry, while the first mapping left a model from the earlier host in the tree. A different host also fails closed. Repeating the pre-pass within one host is idempotent. | Fail |
+| JavaScript GM6–GM8 | No mapping ships, so new-shape name, reload/identity and complete acceptance gates are skipped. Independently, the `galaxie:` display name fails native search's name check, and built-ins, planner and executor still refuse with that role. | Not measured: outcome fixed by GM5 |
+| JavaScript AL-M | The helper-built fresh tree and candidate produce the native decoy's `done` under the unchanged one-reply script. Real checked streaming and requests agree. | Pass |
+| Go NM1, GM1–GM8 | `llmagent.Config.Model` is `model.LLM`, not assignable from a string; there is no registry string oracle. Foreign models are refused before requests. String-mapping acceptance gates have no native scenario. | Not applicable: native string form absent |
+| Go AL-M | Native foreign scripted model and `galaxie.Model("answer")` finish `done`, one model request and zero capability calls under the identical script. This replacement uses existing public surface. | Pass |
+| Python NT1 | A two-tool static set supports list/callable filters, prefixes and Runner-close cleanup. Expansion is cached once per invocation across two model requests. | Native facts recorded; per-request prediction false |
+| JavaScript NT1 | Static sets expand per request. The set applies its own list/callable filter; the tested `prefix` metadata does not rename declarations. Runner has no `close` method; invocation cleanup calls toolset `close`. | Native facts recorded |
+| Go NT1 | Static sets expand at least once per request and contribute native declarations; the interface has no Close method. | Native facts recorded; filter/prefix extensions unmeasured |
+| Python GT1–GT3 | Test-local registered fixed expansion equals a flat list, including confirmation, a single capability call, `adk-python/s/root/0/0` and Loop-pause refusal. Native and flat-list schemas match when the authored schema retains its titles. | Pass for the measured fixed shape |
+| JavaScript GT1–GT3 | Fixed registered capability expansion preserves declaration order and pause-position detection. Flat/grouped runs match native declarations and results; host-confirmed writes each execute once. Full new-helper effect/reload acceptance is not established. | Partial characterization |
+| Go GT1–GT3 | Test-local registered expansion preserves confirmation, model requests, one capability call, `adk-go/c/root/1/0`, interaction ID and refusal of a Parallel pause. Native/flat declarations and final text match. | Pass for the measured fixed shape |
+| All GT4 | Unregistered sets remain refused. Python tests callable-filter, foreign/nested/throwing and OpenAPI neighbours; JavaScript tests WebMCP, dynamic/nested/throwing neighbours; Go checks unregistered/foreign contents. Python MCP cannot import in the locked environment (`mcp` absent); no external toolset connects. Exhaustive network-toolset construction is not acceptance-tested. | Refusal evidence; full gate not measured after GT5 |
+| All GT5 | No public registered-toolset helper exists; creating one would add public surface forbidden by this spike. | Fail |
+| All AL-T | Flat capability lists run the same native tool-call/final-text scripts, with the same declaration surface, one host invocation and result. Per-turn dynamic lists and network toolsets have no proven replacement. | Pass for static lists |
+| All NN1 | Native search and provider code tools add provider config without a function call; no provider service executes. Python/JavaScript reject non-Gemini search names. | Native facts recorded |
+| All GN1 | The router has no provider-tool field. Contrary to the silent-drop prediction, JavaScript `openAiTools`, Python `_tool_definitions` and Go `RequestToWire` reject that configuration as `unsupported`. Python verifies zero bridge requests. | Fail: no carriage |
+| All GN2 | Provider-side governance is not measured after the failed carriage gate. | Not measured: outcome fixed by GN1 |
+| All GN3, AL-N | Prepare refusals cover search, URL, retrieval/Vertex, maps, enterprise and author tools where present. Python covers `load_web_page`; it is absent from the JavaScript web exports. Native built-ins make no function call, so a capability replacement would change the script. | Refusals pass; AL-N fails |
+| Python NX1, GX1 | Built-in execution adds provider config. Native unsafe execution starts a subprocess, reads an author sentinel file and feeds the result back as text. This does not establish isolation; Worker subprocess and cloud/container execution were not run. | GX1 fails to establish an isolation seam |
+| JavaScript NX1, GX1 | Built-in execution adds provider config. UnsafeLocal/Container executors are absent from the pinned web exports; their Node sources require child processes/containers. A trusted executor callback can read the author's global sentinel. No generated JavaScript or eval runs in this probe. | GX1 fails to establish an isolation seam |
+| Python/JavaScript GX2, GX3, AL-X | Carriage is skipped after the failed isolation gate. Built-in executor refusals pass; Python also refuses UnsafeLocalCodeExecutor. Other cloud/container families have source facts only. No same-script isolated replacement is established. | GX2 not measured: outcome fixed by GX1; AL-X fails |
+| Python/JavaScript NL1, GL1 | Native thinking adds provider config which the routed call omits. PlanReAct retags thoughts and yields final `done`; a planner-less run of the identical tagged reply retains the tags. Python strips planning tags from the thought; JavaScript retains them. | GL1 fails |
+| Python/JavaScript GL2, GL3, AL-L | Full stored-schema/output-check retagging acceptance is skipped. Both planners refuse at prepare with zero requests. An instruction-only replacement retains the tagged reply and does not match native final text. | GL2 not measured: outcome fixed by GL1; GL3 passes; AL-L fails |
+| Go NX1/GX, NL1/GL | Reflection proves there is no executor or planner field. A `geminitool` code tool fails `unsupported` before requests. There is no same-script planner/executor replacement. | Source absence; runtime gates not applicable; AL-X/AL-L fail |
+
+Premise checks passed unchanged before measurement: 64 JavaScript Node/Chromium
+executions, 208 Python executor tests, six native Python refusal-shape tests and
+`go test ./galaxie`. Only JavaScript receives declared roles at prepare. Core does
+not reject a static role named `gemini-2.5-flash`. The fixture/example search found
+no accepted string-assigned model or restricted tool shape outside native/refusal
+probes; a scripted model's display name is not a string assignment to an agent.
+The missing Python refusal rows and Go foreign-model/real-toolset/built-in rows
+now have executable coverage. No descriptor field or reader changes.
+
+Predictions that did not hold: P2's M-js SUPPORTED fails GM5; its M-go REFUSED is
+superseded by a passing AL-M replacement even though native strings are absent.
+P3's outcomes hold, but complete GT1–GT4 acceptance was not established for every
+executor; the static alternatives pass independently. NT1's Python per-request
+expansion prediction fails. GN1/GX2's silent-drop prediction fails for provider
+tools: every converter rejects them. GN2 and GX2 were not independently measured
+after earlier failures, and P5's Worker subprocess claim remains unmeasured.
+JavaScript toolset prefix and lifecycle facts differ from Python. P7's claim of
+at least one SUPPORTED cell fails. P1's registry/assignment and Go field facts,
+P4's refusal outcomes and P6's planner refusals hold in the measured shapes.
+
+No executor remains unreached. A future support attempt must rerun these same
+fixed gates; partial evidence above cannot be promoted to a pass. Follow-up items
+belong in the PR for the orchestrator: fresh-tree-safe string mapping, prepare-time
+role inventories for bridge executors, host-owned fixed-toolset construction and
+complete admission/pause/reload gates, and broader browser coverage. No Beads
+writes were made. General network-data guidance is a host-bound read capability;
+it is not an ALTERNATIVE outcome for provider-native tools under the same script.
+
+New measurements use CPython 3.14.5/ADK 2.12.0, Node 24 and headless Chromium with
+ADK JavaScript 2.3.0, and native Go 1.27.3/ADK v1.9.0. Existing Worker and restore
+suites provide regression evidence only. Firefox, WebKit, real models, devices,
+Worker-hosted JavaScript, new Python/Go Worker-specific probes, exhaustive external
+toolsets, cloud/container execution and full skipped support gates remain
+unmeasured. A dependency bump reruns the native and executor measurements.
