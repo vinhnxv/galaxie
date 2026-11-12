@@ -63,3 +63,5 @@ Observed in stages AG2 to AG6 (scripted models only, no real model download; eve
 - Size and cold start, final reference module of stage AG6: 30,109,586 bytes stripped; Go ready after 94 ms on Node and 95 ms in headless Chromium (stage AG5: 30,070,117 bytes, 95 ms; stage AG1: 29,960,388 bytes, 86 ms). Both stay far inside the 48 MB and 10 s stop thresholds.
 
 Still open, so the status stays Proposed: a real-device measurement of boot, memory and first-token cost; a real-model run; the external developer trial; the integrity limits and carried-forward findings listed in [the unsupported list](../unsupported.md#google-adk-go).
+
+The [stream namespace spike](0020-google-adk-through-an-adapter.md#stream-namespaces-workflow-agents-and-subgraphs-spike-2026-11) records this executor's measured attribution and Workflow limits; its subgraphs flag and runtime remain unchanged.

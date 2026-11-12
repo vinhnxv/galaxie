@@ -890,6 +890,35 @@ invocation per write across reload, reversed arrival and failed-resume retry. `W
 pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) names fail
 `unsupported` at prepare. `subgraphs` stays false.
 
+### ADK message attribution
+
+The [stream namespace spike](../../docs/adr/0020-google-adk-through-an-adapter.md#stream-namespaces-workflow-agents-and-subgraphs-spike-2026-11)
+records an **alternative** for messages: build a host-owned lookup from globally
+unique names in the same static agent tree. In the host's event loop:
+
+```ts
+const paths = new Map([['drafter', ['sequence', 'drafter']]]);
+if (event.type === 'stream' && event.executor === 'adk-python' && event.mode === 'messages') {
+  const displayPath = paths.get((event.data as { author: string }).author);
+  // Render displayPath in the host's own UI.
+}
+```
+
+Keep all candidates when building the lookup and decline attribution for duplicate
+names. Duplicate leaves in separate Sequential subtrees are accepted and
+indistinguishable by author/branch. Tool/paused markers have no author, Parallel
+interleaves, and node_info.path is empty under Sequential/Parallel/Loop roots.
+Standalone LlmAgent transfer roots can carry node paths, which are not a universal
+identity oracle. Event paths stay empty, effect scopes stay positional,
+PendingInteraction has no path and no namespace is stored; `subgraphs` stays false.
+The new recipe evidence is CPython only, without a new Worker/browser lane.
+
+Workflow remains **refused**: a manifest-only FunctionNode allow-list cannot prove
+routing, and the full route-preserving tree replacement is unmeasured. Static
+SequentialAgent/ParallelAgent recipes run with fake receipt replay tests only;
+those tests do not replace the host's grants, write confirmations or recovery
+store. Dynamic routes, cycles and node retries have no demonstrated replacement.
+
 ### Asking for input
 
 A confirmation beside ordinary tool calls already works: the ordinary bodies run before the

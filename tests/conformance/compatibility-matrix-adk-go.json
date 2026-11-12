@@ -45,6 +45,7 @@
     "An unbounded Loop with no iteration limit and no exit tool"
   ],
   "evidenceOutsideTheCases": [
+    "Stream namespace spike: A-go REFUSED under the full NA1 oracle (native Runner rejects duplicated names), B-go REFUSED by pinned-source Workflow absence, C-go REFUSED by GF2. Native Go tests cover T1-T5 bridge-author attribution only; no new browser/path support or runtime changes.",
     "go/galaxie/shapes_test.go: each refused construction fails `unsupported` before any model or capability call",
     "tests/conformance/adk-go-agents.node.test.ts: Parallel write branches keep branch-local effect scopes whichever branch reaches the broker first, and a restore after the pause that follows a Parallel stage runs no branch write again"
   ],

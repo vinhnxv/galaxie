@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged.
 
 ## Context
 
@@ -602,3 +602,101 @@ Predictions (registered with the rule; the shipping unit restates them beside th
 - P9. Overall: at least one ALTERNATIVE, so a follow-up is required. Firefox, WebKit and real models stay unmeasured.
 
 Additive matrix entries, conformance registrations and new golden files are permitted for measured executors; existing entries and golden bytes stay unchanged except for the documented old-reason text replacements, empty-path assertions when a mapping ships, and the subgraphs flag only when its own gates pass.
+
+#### Measured outcome (2026-11-12)
+
+The rule was committed in `bcd4341` before any probe ran. Native Python evidence
+is in `64b00bd`, Python executor measurements in `39d2f0d`, JavaScript measurements
+in `41b1fb8`, and Go measurements in `2c3fa02`. These are characterization tests
+with scripted models, not conformance goldens or new runtime support. The outcome
+rule has not been adjusted to fit the observations.
+
+| Cell | Outcome | Decisive evidence |
+| --- | --- | --- |
+| A-py | **ALTERNATIVE** | GA3 fails: two accepted leaves named worker under different Sequential subtrees emit indistinguishable author/branch pairs. AL1–AL3 establish message-only attribution for unique names. |
+| B-py | **REFUSED** | Manifest-only GW1 admission cannot establish routing for author FunctionNodes. Full routed-graph AL-W parity is unmeasured; the partial static-tree recipe is insufficient for the whole family. |
+| C-py | **ALTERNATIVE** | A-py is alternative, so GF2 prevents a true flag. The same message recipe is the replacement; subgraphs stays false. |
+| A-js | **ALTERNATIVE** | GA3 fails on the same accepted duplicate-name tree. AL1–AL3 pass through host-visible messages on Node and Chromium. |
+| B-js | **REFUSED** | Independent native JS facts differ from Python, but the manifest-only routing counterexample remains. Full AL-W parity is unmeasured. |
+| C-js | **ALTERNATIVE** | A-js is alternative; subgraphs stays false. Chromium recipe evidence does not count as nested-path or nested-pause evidence. |
+| A-go | **REFUSED** | The full NA1 oracle cannot run: native Runner construction rejects T6's globally duplicated names. This is a failed premise under the registered rule, not proof that mapping unique-name trees is impossible. |
+| B-go | **REFUSED** | Source fact: pinned ADK v1.9.0 contains no workflow package or exported Workflow type. |
+| C-go | **REFUSED** | GF2 is not established; A-go has no accepted full native oracle. The flag stays false. |
+
+Premise verification passed before measurement: the JavaScript adapter tests ran
+94 executions on Node and headless Chromium, the Python executor ran 208 CPython
+tests and six native refused-shape tests, and `go test ./galaxie` passed. Every
+shipped ADK stream path remains empty; all three descriptors and matrices retain
+`subgraphs: false`. The search for feature readers found descriptors, reporting and
+conformance assertions, with no ADK run behavior selected by the flag (GF1).
+The existing Parallel receipt and restore checks remain regression evidence.
+Literal searches of pre-existing ADK cases, goldens, examples and documentation
+found no accepted duplicate-name or non-ASCII-name fixture; existing duplicate
+pause-refusal tests do exist. The new tests exercise these previously uncovered
+accepted Python/JavaScript trees. This search is not a census of external authors.
+
+| Executor / gate | Observed fact | Result |
+| --- | --- | --- |
+| Python NA1, NA2 | T1–T6 match hand-written author/branch oracles. Only Parallel forks branches; Sequential and Loop children have empty node_info.path. Standalone transfer roots stamp root@1 and root@1/specialist@1. Non-ASCII identifiers run. | Pass; branch alone insufficient |
+| Python GA3 | Accepted duplicate authors have different oracle paths but identical message identities. | Fail |
+| Python GA1, GA2, GA4–GA8 | No candidate mapping ships after GA3; reload, pause-path and carriage gates are not measured. GA2 would test consistency with a tree-derived oracle, not independent namespace parity. | Not measured: outcome fixed by GA3 |
+| Python AL1, AL2, AL3 | Five unique-name trees attribute real executor messages through an author-owned tree lookup; reversed Parallel arrival works. No API, bridge or stored field is added. Markers have no author; duplicate names are ambiguous. | Pass within message-only limits |
+| Python NW1, NW2 | Native chain, fan-out/join, route, cycle, local retry, write and pause run. Fan-out writes use b@1/c@1 branches. Runner(node=...) shares the galaxie session service and an integrity plugin in the probe. | Native facts recorded; entry seam available |
+| Python GW1 | A declared FunctionNode calls an unlisted scripted model directly. A static node-kind list alone cannot prove the required routing. This is not a proof against every possible adapter. | Not established |
+| Python GW2–GW6 | No accepted closed-list candidate exists in this attempt. | Not measured: outcome fixed by GW1 |
+| Python AL-W | Sequential/Parallel static replacements execute and replay writes after failure through a fake receipt journal. Routed-graph parity and host confirmation coverage are not established by that test. | Partial evidence; full alternative unmeasured |
+| JavaScript NA1, NA2 | T1–T6 match native author/branch oracles, including reversed Parallel arrival. Agent-tree events have no nodeInfo path; duplicate names run. | Pass; branch alone insufficient |
+| JavaScript GA3 | Two accepted leaves emit identical host-visible worker messages. | Fail |
+| JavaScript GA1, GA2, GA4–GA8 | No mapping candidate ships; no nested pause or reload-path evidence is claimed. | Not measured: outcome fixed by GA3 |
+| JavaScript AL1, AL2, AL3 | Host message attribution matches all five unique-name tree oracles on Node and Chromium with the unchanged API. Duplicate-name and marker limits remain. | Pass within message-only limits |
+| JavaScript NW1, NW2 | Native chain, fan-out/join, route, cycle, local retry, write and pause run through its own Runner. Workflow events have dotted paths, such as wf.a; context runId increments on revisits. | Native facts recorded; differs from Python |
+| JavaScript GW1 | A declared FunctionNode directly dispatches an unlisted scripted model. The shipped validator still rejects Workflow before dispatch. | Not established |
+| JavaScript GW2–GW6, AL-W | No closed-list candidate; full routed-graph replacement not established. | Support gates not measured after GW1; full alternative unmeasured |
+| Go NA1, NA2 | T1–T5 match the author/branch oracle. The native Runner rejects T6 at construction; the shipped executor also refuses before dispatch. Event has no NodeInfo field. | Full native oracle not established |
+| Go GA1–GA8 | The full native prerequisite fails. Existing ModelRequest carries Author only, without Path, Branch or Tree; page projection uses an empty path. | Not applicable for acceptance |
+| Go AL1–AL3 | A partial recipe over real streaming bridge request authors matches T1–T5; no host nested-path test or full native T6 exists. | Partial evidence; does not override NA1 |
+| Go NW/GW/AL-W | No Workflow graph type exists in the pinned production sources, checked by an executable module walk and Go parser. Older workflowagents are present and supported. | Source absence; runtime gates not applicable |
+| All GF1, GF4 | Feature-reader search and descriptors, matrices, assertions and docs agree on false. | Pass |
+| Python/JavaScript GF2 | Gap A is alternative. | Fail for true flag |
+| Go GF2 | Gap A full native oracle not established. | Fail for true flag |
+| All GF3, GF5 | No source mapping ships, so no new nested-path/pause browser case or true-flag meaning is measured. | Not measured: outcome fixed by GF2 |
+| All artifacts | No runtime source, core, effect scope, interaction ID derivation, stored schema, golden or lock changes. Matrices gain evidence entries only. Existing restore suites pass unchanged. | Regression and diff verification |
+
+The message recipe maps an event's `data.author` through the author's own static
+tree, keeping only globally unique names and returning their below-root ancestry.
+It provides display attribution only. Tool and paused markers carry no author;
+Parallel interleaves messages; duplicate names are ambiguous. No nested stream
+path, checkpoint namespace, path on PendingInteraction or stored namespace is
+created. Effect scopes remain positional. The Python fake receipt journal is not
+evidence of host authorization or backend exactly-once effects; production grants,
+output checks, labels, broker confirmations and restore admission are untouched.
+For static chains/fan-out, authors may use SequentialAgent and ParallelAgent.
+Dynamic routes, cycles and node retries have no demonstrated tree replacement
+in this attempt; Workflow itself continues to fail unsupported at prepare.
+
+Predictions that did not hold: P1's claim that T6 is valid on every language fails
+on Go, and its Workflow-only Python node-path claim fails for standalone transfer
+roots. P5's shared-branch fan-out suspicion is false for the measured LlmAgent
+nodes: they have distinct branches. The NW1 new-run-ID prediction for local
+retry is also false on both Python and JavaScript: retry reuses the visit ID.
+P5/P6's whole-family Workflow alternative is not established; B-py/B-js are
+refused under the rule because the remaining evidence is incomplete. P2/P3 resolve
+to alternatives after GA3, P4's no-shipped-carriage prediction holds but its
+alternative possibility is not accepted after the Go native premise fails,
+P7 holds by source inspection, and P8/P9 hold (flags unchanged; message alternatives).
+
+All executors were reached in Python, JavaScript, Go order. No measured-SUPPORTED
+cell reaches the shipping unit; no source change, new golden, assertion replacement
+or flag flip is eligible. There is no unmeasured executor to extend, but the skipped
+support gates and full Workflow replacement remain unmeasured, not passed. A future
+attempt must rerun the same fixed gates and cannot infer support from the partial
+recipes. Follow-up notes belong to the PR: a duplicate-aware identity proposal,
+closed-list Workflow admission and full route parity, Go's native-oracle revision,
+and dedicated nested-path/pause browser evidence. Tracker filing is left to the
+orchestrator for this run.
+
+New evidence is CPython for Python, Node and headless Chromium for JavaScript,
+and native Go for Go. Existing Worker/browser conformance remains regression
+coverage only; no new Python or Go nested-path browser behavior is claimed.
+Firefox, WebKit, real models and device checks remain unmeasured. A pinned ADK
+version change must rerun the native and executor measurement files.

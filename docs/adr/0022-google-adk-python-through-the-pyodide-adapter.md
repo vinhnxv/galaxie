@@ -181,3 +181,5 @@ Required before each feature flag turns on, and before this ADR is Accepted:
 - `checkpoints`: reload restore of a pending interaction, integrity-key tamper refusal and the frame-size guard, with the recovery guarantees of the other durable executors (stage AP5, observed above).
 - A conformance lane of native CPython goldens reproduced on Node and Chromium, and a credential and content scan over logs, warnings, events, errors, spans and stored records (stage AP6, observed above).
 - Still open, so the status stays Proposed: a real-device measurement of the 29-wheel boot, memory and first-token cost; a real-model run; the external developer trial; and a decision on ADK's experimental confirmation and deprecated workflow agents once ADK changes them.
+
+The [stream namespace spike](0020-google-adk-through-an-adapter.md#stream-namespaces-workflow-agents-and-subgraphs-spike-2026-11) records this executor's measured attribution and Workflow limits; its subgraphs flag and runtime remain unchanged.

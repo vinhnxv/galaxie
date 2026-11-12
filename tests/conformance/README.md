@@ -1520,3 +1520,20 @@ without changing the fixture. No Worker refusal fix was required.
 The first Ubuntu CI DSPy shard had 297 passing tests, one opt-in skip and one
 failure: the overly strict ColBERT attempt assertion, not a timeout. The measured
 rejected fetch is retained above rather than hidden by the correction.
+
+### ADK stream namespace and Workflow measurements
+
+The [fixed rule and results](../../docs/adr/0020-google-adk-through-an-adapter.md#stream-namespaces-workflow-agents-and-subgraphs-spike-2026-11)
+record a message-only attribution alternative on Python and JavaScript, with
+Workflow refused and subgraphs false on every executor. Native Python evidence
+is in `cases-adk-python/test_adk_python_stream_namespaces.py` and
+`test_adk_python_workflow_hosting.py`; executor measurements are in
+`python/galaxie/tests/test_adk_stream_namespaces.py` and `test_adk_workflow_hosting.py`.
+JavaScript's `stream-namespaces-native.test.ts`, `stream-namespaces-measure.test.ts`
+and `workflow-hosting-native.test.ts` run on Node and Chromium. Go's
+`go/galaxie/stream_namespaces_test.go` checks native identities, bridge authors,
+native duplicate-name refusal and the absence of a Workflow graph in pinned sources.
+These characterization tests add no golden cases, so all existing case counts,
+golden bytes and restore assertions remain unchanged. New Python and Go browser
+behavior, full routed Workflow replacement, Firefox, WebKit and real models are
+unmeasured; the fixed-rule table distinguishes skipped gates from passes.
