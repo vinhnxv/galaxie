@@ -15,7 +15,8 @@ from native import FIXTURES, record
 directory = root / 'tests/conformance/golden-dspy'
 if '--check' not in sys.argv:
     directory.mkdir(exist_ok=True)
-for name in FIXTURES:
+names = [arg for arg in sys.argv[1:] if arg != '--check'] or list(FIXTURES)
+for name in names:
     path = directory / f'{name}.json'
     transcript = asyncio.run(record(name))
     text = json.dumps(transcript, indent=2, ensure_ascii=False) + '\n'
@@ -24,4 +25,4 @@ for name in FIXTURES:
             raise SystemExit(f'The DSPy reference differs: {name}')
     else:
         path.write_text(text)
-print(f'Checked {len(FIXTURES)} native DSPy cases.' if '--check' in sys.argv else f'Recorded {len(FIXTURES)} native DSPy cases.')
+print(f'Checked {len(names)} native DSPy cases.' if '--check' in sys.argv else f'Recorded {len(names)} native DSPy cases.')

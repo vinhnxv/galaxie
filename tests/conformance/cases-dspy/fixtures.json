@@ -1,4 +1,54 @@
 {
+  "fanout-single": {
+    "unordered": true,
+    "replies": [
+      {
+        "question": "alpha:first",
+        "text": "[[ ## answer ## ]]\nalpha:first\n[[ ## completed ## ]]"
+      },
+      {
+        "question": "beta:first",
+        "text": "[[ ## answer ## ]]\nbeta:first\n[[ ## completed ## ]]"
+      },
+      {
+        "question": "gamma:first",
+        "text": "[[ ## answer ## ]]\ngamma:first\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "fanout-write": {
+    "unordered": true,
+    "replies": []
+  },
+  "fanout-multi": {
+    "unordered": true,
+    "replies": [
+      {
+        "question": "alpha:first",
+        "text": "[[ ## answer ## ]]\nalpha:first\n[[ ## completed ## ]]"
+      },
+      {
+        "question": "alpha:last",
+        "text": "[[ ## answer ## ]]\nalpha:last\n[[ ## completed ## ]]"
+      },
+      {
+        "question": "beta:first",
+        "text": "[[ ## answer ## ]]\nbeta:first\n[[ ## completed ## ]]"
+      },
+      {
+        "question": "beta:last",
+        "text": "[[ ## answer ## ]]\nbeta:last\n[[ ## completed ## ]]"
+      },
+      {
+        "question": "gamma:first",
+        "text": "[[ ## answer ## ]]\ngamma:first\n[[ ## completed ## ]]"
+      },
+      {
+        "question": "gamma:last",
+        "text": "[[ ## answer ## ]]\ngamma:last\n[[ ## completed ## ]]"
+      }
+    ]
+  },
   "predict": {
     "replies": [
       {

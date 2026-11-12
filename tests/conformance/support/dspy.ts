@@ -21,14 +21,17 @@ import { createMockLatch } from '../../../packages/models/src/mock.js';
 import fixtures from '../cases-dspy/fixtures.json' with { type: 'json' };
 import { autoApprove, confirmationsFor } from './auto-confirm.js';
 
+export const dspyBranchReloadCases = ['fanout-reload'] as const;
 export const dspyCases: readonly string[] = Object.keys(fixtures);
 interface Spec {
+  readonly unordered?: boolean;
   readonly fragmented?: boolean;
   readonly resumes?: readonly { readonly action: string; readonly payload: unknown }[];
   readonly runs?: number;
   readonly steps?: number;
   readonly replies: readonly {
     readonly text: string;
+    readonly question?: string;
     readonly toolCalls?: readonly ToolCall[];
     readonly chunks?: readonly string[];
   }[];
@@ -112,7 +115,13 @@ class ScriptedModel extends BaseChatModel {
     });
     if (this.caseName === 'abort') await this.latch.wait(options.signal);
     const spec = (fixtures as Record<string, Spec>)[this.caseName];
-    const reply = spec?.replies[this.state.index++];
+    const question = String(input.at(-1)?.content)
+      .split('[[ ## question ## ]]\n')[1]
+      ?.split('\n\n')[0]
+      ?.trim();
+    const reply = spec?.unordered
+      ? spec.replies.find((item) => item.question === question)
+      : spec?.replies[this.state.index++];
     if (!reply) throw new Error('The conformance reply is missing.');
     this.transcript.responses.push({ content: reply.text, toolCalls: reply.toolCalls ?? [] });
     return {
@@ -193,7 +202,7 @@ export async function executeDspyCase(
     budgets: { steps: steps ?? spec?.steps ?? 25, toolCalls: 10, tokens: 2000 },
     outputSafety: ({ text }) => (text.includes('BLOCKED_') ? 'block' : 'allow'),
   });
-  const kind = name.endsWith('outcome-unknown') || pauses ? 'write' : 'read';
+  const kind = name.endsWith('outcome-unknown') || pauses || spec?.unordered ? 'write' : 'read';
   // A model-chosen write runs only behind a host confirmation, approved here as it appears.
   const approval = kind === 'write' ? 'confirm' : 'none';
   let stopApproving = (): void => {};
@@ -233,7 +242,7 @@ export async function executeDspyCase(
             kind,
             destination: 'in-browser',
             timeoutMs: 1000,
-            concurrency: 1,
+            concurrency: spec?.unordered ? 3 : 1,
             grantScope: 'instance',
             approval,
             retry: 'none',
@@ -370,6 +379,24 @@ export async function executeDspyCase(
     stopApproving();
     latch.release();
     await runtime.dispose();
+  }
+  if (spec?.unordered) {
+    const key = (value: unknown, field: 'request' | 'response' | 'capability'): string => {
+      const item = value as {
+        messages?: { content: string }[];
+        content?: string;
+        input?: { query: string };
+      };
+      return field === 'request'
+        ? (item.messages?.at(-1)?.content ?? '')
+        : field === 'response'
+          ? (item.content ?? '')
+          : (item.input?.query ?? '');
+    };
+    const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+    transcript.requests.sort((a, b) => compare(key(a, 'request'), key(b, 'request')));
+    transcript.responses.sort((a, b) => compare(key(a, 'response'), key(b, 'response')));
+    transcript.capabilities.sort((a, b) => compare(key(a, 'capability'), key(b, 'capability')));
   }
   return JSON.parse(JSON.stringify(transcript)) as DspyTranscript;
 }

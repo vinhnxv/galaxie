@@ -6,9 +6,14 @@ import type { PyodideAdapterOptions } from '@galaxie-ai/adapter-pyodide';
 import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import {
   type DspyTranscript,
+  dspyBranchReloadCases,
   dspyCases,
   executeDspyCase,
 } from '../../../../../tests/conformance/support/dspy.js';
+import {
+  executeDspyParallelStep,
+  type ParallelResult,
+} from '../../../../../tests/conformance/support/dspy-parallel-step.js';
 import {
   type DspyReloadResult,
   type DspyReloadStep,
@@ -22,6 +27,7 @@ declare const PYTHON_LOCAL_WHEELS: PyodideAdapterOptions['localWheels'];
 const result: {
   transcript?: DspyTranscript;
   reload?: DspyReloadResult;
+  branches?: ParallelResult;
   error?: string;
   errorCode?: string;
   exported?: unknown;
@@ -46,7 +52,14 @@ factory.createPolicy('default', {
 try {
   const name = new URLSearchParams(location.search).get('case') ?? '';
   const parameters = new URLSearchParams(location.search);
-  if (![...dspyCases, ...dspyReloadCases, ...dspyRejectedRestoreCases].includes(name))
+  if (
+    ![
+      ...dspyCases,
+      ...dspyReloadCases,
+      ...dspyRejectedRestoreCases,
+      ...dspyBranchReloadCases,
+    ].includes(name)
+  )
     throw new Error('The conformance case is unknown.');
   const options: PyodideAdapterOptions = {
     runtimeUrl: new URL('/python/runtime/', location.href).href,
@@ -67,7 +80,28 @@ try {
     module: 'selected',
     entry: 'create_agent',
   };
-  if (parameters.has('reload')) {
+  if ((dspyBranchReloadCases as readonly string[]).includes(name)) {
+    agent.files = ['parallel_programs.py', 'parallel_candidate.py', 'selected.py'];
+    const saved = sessionStorage.getItem('dspyBranchStep');
+    const step = saved ? JSON.parse(saved) : { name: 'par-fan-two-stage-single' };
+    if (step.name !== 'par-fan-two-stage-single')
+      throw new Error('The branch reload case does not match.');
+    const saver = await IndexedDBSaver.open({
+      databaseName: 'dspy-branches',
+      appId: 'dspy-parallel-spike',
+      principalScope: 'fixture',
+    });
+    try {
+      result.branches = await executeDspyParallelStep(
+        options,
+        agent,
+        { recovery: saver.recovery, checkpoints: saver.byteRecords },
+        step,
+      );
+    } finally {
+      saver.close();
+    }
+  } else if (parameters.has('reload')) {
     const saved = sessionStorage.getItem('dspyReloadStep');
     const step: DspyReloadStep & { fault?: string } = saved
       ? JSON.parse(saved)

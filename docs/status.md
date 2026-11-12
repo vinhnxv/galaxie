@@ -1,5 +1,18 @@
 # Project status
 
+On 2026-11-13, `galaxie.dspy.branches` ships keyed async fan-out with deterministic
+branch scopes and journal bytes. Scripted CPython and Node Pyodide tests cover
+reversed arrival, silent replay, receipt reuse after Worker loss, malformed
+records and divergence with one compact poison checkpoint. Native tests also
+cover real/inlined thread hops, frozen legacy bytes and the actual old reader.
+Three new live goldens match on Node and headless Chromium; a fresh Chromium page
+and Worker reopen IndexedDB and replay the joined group without redispatch.
+Thread-pool fan-out, branch pauses, nested groups and streaming remain refused.
+Code outside journaled calls must be deterministic. Chromium divergence reload,
+Firefox, WebKit, real models, other DSPy versions and ReAct branches remain
+unmeasured. Existing goldens, fixture/matrix entries and locks are unchanged.
+See the [shipped helper evidence and limits](../tests/conformance/README.md#shipped-async-branch-helper).
+
 On 2026-11-13, the DSPy async branch-helper shipping attempt records **refused**.
 Native replay detects changed branch identity before further model or capability
 requests, but the existing driver then commits an unrecoverable checkpoint marker.

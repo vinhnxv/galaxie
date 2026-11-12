@@ -57,7 +57,11 @@ class Engine:
             for call in message.get('tool_calls', []):
                 call['function']['arguments'] = json.loads(call['function']['arguments'])
         self.transcript['requests'].append(payload)
-        reply = next(self.replies)
+        if FIXTURES.get(self.name, {}).get('unordered'):
+            question = payload['messages'][-1]['content'].split('[[ ## question ## ]]\n', 1)[1].split('\n\n', 1)[0].strip()
+            reply = next(item for item in FIXTURES[self.name]['replies'] if item['question'] == question)
+        else:
+            reply = next(self.replies)
         if self.name == 'abort':
             raise Failure(ERRORS['cancelled'], code='cancelled')
         self.transcript['responses'].append({'content': reply['text'], 'toolCalls': reply.get('toolCalls', [])})
@@ -415,4 +419,8 @@ async def record(name):
             else:
                 normalized.append(event)
         transcript['events'] = normalized
+    if FIXTURES[name].get('unordered'):
+        transcript['requests'].sort(key=lambda item: item['messages'][-1]['content'])
+        transcript['responses'].sort(key=lambda item: item['content'])
+        transcript['capabilities'].sort(key=lambda item: item['input']['query'])
     return json.loads(json.dumps(transcript))

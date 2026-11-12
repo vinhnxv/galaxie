@@ -1037,7 +1037,7 @@ Shipped verification:
 The gate question is decided in the [next subsection](#divergence-persistence-decision).
 
 On 2026-11-13, the attempt to ship a keyed async helper records **refused**.
-The proposed helper was withdrawn; no public `galaxie.dspy.branches` API ships.
+The proposed helper was withdrawn at that gate; the later [shipped helper](#shipped-async-branch-helper) meets the revised gate below.
 Use a sequential loop of `await module.acall(...)` and keep code outside
 journaled calls deterministic. Thread-pool `Parallel` and `Evaluate` retain their
 fixed `unsupported` refusal.
@@ -1149,6 +1149,63 @@ unmeasured for this decision. Checkpoint validation establishes consistency,
 not integrity; metadata is unauthenticated. ADR-0012 controls, production source,
 checkpoint formats and existing goldens, matrices, fixtures, recorders and locks
 are unchanged.
+
+### Shipped async branch helper
+
+On 2026-11-13, `galaxie.dspy.branches` ships under the accepted poison-checkpoint
+rule. The public helper uses author keys and local call ordinals, canonicalizes
+the journal at join, and refuses missing replay entries before dispatch.
+`fanout-single`, `fanout-write` and `fanout-multi` add new native goldens;
+only these unordered cases sort requests, responses and capability queries.
+Their replies are keyed by question label. Existing cases retain their original
+ordering and bytes. Native reference branches use plain `asyncio.gather` with an
+independent DSPy engine and tool, without the galaxie helper.
+
+| Lane | Measured outcome |
+| --- | --- |
+| CPython | Forward/reversed arrival and real/inlined thread hops preserve checkpoint bytes, scopes and receipts. Fresh-driver replay is silent for the recorded group; a crash after two writes reuses receipts. Changed requests, removed/renamed keys, fewer/extra calls and added calling keys poison once before further requests; later restores add no row. Frozen pre-change records restore and re-snapshot byte-identically. Extracted pre-change code refuses new markers without registration. |
+| Node Pyodide | The built wheel matches all three new goldens. Fresh Workers retain branch scopes, checkpoint bytes, silent replay, write deduplication and compact poison persistence. Malformed markers and unknown entry keys fail restore without a row. Nested, wide, streaming and branch-interaction refusals leave no task running. |
+| Headless Chromium | The three live cases match native goldens under strict CSP and external-request aborts. `fanout-reload` reopens scoped IndexedDB in a fresh page and Worker: the joined group makes no additional request, one replay notification fires, and only the later live group dispatches. Shared state-binding reload tests remain green. |
+
+The helper returns results in input order, caps groups at 32 branches and runs at
+1000 non-empty groups, and accepts keys matching `[A-Za-z0-9_.-]{1,64}`. Branches
+must await journaled calls sequentially; code outside journaled calls must be
+deterministic. Ordinary author exceptions wait for siblings and raise in input
+order; terminal failures and outer cancellation drain siblings. Branch pauses,
+nested groups, streaming, concurrent calls inside one branch and root journaled
+calls during a group remain fixed `unsupported`. Thread-pool APIs stay refused.
+No partial group is persisted.
+
+The optional `fanout` entry key stays under metadata `v: 1`; old readers already
+refuse unknown keys before registration, so a version bump adds no rollback
+safety. Root records remain byte-identical. Runtime divergence deliberately
+appends one compact `unrecoverable` checkpoint with null input and empty journal,
+parented on the previous revision, with one null interrupt write. Earlier rows
+and writes remain byte-identical; the original program cannot resume that session
+and the user starts over. Restore-time refusals add no row. These are consistency
+checks, not integrity protection: stored metadata is unauthenticated.
+
+Focused reproduction, after rebuilding the wheel with
+`node scripts/build-python-wheels.ts`:
+
+```sh
+cd python
+.venv/bin/python -m pytest galaxie/tests/test_dspy_branches.py galaxie/tests/test_dspy.py galaxie/tests/test_dspy_state_binding.py galaxie/tests/test_dspy_gate.py galaxie/tests/test_dspy_lint.py
+.venv/bin/python -m pytest ../tests/conformance/cases-dspy
+.venv/bin/python ../scripts/record-dspy-conformance.py --check
+.venv/bin/python ../scripts/record-dspy-state-conformance.py --check
+cd ..
+pnpm run typecheck:python
+pnpm exec vitest run --project node tests/conformance/dspy.node.test.ts tests/conformance/dspy-branches.node.test.ts tests/conformance/dspy-fanout.node.test.ts tests/conformance/dspy-parallel.node.test.ts tests/conformance/dspy-restore.node.test.ts
+pnpm exec vitest run --project node examples/rag-browser/test/dspy-conformance.node.test.ts examples/rag-browser/test/dspy-state-conformance.node.test.ts
+pnpm run check:docs
+```
+
+Give DSPy test processes at least 900000 ms. The evidence uses scripted models on
+DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. Chromium divergence
+reload, Firefox, WebKit, real models, other DSPy versions and ReAct branches remain
+unmeasured. Pauses within groups require a new partial-group design. No core,
+bridge, driver, lock or third-party wheel input changed.
 
 ### Original spike record
 

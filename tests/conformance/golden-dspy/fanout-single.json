@@ -1,0 +1,64 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nalpha:first\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nbeta:first\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\ngamma:first\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "[[ ## answer ## ]]\nalpha:first\n[[ ## completed ## ]]",
+      "toolCalls": []
+    },
+    {
+      "content": "[[ ## answer ## ]]\nbeta:first\n[[ ## completed ## ]]",
+      "toolCalls": []
+    },
+    {
+      "content": "[[ ## answer ## ]]\ngamma:first\n[[ ## completed ## ]]",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "answers": {
+      "alpha": "alpha:first",
+      "beta": "beta:first",
+      "gamma": "gamma:first"
+    }
+  },
+  "error": null
+}

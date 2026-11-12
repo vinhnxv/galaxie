@@ -11,7 +11,7 @@ import os
 import re
 import threading
 import weakref
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import aclosing
 from contextvars import ContextVar
 from dataclasses import dataclass, field, fields
@@ -90,6 +90,26 @@ def _digest(value: Any) -> str:
 
 
 @dataclass
+class _BranchProgress:
+    calls: int = 0
+    busy: bool = False
+
+
+@dataclass(frozen=True)
+class _Branch:
+    group: int
+    key: str
+    index: int
+
+
+@dataclass
+class _Group:
+    ordinal: int
+    branches: dict[str, _BranchProgress]
+    remaining: dict[str, dict[str, Any]]
+
+
+@dataclass
 class _Run:
     conversation: str
     ordinal: int
@@ -103,6 +123,8 @@ class _Run:
     failure: str | None = None
     models: int = 0
     on_stream: Callable[[str, Any], None] | None = None
+    groups: int = 0
+    group: _Group | None = None
 
     def record(self, code: str) -> None:
         if self.failure is None:
@@ -112,6 +134,10 @@ class _Run:
         # A failure that DSPy turned into an observation still ends the run with its code.
         if self.failure is not None:
             raise _Termination(self.failure)
+
+    def refuse(self, code: str = 'unsupported') -> Any:
+        self.record(code)
+        self.check()
 
     def model(self) -> None:
         self.check()
@@ -139,10 +165,43 @@ class _Run:
         if self.pausing:
             self.record('unsupported')
             self.check()
+        branch = _branch.get()
+        if branch is not None:
+            group = self.group
+            if group is None or branch.group != group.ordinal or kind == 'interaction':
+                self.refuse()
+            assert group is not None
+            progress = group.branches[branch.key]
+            if progress.busy or progress.calls > 99999:
+                self.refuse()
+            mark = f'{branch.group}/{branch.key}/{progress.calls}'
+            entry = group.remaining.get(mark)
+            digest = _digest(payload)
+            if entry is not None:
+                if entry['kind'] != kind or entry['digest'] != digest or 'result' not in entry:
+                    self.refuse('unrecoverable')
+                del group.remaining[mark]
+                self.cursor += 1
+                progress.calls += 1
+                progress.busy = True
+                return entry, True
+            # A persisted group is complete: any missing entry before the
+            # replay frontier is divergence, never permission to dispatch.
+            if self.replaying:
+                self.refuse('unrecoverable')
+            self.frontier()
+            entry = {'kind': kind, 'digest': digest, 'fanout': mark}
+            self.session.journal.append(entry)
+            self.cursor += 1
+            progress.calls += 1
+            progress.busy = True
+            return entry, False
+        if self.group is not None:
+            self.refuse()
         digest = _digest(payload)
         if self.replaying:
             entry = self.session.journal[self.cursor]
-            if entry['kind'] != kind or entry['digest'] != digest or 'result' not in entry:
+            if 'fanout' in entry or entry['kind'] != kind or entry['digest'] != digest or 'result' not in entry:
                 self.record('unrecoverable')
                 self.check()
             self.cursor += 1
@@ -153,24 +212,32 @@ class _Run:
         self.cursor += 1
         return entry, False
 
+    def finish(self, entry: dict[str, Any] | None) -> None:
+        if entry is not None and 'fanout' in entry and self.group is not None:
+            self.group.branches[entry['fanout'].split('/')[1]].busy = False
+
     async def capability(self, payload: dict[str, Any]) -> Any:
         ordinal = self.calls
-        self.calls += 1
+        if _branch.get() is None:
+            self.calls += 1
         entry, replayed = self.begin('capability', {'name': payload['name'], 'input': payload['input']})
-        if replayed:
-            return _json(entry['result'])
-        tool_name = _tool_name.get()
-        if self.streaming and tool_name is not None:
-            self.emit('updates', {'kind': 'tool', 'name': tool_name, 'index': ordinal})
-        self.check()
         try:
-            result = await request('capability', {**payload, 'effectScope': f'dspy/{self.conversation}/{self.ordinal}/{ordinal}'})
+            if replayed:
+                return _json(entry['result'])
+            tool_name = _tool_name.get()
+            if self.streaming and tool_name is not None:
+                self.emit('updates', {'kind': 'tool', 'name': tool_name, 'index': ordinal})
+            self.check()
+            suffix = entry.get('fanout', str(ordinal))
+            result = await request('capability', {**payload, 'effectScope': f'dspy/{self.conversation}/{self.ordinal}/{suffix}'})
             self.check()
             entry['result'] = _json(result)
             return result
         except GalaxieError as error:
             self.record(error.code)
             raise _Termination(self.failure or error.code) from None
+        finally:
+            self.finish(entry)
 
     def emit(self, mode: str, data: Any) -> None:
         if self.on_stream is not None:
@@ -184,6 +251,7 @@ class _Run:
 
 
 _run: ContextVar[_Run | None] = ContextVar('galaxie_dspy_run', default=None)
+_branch: ContextVar[_Branch | None] = ContextVar('galaxie_dspy_branch', default=None)
 _tool_name: ContextVar[str | None] = ContextVar('galaxie_dspy_tool_name', default=None)
 
 
@@ -197,6 +265,79 @@ def _refuse_foreign() -> None:
     if _run.get() is None and (run := _foreign_run()) is not None:
         run.record('unsupported')
         raise _Termination('unsupported')
+
+
+async def branches(group: Mapping[str, Callable[[], Awaitable[Any]]]) -> dict[str, Any]:
+    """Join keyed async branches with deterministic journal identity and scopes."""
+    _refuse_foreign()
+    run = _run.get()
+    if run is None:
+        raise GalaxieError('unsupported')
+    run.check()
+    if run.group is not None or _branch.get() is not None or run.streaming or not isinstance(group, Mapping):
+        run.refuse()
+    pairs = list(group.items())
+    if (len(pairs) > 32
+        or any(type(key) is not str or re.fullmatch(r'[A-Za-z0-9_.-]{1,64}', key, re.ASCII) is None or not callable(call) for key, call in pairs)):
+        run.refuse()
+    keys = [key for key, _ in pairs]
+    if len(set(keys)) != len(keys):
+        run.refuse()
+    if not pairs:
+        return {}
+    if run.groups >= 1000:
+        run.refuse()
+    ordinal = run.groups
+    run.groups += 1
+    remaining = {entry['fanout']: entry for entry in run.session.journal[run.cursor:run.replay]
+                 if entry.get('fanout', '').split('/')[0] == str(ordinal)}
+    if any(mark.split('/')[1] not in keys for mark in remaining):
+        run.refuse('unrecoverable')
+    run.group = _Group(ordinal, {key: _BranchProgress() for key in keys}, remaining)
+    start = len(run.session.journal)
+
+    async def invoke(index: int, key: str, call: Callable[[], Awaitable[Any]]) -> tuple[Any, BaseException | None]:
+        token = _branch.set(_Branch(ordinal, key, index))
+        try:
+            result = await call()
+            if any(mark.split('/')[1] == key for mark in remaining):
+                run.refuse('unrecoverable')
+            run.check()
+            return result, None
+        except BaseException as error:
+            if isinstance(error, (GalaxieError, _LMError, _Termination)):
+                run.record(error_code(error))
+            # Ending early is divergence even when the author catches it.
+            if any(mark.split('/')[1] == key for mark in remaining):
+                run.record('unrecoverable')
+            return None, error
+        finally:
+            _branch.reset(token)
+
+    tasks = [asyncio.create_task(invoke(index, key, call)) for index, (key, call) in enumerate(pairs)]
+    try:
+        pending = set(tasks)
+        while pending:
+            _, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            if run.failure is not None:
+                break
+        if run.failure is not None:
+            for task in pending:
+                task.cancel()
+        outcomes = await asyncio.gather(*tasks)
+        run.check()
+        for _, error in outcomes:
+            if error is not None:
+                raise error
+        return {key: outcome[0] for key, outcome in zip(keys, outcomes, strict=True)}
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        run.session.journal[start:] = sorted(run.session.journal[start:], key=lambda entry: (
+            keys.index(entry['fanout'].split('/')[1]), int(entry['fanout'].split('/')[2])))
+        run.group = None
 
 
 def _json(value: Any) -> Any:
@@ -232,6 +373,8 @@ def request_interaction(request: dict[str, Any]) -> dict[str, Any]:
     if run is None:
         raise GalaxieError('unsupported')
     run.check()
+    if _branch.get() is not None:
+        run.refuse()
     try:
         value = _interaction(request)
     except GalaxieError as error:
@@ -409,6 +552,7 @@ class _AsyncEngine:
     async def complete(self, value: Request) -> Response:
         _refuse_foreign()
         run = _run.get()
+        entry = None
         try:
             options = _options(value, self.native)
             payload = {'role': self.role, 'messages': _messages(value), 'options': options}
@@ -429,10 +573,14 @@ class _AsyncEngine:
             if run is not None:
                 run.record(error.code)
             raise _LMError(error.code) from None
+        finally:
+            if run is not None:
+                run.finish(entry)
 
     async def stream(self, value: Request) -> AsyncIterator[Any]:
         _refuse_foreign()
         run = _run.get()
+        entry = None
         task = None
         try:
             options = _options(value, self.native)
@@ -496,6 +644,8 @@ class _AsyncEngine:
                 run.record(error.code)
             raise _LMError(error.code) from None
         finally:
+            if run is not None:
+                run.finish(entry)
             if task is not None:
                 if not task.done():
                     task.cancel()
@@ -763,11 +913,32 @@ class Executor:
             identifier = raw['conversation_id']
             state = _Session(ordinal=raw['ordinal'], pauses=raw['pauses'], value=raw['input'], journal=raw['journal'], unrecoverable=raw['status'] == 'unrecoverable')
             interactions = 0
+            last_group = -1
+            group_closed = False
+            counts: dict[str, int] = {}
             for index, entry in enumerate(state.journal):
                 if type(entry) is not dict or entry.get('kind') not in {'model', 'capability', 'interaction'}:
                     raise ValueError()
                 pending = raw['status'] == 'paused' and index == len(state.journal) - 1
                 expected = {'kind', 'digest'} | ({'request'} if entry['kind'] == 'interaction' else set()) | (set() if pending else {'result'})
+                if 'fanout' in entry:
+                    marker = entry['fanout']
+                    if (entry['kind'] not in {'model', 'capability'} or type(marker) is not str
+                        or re.fullmatch(r'(?:0|[1-9][0-9]{0,2})/[A-Za-z0-9_.-]{1,64}/(?:0|[1-9][0-9]{0,4})', marker, re.ASCII) is None):
+                        raise ValueError()
+                    group, key, number = marker.split('/')
+                    if int(group) != last_group:
+                        if int(group) <= last_group:
+                            raise ValueError()
+                        last_group, group_closed, counts = int(group), False, {}
+                    if group_closed or int(number) != counts.get(key, 0):
+                        raise ValueError()
+                    counts[key] = int(number) + 1
+                    if len(counts) > 32:
+                        raise ValueError()
+                    expected |= {'fanout'}
+                else:
+                    group_closed = True
                 if set(entry) != expected or type(entry['digest']) is not str or re.fullmatch('[0-9a-f]{64}', entry['digest']) is None:
                     raise ValueError()
                 if entry['kind'] == 'interaction':

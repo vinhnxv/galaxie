@@ -10,6 +10,10 @@
     "subgraphs": false
   },
   "cases": [
+    "fanout-single",
+    "fanout-write",
+    "fanout-multi",
+    "fanout-reload",
     "predict",
     "chain-of-thought",
     "json-adapter",
@@ -61,6 +65,7 @@
   ],
   "differences": [],
   "normalizations": [
+    "Unordered fanout cases sort requests by question label, responses by content and capabilities by query; keyed replies never depend on arrival order.",
     "Assistant tool-only content null maps to the bridge empty string.",
     "Tool-call argument JSON strings compare as parsed JSON; call IDs, names, values and all message text remain compared.",
     "Replies project text and tool calls without provider-generated message IDs or timestamps.",

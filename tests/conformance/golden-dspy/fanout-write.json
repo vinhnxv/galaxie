@@ -1,0 +1,33 @@
+{
+  "requests": [],
+  "responses": [],
+  "capabilities": [
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "alpha"
+      }
+    },
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "beta"
+      }
+    },
+    {
+      "name": "docs.lookup@1",
+      "input": {
+        "query": "gamma"
+      }
+    }
+  ],
+  "interactions": [],
+  "output": {
+    "answers": {
+      "alpha": "Paris",
+      "beta": "Paris",
+      "gamma": "Paris"
+    }
+  },
+  "error": null
+}
