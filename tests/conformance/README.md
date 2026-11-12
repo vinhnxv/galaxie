@@ -1173,9 +1173,11 @@ must await journaled calls sequentially; code outside journaled calls must be
 deterministic. Ordinary author exceptions wait for siblings and raise in input
 order; terminal failures and outer cancellation drain siblings. Cancelling a
 replayed group preserves its stored pause for retry, proven natively and in a
-fresh Node Worker; unconsumed entries on cancellation are not divergence. Branch pauses,
-nested groups, streaming, concurrent calls inside one branch and root journaled
-calls during a group remain fixed `unsupported`. Thread-pool APIs stay refused.
+fresh Node Worker; unconsumed entries on cancellation are not divergence.
+Cancellation is recorded before cleanup, so a branch that catches it cannot
+dispatch a model or capability request. Native and Node tests cover this guard.
+Branch pauses, nested groups, streaming, concurrent calls inside one branch and
+root journaled calls during a group remain fixed `unsupported`. Thread-pool APIs stay refused.
 No partial group is persisted.
 
 The optional `fanout` entry key stays under metadata `v: 1`; old readers already

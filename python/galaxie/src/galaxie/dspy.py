@@ -330,6 +330,9 @@ async def branches(group: Mapping[str, Callable[[], Awaitable[Any]]]) -> dict[st
             if error is not None:
                 raise error
         return {key: outcome[0] for key, outcome in zip(keys, outcomes, strict=True)}
+    except asyncio.CancelledError:
+        run.record('cancelled')
+        raise
     finally:
         for task in tasks:
             if not task.done():

@@ -485,3 +485,39 @@ async def branches(group):
     await retry.cleanup();
   }
 }, 900000);
+
+test('a branch catching cancellation cannot dispatch during cleanup', async () => {
+  const name = 'par-fan-two-stage-single';
+  const sources = await branchSources(name);
+  sources['parallel_candidate.py'] += `
+import asyncio
+from galaxie.dspy import branches as join
+async def branches(group):
+    owner = asyncio.current_task()
+    async def blocked():
+        asyncio.get_running_loop().call_soon(owner.cancel)
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            return await next(iter(group.values()))()
+    return await join({'survivor': blocked})
+`;
+  const fixture = await createPythonFixture({ framework: 'dspy', module: 'selected', sources });
+  const store = { checkpoints: new MemoryByteCheckpoints(), recovery: new MemoryRecoveryStore() };
+  const rows = structuredClone(store.checkpoints.rows),
+    writes = structuredClone(store.checkpoints.writes);
+  try {
+    const cancelled = await executeDspyParallelStep(fixture.options, fixture.agent, store, {
+      name,
+    });
+    expect(cancelled.error).toEqual({ code: 'cancelled', message: 'The operation was cancelled.' });
+    expect(cancelled.calls).toEqual([]);
+    expect(cancelled.modelLabels).toEqual([]);
+    expect(cancelled.streams).toContainEqual({ kind: 'spike-tasks', count: 0 });
+    expect(store.checkpoints.rows).toEqual(rows);
+    expect(store.checkpoints.writes).toEqual(writes);
+    expect(fixture.workerErrors).toEqual([]);
+  } finally {
+    await fixture.cleanup();
+  }
+}, 900000);

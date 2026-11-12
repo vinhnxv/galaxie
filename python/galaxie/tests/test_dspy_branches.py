@@ -200,6 +200,34 @@ def test_terminal_failure_and_outer_cancellation_drain_siblings(failure):
     asyncio.run(scenario())
 
 
+def test_outer_cancellation_prevents_dispatch_from_a_branch_that_catches_it():
+    async def scenario():
+        started = asyncio.Event()
+        requests = []
+        async def transport(raw):
+            message = json.loads(raw)
+            requests.append(message)
+            return json.dumps({**{key: message[key] for key in ('v', 'id', 'op')}, 'kind': 'response', 'ok': True, 'payload': 'receipt'})
+        _bridge.install_transport(transport)
+        async def branch():
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                return await capabilities.call('write@1', {})
+        async def body():
+            return await face.branches({'survivor': branch})
+        task = asyncio.create_task(execute(body).run({}, 'c', 5))
+        await started.wait()
+        task.cancel()
+        with pytest.raises(GalaxieError) as caught:
+            await task
+        assert caught.value.code == 'cancelled'
+        assert requests == []
+        assert not [other for other in asyncio.all_tasks() if other is not asyncio.current_task() and not other.done()]
+    asyncio.run(scenario())
+
+
 def test_silent_groups_and_branches_replay_without_consuming_root_scopes():
     async def scenario():
         seen = []
