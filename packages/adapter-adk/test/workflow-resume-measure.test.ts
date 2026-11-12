@@ -44,6 +44,8 @@ import { withResumableRunner } from './support/resumable-seam.js';
  * NA G2/G3: the real pause rule publishes no interaction or stored pause for
  * that shape, so reload/approve/retry cannot be driven. No admission bypass
  * was added. G4 is a shared changed-tree/forged-record gate measured below.
+ * Its FAIL values record unchanged code; shipped code now rejects all eight
+ * cases (ADR-0020, Restore admission and workflow-state rejection).
  * Decision after all measurements: REFUSED. W4 fails G1; no new shape passes
  * all gates. The routing-only seam cannot admit a later pause. W6 scope loss
  * cannot be reached through this seam and is unmeasured here (not a pass).
@@ -540,8 +542,9 @@ test.each([
   { id: 'unknown', tree: 'other' },
   { id: 'agentState', tree: 'b' },
   { id: 'endOfAgent', tree: 'b' },
+  { id: 'first', tree: { seq: ['b', 'c'] } },
 ] as { id: string; tree: Tree }[])(
-  'restore admission: $id is not rejected before publication',
+  'restore admission: $id is rejected before publication unless admitted',
   async ({ id, tree }) => {
     // Mutable memory bytes are intentional here, on both projects, to measure
     // forged actions. Reload above separately uses real IndexedDB in Chromium.
@@ -567,31 +570,24 @@ test.each([
       }
       const before = structuredClone([...bytes.rows]);
       l = await life({ id, tree, paused: ['b'] }, store, { sessionId });
+      if (id !== 'first') {
+        await expect(l.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
+        expect(l.requests).toEqual([]);
+        expect(l.writes).toEqual([]);
+        expect(l.instance.getSnapshot().run?.pending).toBeUndefined();
+        expect([...bytes.rows]).toEqual(before);
+        return;
+      }
       await l.instance.restore();
       await waitForRunStatus(l.instance, 'waiting_input');
       expect(l.requests).toEqual([]);
       expect(l.writes).toEqual([]);
       expect(l.instance.getSnapshot().run?.pending?.interactionId).toBe(pending);
       expect([...bytes.rows]).toEqual(before);
-      // Publication already violates G4. Also record whether answering reaches work.
       const end = await answer(l);
-      const last = end.at(-1);
-      const observed: Record<string, string> = {
-        last: 'a b',
-        middle: 'a b c',
-        loop: 'b b',
-        parallel: 'right',
-        duplicate: 'b b',
-        unknown: 'other',
-        agentState: 'b',
-        endOfAgent: 'b',
-      };
-      if (id === 'parallel') expect(['', 'right']).toContain(l.requests.join(' '));
-      else expect(l.requests.join(' ')).toBe(observed[id]);
-      expect(l.writes).toEqual(['parallel', 'unknown'].includes(id) ? [] : ['b']);
-      if (id === 'parallel')
-        expect(last).toMatchObject({ type: 'error', error: { code: 'invalid' } });
-      else expect(last?.type).toBe('output');
+      expect(l.requests).toEqual(['b', 'c']);
+      expect(l.writes).toEqual(['b']);
+      expect(end.at(-1)?.type).toBe('output');
     } finally {
       await l.close();
     }

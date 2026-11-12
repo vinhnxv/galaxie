@@ -567,3 +567,124 @@ test('a confirmation raised by a sub-agent reached by transfer survives a reload
   const systems = second.model.seen.map((call) => JSON.stringify(call.messages[0]?.content));
   expect(systems.some((system) => system.includes('role=parent;'))).toBe(false);
 });
+
+test('a long-running pause reloads with the same interaction and does not repeat its write', async () => {
+  const source = shared('adk-restore-long-running');
+  const longRunning: AdkAgent = (host) =>
+    defineAdkEntry({
+      agent: new LlmAgent({
+        name: 'agent',
+        model: host.adk.llm('agent'),
+        instruction: 'Answer briefly.',
+        tools: [
+          host.adk.capabilityTool('docs.save@1', {
+            description: save.description,
+            parameters: save.parameters,
+            longRunning: true,
+          }),
+        ],
+      }),
+      interaction: (requests) => ({
+        surfaceId: 'main',
+        viewRevision: 'r1',
+        component: 'conformance.Approval/v1',
+        props: { count: requests.length },
+      }),
+      resume: () => [{ response: { saved: 'external' } }],
+    });
+  const first = await life(await source.open(), saving, { factory: longRunning });
+  await first.instance.start({ prompt: 'go' });
+  const submitted = await approval(first);
+  expect(first.writes).toEqual([{ q: 'note' }]);
+  await first.runtime.dispose();
+
+  const second = await life(await source.open(), saving, {
+    sessionId: first.sessionId,
+    factory: longRunning,
+  });
+  expect(await second.instance.restore()).toBeDefined();
+  const restored = await approval(second);
+  expect(restored.interactionId).toBe(submitted.interactionId);
+  expect(second.model.seen).toEqual([]);
+  expect(second.writes).toEqual([]);
+  expect((await second.instance.dispatch(restored)).status).toBe('accepted');
+  await waitForRunStatus(second.instance, 'succeeded');
+  expect(second.writes).toEqual([]);
+  expect(JSON.stringify(second.model.seen.at(-1)?.messages)).toContain('external');
+});
+
+test('moving a paused author to a middle child rejects restore before anything runs', async () => {
+  const source = shared('adk-restore-changed-tree');
+  const store = await source.open();
+  const first = await life(store, saving);
+  await first.instance.start({ prompt: 'go' });
+  await approval(first);
+  const request = { op: 'get', executor: 'adk-js', sessionId: first.sessionId, namespace: '' };
+  const before = structuredClone(await store.checkpoints.request(request));
+  await first.runtime.dispose();
+  const changed: AdkAgent = (host) =>
+    defineAdkEntry({
+      agent: new SequentialAgent({
+        name: 'flow',
+        subAgents: ['earlier', 'agent', 'later'].map(
+          (name) =>
+            new LlmAgent({
+              name,
+              model: host.adk.llm('agent'),
+              instruction: 'Answer briefly.',
+              tools: [host.adk.capabilityTool('docs.save@1', save)],
+            }),
+        ),
+      }),
+      interaction: () => ({
+        surfaceId: 'main',
+        viewRevision: 'r1',
+        component: 'conformance.Approval/v1',
+        props: { count: 1 },
+      }),
+    });
+  const second = await life(store, saving, { sessionId: first.sessionId, factory: changed });
+  await expect(second.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
+  expect(second.model.seen).toEqual([]);
+  expect(second.writes).toEqual([]);
+  expect(second.instance.getSnapshot().run?.pending).toBeUndefined();
+  expect(await store.checkpoints.request(request)).toEqual(before);
+});
+
+test.skipIf(durable)(
+  'workflow-state rejection repeats without changing rows or other sessions',
+  async () => {
+    const bytes = new MemoryByteCheckpoints();
+    const store: Store = { checkpoints: bytes, recovery: new MemoryRecoveryStore(), close() {} };
+    const first = await life(store, saving);
+    await first.instance.start({ prompt: 'go' });
+    await approval(first);
+    await first.runtime.dispose();
+    const other = await life(store, saving);
+    await other.instance.start({ prompt: 'go' });
+    const untouched = await approval(other);
+    await other.runtime.dispose();
+    const row = [...bytes.rows.values()].find((value) => value.sessionId === first.sessionId);
+    if (row === undefined) throw new Error('No record was stored.');
+    const body = JSON.parse(new TextDecoder().decode(row.checkpoint.bytes));
+    body.events[0].actions.agentState = { agent: { progress: 1 } };
+    bytes.rows.set(JSON.stringify([first.sessionId, '', row.id]), {
+      ...row,
+      checkpoint: { ...row.checkpoint, bytes: new TextEncoder().encode(JSON.stringify(body)) },
+    });
+    const before = structuredClone([...bytes.rows]);
+    const broken = await life(store, saving, { sessionId: first.sessionId });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await expect(broken.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
+      expect(broken.model.seen).toEqual([]);
+      expect(broken.writes).toEqual([]);
+      expect(broken.instance.getSnapshot().run?.pending).toBeUndefined();
+      expect([...bytes.rows]).toEqual(before);
+    }
+    const fine = await life(store, saving, { sessionId: other.sessionId });
+    expect(await fine.instance.restore()).toBeDefined();
+    expect((await approval(fine)).interactionId).toBe(untouched.interactionId);
+    expect(fine.model.seen).toEqual([]);
+    expect(fine.writes).toEqual([]);
+  },
+);
