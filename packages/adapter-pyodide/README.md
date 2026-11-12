@@ -890,6 +890,54 @@ invocation per write across reload, reversed arrival and failed-resume retry. `W
 pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) names fail
 `unsupported` at prepare. `subgraphs` stays false.
 
+### Asking for input
+
+A confirmation beside ordinary tool calls already works: the ordinary bodies run before the
+ADK answer, and a denied gated body never runs. Both call orders and two siblings match native
+ADK in six new live/reloaded Node Worker cases. Writes still need their own host confirmation
+and matching checkpoint/recovery stores. The spike's sibling write-retry measurements use a
+fake host receipt journal in CPython; they do not add broker integration evidence for this shape.
+A confirmation beside a long-running call stays refused because native ADK loses the real answer
+when both requests are answered together.
+
+For `adk_request_input`, use an ordinary long-running capability and validate the submitted
+answer in the author's `resume`. The host binds `question.ask@1` as a read capability returning
+a pending result; the interaction displays the question from the tool arguments. For example,
+the measured city-answer shape uses:
+
+```python
+from galaxie import GalaxieError
+from galaxie.adk import capability_tool
+
+question_tool = capability_tool(
+    'ask_city', 'question.ask@1',
+    {'type': 'object', 'properties': {
+        'message': {'type': 'string'}, 'response_schema': {'type': 'object'},
+    }, 'required': ['message', 'response_schema']},
+    'Ask for a city.', long_running=True,
+)
+
+def interaction(requests):
+    return {'surfaceId': 'main', 'viewRevision': 'r1',
+            'component': 'app.Question/v1', 'props': {'requests': requests}}
+
+def resume(requests, action, payload):
+    if (action != 'submit' or type(payload) is not dict or set(payload) != {'city'}
+            or type(payload['city']) is not str or not payload['city']):
+        raise GalaxieError('invalid')
+    return [{'response': payload} for _ in requests]
+```
+
+Add `question_tool` to the leaf's tools and return `Executor(agent, interaction=interaction,
+resume=resume)` from the entry factory. This example validates a nonempty city answer; an author
+using another response schema must validate that schema instead. The executable evidence is
+`python/galaxie/tests/test_adk_beside_calls.py`: the question and schema reach the interaction,
+invalid answers leave the pause answerable, and the answer reaches the model live and after
+byte restore. The reserved capability name `adk_request_input` is also harmless in that Python
+test, but an ordinary name keeps the intent clear. No new helper API ships. Dedicated Chromium,
+Firefox, WebKit and real-model input measurements remain unmeasured; see the
+[spike record](../../docs/adr/0020-google-adk-through-an-adapter.md#confirmation-beside-calls-and-request-input-spike-2026-11).
+
 ### Third-party licenses
 
 The 29-wheel `adk` set carries the licenses its wheels declare in their dist-info metadata:

@@ -105,7 +105,11 @@ const agent: AdkAgent = (host) =>
   long-running call whose result never arrives, fail `unsupported` too. A pause abandoned without a
   valid answer is answered with a denial before the next `start`, so history stays well-formed. ADK also hides
   `adk_request_input` calls and answers from an `LlmAgent`, so `host.adk.requestInput()` fails the
-  run `unsupported`; use a long-running tool to ask the user a question.
+  run `unsupported`; use a long-running tool with an ordinary, non-reserved name and a validating
+  author `resume` to ask the user a question. Do not name a capability tool `adk_request_input`:
+  it is admitted and invokes its capability before failing without an answerable pause. The
+  [scripted Node/Chromium spike](../../docs/adr/0020-google-adk-through-an-adapter.md#confirmation-beside-calls-and-request-input-spike-2026-11)
+  therefore records request input as refused under its reserved-name criterion.
 - Durable sessions: pass `services.checkpoints` (the `byteRecords` port of `IndexedDBSaver`). After a
   run pauses or completes, the adapter writes one `adk.session/v1` record holding the conversation
   events, the pause ordinal and the pending interaction. The per-session integrity key for ADK's
