@@ -8,8 +8,10 @@ S1-S3 and ordinary two-turn baseline PASS; S6-S8 not measured: fixed by S5.
 DA3 PASS S4: rebuilt pause log and live derivation agree.
 DA4: first-match output key loses structured output; Python additionally
 mixes Parallel surrogate buffers. Native transfer prediction did not hold.
-D-js/D-py select the refusal candidate, conditional on RF1-RF8 and shipping.
-RF1 census PASS; RF2-RF8 pending shipped candidate verification.
+D-py REFUSED: the prepare-time refusal ships after the recorded DA failure.
+RF1-RF8 PASS: exact-name refusal, unchanged unique-name restore bytes,
+zero model/store requests, limit trees and unchanged control boundaries.
+GA1-GA5/GA7 PASS test-locally; GA3 follows unique accepted names.
 GA6/GA8 not measured: carriage not shipped; GF1-GF5 fixed by GF2.
 No public path, stored format or effect scope changes.
 """
@@ -18,7 +20,7 @@ import asyncio
 import json
 
 import pytest
-from google.adk.agents import LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
+from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from google.adk.events import Event
 from pydantic import BaseModel
 
@@ -60,24 +62,11 @@ class Output(BaseModel):
     position: str
 
 
-def tree(shape='sequential', tools=False, pause=False, output=False, partial_only=False):
+def tree(shape='sequential', tools=False, pause=False, output=False):
     def leaf(name, role):
         extras = {'output_key': f'{role}_key', 'output_schema': Output} if output else {}
         tool = capability_tool('echo', 'test.echo@1', {'type': 'object', 'properties': {}}, 'Echo.', require_confirmation=role == 'gate')
         model = llm(role)
-        if partial_only and role == 'first':
-            generate = model.generate_content_async
-            omitted = False
-
-            async def partial(request, stream=False):
-                nonlocal omitted
-                drop = not omitted
-                async for response in generate(request, stream):
-                    if not drop or response.partial:
-                        yield response
-                omitted = True
-
-            object.__setattr__(model, 'generate_content_async', partial)
         return LlmAgent(name=name, model=model, tools=[tool] if tools or role == 'gate' else [], **extras)
 
     if shape == 'unique-sequential':
@@ -92,7 +81,7 @@ def tree(shape='sequential', tools=False, pause=False, output=False, partial_onl
         return LlmAgent(name='root', model=llm('router'), sub_agents=[leaf('specialist', 'specialist')])
     if shape == 'unique-pause':
         return SequentialAgent(name='root', sub_agents=[leaf('head', 'head'), leaf('gate', 'gate')])
-    branches = [SequentialAgent(name=name, sub_agents=[leaf('specialist' if shape == 'transfer' else 'worker', name)]) for name in ('first', 'second')]
+    branches: list[BaseAgent] = [SequentialAgent(name=name, sub_agents=[leaf('specialist' if shape == 'transfer' else 'worker', name)]) for name in ('first', 'second')]
     if shape == 'loop':
         return LoopAgent(name='root', max_iterations=2, sub_agents=branches)
     if shape == 'parallel':
@@ -144,108 +133,6 @@ def stored(executor):
     return [Event.model_validate(event) for event in json.loads(checkpoint)['events']]
 
 
-@pytest.mark.parametrize(('script', 'shape', 'tools', 'oracle'), [
-    ('S1', 'sequential', False, [['first', 'worker'], ['second', 'worker']]),
-    ('S2', 'sequential', True, [['first', 'worker']] * 2 + [['second', 'worker']] * 2),
-    ('S3', 'loop', False, [['first', 'worker'], ['second', 'worker']] * 2),
-])
-def test_dc1_matches_authored_oracle(script, shape, tools, oracle):
-    install(tools=tools)
-    root = tree(shape, tools=tools)
-    executor = Executor(root)
-    executor.durable = True
-    run(executor)
-    assert derive(stored(executor), root) == oracle
-
-
-def test_s5_two_user_turns():
-    requests = install()
-    root = tree()
-    executor = Executor(root)
-    executor.durable = True
-    run(executor)
-    run(executor)
-    assert [payload['role'] for op, payload in requests if op == 'model'] == ['first', 'second', 'first', 'second']
-    assert derive(stored(executor), root) == [['first', 'worker'], ['second', 'worker']] * 2
-
-
-def test_s4_da3_pause_restores_the_live_derivation():
-    install()
-    root = tree(pause=True)
-    original = Executor(root, interaction=interaction)
-    original.durable = True
-    assert run(original)[0] is None
-    checkpoint, metadata = original._snapshot('s1', 'bound')
-    before = derive(stored(original), root)
-    rebuilt = tree(pause=True)
-    other = Executor(rebuilt, interaction=interaction)
-    other.durable = True
-    assert asyncio.run(other._restore(checkpoint, metadata, 'bound')) == 's1'
-    assert other._snapshot('s1', 'bound') == (checkpoint, metadata)
-    assert derive(stored(other), rebuilt) == before
-    pending = other.pending('s1')
-    assert pending == original.pending('s1')
-    assert run(other, {'interactionId': pending['id'], 'action': 'approve', 'payload': {'indexes': [0]}})[0] == 'gate'
-
-
-def test_da4_output_key_uses_first_agent_and_loses_structured_value():
-    install(output=True)
-    executor = Executor(tree(output=True))
-    assert run(executor)[0] == '{"position": "second"}'
-
-
-def test_s5_partial_only_worker_makes_stored_log_dc1_choose_wrong_position():
-    requests = install()
-    root = tree(partial_only=True)
-    executor = Executor(root)
-    executor.durable = True
-    run(executor)
-    run(executor)
-    oracle = [['second', 'worker'], ['first', 'worker'], ['second', 'worker']]
-    observed = derive(stored(executor), root)
-    assert observed == [['first', 'worker'], ['second', 'worker'], ['first', 'worker']]
-    assert observed != oracle
-    assert [payload['role'] for op, payload in requests if op == 'model'] == ['first', 'second', 'first', 'second']
-
-
-def test_da4_parallel_duplicates_mix_surrogate_buffers():
-    async def go():
-        left_started, right_done = asyncio.Event(), asyncio.Event()
-        events = []
-
-        async def transport(raw):
-            message = json.loads(raw)
-
-            def chunk(text):
-                _bridge.receive_model_chunk(json.dumps({**message, 'kind': 'notify', 'op': 'model-chunk', 'payload': {'content': text}}))
-
-            if message['payload']['role'] == 'first':
-                chunk('x\ud83d')
-                await right_done.wait()
-                await asyncio.sleep(0.01)
-                chunk('\ude00')
-                reply = {'content': 'x\U0001f600'}
-            else:
-                await left_started.wait()
-                chunk('y')
-                reply = {'content': 'y'}
-            return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
-
-        def stream(mode, data):
-            if mode == 'messages':
-                events.append(data['text'])
-                if data['text'] == 'x':
-                    left_started.set()
-                if 'y' in data['text']:
-                    right_done.set()
-
-        _bridge.install_transport(transport)
-        await Executor(tree('parallel')).run({'prompt': 'go'}, 's1', 10, on_stream=stream)
-        return events
-
-    assert asyncio.run(go()) == ['x', '\ud83dy', '\ude00']
-
-
 @pytest.mark.parametrize(('shape', 'oracle'), [
     ('unique-sequential', [['drafter'], ['reviewer']]),
     ('unique-parallel', [['left'], ['right']]),
@@ -268,3 +155,69 @@ def test_namespace_recipe_is_deterministic_content_free_and_uses_no_stored_field
                     assert len(positions) == 1
                     assert len(positions[0]) <= 16
                     assert 'content-canary' not in json.dumps(positions)
+
+
+@pytest.mark.parametrize('shape', ['sequential', 'parallel', 'loop', 'transfer', 'root-duplicate', 'shared', 'tools', 'output', 'pause'])
+def test_duplicates_fail_at_prepare_before_model_or_store_requests(shape):
+    requests = install()
+    root = tree(shape, tools=shape == 'tools', output=shape == 'output', pause=shape == 'pause')
+    if shape == 'root-duplicate':
+        root = SequentialAgent(name='worker', sub_agents=[LlmAgent(name='worker', model=llm('first'))])
+    if shape == 'shared':
+        shared = root.sub_agents[0].sub_agents[0]
+        object.__setattr__(root.sub_agents[1], 'sub_agents', [shared])
+    with pytest.raises(GalaxieError) as error:
+        Executor(root)
+    assert error.value.code == 'unsupported'
+    assert str(error.value) == 'This operation is unsupported.'
+    assert requests == []
+
+
+def test_duplicate_does_not_hide_a_later_invalid_child():
+    requests = install()
+    root = tree()
+    bad = LlmAgent(name='bad', model=llm('bad'))
+    object.__setattr__(bad, 'sub_agents', {})
+    root.sub_agents.append(bad)
+    with pytest.raises(GalaxieError) as error:
+        Executor(root)
+    assert error.value.code == 'invalid'
+    assert requests == []
+
+
+@pytest.mark.parametrize('shape', ['distinct', 'depth-limit', 'size-limit'])
+def test_exact_distinct_names_and_limit_trees_prepare_and_run(shape):
+    requests = install()
+    if shape == 'distinct':
+        root = SequentialAgent(name='root', sub_agents=[LlmAgent(name=name, model=llm(f'name{index}')) for index, name in enumerate(['Worker', 'worker', '\u00e9', 'e\u0301'])])
+    elif shape == 'size-limit':
+        root = SequentialAgent(name='root', sub_agents=[LlmAgent(name=f'leaf{index}', model=llm(f'leaf{index}')) for index in range(255)])
+    else:
+        root = LlmAgent(name='bottom', model=llm('bottom'))
+        for depth in reversed(range(16)):
+            root = SequentialAgent(name=f'level{depth}', sub_agents=[root])
+    assert all(len(positions) == 1 for positions in paths_of(root).values())
+    assert asyncio.run(Executor(root).run({'prompt': 'go'}, 's1', 300, on_stream=lambda *_: None)) is not None
+    assert len(requests) == (255 if shape == 'size-limit' else 4 if shape == 'distinct' else 1)
+
+
+def test_unique_pause_bytes_restore_unchanged_and_duplicate_prepare_never_reads_them():
+    requests = install()
+    original = Executor(tree('unique-pause'), interaction=interaction)
+    original.durable = True
+    assert run(original)[0] is None
+    checkpoint, metadata = original._snapshot('s1', 'bound')
+    other = Executor(tree('unique-pause'), interaction=interaction)
+    other.durable = True
+    assert asyncio.run(other._restore(checkpoint, metadata, 'bound')) == 's1'
+    assert other._snapshot('s1', 'bound') == (checkpoint, metadata)
+    pending = other.pending('s1')
+    assert pending is not None
+    assert pending == original.pending('s1')
+    assert run(other, {'interactionId': pending['id'], 'action': 'approve', 'payload': {'indexes': [0]}})[0] == 'gate'
+    before = list(requests)
+    with pytest.raises(GalaxieError) as error:
+        Executor(tree(pause=True), interaction=interaction)
+    assert error.value.code == 'unsupported'
+    assert requests == before
+    assert original._snapshot('s1', 'bound') == (checkpoint, metadata)

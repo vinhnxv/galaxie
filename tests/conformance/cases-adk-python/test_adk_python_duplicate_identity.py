@@ -9,9 +9,10 @@ Case and Unicode normalization distinguish names exactly.
 """
 
 import asyncio
+import logging
 
 import pytest
-from google.adk.agents import LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
+from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import InMemoryRunner
@@ -35,7 +36,7 @@ def tree(shape, reverse=False):
         return LlmAgent(name=name, model=Scripted(model=position, calls=[], delay=delay))
 
     name = 'specialist' if shape == 'transfer' else 'worker'
-    branches = [SequentialAgent(name=parent, sub_agents=[leaf(name, parent, reverse != second)])
+    branches: list[BaseAgent] = [SequentialAgent(name=parent, sub_agents=[leaf(name, parent, reverse != second)])
                 for second, parent in enumerate(('first', 'second'))]
     if shape == 'parallel':
         return ParallelAgent(name='root', sub_agents=branches)
@@ -67,7 +68,11 @@ def test_native_duplicate_identity_fields(shape, expected):
 
 def test_native_parallel_identity_survives_reversed_arrival():
     runs = [asyncio.run(collect(tree('parallel', reverse))) for reverse in (False, True)]
-    assert [[(e.content.parts[0].text, e.branch) for e in events] for events in runs] == [
+    def text(event):
+        assert event.content is not None and event.content.parts
+        return event.content.parts[0].text
+
+    assert [[(text(e), e.branch) for e in events] for events in runs] == [
         [('first', 'root.first'), ('second', 'root.second')],
         [('second', 'root.second'), ('first', 'root.first')],
     ]
@@ -79,6 +84,9 @@ def test_native_find_agent_chooses_first_match_but_transfer_refuses_unrelated_le
     assert root.find_agent('specialist') is first
     with pytest.raises(ValueError, match="Cannot transfer from 'root' to unrelated agent 'specialist'"):
         asyncio.run(collect(root))
+    assert isinstance(root, LlmAgent) and isinstance(root.model, Scripted)
+    assert isinstance(first, LlmAgent) and isinstance(first.model, Scripted)
+    assert isinstance(second, LlmAgent) and isinstance(second.model, Scripted)
     assert root.model.calls == ['router']
     assert first.model.calls == []
     assert second.model.calls == []
@@ -92,7 +100,9 @@ def test_native_root_name_reuse_and_exact_distinct_names():
     assert [e.author for e in asyncio.run(collect(root))] == names
 
 
-def test_native_shared_instance_is_refused_but_sibling_duplicates_only_warn(caplog):
+def test_native_shared_instance_is_refused_but_sibling_duplicates_only_warn(caplog, monkeypatch):
+    # The executor mutes this parent logger when imported by another test file.
+    monkeypatch.setattr(logging.getLogger('google_adk'), 'propagate', True)
     shared = LlmAgent(name='worker', model=Scripted(model='shared', calls=[]))
     SequentialAgent(name='first', sub_agents=[shared])
     with pytest.raises(ValueError, match='parent'):

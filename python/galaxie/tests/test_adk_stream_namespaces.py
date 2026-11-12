@@ -22,7 +22,7 @@ import json
 import pytest
 from google.adk.agents import LlmAgent, LoopAgent, ParallelAgent, SequentialAgent
 
-from galaxie import _bridge
+from galaxie import GalaxieError, _bridge
 from galaxie.adk import Executor, llm
 
 
@@ -104,11 +104,20 @@ def test_author_recipe_reproduces_the_native_tree_oracle_for_messages(shape, exp
     assert all(len(paths[data['author']]) == 1 for data in messages)
 
 
-def test_duplicate_names_still_prepare_but_cannot_be_attributed_uniquely():
+def test_duplicate_names_fail_unsupported_at_prepare_without_a_model_call():
     root = tree('duplicate')
     assert author_paths(root)['worker'] == [['first', 'worker'], ['second', 'worker']]
-    messages = [data for mode, data in measure(root) if mode == 'messages']
-    assert messages == [{'author': 'worker', 'text': 'worker'}] * 2
+    requests = []
+
+    async def transport(raw):
+        requests.append(raw)
+        raise AssertionError('Prepare must not reach the bridge.')
+
+    _bridge.install_transport(transport)
+    with pytest.raises(GalaxieError) as error:
+        Executor(root)
+    assert error.value.code == 'unsupported'
+    assert requests == []
 
 
 def test_reversed_parallel_arrival_keeps_the_recipe_paths():

@@ -633,10 +633,10 @@ def _validate(root: Any) -> tuple[frozenset[str], bool]:
         return exits
 
     walk(root, False, 0, set(), ())
-    # The agent named on a pausing event must identify one agent.
-    if any(names[name] != 1 for name in pausing):
+    # Every event author must identify exactly one agent in the tree.
+    if any(count != 1 for count in names.values()):
         raise GalaxieError('unsupported')
-    if resumable and (resumable_refused or len(pausing) > 1 or any(count != 1 for count in names.values())):
+    if resumable and (resumable_refused or len(pausing) > 1):
         raise GalaxieError('unsupported')
     return frozenset(pausing), resumable
 
