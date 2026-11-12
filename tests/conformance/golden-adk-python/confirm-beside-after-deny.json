@@ -1,0 +1,220 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "confirm-beside-after-deny"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "ordinary",
+            "description": "Double an integer without an ADK confirmation.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "other",
+            "description": "Double an integer without an ADK confirmation.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Use the supplied tools and answer briefly.\n\nYou are an agent. Your internal name is \"conformance\"."
+        },
+        {
+          "role": "user",
+          "content": "confirm-beside-after-deny"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call-1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":2}"
+              }
+            },
+            {
+              "id": "call-2",
+              "type": "function",
+              "function": {
+                "name": "ordinary",
+                "arguments": "{\"value\":3}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-1",
+          "content": "{\"error\":\"This tool call is rejected.\"}"
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-2",
+          "content": "{\"value\":6}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "ordinary",
+            "description": "Double an integer without an ADK confirmation.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "other",
+            "description": "Double an integer without an ADK confirmation.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "tool_0",
+          "name": "double",
+          "args": {
+            "value": 2
+          }
+        },
+        {
+          "id": "tool_1",
+          "name": "ordinary",
+          "args": {
+            "value": 3
+          }
+        }
+      ]
+    },
+    {
+      "content": "The sibling results and decision are ready.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 3
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "interactionId": "pause-0",
+      "surfaceId": "main",
+      "viewRevision": "confirm-1",
+      "component": "tests.Approval/v1",
+      "props": {
+        "requests": [
+          {
+            "kind": "confirmation",
+            "tool": "double",
+            "args": {
+              "value": 2
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "output": "The sibling results and decision are ready.",
+  "error": null
+}

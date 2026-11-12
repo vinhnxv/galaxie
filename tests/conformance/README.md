@@ -717,7 +717,7 @@ Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformanc
 
 ## Google ADK Python conversations
 
-The separate [ADK Python matrix](compatibility-matrix-adk-python.json) lists 33 scripted cases for
+The separate [ADK Python matrix](compatibility-matrix-adk-python.json) lists 39 scripted cases for
 the `adk-python` executor against pinned `google-adk` 2.12.0 in the Pyodide Worker: text, tools,
 denials, streaming, confirmations, long-running tools, durable restore, and the agent shapes
 `agents-sequential`, `stream-agents-sequential`, `agents-parallel`, `agents-loop`,
@@ -739,6 +739,17 @@ Both native and Worker lanes check the reply-gate order and that the merger foll
 branches; reload joins traces across runtime lifetimes. `afterCall` waits for another agent's
 tool call so the reversed-order fixture can proceed before approval. Existing goldens are
 byte-identical.
+
+The six `confirm-beside-*` cases add a confirmation beside an ordinary call in both orders
+and between two ordinary siblings, each approved and denied. Native ADK records every result;
+live and restored Node Workers match those new goldens. Existing matrix entries and goldens
+are unchanged. CPython measurements in `cases-adk-python/test_adk_python_confirmation_beside_calls.py`
+and `python/galaxie/tests/test_adk_beside_calls.py` also cover native combined/split long-running
+answers, sibling writes with fake host receipts, partial/wrong-kind answers and the validating
+input replacement. Those measurements do not claim core broker integration or new Chromium
+coverage. The [shared spike record](../../docs/adr/0020-google-adk-through-an-adapter.md#confirmation-beside-calls-and-request-input-spike-2026-11)
+records each gate and the JavaScript Node/Chromium refusals. Native golden verification always
+uses `python -I ../scripts/record-adk-python-conformance.py --check` from `python/`.
 
 [`adk-python-agents.node.test.ts`](adk-python-agents.node.test.ts) asserts that `Workflow`,
 `AgentTool` and the pause shapes ADK cannot resume faithfully fail `unsupported` at prepare, with

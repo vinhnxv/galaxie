@@ -21,6 +21,12 @@ import {
 import specs from '../cases-adk-python/fixtures.json' with { type: 'json' };
 
 export const adkPythonCases = [
+  'confirm-beside-after-approve',
+  'confirm-beside-after-deny',
+  'confirm-beside-before-approve',
+  'confirm-beside-before-deny',
+  'confirm-beside-between-approve',
+  'confirm-beside-between-deny',
   'plain-text',
   'capability',
   'sequential-tools',

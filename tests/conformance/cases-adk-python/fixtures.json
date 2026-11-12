@@ -1,4 +1,228 @@
 {
+  "confirm-beside-after-approve": {
+    "prompt": "confirm-beside-after-approve",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "tool_0",
+            "name": "double",
+            "args": {
+              "value": 2
+            }
+          },
+          {
+            "id": "tool_1",
+            "name": "ordinary",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
+  },
+  "confirm-beside-after-deny": {
+    "prompt": "confirm-beside-after-deny",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "tool_0",
+            "name": "double",
+            "args": {
+              "value": 2
+            }
+          },
+          {
+            "id": "tool_1",
+            "name": "ordinary",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
+  },
+  "confirm-beside-before-approve": {
+    "prompt": "confirm-beside-before-approve",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "tool_0",
+            "name": "ordinary",
+            "args": {
+              "value": 2
+            }
+          },
+          {
+            "id": "tool_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
+  },
+  "confirm-beside-before-deny": {
+    "prompt": "confirm-beside-before-deny",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "tool_0",
+            "name": "ordinary",
+            "args": {
+              "value": 2
+            }
+          },
+          {
+            "id": "tool_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
+  },
+  "confirm-beside-between-approve": {
+    "prompt": "confirm-beside-between-approve",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "tool_0",
+            "name": "ordinary",
+            "args": {
+              "value": 2
+            }
+          },
+          {
+            "id": "tool_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          },
+          {
+            "id": "tool_2",
+            "name": "other",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
+  },
+  "confirm-beside-between-deny": {
+    "prompt": "confirm-beside-between-deny",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "tool_0",
+            "name": "ordinary",
+            "args": {
+              "value": 2
+            }
+          },
+          {
+            "id": "tool_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          },
+          {
+            "id": "tool_2",
+            "name": "other",
+            "args": {
+              "value": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
+  },
   "plain-text": {
     "prompt": "plain text",
     "replies": [

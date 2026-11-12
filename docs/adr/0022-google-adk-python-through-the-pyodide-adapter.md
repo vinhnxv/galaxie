@@ -52,6 +52,8 @@ Agent authors ask for Google's Agent Development Kit in Python. ADR-0018 gives P
 
 ## Verification
 
+The [confirmation-beside-calls and request-input spike](0020-google-adk-through-an-adapter.md#confirmation-beside-calls-and-request-input-spike-2026-11) records the already shipped ordinary-sibling behavior as supported with six new native/live/restored Node goldens, long-running siblings as refused after native answer loss, and the validating long-running input alternative; no production source or helper API changed.
+
 ### Workflow-agent pause spike (2026-11)
 
 The native evidence uses ADK 2.12.0's own Runner and scripted models in
