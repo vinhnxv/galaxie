@@ -43,6 +43,7 @@ func Definitions() map[string]galaxie.Definition {
 		definitions[name] = galaxie.Definition{Build: entry}
 	}
 	definitions["confirm"] = galaxie.Definition{Build: confirm, Interaction: approval}
+	definitions["confirm-beside"] = galaxie.Definition{Build: confirmBeside, Interaction: approval}
 	definitions["parallel-confirm"] = galaxie.Definition{Build: parallelConfirm, Interaction: approval}
 	definitions["confirm-transfer"] = galaxie.Definition{Build: confirmTransfer, Interaction: approval}
 	definitions["confirm-sequential"] = galaxie.Definition{Build: confirmLast, Interaction: approval}
@@ -107,6 +108,22 @@ func pausing(name string, confirmation, longRunningTool bool) (agent.Agent, erro
 }
 
 func confirm() (agent.Agent, error) { return pausing("agent", true, false) }
+
+func confirmBeside() (agent.Agent, error) {
+	var tools []tool.Tool
+	for _, name := range []string{"math.double@1", "math.triple@1"} {
+		created, err := galaxie.CapabilityTool(name, galaxie.ToolSpec{
+			Description:         "Run the operation.",
+			Schema:              doubleSchema,
+			RequireConfirmation: name == "math.double@1",
+		})
+		if err != nil {
+			return nil, err
+		}
+		tools = append(tools, created)
+	}
+	return leaf("agent", tools...)
+}
 
 func longRunning() (agent.Agent, error) { return pausing("agent", false, true) }
 

@@ -1,4 +1,322 @@
 {
+  "confirm-beside-after-approve": {
+    "entry": "confirm-beside",
+    "prompt": "confirm-beside-after-approve",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":2}"
+            }
+          },
+          {
+            "id": "p2",
+            "type": "function",
+            "function": {
+              "name": "math_triple_1",
+              "arguments": "{\"value\":3}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 4
+        }
+      },
+      "math.triple@1": {
+        "result": {
+          "value": 9
+        }
+      }
+    }
+  },
+  "confirm-beside-after-deny": {
+    "entry": "confirm-beside",
+    "prompt": "confirm-beside-after-deny",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":2}"
+            }
+          },
+          {
+            "id": "p2",
+            "type": "function",
+            "function": {
+              "name": "math_triple_1",
+              "arguments": "{\"value\":3}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 4
+        }
+      },
+      "math.triple@1": {
+        "result": {
+          "value": 9
+        }
+      }
+    }
+  },
+  "confirm-beside-before-approve": {
+    "entry": "confirm-beside",
+    "prompt": "confirm-beside-before-approve",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_triple_1",
+              "arguments": "{\"value\":3}"
+            }
+          },
+          {
+            "id": "p2",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":2}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 4
+        }
+      },
+      "math.triple@1": {
+        "result": {
+          "value": 9
+        }
+      }
+    }
+  },
+  "confirm-beside-before-deny": {
+    "entry": "confirm-beside",
+    "prompt": "confirm-beside-before-deny",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_triple_1",
+              "arguments": "{\"value\":3}"
+            }
+          },
+          {
+            "id": "p2",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":2}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 4
+        }
+      },
+      "math.triple@1": {
+        "result": {
+          "value": 9
+        }
+      }
+    }
+  },
+  "confirm-beside-between-approve": {
+    "unordered": true,
+    "entry": "confirm-beside",
+    "prompt": "confirm-beside-between-approve",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_triple_1",
+              "arguments": "{\"value\":3}"
+            }
+          },
+          {
+            "id": "p2",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":2}"
+            }
+          },
+          {
+            "id": "p3",
+            "type": "function",
+            "function": {
+              "name": "math_triple_1",
+              "arguments": "{\"value\":3}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 4
+        }
+      },
+      "math.triple@1": {
+        "result": {
+          "value": 9
+        }
+      }
+    }
+  },
+  "confirm-beside-between-deny": {
+    "unordered": true,
+    "entry": "confirm-beside",
+    "prompt": "confirm-beside-between-deny",
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_triple_1",
+              "arguments": "{\"value\":3}"
+            }
+          },
+          {
+            "id": "p2",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":2}"
+            }
+          },
+          {
+            "id": "p3",
+            "type": "function",
+            "function": {
+              "name": "math_triple_1",
+              "arguments": "{\"value\":3}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The sibling results and decision are ready."
+      }
+    ],
+    "answers": [
+      {
+        "action": "deny",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 4
+        }
+      },
+      "math.triple@1": {
+        "result": {
+          "value": 9
+        }
+      }
+    }
+  },
   "plain-text": {
     "entry": "single",
     "prompt": "Say hello.",

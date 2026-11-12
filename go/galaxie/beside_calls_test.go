@@ -11,12 +11,12 @@ package galaxie_test
 // the uninterrupted script's scopes and one approval/invocation per write.
 // GA4 passes for persisted pauses: invalid partial/wrong-kind answers dispatch
 // nothing and the original pause bytes remain answerable in a fresh Store.
-// GA5 retains the existing refusals; full conformance remains a separate gate.
+// GA5 retains the existing refusals; native, Node and Chromium conformance pass.
 // NB1 fails: combined answers keep the pending marker instead of the real
 // long-running answer. GB1-GB5 have no native-parity candidate and are inapplicable.
 // NB2: either split order delivers both outcomes after an intermediate model call.
 // C-go is a source fact: the pinned module has no request_input tool or symbol.
-// Ordinary siblings are eligible for support once new conformance goldens pass;
+// Ordinary siblings are supported with six new live/restored conformance goldens;
 // long-running siblings and request input remain refused. No runtime code changes.
 
 import (

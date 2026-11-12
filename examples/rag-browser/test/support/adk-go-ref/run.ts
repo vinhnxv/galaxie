@@ -135,6 +135,13 @@ const definition = defineAgentDefinition({
   executor: 'adk-go',
   input: z.object({ prompt: z.string() }),
   capabilities: {
+    optional: {
+      'math.triple@1': {
+        kind: 'read',
+        input: z.object({ value: z.number() }),
+        output: z.object({ value: z.number() }),
+      },
+    },
     required: {
       'math.double@1': {
         kind: 'read',
@@ -259,6 +266,21 @@ export async function runCase(
         roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
       },
       bindings: {
+        ...(script.capabilities['math.triple@1']
+          ? {
+              'math.triple@1': {
+                kind: 'read' as const,
+                destination: 'in-browser' as const,
+                timeoutMs: 5000,
+                concurrency: 1,
+                grantScope: 'instance' as const,
+                approval: 'none' as const,
+                retry: 'none' as const,
+                invoke: async () =>
+                  script.capabilities['math.triple@1']?.result as { value: number },
+              },
+            }
+          : {}),
         'math.double@1': {
           kind: 'read',
           destination: 'in-browser',
