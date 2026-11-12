@@ -153,9 +153,11 @@ def test_search_only_adds_provider_config_and_rejects_a_non_gemini_name():
 
 @pytest.mark.parametrize('shape', ['code', 'thinking'])
 def test_builtin_executor_and_planner_only_add_provider_configuration(shape):
-    options = {'code_executor': BuiltInCodeExecutor()} if shape == 'code' else {
-        'planner': BuiltInPlanner(thinking_config=types.ThinkingConfig(thinking_budget=128))}
-    root = LlmAgent(name='root', model=Scripted(model='gemini-2.5-flash'), **options)
+    root = LlmAgent(
+        name='root', model=Scripted(model='gemini-2.5-flash'),
+        code_executor=BuiltInCodeExecutor() if shape == 'code' else None,
+        planner=BuiltInPlanner(thinking_config=types.ThinkingConfig(thinking_budget=128)) if shape == 'thinking' else None,
+    )
     assert final_text(asyncio.run(converse(root))) == 'done'
     assert len(REQUESTS) == 1 and CALLS == []
     if shape == 'code':
