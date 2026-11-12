@@ -731,6 +731,8 @@ closed-list Workflow admission and full route parity, Go's native-oracle revisio
 and dedicated nested-path/pause browser evidence. Tracker filing is left to the
 orchestrator for this run.
 
+The duplicate-aware identity follow-up is answered by the [later outcome](#duplicate-identity-measured-outcome-2026-11-13).
+
 New evidence is CPython for Python, Node and headless Chromium for JavaScript,
 and native Go for Go. Existing Worker/browser conformance remains regression
 coverage only; no new Python or Go nested-path browser behavior is claimed.
@@ -799,6 +801,91 @@ Predictions (registered with the rule; U6 restates them beside the results and n
 - P7. Every `subgraphs` flag stays false, GA6, GA8 and GF1 to GF5 are not measured, and the follow-up list is non-empty.
 
 New tests, additive ADK matrix and fixture entries, new documentation, and the three named accepted-duplicate assertion conversions are permitted; existing entries, goldens and locks stay unchanged.
+
+#### Duplicate-identity measured outcome (2026-11-13)
+
+The outcome rule above was committed in `423df17` before any probe ran. Native
+facts landed in `9d31f0f` and `266c557`; the unchanged-executor measurements in
+`2520597` precede the refusal. The rule and predictions remain as registered.
+The JavaScript and Python measurements use ADK 2.3.0 and 2.12.0 respectively,
+scripted models, Node 24.15.0/headless Chromium and CPython 3.14.5. The Python
+prepare refusal also runs through the rebuilt wheel in the Node Pyodide Worker.
+
+| Cell | Outcome | Decisive evidence |
+| --- | --- | --- |
+| D-js | **REFUSED** | DA1 fails on Sequential/Loop identity fields; DC1 fails DA2 S5 when a worker emits no final response. RF1–RF8 pass; the existing prepare walk now refuses repeated names with `unsupported`. |
+| D-py | **REFUSED** | The same DA1/DA2 failure, plus first-match output-key loss and a shared Parallel delta buffer. RF1–RF8 pass; `_validate` folds its conditional duplicate checks into one unconditional check. |
+| D-go | **REFUSED**, already shipped | Native `runner.New` rejects non-unique agent names. `go/galaxie/run.go` maps this to `unsupported` at the start of Execute, before model dispatch, rather than at a separate prepare step. No Go source or test changes. |
+
+Evidence files: [native JavaScript](../../packages/adapter-adk/test/duplicate-identity-native.test.ts),
+[native Python](../../tests/conformance/cases-adk-python/test_adk_python_duplicate_identity.py),
+[JavaScript executor](../../packages/adapter-adk/test/duplicate-identity-measure.test.ts),
+[Python executor](../../python/galaxie/tests/test_adk_duplicate_identity.py), and
+[existing Go regression](../../go/galaxie/stream_namespaces_test.go).
+The pre-refusal measurement commit preserves the accepted-duplicate assertions;
+the shipped tests now assert the earlier refusal instead of bypassing validation.
+
+| Gate | Measured evidence | Result |
+| --- | --- | --- |
+| DA1 | D1 and D3 duplicate workers have equal author, branch and invocation ID, with the same partial/final flags and empty Python node paths. D2 has distinct `root.first`/`root.second` branches, stable under reversed arrival. | Fail on both executors |
+| DA2 S1–S3 | One sequential pass, tool/result/final turns and two Loop iterations equal their hand-written position oracles. | Pass before refusal |
+| DA2 S5 | Ordinary two-turn baseline passes. In the adversarial variant, first emits only partial text on turn one; the stored final authors belong to second/first/second, while DC1 assigns first/second/first. The native partial-only probe precedes this executor measurement. | Fail on both executors |
+| DA2 S6–S8 | Not measured: outcome fixed by S5. Native D2 reversed arrival is measured, but is not a claimed S8 executor pass. | Not measured |
+| DA3 S4 | JavaScript pauses ahead of duplicate branches; Python pauses in the last child after them. Reload rebuilds the same derivation and preserves the stored bytes; the resumed script completes. | Pass before refusal; broader restore shapes not measured |
+| DA4 | `findAgent`/`find_agent` selects the first matching leaf. Two duplicate workers with different output keys return the last worker's JSON as text rather than its structured value. Python Parallel workers contaminate the shared surrogate buffer. | Existing defects recorded; no ad hoc resolution changes |
+| RF1 | Literal/builder review plus a temporary uncommitted refusal: existing JavaScript adapter/conformance suites fail only the two named duplicate subjects; all 79 Worker tests pass. Full Python census has 1421 passes and only the named duplicate-attribution failure. No recipe, example, template or golden builder requires accepted duplicate names. | Pass; exactly three existing assertion groups converted |
+| RF2/RF3 | D1–D6, including root-name reuse and a shared instance forced into two positions, fail with the fixed content-free `unsupported` error. JavaScript counts zero model and store requests; Python counts zero bridge requests, and the Worker asserts zero model calls. One check follows each existing walk, preserving a later malformed child's `invalid` precedence. | Pass |
+| RF4 | Unique-name paused records restore byte-for-byte with unchanged pending identity and resume. Preparing a duplicate tree with retained authentic pause bytes fails before reading them and leaves rows unchanged. Existing restore suites retain their assertions apart from the named JavaScript duplicate admission conversion. | Pass, with the compatibility cost below |
+| RF5/RF6 | Case/NFC/NFD-distinct names, T1–T5, and generated trees at depth 16 and 256 agents prepare and run with exactly one position per name. Existing recipe/conformance gates remain regression evidence. | Pass; GA3 passes for every accepted tree |
+| RF7/RF8 | Only the two validation walks change. No router, broker, label, confirmation, redaction, scope or record code changes. DA1/DA2 fail and the name-keyed defects justify the narrower admission. | Pass |
+| GA1/GA2/GA4/GA5 | T1–T5 final-message paths match authored oracles across two turns and rebuilt trees. The admitted pause reload is covered above. Paths use names and author only, contain no content canary, and add no stored field. | Pass test-locally |
+| GA7 | Existing goldens, locks, core, effect scopes and record formats are unchanged; matrix changes add entries only. | Pass by diff and regression gates |
+| GA6/GA8 | Not measured: carriage is not shipped. | Not measured |
+| GF1–GF5 | Not measured: outcome fixed by GF2. | Not measured |
+
+The census counts three existing integration subjects: the JavaScript restore
+admission row `duplicate`, JavaScript accepted duplicate message attribution,
+and Python accepted duplicate message attribution. Helper-only duplicate trees
+in `agents.test.ts` still test the unchanged pause rule; native duplicate trees
+still characterize ADK itself. Neither group is an additional conversion.
+
+This explicitly narrows admission for Accepted ADR-0020: every agent name,
+including the root, must be unique by exact string equality. A repeated name now
+fails `unsupported` at prepare, before model dispatch or a store read. Rename
+agents for a fresh tree. A pause written under a previously accepted duplicate
+tree can no longer prepare, even when the pausing agent itself is unique; keep
+its original bytes for rollback. Renaming is not a migration of stored authors.
+Unique-name records, `adk.session/v1`, Python/Go records, effect-scope strings and
+interaction-ID derivation are unchanged. Python already refused resumable and
+ambiguous pausing trees, so its new refusal affects the remaining trees.
+
+The message-only author/tree recipe is now unambiguous for every tree that
+prepares. It remains an **alternative** to namespaces. `subgraphs` stays false
+on all three executors: no nested path carriage, pending path or stored namespace
+ships, and there is no dedicated nested-path/pause browser evidence. The older
+Go namespace cell remains refused under its full native-oracle rule.
+
+Prediction accounting: P1's overall separating-field failure holds for D1/D3,
+but D4 does not transfer through the measured Sequential wrappers: JavaScript
+repeats the router to the native 500-call bound, while Python raises an unrelated
+agent error; neither specialist runs. Python sibling uniqueness is only a warning,
+contrary to the premise. P2 holds on the no-final S5 variant; S8 is unmeasured.
+P3 holds only for linear S4; failure-shape restore was not measured. P4's native
+transfer-first-match prediction fails, while lookup/output-key/delta predictions
+hold. P5/P6/P7 hold: the refusals ship or already exist, only the named conversions
+were needed, flags stay false and follow-ups remain.
+
+The output-key defect's observed symptom is loss of structured output, not a
+measured return of the first worker's value. The Python delta probe emits `x`,
+a high surrogate followed by the other worker's `y`, and an isolated low surrogate;
+the two workers' own complete texts were a valid surrogate pair and `y`. The
+refusal prevents these duplicate-tree cases without changing output or delta code.
+
+Follow-ups: path carriage and nested-pause/browser evidence; a new duplicate
+identity derivation if demand requires those trees; transfer reachability through
+workflow wrappers; and remeasurement at any ADK version change. S6–S8, early-exit
+Loop variants, broader restore shapes, Firefox, WebKit, real models and device
+checks remain unmeasured. No cell is recorded as supported or left incomplete.
 
 ### String models, toolsets, code executors, planners and built-in tools spike (2026-11)
 

@@ -35,8 +35,10 @@ import { FakeChatModel, wordChunks } from './support/fixtures.js';
  * DA3 PASS S4: rebuilt pause log and live derivation agree.
  * DA4: first-match output key loses structured output; Python additionally
  * mixes Parallel surrogate buffers. Native transfer prediction did not hold.
- * D-js/D-py select the refusal candidate, conditional on RF1-RF8 and shipping.
- * RF1 census PASS; RF2-RF8 pending shipped candidate verification.
+ * D-js REFUSED: the prepare-time refusal ships after the recorded DA failure.
+ * RF1-RF8 PASS: exact-name refusal, unchanged unique-name restore bytes,
+ * zero model/store requests, limit trees and unchanged control boundaries.
+ * GA1-GA5/GA7 PASS test-locally; GA3 follows unique accepted names.
  * GA6/GA8 not measured: carriage not shipped; GF1-GF5 fixed by GF2.
  * No public path, stored format or effect scope changes.
  */

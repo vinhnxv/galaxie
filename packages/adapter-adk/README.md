@@ -84,13 +84,18 @@ if (event.type === 'stream' && event.mode === 'messages') {
 }
 ```
 
-Build the lookup from the same static tree the factory returns, and reject
-ambiguous names in the host's lookup rather than changing executor admission.
-Tool and paused markers carry no author; Parallel messages interleave. Duplicate
-leaves in different Sequential subtrees have the same author and branch, so their
-ancestry cannot be recovered this way. `subgraphs` stays false: event paths remain
-empty, scopes stay positional, PendingInteraction carries no path and no namespace
-is stored. These are display labels, not checkpoint or authorization keys.
+Build the lookup from the same static tree the factory returns. The
+[duplicate-identity outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#duplicate-identity-measured-outcome-2026-11-13)
+now refuses a repeated agent name, including reuse of the root name, with
+`unsupported` at prepare before a model call or store read. Rename agents in a
+fresh tree; comparison is exact, so case and Unicode normalization stay distinct.
+Message authors identify one position in every tree that prepares. Pauses stored
+under an older duplicate tree can no longer prepare; renaming does not migrate
+stored authors. Unique-name records restore unchanged.
+Tool and paused markers carry no author; Parallel messages interleave.
+`subgraphs` stays false: event paths remain empty, scopes stay positional,
+PendingInteraction carries no path and no namespace is stored. These are display
+labels, not checkpoint or authorization keys.
 
 Workflow is **refused** under the spike rule. Static FunctionNode lists alone do
 not establish routed model calls, and full routed-graph replacement is unmeasured.

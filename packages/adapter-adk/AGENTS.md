@@ -35,7 +35,7 @@ Do not import an `@google/adk/...` subpath, another executor adapter or LangGrap
 
 The adapter streams checked text deltas and content-free tool markers and pauses on confirmations
 and long-running tools (interrupts and resume), and stores sessions through `services.checkpoints`
-when the host supplies it (otherwise in memory). It has no subgraphs.
+when the host supplies it (otherwise in memory). It has no subgraphs. Any repeated agent name, including the root, fails `unsupported` at prepare before model or store access; names compare exactly.
 Live pauses and stored pauses share `pauseAdmitted`; restore rejects a missing,
 ambiguous or refused author before registration or loading (`unrecoverable`). Any defined
 `actions.agentState` or `actions.endOfAgent` is refused on encode (`unsupported`) and restore

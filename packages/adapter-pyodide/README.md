@@ -1000,14 +1000,19 @@ if (event.type === 'stream' && event.executor === 'adk-python' && event.mode ===
 }
 ```
 
-Keep all candidates when building the lookup and decline attribution for duplicate
-names. Duplicate leaves in separate Sequential subtrees are accepted and
-indistinguishable by author/branch. Tool/paused markers have no author, Parallel
-interleaves, and node_info.path is empty under Sequential/Parallel/Loop roots.
-Standalone LlmAgent transfer roots can carry node paths, which are not a universal
-identity oracle. Event paths stay empty, effect scopes stay positional,
-PendingInteraction has no path and no namespace is stored; `subgraphs` stays false.
-The new recipe evidence is CPython only, without a new Worker/browser lane.
+The [duplicate-identity outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#duplicate-identity-measured-outcome-2026-11-13)
+now refuses every repeated agent name, including the root, with `unsupported`
+at prepare before model or store access. Rename agents in a fresh tree; names
+compare exactly, including case and Unicode normalization. Message attribution is
+unambiguous for every tree that prepares. Older duplicate-tree pauses can no
+longer prepare; renaming does not migrate their stored authors. Unique-name pause
+records restore unchanged. The new refusal is measured in CPython and Node Pyodide.
+Tool/paused markers have no author, Parallel interleaves, and node_info.path is
+empty under Sequential/Parallel/Loop roots. Standalone LlmAgent transfer roots can
+carry node paths, which are not a universal identity oracle. Event paths stay
+empty, effect scopes stay positional, PendingInteraction has no path and no
+namespace is stored; `subgraphs` stays false. Dedicated nested-path browser
+behavior, Firefox, WebKit and real models remain unmeasured.
 
 Workflow remains **refused**: a manifest-only FunctionNode allow-list cannot prove
 routing, and the full route-preserving tree replacement is unmeasured. Static

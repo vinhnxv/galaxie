@@ -39,7 +39,10 @@ nested-path browser support. The bridge carries no tree/path field. Stream paths
 remain empty, scopes positional, PendingInteraction has no path and no namespace
 is stored; `subgraphs` stays false. Workflow is **refused** by source fact: ADK
 v1.9.0 has no workflow graph package or exported Workflow type. The older
-SequentialAgent, ParallelAgent and LoopAgent remain supported.
+SequentialAgent, ParallelAgent and LoopAgent remain supported. The
+[duplicate-identity outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#duplicate-identity-measured-outcome-2026-11-13)
+confirms that a repeated name fails `unsupported` at Execute before model dispatch.
+Rename agents for a fresh tree; no Go behavior, stored format or flag changed.
 
 ## Interactions
 
