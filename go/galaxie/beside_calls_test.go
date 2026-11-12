@@ -9,15 +9,17 @@ package galaxie_test
 // ordered native results, without running ordinary calls again.
 // GA3 passes with fake host receipts: live/reload/failed-resume retries keep
 // the uninterrupted script's scopes and one approval/invocation per write.
-// GA4 passes for persisted pauses: invalid partial/wrong-kind answers dispatch
-// nothing and the original pause bytes remain answerable in a fresh Store.
-// GA5 retains the existing refusals; native, Node and Chromium conformance pass.
+// GA4 fails for memory-only pauses: an invalid answer consumes the pause.
+// Persisted original bytes remain answerable in a fresh Store, which does not
+// satisfy the unconditional answerability gate. No production fix ships.
+// GA5 retains the existing refusals; existing conformance passes unchanged.
 // NB1 fails: combined answers keep the pending marker instead of the real
 // long-running answer. GB1-GB5 have no native-parity candidate and are inapplicable.
 // NB2: either split order delivers both outcomes after an intermediate model call.
 // C-go is a source fact: the pinned module has no request_input tool or symbol.
-// Ordinary siblings are supported with six new live/restored conformance goldens;
-// long-running siblings and request input remain refused. No runtime code changes.
+// Ordinary siblings remain accepted by shipped approve/deny behavior, but the
+// spike outcome is REFUSED after GA4, contrary to the support prediction.
+// Long-running siblings and request input remain refused. No runtime code changes.
 
 import (
 	"context"
@@ -462,6 +464,34 @@ func TestConfirmationBesideOrdinaryInvalidAnswersKeepPersistedPauseAnswerable(t 
 			if done.Output != "done" || len(caller.calls) != 3 {
 				t.Fatalf("the saved pause was not answerable: done=%+v calls=%v", done, caller.calls)
 			}
+		})
+	}
+}
+
+func TestConfirmationBesideOrdinaryInvalidAnswersConsumeMemoryOnlyPause(t *testing.T) {
+	for _, wrongKind := range []bool{false, true} {
+		t.Run(fmt.Sprint(wrongKind), func(t *testing.T) {
+			names := []string{"math_triple_1", besideGate, besideGate}
+			caller := &scripted{replies: []string{besideScript(names), reply("done")}, capability: echoCapability}
+			definition := definitionOf(besideEntry(true))
+			if wrongKind {
+				definition.Resume = func([]galaxie.Request, string, any) ([]galaxie.Decision, error) {
+					return []galaxie.Decision{galaxie.Respond(map[string]any{}), galaxie.Confirm(true)}, nil
+				}
+			}
+			store := galaxie.NewStore()
+			paused := start(t, store, caller, definition)
+			if paused.Pause == nil || len(caller.calls) != 1 {
+				t.Fatalf("pause = %+v, calls = %+v", paused.Pause, caller.calls)
+			}
+			_, err := answer(store, caller, definition, paused.Pause.ID, "approve", approveAll(1))
+			assertCode(t, err, "invalid")
+			if len(caller.calls) != 1 || len(caller.models) != 1 {
+				t.Fatalf("invalid answer dispatched work: calls = %+v, models = %d", caller.calls, len(caller.models))
+			}
+			definition.Resume = nil
+			_, err = answer(store, caller, definition, paused.Pause.ID, "approve", approveAll(2))
+			assertCode(t, err, "stale")
 		})
 	}
 }
