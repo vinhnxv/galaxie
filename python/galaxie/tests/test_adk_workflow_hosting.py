@@ -18,11 +18,13 @@ No production validator is weakened and no external model is called.
 
 import asyncio
 import json
+from typing import cast
 
 import pytest
-from google.adk.agents import LlmAgent, ParallelAgent, SequentialAgent
+from google.adk.agents import BaseAgent, LlmAgent, ParallelAgent, SequentialAgent
 from google.adk.agents.context import Context
 from google.adk.models.base_llm import BaseLlm
+from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import Runner
 from google.adk.workflow import FunctionNode, Workflow
@@ -40,7 +42,8 @@ def test_workflow_is_refused_before_any_bridge_dispatch():
     _bridge.install_transport(forbidden)
     flow = Workflow(name='wf', edges=[('START', LlmAgent(name='a', model=llm('answer')))])
     with pytest.raises(GalaxieError) as error:
-        Executor(flow)
+        # Exercise runtime admission with a deliberately unsupported root.
+        Executor(cast(BaseAgent, flow))
     assert error.value.code == 'unsupported'
 
 
@@ -52,15 +55,16 @@ def test_static_function_node_manifest_does_not_close_model_dispatch():
             calls.append(self.model)
             yield LlmResponse(content=types.Content(role='model', parts=[types.Part(text='hidden')]))
 
-    hidden = LlmAgent(name='hidden', model=Scripted(model='unregistered_script'))
+    hidden = Scripted(model='unregistered_script')
 
     async def dispatch(ctx: Context):
-        return [reply async for reply in hidden.model.generate_content_async(None)]
+        return [reply async for reply in hidden.generate_content_async(LlmRequest())]
 
     declared = FunctionNode(name='declared', func=dispatch)
     flow = Workflow(name='wf', edges=[('START', declared)])
-    # These are exactly the allowed static node kinds; the hidden node is not in the graph.
+    # These are exactly the allowed static node kinds; the hidden model is not in the graph.
     assert type(declared) is FunctionNode
+    assert flow.graph is not None
     assert [node.name for node in flow.graph.nodes if node.name != '__START__'] == ['declared']
 
     async def run():
@@ -108,11 +112,14 @@ def test_static_chain_and_fanout_replacement_replay_each_write_once(parallel):
         return json.dumps({**message, 'kind': 'response', 'ok': True, 'payload': reply})
 
     _bridge.install_transport(transport)
-    tools = lambda: [capability_tool('write', 'notes.write@1', {
-        'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'],
-    }, 'Write a value.')]
+    children: list[BaseAgent] = [
+        LlmAgent(name=name, model=llm(name), tools=[capability_tool('write', 'notes.write@1', {
+            'type': 'object', 'properties': {'value': {'type': 'integer'}}, 'required': ['value'],
+        }, 'Write a value.')])
+        for name in ('a', 'b')
+    ]
     cls = ParallelAgent if parallel else SequentialAgent
-    root = cls(name='root', sub_agents=[LlmAgent(name=name, model=llm(name), tools=tools()) for name in ('a', 'b')])
+    root = cls(name='root', sub_agents=children)
     executor = Executor(root)
     with pytest.raises(GalaxieError) as error:
         asyncio.run(executor.run({'prompt': 'go'}, 's1', 10))
