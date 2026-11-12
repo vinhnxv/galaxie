@@ -890,6 +890,39 @@ invocation per write across reload, reversed arrival and failed-resume retry. `W
 pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) names fail
 `unsupported` at prepare. `subgraphs` stays false.
 
+### Porting ADK models and static toolsets
+
+The [model/toolset/built-in spike](../../docs/adr/0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11)
+records **ALTERNATIVE** for explicit models and static capability lists. Replace
+`model='gemini-2.5-flash'` or a foreign model with `model=llm('answer')`; the host
+must declare and route `answer`. Prepare has no declared-role list, so string
+mapping cannot fail closed there without a new bridge field. Prefer role names
+such as `answer`: ADK treats the display name `galaxie/gemini-*` as Gemini-like,
+although built-ins still fail at prepare regardless of that name.
+
+```python
+from google.adk.agents import LlmAgent
+from galaxie.adk import capability_tool, llm
+
+SPECS = [('search', 'docs.search@1', {'type': 'object', 'properties': {'q': {'type': 'string'}}, 'required': ['q']}, 'Search documents.')]
+
+def create():
+    return LlmAgent(name='root', model=llm('answer'), tools=[
+        capability_tool(name, capability, parameters, description)
+        for name, capability, parameters, description in SPECS
+    ])
+```
+
+Keep the table static and construct tools inside the entry factory. MCP-backed
+entries use the host's `tools-mcp` bindings. Per-turn dynamic lists and network
+toolsets have no proven replacement. Provider-native network tools, code executors
+and both planners remain **REFUSED**: provider tool config is rejected before the
+bridge; thinking config is omitted; instruction text does not reproduce PlanReAct
+final retagging under the same script. Use a narrow host-bound read capability for
+network data as general guidance, not as this spike's same-script alternative.
+New probes ran on CPython only; existing Worker/browser suites are regression
+evidence. No new Worker support, real-model, Firefox or WebKit result is claimed.
+
 ### ADK message attribution
 
 The [stream namespace spike](../../docs/adr/0020-google-adk-through-an-adapter.md#stream-namespaces-workflow-agents-and-subgraphs-spike-2026-11)

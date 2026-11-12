@@ -55,6 +55,7 @@
   ],
   "differences": [],
   "normalizations": [
+    "Model/toolset/builtin spike: M-py and T-py ALTERNATIVE through explicit llm(role) and flat capability lists; N-py/X-py/L-py REFUSED. Prepare has no role inventory; galaxie/gemini-* satisfies the native name predicate, but builtins remain refused. Provider tool config is rejected, not silently dropped. New CPython characterizations only; no runtime, golden or existing case changes.",
     "Stream namespace spike: A-py/C-py ALTERNATIVE (unique-name message attribution only; GA3 duplicate-name ambiguity); B-py REFUSED (manifest-only routing and full routed replacement not established). New probes are CPython only; subgraphs remains false and all stream paths remain empty.",
     "Provider call IDs are runtime-generated on each side (ADK uses adk-<uuid>, galaxie uses galaxie-<n>), so request messages number them by first appearance.",
     "Transcripts compare the requests the model saw, the scripted replies it returned, the capability calls, the run output and the run error. ADK events are not part of a transcript except the stream events a streaming case records: checked text deltas as `messages` and content-free tool markers as `updates`.",

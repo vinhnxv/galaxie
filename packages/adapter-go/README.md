@@ -139,6 +139,38 @@ an agent, model, function tool or toolset built directly with ADK, and a tree ou
 `subgraphs` stays false. Every shape is recorded with its native result in `tests/conformance` and
 `go/galaxie/shapes_test.go`; see the [limits](../../docs/unsupported.md#google-adk-go).
 
+### Porting models and static toolsets
+
+The [model/toolset/built-in spike](../../docs/adr/0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11)
+records **ALTERNATIVE** for models and static capability lists. Native Go has no
+string-model form. Replace a foreign `model.LLM` with `galaxie.Model("answer")`;
+the host declares and routes `answer`. A foreign model or native toolset still
+fails `unsupported` before requests. Create fresh values inside `Definition.Build`.
+
+```go
+func build() (agent.Agent, error) {
+    specs := []struct { name string; spec galaxie.ToolSpec }{
+        {"docs.search@1", galaxie.ToolSpec{Description: "Search documents.", Schema: `{"type":"object","properties":{"q":{"type":"string"}},"required":["q"]}`}},
+    }
+    tools := make([]tool.Tool, 0, len(specs))
+    for _, item := range specs {
+        created, err := galaxie.CapabilityTool(item.name, item.spec)
+        if err != nil { return nil, err }
+        tools = append(tools, created)
+    }
+    return galaxie.LlmAgent(llmagent.Config{Name: "root", Model: galaxie.Model("answer"), Tools: tools})
+}
+```
+
+This uses the existing `agent`, `llmagent`, `tool` and `galaxie` imports. MCP-backed
+entries use the host's `tools-mcp` capability bindings. Dynamic lists and network
+toolsets have no proven replacement. Built-in network/code tools remain **REFUSED**:
+`RequestToWire` rejects provider tool configuration. The pinned agent config has
+no planner or code-executor field. Host-bound network reads are general guidance,
+not a same-script replacement for provider-native tools. New evidence is native
+Go only; existing Worker/restore suites remain regression coverage. Firefox,
+WebKit, real models and new Worker-specific measurements remain unmeasured.
+
 ## Build and licenses
 
 ```sh

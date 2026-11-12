@@ -8,8 +8,9 @@ for confirmations and Loop refusal. GT4 uses closed membership. GT5 fails: no
 public registered-toolset constructor. AL-T passes for a static list only.
 N-py REFUSED: GN1 fails (provider tools refused, not carried); GN2 not measured after GN1;
 GN3 passes. AL-N fails: native search emits no function call to replace.
-X-py REFUSED: GX1 fails (author file access in native probe; Worker subprocess
-source absence). GX2 not measured after GX1; GX3 passes. No AL-X boundary.
+X-py REFUSED: GX1 fails to establish isolation (author file access in native
+probe; Worker subprocess unmeasured). GX2 not measured after GX1; GX3 passes.
+No AL-X boundary.
 L-py REFUSED: GL1 fails (thinking dropped; tagged final differs); GL2 not measured
 after GL1; GL3 passes. AL-L fails under the same tagged script.
 """

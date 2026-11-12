@@ -176,6 +176,38 @@ receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `fal
 - `AgentTool` and `Workflow` fail `unsupported` at prepare. Re-admitting `AgentTool` needs an
   adapter-owned wrapper with its own run config, integrity plugin and session keying.
 
+### Porting models and static toolsets
+
+The [model/toolset/built-in spike](../../docs/adr/0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11)
+records **ALTERNATIVE** for models and static toolsets. Raw strings, Gemini/foreign
+models and toolsets still fail `unsupported` at prepare. Build fresh agent objects
+inside the factory: a tree mapped during an earlier prepare belongs to that earlier
+host and fails the next host's registry check.
+
+| Native sample | galaxie replacement |
+| --- | --- |
+| `model: 'gemini-2.5-flash'` or a provider model | `model: host.adk.llm('answer')`, with `answer` declared and routed by the host |
+| Static toolset | A flat array of `host.adk.capabilityTool(...)` built from a static table |
+
+```ts
+const specs = [{ name: 'docs.search@1', description: 'Search documents.', parameters: z.object({ q: z.string() }) }];
+const agent: AdkAgent = (host) => new LlmAgent({
+  name: 'root',
+  model: host.adk.llm('answer'),
+  tools: specs.map(({ name, ...spec }) => host.adk.capabilityTool(name, spec)),
+});
+```
+
+The role names host policy, not a provider client. MCP-backed entries use host
+`tools-mcp` capability bindings. Per-turn dynamic tool lists and network toolsets
+have no proven replacement. Built-in search/grounding, code executors and both
+planners remain **REFUSED**: provider tools are rejected at the converter, thinking
+config is omitted and instruction text cannot reproduce PlanReAct final retagging
+under the same script. A host-bound read capability is general network-data guidance,
+not the same-script outcome for a provider-native tool. No generated code runs.
+New evidence is scripted Node and Chromium; Firefox, WebKit, real models and
+Worker-hosted JavaScript remain unmeasured.
+
 ## Other facts for hosts
 
 - The adapter installs a no-op ADK logger, which is process-global, so it also silences ADK logging
