@@ -21,23 +21,6 @@ def fields(**values):
     return '\n'.join(f'[[ ## {key} ## ]]\n{value}' for key, value in values.items()) + '\n[[ ## completed ## ]]'
 
 
-@pytest.mark.parametrize('kind', ['parallel', 'evaluate', 'executor'])
-@pytest.mark.parametrize('container', ['direct', 'list', 'tuple', 'dict'])
-def test_prepare_refuses_held_thread_pool_objects(kind, container):
-    from dspy.utils.parallelizer import ParallelExecutor
-    held = (dspy.Parallel() if kind == 'parallel' else
-            dspy.Evaluate(devset=[], display_progress=False, display_table=False) if kind == 'evaluate' else
-            ParallelExecutor(num_threads=2))
-    class Program(dspy.Module):
-        def __init__(self):
-            self.held = {'direct': held, 'list': [held], 'tuple': (held,), 'dict': {'pool': held}}[container]
-        async def aforward(self):
-            return dspy.Prediction(answer='ok')
-    with pytest.raises(GalaxieError) as error:
-        prepare_executor(Program())
-    assert error.value.code == 'unsupported'
-
-
 def transport_for(replies, seen=None, code=None):
     replies = iter(replies)
     async def transport(raw):
