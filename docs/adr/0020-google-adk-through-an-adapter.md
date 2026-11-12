@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement.
 
 ## Context
 
@@ -523,3 +523,82 @@ and unchanged regression conformance. Dedicated Chromium
 coverage for the new Python shapes, Firefox, WebKit and device checks remain
 unmeasured. A pinned ADK version change must rerun the native and executor
 measurement files as well as conformance; these outcomes do not predict other versions.
+
+### Stream namespaces, Workflow agents and subgraphs spike (2026-11)
+
+#### Outcome rule registered before measurement (2026-11-12)
+
+Cells (G = gap, E = executor). The premise check re-verifies today's state:
+
+| Cell | Question | Today |
+| --- | --- | --- |
+| A-js, A-py, A-go | do `author` / `branch` map to stable nested stream paths and checkpoint namespaces | every stream event has `path: []`; `subgraphs` false |
+| B-py | host an ADK 2.12.0 `Workflow` with Parallel-branch effect-scope rules | refused at prepare (`_validate`) |
+| B-js | host an ADK 2.3.0 `Workflow` | refused at prepare (`validateAgentTree`) |
+| B-go | host a Workflow | ADK Go v1.9.0 appears to ship none |
+| C-js, C-py, C-go | may the executor's `subgraphs` flag be true | false |
+
+Trees and graphs. Each is driven by native ADK with its own `Runner` and by the galaxie lane, with scripted models and counted capability tools.
+
+- Gap A trees: T1 root `SequentialAgent` [drafter, reviewer]; T2 `ParallelAgent` [left, right] with reversed arrival; T3 `ParallelAgent` [`SequentialAgent` [a, b], c] (branch composition); T4 `LoopAgent` (two iterations) [worker]; T5 `LlmAgent` root transferring to a sub-agent; T6 the same agent name in two different subtrees; T7 each already-accepted pause position (first, middle, nested Sequential leaf; a single confirming Parallel branch) with reload.
+- Gap B graphs: W1 chain START to a to b; W2 fan-out a to [b, c] into a `JoinNode`; W3 route-labeled branch; W4 cycle that revisits a node, and a node with a retry configuration that fails once; W5 an `LlmAgent` node that calls a write capability. Each LLM node uses a galaxie-registered model.
+
+Tree-ancestry mapping candidate, restated as the gate subject: the stream path of an event is the list of agent names from below the root down to the authoring agent (root authoring gives `[]`); the namespace of a sub-agent is that path joined by `/`.
+
+Gates. N = native ADK of that language with its own `Runner`; G = galaxie lane.
+
+Gap A:
+
+- NA1 (native facts and oracle): for T1 to T6 record, per event, `author`, `branch` and, on Python, `node_info.path` (informational). The oracle is a hand-written expected path list per tree and per event, written in the native test before the galaxie lane exists. NA1 passes when every observed native `author` equals the authoring agent of the hand-written expectation and every observed `branch` follows the P1 rule (it forks only at `ParallelAgent`). If observed native facts contradict the hand-written expectation, NA1 fails for that executor: the cell is REFUSED citing NA1 and its galaxie gates are not applicable. Record whether names collide in T6 natively. The oracle is tree-derived on all three executors, so GA2 is an implementation-consistency check, not independent parity, and the ADR says so.
+- NA2 (branch sufficiency, informational): record whether `branch` alone separates sibling agents in each tree.
+- GA1 (determinism): each stream event's path is identical across two runs of the same script, across a reload from the byte store (T7), and across a rebuilt tree (a second factory call).
+- GA2 (consistency with the oracle): the galaxie path of each event equals the hand-written oracle path, compared as ordered sequences per path (Parallel arrival order may differ, as in the existing wire-list rule).
+- GA3 (uniqueness and totality): distinct agents get distinct paths in T1 to T5. For T6 distinct paths must be proven without newly refusing any tree that prepares today. A mapping that is ambiguous for a tree the executor accepts fails the gate, and the cell is then at most ALTERNATIVE with the duplicate-name limit documented under AL3. A new prepare refusal of previously accepted trees is not a route to SUPPORTED, because authors' own agents and stored sessions outside this repository would stop preparing.
+- GA4 (content-free): path segments are the tree's agent names only, and depth is bounded by the existing agent-tree depth limit (16); no model, tool-argument, capability-result or user text enters a path; stream checks, output checks and labels are untouched; no tree or name that prepares today is newly refused.
+- GA5 (namespace stability): the namespace is derived at read time from stored `author` and the tree. No field is added to any stored record; stored bytes of every existing script, effect-scope strings and interaction IDs equal their pre-change values (string equality against the existing assertions); the namespace is the same before and after reload and after a tree rebuild; a stored pause whose pausing agent no longer exists in the rebuilt tree fails closed (record what happens today).
+- GA6 (nested pause parity): for each T7 position the `paused` marker carries the pausing agent's path, the events before the pause and after the resume carry nested paths, the published interaction and its ID are unchanged, and the interaction count is unchanged.
+- GA7 (unchanged artifacts): every existing golden is byte-identical; no existing assertion is weakened (the empty-path assertions change only for shipped supported mappings); no core change.
+- GA8 (carriage): the path reaches the host-visible stream event: from `StreamProjector` output on JavaScript, through `adk-python-driver.ts` and `notify_stream_data` on Python (Node conformance lane over the real driver). GA8 can only be measured against shipped code, so it is measured in the shipping unit (see the two-phase decision below).
+- AL1 to AL3 (alternative): AL1 a documented recipe (the host reads `data.author` of `messages` events and maps it through the author's own tree names) reproduces the oracle path for T1 to T5 in an executable test; AL2 it needs no new API, core, bridge or stored-format change; AL3 the docs state its limits (markers carry no author, Parallel interleaves, duplicate names are ambiguous, `node_info.path` is empty for agent children on Python).
+
+Gap B (cell B-py first):
+
+- NW1 (native facts): for W1 to W5 record the final output, per-event `author`, `branch`, `node_info.path` with run IDs, model-request counts and tool-body counts, including that a revisit and a retry produce new run IDs.
+- NW2 (entry point, a gate): record what hosting needs: `Runner(node=...)` or an equivalent over the adapter's session service, integrity plugin and `RunConfig`; use a test-local seam only. NW2 fails when no routing-only seam exists; GW1 to GW6 are then not applicable (record the NW2 finding) and B is decided by AL-W alone.
+- GW1 (closed list at prepare): a candidate prepare walk accepts only a static `Workflow` of galaxie-registered `LlmAgent` nodes, `JoinNode` and author function nodes, and refuses every other node kind, dynamic scheduling (`run_node`), parallel workers, retry or timeout settings, nested workflows and tool nodes, each with `unsupported` before any model call and a test per refusal.
+- GW2 (routing): every model call from a node goes through the router and every capability call through the broker; ordered request digests equal native for W1 to W3.
+- GW3 (effect-scope rule): capability calls use the Parallel-branch scope `adk-python/<conversation>/<branch-or-root>/<branch-local-index>/<part-index>`; fan-out nodes get distinct scopes; reversed arrival leaves every scope unchanged; a revisit of a node (W4) gets a new scope per visit while a re-dispatch of the same visit replays its receipt.
+- GW4 (writes once): with the recovery store and host confirmations, host `invoke` count equals the logical write count across a normal run and a run that fails after a node's write and is retried with the same prompt.
+- GW5 (no pause inside): a pausing tool anywhere under a `Workflow` is refused at prepare; native pause behavior is recorded as information.
+- GW6 (conformance and artifacts): new cases and goldens only; existing artifacts unchanged.
+- AL-W (alternative): a documented replacement for the static shapes W1 to W3 with `SequentialAgent` and `ParallelAgent` runs in an executable test with the same output and write-once behavior; the docs state what has no replacement (routes, cycles, retries).
+
+Gap C (per executor X):
+
+- GF1 (no hidden consumer): a search of `packages`, `tests`, `python`, `go` and `examples` shows `features.subgraphs` read only by descriptors and conformance assertions, so flipping it changes no run behavior.
+- GF2 (A-X supported): A-X is SUPPORTED, including GA6.
+- GF3 (browser evidence): at least one new nested-path streaming case and one nested-pause case pass in headless Chromium for X: the vitest browser project for JavaScript (`--project browser`); for Python `examples/rag-browser/test/adk-python-conformance.node.test.ts`, which runs only the cases listed in `adkPythonBrowserCases` (`tests/conformance/support/adk-python.ts`), so the new cases are registered there; for Go `examples/rag-browser/test/adk-go-reference.node.test.ts`. An unmeasured browser is not a pass.
+- GF4 (consistency): the matrix `features`, the adapter `features`, the adapter tests and every doc sentence agree.
+- GF5 (stated meaning): the matrix `limits`, `docs/unsupported.md`, `docs/status.md` and the adapter README each state, for X, what `subgraphs: true` means and does not: stream events from nested agents carry non-empty `path` (`messages`, tool markers and `paused`); effect scopes stay positional and are not keyed by the path; `PendingInteraction` carries no path; no namespace is stored. Verified by the U7 docs search. This keeps a host that reads the descriptor from inferring LangGraph-style checkpoint-namespace semantics.
+
+Decision rule, per cell:
+
+- SUPPORTED iff every gate of its family passes, measured, and the shipped change plus new goldens landed. For gap C, SUPPORTED means the flag is true and shipped.
+- ALTERNATIVE iff not SUPPORTED, no new public API, core, bridge or stored-format change is needed, and AL1 to AL3 (gap A) or AL-W (gap B) pass. Gap C is ALTERNATIVE when its A cell is ALTERNATIVE: the flag stays false and the recipe is the documented replacement.
+- REFUSED otherwise. A failed or unmeasured gate never yields SUPPORTED. The cell keeps (or gets) an executable refusal test and the record cites the failing gate. A gap C cell whose only failing gate is an unrun GF3 browser lane is recorded as REFUSED (browser lane not run) and the docs say exactly that, with no claim of technical impossibility.
+- A failing native gate makes the matching galaxie gates not applicable for acceptance.
+- Two-phase decision for gaps A and C. The measurement units record A as "measured-SUPPORTED" when every gate except GA8 passes on test-local evidence, and C as pending GF2/GF3/GF5. The shipping unit then ships the A change, measures GA8, runs the browser lane (GF3), and only then flips the flag. If GA8 fails, the A source change is reverted and A is recorded ALTERNATIVE or REFUSED by the rule. If GF3 fails or cannot run, A stays shipped (empty-path assertions replaced only for shipped supported mappings) and the flag stays false.
+
+Predictions (registered with the rule; the shipping unit restates them beside the measured results and names every one that did not hold):
+
+- P1. Native facts: `branch` forks only at `ParallelAgent` (`<parallel>.<child>`), so it cannot name Sequential, Loop or transfer children; `author` plus tree ancestry can; ADK Python 2.12.0 `node_info.path` is empty for `SequentialAgent`, `ParallelAgent` and `LoopAgent` children (probed) and non-empty only for `Workflow` nodes; ADK JS 2.3.0 and Go v1.9.0 agent events carry no node path; T6 is valid natively.
+- P2. A-py: mapping gates GA1, GA2, GA4 and GA5 pass; the open gates are GA3 (T6) and the carriage change through `on_stream` and the Worker driver. Outcome SUPPORTED if GA3, GA6 and GA8 pass, otherwise ALTERNATIVE.
+- P3. A-js: same as A-py with the tree available in-process to `StreamProjector`; outcome SUPPORTED if GA3, GA6 and GA8 pass, otherwise ALTERNATIVE.
+- P4. A-go: the `agent` identity crosses the WebAssembly bridge only as a model-request field and the stream frames have no path field, so a path needs a bridge wire change (ADR-0023 scope). Outcome ALTERNATIVE (the `author` recipe) or REFUSED; not SUPPORTED.
+- P5. B-py: native ADK runs W1 to W5, but `Workflow` owns scheduling, retry, dynamic nodes and rehydration, and the adapter may only add routing, so GW1 or GW3 on revisits is the likely failing gate (a probe shows fan-out nodes can run with branch `None`, while `_scope` counts a branch-local ordinal over all events sharing a branch, so reversed arrival may change scopes). Outcome ALTERNATIVE for the static shapes (AL-W); `Workflow` itself stays refused at prepare.
+- P6. B-js: native ADK JS 2.3.0 also runs a `Workflow`; the galaxie lane repeats B-py's decision by extension unless the native facts differ, and the cell is then ALTERNATIVE or REFUSED, not SUPPORTED.
+- P7. B-go: REFUSED by source fact if the pinned module ships no Workflow; recorded as a source fact, not a measurement.
+- P8. C-js and C-py turn true only if GF3 browser evidence and GF5 exist; C-go stays false. If A is not SUPPORTED the flag stays false and the documented reason is rewritten to the measured one.
+- P9. Overall: at least one ALTERNATIVE, so a follow-up is required. Firefox, WebKit and real models stay unmeasured.
+
+Additive matrix entries, conformance registrations and new golden files are permitted for measured executors; existing entries and golden bytes stay unchanged except for the documented old-reason text replacements, empty-path assertions when a mapping ships, and the subgraphs flag only when its own gates pass.
