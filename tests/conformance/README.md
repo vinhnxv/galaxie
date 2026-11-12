@@ -710,6 +710,13 @@ write approved before a crash that replays its receipt after the restore, a fail
 nothing, a record from another executor, and (Node) a tampered stored call, a record spliced from
 another session and a corrupt record. Node keeps the byte records in memory; the Chromium lane uses
 a real `IndexedDBSaver` and also checks that an export never contains the integrity key.
+Confirmation and long-running reloads preserve the interaction ID without model or capability
+work at restore. A changed tree whose paused author is no longer admitted fails `unrecoverable`
+before publication; Node also checks repeated workflow-state rejection, unchanged stored rows
+and another session's readability. The codec rejects any defined `actions.agentState` or
+`actions.endOfAgent` on write (`unsupported`) and read (`unrecoverable`), with or without a pause.
+These scripted Node/Chromium checks leave the record format unchanged; Firefox, WebKit and
+real models remain unmeasured for them.
 
 Agent shapes (`SequentialAgent`, `LoopAgent`, `ParallelAgent`, transfer) are compared with native ADK in [agents.test.ts](../../packages/adapter-adk/test/agents.test.ts), which also covers parallel write branches re-dispatched with reversed arrival and the refused pauses; the first-child pause reload is in `adk-restore.test.ts`.
 

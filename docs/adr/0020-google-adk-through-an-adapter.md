@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format.
 
 ## Context
 
@@ -344,6 +344,42 @@ The `adk-go` extension remains record only: ADK Go 1.9.0 has no resumable
 invocation. A galaxie-owned continuation design is a separate question. An ADK
 JavaScript version bump must rerun the native and adapter evidence before any
 workflow-pause rule is widened.
+
+#### Restore admission and workflow-state rejection (2026-11)
+
+Stored pauses now pass the same author-position predicate as live pauses. The
+tree must contain no `ParallelAgent`, and the author must be known, unique and
+at a position where `restartsSiblings` is false. The author is derived from
+every stored event holding each paused call's ID: the confirmation-request call
+for a confirmation, or the tool call for a long-running result. Missing calls,
+missing authors or differing authors fail closed. No author field is added to
+the record, so older records restore when their pauses meet the same rule.
+
+The rule runs at pause time and restore time, rather than prepare time: the
+adapter cannot know which agent will pause before execution. A live refusal
+uses the fixed `unsupported` error; restore uses fixed `unrecoverable`, before
+private-content registration, session loading or interaction publication. A
+rejected restore makes no model or capability call and writes nothing; another
+attempt fails identically and other sessions remain readable.
+
+Every stored event also rejects any defined `actions.agentState` or
+`actions.endOfAgent`, including `false` and `null`, whether or not a pause exists.
+Encoding such an event fails `unsupported`; decoding fails `unrecoverable`.
+An own key with an `undefined` value still encodes. `nodeInfo` remains outside
+the closed event/action shapes. The pinned ADK JavaScript 2.3.0 workflow agents
+produce none of these markers in supported runs; only its unsupported workflow
+node runner writes workflow state. This is a presence check, not workflow-state
+validation.
+
+Scripted Node and headless Chromium tests now reject all eight historical G4
+cases above before publication. The admitted first-child control restores the
+same interaction without model or capability work, then completes with requests
+`b,c` and one write. Existing lone-agent, first-child and transfer-chain reload
+tests pass unchanged; a new long-running reload completes with one host write
+across both lifetimes. Literal checkpoint tests pin the unchanged version-one
+format. Existing goldens, matrices and locks are unchanged. No new pause shape
+or resumable production Runner ships. Firefox, WebKit and real models remain
+unmeasured for these checks.
 
 ### Confirmation-beside-calls and request-input spike (2026-11)
 
