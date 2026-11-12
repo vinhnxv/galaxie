@@ -180,7 +180,7 @@ function parseLockfile(text: string): Lockfile {
       entry = undefined;
     }
     if (section === undefined) continue;
-    const record = /^  (\S.*?):(?: \{\})?$/.exec(line);
+    const record = /^ {2}(\S.*?):(?: \{\})?$/.exec(line);
     if (record?.[1] !== undefined) {
       entry = { dependencies: {}, devDependencies: {}, optionalDependencies: {} };
       section[scalar(record[1])] = entry;
@@ -188,7 +188,7 @@ function parseLockfile(text: string): Lockfile {
       continue;
     }
     if (entry === undefined) continue;
-    const field = /^    (\w+):(?: (.*))?$/.exec(line);
+    const field = /^ {4}(\w+):(?: (.*))?$/.exec(line);
     if (field?.[1] !== undefined) {
       group = field[1];
       if (group === 'os' || group === 'cpu' || group === 'libc') {
@@ -204,12 +204,12 @@ function parseLockfile(text: string): Lockfile {
     }
     if (group !== 'dependencies' && group !== 'devDependencies' && group !== 'optionalDependencies')
       continue;
-    const edge = /^      (\S.*?):(?: (.+))?$/.exec(line);
+    const edge = /^ {6}(\S.*?):(?: (.+))?$/.exec(line);
     if (edge?.[1] !== undefined) {
       dependency = scalar(edge[1]);
       if (edge[2] !== undefined) entry[group][dependency] = scalar(edge[2]);
     }
-    const pin = /^        version: (.+)$/.exec(line);
+    const pin = /^ {8}version: (.+)$/.exec(line);
     if (pin?.[1] !== undefined) entry[group][dependency] = scalar(pin[1]);
   }
   return lock;

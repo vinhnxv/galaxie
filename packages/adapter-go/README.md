@@ -30,6 +30,17 @@ Go still receives one aggregated reply per model call, so ADK runs in its server
 sees no partial response: the page checks and forwards the text, and nothing unchecked reaches Go. Without
 `stream`, a run emits only its output. Stream events are delivered live and are not journaled.
 
+The [stream namespace spike](../../docs/adr/0020-google-adk-through-an-adapter.md#stream-namespaces-workflow-agents-and-subgraphs-spike-2026-11)
+records **refused** for the full ancestry oracle: pinned ADK's Runner rejects
+globally duplicate names, contrary to the registered six-tree premise. A partial
+native-Go recipe maps existing bridge authors through an author-owned lookup for
+Sequential, Parallel, nested, Loop and transfer trees, but establishes no new
+nested-path browser support. The bridge carries no tree/path field. Stream paths
+remain empty, scopes positional, PendingInteraction has no path and no namespace
+is stored; `subgraphs` stays false. Workflow is **refused** by source fact: ADK
+v1.9.0 has no workflow graph package or exported Workflow type. The older
+SequentialAgent, ParallelAgent and LoopAgent remain supported.
+
 ## Interactions
 
 A tool created with `RequireConfirmation` (the tool does not run before approval) or `LongRunning` (the

@@ -65,6 +65,38 @@ Stream data is delivered live and is not journaled. A provider without native st
 whole reply as one chunk. The final response ADK records carries the whole reply, so the run output
 does not depend on the deltas. Abort or an early stop settles the model call once, as failed.
 
+### Attributing nested messages
+
+The [stream namespace spike](../../docs/adr/0020-google-adk-through-an-adapter.md#stream-namespaces-workflow-agents-and-subgraphs-spike-2026-11)
+records an **alternative**, not nested stream support. For a tree whose agent names
+are globally unique, the host can build its own below-root lookup and attribute
+messages without changing the event:
+
+```ts
+const paths = new Map([
+  ['drafter', ['sequence', 'drafter']],
+  ['reviewer', ['sequence', 'reviewer']],
+]);
+if (event.type === 'stream' && event.mode === 'messages') {
+  const author = (event.data as { author: string }).author;
+  const displayPath = paths.get(author);
+  // Render displayPath in the host's own UI.
+}
+```
+
+Build the lookup from the same static tree the factory returns, and reject
+ambiguous names in the host's lookup rather than changing executor admission.
+Tool and paused markers carry no author; Parallel messages interleave. Duplicate
+leaves in different Sequential subtrees have the same author and branch, so their
+ancestry cannot be recovered this way. `subgraphs` stays false: event paths remain
+empty, scopes stay positional, PendingInteraction carries no path and no namespace
+is stored. These are display labels, not checkpoint or authorization keys.
+
+Workflow is **refused** under the spike rule. Static FunctionNode lists alone do
+not establish routed model calls, and full routed-graph replacement is unmeasured.
+SequentialAgent/ParallelAgent cover static chains and fan-out; dynamic routes,
+cycles and retries have no demonstrated replacement here.
+
 ## Pauses and resume
 
 A tool created with `requireConfirmation: true`, or with `longRunning: true`, can stop the run to

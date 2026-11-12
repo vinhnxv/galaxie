@@ -55,6 +55,7 @@
   ],
   "differences": [],
   "normalizations": [
+    "Stream namespace spike: A-py/C-py ALTERNATIVE (unique-name message attribution only; GA3 duplicate-name ambiguity); B-py REFUSED (manifest-only routing and full routed replacement not established). New probes are CPython only; subgraphs remains false and all stream paths remain empty.",
     "Provider call IDs are runtime-generated on each side (ADK uses adk-<uuid>, galaxie uses galaxie-<n>), so request messages number them by first appearance.",
     "Transcripts compare the requests the model saw, the scripted replies it returned, the capability calls, the run output and the run error. ADK events are not part of a transcript except the stream events a streaming case records: checked text deltas as `messages` and content-free tool markers as `updates`.",
     "The native lane implements the capability tool itself with the same declaration, so the lanes compare the model mapping and the run loop, not the tool body. The denial case pins the fixed model-visible error a denied capability returns.",
