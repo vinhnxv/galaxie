@@ -155,6 +155,13 @@ const agent: AdkAgent = (host) =>
   stay in memory, as before. The effect scope of a write is position-derived, so an approved write
   whose run crashed replays its receipt after the restore. One active owner per session applies, as for
   the other executors; the example host is a later stage.
+  Before registering or loading a stored pause, restore derives its author from the call events
+  and applies the live pause-position rule; a missing, ambiguous or refused author fails
+  `unrecoverable` before any interaction or model/capability call. Any defined
+  `actions.agentState` or `actions.endOfAgent` (including `false` and `null`) fails encoding
+  `unsupported` and restore `unrecoverable`, even without a pause; `nodeInfo` remains refused.
+  The stored format is unchanged. These checks use scripted Node and Chromium tests;
+  Firefox, WebKit and real models remain unmeasured.
 
 ## Supported agent shapes
 
@@ -173,6 +180,8 @@ receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `fal
   The same holds in any tree that contains a `ParallelAgent`, and for an unknown or
   duplicate-named pausing agent. A pause in the first child at every `SequentialAgent` step, or in
   a chain of `LlmAgent`s linked by transfer, resumes in place and survives a reload.
+  The same predicate re-checks stored pauses at restore (`unrecoverable` on refusal), so moving
+  a formerly admitted author into a refused position cannot republish its interaction.
 - `AgentTool` and `Workflow` fail `unsupported` at prepare. Re-admitting `AgentTool` needs an
   adapter-owned wrapper with its own run config, integrity plugin and session keying.
 

@@ -36,6 +36,7 @@ import {
   decodeRecord,
   EXECUTOR,
   encodeRecord,
+  pauseAuthor,
   restoredContent,
   revisionId,
   SESSION_TYPE,
@@ -116,6 +117,15 @@ export function restartsSiblings(root: BaseAgent, name: string): boolean {
   return chain.some((parent, index) => {
     return !(parent instanceof SequentialAgent) || parent.subAgents[0] !== path[index + 1];
   });
+}
+
+/** The same author-position rule admits live pauses and stored pauses before restore. */
+export function pauseAdmitted(
+  root: BaseAgent,
+  parallel: boolean,
+  author: string | undefined,
+): boolean {
+  return !parallel && author !== undefined && !restartsSiblings(root, author);
 }
 
 function findAgent(root: BaseAgent, name: string): BaseAgent | undefined {
@@ -214,6 +224,15 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
           }
           if (reply !== null) {
             const stored = await storedOf(sessionId, reply);
+            if (
+              stored.pause !== undefined &&
+              !pauseAdmitted(
+                root as BaseAgent,
+                parallel,
+                pauseAuthor(stored.pause.calls, stored.events),
+              )
+            )
+              throw failure('unrecoverable');
             if (register === undefined) throw failure('unsupported');
             try {
               register(restoredContent(stored));
@@ -507,12 +526,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               let paused = false;
               try {
                 paused = tracker.observe(event);
-                if (
-                  paused &&
-                  (parallel ||
-                    (event.author !== undefined &&
-                      restartsSiblings(root as BaseAgent, event.author)))
-                )
+                if (paused && !pauseAdmitted(root as BaseAgent, parallel, event.author))
                   throw failure('unsupported');
               } catch (error) {
                 run.fail(error);

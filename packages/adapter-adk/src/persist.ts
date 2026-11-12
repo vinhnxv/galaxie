@@ -118,6 +118,7 @@ function validEvent(event: unknown): event is Event {
   if (running !== undefined && !(Array.isArray(running) && running.every(text))) return false;
   const actions = event['actions'];
   if (!plain(actions) || !only(actions, ACTION_KEYS)) return false;
+  if (actions['agentState'] !== undefined || actions['endOfAgent'] !== undefined) return false;
   const content = event['content'];
   if (content === undefined) return true;
   if (!plain(content) || !only(content, ['role', 'parts'])) return false;
@@ -173,6 +174,27 @@ function pauseMatches(calls: readonly PausedCall[], events: readonly Event[]): b
       JSON.stringify(stored.args ?? {}) === JSON.stringify(call.request.args)
     );
   });
+}
+
+/** The single defined author shared by every event holding a paused call's own ID. */
+export function pauseAuthor(
+  calls: readonly PausedCall[],
+  events: readonly Event[],
+): string | undefined {
+  const ids = new Set(calls.map((call) => call.id));
+  const matched = new Set<string>();
+  let author: string | undefined;
+  for (const event of events) {
+    for (const part of event.content?.parts ?? []) {
+      const id = part.functionCall?.id;
+      if (id === undefined || !ids.has(id)) continue;
+      if (event.author === undefined || (author !== undefined && event.author !== author))
+        return undefined;
+      author = event.author;
+      matched.add(id);
+    }
+  }
+  return matched.size === ids.size ? author : undefined;
 }
 
 const encoder = new TextEncoder();

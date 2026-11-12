@@ -27,7 +27,7 @@ import { AIMessage } from '@langchain/core/messages';
 import { afterAll, expect, test } from 'vitest';
 import { z } from 'zod';
 import { MemoryRecoveryStore } from '../../core/test/support/memory-recovery-store.js';
-import { createAdkAdapter, restartsSiblings } from '../src/adapter.js';
+import { createAdkAdapter, pauseAdmitted, restartsSiblings } from '../src/adapter.js';
 import type { AdkAgent, AdkHost } from '../src/host.js';
 import { ADK_EXECUTOR_ID } from '../src/index.js';
 import { defineAdkEntry } from '../src/interaction.js';
@@ -590,4 +590,33 @@ test('the resume rule follows ADK: only a restart through first children is safe
     restartsSiblings(new LoopAgent({ name: 'loop', maxIterations: 2, subAgents: [llm('a')] }), 'a'),
   ).toBe(true);
   expect(restartsSiblings(flow('s', llm('x'), flow('t', llm('y'), llm('x'))), 'x')).toBe(true);
+});
+
+test('pause admission shares the live and restore position rule and requires one known author', () => {
+  const llm = (name: string, subAgents: LlmAgent[] = []): LlmAgent =>
+    new LlmAgent({ name, instruction: name, subAgents });
+  const seq = (name: string, ...subAgents: BaseAgent[]): SequentialAgent =>
+    new SequentialAgent({ name, subAgents });
+  const cases: { root: BaseAgent; author: string; admitted: boolean; parallel?: boolean }[] = [
+    { root: llm('solo'), author: 'solo', admitted: true },
+    { root: llm('parent', [llm('child')]), author: 'child', admitted: true },
+    { root: seq('s', llm('a'), llm('b')), author: 'a', admitted: true },
+    { root: seq('s', seq('t', llm('a'), llm('b')), llm('c')), author: 'a', admitted: true },
+    { root: seq('s', llm('a'), llm('b'), llm('c')), author: 'b', admitted: false },
+    { root: seq('s', llm('a'), llm('b')), author: 'b', admitted: false },
+    { root: new LoopAgent({ name: 'loop', subAgents: [llm('a')] }), author: 'a', admitted: false },
+    { root: llm('solo'), author: 'unknown', admitted: false },
+    { root: seq('s', llm('b'), seq('t', llm('b'))), author: 'b', admitted: false },
+    {
+      root: seq('s', llm('a'), new ParallelAgent({ name: 'par', subAgents: [llm('b')] })),
+      author: 'a',
+      parallel: true,
+      admitted: false,
+    },
+  ];
+  for (const { root, author, admitted, parallel = false } of cases) {
+    expect(pauseAdmitted(root, parallel, author)).toBe(admitted);
+    if (!parallel) expect(pauseAdmitted(root, false, author)).toBe(!restartsSiblings(root, author));
+    expect(pauseAdmitted(root, parallel, undefined)).toBe(false);
+  }
 });
