@@ -86,7 +86,10 @@ def test_native_authors_and_branches_follow_the_tree_oracle(shape):
     actual = [(event.author, event.branch or '') for event in authored]
     expected = [(author, branch) for author, branch, _ in ORACLE[shape]]
     assert sorted(actual) == sorted(expected)
-    if shape not in ('transfer',):
+    if shape == 'transfer':
+        # Standalone LlmAgent roots also stamp node paths, contrary to P1.
+        assert [event.node_info.path for event in authored] == ['root@1', 'root@1/specialist@1']
+    else:
         assert [event.node_info.path for event in authored] == [''] * len(authored)
     if shape == 'duplicate':
         assert actual == [('worker', ''), ('worker', '')]
