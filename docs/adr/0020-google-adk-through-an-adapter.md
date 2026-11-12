@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement.
 
 ## Context
 
@@ -344,3 +344,52 @@ The `adk-go` extension remains record only: ADK Go 1.9.0 has no resumable
 invocation. A galaxie-owned continuation design is a separate question. An ADK
 JavaScript version bump must rerun the native and adapter evidence before any
 workflow-pause rule is widened.
+
+### Confirmation-beside-calls and request-input spike (2026-11)
+
+#### Outcome rule registered before measurement (2026-11-12)
+
+Cells (G = gap, E = executor). Today's state is what the premise tests re-verify:
+
+| Cell | Shape | Today |
+| --- | --- | --- |
+| A-js | gated call G plus ordinary call W in one turn | refused (`PauseTracker`) |
+| A-py | same | shipped, unit-tested, no conformance case |
+| A-go | same | shipped, unit-tested, no conformance case |
+| B-js, B-py, B-go | gated call G plus long-running call L in one turn, either call order | refused |
+| C-js | `adk_request_input` call by an `LlmAgent` | refused at pause time |
+| C-py | `adk_request_input` | no helper; reachable only as a long-running capability tool named that way |
+| C-go | `adk_request_input` | ADK Go v1.9.0 ships no such tool |
+
+Shapes per gap, each asserted with approve and deny: A1 `[G, W]`, A2 `[W, G]`, A3 `[W1, G, W2]` where W is a read; A4 the same with W a write capability under the recovery store and host confirmation; B1 `[G, L]`, B2 `[L, G]`; C1 one request with a message and a response schema.
+
+Gates. N = native ADK of that language with its own `Runner` and scripted models; G = galaxie lane.
+
+- NA1 (native continuity): after the answer, the next model request carries a result for every call of the turn, each ordinary tool body ran exactly once in total, G's body ran once on approve and never on deny, and on deny the model sees the rejection.
+- NB1 (native combined answer): one user message answering both G's confirmation request and L's call yields a model request with L's real answer and G's outcome, L's body ran once, G's body once on approve and never on deny.
+- NB2 (native split answer): record what ADK does when the two answers arrive in separate runs (informational; it decides whether ADR-0030 would be needed, and fails nothing by itself).
+- NC1 (native input): after `adk_request_input` is answered, the `LlmAgent` model's next request carries the answer.
+- GA1 (live parity): output, ordered model requests, capability calls and the published interaction match native. Exactly one interaction is published, listing only the gated call(s); no gated body runs before the answer.
+- GA2 (reload): pause, dispose the runtime, build a fresh runtime over the same byte store: same interaction ID, same completion transcript as live, W not run again.
+- GA3 (writes once): with the recovery store and host confirmations, host `invoke` count equals the logical write count across approve, reload, and an approve whose resume fails after the write and is retried; effect-scope strings equal those of an uninterrupted run of the same script with G ungated.
+- GA4 (nothing skipped, nothing lost): deny never runs G; a partial answer (one of two requests, or a wrong kind) fails `invalid` before any body runs; the pause stays answerable.
+- GA5 (refusals intact): every shape the cell does not accept still ends `unsupported` with no interaction published, no body run after the pause and the conversation rolled back; all existing tests and goldens pass unmodified (one exception: when A-js is decided SUPPORTED, the implementation replaces the sibling-refusal test in `packages/adapter-adk/test/interaction.test.ts` with an acceptance test; the long-running-sibling refusal test stays).
+- GB1 to GB5: GA1 to GA5 for B1 and B2 with one interaction carrying two positional requests (a confirmation and a long-running one), answered together through the author's `resume` hook. L's capability reaches the host once even though it runs at call time.
+- AL1 to AL3 (alternative, gap C and any cell that fails): AL1 the documented replacement runs in an executable test and the answer reaches the model; AL2 the interaction request carries the question and the author's `resume` validates the answer; AL3 reserved-name safety: a capability tool named `adk_request_input` is either refused at construction or proven harmless by a test.
+
+Decision rule, per cell:
+
+- SUPPORTED iff every gate of its family (A: NA1, GA1 to GA5; B: NB1, GB1 to GB5; C: NC1 and GA1 to GA5 shaped for a single input request) passes, measured, and the shipped change plus new goldens landed (implementation and documentation). For A-py and A-go the change is already shipped; SUPPORTED then needs only NA1 and GA1 to GA5 passing, plus the new conformance case with a golden.
+- ALTERNATIVE iff not SUPPORTED, no new public API is needed, and AL1 to AL3 pass.
+- REFUSED otherwise. A failed or unmeasured gate never yields SUPPORTED. The cell keeps (or gets) an executable refusal test and the record cites the failing gate.
+- A native gate that fails (NA1, NB1, NC1) makes the corresponding G gates not applicable for acceptance: the adapter cannot repair ADK's loss of an answer without changing the model-visible history, which is in Considered and not built.
+
+Predictions (registered with the rule; the record restates them beside the measured results and names every one that did not hold):
+
+- P1. A-py and A-go: NA1 and GA1 to GA5 pass; SUPPORTED. The Python result already matches the unit test.
+- P2. A-js: NA1 fails on ADK 2.3.0 because a sibling's result is dropped from the model request after the confirmation answer (the matrix note). Outcome REFUSED. If NA1 passes, A-js proceeds to implementation and must pass the full family.
+- P3. B on all three: NB1 fails or NB1 passes but GB3 fails because L's capability would run again on resume; outcome REFUSED. Python is the executor where NB1 is most likely to pass (`flows/llm_flows/core/_resume.py` handles several calls per event), so Python gets measured first and decides whether Go and JavaScript repeat it. NB2 is recorded either way.
+- P4. C-js: NC1 fails (ADK hides the answer); ALTERNATIVE through `capabilityTool({ longRunning: true })` with an author `resume` hook, which `interaction.test.ts` already exercises.
+- P5. C-py: NC1 passes natively; no helper ships (R5); ALTERNATIVE through `capability_tool(..., long_running=True)` with an author `resume`; AL3 is open (the name `adk_request_input` passes the `_TOOL_NAME` pattern today).
+- P6. C-go: REFUSED, with the reason that ADK Go v1.9.0 ships no request-input tool; this is a source fact, not a measurement, and is recorded as such.
+- P7. Overall: at least one ALTERNATIVE and at least one SUPPORTED (A-py, A-go), so a follow-up is required. Firefox, WebKit and real models unmeasured.
