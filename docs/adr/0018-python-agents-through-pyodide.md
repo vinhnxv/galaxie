@@ -27,6 +27,8 @@
   2026-11-11: recorded provider-string LM, schema-output and service-retrieval alternatives and embedding refusal; status stays Proposed.
   2026-11-12: shipped fixed `unsupported` refusal for DSPy thread-pool fan-out; status stays Proposed.
 
+  2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement.
+
 ## Context
 
 Agent authors ask for Python frameworks: LangChain and LangGraph for Python, pydantic-ai, DSPy, CrewAI and others. Brief §7.4 places Python in the Experimental tier, and §16.7 gates it on a use case strong enough to pay the compatibility cost. This ADR fixes the boundary a Python executor would use, so that a spike can test it and the gate decision can be made with evidence.
@@ -591,3 +593,84 @@ LiteLLM/declared-provider routes, Databricks/Weaviate, vector capabilities,
 undeclared roles and multimodal shapes remain unmeasured. Prior Chromium evidence
 is reused only for existing goldens/RAG cases. ADR-0012 controls and Decision text
 are unchanged; this ADR remains Proposed.
+
+### LangGraph Python tool-call replies spike (2026-11)
+
+#### Outcome rule registered before measurement (2026-11-12)
+
+One executor, six cells. Today every tool shape on this lane is refused (U1 re-verifies). "Candidate" means the smallest shape a host could own, measured as a test-local copy first (KTD3): (a) `GalaxieChatModel.bind_tools(tools, *, tool_choice=None)` that admits only tools created by (c) and returns a bound runnable carrying `options.tools` and `options.toolChoice` (`auto`, `none`, `required`, or one tool name); (b) message conversion that maps assistant `tool_calls` to `toolCalls` and a `ToolMessage` with text content to a tool-role message with `tool_call_id`, and reply `toolCalls` to `AIMessage.tool_calls` with parsed JSON-object arguments and unchanged IDs, streamed deltas to `tool_call_chunks`; (c) `capability_tool(name, capability, parameters, description)` returning a `StructuredTool` whose coroutine calls `galaxie.capabilities.call(capability, input, config, tool=True)`, converts only `denied` into fixed model-visible text and re-raises every other code; (d) a proxy-side latch: the first non-`denied` code a helper tool observes is stored in a slot keyed by the run (the effect-scope root taken from the config's `langgraph_checkpoint_ns` or `checkpoint_ns`, or the thread ID in `configurable` when that is the only Python-visible run key) and every later `GalaxieChatModel` request or helper call carrying the same key re-raises it before any bridge request. The slot is never a plain module global and is not a ContextVar that the `ToolNode` child tasks cannot propagate to the model node (the Worker driver does not set `capabilities.failures`, and `worker.ts` is out of bounds). If no Python-visible run key exists that lets the model node and the tool coroutine agree without a driver change, the latch is not built and G4.5 is recorded `fail`. The native reference is CPython with the pinned LangGraph, a scripted tool-calling `BaseChatModel` and the prebuilt `ToolNode`. Each scenario uses scripted models and counted capabilities.
+
+Gates are measured in the order listed. A gate passes only when the favourable condition holds. A gate that states a fact expected to be the failing result is recorded `fail` when observed.
+
+C1 bind and non-streaming reply (read capability tool; prebuilt `ToolNode` loop and a hand-written loop):
+
+- N1 (native oracle): on native CPython record the ordered message list with tool-call IDs, projection of `AIMessage.tool_calls` and `ToolMessage`, whether a coroutine tool receives its `config`, the `checkpoint_ns` of two parallel calls in one reply, and the default error handler rule. N1 fails if prebuilt `ToolNode` cannot run in the pinned Worker wheel set (then C1 is decided by AL).
+- G1.1 (wire fidelity): requests carry `options.tools` equal to the helper's declarations in order (names, descriptions, JSON Schema), `toolChoice` as mapped, assistant `toolCalls` with JSON-string arguments, tool-role messages with `tool_call_id`; replies become `tool_calls` with the same IDs and parsed arguments.
+- G1.2 (routing): through core and Node Pyodide, a role whose provider declares `tool-calling` and has `bindTools` runs the loop; a role without the feature fails before dispatch with zero provider calls; a provider with no `bindTools` fails `unsupported`.
+- G1.3 (parity): final state, message projection (type, content, id, tool-call name, arguments and id), stream modes and paths, ordered broker calls and counters equal the native reference on Node Pyodide; every difference is a named row.
+- G1.4 (reply validity): a non-object or non-JSON `arguments` string, a duplicate call ID in one reply, an empty name, and a call naming a tool that was not offered each fail fixed `invalid` at the proxy before any tool body runs.
+- G1.5 (unchanged behavior): tool-less text calls, schema-constrained calls and streaming text calls match the existing goldens and tests unmodified; a history holding tool parts with no `bind_tools` call is decided and recorded.
+
+C2 streamed reply:
+
+- N2 (native): record `tool_call_chunks` shapes from a scripted streaming tool-calling model and the merged `tool_calls` of the aggregated chunk.
+- G2.1 (delta mapping): bridge `toolCalls` deltas become `tool_call_chunks` (index, id, name, args) so LangChain's chunk merge equals the native merged `tool_calls`; a final reply that disagrees with the merged deltas fails `invalid`.
+- G2.2 (checked growing text): split arguments and growing IDs are checked before forwarding; a blocked fragment never reaches Python, no tool body runs, the run ends `denied`.
+- G2.3 (features): a streamed tool call requires both `streaming` and `tool-calling`; a provider lacking either fails before dispatch.
+- G2.4 (stream projection and close): `messages` stream events carrying tool-call chunks stay inside the existing bounded projection; cancel and close mid tool-call stream drain as text streams do.
+
+C3 confirmed write:
+
+- G3.1 (confirm and run once): a write bound with `approval: 'confirm'` and host confirmation coverage runs only after host approval, exactly once, on the frozen arguments; model text or tool output cannot approve.
+- G3.2 (denial): a declined confirmation returns fixed model-visible text, the loop continues bounded by `steps` and `toolCalls`, and the host write count is zero.
+- G3.3 (refused bindings): a write without `approval: 'confirm'`, a write with no confirmation coverage and an unbound capability each fail fixed `invalid` with zero host writes and end the run.
+- G3.4 (mapping difference): schema-invalid model arguments end the run `invalid`, unlike the JavaScript helper's model-visible text. This is expected to be a recorded difference, not a failure of the cell; it fails only if the bridge reports distinct codes (then the candidate follows JavaScript).
+- G3.5 (cancel while waiting): cancelling or aborting while a confirmation is pending settles `cancelled`, leaves no unsettled lease and no write.
+
+C4 safety floor. G4.1, G4.2, G4.4, G4.5 and G4.6 are floor gates (veto, see decision rule):
+
+- G4.1 (output check): blocked tool-call arguments or IDs fail `denied` before the tool runs and before any broker call, non-streaming and streaming.
+- G4.2 (tool-call budget): with `limits.toolCalls = n` the call n+1 fails `budget_exceeded` before host dispatch and ends the run under the default `ToolNode`.
+- G4.3 (step budget): an endless tool loop ends `budget_exceeded` through the recursion limit with a bounded number of broker calls and no model call after exhaustion.
+- G4.4 (labels): a `private-user` result returned to the model is not sent to a destination the label policy refuses; the next model call fails `denied` with zero provider dispatch, as on the JavaScript lane.
+- G4.6 (latch scope): after a run ends through a latched terminal code, a fresh run on the same prepared adapter and Worker, including one for a different session, issues model and capability requests normally; the latch is cleared or never matches the new run's key.
+- G4.5 (swallowed failures): with `ToolNode(handle_tool_errors=True)` and with a callable handler, a terminal broker code (`budget_exceeded`, `cancelled`, `timeout`, `unavailable`, `outcome_unknown`, `unrecoverable`) observed by a helper tool still ends the run through the latch: no model request, helper call or host write follows. The residual shape (the graph never makes another proxy request) is recorded as a limit.
+
+C5 durability and effect identity:
+
+- G5.1 (parallel calls): two calls in one reply get distinct effect IDs and receipts, stable across a replay of the same step.
+- G5.2 (crash after write): the Worker is disposed after a host write but before the `ToolMessage` checkpoint; recovery re-runs the node and the host write count stays one (journal receipt).
+- G5.3 (restore): a graph that interrupts after a completed tool loop restores with a fresh Worker and a byte store; the completed tool node does not re-run; final state equals a native reconstruction.
+- G5.4 (serialization): `AIMessage.tool_calls` and `ToolMessage` round-trip through `GalaxieCheckpointer` within the 1 MiB bridge message; an oversized tool result fails fixed `unsupported` without a partial checkpoint.
+
+C6 refused neighbours (each with zero bridge requests and a fixed code, no argument or content text in any error):
+
+- G6.1: a plain `@tool` function, a callable, an OpenAI-format dict and a pydantic class in `bind_tools`; `with_structured_output` through function calling; kwargs other than `tool_choice`; a `tool_choice` outside the four forms; two tools with one name; a name outside `[A-Za-z_][A-Za-z0-9_]{0,63}`; a tool schema larger than the bridge limit.
+- G6.2: multimodal content blocks in a human, AI or tool message; `ToolMessage` with non-string content, `artifact` or error status; a `ToolMessage` whose `tool_call_id` matches no earlier call.
+- G6.3: native `bind_tools` on a model that is not `GalaxieChatModel` and direct trusted `capabilities.call` stay outside the guard and are documented as such, not refused.
+
+AL (alternative, shared by C1 to C5): the documented text-protocol recipe, where a node asks the routed model for a JSON tool request in plain text, parses it and calls `galaxie.capabilities.call(name, input, config)`, runs under a scripted model whose reply carries the call as JSON text instead of a tool-call part and yields the same ordered broker calls, the same write-once count and the same final text as the native tool-call run. Its limits (no `ToolNode`, no schema-constrained choice, no streamed tool deltas, direct calls are not subject to the helper's `tool: true` policy check) are stated in the docs.
+
+Decision rule, per cell:
+
+- SUPPORTED iff every gate of its family passes, measured; no public surface beyond R5 changed; the shipped change, conformance cases and new goldens landed; refusals updated at every enforcement point.
+- ALTERNATIVE iff not SUPPORTED, no new surface beyond R5 is needed, and AL passes for the cell's scenario.
+- REFUSED otherwise. A failed or unmeasured gate never yields SUPPORTED. The cell keeps (or gets) an executable refusal test and the record cites the failing gate.
+- Floor veto: if G4.1, G4.2, G4.4, G4.5 or G4.6 fails, no source ships and C1, C2, C3 and C5 are decided by AL.
+- Dependency: C2, C3 and C5 can be SUPPORTED only if C1 is SUPPORTED (they need the loop). C4 is measured on the C1 candidate even if C1 later fails another gate.
+- C6 is REFUSED when every listed refusal test passes. A listed shape that runs is a defect: record it, change no source, and list it in the PR body.
+- A failing native gate makes the matching galaxie gates not applicable.
+
+Predictions (registered with the rule; U6 restates them beside the measured results and names every one that did not hold):
+
+- P1. Native facts: prebuilt `ToolNode` runs in the Worker wheel set (`langgraph-prebuilt` is in the inventory) and its default handler re-raises non-`ToolInvocationError` exceptions; coroutine tools receive `config`.
+- P2. C1 is SUPPORTED: the bridge and adapter need no change; only the proxy does.
+- P3. C2 is SUPPORTED: deltas map to `tool_call_chunks` and the JS-side checks already exist.
+- P4. C3 is SUPPORTED with the G3.4 difference recorded.
+- P5. C4: floor gates pass; G4.5 passes for graphs that call the proxy again after a swallowed failure and records the residual limit; G4.6 passes if a run key is visible to Python, otherwise the latch is not built and G4.5 fails (which vetoes shipping, see P8).
+- P6. C5 is SUPPORTED on CPython and Node Pyodide; Chromium reload stays unmeasured.
+- P7. C6 is REFUSED for every listed shape.
+- P8. Overall at least one SUPPORTED cell, so U7 lists follow-ups. A failing floor gate (including G4.5 or G4.6) would flip C1, C2, C3 and C5 to ALTERNATIVE and ship no source.
+
+
+Additive entries in the Python compatibility matrix and conformance case lists, separate tool-case projections and new native-recorded goldens are permitted; existing entries, fixtures, case names, golden bytes, locks and other executors remain unchanged.
