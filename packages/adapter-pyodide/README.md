@@ -132,10 +132,11 @@ own the static allowlist and write-binding setup; grants, validation, labels,
 budgets, output checks, host confirmations and the effect journal remain in
 JavaScript. Plain native models and direct trusted capability calls are outside
 the candidate guard. Plain tools, arbitrary binding forms and multimodal/tool
-message neighbours remain **refused** on this proxy. Scripted CPython and Node
-Pyodide evidence covers the replacement, budget termination and private-result
-destination refusal; new Chromium reload, Firefox, WebKit and real models are
-unmeasured. See the [gate record](../../docs/adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-replies-spike-2026-11)
+message neighbours remain **refused** on this proxy. Scripted CPython tests compare
+the replacement with native tool-call loops; Node Pyodide additionally exercises
+host confirmations, budget termination, private-result destination refusal and
+fresh-Worker restore/replay. New Chromium reload, Firefox, WebKit and real models
+are unmeasured. See the [gate record](../../docs/adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-replies-spike-2026-11)
 and [executable evidence](../../tests/conformance/README.md#langgraph-python-tool-call-replies-spike).
 
 For LangGraph Python, `interrupts`, `resume`, `checkpoints`, `streaming` and
