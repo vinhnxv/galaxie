@@ -61,7 +61,7 @@ The `adk` framework (executor `adk-python`, ADR-0022) accepts only `LlmAgent`,
 and tools. A leaf may pause under sequential ancestors at any child position; a single
 pausing agent beneath each Parallel ancestor may ask for confirmation. Loop pauses,
 long-running Parallel tools and transfer pauses stay refused. Newly enabled positions
-use ADK resumability and refuse duplicate names anywhere, `temp:` output keys and
+use ADK resumability and refuse `temp:` output keys and
 `LlmAgent` transfer children; original last-child sequences keep their runner.
 Keep `subgraphs` false and keep the parallel-write replay test
 (`tests/conformance/adk-python-agents.node.test.ts`) green when changing effect scopes.

@@ -946,7 +946,7 @@ confirmation in any child of a `SequentialAgent` (including nested sequences), a
 middle child and one confirming branch under each `ParallelAgent`, also across a reload on Node.
 Newly enabled pause positions use ADK resumability; original last-child sequences keep their
 runner. Loop pauses remain refused because native resumability repeats an earlier writer's
-finished tool. Resumable apps refuse duplicate agent names, `temp:` output keys and `LlmAgent`
+finished tool. Every app refuses repeated agent names at prepare; resumable apps also refuse `temp:` output keys and `LlmAgent`
 transfer children. Two parallel branches
 that call write capabilities keep branch-local replay scopes; recovery tests count one host
 invocation per write across reload, reversed arrival and failed-resume retry. `Workflow`, `AgentTool` and every

@@ -182,8 +182,8 @@ receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `fal
   from its first child (the native test shows this for `SequentialAgent`). A pause would run
   earlier siblings, and their writes, again in a `LoopAgent`, in a later child of a
   `SequentialAgent`, or under an `LlmAgent` inside a workflow agent, so it fails `unsupported`.
-  The same holds in any tree that contains a `ParallelAgent`, and for an unknown or
-  duplicate-named pausing agent. A pause in the first child at every `SequentialAgent` step, or in
+  The same holds in any tree that contains a `ParallelAgent`, and for an unknown pausing
+  agent (repeated agent names are refused earlier, at prepare). A pause in the first child at every `SequentialAgent` step, or in
   a chain of `LlmAgent`s linked by transfer, resumes in place and survives a reload.
   The same predicate re-checks stored pauses at restore (`unrecoverable` on refusal), so moving
   a formerly admitted author into a refused position cannot republish its interaction.
