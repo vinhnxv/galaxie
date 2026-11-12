@@ -1,5 +1,16 @@
 # Project status
 
+On 2026-11-12, the LangGraph Python tool-call replies spike records **alternative**
+for binding/replies, streaming, confirmed writes, the safety floor and durable
+replay, and **refused** for neighbouring binding/message shapes: scripted CPython
+tests compare the text-protocol replacement with native tool-call loops, while
+Node Pyodide adds one confirmed host write across restore/replay, budget termination
+and private-result destination refusal; the test-local helper fails
+swallowed-terminal-code containment in both lanes.
+No production source or existing golden/lock changed; new Chromium reload,
+Firefox, WebKit and real-model probes remain unmeasured. See the
+[record and limits](adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-replies-spike-2026-11).
+
 On 2026-11-11, the DSPy provider spike records provider-string LMs **alternative**,
 native provider schema output **alternative**, embeddings **refused** and service
 retrievers **alternative**. Native CPython and Node Pyodide cover `pe-lm-*`,

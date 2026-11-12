@@ -43,8 +43,11 @@ subgraphs preserve nested paths, child interrupts, resume and durable restore. S
 calls require a provider declaring `streaming`, including implicit graph message
 streaming from Python `ainvoke`. Growing text and final text are checked in JavaScript
 before forwarding; earlier allowed deltas cannot be retracted after a block.
-The adapter supports asynchronous text-only model calls, schema-constrained replies
-and streaming. A bridge `repairAttempt` must be a positive safe integer beside
+The LangGraph proxy supports asynchronous text-only model calls and streaming;
+model-chosen calls use the measured [text-protocol replacement](README.md#langgraph-python-model-chosen-calls-through-text).
+Native tool binding remains unimplemented after the swallowed-failure floor failed;
+do not promote the test-local candidate. Other Python faces support routed
+schema-constrained replies. A bridge `repairAttempt` must be a positive safe integer beside
 `jsonSchema`; forward it to `ModelPort.begin` so native-output retries consume the
 host's route and run repair limits. Python code
 is trusted and can import `js`; a Worker is not an isolation boundary. CSP constrains

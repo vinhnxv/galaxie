@@ -22,6 +22,9 @@
     }
   ],
   "limits": [
+    "LangGraph Python tool-call replies spike: binding/replies, streaming, confirmed writes, safety floor and durable replay have text-protocol alternatives; native tool binding and neighbouring tool/message shapes remain refused. The test-local helper failed swallowed-terminal-code containment and no production source shipped.",
+    "Four CPython tool-reply alternatives compare final text, ordered capability calls and write count with the native tool-call oracle. Node Pyodide additionally exercises core host approval/decline, budget termination, private-result destination refusal and one write across fresh-Worker restore/replay. The alternatives supply no ToolNode, schema-constrained choice or streamed tool deltas; direct capability calls omit the helper tool-policy flag.",
+    "New tool-reply probes have no Chromium reload, Firefox, WebKit or real-model measurement. Existing twelve-case projections, case names, golden bytes and locks are unchanged. Inherited Python bind_tools raises NotImplementedError rather than GalaxieError; fixed Worker translation depends on boot versus run.",
     "Pyodide lanes compare projected stream events for eight cases, and pending values and final counters for the four original interrupt cases; complete checkpoint histories are native-only.",
     "Interrupt-subgraph reload compares the same pending ID/value and final counters after reconstruction; accepted-answer reconciliation is covered by the three original reload cases.",
     "Models and capability replies are deterministic fixtures. No real model or external network is used."
