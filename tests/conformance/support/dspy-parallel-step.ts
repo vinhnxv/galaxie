@@ -160,7 +160,11 @@ export async function executeDspyParallelStep(
           postTerminationRequests++;
       });
       return {
-        ...worker,
+        addEventListener: worker.addEventListener.bind(worker),
+        removeEventListener: worker.removeEventListener.bind(worker),
+        terminate() {
+          return worker.terminate();
+        },
         postMessage(message) {
           worker.postMessage(message);
           const value = JSON.parse(message) as {

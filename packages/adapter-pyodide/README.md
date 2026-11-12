@@ -494,7 +494,8 @@ and arguments before ChatAdapter, JSONAdapter or ReAct parses them.
 
 Thread-pool fan-out through `dspy.Parallel` or `dspy.Evaluate` is refused with
 fixed `unsupported`: the Worker cannot start threads, and a synchronous LM entry
-cannot await the bridge. Use sequential `await module.acall(...)` calls instead.
+cannot await the bridge. Sequential `await module.acall(...)` loops remain valid;
+use the keyed helper below for concurrent async calls.
 
 `streaming`, `interrupts`, `resume` and `checkpoints` are true; `subgraphs` is
 false. Nested modules have no checkpoint namespaces, interrupt propagation or
@@ -507,15 +508,41 @@ have an **alternative**; embeddings are **refused**. Multimodal inputs remain
 unsupported. See the [provider recipes and limits](#provider-strings-schema-output-embeddings-and-retrievers). Offline-optimized JSON state has the scripted evidence and limits
 [below](#offline-optimized-program-state).
 
-The parallel spike records **alternative** for `dspy.Parallel` and **alternative**
-for threaded `Evaluate`: use a sequential loop of `await module.acall(...)` today.
-The branch-keyed replacement remains test-only. Its 2026-11-13 shipping attempt
-is **refused**: changed-branch replay ends `unrecoverable` without further model
-or capability requests, but the driver commits a poison checkpoint to prevent
-retrying the divergent program. That changes the stored row set and cannot meet
-the required unchanged-row outcome while retaining the current recovery rule.
-No public `galaxie.dspy.branches` helper ships. See the
-[refusal evidence](../../tests/conformance/README.md#async-branch-helper-shipping-refusal).
+Use the shipped helper for concurrent async calls:
+
+```python
+from galaxie.dspy import branches
+
+answers = await branches({
+    "summary": lambda: summarize.acall(document=document),
+    "keywords": lambda: keywords.acall(document=document),
+})
+```
+
+The input is a mapping of unique keys to zero-argument callables returning
+awaitables; results keep input order. Keys match `[A-Za-z0-9_.-]{1,64}`. A group
+holds at most 32 branches, and a run at most 1000 non-empty groups. Empty groups
+return `{}` without journaling. Each branch must await its journaled calls
+sequentially. Code outside journaled calls must be deterministic.
+
+Branch identity uses group order, the author key and the branch-local call
+ordinal. Replay after a pause matches those markers without new requests for
+the joined group, independent of arrival order and DSPy's thread hops. Branch
+capability calls keep distinct effect scopes and can reuse host write receipts
+after Worker loss. Pause only after the join: interaction requests inside branches,
+nested groups and streaming with branches end fixed `unsupported`. Root journaled
+calls during a group and overlapping journaled calls inside one branch are refused
+only when the overlap is observed in flight; otherwise a later resume can end
+`unrecoverable`, so await each branch's calls sequentially.
+
+Removing/renaming a recorded key, changing a request or adding a journaled call
+on replay ends `unrecoverable` before dispatch. Earlier rows stay unchanged and
+the driver appends one compact poison checkpoint. A divergent paused fan-out
+cannot resume even after the original program returns; the user starts over.
+Malformed stored markers fail before registration and add no row. Metadata stays
+`v: 1`; older libraries refuse fan-out records until newer code returns. Records
+without fan-out keep their original bytes. See the [shipped helper evidence](../../tests/conformance/README.md#shipped-async-branch-helper).
+
 Threaded verbatim calls, including the default thread count, now end fixed
 `unsupported` in native CPython and Node Pyodide, with zero model or capability
 requests. With one thread both still end `unsupported`. Raw author-created threads

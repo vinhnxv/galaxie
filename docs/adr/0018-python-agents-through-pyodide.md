@@ -27,6 +27,7 @@
   2026-11-11: recorded provider-string LM, schema-output and service-retrieval alternatives and embedding refusal; status stays Proposed.
   2026-11-12: shipped fixed `unsupported` refusal for DSPy thread-pool fan-out; status stays Proposed.
   2026-11-13: refused shipping the DSPy async branch helper after measuring its conflict with persistent divergence markers; no production source or checkpoint format change, status stays Proposed.
+  2026-11-13: shipped the DSPy keyed async branch helper with optional journal markers, native/Node replay and Chromium reload evidence; status stays Proposed.
   2026-11-13: accepted the existing DSPy runtime divergence poison checkpoint and revised the gate for a separately scoped helper retry, with sequential and branch persistence pins; status stays Proposed.
 
   2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement; subsequent evidence records five text-protocol alternatives and neighbouring-shape refusal, with no production source shipped.
@@ -490,6 +491,8 @@ ADR-0012 controls are unchanged and this ADR remains Proposed.
 
 ### DSPy async branch-helper shipping refusal (2026-11)
 
+The later [shipped helper](#dspy-async-branch-helper-2026-11-shipped) meets the revised gate; this subsection records the earlier attempt.
+
 The 2026-11-13 shipping attempt is **refused**. The native keyed-helper experiment
 replayed with deterministic scopes across thread hops and reversed arrivals,
 but failed the required unchanged-row check on divergence. The driver deliberately
@@ -560,6 +563,65 @@ Checkpoint validation shows consistency, not integrity; metadata is
 unauthenticated. No production source, checkpoint format, metadata key, error
 code or public symbol changes. ADR-0012 controls and Decision text are unchanged;
 this ADR remains Proposed.
+
+### DSPy async branch helper (2026-11, shipped)
+
+On 2026-11-13, `galaxie.dspy.branches({key: async_callable})` ships for keyed
+concurrent `module.acall` work. It returns a dict in input order. Keys match
+`[A-Za-z0-9_.-]{1,64}`; groups contain at most 32 branches and a run at most
+1000 non-empty groups. Empty groups journal nothing. Each branch must await its
+journaled calls sequentially, and code outside journaled calls must be deterministic.
+Thread-pool `Parallel`, `Evaluate` and `ParallelExecutor` remain refused.
+
+A model or capability journal entry inside a branch gains an optional `fanout`
+marker, `<group>/<key>/<call>`. Group ordinals follow program order; call ordinals
+are local to the branch, including across DSPy's thread hops. Capability scopes
+are `dspy/{conversation}/{run.ordinal}/{group}/{key}/{call}` and leave root
+counters alone. The join sorts its journal slice by input key order and local
+call ordinal, including on failure. Ordinary author exceptions wait for siblings
+and raise the first exception in input order; recorded failures and outer
+cancellation cancel and drain siblings.
+
+Metadata remains `v: 1`. Decision 7's reader-first migration rule concerns the
+`RecoverySession` envelope; these bytes are the executor's opaque journal.
+The old reader already rejects the unknown entry key before registration with
+`unrecoverable` and no row, so a version bump adds no rollback safety and would
+require a second legacy path. New code restores old records unchanged; programs
+without fan-out retain identical checkpoint and metadata bytes. Rolling the
+library back makes a fan-out pause unreadable until newer code returns.
+Completed non-compact snapshots validate markers too; compact snapshots carry
+no journal. Unknown keys, malformed markers, duplicate markers, broken group
+order, non-contiguous call ordinals and over-wide recorded groups fail restore
+before registration, with no write.
+
+Pause inside a branch, nested groups, streaming with branches, malformed keys
+and exceeded bounds end fixed `unsupported`, even if author code catches the
+exception. Root journaled calls during a group and overlapping journaled calls in
+one branch are refused only when the overlap is observed in flight (`busy` guard);
+an overlap that is not observed records calls in arrival order, so a later resume
+with different timing can end `unrecoverable` (measured by the review of this
+change). A task-identity guard is a recorded follow-up. Persisted groups therefore contain completed calls only. A replayed
+group precedes the recorded root frontier, so a missing branch-call marker is
+`unrecoverable` before dispatch, regardless of arrival order. Removing or renaming
+a recorded key, changing a request, adding a journaled call or ending a branch
+early also diverges. An added silent branch is allowed.
+
+The helper meets the accepted divergence-persistence gate: zero further model
+or capability requests, byte-identical earlier rows and writes, exactly one
+compact poison checkpoint, and later restores refused without another row.
+The driver and JavaScript contracts are unchanged. A divergent session cannot
+resume even after rollback; the user starts over. Restore-time refusals still
+add no row. This establishes consistency, not integrity: metadata and checkpoint
+bytes are unauthenticated, and ADR-0012 controls remain in JavaScript.
+
+The [shipped evidence](../../tests/conformance/README.md#shipped-async-branch-helper)
+uses scripted models on DSPy 3.4.1: CPython and Node Pyodide cover arrival order,
+replay, write receipts and divergence; headless Chromium matches three new live
+goldens and reopens IndexedDB in a fresh page and Worker to replay a joined group
+without redispatch. State-binding reload tests also pass. Chromium divergence
+reload, Firefox, WebKit, real models, other DSPy versions and ReAct branches
+remain unmeasured. No existing golden, fixture entry, matrix entry or lock changes.
+This ADR stays Proposed.
 
 ### DSPy thread-pool fan-out refusal (2026-11, shipped)
 

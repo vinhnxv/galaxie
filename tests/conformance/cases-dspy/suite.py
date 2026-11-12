@@ -84,6 +84,7 @@ def pause_program(name, lm, tool, interaction):
 
 
 def program(name, lm=None, tool=None, interaction=None):
+    hosted = lm is None
     streaming = name.startswith('stream-')
     name = base_name(name)
     if lm is None:
@@ -91,6 +92,33 @@ def program(name, lm=None, tool=None, interaction=None):
         lm = GalaxieLM('answer', native_tools=name in {'native-tool-calling', 'argument-block'})
     if 'pause-' in name:
         return pause_program(name, lm, tool, interaction)
+    if name.startswith('fanout-'):
+        if tool is None:
+            from galaxie.dspy import capability_tool
+            tool = capability_tool('docs.lookup@1', 'Look up the fact.', SCHEMA, tool_name='lookup')
+        class Fanout(dspy.Module):
+            def __init__(self):
+                self.predict = dspy.Predict(Question)
+                self.predict.set_lm(lm)
+            async def aforward(self, question):
+                async def branch(key):
+                    if name == 'fanout-write':
+                        return await tool.acall(query=key)
+                    first = await self.predict.acall(question=key + ':first')
+                    if name == 'fanout-multi':
+                        receipt = await tool.acall(query=key)
+                        last = await self.predict.acall(question=key + ':last')
+                        return {'first': first.answer, 'receipt': receipt, 'answer': last.answer}
+                    return first.answer
+                calls = {key: lambda key=key: branch(key) for key in ('alpha', 'beta', 'gamma')}
+                if hosted:
+                    from galaxie.dspy import branches
+                    results = await branches(calls)
+                else:
+                    results = dict(zip(calls, await asyncio.gather(*(call() for call in calls.values())), strict=True))
+                return dspy.Prediction(answers=results)
+        return Fanout()
+
     if name in {'react-one-tool', 'react-two-tools', 'react-v2', 'native-tool-calling', 'argument-block', 'capability-denial', 'outcome-unknown'}:
         if tool is None:
             from galaxie.dspy import capability_tool

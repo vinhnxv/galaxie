@@ -8,7 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, type Page } from 'playwright';
 import { build, type PreviewServer, preview } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { dspyCases } from '../../../tests/conformance/support/dspy.js';
+import { dspyBranchReloadCases, dspyCases } from '../../../tests/conformance/support/dspy.js';
+import { branchSources } from '../../../tests/conformance/support/dspy-branches-sources.node.js';
+import { parallelAnswers } from '../../../tests/conformance/support/dspy-parallel.js';
+import type { ParallelResult } from '../../../tests/conformance/support/dspy-parallel-step.js';
 import {
   type DspyReloadResult,
   dspyRejectedRestoreCases,
@@ -44,6 +47,12 @@ beforeAll(async () => {
     const path = join(publicDir, 'conformance', name);
     await mkdir(path, { recursive: true });
     for (const [file, source] of Object.entries(await dspySources(name)))
+      await writeFile(join(path, file), source);
+  }
+  for (const name of dspyBranchReloadCases) {
+    const path = join(publicDir, 'conformance', name);
+    await mkdir(path, { recursive: true });
+    for (const [file, source] of Object.entries(await branchSources('par-fan-two-stage-single')))
       await writeFile(join(path, file), source);
   }
   const local = JSON.parse(
@@ -373,4 +382,85 @@ test.each([
     }
   },
   90000,
+);
+
+test.each(dspyBranchReloadCases)(
+  'Chromium replays a joined fanout after a real IndexedDB reload: %s',
+  async (name) => {
+    if (!browser) throw new Error('The conformance browser is missing.');
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    const external: string[] = [],
+      headers: string[] = [];
+    await context.route('**/*', (route) => {
+      if (new URL(route.request().url()).origin === origin) return route.continue();
+      external.push(route.request().url());
+      return route.abort();
+    });
+    context.on('response', (response) =>
+      headers.push(response.headers()['content-security-policy'] ?? ''),
+    );
+    try {
+      const page = await context.newPage();
+      const result = async (): Promise<{
+        branches: ParallelResult;
+        error?: string;
+        violations: string[];
+      }> => {
+        await page.waitForFunction(
+          () => Reflect.get(globalThis, 'dspyConformance')?.done,
+          undefined,
+          { timeout: 900000 },
+        );
+        return page.evaluate(() => Reflect.get(globalThis, 'dspyConformance'));
+      };
+      await page.goto(`${origin}/?case=${name}`);
+      const first = await result();
+      expect(first.error).toBeUndefined();
+      expect(first.branches.error).toBeUndefined();
+      expect(first.branches.pending).toBeDefined();
+      expect(first.branches.modelLabels.sort()).toEqual([
+        'alpha:before',
+        'beta:before',
+        'gamma:before',
+      ]);
+      expect(first.violations).toEqual([]);
+      await page.evaluate(
+        (sessionId) =>
+          sessionStorage.setItem(
+            'dspyBranchStep',
+            JSON.stringify({ name: 'par-fan-two-stage-single', sessionId, order: 'reversed' }),
+          ),
+        first.branches.sessionId,
+      );
+      await page.reload();
+      const resumed = await result();
+      expect(resumed.error).toBeUndefined();
+      expect(resumed.branches.error).toBeUndefined();
+      expect(resumed.branches.restored).toEqual(first.branches.pending);
+      expect(resumed.branches.modelLabels.sort()).toEqual([
+        'alpha:after',
+        'beta:after',
+        'gamma:after',
+      ]);
+      expect(resumed.branches.calls).toEqual([]);
+      expect(
+        resumed.branches.streams.filter(
+          (value) => (value as { kind?: string }).kind === 'replayed',
+        ),
+      ).toHaveLength(1);
+      expect(resumed.branches.streams).toContainEqual({ kind: 'spike-tasks', count: 0 });
+      expect(resumed.branches.postTerminationRequests).toBe(0);
+      expect(resumed.branches.output).toEqual({
+        before: parallelAnswers('single'),
+        answers: parallelAnswers('single', 'after'),
+      });
+      expect(resumed.violations).toEqual([]);
+      expect(external).toEqual([]);
+      expect(headers.length).toBeGreaterThan(0);
+      expect(headers.every((value) => value === header)).toBe(true);
+    } finally {
+      await context.close();
+    }
+  },
+  900000,
 );

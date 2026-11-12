@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 import { createPythonFixture } from '../../examples/rag-browser/test/support/python.node.js';
 import { createPyodideAdapter } from '../../packages/adapter-pyodide/src/adapter.js';
-import { dspyCases, executeDspyCase } from './support/dspy.js';
+import { dspyBranchReloadCases, dspyCases, executeDspyCase } from './support/dspy.js';
 import { dspyRejectedRestoreCases, dspyReloadCases } from './support/dspy-restore.js';
 import { dspySources } from './support/dspy-sources.node.js';
 
@@ -56,7 +56,12 @@ test('the DSPy compatibility matrix lists every case and the adapter features', 
     await readFile(new URL('./compatibility-matrix-dspy.json', import.meta.url), 'utf8'),
   );
   expect([...matrix.cases].sort()).toEqual(
-    [...dspyCases, ...dspyReloadCases, ...dspyRejectedRestoreCases].sort(),
+    [
+      ...dspyCases,
+      ...dspyReloadCases,
+      ...dspyRejectedRestoreCases,
+      ...dspyBranchReloadCases,
+    ].sort(),
   );
   expect(matrix.features).toEqual(
     createPyodideAdapter({
