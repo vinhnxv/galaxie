@@ -5,6 +5,9 @@ from google.adk.agents import LlmAgent, LoopAgent, ParallelAgent, SequentialAgen
 from pydantic import BaseModel
 
 CASES = (
+    'confirm-beside-after-approve', 'confirm-beside-after-deny',
+    'confirm-beside-before-approve', 'confirm-beside-before-deny',
+    'confirm-beside-between-approve', 'confirm-beside-between-deny',
     'plain-text', 'capability', 'sequential-tools', 'output-schema',
     'capability-denial', 'argument-block', 'step-budget', 'abort',
     'stream-text', 'stream-tools', 'stream-mid-block', 'stream-abort',
@@ -27,6 +30,7 @@ RESUMABLE = (
     'agents-confirm-parallel', 'agents-confirm-parallel-reversed', 'agents-long-running-middle',
 )
 CONFIRMATION_CASES = tuple(name for name in CASES if 'confirm' in name)
+BESIDE_CASES = tuple(name for name in CASES if name.startswith('confirm-beside-'))
 LONG_RUNNING_CASES = ('long-running', 'agents-long-running-middle')
 INTERACTION_CASES = (*CONFIRMATION_CASES, *LONG_RUNNING_CASES)
 PARAMETERS = {
@@ -96,7 +100,7 @@ def shape(name, model, tool):
     raise ValueError('The conformance case is unknown.')
 
 
-def factory(name, model=None, tool=None):
+def factory(name, model=None, tool=None, ordinary=()):
     """The case's agent; the native lane passes its own model and tool, the Worker lane the host helpers."""
     if name not in CASES:
         raise ValueError('The conformance case is unknown.')
@@ -108,10 +112,15 @@ def factory(name, model=None, tool=None):
             'double', 'math.double@1', PARAMETERS, 'Double an integer.',
             require_confirmation=name in CONFIRMATION_CASES, long_running=name in LONG_RUNNING_CASES,
         )
+        if name in BESIDE_CASES:
+            ordinary = tuple(capability_tool(
+                sibling, 'math.double@1', PARAMETERS, 'Double an integer without an ADK confirmation.',
+            ) for sibling in ('ordinary', 'other'))
     options = {'output_schema': Answer, 'output_key': 'result'} if name == 'output-schema' else {}
     agent = shape(name, model, tool) if name in SHAPES else LlmAgent(
         name='conformance', model=model, instruction='Use the supplied tools and answer briefly.',
-        tools=[tool] if name in TOOL_CASES and tool is not None else [], **options,
+        tools=([tool, *ordinary] if name in BESIDE_CASES else [tool])
+        if name in TOOL_CASES and tool is not None else [], **options,
     )
     if worker and name in INTERACTION_CASES:
         from galaxie.adk import Executor

@@ -32,6 +32,12 @@ import { autoApprove, confirmationsFor } from './auto-confirm.js';
 
 /** Golden cases whose pause survives a reload; each is compared with its one-lifetime golden. */
 export const adkPythonReloadCases = [
+  'confirm-beside-after-approve',
+  'confirm-beside-after-deny',
+  'confirm-beside-before-approve',
+  'confirm-beside-before-deny',
+  'confirm-beside-between-approve',
+  'confirm-beside-between-deny',
   'confirm-approve',
   'confirm-deny',
   'confirm-two',

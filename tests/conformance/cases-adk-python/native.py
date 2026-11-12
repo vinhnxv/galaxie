@@ -233,13 +233,16 @@ class ScriptedLlm(BaseLlm):
 class NativeDouble(BaseTool):
     """Independent native tool: same declaration, runs the fixture's arithmetic directly."""
 
-    def __init__(self, case, transcript):
-        super().__init__(name='double', description='Double an integer.', is_long_running=case in suite.LONG_RUNNING_CASES)
+    def __init__(self, case, transcript, sibling=None):
+        super().__init__(name=sibling or 'double', description=(
+            'Double an integer without an ADK confirmation.' if sibling else 'Double an integer.'
+        ), is_long_running=case in suite.LONG_RUNNING_CASES)
         self.case = case
         self.transcript = transcript
+        self.sibling = sibling
 
     async def check_require_confirmation(self, args, tool_context):
-        return self.case in suite.CONFIRMATION_CASES
+        return self.sibling is None and self.case in suite.CONFIRMATION_CASES
 
     def _get_declaration(self):
         return types.FunctionDeclaration(
@@ -349,7 +352,8 @@ async def _run_case(name):
         **({'streams': []} if streaming else {}),
     }
     model = ScriptedLlm(model='answer', case=name, spec=spec, transcript=transcript, gates={}, trace=[])
-    agent = suite.factory(name, model, NativeDouble(name, transcript))
+    ordinary = tuple(NativeDouble(name, transcript, sibling) for sibling in ('ordinary', 'other')) if name in suite.BESIDE_CASES else ()
+    agent = suite.factory(name, model, NativeDouble(name, transcript), ordinary)
     runner = InMemoryRunner(app=App(
         name='conformance', root_agent=agent, resumability_config=ResumabilityConfig(is_resumable=True),
     )) if name in suite.RESUMABLE else InMemoryRunner(agent=agent, app_name='conformance')

@@ -12,15 +12,16 @@ GA1 | A1/A2/A3 approve and deny preserve ordered native results | PASS
 GA2 | Fresh executors restore the same pause from bytes without rerunning siblings | PASS
 GA3 | A4 fake-host receipts survive failed resume/retry; scopes match ungated runs | PASS
 GA4 | Partial/wrong-kind answers invoke nothing and leave the pause answerable | PASS
-GA5 | Existing unit refusals retained; full conformance goldens not rerun here | incomplete
+GA5 | Existing refusals retained; native/live/reload conformance passes unchanged | PASS
 GB1-GB5 | Native combined answer loses L's result, so no candidate seam is built | not applicable
 AL1 | Ordinary long-running capability delivers the input answer to the model | PASS
 AL2 | Four-field interaction carries question/schema; resume rejects malformed input | PASS
 AL3 | Reserved-name capability also delivers the answer, live and restored | PASS
 
-These are measurement results, not completed support outcomes: adding the
-required conformance cases would require changing the existing compatibility
-matrix, which is frozen for this run. No runtime behavior or public API changes.
+Outcomes: ordinary siblings SUPPORTED with six new native/live/reload goldens;
+long-running siblings REFUSED after native answer loss; request input ALTERNATIVE
+through an ordinary long-running capability. No runtime or public API changes.
+The Worker conformance gate is run separately from this CPython measurement.
 """
 
 import asyncio
