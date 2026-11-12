@@ -80,7 +80,7 @@ def loop(model, tools, *, manual=False, handler=None, observations=None):
             .add_edge('tools', 'model').compile(checkpointer=InMemorySaver()))
 
 
-async def native_record(*, manual=False, parallel=False):
+async def native_record(*, manual=False, parallel=False, write_only=False):
     broker = []
     configs = []
 
@@ -97,6 +97,8 @@ async def native_record(*, manual=False, parallel=False):
     calls = [{'name': 'read', 'args': {'value': 2}, 'id': 'call-1', 'type': 'tool_call'}]
     if parallel:
         calls.append({'name': 'write', 'args': {'value': 4}, 'id': 'call-2', 'type': 'tool_call'})
+    if write_only:
+        calls = [{'name': 'write', 'args': {'value': 4}, 'id': 'call-1', 'type': 'tool_call'}]
     tools = [StructuredTool.from_function(coroutine=read, name='read', description='Read a value.'),
              StructuredTool.from_function(coroutine=write, name='write', description='Save a value.')]
     graph = loop(ToolReplyModel(calls=calls).bind_tools(tools), tools,
@@ -138,7 +140,8 @@ def test_node_namespaces_change_at_every_node_but_thread_id_repeats_between_runs
         model = ToolReplyModel(calls=[{'name': 'inspect', 'args': {}, 'id': 'inspect-1'}])
         graph = loop(model, [tool], observations=seen)
         for _ in range(2):
-            value: MessagesState = {'messages': [RemoveMessage(id=REMOVE_ALL_MESSAGES), HumanMessage('request')]}
+            # MessagesState's upstream annotation omits the supported RemoveMessage input.
+            value: Any = {'messages': [RemoveMessage(id=REMOVE_ALL_MESSAGES), HumanMessage('request')]}
             await graph.ainvoke(value,
                                {'configurable': {'thread_id': 'same-session'}, 'recursion_limit': 12})
         assert len(seen) == 6
