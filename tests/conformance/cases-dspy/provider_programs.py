@@ -34,20 +34,23 @@ def egress_recorder():
             if key.startswith('OPENAI_') or key.lower().endswith('_proxy'):
                 stack.enter_context(patch.dict(os.environ, {key: ''}))
         if sys.platform == 'emscripten':
-            from pyodide.code import run_js
+            import js
+            from pyodide.ffi import create_proxy
+
+            def reject(input, *args):
+                url = js.URL.new(input if isinstance(input, str) else input.url)
+                target = f'{url.hostname}:{url.port or ("443" if url.protocol == "https:" else "80")}'
+                if target == '127.0.0.1:9':
+                    evidence['attempts'].append(target)
+                else:
+                    evidence['unexpected'] = True
+                return js.Promise.reject(js.Error.new('Provider probe rejects egress.'))
+
+            previous = js.globalThis.fetch
+            proxy = create_proxy(reject)
             installed = False
             try:
-                run_js("""
-globalThis.__providerProbe = {previous: globalThis.fetch, attempts: [], unexpected: false};
-globalThis.fetch = function(input) {
-    const state = globalThis.__providerProbe;
-    const url = new URL(typeof input === 'string' ? input : input.url);
-    const target = url.hostname + ':' + (url.port || (url.protocol === 'https:' ? '443' : '80'));
-    if (target === '127.0.0.1:9') state.attempts.push(target);
-    else state.unexpected = true;
-    return Promise.reject(new Error('Provider probe rejects egress.'));
-};
-""")
+                js.globalThis.fetch = proxy
                 installed = True
             except Exception:
                 evidence['recorder'] = False
@@ -55,14 +58,8 @@ globalThis.fetch = function(input) {
                 yield evidence
             finally:
                 if installed:
-                    evidence.update(json.loads(run_js("""
-(() => {
-    const state = globalThis.__providerProbe;
-    globalThis.fetch = state.previous;
-    delete globalThis.__providerProbe;
-    return JSON.stringify({attempts: state.attempts, unexpected: state.unexpected});
-})()
-""")))
+                    js.globalThis.fetch = previous
+                proxy.destroy()
         else:
             def reject(host, port):
                 if (str(host), int(port)) == ('127.0.0.1', 9):
