@@ -13,8 +13,15 @@ import pytest
 
 from schema_native import measure
 from schema_programs import CHAT_REPLY, JSON_REPLY, Program, QUESTION, adapter_for
-from test_dspy_durable import Store as DurableStore, execute, pending
+from test_dspy_durable import Store as DurableStore, pending
 import test_dspy_durable as durable
+
+
+def execute(context, before=None):
+    if before is not None:
+        return durable.execute(context, before)
+    context['_galaxie_input'] = json.dumps({'threadId': 'session', 'steps': 10, 'input': {'question': QUESTION}})
+    return json.loads(asyncio.run(context['_galaxie_execute']()))
 
 
 class Store(DurableStore):

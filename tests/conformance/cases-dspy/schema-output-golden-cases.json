@@ -1,0 +1,9 @@
+{
+  "so-json-adapter-schema": { "golden": "so-json-adapter-schema.json", "reply": "{\"answer\":\"done\"}" },
+  "so-explicit-response-format": { "golden": "so-explicit-response-format.json", "reply": "[[ ## answer ## ]]\ndone\n[[ ## completed ## ]]" },
+  "so-typed-violation": { "golden": "so-typed-violation.json", "reply": "{\"answer\":\"wrong\"}" },
+  "so-mock-ignores-schema": { "golden": "so-mock-ignores-schema.json", "reply": "plain prose" },
+  "so-json-object-refused": { "golden": "so-json-object-refused.json", "reply": "{\"answer\":{}}", "refused": true },
+  "so-schema-tools-refused": { "golden": "so-schema-tools-refused.json", "reply": "[[ ## answer ## ]]\ndone\n[[ ## completed ## ]]", "refused": true },
+  "so-stream-schema-refused": { "golden": "so-stream-schema-refused.json", "reply": "[[ ## answer ## ]]\ndone\n[[ ## completed ## ]]", "refused": true }
+}

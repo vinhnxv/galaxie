@@ -1,0 +1,46 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (Literal['done', 'other']):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\nInputs will have the following structure:\n\n[[ ## question ## ]]\n{question}\n\nOutputs will be a JSON object with the following fields.\n\n{\n  \"answer\": \"{answer}        # note: the value you produce must exactly match (no extra characters) one of: done; other\"\n}\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhich answer?\n\nRespond with a JSON object in the following order of fields: `answer` (must be formatted as a valid Python Literal['done', 'other'])."
+        }
+      ],
+      "jsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "enum": [
+              "done",
+              "other"
+            ],
+            "title": "Answer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "DSPyProgramOutputs",
+        "type": "object"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "content": "{\"answer\":\"done\"}",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "answer": "done"
+  },
+  "error": null
+}

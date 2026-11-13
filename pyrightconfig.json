@@ -26,6 +26,10 @@
   "exclude": ["**/build", "**/node_modules", "**/__pycache__", "**/.*"],
   "executionEnvironments": [
     {
+      "root": "scripts/record-dspy-schema-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
+    },
+    {
       "root": "tests/conformance/cases-pydantic-ai-child-approval",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-pydantic-ai-child-approval"]
     },

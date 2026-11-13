@@ -4,6 +4,7 @@
 """Plain DSPy schema reference: no provider connection or galaxie model engine."""
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 import dspy
@@ -11,6 +12,8 @@ from dspy.clients.lm15_boundary import request_kwargs
 from dspy.lm15 import Message, Response, TextPart, Usage
 
 from schema_programs import Program, QUESTION, adapter_for
+
+CASES = json.loads(Path(__file__).with_name('schema-output-golden-cases.json').read_text())
 
 
 class Engine:
@@ -63,5 +66,14 @@ async def measure(name, reply):
             result['output'] = dict(output.items())
         except Exception:
             result['error'] = {'code': 'executor_error', 'message': 'The executor or agent code failed.'}
-    result['responses'] = [reply] * len(engine.requests)
+    result['responses'] = [{'content': reply, 'toolCalls': []}] * len(engine.requests)
     return json.loads(json.dumps(result)), engine.formats
+
+
+async def record_schema(name):
+    case = CASES[name]
+    if case.get('refused'):
+        # These are galaxie policy refusals, not a claim that plain DSPy refuses.
+        return {'requests': [], 'responses': [], 'capabilities': [], 'interactions': [], 'output': None,
+                'error': {'code': 'unsupported', 'message': 'This operation is unsupported.'}}
+    return (await measure(name, case['reply']))[0]

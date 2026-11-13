@@ -1,0 +1,46 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (Literal['done', 'other']):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}        # note: the value you produce must exactly match (no extra characters) one of: done; other\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhich answer?\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]` (must be formatted as a valid Python Literal['done', 'other']), and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ],
+      "jsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "enum": [
+              "done",
+              "other"
+            ],
+            "title": "Answer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "AnswerModel",
+        "type": "object"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "content": "[[ ## answer ## ]]\ndone\n[[ ## completed ## ]]",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "answer": "done"
+  },
+  "error": null
+}
