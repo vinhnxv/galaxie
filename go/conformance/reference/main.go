@@ -11,5 +11,9 @@ import (
 )
 
 func main() {
-	galaxie.ServeWith(cases.Definitions())
+	definitions := cases.Definitions()
+	for name, definition := range cases.IdentityDefinitions() {
+		definitions[name] = definition
+	}
+	galaxie.ServeWith(definitions)
 }

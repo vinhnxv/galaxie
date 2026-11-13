@@ -1,0 +1,181 @@
+{
+  "identity-loop-nested": {
+    "prompt": "Measure identity.",
+    "stream": true,
+    "replies": [
+      {
+        "content": "Pass one."
+      },
+      {
+        "content": "Pass two."
+      }
+    ],
+    "capabilities": {},
+    "entry": "identity-loop-nested"
+  },
+  "identity-sequence-in-sequence": {
+    "prompt": "Measure identity.",
+    "stream": true,
+    "replies": [
+      {
+        "content": "First step."
+      },
+      {
+        "content": "Middle step."
+      },
+      {
+        "content": "Deep step."
+      }
+    ],
+    "capabilities": {},
+    "entry": "identity-sequence-in-sequence"
+  },
+  "identity-transfer-below-nested": {
+    "prompt": "Measure identity.",
+    "stream": true,
+    "replies": [
+      {
+        "content": "First step."
+      },
+      {
+        "content": "Middle step."
+      },
+      {
+        "content": "Routing.",
+        "toolCalls": [
+          {
+            "id": "t1",
+            "type": "function",
+            "function": {
+              "name": "transfer_to_agent",
+              "arguments": "{\"agent_name\":\"helper\"}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Helper answer."
+      }
+    ],
+    "capabilities": {},
+    "entry": "identity-transfer-below-nested"
+  },
+  "identity-chain-16": {
+    "prompt": "Measure identity.",
+    "stream": true,
+    "replies": [
+      {
+        "content": "Level 1."
+      },
+      {
+        "content": "Level 2."
+      },
+      {
+        "content": "Level 3."
+      },
+      {
+        "content": "Level 4."
+      },
+      {
+        "content": "Level 5."
+      },
+      {
+        "content": "Level 6."
+      },
+      {
+        "content": "Level 7."
+      },
+      {
+        "content": "Level 8."
+      },
+      {
+        "content": "Level 9."
+      },
+      {
+        "content": "Level 10."
+      },
+      {
+        "content": "Level 11."
+      },
+      {
+        "content": "Level 12."
+      },
+      {
+        "content": "Level 13."
+      },
+      {
+        "content": "Level 14."
+      },
+      {
+        "content": "Level 15."
+      },
+      {
+        "content": "Level 16."
+      }
+    ],
+    "capabilities": {},
+    "entry": "identity-chain-16"
+  },
+  "identity-parallel-nested": {
+    "prompt": "Measure identity.",
+    "stream": true,
+    "replies": [
+      {
+        "content": "Branch."
+      },
+      {
+        "content": "Branch."
+      },
+      {
+        "content": "Branch."
+      }
+    ],
+    "capabilities": {},
+    "entry": "identity-parallel-nested",
+    "unordered": true
+  },
+  "identity-pause-nested-last": {
+    "prompt": "Measure identity.",
+    "stream": true,
+    "replies": [
+      {
+        "content": "First step."
+      },
+      {
+        "content": "Middle step."
+      },
+      {
+        "content": "Checking.",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": {
+              "name": "math_double_1",
+              "arguments": "{\"value\":21}"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The result is 42."
+      }
+    ],
+    "capabilities": {
+      "math.double@1": {
+        "result": {
+          "value": 42
+        }
+      }
+    },
+    "entry": "identity-pause-nested-last",
+    "answers": [
+      {
+        "action": "approve",
+        "payload": {
+          "indexes": [0]
+        }
+      }
+    ]
+  }
+}
