@@ -65,14 +65,32 @@ function checkGuide(
   sources: ReadonlyMap<string, string>,
 ): string[] {
   const ids: string[] = [];
-  for (const block of markdown.matchAll(/^```([^\n]*)\n([\s\S]*?)^```[ \t]*$/gm)) {
-    const language = block[1]?.trim();
-    if (!['ts', 'python', 'go'].includes(language ?? '')) continue;
-    const id = markdown.slice(0, block.index).match(/<!-- snippet: ([\w-]+) -->\s*$/)?.[1];
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const opening = lines[index]?.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (opening === null || opening === undefined) continue;
+    const fence = opening[1] ?? '';
+    const info = opening[2]?.trim() ?? '';
+    if (fence.startsWith('`') && info.includes('`')) continue;
+    let end = index + 1;
+    for (; end < lines.length; end += 1) {
+      const closing = lines[end]?.match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/)?.[1];
+      if (closing !== undefined && closing[0] === fence[0] && closing.length >= fence.length) break;
+    }
+    const start = index;
+    index = end;
+    const language = info.split(/\s+/)[0] ?? '';
+    if (!['ts', 'python', 'go'].includes(language)) continue;
+    const id = lines
+      .slice(0, start)
+      .join('\n')
+      .match(/<!-- snippet: ([\w-]+) -->\s*$/)?.[1];
     if (id === undefined) throw new Error(`Unmarked ${language} fence in ${guide}.`);
     const expected = sources.get(id);
     if (expected === undefined) throw new Error(`Unregistered snippet ${id} in ${guide}.`);
-    expect(normalize(block[2] ?? ''), `${id} in ${guide}`).toBe(normalize(expected));
+    expect(normalize(lines.slice(start + 1, end).join('\n')), `${id} in ${guide}`).toBe(
+      normalize(expected),
+    );
     ids.push(id);
   }
   return ids;
@@ -114,6 +132,22 @@ test('unmarked executable fences fail while text fences are exempt', () => {
   );
   expect(checkGuide('```text\nexample\n```', 'example.md', new Map())).toEqual([]);
 });
+
+test.each([' ```', '   ~~~', '````'])(
+  'executable fence %s cannot bypass snippet registration',
+  (fence) => {
+    expect(() => checkGuide(`${fence}python\npass\n${fence}`, 'example.md', new Map())).toThrow(
+      'Unmarked python fence in example.md',
+    );
+    expect(
+      checkGuide(
+        `<!-- snippet: sample -->\n${fence}python\npass\n${fence}`,
+        'example.md',
+        new Map([['sample', 'pass']]),
+      ),
+    ).toEqual(['sample']);
+  },
+);
 
 test('a registered region without its end marker fails', () => {
   expect(() => sourceText('# guide:begin sample\npass', 'sample', 'example.py')).toThrow(
