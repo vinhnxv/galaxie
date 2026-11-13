@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates. 2026-11-13: measured host inventories ship on Python and fixed toolsets on Go; both JavaScript candidates take the registered refusal path. 2026-11-13: the read-only admission rerun registers its outcome rule before measurement and records REFUSED after copied temporary-state parity fails on both admission variants.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates. 2026-11-13: measured host inventories ship on Python and fixed toolsets on Go; both JavaScript candidates take the registered refusal path. 2026-11-14: the last-child resume rerun registered its outcome rule before measurement. 2026-11-13: the read-only admission rerun registers its outcome rule before measurement and records REFUSED after copied temporary-state parity fails on both admission variants. 2026-11-14: the admission-capable last-child rerun records REFUSED after a base-shape scope mismatch; live and restore now share one pause-author derivation with gated-call agreement.
 
 ## Context
 
@@ -466,9 +466,20 @@ Stored pauses now pass the same author-position predicate as live pauses. The
 tree must contain no `ParallelAgent`, and the author must be known, unique and
 at a position where `restartsSiblings` is false. The author is derived from
 every stored event holding each paused call's ID: the confirmation-request call
-for a confirmation, or the tool call for a long-running result. Missing calls,
+and its gated call for a confirmation, or the tool call for a long-running result. Missing calls,
 missing authors or differing authors fail closed. No author field is added to
 the record, so older records restore when their pauses meet the same rule.
+
+Live pause admission and restore now use one `pauseAuthor` derivation over the
+stored call events. A confirmation's request event and every event holding its
+gated call must have one defined, agreeing author, as must all long-running call
+events; missing or disagreeing authors fail `unsupported` live and
+`unrecoverable` at restore before private-content registration, session loading
+or interaction publication. All genuine previously admitted shapes pass without
+a fallback. Invalid older stored pauses whose gated-call authors are missing or
+disagree now fail `unrecoverable`; the `adk.session/v1` format, fields and public
+error codes are unchanged. Ordinary records written with this unified derivation
+already satisfy the older adapter's rule and remain readable by it.
 
 The rule runs at pause time and restore time, rather than prepare time: the
 adapter cannot know which agent will pause before execution. A live refusal
@@ -495,6 +506,165 @@ across both lifetimes. Literal checkpoint tests pin the unchanged version-one
 format. Existing goldens, matrices and locks are unchanged. No new pause shape
 or resumable production Runner ships. Firefox, WebKit and real models remain
 unmeasured for these checks.
+
+#### Last-child rerun with an admission-capable seam (2026-11)
+
+##### Outcome rule registered before measurement (2026-11-14)
+
+The candidate keeps today's pause rule for every shape it accepts and adds one route, `in-place`, for a pause in the last leaf of a tree made only of `SequentialAgent` nodes and leaf `LlmAgent` nodes (KTD6). At resume, an `in-place` pause runs through a second Runner with `resumabilityConfig: {isResumable: true}`; every other admitted pause keeps the default Runner. The candidate is a test-only copy of the adapter (KTD5). All models are scripted. Firefox and WebKit are recorded separately and never inferred from Chromium. Real models are unmeasured.
+
+Candidate shapes (Seq is `SequentialAgent`; every leaf is an `LlmAgent` with a gated `capabilityTool` unless noted; `requireConfirmation: true` unless noted):
+
+| ID | Tree and pause | Today on adk-js |
+| --- | --- | --- |
+| L1 | `Seq[a, b]`; `b` pauses on a confirmation; approve | refused |
+| L2 | `Seq[a, b]`; same pause; deny (zero tool bodies) | refused |
+| L3 | `Seq[a, Seq[b, c]]`; `c` pauses | refused |
+| L4 | `Seq[a, b]`; `b` pauses, approve, then `b` pauses again | refused |
+| L5 | `Seq[a, b]`; `b` calls a long-running tool; the author `resume` returns the external result | refused |
+| L6 | `Seq[a, Seq[b, Seq[c, d]]]`; `d` pauses | refused |
+| L7 | `Seq[a, b]`; `b` raises two gated calls in one turn; one answer with `indexes: [0, 1]` | refused |
+| L8 | `Seq[writer, b]`; `writer` performs a confirmed host write, then `b` pauses | refused |
+| L9 | `Seq[a, b]`; `a` has a non-`temp:` `outputKey` that `b`'s instruction reads; `b` pauses | refused |
+
+Controls (must stay on the default Runner with unchanged behavior): C1 `Seq[first(tool), second]`; C2 `Seq[Seq[inner(tool), b], c]` pausing `inner`; C3 transfer chain `parent[child(tool)]`; C4 a lone agent.
+
+Refusals (must keep failing `unsupported`): R1 `Seq[a, b, c]` pausing `b`; R2 `Seq[a, Seq[b, c]]` pausing `b`; R3 `Seq[a(outputKey temp:saved), b]` pausing `b`; R4 `Loop(2)[worker]`; R5 `Loop(2)[writer, checker]` pausing `checker`; R6 the four `Par` shapes of the PR 218 table (`left` first, `right` first, `Par` last, both confirm); R7 `Seq[a, b, c]` with a long-running `b`; R8 `Seq[a, parent[child], c]` pausing `child`; R9 `Seq[a, parent[child]]` pausing `child`; R10 `Seq[Loop(2)[w], b]` pausing `b`.
+
+Gates, each measured per shape, recorded as PASS, FAIL, NA with a reason, or UNMEASURED:
+
+| Gate | Required evidence |
+| --- | --- |
+| N1 native continuity | With `resumabilityConfig` on ADK's own Runner, after the answer every unfinished agent runs once, no finished agent is asked again, and ordered model requests equal the same script run uninterrupted. L1, L2, L3, L4, L5 reuse the PR 218 native file. |
+| N2 native tool once | The gated tool body runs once per logical call, and zero times on deny. |
+| N3 native state | Non-`temp:` state written before the pause is visible after the resume. `temp:` visibility is recorded (informational). |
+| G0 seam faithfulness | With the shipped policy substituted, the candidate reproduces the shipped adapter on C1 to C4 (requests, writes, scopes, interaction props, output); the resumable Runner is used only for `in-place` resumes; a probe resume routes to the answered author. G0 failing makes the outcome INCOMPLETE. |
+| G1 live parity | Output, ordered model requests, capability calls and the published interaction equal native resumable: exactly one interaction per pause, no capability before the answer. |
+| G2 reload parity | Dispose and recreate the runtime over the same bytes (memory on Node, real IndexedDB on Chromium and the other engines); the same interaction ID is republished with zero requests and zero writes at restore; the answer finishes with the live transcript. |
+| G3 writes once, scope stable | With recovery and host confirmations: host invocations equal logical writes across approve, reload, and an approved write followed by a model failure and an automatic replay; the resumed write's effect scope equals the uninterrupted run's (conversation ID normalized). L8's earlier write runs once. |
+| G4 restore admission | A stored last-child pause restored into a tree where the author is a middle child, a loop worker, beside a `ParallelAgent`, unknown, non-leaf, under a tree with a `temp:` key, or missing an earlier leaf's history fails `unrecoverable` before any model or capability call with stored rows unchanged. The same record through the shipped adapter as it stands before U6 (the pre-change `src/`, measured in U5) fails `unrecoverable`. Forged `agentState` and `endOfAgent` fail `unrecoverable`. The existing G4 `last` row keeps rejecting. |
+| G5 refusals and controls | Every refusal shape ends `unsupported` at the pause with no interaction, no host invocation after the pause, no stored checkpoint, and a clean fresh start; C1 to C4 are unchanged. |
+
+Per-engine rule: Node and headless Chromium gate the outcome. Firefox and WebKit are run locally and recorded PASS, DIVERGED or NOT RUN. A shape that DIVERGED on an engine that ran is not shipped.
+
+Outcome mapping, applied once, in this order. The base shapes are L1, L2, L4 and L8.
+
+| Order | Outcome | Condition | Shipped result |
+| --- | --- | --- | --- |
+| 1 | INCOMPLETE | G0 fails, or a gate of any candidate shape is UNMEASURED on Node or Chromium with no FAIL on any measured gate (NA with a stated reason counts as not failing) | No source change; the gap and blocker recorded |
+| 2 | REFUSED | A gate of a base shape FAILS, or any G4 restore-admission case or any G5 refusal or control shape FAILS (a failure of the registered predicate itself), or the failing shapes cannot be isolated by one predicate (below), or shipping would need an edit outside the sanctioned list | No source change beyond the author derivation; evidence and refusal recorded |
+| 3 | SUPPORTED | Every candidate shape passes every gate on Node and Chromium, and on every engine that ran | `in-place` route for all of L1 to L9, same predicate at pause and restore, docs |
+| 4 | ALTERNATIVE | All base shapes pass and some of L3, L5, L6, L7, L9 fail, and the failing ones are excluded by a predicate over tree structure, pause kind and call count that is evaluated identically at pause time and restore | `in-place` route for exactly the passing set, docs stating what stays refused |
+
+A shipping outcome additionally requires the shipped-adapter lane after U6 to pass the admitted-shape gates (G1 to G3, G4 changed-tree rejection and forged-marker cases, G5, and the `last` row); failure converts it to REFUSED. The pre-U6 clauses (the shipped adapter rejecting a candidate record, and the shipped-lane refusal assertions for the L shapes) are measured in U5 against the pre-change `src/` and do not apply after U6. Existing goldens, matrices (except the sanctioned string), locks and assertions (except the sanctioned lifts) stay byte-identical. Candidate and measurement commits stay in history if removed from the final tree.
+
+Predictions, fixed before any probe:
+
+- P0 mechanism: resumability changes only routing; workflow agents write no `agentState`, `endOfAgent` or `nodeInfo`; a resumed last leaf has no context branch, as in an uninterrupted run, so effect scopes equal.
+- P1 native: L1, L2, L3, L4, L5 hold (already recorded in PR 218; L3 requests `a,b,c,c`). Fresh predictions: L6 `a,b,c,d,d`; L7 `a,b,b`, two bodies once each; L8 `writer,writer,b,b`, one `writer` write and one `b` write; L9 `a,b,b` with the `a` value visible after the resume. R10 natively resumes the loop's `b` alone and is excluded by the rule regardless.
+- P2 seam: G0 passes.
+- P3 candidate on Node and Chromium: G1, G2, G3 and G4 pass for L1 to L9; G5 passes for every refusal and control, including the `last` G4 row.
+- P4 least certain: L7 (ADK routes by the first function response in the answer message) and L4 (the second pause after an in-place resume). A miss on L7 gives ALTERNATIVE; a miss on L4 gives REFUSED.
+- P5 engines: Firefox and WebKit PASS every gate they run; a divergence is a finding.
+- P6 overall: SUPPORTED. Forward compatibility: a record stored under the candidate fails `unrecoverable` on the shipped (older) adapter by construction.
+
+##### Measured outcome: REFUSED (2026-11-14)
+
+The rule and predictions were committed as
+`fed22b29c5464b458a89ea785a00c3c5082c380c` before the native and candidate probes.
+The complete measurement and decision are preserved in
+`8e1282b434353444e0f3ef2feae2a9664c0be045`. The registered mapping selects
+**REFUSED**: L4 is a base shape and fails G3. No new pause admission or resumable
+production Runner ships; all L1-L9 candidate shapes remain refused. The test-only
+candidate adapter, its drift test and candidate measurement lane are removed;
+the shipped-adapter L1-L9 and refusal regressions remain.
+
+Every gate was measured on Node and headless Chromium before applying the rule.
+The shared G0, G4 and G5 evidence applies to every candidate row; NA reasons are
+shown in the table.
+
+| Shape | N1 | N2 | N3 | G0 | G1 | G2 | G3 | G4 | G5 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| L1 last approve | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS |
+| L2 last deny | PASS | PASS | PASS | PASS | PASS | PASS | NA: deny, zero bodies | PASS | PASS |
+| L3 nested last | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS |
+| L4 two consecutive pauses | PASS | PASS | PASS | PASS | PASS | PASS | FAIL | PASS | PASS |
+| L5 long-running last | PASS | PASS | PASS | PASS | FAIL | PASS | PASS | PASS | PASS |
+| L6 deep last chain | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS |
+| L7 two gated calls | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS |
+| L8 earlier confirmed writer | PASS | PASS | NA: no prior state | PASS | PASS | PASS | PASS | PASS | PASS |
+| L9 persistent output | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS |
+
+G0 passes with the shipped policy substituted into the candidate for C1-C4:
+requests, writes, scopes, interaction props and output match the shipped adapter.
+These controls retain the default Runner; only an `in-place` answer selects the
+resumable Runner, and the probe resumes the answered author. This establishes the
+seam's faithfulness for the measured shapes, not a workflow continuation contract.
+
+G1's L5 failure is literal: the long-running body `b` has already been invoked
+before the external ADK answer, violating the registered no-capability-before-answer
+criterion. The separate host write confirmation is still required and checked.
+All live transcript comparisons agree with native resumability. L8's earlier
+ordinary ADK writer runs behind its own host confirmation before `b` pauses.
+
+G2 closes and reopens the same memory store on Node and real IndexedDB in each
+browser at every pause, including L4's second pause. Restore republishes the same
+interaction ID with zero model requests and zero capability calls, and the answer
+finishes with the live transcript.
+
+G3 measures approved-write failure and automatic accepted-inbox replay for L1,
+L4, L5 and L8. Host bodies run once per logical write, and receipts and scopes
+remain stable against the failed attempt. L4 nevertheless fails the uninterrupted
+reference: both live and crash/replay scopes are
+`[adk/<conversation>/root/0/0, adk/<conversation>/root/2/0]`, while uninterrupted
+scopes are `[adk/<conversation>/root/0/0, adk/<conversation>/root/1/0]`.
+Only the conversation ID is normalized. The earlier confirmation-request event
+advances `host.ts`'s `sequenceOf` function-call ordinal before the second logical
+call. The writes themselves still occur once; receipt replay does not repair the
+scope mismatch with uninterrupted execution. No expected value or gate was
+relaxed to admit it.
+
+G4 passes all 90 rows: nine stored shapes times ten changed-tree, missing-history,
+forged-marker or older-adapter cases, including L4's second pause. Each failed
+restore is repeated before private-content registration, with zero model or
+capability calls and unchanged stored rows and write markers. Candidate last-child
+records fail `unrecoverable` in the older shipped adapter, as predicted; no such
+new records ship under REFUSED. This differs from ordinary author-unified records,
+whose unchanged format already satisfies that older adapter's rule.
+
+G5 passes all 13 refusal variants (R1-R10, including four Parallel trees) through
+both the candidate and shipped adapters: `unsupported`, no published interaction,
+no capability after the pause, no stored checkpoint and a clean fresh start.
+C1-C4 pass unchanged, and the existing G4 `last` rejection row and its assertions
+remain unchanged and reject through both adapters. No golden, matrix or lock changes; the shared
+multi-agent golden harness is absent, so these shapes use direct scripted parity.
+
+Native predictions hold: L6 requests `a,b,c,d,d`; L7 requests `a,b,b` with two
+bodies once each; L8 requests `writer,writer,b,b`; L9 requests `a,b,b` and sees the
+persistent `saved` value after resume. The reused native L1-L5 observations hold
+on Node and Chromium. Extra native R9/R10 continuity also holds, but the registered
+predicate excludes those trees. No workflow markers were observed. P0's scope
+equality, P3's universal candidate gates, P5's universal Firefox/WebKit gate-pass
+prediction and P6's SUPPORTED prediction miss. P1's request orders and P2's seam
+faithfulness hold. P4's warning about a base-shape L4 failure is realized, forcing
+REFUSED. Firefox and WebKit reproduce the same L4 G3 and L5 G1 failures, so P5
+misses despite suite PASS and no engine-specific divergence.
+
+| Engine | Result | Evidence before candidate cleanup |
+| --- | --- | --- |
+| Node | PASS | Combined Node/Chromium command: 454 passed, 7 skipped across 11 project files; new native variants, candidate gates, legacy G4 rejection, pause authors and restore checks. |
+| Headless Chromium | PASS | Same combined command, using real IndexedDB for reload/replay. |
+| Firefox (local) | PASS | 189 passed, 6 skipped: new native variants, full candidate measurement, pause-author and ADK restore files. |
+| WebKit (local) | PASS | 189 passed, 6 skipped: the same four files, with real IndexedDB. |
+
+All four engines actually launched locally. PASS means that the suites reproduce
+the recorded observations, including the expected refusal findings; it does not
+mean every candidate gate passes. No engine-specific divergence was observed and
+the known-failure registry is unchanged. The older native L1-L5 file is cited from
+Node/Chromium, not claimed as freshly measured on Firefox/WebKit; the new native
+variants ran on all four engines. Real models, providers and device behavior
+remain unmeasured. The outcome changes neither the core lifecycle nor the
+adapter's default Runner policy.
 
 ### Confirmation-beside-calls and request-input spike (2026-11)
 

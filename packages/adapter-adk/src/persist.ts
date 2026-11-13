@@ -176,12 +176,14 @@ function pauseMatches(calls: readonly PausedCall[], events: readonly Event[]): b
   });
 }
 
-/** The single defined author shared by every event holding a paused call's own ID. */
+/** The single defined author shared by every paused call and its gated call, when present. */
 export function pauseAuthor(
   calls: readonly PausedCall[],
   events: readonly Event[],
 ): string | undefined {
-  const ids = new Set(calls.map((call) => call.id));
+  const ids = new Set(
+    calls.flatMap((call) => [call.id, ...(call.gated === undefined ? [] : [call.gated.id])]),
+  );
   const matched = new Set<string>();
   let author: string | undefined;
   for (const event of events) {

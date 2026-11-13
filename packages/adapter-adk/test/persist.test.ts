@@ -230,6 +230,31 @@ test('the version-one checkpoint bytes stay unchanged and an older literal resto
   expect(pauseAuthor(restored.pause?.calls ?? [], restored.events)).toBe('agent');
 });
 
+test('a confirmation requires its gated call and request to have one defined author', () => {
+  const confirmation: PausedCall = {
+    id: 'confirm_1',
+    name: 'adk_request_confirmation',
+    request: { ...longCall.request, kind: 'confirmation' },
+    gated: { id: longCall.id, name: longCall.name },
+  };
+  const confirming = createEvent({
+    author: 'agent',
+    content: {
+      role: 'model',
+      parts: [{ functionCall: { id: confirmation.id, name: confirmation.name, args: {} } }],
+    },
+  });
+  expect(
+    pauseAuthor([confirmation], [{ ...callEvent, author: 'other' }, confirming]),
+  ).toBeUndefined();
+  const unauthored = { ...callEvent };
+  delete unauthored.author;
+  expect(pauseAuthor([confirmation], [unauthored, confirming])).toBeUndefined();
+  expect(pauseAuthor([confirmation], [confirming])).toBeUndefined();
+  const { gated: _, ...withoutGated } = confirmation;
+  expect(pauseAuthor([withoutGated], [confirming])).toBe('agent');
+});
+
 test.each(['event', 'actions'])('nodeInfo on %s is refused on write and read', async (location) => {
   const event = createEvent({ author: 'agent' });
   Object.assign(location === 'event' ? event : event.actions, { nodeInfo: {} });

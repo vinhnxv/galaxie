@@ -3,7 +3,7 @@
 ## Purpose
 
 Host Google ADK (JavaScript) agents as a galaxie executor, with routing, labels, consent,
-budgets and persistence kept in galaxie. Durable sessions go through the byte-record checkpoint port. A pause is accepted only where ADK's resume does not rerun earlier siblings (`restartsSiblings` in `src/adapter.ts`, evidence in `test/agents.test.ts`); loosening that rule needs new native evidence. See the
+budgets and persistence kept in galaxie. Durable sessions go through the byte-record checkpoint port. A pause is accepted only where ADK's resume does not rerun earlier siblings (`restartsSiblings` in `src/adapter.ts`, evidence in `test/agents.test.ts`); the admission-capable last-child rerun remains REFUSED after a second-write scope mismatch and early long-running invocation, so loosening that rule still needs new evidence. See the
 [README](README.md) and [ADR-0020](../../docs/adr/0020-google-adk-through-an-adapter.md).
 
 ## Entry points
@@ -36,8 +36,11 @@ Do not import an `@google/adk/...` subpath, another executor adapter or LangGrap
 The adapter streams checked text deltas and content-free tool markers and pauses on confirmations
 and long-running tools (interrupts and resume), and stores sessions through `services.checkpoints`
 when the host supplies it (otherwise in memory). It has no subgraphs. Any repeated agent name, including the root, fails `unsupported` at prepare before model or store access; names compare exactly.
-Live pauses and stored pauses share `pauseAdmitted`; restore rejects a missing,
-ambiguous or refused author before registration or loading (`unrecoverable`). Any defined
+Live and stored pauses use one `pauseAuthor` derivation and share `pauseAdmitted`;
+confirmation-request and gated-call events need one defined, agreeing author, and restore
+rejects missing, disagreeing or refused authors before registration or loading (`unrecoverable`).
+Invalid older pauses with missing or differing gated authors now fail closed; the unchanged
+format keeps ordinary author-unified records readable by older adapters. Any defined
 `actions.agentState` or `actions.endOfAgent` is refused on encode (`unsupported`) and restore
 (`unrecoverable`), without changing the format. The integrity key lives in
 record metadata and must never be logged, put in a span or error, or exported. Author code sees positional requests only; never expose ADK call IDs. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle, so
@@ -54,5 +57,6 @@ capability-tool lists. Native, author-defined and dynamic toolsets remain refuse
 Run `pnpm exec vitest run packages/adapter-adk tests/conformance/adk.test.ts
 tests/conformance/adk-native.node.test.ts tests/conformance/adk-restore.test.ts`. `test/persist.test.ts` covers the record codec; `adk-restore.test.ts` covers reload, replay, rollback and tampering. The bundle-file test fails on any ADK or bundle change.
 Run `pnpm check` before reporting the integrated change as finished.
-The restore-admission and workflow-state tests run with scripted models on Node and Chromium;
-Firefox, WebKit and real models remain unmeasured for these checks.
+The pause-author, restore-admission and new last-child measurement files have scripted Node/Chromium
+and local Firefox/WebKit evidence; the older native L1-L5 file is cited from Node/Chromium only.
+Real models remain unmeasured, and the retained last-child suite pins shipped refusals.
