@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates. 2026-11-13: measured host inventories ship on Python and fixed toolsets on Go; both JavaScript candidates take the registered refusal path. 2026-11-13: the read-only admission rerun registers its outcome rule before measurement.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates. 2026-11-13: measured host inventories ship on Python and fixed toolsets on Go; both JavaScript candidates take the registered refusal path. 2026-11-13: the read-only admission rerun registers its outcome rule before measurement and records REFUSED after copied temporary-state parity fails on both admission variants.
 
 ## Context
 
@@ -211,6 +211,58 @@ gaps, and simultaneous calls are expected to work without serialization. Nested
 pauses, nested wrappers, inner schemas, inner writes, Workflow and raw AgentTool
 are predicted to remain refused. Firefox, WebKit and real models are outside the
 measurement lane.
+
+##### Measured outcome: REFUSED
+
+The rule commit is `56c3571`. Candidate source and unit tests are preserved in
+`7e48769`; primary gate measurements are in `292cee3`; the separately committed
+entry-only variant and its admission measurements are in `3f222a0`. These commits
+remain in history. The final tree removes the wrapper, registry additions,
+admission hooks, ID-seeding change and every candidate-dependent test. No
+conformance cases, goldens, matrix entries, locks or existing assertions change.
+
+Both variants ran against the pinned ADK 2.3.0 web bundle with scripted models on
+Node and headless Chromium. The primary gate command had 108 passing assertions
+and two failing assertions (one copied-state parity failure per project). The
+entry-only command had 106 passing assertions and the same two failures; its
+live-mutation entry check also passed separately on both projects. Native premise
+tests were rerun unchanged in both commands.
+
+| Gate | Primary Node | Primary Chromium | Entry-only Node | Entry-only Chromium | Measured evidence |
+| --- | --- | --- | --- | --- | --- |
+| G1 | PASS | PASS | PASS | PASS | Declaration, subclass delegation, request order, text result, state forwarding, session keying, two calls, abort and native empty-result swallows pass unchanged. |
+| G2 | PASS | PASS | PASS | PASS | Three requests have three leases; two steps fail before the third dispatch. Blocked inner output is denied. Private read output restricts later leases exactly as in direct controls. Run grants and capability budgets reach the real broker. |
+| G3 | PASS | PASS | PASS | PASS | Two simultaneous calls use three distinct session services including the outer service and fresh distinct inner keys. Only outer text and events reach the outer stream and record. Stored IDs 0 and 2 reload to ID 3, also after a failed turn and retry. No serialization was needed. |
+| G4 | FAIL | FAIL | FAIL | FAIL | With outer state `k: 'v'` and `temp:x: 1`, native inner state reads `['v', undefined]`; candidate inner state reads `['v', 1]`. Final text agrees, but copied state does not. |
+| G5 | PASS | PASS | PASS | PASS | Inner provider errors, output denial, budget exhaustion, binding failure, error events and cancellation match direct controls and prevent another outer request. Capability denied/invalid messages remain fixed and model-visible. |
+| G6 | PASS | PASS | PASS | PASS | Primary refusals have zero model requests, leases, binding invocations and store operations, including a stored-pause resume. Entry-only refusals allow one outer lease and a store read, with zero inner leases, capability invocations or store writes and rolled-back history. Read-only tools, static refusals, live mutation refusal and the pause predicate pass. |
+| G7 | PASS | PASS | PASS | PASS | Fresh adapter lifetimes over the same byte store replay wrapper history without inner events. A failed outer turn preserves checkpoint bytes, revision and next-request history. |
+
+The durability measurements exercise the executor boundary with a fresh real-runtime
+broker port and the stored conversation ID: core's adopted-session API permits
+restore only, so it cannot start a new turn on a completed adopted session. This
+is adapter continuation evidence, not a new core lifecycle feature.
+
+The [retained characterization](../../packages/adapter-adk/test/agent-tool-native-gaps.test.ts)
+reproduces the state mismatch without candidate source: native `AgentTool` with
+ADK's `InMemorySessionService` drops copied `temp:` input, while the same native
+tool with `GalaxieSessionService` preserves it. Both forward the ordinary `changed`
+delta and omit the inner temporary delta. The session service's creation semantics,
+not read-only admission or routing, explain the failed prediction.
+
+The registered mapping selects **REFUSED** because both measured variants fail
+result/state parity. Run-port read-only admission, shared routing, gap-aware ID
+seeding and simultaneous calls behaved as predicted; the overall SUPPORTED
+prediction did not hold. No expected value or gate was relaxed to admit the
+mismatch. The raw-shape refusals and ADR-0012 controls remain unchanged. There is
+no package-level `agentTool` helper in the shipped tree.
+
+**Extension decision:** no Python or Go source ships. Their independent wrapper
+designs and gates are **INCOMPLETE**, not attempted in this JavaScript-only rerun;
+their current AgentTool refusals remain. Reconsider JavaScript only with an explicit
+native temporary-input-state contract and a new registered measurement, then
+measure each sibling independently before proposing a port. Firefox, WebKit,
+real models, devices and Worker-hosted JavaScript remain unmeasured for this rerun.
 
 ### Workflow-child resume spike (2026-11)
 

@@ -501,20 +501,15 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
                 });
             }
             before = session.events.length;
-            const seed = session.events.reduce(
-              (seed, event) => {
-                for (const part of event.content?.parts ?? []) {
-                  const call = part.functionCall;
-                  if (call === undefined) continue;
-                  seed.count += 1;
-                  const match = /^galaxie-(\d+)$/.exec(call.id ?? '');
-                  if (match !== null) seed.next = Math.max(seed.next, Number(match[1]) + 1);
-                }
-                return seed;
-              },
-              { count: 0, next: 0 },
+            run.seedCallIds(
+              session.events.reduce(
+                (count, event) =>
+                  count +
+                  (event.content?.parts ?? []).filter((part) => part.functionCall !== undefined)
+                    .length,
+                0,
+              ),
             );
-            run.seedCallIds(Math.max(seed.count, seed.next));
             for await (const event of runnerFor(sessionId).runAsync({
               userId: USER_ID,
               sessionId,

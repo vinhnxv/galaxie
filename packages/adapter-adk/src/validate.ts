@@ -44,12 +44,7 @@ function defaultsOnly(agent: LlmAgent, field: ProcessorField): boolean {
   );
 }
 
-export function validatedInnerCapabilities(
-  root: unknown,
-  registry: HostRegistry,
-  innerRoot = false,
-): readonly string[] {
-  const capabilities = new Set<string>();
+export function validateAgentTree(root: unknown, registry: HostRegistry): void {
   let visited = 0;
   const names = new Map<unknown, number>();
   const walk = (
@@ -57,14 +52,12 @@ export function validatedInnerCapabilities(
     inheritedModel: boolean,
     depth: number,
     path: Set<object>,
-    inner: boolean,
   ): void => {
     if (!object(agent)) throw failure('invalid');
     if (depth > MAX_DEPTH || ++visited > MAX_AGENTS || path.has(agent)) throw failure('invalid');
     if (!ALLOWED.has(Object.getPrototypeOf(agent) as object)) throw failure('unsupported');
     names.set(agent['name'], (names.get(agent['name']) ?? 0) + 1);
     let modelKnown = inheritedModel;
-    path.add(agent);
     if (agent instanceof LlmAgent) {
       if (agent.model !== undefined) {
         if (!object(agent.model) || !registry.models.has(agent.model)) throw failure('unsupported');
@@ -72,8 +65,6 @@ export function validatedInnerCapabilities(
       }
       // An agent with no model of its own and none above it would fall back to ADK's registry.
       if (!modelKnown) throw failure('unsupported');
-      if (inner && (agent.inputSchema !== undefined || agent.outputSchema !== undefined))
-        throw failure('unsupported');
       if (agent.codeExecutor !== undefined || agent.planner !== undefined)
         throw failure('unsupported');
       // Compactors and added processors can hold their own models or run author code on each
@@ -82,38 +73,14 @@ export function validatedInnerCapabilities(
         throw failure('unsupported');
       if (!defaultsOnly(agent, 'responseProcessors')) throw failure('unsupported');
       if (!Array.isArray(agent.tools)) throw failure('invalid');
-      const toolNames = new Set<string>();
-      for (const tool of agent.tools) {
+      for (const tool of agent.tools)
         if (!object(tool) || !registry.tools.has(tool)) throw failure('unsupported');
-        if (typeof tool['name'] !== 'string') throw failure('unsupported');
-        const wrapped = registry.wrappers.get(tool);
-        if (inner) {
-          if (registry.pausing.has(tool) || wrapped !== undefined) throw failure('unsupported');
-          const name = registry.capabilities.get(tool);
-          if (name !== undefined) capabilities.add(name);
-        }
-        if (wrapped !== undefined) {
-          if (
-            agent.tools.some(
-              (other) => other !== tool && Reflect.get(other, 'name') === tool['name'],
-            ) ||
-            toolNames.has(tool['name'])
-          )
-            throw failure('unsupported');
-          walk(wrapped, false, depth + 1, path, true);
-        }
-        toolNames.add(tool['name']);
-      }
     }
     if (!Array.isArray(agent['subAgents'])) throw failure('invalid');
-    for (const child of agent['subAgents']) walk(child, modelKnown, depth + 1, path, inner);
+    path.add(agent);
+    for (const child of agent['subAgents']) walk(child, modelKnown, depth + 1, path);
     path.delete(agent);
   };
-  walk(root, false, 0, new Set(), innerRoot);
+  walk(root, false, 0, new Set());
   if ([...names.values()].some((count) => count > 1)) throw failure('unsupported');
-  return [...capabilities];
-}
-
-export function validateAgentTree(root: unknown, registry: HostRegistry): void {
-  validatedInnerCapabilities(root, registry);
 }
