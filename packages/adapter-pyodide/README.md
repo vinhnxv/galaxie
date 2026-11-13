@@ -542,6 +542,26 @@ only when the overlap is observed in flight; otherwise a later resume can end
 that two concurrent terminal failures report the first recorded code rather than
 the first in input order, and both siblings drain.
 
+The branch-handle decision **accepts this limit with an author alternative**;
+no handle ships. When a branch gathers children, create them in fixed order and
+take a per-branch lock before any suspension, holding it around each journaled call:
+
+```python
+async def branch():
+    lock = asyncio.Lock()
+    async def call(question):
+        async with lock:
+            return await predictor.acall(question=question)
+    return await asyncio.gather(call('first'), call('second'))
+```
+
+The recipe preserves checkpoint bytes under reversed completion timing and
+replays without redispatch on native CPython and Node Pyodide, including a single
+awaited helper task. It protects participating calls; it does not order arbitrary
+external arrivals. The test-local owner candidate can refuse after the first
+model has dispatched, and unguarded overlap still has the arrival-order hazard.
+See the [measured decision](../../tests/conformance/README.md#dspy-schema-output-and-branch-handle-decision).
+
 Removing/renaming a recorded key, changing a request or adding a journaled call
 on replay ends `unrecoverable` before dispatch. Earlier rows stay unchanged and
 the driver appends one compact poison checkpoint. A divergent paused fan-out
@@ -573,9 +593,10 @@ Chromium, Firefox, WebKit, real models, other DSPy versions and successful strea
 nested or pausing fan-out and ReAct branches are unmeasured by this spike. See the
 [evidence and exact limits](../../tests/conformance/README.md#dspy-parallel-and-threaded-evaluate-spike).
 
-JSONAdapter works without streaming; native provider schema output has an
-**alternative** through typed signatures with Python-side validation. Verbatim
-provider `response_format` ends `unsupported` before a model request. The default ChatAdapter disables JSON fallback, since a
+JSONAdapter works without streaming. Native schema output is **supported** with
+`GalaxieLM(role, schema_output=True)`; the default LM still refuses explicit
+provider `response_format` before a model request. Typed signatures retain
+Python-side validation. The default ChatAdapter disables JSON fallback, since a
 fallback would change the replay call sequence. Parse failures end the run.
 
 An `Executor` with `stream_fields` always streams in the Worker, even if the host
@@ -816,7 +837,7 @@ fallback disabled, or non-streaming JSONAdapter:
 ```python
 from typing import Literal
 import dspy
-from galaxie.dspy import GalaxieLM
+from galaxie.dspy import Executor, GalaxieLM
 
 class Answer(dspy.Signature):
     question: str = dspy.InputField()
@@ -831,10 +852,26 @@ reply = await predict.acall(question=question)
 DSPy validates typed fields after receiving the reply. `pe-schema-typed-ok`
 matches plain DSPy with one request and no `jsonSchema`; the `int` violation in
 `pe-schema-typed-violation` ends `executor_error` after one request, without retry.
-This is a weaker guarantee than provider-constrained decoding. Verbatim
-`response_format` ends `unsupported` with zero requests. The router's
-structured-output feature is already used by pydantic-ai `NativeOutput`; mapping
-DSPy to it remains implementation work. The native-only
+This alone does not constrain provider decoding. With the default LM, explicit
+`response_format` ends `unsupported` with zero requests. For provider schema
+output, opt in explicitly:
+
+```python
+predict = dspy.Predict(Answer)
+predict.set_lm(GalaxieLM('answer', schema_output=True))
+executor = Executor(predict, adapter=dspy.JSONAdapter())
+```
+
+The host route must declare `structured-output`. JSONAdapter's typed output schema
+and an explicit `response_format=Model` forward only the JSON schema, without name
+or strict metadata. A route without the feature fails fixed `unavailable` before
+the provider. Open-ended `dict` outputs (`json_object`), tools beside a schema and
+schema streaming remain fixed `unsupported`. No repair attempt or hidden retry is
+added; typed violations end `executor_error` after one request. Constraint
+enforcement belongs to the selected router provider: the mock ignores the schema.
+Replay reuses the recorded reply; a changed schema diverges. See the
+[native, Node and browser evidence](../../tests/conformance/README.md#dspy-schema-output-and-branch-handle-decision).
+The earlier native-only
 `pe-schema-candidate-shape` records a normalized `json_schema` dictionary holding
 an object schema and the open-mapping `{'type': 'json_object'}` fallback.
 

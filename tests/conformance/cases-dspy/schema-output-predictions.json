@@ -1,0 +1,39 @@
+{
+  "rule": {
+    "schema_supported": "Ship only an opt-in GalaxieLM schema_output keyword when default behavior, schema forwarding, fixed refusals, routing, typed validation and replay all pass native and Node gates.",
+    "schema_alternative": "If the mapping needs bridge, router or existing assertion changes, keep typed reply validation or pydantic-ai NativeOutput as the alternative.",
+    "schema_refused": "Refuse any mapping that changes defaults, leaks author text in errors or silently drops constraints.",
+    "branch_accepted": "Accept the existing overlap limit if a per-branch asyncio.Lock preserves marks, checkpoints and replay, including one awaited helper task.",
+    "branch_handle": "If only the test-local handle passes, stop: shipping a handle needs a separate public API decision and plan.",
+    "branch_refused": "If neither recipe nor candidate passes, record the evidence and preserve the existing limit."
+  },
+  "predictions": {
+    "P1": "Default GalaxieLM stays unchanged; pe-schema-response-format remains unsupported with zero requests.",
+    "P2": "The native JSONAdapter twin emits a strict json_schema response_format.",
+    "P3": "Opt-in JSONAdapter forwards exactly the native schema as options.jsonSchema.",
+    "P4": "Explicit response_format=Model forwards the same schema.",
+    "P5": "Open dict json_object output is unsupported before dispatch.",
+    "P6": "Schema beside tools is unsupported before dispatch.",
+    "P7": "Schema streaming is unsupported before dispatch.",
+    "P8": "A route without structured-output ends unavailable with zero provider calls.",
+    "P9": "Typed violations end executor_error after one request without retry.",
+    "P10": "Restore replays without redispatch; a changed schema ends unrecoverable.",
+    "P11": "The lock recipe preserves marks and checkpoint bytes under reversed hop timing and permits one awaited helper task.",
+    "P12": "The test-local owner guard refuses a concurrent second entry before its dispatch and permits one awaited helper task; only guarded calls are protected."
+  },
+  "vocabulary": {
+    "PASS": "The lane ran and matched the assertion.",
+    "DIVERGED": "The lane ran and differed; retain the first failure and register the exact engine title.",
+    "NOT RUN": "The lane did not complete; state the cause.",
+    "EXISTING": "Earlier recorded evidence, not a measurement in this run.",
+    "UNMEASURED": "Outside the measured scope; state the cause."
+  },
+  "unmeasured": {
+    "real_models": "No model access; scripted parity does not establish provider enforcement.",
+    "root_call_guards": "No root-call guard experiment is included.",
+    "worker_task_identity": "Branch recipe is measured on native CPython and Node Pyodide only.",
+    "react_schema_replay": "Only a bounded schema-call replay is measured.",
+    "chromium_schema_reload": "Browser probes exclude reload replay.",
+    "other_dspy_versions": "Only the installed pinned DSPy version is exercised."
+  }
+}

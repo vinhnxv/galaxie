@@ -2298,7 +2298,7 @@ compare outputs and model payloads for the routed control and typed-literal case
 | Gap | Outcome | Deciding evidence and replacement |
 | --- | --- | --- |
 | Provider-string LMs | **alternative** | Existing `refused-lm` at prepare plus the three new runtime-LM probes; `pe-control-routed` and `pe-lm-kwargs` prove role mapping and host-owned model configuration on native/Node. |
-| Native provider schema output | **alternative** | `pe-schema-response-format` refuses; typed success/violation and existing `json-adapter`/`parse-failure` prove Python-side validation on native/Node, without provider-constrained decoding. Mapping the router feature remains implementation work. |
+| Native provider schema output | **alternative** in the initial spike; later **supported** opt-in | `pe-schema-response-format` still refuses by default. The [schema-output decision](#dspy-schema-output-and-branch-handle-decision) adds `GalaxieLM(role, schema_output=True)` through the existing router feature, with new-only goldens. |
 | Embeddings | **refused** | All three `pe-embed-*` shapes fail in both lanes; `pe-env-facts` shows missing dependencies and no measured vector replacement. Router roles are text/decision only. |
 | Service retrievers | **alternative** | `pe-retrieve-colbert` ends outside the broker; native/Node RAG regression proves host-bound `docs.search@1` plus routed generation. Local `rm` is an informational bundled-corpus control. |
 
@@ -2346,7 +2346,7 @@ than vectors; no embedding role or vector capability is established here.
 | Foreign predictor LM refused at prepare | `golden-dspy/refused-lm.json`, `python/galaxie/tests/test_dspy.py` | Existing native/Node/Chromium evidence; native/Node regression rerun, no duplicate probe |
 | Provider literal lint | `python/galaxie/tests/test_dspy_lint.py` | Native regression; syntax-only aid |
 | Routed payloads, prompted JSON, parse failure | `golden-dspy/predict.json`, `json-adapter.json`, `parse-failure.json` | Existing native/Node/Chromium evidence; native/Node regression rerun |
-| Router schemas and pydantic-ai NativeOutput | `_bridge.py`, `bridge.ts`, `adapter.ts`, `pydantic_ai.py`, ADR-0018 decision 11 | Source/matrix evidence, no DSPy schema-forwarding claim |
+| Router schemas and pydantic-ai NativeOutput | `_bridge.py`, `bridge.ts`, `adapter.ts`, `pydantic_ai.py`, ADR-0018 decision 11 | Source/matrix evidence in this earlier spike; the later [schema-output decision](#dspy-schema-output-and-branch-handle-decision) measures DSPy forwarding |
 | Host-bound retrieval and routed answer | RAG `test_dspy_agent.py`, `dspy-agent.node.test.ts`, `dspy-conformance.node.test.ts`, `dspy-gate.node.test.ts`; `test_dspy.py` capability tool | Native/Node regression rerun; previous Chromium RAG evidence only |
 | Offline state, descriptor binding, parallel and runtime | PRs #196, #213, #214, #215 | Existing native/Node suites rerun; only previously measured state/binding cases have Chromium evidence |
 
@@ -2734,5 +2734,123 @@ go test -count=1 -timeout=900s ./conformance/... ./galaxie/...
 go vet ./...
 GOOS=js GOARCH=wasm go vet ./...
 # From the repository root:
+pnpm check
+```
+
+## DSPy schema output and branch handle decision
+
+Measured 2026-11-14 on DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and
+Pyodide 314.0.7. Schema output is **supported as an opt-in** through
+`GalaxieLM(role, schema_output=True)`. The branch overlap limit is **accepted
+with an author alternative**; no branch handle or other branch public symbol
+ships. [ADR-0018](../../docs/adr/0018-python-agents-through-pyodide.md#dspy-schema-output-mapping-2026-11-14)
+records the decisions. Existing default-LM assertions, goldens, matrices and
+locks are unchanged. Predictions remain in `cases-dspy/schema-output-predictions.json`.
+
+Vocabulary: **PASS** means the named command completed with its assertions;
+**DIVERGED** means an observed mismatch, registered without weakening the test;
+**NOT RUN** means that lane was not executed, with the cause stated;
+**EXISTING** refers to earlier evidence, not a new measurement;
+**UNMEASURED** means no experiment establishes the claim.
+
+Each browser command completed all eight cases under the unchanged strict CSP:
+Chromium **156.0.8078.4**, Firefox **157.0**, WebKit **27.2**. All had zero CSP
+violations, Worker errors and external requests, and every response had the
+required CSP header. The known-failures registry needs no new entry.
+The unchanged `dspy-golden-engines` and `dspy-engines` suites also pass:
+25 tests on Chromium, 36 on Firefox and 36 on WebKit. The combined Node schema,
+branch, provider and golden command passes all 58 tests; the focused native branch
+command passes all 99 tests.
+
+| Case | Plain native DSPy | Galaxie native CPython | Node Pyodide | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- | --- |
+| `so-json-adapter-schema` | PASS: strict object schema, `done`, one request | PASS: equal schema, `done`, one request | PASS | PASS | PASS | PASS |
+| `so-explicit-response-format` | PASS: explicit pydantic schema, `done`, one request | PASS: equal schema, `done`, one request | PASS | PASS | PASS | PASS |
+| `so-typed-violation` | PASS: typed parse error, one request | PASS: fixed `executor_error`, one request | PASS | PASS | PASS | PASS |
+| `so-mock-ignores-schema` | PASS: prose parse error, one request | PASS: fixed `executor_error`, one request | PASS | PASS | PASS | PASS |
+| `so-json-object-refused` | PASS: emits `json_object`, accepts an open mapping | PASS: fixed `unsupported`, zero requests | PASS | PASS | PASS | PASS |
+| `so-schema-tools-refused` | PASS: native LM format accepts schema and tools | PASS: fixed `unsupported`, zero requests | PASS | PASS | PASS | PASS |
+| `so-stream-schema-refused` | NOT RUN: scripted native reference implements completion only | PASS: fixed `unsupported`, zero requests | PASS | PASS | PASS | PASS |
+| Route lacks `structured-output` (inline, no golden) | NOT RUN: plain DSPy has no router | NOT RUN: fake native bridge has no router | PASS: fixed `unavailable`, zero provider calls | PASS | PASS | PASS |
+| Restore same schema / changed schema | NOT RUN: galaxie journal contract | PASS: zero redispatch / `unrecoverable` | PASS: fresh Workers, zero redispatch / `unrecoverable` | UNMEASURED: no schema reload lane | UNMEASURED: no schema reload lane | UNMEASURED: no schema reload lane |
+
+Transcript normalization is explicit: the plain native LM receives lm15
+`response_format = {type: 'json_schema', schema, name, strict}`; the OpenAI boundary
+represents it as `response_format.json_schema.schema`. The reference records that
+schema as `jsonSchema` and drops only format `name` and `strict`. Requests otherwise
+retain their messages and stop values. The seven new `golden-dspy-schema/` files
+hold galaxie's transcript shape (`requests`, `responses`, `capabilities`,
+`interactions`, `output`, `error`). Wrapper-only refusals use fixed policy
+transcripts, not a claim that plain DSPy refuses them. The independent native
+reference matches the four request-bearing cases; the native galaxie driver and
+Node/browser adapter match all seven goldens. The recorder uses exclusive creation
+for missing files; running `--write-new` twice changes nothing.
+
+The mock ignores the schema. This measures parity, not constraint enforcement.
+The selected router provider owns constraint enforcement; no real provider was
+run. No format name, strict flag or repair attempt crosses the bridge.
+
+| Schema gate | Measured result |
+| --- | --- |
+| G1 default unchanged | PASS: default `supported_params == {'stop'}`, `supports_response_schema == False`; explicit `pe-schema-response-format` still refuses with zero requests. Existing native/Node goldens remain the oracle. |
+| G2 JSONAdapter schema | PASS: strict object schema equals the native twin, including required fields and `additionalProperties: false`. |
+| G3 explicit response model | PASS: schema-only forwarding equals native DSPy's explicit pydantic format. |
+| G4 unsupported neighbours | PASS: open mappings, schema beside actual tools and schema streaming refuse before dispatch. Focused engine tests additionally refuse empty/non-object schemas, unknown format keys, non-JSON values and every other Config field. lm15 validates Config construction first; malformed engine inputs are injected after construction for these defensive tests. |
+| G5 feature requirement | PASS: Node and all three browsers return fixed `unavailable` before provider calls, with no unconstrained fallback. |
+| G6 typed violation | PASS: `executor_error` after exactly one request on native and galaxie lanes. |
+| G7 defaults, errors, no retries | PASS: fixed public errors contain no author text; existing goldens/assertions remain unchanged; invalid boolean constructor values return fixed `invalid`; neither parse failure retries. |
+| G8 replay and changed schema | PASS: native restore and fresh Node Workers reuse the recorded reply; changed signature ends `unrecoverable` before redispatch. |
+
+The shipped mapping changes only `GalaxieLM`, `_AsyncEngine` and `_options`.
+The bridge and router already carry and require `jsonSchema`. The wheel was
+rebuilt; recorders use `--check`, never a rewrite of an existing golden.
+
+The per-branch lock recipe is:
+
+```python
+async def branch():
+    lock = asyncio.Lock()
+    async def call(question):
+        async with lock:
+            return await predictor.acall(question=question)
+    return await asyncio.gather(call('first'), call('second'))
+```
+
+Create children in fixed order and acquire the lock before their first
+suspension. The lock serializes participating journaled calls; it does not sort
+arbitrary external arrivals. A separate lock belongs to each branch invocation.
+Code outside journaled calls must still be deterministic.
+
+| Branch measurement | Native CPython | Node Pyodide |
+| --- | --- | --- |
+| G-a locked forward/reversed transport timing | PASS: actual reversed completions across two branches, real DSPy `to_thread` hops, equal marks/checkpoint/metadata bytes | PASS: three branches, six model calls, actual reversed completions, equal checkpoint bytes |
+| G-b restore | PASS: zero redispatch | PASS: fresh Worker, zero requests, one replay notification, no Worker errors or remaining tasks |
+| G-c one awaited helper task | PASS with lock and owner candidate | PASS with lock |
+| G-d unguarded overlap | PASS: reversed hops change digests and checkpoint bytes; reversed replay ends `unrecoverable` with zero new requests | NOT RUN: native hazard characterization only |
+| G-e explicit owner candidate | PASS for refusal of second entry before its dispatch and helper-task acceptance; the first model may already dispatch. Reversed retry stays `unsupported`; harness cancels/drains one remaining author child. An unused candidate does not protect unguarded calls. | NOT RUN: candidate is a native test-local measurement |
+| Branch public contract | PASS: existing signature and documented public names pinned; no source change | PASS: existing branch tests unchanged |
+
+The lock recipe passes the required determinism and replay checks. The owner
+candidate offers no advantage that warrants a permanent public API and does not
+provide universal refusal before the first dispatch. Worker task identities,
+root-call guards, ReAct replay of a schema-constrained loop, browser schema reload,
+browser branch-recipe lanes, other DSPy versions and real-model enforcement are
+**UNMEASURED**: no such lane or provider experiment was run.
+
+Reproduce from the repository root with Go 1.27.3 first on PATH and
+`GOTOOLCHAIN=local`. Give each process at least 900000 ms and `pnpm check` at least
+1800000 ms:
+
+```sh
+node scripts/test-python.ts ../tests/conformance/cases-dspy galaxie/tests
+node scripts/build-python-wheels.ts
+pnpm check:python-wheels
+# From python/, for every scripts/record-*.py in the repository:
+.venv/bin/python -I ../scripts/record-dspy-schema-conformance.py --check
+# From the repository root:
+pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 tests/conformance/dspy-schema.node.test.ts tests/conformance/dspy-branch-handle.node.test.ts tests/conformance/dspy-branches.node.test.ts tests/conformance/dspy-provider.node.test.ts tests/conformance/dspy-golden.node.test.ts
+# Repeat with chromium, firefox and webkit:
+GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-schema-engines.node.test.ts
+GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts examples/rag-browser/test/dspy-engines.node.test.ts
 pnpm check
 ```

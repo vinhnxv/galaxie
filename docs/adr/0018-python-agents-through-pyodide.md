@@ -4,6 +4,7 @@
 - **Date:** 2026-10-30
 - **Related:** brief §6.2, §7.4, §7.5, §16.2, §16.7; ADR-0002, ADR-0003, ADR-0005, ADR-0006, ADR-0012, ADR-0016, ADR-0017
 - **Revisions:** 2026-10-30: added pydantic-ai as the second framework, ahead of DSPy, and the rule for framework-owned instrumentation.
+  2026-11-14: mapped DSPy schema output onto routed structured output through an opt-in LM keyword and accepted the branch overlap limit with a measured lock recipe; status stays Proposed.
   2026-11-13: bounded repeated DSPy poison markers after measuring original-instance public retries, and recorded the Python data-module binding alternative; no exclusion option ships, status stays Proposed.
   2026-11-13: added fixed runtime provider-LM refusal and a Python-side strict-CSP probe recorder; status stays Proposed.
   2026-10-30: recorded the use case that opened the brief §16.7 gate.
@@ -672,7 +673,9 @@ allows a write before refusal and a reversed retry can end `unrecoverable`;
 capturing the branch task prevents that dispatch but falsely refuses a branch
 whose sequential calls all run in one awaited helper task. The
 [guard refusal evidence](../../tests/conformance/README.md#branch-task-identity-guard-refusal)
-records both outcomes. Production source is unchanged. Persisted groups
+records both outcomes. The later
+[branch overlap decision](#dspy-branch-overlap-handle-decision-2026-11-14)
+accepts the limit with an author lock recipe; no branch handle ships. Persisted groups
 therefore contain completed calls only. A replayed
 group precedes the recorded root frontier, so a missing branch-call marker is
 `unrecoverable` before dispatch, regardless of arrival order. Removing or renaming
@@ -806,6 +809,55 @@ BetterTogether/fine-tuning optimizers and optimizers given an in-Worker plain
 `dspy.LM` remain unmeasured. Shipped source, existing goldens, matrices, locks and Decision
 text are unchanged. ADR-0012 controls are unchanged; this ADR stays Proposed.
 
+### DSPy schema output mapping (2026-11-14)
+
+Outcome: **supported**, explicitly through `GalaxieLM(role, schema_output=True)`.
+DSPy 3.4.1's JSONAdapter and explicit pydantic response models produce an lm15
+`json_schema` format. The LM forwards only its non-empty JSON object schema as
+`options.jsonSchema`; it drops the format's name and strict flag. The existing
+adapter requires the router's `structured-output` feature. A route without it
+ends fixed `unavailable` with zero provider calls, with no unconstrained fallback.
+The default LM and `pe-schema-response-format` retain their earlier behavior.
+
+Open-ended `json_object`, tools beside a schema, schema streaming, unknown format
+keys and other Config settings remain fixed `unsupported` at the engine boundary.
+lm15 validates Config construction first; defensive malformed-Config tests inject
+values after construction to exercise that boundary. No `repairAttempt` is set.
+A typed violation or a mock that ignores the schema ends `executor_error` after
+one request. Replay sends no new request; a changed schema diverges through the
+existing `unrecoverable` rule. No bridge or router contract changes.
+
+The [schema evidence](../../tests/conformance/README.md#dspy-schema-output-and-branch-handle-decision)
+records independent native reference normalization, new goldens, native and Node
+gates, and the measured browser lanes. This is scripted parity, not provider
+constraint enforcement: the mock ignores the schema. Real providers, other DSPy
+versions, schema-loop ReAct replay and browser schema reload remain unmeasured.
+Auto-enabling schemas, dropping `json_object` constraints and forwarding provider
+format metadata were rejected because they change defaults or silently lose the
+requested constraint. ADR-0012 controls remain in JavaScript; this ADR stays Proposed.
+
+### DSPy branch overlap handle decision (2026-11-14)
+
+Outcome: **accepted with an author alternative**. No public branch symbol or
+signature change ships. Create an `asyncio.Lock` inside each branch callable and
+hold it around each journaled call. With children created in a fixed order and
+the lock acquired before their first suspension, the recipe preserves marks and
+checkpoint bytes under reversed model completion timing, replays without
+redispatch and accepts sequential calls in one awaited helper task on native
+CPython and Node Pyodide. It does not sort arbitrarily arriving external work.
+
+Native tests also measure an explicit owner candidate keyed on the branch token.
+It accepts the helper task and refuses the second concurrent entry before that
+call dispatches, but the first model request may already have dispatched. A
+reversed retry stays fixed `unsupported`; the harness cancels and drains the
+remaining author child. Merely constructing an unused candidate leaves the
+arrival-order hazard unchanged. Unguarded calls record different bytes under
+reversed thread hops, and reversed replay ends `unrecoverable` before redispatch.
+The candidate adds no benefit that warrants a permanent API over the measured
+lock recipe. See the [recipe and limits](../../tests/conformance/README.md#dspy-schema-output-and-branch-handle-decision).
+Worker task identities, root-call guards and browser branch-recipe lanes remain
+unmeasured; the candidate is native test-local evidence only.
+
 ### DSPy provider strings, schema output, embeddings and retrievers spike (2026-11)
 
 The [provider probes](../../tests/conformance/README.md#dspy-provider-strings-schema-output-embeddings-and-retrievers-spike)
@@ -823,8 +875,10 @@ refuses per-call sampling parameters. Host configuration owns those parameters.
 
 `pe-schema-response-format` refuses before a request. Typed-field replacements
 have parity without `jsonSchema`; invalid typed output ends `executor_error`
-after one response without retry. Provider constraints through the existing
-router feature remain follow-up work. `pe-embed-*` fail without requests:
+after one response without retry. The later
+[schema-output decision](#dspy-schema-output-mapping-2026-11-14) adds an explicit
+opt-in through the existing router feature; the default refusal stays unchanged.
+`pe-embed-*` fail without requests:
 LiteLLM and NumPy are absent, there is no embedding role, and retrieval returns
 passages, not vectors. `pe-retrieve-colbert` is outside the broker and fails;
 it records zero Node fetch attempts locally on macOS and one rejected loopback
