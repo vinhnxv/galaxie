@@ -1050,10 +1050,10 @@ class Executor:
         streaming = on_stream is not None and bool(self.stream_fields)
         run = _Run(conversation, state.ordinal, state, replay=replay, streaming=streaming, on_stream=on_stream)
         token = _run.set(run)
-        with _active_runs_lock:
-            _active_runs += 1
         observer = capabilities.failures.set(run.record)
         dispatcher = capabilities.dispatch.set(run.capability)
+        with _active_runs_lock:
+            _active_runs += 1
         try:
             state.bounded()
             value = _json(state.value)

@@ -674,7 +674,7 @@ count covers overlapping runs and resets on success, failure and cancellation.
 The call cannot identify its owner, so it does not terminate a run. Standalone
 async calls outside every active run retain their existing behavior. A run-less
 standalone call during an unrelated run is also refused: this is the deliberate
-fail-closed trade for the single-run-per-Worker lane. Stale weak settings cannot
+fail-closed trade for the one-Worker, one-interpreter lane. Stale weak settings cannot
 terminate a later run.
 
 Thread-start classification follows each exception-group leaf's explicit cause,
