@@ -1395,3 +1395,23 @@ and no further bridge requests, with a unique-name restore-recorder control.
 ADR-0012, core contracts, stored records, effect scopes, interaction IDs and the
 bridge version are unchanged. Firefox, WebKit, real models and devices remain
 unmeasured for this follow-up.
+
+### Engine measurements and the native Go identity oracle (2026-11)
+
+#### Outcome rule registered before measurement
+
+The [registered predictions](../../tests/conformance/cases-adk-engine/engine-fixtures.json)
+predict PASS for six confirmation-beside-ordinary-calls Python cases, live and
+across real page reloads, and for the new Go identity and nested last-child pause
+cases on Chromium, Firefox and WebKit. Named risks are Worker boot, reload timing
+and Firefox/WebKit wasm instantiation under strict CSP. The
+[measurement record](../../tests/conformance/README.md#adk-engine-measurements)
+defines PASS, DIVERGED, NOT RUN, EXISTING, UNMEASURED and INCOMPLETE. A real
+divergence keeps its assertion and enters the shared known-failures registry.
+An engine not run has no passing claim.
+
+The new native Go oracle covers only unique-name trees admitted by the pinned
+runner. Duplicated-name trees are stronger native construction refusals; the
+existing A-go, B-go and C-go outcomes stand. New test-side reference entries must
+pass existing pins before they ship. No shipped runtime, persisted contract,
+existing golden, matrix entry, lock, security control or feature flag changes.

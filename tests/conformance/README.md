@@ -2197,3 +2197,30 @@ pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 te
 # From python/; this is the recorder for the affected LangGraph Python family.
 .venv/bin/python -I ../scripts/record-python-conformance.py --check
 ```
+
+## ADK engine measurements
+
+### Outcome rule registered before measurement
+
+The [predictions](cases-adk-engine/engine-fixtures.json) and empty
+[known-failures registry](adk-engine-known-failures.json) are committed before
+measurement. All new Python live/reload and Go identity/pause cells predict PASS.
+The risks are module Worker boot, IndexedDB reload timing and Firefox/WebKit wasm
+instantiation under strict CSP. Scripted models only; each engine runs locally.
+
+- **PASS:** ran through the final assertion successfully.
+- **DIVERGED:** an unchanged assertion failed; retain it, register the exact test
+  title and record the first failing assertion and a follow-up finding.
+- **NOT RUN:** launch or boot prevented a scenario measurement; state the cause.
+- **EXISTING:** prior unchanged evidence, cited separately.
+- **UNMEASURED:** not attempted; state the cause. A skipped test is never PASS.
+- **INCOMPLETE:** a required executor gate could not be measured; no source for
+  that executor ships.
+
+The native Go oracle is restated over unique-name trees. Duplicated-name trees
+remain construction refusals. No existing golden, matrix entry, lock or runtime
+source changes, and `subgraphs` stays false.
+
+| Lane | Engine | Case | Outcome | Evidence |
+| --- | --- | --- | --- | --- |
+

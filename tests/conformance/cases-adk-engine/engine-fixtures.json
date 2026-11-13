@@ -1,0 +1,70 @@
+{
+  "rule": {
+    "PASS": "Ran through its final assertion successfully.",
+    "DIVERGED": "Ran with an unchanged assertion that failed; record the finding and first failing assertion.",
+    "NOT RUN": "Launch or boot failed; record the cause without scenario claims.",
+    "EXISTING": "Prior unchanged measurement, cited separately.",
+    "UNMEASURED": "Not attempted; state the cause.",
+    "INCOMPLETE": "A required lane gate could not be measured; no source for that executor ships."
+  },
+  "engines": ["chromium", "firefox", "webkit"],
+  "lanes": {
+    "python": [
+      "measures confirm-beside-before-approve live",
+      "measures confirm-beside-before-approve reload",
+      "measures confirm-beside-before-deny live",
+      "measures confirm-beside-before-deny reload",
+      "measures confirm-beside-after-approve live",
+      "measures confirm-beside-after-approve reload",
+      "measures confirm-beside-after-deny live",
+      "measures confirm-beside-after-deny reload",
+      "measures confirm-beside-between-approve live",
+      "measures confirm-beside-between-approve reload",
+      "measures confirm-beside-between-deny live",
+      "measures confirm-beside-between-deny reload"
+    ],
+    "go": [
+      "measures identity-loop-nested live",
+      "measures identity-sequence-in-sequence live",
+      "measures identity-transfer-below-nested live",
+      "measures identity-chain-16 live",
+      "measures identity-parallel-nested live",
+      "measures identity-pause-nested-last live",
+      "measures identity-pause-nested-last durable",
+      "refuses wasm compilation without wasm-unsafe-eval"
+    ]
+  },
+  "predictions": {
+    "chromium": {
+      "python": {
+        "outcome": "PASS",
+        "risk": "Module Worker and IndexedDB timing across real page reloads."
+      },
+      "go": {
+        "outcome": "PASS",
+        "risk": "Wasm instantiation under strict CSP, especially Firefox and WebKit; durable Worker replacement."
+      }
+    },
+    "firefox": {
+      "python": {
+        "outcome": "PASS",
+        "risk": "Module Worker and IndexedDB timing across real page reloads."
+      },
+      "go": {
+        "outcome": "PASS",
+        "risk": "Wasm instantiation under strict CSP, especially Firefox and WebKit; durable Worker replacement."
+      }
+    },
+    "webkit": {
+      "python": {
+        "outcome": "PASS",
+        "risk": "Module Worker and IndexedDB timing across real page reloads."
+      },
+      "go": {
+        "outcome": "PASS",
+        "risk": "Wasm instantiation under strict CSP, especially Firefox and WebKit; durable Worker replacement."
+      }
+    }
+  },
+  "nativeGo": "Unique-name model authors and branches match the admitted-domain oracle; duplicated-name trees fail construction."
+}
