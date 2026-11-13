@@ -546,6 +546,12 @@ Removing/renaming a recorded key, changing a request or adding a journaled call
 on replay ends `unrecoverable` before dispatch. Earlier rows stay unchanged and
 the driver appends one compact poison checkpoint. A divergent paused fan-out
 cannot resume even after the original program returns; the user starts over.
+An adopted poisoned session rejects `start` with `invalid`; restore and resume
+refuse `unrecoverable` before any further row is written. An original instance
+can call `start` after its run fails; the driver now bounds repeats using the
+loaded stored poison status. Direct driver repeats are bounded too. A failed
+first-marker commit still retries because the stored row remains paused. See the
+[public-path probes](../../tests/conformance/README.md#dspy-poison-marker-bound-and-divergence-engine-probes).
 Malformed stored markers fail before registration and add no row. Metadata stays
 `v: 1`; older libraries refuse fan-out records until newer code returns. Records
 without fan-out keep their original bytes. See the [shipped helper evidence](../../tests/conformance/README.md#shipped-async-branch-helper).
@@ -893,8 +899,14 @@ checkpoint metadata is unauthenticated and can be forged or stripped by a writer
 Every descriptor `.json` file counts, including whitespace and unused training or
 configuration data; paths with a `__pycache__` component are ignored. An edit to
 any descriptor JSON file refuses earlier bound pauses until the original bytes
-return. Keep volatile non-state data outside descriptor JSON. Python sources are
-excluded. The Worker strips a UTF-8 BOM when decoding sources, so the digest covers
+return. Keep editable non-state data in a descriptor Python module (a literal,
+or `json.loads` over an embedded string), or obtain it from a host capability.
+Both are outside the JSON manifest. A Python-data change that alters a journaled
+request ends `unrecoverable` through replay divergence; changes that alter no
+journaled request are not detected. The measured exclusion-list decision is
+**alternative**, with no new option: excluding real state would permit undetected
+swaps. See the [native and Node pins](../../tests/conformance/README.md#dspy-poison-marker-bound-and-divergence-engine-probes).
+Python sources are excluded. The Worker strips a UTF-8 BOM when decoding sources, so the digest covers
 those decoded bytes rather than the bytes served over HTTP. The digest stays
 frozen for the Worker lifetime.
 

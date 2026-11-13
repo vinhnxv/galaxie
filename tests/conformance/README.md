@@ -1027,6 +1027,10 @@ key consumes about 110 base64 characters of the existing 1 MiB pause headroom.
 | `bind-legacy-late-prompt` | completes under new state | completes under new state | completes under new state |
 | Legacy session pauses again | second pause gains binding; changed JSON then refuses | Unmeasured | Unmeasured |
 
+The later [binding-exclusion measurements](#dspy-poison-marker-bound-and-divergence-engine-probes)
+pin editable Python data and the test-only exclusion cost without changing this
+table's historical outcomes or the shipped digest.
+
 Every refusal above returns `unrecoverable`, with zero live model/capability
 requests, no replay notification and unchanged checkpoint, pending-write and
 effect rows. Rollback completes with one replay and no repeated capability effect.
@@ -1167,10 +1171,11 @@ start over. The revised helper gate therefore requires zero further requests,
 unchanged earlier rows/writes, one compact marker after the divergent execution
 and refused later restores; restore-time refusals still require no new row.
 
-The sequential probe also observed a second compact marker after a second execute
-on the poisoned session in the same driver, with zero requests. Marker counts
-after repeated executes are deliberately not asserted. Hosts stop at the refused
-pending read; bounding repeated markers is a separate follow-up.
+The [repeated-marker measurements](#dspy-poison-marker-bound-and-divergence-engine-probes)
+now support a driver-only bound after finding an original-instance public start
+path. Direct native repeats and original-instance starts retain one marker;
+adopted starts and poisoned restores refuse before execute. The earlier counts
+are pre-change characterization.
 
 Focused verification (give DSPy commands a timeout of at least 900000 ms):
 
@@ -1582,6 +1587,162 @@ pnpm typecheck:ts6
 VITEST_MAX_WORKERS=4 pnpm check
 git diff --name-status main
 ```
+
+## DSPy poison marker bound and divergence engine probes
+
+On 2026-11-13 the repeated-marker bound is **supported** in the DSPy driver,
+and binding exclusions record **alternative**. The
+[registered predictions](cases-dspy/poison-binding-predictions.json) preceded
+measurement. No exclusion option, descriptor key, driver global or new digest
+envelope ships. The default binding, metadata `v: 1`, marker format and recovery
+rule remain unchanged. Runtime divergence loses the session even after rollback;
+the user starts over. Checkpoint validation checks consistency, not integrity:
+metadata remains unauthenticated.
+
+Vocabulary: PASS reached its final assertion; DIVERGED failed an unchanged
+assertion; NOT RUN failed launch or boot; EXISTING reran unchanged coverage;
+UNMEASURED was not attempted, with a stated cause; UNREACHABLE means the public
+path refuses before repeated Worker execution on that path. INCOMPLETE means a required gate
+could not be measured and that executor ships no source.
+
+| Lane | Variant | First marker | Direct markers before → after bound | Original-program restore | Adopted `start`, twice |
+| --- | --- | --- | --- | --- | --- |
+| Native CPython | changed | PASS | 4 → 1, same and fresh drivers | PASS, pending refuses with unchanged rows | UNMEASURED, no core in this harness |
+| Native CPython | removed | PASS | 4 → 1, same and fresh drivers | PASS, pending refuses with unchanged rows | UNMEASURED, no core in this harness |
+| Node Pyodide | changed | PASS | UNREACHABLE through core | PASS, `unrecoverable`, unchanged rows/writes/effects | REFUSED before the driver, `invalid`, unchanged storage |
+| Node Pyodide | removed | PASS | UNREACHABLE through core | PASS, `unrecoverable`, unchanged rows/writes/effects | REFUSED before the driver, `invalid`, unchanged storage |
+| Chromium 156.0.8078.4 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| Chromium 156.0.8078.4 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| Firefox 157.0 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| Firefox 157.0 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| WebKit 27.2 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| WebKit 27.2 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+
+The pre-change native count was one first marker plus three direct executes,
+mixing start and resume forms. After the bound, all four same/fresh-driver and
+changed/removed combinations retain one marker with byte-identical storage.
+Each execute still returns `unrecoverable` with zero further traffic. Failed first-marker commits leave the stored pause
+in place; same/fresh-driver retry commits exactly one marker, then pending reads
+refuse without writes. The original core instance supplies a public repeated-execute path even though
+adopted instances cannot. Core refuses adopted `start` with `invalid` and the message
+`An adopted session can only be restored.` Preparation sends `boot` only;
+neither `pending` nor `run` is sent for that start. Original-program restore
+refuses with `Stored state cannot be recovered.` and no run command. Resume and
+submit pending-first guards are source-read in core and the adapter; separate
+resume/submit commands on already poisoned sessions are not runtime-measured.
+
+A same-instance probe deliberately changes an author-side invocation counter on
+replay, detects divergence, then starts twice on the original object. This is
+nondeterministic author code, which the existing replay check is meant to refuse.
+The adopted-only prediction missed that the original instance keeps its session
+id and can start again after a failed run. The driver now checks the status loaded
+from storage before deciding whether a marker commit is needed.
+
+| Original-instance public lane | Before bound, checkpoint counts | After bound, checkpoint counts | Outcome |
+| --- | --- | --- | --- |
+| Node Pyodide | 2, 3, 4 | 2, 2, 2 | PASS, fixed `unrecoverable`, one initial capability call only |
+| Chromium 156.0.8078.4 | UNMEASURED, Node triggered the conditional fix | 2, 2, 2 | PASS, unchanged IndexedDB snapshots |
+| Firefox 157.0 | UNMEASURED, Node triggered the conditional fix | 2, 2, 2 | PASS, unchanged IndexedDB snapshots |
+| WebKit 27.2 | UNMEASURED, Node triggered the conditional fix | 2, 2, 2 | PASS, unchanged IndexedDB snapshots |
+
+Counts include the original pause and first poison marker. Each run asserts
+three fixed errors, zero model requests, only the initial capability call, and
+byte-identical rows/writes/effects after both retries. The guard is driver-only:
+no core contract or adapter preflight is changed.
+
+The new Node files have three poison tests and four alternative pins. Each
+browser run has four tests (boot, both reload variants and original-instance
+public retries). The probes assert no model or
+capability traffic after divergence, unchanged earlier bytes, exactly one compact
+marker with null input/empty journal/four metadata keys, the next revision and
+previous parent, and one null `__interrupt__` write at index -3. Browsers retain
+strict CSP, exact response-header equality including 304s, zero external requests
+and no CSP or Worker errors. No engine failure-registry entry was needed.
+
+These scripted measurements use CPython 3.14.5, DSPy 3.4.1, Node 24.15.0,
+Pyodide 314.0.7 and Playwright 1.64.1. The focused native run passes 51 tests,
+including the unchanged divergence file; the complete `cases-dspy` directory
+passes 312 tests. The six-file Node recovery gate passes 41 tests.
+
+### Binding alternative and test-only candidate
+
+Native and Node pins resume with an edited `catalog.py`, produce the new data
+value and emit one replay notification. An edit to `unrelated.json` refuses
+before traffic/replay and leaves rows, writes and effects unchanged; original
+JSON resumes. An independent SHA-256 oracle binds only `unrelated.json`.
+Python-only descriptors retain exact unbound metadata bytes. A Python edit that
+changes the journaled capability request instead appends one poison marker.
+
+Keep editable non-state data in a descriptor Python module (a literal or
+`json.loads` over an embedded string), or obtain it from a host capability. Data
+outside JSON is unbound: edits that change no journaled request are undetected.
+The author fingerprint recipe remains the way to bind source drift. A non-Python,
+non-JSON descriptor extension is unavailable. Glob/prefix exclusions hide typos;
+an exclusion option would require a public API and coordinated Python/TypeScript
+digest design. No such option is needed for the measured alternative.
+
+| Candidate property | Native result |
+| --- | --- |
+| C1: empty list | PASS, byte-identical shipped digest, including no JSON |
+| C2: file changes | PASS, excluded edits ignored; other JSON edit/add/remove/whitespace changes digest |
+| C3: list changes | PASS, adding/removing/replacing an entry changes digest and refuses an earlier pause; unsorted/duplicate entries refuse |
+| C4: validation | PASS, at most 16 sorted unique explicit descriptor JSON paths; invalid types, absolute/traversal/backslash/glob/non-JSON/missing names refuse `unsupported` |
+| C5: driver restore | PASS, excluded edit resumes; bound JSON edit refuses with unchanged rows/traffic |
+| C6: envelope | PASS, only existing `stateBinding` key with 64 lowercase hex and `v: 1` |
+| C7: actual loaded state | PASS cost measurement, excluding a `Module.load` state file permits a swapped state; shipped binding refuses it |
+
+All 35 candidate tests run natively, restoring the shipped function after each
+patch. The candidate stays test-only. The Python wheel was rebuilt after the
+contingent Pyodide driver change, followed by all five DSPy recorders with
+`--check`; the Python payload is unchanged. Earlier, a timestamp-only stale-cache
+warning was resolved by byte comparison and refreshing its mtime. No tracked
+wheel, manifest or lock changes.
+
+Reproduce from the repository root. Give each process at least 900000 ms and
+`pnpm check` at least 1800000 ms; the runs here used subprocess timeouts of those
+lengths. All recorders use `--check` from `python/`.
+
+```sh
+python/.venv/bin/python -I -m json.tool tests/conformance/cases-dspy/poison-binding-predictions.json
+node scripts/check-license.ts
+node scripts/build-python-wheels.ts
+pnpm check:python-wheels
+node scripts/test-python.ts ../tests/conformance/cases-dspy/test_dspy_poison_bound.py ../tests/conformance/cases-dspy/test_dspy_state_exclusion_candidate.py ../tests/conformance/cases-dspy/test_dspy_binding_alternative.py ../tests/conformance/cases-dspy/test_dspy_divergence_persistence.py -s
+node scripts/test-python.ts ../tests/conformance/cases-dspy
+pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 tests/conformance/dspy-poison-bound.node.test.ts tests/conformance/dspy-binding-alternative.node.test.ts tests/conformance/dspy-fanout.node.test.ts tests/conformance/dspy-state-repause.node.test.ts tests/conformance/dspy-state-bind.node.test.ts tests/conformance/dspy-restore.node.test.ts
+for engine in chromium firefox webkit; do
+  GALAXIE_BROWSER="$engine" pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-divergence-engines.node.test.ts
+  GALAXIE_BROWSER="$engine" pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-engines.node.test.ts
+done
+pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 examples/rag-browser/test/dspy-conformance.node.test.ts examples/rag-browser/test/dspy-state-conformance.node.test.ts
+cd python
+.venv/bin/python -I ../scripts/record-dspy-conformance.py --check
+.venv/bin/python -I ../scripts/record-dspy-state-conformance.py --check
+.venv/bin/python -I ../scripts/record-dspy-runtime-conformance.py --check
+.venv/bin/python -I ../scripts/record-dspy-retrieval-conformance.py --check
+.venv/bin/python -I ../scripts/record-dspy-provider-lm-conformance.py --check
+cd ..
+pnpm typecheck
+pnpm typecheck:python
+pnpm lint
+pnpm check:docs
+pnpm check:license
+node scripts/check-dco.ts main..HEAD
+PATH="$HOME/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.3.darwin-arm64/bin:$PATH" GOTOOLCHAIN=local pnpm check
+```
+
+Real models remain UNMEASURED because no model access is available. DSPy 3.2.1
+remains UNMEASURED: the PR #236 offline overlay stopped at collection with
+`ModuleNotFoundError: No module named 'dspy.lm15'`. Concurrent tabs, forged
+metadata, large many-file descriptors, other versions and other browser engines
+remain unmeasured. Go wasm and other executors gain no source or new conformance
+claim from this DSPy work. Suppressing the first poison marker loses retry
+protection, and an arbitrary repeat cap adds no public-path benefit. The
+contingent driver bound ships because original-instance public starts did reach
+execute. It suppresses a commit only when the loaded stored row is already
+poisoned; it never drops the first marker or its failed-commit retry. The only
+existing assertion-bearing file change is one comment pointing to the bound
+tests. ADR-0012 controls remain unchanged.
 
 ## DSPy engine measurements
 

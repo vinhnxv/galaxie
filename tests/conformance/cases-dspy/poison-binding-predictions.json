@@ -1,0 +1,25 @@
+{
+  "rule": {
+    "poisonAccepted": "Accept repeated driver markers when every measured public path refuses before another execute and preserves stored rows. Ship divergence probes without shipped-source changes.",
+    "poisonBound": "Reopen a driver-only bound only if a public call reaches repeated execute or appends a second marker. Ship only with first-marker, failed-commit retry and refusal gates passing on every applicable lane; otherwise retain tests and record INCOMPLETE without source.",
+    "exclusionAlternative": "Keep the default binding byte-identical when the Python data-module alternative passes and a test-only exclusion candidate demonstrates the author-controlled undetected-state cost.",
+    "exclusionReopen": "Do not ship an exclusion option. If the alternative fails or a candidate requires shipped Python changes, stop and report the evidence."
+  },
+  "predictions": {
+    "driverRepeats": "Native CPython adds one marker per extra direct execute, in the same and fresh drivers. Public adopted-session start rejects invalid; restore, resume and submit refuse unrecoverable without rows or traffic on Node and all three browsers, making repeated execute UNREACHABLE.",
+    "firstMarker": "Changed-request and removed-call divergence append exactly one compact marker on native, Node, Chromium, Firefox and WebKit.",
+    "failedCommit": "A failed marker commit leaves the paused row intact; a subsequent direct execute re-detects divergence and commits one marker. Public pending reads of the committed poison add nothing.",
+    "bindingAlternative": "Python data-module edits allow resume; JSON edits refuse before replay or traffic. A Python edit changing a journaled request diverges.",
+    "candidate": "The test-only candidate satisfies explicit bounded validation and digest properties; an excluded real DSPy state file can be swapped undetected.",
+    "limits": "Real models remain unmeasured because no model access is available. DSPy 3.2.1 remains unmeasured because the prior offline overlay failed collection with ModuleNotFoundError: No module named 'dspy.lm15'."
+  },
+  "vocabulary": {
+    "PASS": "Ran through its final assertion successfully.",
+    "DIVERGED": "Ran with an unchanged assertion that failed; record the first failing message.",
+    "NOT RUN": "Launch, boot or installation failed; record the error without scenario claims.",
+    "EXISTING": "An existing unchanged measurement was run again.",
+    "UNMEASURED": "Not attempted; state the cause.",
+    "UNREACHABLE": "The public path refuses before the Worker execute can repeat a marker.",
+    "INCOMPLETE": "A required gate could not be measured; that executor ships no source."
+  }
+}

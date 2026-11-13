@@ -111,6 +111,18 @@ and refused later restores. Restore-time refusals still write no row. The helper
 remains unshipped; a retry is separately scoped. No production source or existing
 golden, matrix or lock changed. See the [decision and limits](../tests/conformance/README.md#divergence-persistence-decision).
 
+On 2026-11-13, the DSPy repeated-marker bound is **supported** in the driver.
+Pre-change native repeats produced four markers, and a missed public path on the
+original instance produced checkpoint counts 2, 3, 4 after poison and two starts.
+The stored-status guard now retains one native marker and unchanged rows on
+public retries; failed first-marker commits still retry and commit once. Adopted
+starts reject `invalid`, while poisoned restore and original-instance starts
+remain fixed `unrecoverable`. New real IndexedDB reload probes pass
+both variants on Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2 with zero
+traffic after divergence and unchanged CSP. Original-instance retry probes also
+retain the first poison without new rows. See the
+[engine probes and measured limits](../tests/conformance/README.md#dspy-poison-marker-bound-and-divergence-engine-probes).
+
 On 2026-11-12, the LangGraph Python tool-call replies spike records **alternative**
 for binding/replies, streaming, confirmed writes, the safety floor and durable
 replay, and **refused** for neighbouring binding/message shapes: scripted CPython
@@ -217,6 +229,13 @@ reload assertions diverge on reported CSP headers. Real models, concurrent tabs,
 forged metadata and large many-file descriptors remain unmeasured; the
 other-version attempt could not collect tests. See
 [shipped evidence and the spike record](../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
+
+The 2026-11-13 binding-exclusion outcome is **alternative**: native and Node pins
+resume with edited descriptor Python data, refuse edited JSON without traffic or
+writes, and poison Python edits that change a journaled request; a test-only
+exclusion candidate permits a loaded state swap, so no exclusion option ships
+and the default digest stays unchanged. See the
+[candidate evidence](../tests/conformance/README.md#dspy-poison-marker-bound-and-divergence-engine-probes).
 
 Earlier on 2026-11-11, the automatic-binding spike recorded **supported** (design
 proven). Its test-only candidate established changed-byte refusal, unchanged rows,
