@@ -69,3 +69,13 @@ The [stream namespace spike](0020-google-adk-through-an-adapter.md#stream-namesp
 The [host inventory outcome](0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11) adds `galaxie.Toolset` over same-build capability tools, with native declaration-order, pause/effect/reload and pinned wasm/Node evidence. Model strings are not applicable; `Model(role)` remains the explicit form. Foreign/native/dynamic toolsets and provider tools remain refused, and the pinned config has no planner or code-executor field. The prior model/toolset spike remains the historical record.
 
 The [duplicate-identity outcome](0020-google-adk-through-an-adapter.md#duplicate-identity-measured-outcome-2026-11-13) confirms the existing native global-name refusal before dispatch; Go source and tests remain unchanged.
+
+The later [engine measurements](../../tests/conformance/README.md#adk-engine-measurements)
+add a native unique-name identity oracle and duplicate/shared-instance refusal
+pins. Local scripted Chromium, Firefox and WebKit runs each pass 12 tests for six
+identity trees, empty stream paths, nested last-child approval, durable reopened
+IndexedDB/new Worker and the CSP compilation control. The reference module is
+30,121,430 bytes; the existing size/cold-start limits pass. No runtime source,
+existing golden, matrix entry or lock changes. Go page reload, the existing 23
+scripts on Firefox/WebKit, Linux CI engine evidence, real models and devices stay
+unmeasured; `subgraphs` remains false and this ADR stays Proposed.

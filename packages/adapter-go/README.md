@@ -44,6 +44,16 @@ SequentialAgent, ParallelAgent and LoopAgent remain supported. The
 confirms that a repeated name fails `unsupported` at Execute before model dispatch.
 Rename agents for a fresh tree; no Go behavior, stored format or flag changed.
 
+The [engine measurements](../../tests/conformance/README.md#adk-engine-measurements)
+restate a native unique-name oracle with six shapes and stronger construction
+refusals. Chromium, Firefox and WebKit pass message-author identity, empty paths,
+nested last-child approval and durable IndexedDB/new-Worker continuation in the
+same page. The reference module is 30,121,430 bytes; maximum ready times in those
+local scripted runs were 132 / 300 / 151 ms respectively, within unchanged limits.
+A real Go page reload, the existing 23 scripts on Firefox/WebKit, Linux CI engine
+evidence, real models and devices remain unmeasured. No runtime path or namespace
+support is added.
+
 ## Interactions
 
 See the [ADK request-input guide](../../docs/guides/adk-request-input.md#go-and-evidence-limits) for the pinned Go source fact and the limits of the input measurements.

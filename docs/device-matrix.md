@@ -40,6 +40,15 @@ The [hosted RAG demo](../examples/rag-browser/README.md#hosted-demo-build) is a 
 
 ## Mock-model runs on Firefox and WebKit
 
+Local scripted [ADK measurements](../tests/conformance/README.md#adk-engine-measurements)
+on 2026-11-13 pass all 16 Python and 12 Go tests per engine on Chromium
+156.0.8078.4, Firefox 157.0 and WebKit 27.2 (macOS arm64). Python covers six
+ordinary-sibling confirmations live and across real page reloads. Go covers six
+identity trees, including nested last-child approval, retaining empty stream paths;
+durable Go reopens IndexedDB with a new Worker in the same page, without a page
+reload. These are local results; the existing 23 Go scripts on Firefox/WebKit,
+Linux CI engine evidence, real models and devices remain unmeasured.
+
 **Header follow-up, 2026-11-13:** the DSPy test preview now sets the unchanged CSP
 header before Vite's static handler, which omitted configured headers on 304
 revalidations. A wire-level test pins 200/304 equality. Local macOS full reruns
@@ -55,6 +64,9 @@ rows diverge on unchanged CSP-header equality assertions for reported cached
 HTTP 304 responses. Those measurements are separate from the Linux CI job below;
 the remaining Pyodide and Go WebAssembly paths still have no engine evidence from
 that job.
+
+The following coverage statement concerns Linux CI only; it excludes the local
+ADK and DSPy measurements above.
 
 The `test-browser-engines` CI job runs the Vitest browser project on Playwright 1.64.1 Firefox and WebKit builds on `ubuntu-24.04`. It runs the `general` group: every browser case except the Pyodide and Go WebAssembly groups, so those Worker and WebAssembly paths have no Firefox or WebKit evidence yet. The cases use scripted models, a fake `LanguageModel` and loopback fixtures, with no GPU and no model weights. Chromium in `test-general` stays the engine that gates a change; the engine job fails only on a case that is not in [the known-failure list](../tests/browser-engines-known-failures.json). No CSP or Trusted Types setting is relaxed for these runs.
 

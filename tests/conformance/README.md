@@ -771,8 +771,10 @@ byte-identical.
 
 The six `confirm-beside-*` cases add a confirmation beside an ordinary call in both orders
 and between two ordinary siblings, each approved and denied. Native ADK records every result;
-live and restored Node Workers match those new goldens. Existing matrix entries and goldens
-are unchanged. CPython measurements in `cases-adk-python/test_adk_python_confirmation_beside_calls.py`
+the prior evidence is Node Worker (live and restored); Chromium, Firefox and WebKit
+now match them live and across real page reloads per the
+[engine table](#adk-engine-measurements). Existing matrix entries and goldens are
+unchanged. CPython measurements in `cases-adk-python/test_adk_python_confirmation_beside_calls.py`
 and `python/galaxie/tests/test_adk_beside_calls.py` also cover native combined/split long-running
 answers, sibling writes with fake host receipts, partial/wrong-kind answers and the validating
 input replacement. Those measurements do not claim core broker integration or new Chromium
@@ -823,6 +825,10 @@ runs the same agents compiled into the reference module through the adapter, rou
 strict CSP and Trusted Types. A case marked `unordered` (`parallel`) compares its wire lists by canonical
 JSON text because sibling branches reach the page in any order. The matrix also records the refused
 shapes.
+
+The separate [engine measurements](#adk-engine-measurements) add six identity trees,
+including a nested last-child pause, on Chromium, Firefox and WebKit. Their native oracle
+and scripts are separate new files; the 23-script matrix and golden lanes stay unchanged.
 
 [`adk-go-agents.node.test.ts`](adk-go-agents.node.test.ts) asserts that Parallel write branches keep
 branch-local effect scopes whichever branch reaches the broker first and that a restore after the pause
@@ -2196,4 +2202,162 @@ pnpm run test:python ../tests/conformance/cases-python/test_tool_call_replies_al
 pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 tests/conformance/pyodide-tool-identity.node.test.ts tests/conformance/pyodide-tool-calls.node.test.ts
 # From python/; this is the recorder for the affected LangGraph Python family.
 .venv/bin/python -I ../scripts/record-python-conformance.py --check
+```
+
+## ADK engine measurements
+
+### Outcome rule registered before measurement
+
+The [predictions](cases-adk-engine/engine-fixtures.json) and empty
+[known-failures registry](adk-engine-known-failures.json) are committed before
+measurement. All new Python live/reload and Go identity/pause cells predict PASS.
+The risks are module Worker boot, IndexedDB reload timing and Firefox/WebKit wasm
+instantiation under strict CSP. Scripted models only; each engine runs locally.
+
+- **PASS:** ran through the final assertion successfully.
+- **DIVERGED:** an unchanged assertion failed; retain it, register the exact test
+  title and record the first failing assertion and a follow-up finding.
+- **NOT RUN:** launch or boot prevented a scenario measurement; state the cause.
+- **EXISTING:** prior unchanged evidence, cited separately.
+- **UNMEASURED:** not attempted; state the cause. A skipped test is never PASS.
+- **INCOMPLETE:** a required executor gate could not be measured; no source for
+  that executor ships.
+
+The native Go oracle is restated over unique-name trees. Duplicated-name trees
+remain construction refusals. No existing golden, matrix entry, lock or runtime
+source changes, and `subgraphs` stays false.
+
+| Lane | Engine | Case | Outcome | Evidence |
+| --- | --- | --- | --- | --- |
+| adk-python | chromium | `confirm-beside-before-approve live` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-before-approve reload` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-before-deny live` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-before-deny reload` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-after-approve live` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-after-approve reload` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-after-deny live` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-after-deny reload` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-between-approve live` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-between-approve reload` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-between-deny live` | PASS | existing golden equality |
+| adk-python | chromium | `confirm-beside-between-deny reload` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-before-approve live` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-before-approve reload` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-before-deny live` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-before-deny reload` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-after-approve live` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-after-approve reload` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-after-deny live` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-after-deny reload` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-between-approve live` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-between-approve reload` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-between-deny live` | PASS | existing golden equality |
+| adk-python | firefox | `confirm-beside-between-deny reload` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-before-approve live` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-before-approve reload` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-before-deny live` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-before-deny reload` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-after-approve live` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-after-approve reload` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-after-deny live` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-after-deny reload` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-between-approve live` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-between-approve reload` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-between-deny live` | PASS | existing golden equality |
+| adk-python | webkit | `confirm-beside-between-deny reload` | PASS | existing golden equality |
+| adk-go | chromium | `identity-loop-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | chromium | `identity-sequence-in-sequence live` | PASS | new native author oracle; every stream path [] |
+| adk-go | chromium | `identity-transfer-below-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | chromium | `identity-chain-16 live` | PASS | new native author oracle; every stream path [] |
+| adk-go | chromium | `identity-parallel-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | chromium | `identity-pause-nested-last live` | PASS | new native author oracle; every stream path [] |
+| adk-go | chromium | `identity-pause-nested-last durable` | PASS | new oracle; full live/durable equality; 2 Workers |
+| adk-go | chromium | `refuses wasm compilation without wasm-unsafe-eval` | PASS | compile refused with directive omitted |
+| adk-go | firefox | `identity-loop-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | firefox | `identity-sequence-in-sequence live` | PASS | new native author oracle; every stream path [] |
+| adk-go | firefox | `identity-transfer-below-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | firefox | `identity-chain-16 live` | PASS | new native author oracle; every stream path [] |
+| adk-go | firefox | `identity-parallel-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | firefox | `identity-pause-nested-last live` | PASS | new native author oracle; every stream path [] |
+| adk-go | firefox | `identity-pause-nested-last durable` | PASS | new oracle; full live/durable equality; 2 Workers |
+| adk-go | firefox | `refuses wasm compilation without wasm-unsafe-eval` | PASS | compile refused with directive omitted |
+| adk-go | webkit | `identity-loop-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | webkit | `identity-sequence-in-sequence live` | PASS | new native author oracle; every stream path [] |
+| adk-go | webkit | `identity-transfer-below-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | webkit | `identity-chain-16 live` | PASS | new native author oracle; every stream path [] |
+| adk-go | webkit | `identity-parallel-nested live` | PASS | new native author oracle; every stream path [] |
+| adk-go | webkit | `identity-pause-nested-last live` | PASS | new native author oracle; every stream path [] |
+| adk-go | webkit | `identity-pause-nested-last durable` | PASS | new oracle; full live/durable equality; 2 Workers |
+| adk-go | webkit | `refuses wasm compilation without wasm-unsafe-eval` | PASS | compile refused with directive omitted |
+
+### Measured outcome (2026-11-13)
+
+All registered PASS predictions held. These are local macOS arm64 results with
+scripted models, Node 24.15.0, Playwright 1.64.1, ADK Python 2.12.0 / Pyodide
+314.0.7 and ADK Go v1.9.0 compiled with Go 1.27.3. Every row above ran through its
+final assertion. No expected failures or skips occurred; the registry is empty.
+The Python file passes 16 tests per engine (12 case rows plus boot, selection,
+title registration and 200/304 CSP revalidation). The Go file passes 12 per engine
+(eight case/control rows plus boot/limits, selection, registration and revalidation).
+
+| Engine | `typeof trustedTypes` / `WebAssembly` / `indexedDB` | Python module Worker | Go module Worker | Go bytes | Maximum Go cold start |
+| --- | --- | --- | --- | --- | --- |
+| Chromium 156.0.8078.4 | `object` / `object` / `object` | PASS | PASS | 30,121,430 | 132 ms |
+| Firefox 157.0 | `object` / `object` / `object` | PASS | PASS | 30,121,430 | 300 ms |
+| WebKit 27.2 | `object` / `object` / `object` | PASS | PASS | 30,121,430 | 151 ms |
+
+Cold start is the maximum adapter ready time among six live identity cases in
+these local runs, with concurrent tests and possibly warm caches; it is a
+demonstration, not a benchmark. The existing ceilings remain 48 MiB and 10 seconds.
+Every positive response retains the strict CSP, external requests are empty and
+page CSP violations are empty. Negative controls omit only `'wasm-unsafe-eval'`
+and cannot complete the reference run. Both previews apply CSP before the static
+handler; wire-level tests cover 200 and 304 responses without changing the policy.
+
+The six Python cases previously had Node Worker evidence only. Chromium,
+Firefox and WebKit are new measurements here. Denials retain the exact existing
+transcript, including no denied tool invocation. Every reload joins at least two
+page lifetimes, reopens IndexedDB and consumes the accepted answer.
+
+The [new Go oracle](cases-adk-go/identity-oracle.json) restates the admitted domain:
+nested Loop, nested Sequential, nested transfer, depth sixteen, nested Parallel
+and the nested last-child pause. Sequential text-bearing authors compare in
+order, Parallel authors as sorted multisets; native model-role author/branch pairs
+compare as sorted lists. Every captured browser stream event, including pause and
+tool markers, has `path: []`. The native T6 duplicate leaves and D5 root/descendant
+refuse with `agent names must be unique`; D6's shared instance refuses with
+`agent cannot have >1 parents`. Galaxie refuses each `unsupported` before any
+model author is dispatched. The native event still lacks `NodeInfo` and the
+model request lacks `Path`, `Branch` and `Tree`.
+
+The Go pause is `tree[first, inner[mid, deep]]`, with one Approval interaction at
+`deep`. Live approval and the reviewed pause transcript match; durable execution
+closes/reopens IndexedDB and creates a second Worker in the same page, then
+matches the entire live wire transcript and streams. A real page reload is
+**UNMEASURED** in this Go lane: it tests Worker/store replacement only.
+The previous A-go, B-go and C-go refusals stand; this adds evidence without path
+carriage, stored namespaces or a `subgraphs` flag change.
+
+The unchanged 23-script Go lane remains **EXISTING** on native Go, Node and
+Chromium (rerun here); it is **UNMEASURED** on Firefox and WebKit because this
+lane runs only the new identity scripts. Linux CI engine evidence, real models,
+real devices and new nested namespace support remain **UNMEASURED**: this is a
+local scripted measurement, and no namespace implementation ships.
+
+### Reproduce the ADK engine measurements
+
+Use the pinned Go 1.27.3 directory first on PATH and `GOTOOLCHAIN=local` for every
+command below. The local wheels must pass `pnpm check:python-wheels`; rebuild them
+only after Python/Pyodide source changes.
+
+```sh
+# Repeat with chromium, firefox and webkit.
+GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 examples/rag-browser/test/adk-python-engines.node.test.ts
+GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 examples/rag-browser/test/adk-go-engines.node.test.ts
+# From go/:
+go test -count=1 -timeout=900s ./conformance/... ./galaxie/...
+go vet ./...
+GOOS=js GOARCH=wasm go vet ./...
+# From the repository root:
+pnpm check
 ```
