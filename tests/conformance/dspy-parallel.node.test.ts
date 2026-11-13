@@ -111,7 +111,8 @@ test.each(
   parallelScenarios.filter(
     (name) =>
       (name.startsWith('par-verbatim-') && name !== 'par-verbatim-thread-start') ||
-      name.startsWith('par-refuse-'),
+      name.startsWith('par-refuse-') ||
+      name.startsWith('par-wrapped-'),
   ),
 )(
   'Node Pyodide refuses verbatim fan-out and propagated contexts: %s',

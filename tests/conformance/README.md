@@ -1506,24 +1506,50 @@ workers, engine completion/streaming with lost context, grouped thread-start
 errors, cleanup and a second supported run on the same executor. An ordinary
 author `RuntimeError` keeps `executor_error`.
 
-The threaded Parallel probe captures logger `dspy.utils.parallelizer`: **zero
-records**, with **no example question text** logged. `_Termination` bypasses its
-`Exception` handler. The sequential control still logs item text through DSPy;
-galaxie neither adds diagnostic text nor suppresses DSPy logging.
+DSPy's logger is accepted unchanged, pinned by native tests on DSPy 3.4.1.
+Threaded Parallel and pool-worker async `n=2` refusal capture **zero records**
+from `dspy.utils.parallelizer`, with zero requests; `_Termination` bypasses its
+`Exception` handler. Sequential Parallel over three examples emits **one record**
+containing the first author's item and the exact suffix:
+
+```text
+: This operation is unsupported.. Set `provide_traceback=True` for traceback.
+```
+
+No galaxie logger records are added. galaxie neither suppresses, redacts nor adds
+log text. Natively this goes to the author's own process stderr. The production,
+test and DSPy-gate host-created Pyodide instances discard Python stdout/stderr
+(source-read, not runtime-measured). Global logging changes or a filter on a
+DSPy-owned handler that DSPy can recreate offer no benefit on the shipped lane.
 
 Two snapshot pairs captured twice before the source edit now pin literal paused
 and completed checkpoint/metadata bytes. Both recorder checks and the unchanged
 native candidate, async fan-out, runtime, state and Node regression suites protect
 supported behavior. No golden, matrix, lock, recorder, journal key or core contract
-changes. The fixture adds only the new scenario name; its spike predictions stay
-historical.
+changes. Fixture entries are additive; existing spike predictions stay historical.
 
-Residual limits: raw author-created threads without DSPy's propagated settings are
-unattributed natively; a thread-start error caught by author code is invisible to
-the executor. Stale settings hold only a weak reference and cannot affect a later
-run. Any `RuntimeError` raised inside `Thread.start`, including misuse, maps to
-`unsupported` if it reaches the executor. The six probes now pass in Chromium,
-Firefox and WebKit in the local [engine measurements](#dspy-engine-measurements).
+Async model entries without the run ContextVar or a live settings handle now
+refuse before payload construction while any DSPy run is active. Raw native
+threads, `run_in_executor` and empty-context tasks send zero bridge requests.
+The call cannot identify its owner and therefore does not terminate a run;
+author catches can return a fallback. Standalone calls after success, failure or
+cancellation still work. Overlapping attributed runs and context-carrying native
+`to_thread`/`Thread(context=copy_context())` calls keep their journaled requests.
+A 20-thread native probe alternates active and inactive lifetimes without count
+leaks. Stale weak settings cannot terminate a later run. A legitimate run-less
+standalone call during an unrelated run is also refused by this deliberate
+fail-closed rule.
+
+Residual limits: Pyodide cannot start real threads; a swallowed thread-start
+failure remains invisible and permits a sequential fallback. Native threads
+outliving every run are outside the active-run guard. A global thread patch or
+owner heuristic would be needed to attribute creation or terminate a guessed
+owner and would break run isolation. Thread-start `RuntimeError` tracebacks,
+including misuse, map to `unsupported` through explicit causes or unsuppressed
+contexts, with cycle detection and a 32-exception bound. `from None`, ordinary
+author errors, cycles and chains beyond that bound keep `executor_error`.
+The eight probes now pass in Chromium, Firefox and WebKit in the local
+[engine measurements](#dspy-engine-measurements).
 Real models remain **unmeasured**; the other-version attempt could not collect
 tests. Thread-pool fan-out remains unsupported; use sequential
 `await module.acall(...)` loops or the [shipped keyed async helper](#shipped-async-branch-helper).
@@ -1537,6 +1563,7 @@ before Node tests; recorder commands always require `--check`.
 ```sh
 cd python
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest galaxie/tests/test_dspy.py galaxie/tests/test_dspy_state_binding.py galaxie/tests/test_dspy_gate.py galaxie/tests/test_dspy_lint.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest galaxie/tests/test_dspy_thread_attribution.py galaxie/tests/test_dspy.py galaxie/tests/test_dspy_branches.py galaxie/tests/test_dspy_state_binding.py galaxie/tests/test_dspy_gate.py galaxie/tests/test_dspy_lint.py -q
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_parallel_baseline.py -q
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy/test_dspy_parallel_candidate.py ../tests/conformance/cases-dspy/test_dspy_runtime.py -q
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest ../tests/conformance/cases-dspy -q
@@ -1627,6 +1654,8 @@ The eight-scenario legacy state-swap family and native-only
 
 | Probe | Native CPython | Node Pyodide | Chromium | Firefox | WebKit |
 | --- | --- | --- | --- | --- | --- |
+| `par-refuse-bare-context` | PASS: `unsupported`, zero requests | PASS | PASS | PASS | PASS |
+| `par-wrapped-thread-start` | PASS: forced native start failure in unit tests; Worker scenario not applicable | PASS | PASS | PASS | PASS |
 | `par-verbatim-thread-start` | EXISTING: threads start, zero requests | EXISTING: both `RuntimeError` | PASS: both `RuntimeError` | PASS: both `RuntimeError` | PASS: both `RuntimeError` |
 | `par-verbatim-parallel-threads` | EXISTING | EXISTING | PASS | PASS | PASS |
 | `par-verbatim-parallel-sequential` | EXISTING | EXISTING | PASS | PASS | PASS |
@@ -1634,10 +1663,32 @@ The eight-scenario legacy state-swap family and native-only
 | `par-verbatim-evaluate-sequential` | EXISTING | EXISTING | PASS | PASS | PASS |
 | `par-refuse-context` | EXISTING | EXISTING | PASS | PASS | PASS |
 
-The last five rows end with fixed `unsupported`, no output, no model or capability
+The seven refusal rows end with fixed `unsupported`, no output, no model or capability
 request, no request after termination and no Worker error. Browser probes also
 require zero CSP violations, zero external requests and exact header equality.
 Thread-pool APIs remain refused.
+
+The run-less/context and wrapped-start predictions were committed before Worker
+measurement. The empty-context task is awaited uncaught; the wrapped-start
+scenario raises `ValueError` from the start `RuntimeError`. Native unit tests also
+pin implicit chaining, exception-group leaves, explicit suppression, cycles,
+depth bounds and swallowed failures. The native raw-thread and executor-worker
+regressions first failed with one unjournaled model request before the source fix.
+No existing fixture or prediction entry changed.
+
+The combined engine and golden-engine rerun on 2026-11-13 passed 18 tests on
+Chromium and 29 each on Firefox and WebKit. Each engine also had two pre-existing
+expected failures for the eval-instrumented retrieval probes; those assertions
+and registry entries are unchanged. All eight thread-pool/context probes reached
+their final assertions on every browser. The focused Node suite passed 135 tests;
+the focused native DSPy suite passed 223, and the new native test plus complete
+DSPy conformance suite passed 281.
+
+Reproduce each local engine (replace `chromium` with `firefox` or `webkit`):
+
+```sh
+GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 examples/rag-browser/test/dspy-engines.node.test.ts examples/rag-browser/test/dspy-golden-engines.node.test.ts
+```
 
 ### Async fan-out by engine
 

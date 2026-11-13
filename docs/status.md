@@ -161,12 +161,20 @@ On 2026-11-12, DSPy thread-pool fan-out gained fixed `unsupported` refusal in
 native CPython and Node Pyodide. `Parallel` and `Evaluate`, including their default
 thread count, end without model or capability requests; author catches cannot
 turn an attributed LM refusal into a successful fallback. Supported programs keep
-their snapshot bytes, replay and outputs. The six browser probes now pass in
+their snapshot bytes, replay and outputs. The eight browser probes now pass in
 Chromium, Firefox and WebKit in the local
 [engine measurements](../tests/conformance/README.md#dspy-engine-measurements).
 Real models remain unmeasured; the other-version attempt could not collect tests.
-Raw author-created threads remain
-unattributed natively; a caught thread-start error is invisible to the executor.
+The 2026-11-13 follow-up refuses async model calls without a run ContextVar or live
+DSPy settings handle before payload construction while any run is active, without terminating an
+unidentified run. Standalone calls after all runs end remain available. Wrapped
+thread-start failures follow explicit causes or unsuppressed contexts (32-exception
+bound); `from None` remains `executor_error`. Swallowed start errors and threads
+outliving every run remain outside attribution; native context-carrying threads
+journal normally. DSPy's logger is accepted unchanged: sequential refusal logs one
+author item plus the fixed message; threaded and pool-worker `n=2` refusals log
+zero records. Native stderr belongs to the author's process. Worker stdout/stderr
+are discarded by host constructors (source-read, not runtime-measured).
 The later async-helper shipping attempt is refused as recorded above. See the
 [refusal evidence and limits](../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
 

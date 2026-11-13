@@ -82,6 +82,16 @@ def program(name: str, *, lm: Any = None, tool: Any = None, interaction: Any = N
         async def aforward(self, question: str) -> dspy.Prediction:
             if name == 'par-verbatim-thread-start':
                 return dspy.Prediction(**thread_probe())
+            if name == 'par-refuse-bare-context':
+                return await asyncio.create_task(self.predict.acall(question=question), context=contextvars.Context())
+            if name == 'par-wrapped-thread-start':
+                try:
+                    thread = threading.Thread(target=lambda: None)
+                    thread.start()
+                    thread.join()
+                except RuntimeError as error:
+                    raise ValueError('Author thread wrapper.') from error
+                return dspy.Prediction(answers=['started'])
             if name == 'par-refuse-context':
                 parent = thread_local_overrides.get().copy()
                 def worker():
