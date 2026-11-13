@@ -1,0 +1,57 @@
+{
+  "pe-retrieve-local-rm": { "golden": "pe-retrieve-local-rm.json" },
+  "pe-retrieve-colbert": { "golden": "pe-retrieve-colbert.json" },
+  "rag-docs-search": {
+    "golden": "rag-docs-search.json",
+    "input": { "question": "Where do agent pipelines run?", "mode": "fulltext" },
+    "role": "rag.answer",
+    "capability": {
+      "name": "docs.search@1",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "mode": { "type": "string", "enum": ["fulltext", "vector", "hybrid"] },
+          "k": { "type": "integer", "minimum": 1, "maximum": 10 }
+        },
+        "required": ["query", "mode", "k"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "passages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "title": { "type": "string" },
+                "text": { "type": "string" }
+              },
+              "required": ["id", "title", "text"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["passages"],
+        "additionalProperties": false
+      },
+      "result": {
+        "passages": [
+          {
+            "id": "overview",
+            "title": "Browser agents",
+            "text": "Agent pipelines run in the browser on the user's own machine."
+          }
+        ]
+      }
+    },
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nIn the browser on the user's own machine. [1]\n[[ ## completed ## ]]"
+      }
+    ]
+  }
+}

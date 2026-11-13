@@ -1,5 +1,14 @@
 {
-  "chromium": [],
-  "firefox": [],
-  "webkit": []
+  "chromium": [
+    "chromium matches the new DSPy golden: pe-retrieve-local-rm",
+    "chromium matches the new DSPy golden: pe-retrieve-colbert"
+  ],
+  "firefox": [
+    "firefox matches the new DSPy golden: pe-retrieve-local-rm",
+    "firefox matches the new DSPy golden: pe-retrieve-colbert"
+  ],
+  "webkit": [
+    "webkit matches the new DSPy golden: pe-retrieve-local-rm",
+    "webkit matches the new DSPy golden: pe-retrieve-colbert"
+  ]
 }

@@ -1,0 +1,111 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nCapital of Japan?"
+        },
+        {
+          "role": "assistant",
+          "content": "[[ ## answer ## ]]\nTokyo\n\n[[ ## completed ## ]]\n"
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nCapital of Italy?"
+        },
+        {
+          "role": "assistant",
+          "content": "[[ ## answer ## ]]\nRome\n\n[[ ## completed ## ]]\n"
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nCapital of France?\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nCapital of Japan?"
+        },
+        {
+          "role": "assistant",
+          "content": "[[ ## answer ## ]]\nTokyo\n\n[[ ## completed ## ]]\n"
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nCapital of Italy?"
+        },
+        {
+          "role": "assistant",
+          "content": "[[ ## answer ## ]]\nRome\n\n[[ ## completed ## ]]\n"
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nReview the capital\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]",
+      "toolCalls": []
+    },
+    {
+      "content": "[[ ## answer ## ]]\nReviewed Paris\n[[ ## completed ## ]]",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [],
+  "interactions": [
+    {
+      "surfaceId": "main",
+      "viewRevision": "runtime",
+      "component": "test.Review/v1",
+      "props": {
+        "answer": "Paris"
+      }
+    }
+  ],
+  "output": {
+    "first": "Paris",
+    "answer": "Reviewed Paris",
+    "demos": [
+      {
+        "question": "Capital of Japan?",
+        "answer": "Tokyo"
+      },
+      {
+        "question": "Capital of Italy?",
+        "answer": "Rome"
+      }
+    ]
+  },
+  "error": null,
+  "events": [
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "pause"
+      }
+    },
+    {
+      "mode": "updates",
+      "data": {
+        "kind": "replayed",
+        "count": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "requests": [],
+  "responses": [],
+  "capabilities": [],
+  "interactions": [],
+  "output": {
+    "passages": ["local a", "local b"]
+  },
+  "error": null
+}
