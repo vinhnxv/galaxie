@@ -28,18 +28,22 @@ import type { AdkHost } from '../src/host.js';
 import { defineAdkEntry } from '../src/interaction.js';
 import { FakeChatModel, wordChunks } from './support/fixtures.js';
 
-/* DA1 FAIL: native Sequential/Loop fields collide.
- * DA2 FAIL S5: partial-only first worker is missing from the stored log;
- * DC1 attributes second/first/second to first/second/first.
- * S1-S3 and ordinary two-turn baseline PASS; S6-S8 not measured: fixed by S5.
- * DA3 PASS S4: rebuilt pause log and live derivation agree.
- * DA4: first-match output key loses structured output; Python additionally
- * mixes Parallel surrogate buffers. Native transfer prediction did not hold.
- * D-js REFUSED: the prepare-time refusal ships after the recorded DA failure.
- * RF1-RF8 PASS: exact-name refusal, unchanged unique-name restore bytes,
- * zero model/store requests, limit trees and unchanged control boundaries.
- * GA1-GA5/GA7 PASS test-locally; GA3 follows unique accepted names.
- * GA6/GA8 not measured: carriage not shipped; GF1-GF5 fixed by GF2.
+/* Repeated agent names refuse at prepare; unique names keep their recipes.
+ * Executed here: RF2/RF5 duplicate refusal before model/store access and malformed-child
+ * precedence; RF4 unique-pause restore bytes and refusal before duplicate-tree restore;
+ * RF5/RF6 exact distinct names and limit trees; GA1/GA2/GA4/GA5 unique-name recipes
+ * across runs and rebuilt trees. Each claim maps to the identically labelled tests below.
+ * Measured before the refusal shipped, when duplicate trees still prepared, and not
+ * executed in this file: DA1 FAIL (native Sequential/Loop fields collide); DA2 FAIL S5
+ * (partial-only first worker missing from the stored log, DC1 attributes second/first/second
+ * to first/second/first); S1-S3 and ordinary two-turn baseline PASS; DA3 PASS S4
+ * (rebuilt pause log and live derivation agree); DA4 first-match output-key loss,
+ * Python Parallel surrogate-buffer mixing and the failed native transfer prediction.
+ * See ADR-0020, "Duplicate-identity measured outcome", for D-js REFUSED and this history.
+ * Native probes remain in packages/adapter-adk/test/duplicate-identity-native.test.ts
+ * and tests/conformance/cases-adk-python/test_adk_python_duplicate_identity.py.
+ * S6-S8 not measured: outcome fixed by S5. GA6/GA8 not measured: carriage not shipped.
+ * GF1-GF5 not measured: outcome fixed by GF2.
  * No public path, stored format or effect scope changes.
  */
 const definition = defineAgentDefinition({

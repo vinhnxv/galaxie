@@ -1,18 +1,22 @@
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 # SPDX-License-Identifier: Apache-2.0
 
-"""DA1 FAIL: native Sequential/Loop fields collide.
-DA2 FAIL S5: partial-only first worker is missing from the stored log;
-DC1 attributes second/first/second to first/second/first.
-S1-S3 and ordinary two-turn baseline PASS; S6-S8 not measured: fixed by S5.
-DA3 PASS S4: rebuilt pause log and live derivation agree.
-DA4: first-match output key loses structured output; Python additionally
-mixes Parallel surrogate buffers. Native transfer prediction did not hold.
-D-py REFUSED: the prepare-time refusal ships after the recorded DA failure.
-RF1-RF8 PASS: exact-name refusal, unchanged unique-name restore bytes,
-zero model/store requests, limit trees and unchanged control boundaries.
-GA1-GA5/GA7 PASS test-locally; GA3 follows unique accepted names.
-GA6/GA8 not measured: carriage not shipped; GF1-GF5 fixed by GF2.
+"""Repeated agent names refuse at prepare; unique names keep their recipes.
+Executed here: duplicate refusal before requests (test_duplicates_fail_at_prepare_before_model_or_store_requests),
+malformed-child precedence (test_duplicate_does_not_hide_a_later_invalid_child),
+distinct names and limits (test_exact_distinct_names_and_limit_trees_prepare_and_run),
+unique-pause bytes (test_unique_pause_bytes_restore_unchanged_and_duplicate_prepare_never_reads_them),
+and unique-name recipes (test_namespace_recipe_is_deterministic_content_free_and_uses_no_stored_field).
+Measured before the refusal shipped, when duplicate trees still prepared, and not executed in this file:
+DA1 FAIL (native Sequential/Loop fields collide); DA2 FAIL S5 (partial-only first worker missing
+from the stored log, DC1 attributes second/first/second to first/second/first); S1-S3 and the
+ordinary two-turn baseline PASS; DA3 PASS S4 (rebuilt pause log and live derivation agree);
+DA4 first-match output-key loss, Python Parallel surrogate-buffer mixing and the failed native
+transfer prediction. See ADR-0020, "Duplicate-identity measured outcome", for D-py REFUSED and this history.
+Native probes remain in packages/adapter-adk/test/duplicate-identity-native.test.ts and
+tests/conformance/cases-adk-python/test_adk_python_duplicate_identity.py.
+S6-S8 not measured: outcome fixed by S5. GA6/GA8 not measured: carriage not shipped.
+GF1-GF5 not measured: outcome fixed by GF2.
 No public path, stored format or effect scope changes.
 """
 
@@ -221,3 +225,42 @@ def test_unique_pause_bytes_restore_unchanged_and_duplicate_prepare_never_reads_
     assert error.value.code == 'unsupported'
     assert requests == before
     assert original._snapshot('s1', 'bound') == (checkpoint, metadata)
+
+
+@pytest.mark.parametrize('shape', ['sequential', 'root-duplicate'])
+def test_duplicate_boot_cannot_reach_restore_with_authentic_pause_bytes(monkeypatch, shape):
+    from galaxie.adk import prepare_executor
+
+    requests = install()
+    original = Executor(tree('unique-pause'), interaction=interaction)
+    original.durable = True
+    assert run(original)[0] is None
+    checkpoint, metadata = original._snapshot('s1', 'bound')
+    before = list(requests)
+    restored = []
+
+    async def restore(executor, checkpoint, metadata, session):
+        restored.append((executor, checkpoint, metadata, session))
+        return 's1'
+
+    monkeypatch.setattr(Executor, '_restore', restore)
+    # Admission runs in __init__, so no duplicate-tree executor exists to restore into.
+    with pytest.raises(GalaxieError) as error:
+        Executor(tree(pause=True), interaction=interaction)
+    assert error.value.code == 'unsupported'
+    assert str(error.value) == 'This operation is unsupported.'
+    root = tree(shape)
+    if shape == 'root-duplicate':
+        root = SequentialAgent(name='worker', sub_agents=[LlmAgent(name='worker', model=llm('first'))])
+    with pytest.raises(GalaxieError) as error:
+        prepare_executor(root)
+    assert error.value.code == 'unsupported'
+    assert str(error.value) == 'This operation is unsupported.'
+    assert restored == []
+    assert requests == before
+    assert original._snapshot('s1', 'bound') == (checkpoint, metadata)
+
+    # This control proves the recorder is effective; constructor refusal is the guarantee.
+    other = Executor(tree('unique-pause'), interaction=interaction)
+    asyncio.run(other._restore(checkpoint, metadata, 'bound'))
+    assert restored == [(other, checkpoint, metadata, 'bound')]

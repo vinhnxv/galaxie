@@ -1002,6 +1002,59 @@ workflow wrappers; and remeasurement at any ADK version change. S6–S8, early-e
 Loop variants, broader restore shapes, Firefox, WebKit, real models and device
 checks remain unmeasured. No cell is recorded as supported.
 
+Census reproduction (2026-11-13, Node 24.15.0, pnpm 11.21.0 and CPython 3.14.5):
+the historical baseline is `b184545`, the parent of `7e56da2` on `main`, plus only
+the Python validation diff from `fix(adk): refuse duplicate agent names before
+execution` (`7e56da2`). Use a detached throwaway worktree outside the checkout:
+
+```sh
+git worktree add --detach ../galaxie-census b184545
+git show --format= 7e56da2 -- python/galaxie/src/galaxie/adk.py | git -C ../galaxie-census apply
+mkdir -p ../galaxie-census/.cache
+cp -R .cache/python-wheels ../galaxie-census/.cache/
+cd ../galaxie-census
+corepack pnpm install --frozen-lockfile --offline
+(cd python && uv sync --locked --offline)
+node scripts/build-python-wheels.ts
+corepack pnpm run test:python
+GALAXIE_TEST_GROUP=python-adk corepack pnpm exec vitest run --project node
+corepack pnpm exec vitest run --project node tests/conformance/adk-python*.node.test.ts
+VITEST_MAX_WORKERS=2 corepack pnpm exec vitest run --project node \
+  tests/conformance/adk-python.node.test.ts \
+  tests/conformance/adk-python-restore.node.test.ts \
+  tests/conformance/adk-python-agents.node.test.ts \
+  tests/conformance/adk-python-scan.node.test.ts \
+  tests/conformance/adk-python-run.node.test.ts
+```
+
+Worker runs also require the cached third-party wheels and installed Pyodide
+runtime; this rerun copied the wheel cache into the worktree before rebuilding
+its local wheel, independently of the main checkout. Offline installation used
+Corepack because the standalone pnpm launcher could not resolve its cached
+package-manager metadata. No dependency or lock was changed. The Python rerun
+reproduced **1421 passed and one expected failure**:
+`galaxie/tests/test_adk_stream_namespaces.py::test_duplicate_names_still_prepare_but_cannot_be_attributed_uniquely`.
+
+Run the same selectors at this follow-up's head, using `pnpm` in place of
+`corepack pnpm` when the pinned launcher is already resolved:
+
+| Selector | Historical baseline rerun | Follow-up head |
+| --- | --- | --- |
+| `pnpm run test:python` | 1421 passed, one expected failure | 1719 passed |
+| `GALAXIE_TEST_GROUP=python-adk pnpm exec vitest run --project node` | 162 passed | 170 passed |
+| `pnpm exec vitest run --project node tests/conformance/adk-python*.node.test.ts` | 87 passed | 95 passed |
+| The five named Worker suites in the last command above | 80 passed | 82 passed |
+
+All three Worker selectors ran with zero skips. The filename group also includes
+native and example tests, and the conformance glob includes normalization tests.
+None reproduced the quoted **79**; that historical Worker figure was **not
+re-derived** by this procedure. The later counts reflect tests added since the
+historical census. `2520597` is the pre-refusal measurement commit in the PR's
+pre-squash history and may be unreachable from a clone of `main`. Keep the
+historical figures above unchanged; the commands and outcomes here are a later
+reproduction record. Remove the detached worktree after the runs; commit nothing
+there.
+
 ### String models, toolsets, code executors, planners and built-in tools spike (2026-11)
 
 The [host inventory follow-up](#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
@@ -1305,3 +1358,40 @@ Firefox, WebKit, real models, devices, Worker-hosted JavaScript and external
 network-toolset execution remain unmeasured for this change. Follow-ups are listed
 in the PR: a different atomic JavaScript admission design and an explicitly
 authorized host-surface assertion update before retrying the JavaScript helper.
+
+#### Review follow-up decisions (2026-11)
+
+Python model-string admission now requires an exact `str`, including the guard
+that distinguishes an inherited empty model. ADK 2.12.0 on CPython 3.14.5
+normalizes both `StrEnum` members and plain `str` subclasses to exact `str` at
+construction; direct field assignment can retain a subclass. The
+[role-inventory tests](../../python/galaxie/tests/test_adk_role_inventory.py)
+pin that compatibility result and refuse assigned subclasses, including ones
+that override equality, inequality, hashing and formatting, before assignment
+or bridge dispatch. A valid sibling remains unchanged when admission fails.
+The host still validates every dispatched role; this tightening adds defense
+in depth without changing the explicit `llm(role)` helper.
+
+The host continues omitting empty or over-128-character role names and taking
+the first 256 valid declarations in order, without a host-visible error. The
+[boot tests](../../packages/adapter-pyodide/test/adk-boot-roles.test.ts) pin the
+128-character boundary and cap; Python tests pin admission at 128 and refusal
+at 129. A string naming an omitted role fails fixed `unsupported` at prepare.
+Omission only removes reachable roles. Rejecting the whole boot would break a
+host with an unused out-of-bounds declaration, while a content-free prepare
+error would report the same refusal. Reconsider diagnostics if an integration
+demonstrates that the documented bounds and fixed refusal are insufficient to
+identify an omitted role.
+
+A duplicate role continues failing the whole boot `unsupported`: conforming
+hosts use unique routing-record keys, so a duplicate signals a malformed
+hand-built payload. Deduplication would hide that host bug. Python tests prove
+that duplicate and over-long declarations both preserve the previous inventory
+on failure. The
+[duplicate-identity test](../../python/galaxie/tests/test_adk_duplicate_identity.py)
+also pins constructor refusal with authentic pause bytes, zero restore calls
+and no further bridge requests, with a unique-name restore-recorder control.
+
+ADR-0012, core contracts, stored records, effect scopes, interaction IDs and the
+bridge version are unchanged. Firefox, WebKit, real models and devices remain
+unmeasured for this follow-up.

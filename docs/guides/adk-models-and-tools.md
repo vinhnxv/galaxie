@@ -84,6 +84,8 @@ refuse `unsupported` with no bridge messages. The explicit `llm('answer')`
 helper also works, as the toolset example below demonstrates.
 
 The optional ADK-only boot inventory is bounded to 256 roles of 1–128 characters.
+Over-long names and surplus roles are omitted without a host-visible error; an
+author naming an omitted role sees only `unsupported` at prepare, so keep names short.
 See [role admission details](../../packages/adapter-pyodide/README.md#porting-adk-models-and-static-toolsets).
 A Gemini-looking role can satisfy ADK's built-in name predicate through the
 explicit helper, as the original spike records; it still refuses as a Python
