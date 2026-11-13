@@ -16,8 +16,10 @@ from google.adk.agents.run_config import RunConfig, StreamingMode  # pyright: ig
 from google.adk.apps import App, ResumabilityConfig
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
+from google.adk.models import registry
 from google.adk.runners import InMemoryRunner
 from google.adk.tools.base_tool import BaseTool
+from google.adk.tools.base_toolset import BaseToolset
 from google.genai import types
 
 from galaxie import GalaxieError
@@ -344,6 +346,34 @@ async def converse(runner, session, spec, name, transcript):
         message = types.Content(role='user', parts=parts)
 
 
+class NativeFixedToolset(BaseToolset):
+    """Native oracle for a fixed grouping, independent of the galaxie helper."""
+
+    def __init__(self, tools):
+        super().__init__()
+        self.members = tuple(tools)
+
+    async def get_tools(self, readonly_context=None):
+        return list(self.members)
+
+    async def close(self):
+        pass
+
+
+def register_string_oracle(scripted):
+    """ADK's own string registry constructs the model that shares this case's script."""
+    class StringOracle(ScriptedLlm):
+        @classmethod
+        def supported_models(cls):
+            return [r'^answer$']
+
+        def __init__(self, model):
+            super().__init__(model=model, case=scripted.case, spec=scripted.spec,
+                             transcript=scripted.transcript, gates=scripted.gates, trace=scripted.trace)
+
+    registry.LLMRegistry.register(StringOracle)
+
+
 async def _run_case(name):
     spec = json.loads(Path(__file__).with_name('fixtures.json').read_text())[name]
     streaming = name.startswith('stream-')
@@ -352,8 +382,12 @@ async def _run_case(name):
         **({'streams': []} if streaming else {}),
     }
     model = ScriptedLlm(model='answer', case=name, spec=spec, transcript=transcript, gates={}, trace=[])
+    if name == 'model-string':
+        register_string_oracle(model)
     ordinary = tuple(NativeDouble(name, transcript, sibling) for sibling in ('ordinary', 'other')) if name in suite.BESIDE_CASES else ()
-    agent = suite.factory(name, model, NativeDouble(name, transcript), ordinary)
+    native_tool = NativeDouble(name, transcript)
+    agent = suite.factory(name, 'answer' if name == 'model-string' else model,
+                          NativeFixedToolset([native_tool]) if name == 'toolset-fixed' else native_tool, ordinary)
     runner = InMemoryRunner(app=App(
         name='conformance', root_agent=agent, resumability_config=ResumabilityConfig(is_resumable=True),
     )) if name in suite.RESUMABLE else InMemoryRunner(agent=agent, app_name='conformance')
@@ -387,4 +421,11 @@ async def run_case(name):
         patch.object(socket.socket, 'connect_ex', _blocked_network),
         patch.object(socket, 'getaddrinfo', _blocked_network),
     ):
-        return await _run_case(name)
+        saved = dict(registry._llm_registry_dict)
+        try:
+            return await _run_case(name)
+        finally:
+            if name == 'model-string':
+                registry._llm_registry_dict.clear()
+                registry._llm_registry_dict.update(saved)
+                registry.LLMRegistry.resolve.cache_clear()

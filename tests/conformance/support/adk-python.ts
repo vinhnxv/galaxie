@@ -60,6 +60,8 @@ export const adkPythonCases = [
   'agents-confirm-parallel',
   'agents-confirm-parallel-reversed',
   'agents-long-running-middle',
+  'model-string',
+  'toolset-fixed',
 ] as const;
 /** The Chromium lane repeats these; the Node lane runs all of them. */
 export const adkPythonBrowserCases = [
