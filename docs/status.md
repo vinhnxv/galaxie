@@ -17,12 +17,17 @@ On 2026-11-13, five new DSPy [runtime optimizer and retrieval goldens](../tests/
 pass independent native recording and Node Pyodide replay. Rebound runtime
 LabeledFewShot, its two-stage replay frontier and host-bound `docs.search@1`
 pass on local Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2, including
-real IndexedDB page reloads. Both reused `pe-retrieve-*` browser probes are
-DIVERGED: Trusted Types blocks their eval-based egress recorder, each ends
-`invalid` with zero model/capability requests, and browser egress counts remain
-UNMEASURED. Six exact titles are registered as expected failures with assertions
-and CSP unchanged. All runs use scripted models; real services and real models
-remain unmeasured. No shipped source, existing golden, matrix, fixture or lock changed.
+real IndexedDB page reloads. Both reused `pe-retrieve-*` browser probes now pass
+with a Python-side fetch recorder under the unchanged strict CSP. Local RM has
+zero attempts; ColBERT records one rejected `127.0.0.1:9` attempt per browser,
+ending `executor_error` with zero bridge requests. The failure registry is empty.
+Five new [runtime provider-LM refusal cases](../tests/conformance/README.md#dspy-runtime-constructed-provider-lm-refusal)
+end fixed `unsupported` with zero requests and zero attempts on native, Node and
+all three browsers. The call-time guard covers non-`GalaxieLM` BaseLM entries,
+including in-process engines and caught errors. Trusted code can still bypass
+those entries; Worker egress policy is not decided here, decision 9 unchanged.
+All runs use scripted models; real services and real models remain unmeasured.
+Existing goldens, matrices, fixtures and locks are unchanged.
 
 On 2026-11-13, local scripted DSPy engine measurements add WebKit binding and
 legacy re-pause evidence, Chromium legacy re-pause evidence, thread-pool probes
@@ -121,10 +126,10 @@ On 2026-11-11, the DSPy provider spike records provider-string LMs **alternative
 native provider schema output **alternative**, embeddings **refused** and service
 retrievers **alternative**. Native CPython and Node Pyodide cover `pe-lm-*`,
 `pe-schema-*`, `pe-embed-*` and `pe-retrieve-*` with scripted models on DSPy 3.4.1,
-CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. Runtime-created provider LMs use
-lm15 outside the router: native set/context probes each attempt one rejected
-loopback connection; Node records zero fetch attempts because the default
-transport is sockets. Both end `executor_error`. Typed signatures match plain
+CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. The 2026-11-13 follow-up refuses
+runtime-created provider LM calls with fixed `unsupported` before engine execution,
+with zero bridge requests or egress attempts on native, Node and all three browsers.
+Use host-mapped `GalaxieLM` roles. Typed signatures match plain
 DSPy without provider constraints; an invalid typed reply fails after one request.
 The host-bound RAG retrieval replacement now has the new golden evidence above. ColBERT records
 zero Node fetch attempts locally on macOS and one rejected loopback fetch in
@@ -132,9 +137,10 @@ Ubuntu CI (Node 24.22.2; CPython 3.14.6 references), with the same fixed failure
 and zero bridge requests. The exact
 transport difference is unmeasured; a Worker egress decision remains follow-up
 work under ADR-0018 decision 9. The Worker has `requests` but no `httpx`, `openai`,
-`litellm`, `numpy` or `faiss`. No shipped
-source, core contract, golden, matrix or lock changed; conditional refusal was
-unneeded. The browser retrieval outcomes are recorded above; other new browser
+`litellm`, `numpy` or `faiss`. No core contract, existing golden, matrix or lock
+changed in that initial spike.
+The follow-up changes Python LM entry guards and test instrumentation; its
+browser retrieval outcomes are recorded above. Other new browser
 provider probes, real services and the other
 [unmeasured shapes and predictions](../tests/conformance/README.md#dspy-provider-strings-schema-output-embeddings-and-retrievers-spike)
 remain unmeasured. See the [author recipes](../packages/adapter-pyodide/README.md#provider-strings-schema-output-embeddings-and-retrievers).

@@ -788,15 +788,21 @@ output and payload parity; `pe-lm-kwargs` ends `unsupported` with zero requests.
 In DSPy 3.4.1 provider strings default to the native lm15 engine, **not LiteLLM**.
 The native engine defaults to sockets even in Pyodide; its optional
 `FetchTransport` is not selected automatically. A predictor-bound foreign LM is
-refused at prepare (existing `refused-lm`), but `pe-lm-runtime-set` and
-`pe-lm-runtime-context` construct one after prepare and bypass that validation.
-Each attempts one rejected loopback connection natively and ends `executor_error`
-with zero bridge requests. In Node both end `executor_error` with zero recorded
-fetch attempts. This does not establish network containment: the router's grants,
-budgets and destination policy do not cover this path. It is the trusted-code
-limit in [ADR-0018 decision 9](../../docs/adr/0018-python-agents-through-pyodide.md#decision).
-The syntax-only lint flags literals, not arbitrary runtime construction.
-`pe-lm-runtime-nokey` ends `executor_error` before I/O in both lanes.
+refused at prepare (existing `refused-lm`). Runtime-created provider calls now
+end fixed `unsupported` at `BaseLM.__call__` or `BaseLM.acall`, before payload or
+engine execution. The five [refusal cases](../../tests/conformance/README.md#dspy-runtime-constructed-provider-lm-refusal)
+cover `set_lm`, context binding, no key, an in-process engine and a caught error:
+all have zero model/capability requests and zero egress attempts on native, Node,
+Chromium, Firefox and WebKit. A caught refusal still terminates its run; plain
+DSPy outside every active run remains unchanged. Calls without an attributable
+run refuse while another run is active, without terminating that run.
+
+This guards the base LM entries; custom subclasses overriding both entries,
+direct `forward` or `aforward` calls, direct `lm15` or `litellm` calls, network retrievers, arbitrary Python requests and author code importing `js`
+remain trusted code under [ADR-0018 decision 9](../../docs/adr/0018-python-agents-through-pyodide.md#decision).
+The syntax-only lint flags literals, not arbitrary runtime construction. Worker
+egress policy is not decided here; decision 9 is unchanged. Real services and
+real models remain unmeasured.
 
 For typed output, declare types in the signature and use ChatAdapter with JSON
 fallback disabled, or non-streaming JSONAdapter:

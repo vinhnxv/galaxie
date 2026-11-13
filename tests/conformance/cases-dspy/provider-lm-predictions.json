@@ -1,0 +1,14 @@
+{
+  "rule": "Support the runtime provider-LM refusal only when all five scenarios end unsupported with zero model requests and zero egress attempts on native, Node, Chromium, Firefox and WebKit. Retrieval probes are promoted per measured engine; ColBERT remains refused or a documented limit.",
+  "predictions": {
+    "csp": "The Python fetch recorder installs with recorder=true on Node and all three browsers without script evaluation. Local RM passes. ColBERT ends executor_error with zero or one rejected attempt; a connect-src divergence or recorder installation failure remains registered with its exact cause.",
+    "refusal": "All five runtime-constructed provider LM calls end unsupported with the fixed public message, no model or capability requests, and no egress attempts. Catching an LM error does not clear the run failure."
+  },
+  "scenarios": [
+    "pe-lm-runtime-set",
+    "pe-lm-runtime-context",
+    "pe-lm-runtime-nokey",
+    "pe-lm-runtime-engine",
+    "pe-lm-runtime-caught"
+  ]
+}

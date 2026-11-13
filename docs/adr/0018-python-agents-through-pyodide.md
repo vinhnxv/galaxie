@@ -4,6 +4,7 @@
 - **Date:** 2026-10-30
 - **Related:** brief §6.2, §7.4, §7.5, §16.2, §16.7; ADR-0002, ADR-0003, ADR-0005, ADR-0006, ADR-0012, ADR-0016, ADR-0017
 - **Revisions:** 2026-10-30: added pydantic-ai as the second framework, ahead of DSPy, and the rule for framework-owned instrumentation.
+  2026-11-13: added fixed runtime provider-LM refusal and a Python-side strict-CSP probe recorder; status stays Proposed.
   2026-10-30: recorded the use case that opened the brief §16.7 gate.
   2026-10-30: designed the executor-aware `RecoverySession` contract in decision 7.
   2026-10-30: worker spike passed the basic LangGraph and pydantic-ai paths on Node and Chromium; retained Proposed status, revised the dependency assessment and identified the executor-aware recovery contract change.
@@ -757,11 +758,10 @@ record provider-string LMs **alternative**, native provider schema output
 Scripted native/Node evidence uses DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and
 Pyodide 314.0.7; no shipped source or core contract changes.
 
-`pe-lm-runtime-set` and `pe-lm-runtime-context` each attempt one rejected loopback
-connection natively, outside the router; Node ends `executor_error` with no fetch
-attempts. lm15 defaults to sockets, not LiteLLM or automatic FetchTransport.
-Prepare validation and syntax-only lint do not block runtime construction, as
-decision 9 permits trusted code to bypass the bridge. Use a host-mapped
+The initial `pe-lm-runtime-set` and `pe-lm-runtime-context` measurements used lm15
+outside the router. The follow-up below now refuses those calls before engine
+execution with fixed `unsupported` and zero attempts across the measured lanes.
+Prepare validation cannot inspect runtime construction. Use a host-mapped
 `GalaxieLM(role)`; `pe-control-routed` proves payload parity and `pe-lm-kwargs`
 refuses per-call sampling parameters. Host configuration owns those parameters.
 
@@ -783,15 +783,44 @@ The Worker package probe finds `requests` but not `httpx`; native CPython has
 both. The committed predictions remain unchanged beside these differences.
 On 2026-11-13, [independent retrieval goldens](../../tests/conformance/README.md#dspy-golden-runtime-optimizer-and-retrieval-cases)
 pass natively and on Node. Host-bound `docs.search@1` passes local Chromium,
-Firefox and WebKit; both reused `pe-retrieve-*` browser probes are DIVERGED.
-Trusted Types blocks their eval-based egress recorder; both end `invalid`
-without bridge requests, and browser egress counts stay UNMEASURED. Assertions
-and CSP stay unchanged, with six exact expected-failure registry entries.
+Firefox and WebKit. Both reused `pe-retrieve-*` browser probes now pass with a
+Python fetch proxy, without script evaluation or CSP changes. Local RM records
+zero attempts; ColBERT records one rejected loopback attempt per browser and
+keeps its fixed `executor_error` golden. The failure registry is empty.
 Other new browser provider probes, real models/services, other DSPy versions,
 LiteLLM/declared-provider routes, Databricks/Weaviate, vector capabilities,
 undeclared roles and multimodal shapes remain unmeasured. Prior Chromium evidence
 is reused only for existing goldens/RAG cases. ADR-0012 controls and Decision text
 are unchanged; this ADR remains Proposed.
+
+### Runtime provider-LM refusal and strict-CSP recorder (2026-11-13)
+
+Calls through `dspy.BaseLM.__call__` and `acall` now refuse non-`GalaxieLM`
+instances during a galaxie DSPy run. The import-time wrappers are idempotent,
+preserve DSPy's callbacks and async entry identity, and check before payload or
+engine execution. Prepare cannot see a provider LM created inside `aforward`.
+The existing run handle and first-failure latch preserve fixed `unsupported`,
+including when author code catches it or DSPy pool threads carry only settings.
+Unattributed calls refuse while any run is active without terminating that run;
+plain DSPy use outside all runs is unchanged. Routed controls remain unchanged.
+
+Five new goldens and separate native driver measurements cover runtime `set_lm`,
+context binding, no key, an in-process engine and a caught error. They match on
+Node Pyodide and local Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2, with
+zero model/capability requests and zero recorded egress attempts. The native
+golden pins the fixed public refusal, rather than claiming provider reachability.
+Native tests use the same local model-metadata snapshot setting as the Worker.
+The new Python fetch recorder also promotes both retrieval probes on all three
+browsers with zero CSP violations and zero external routes; Node ColBERT records
+zero fetch attempts locally. Existing retrieval goldens remain byte-identical.
+
+This is accident-proofing under decision 9. Custom `BaseLM` subclasses overriding
+both entries, direct `forward` or `aforward` calls, direct `lm15` or `litellm`
+calls, network retrievers, arbitrary requests and `import js` can bypass the
+guard. XMLHttpRequest and real models/services remain unmeasured. Use
+host-bound `docs.search@1` for retrieval. Worker egress policy is not decided
+here; decision 9 and decision 11 text remain unchanged, as in the prior refusal
+follow-up. ADR-0012 and the core/bridge contracts are unchanged.
 
 ### LangGraph Python tool-call replies spike (2026-11)
 

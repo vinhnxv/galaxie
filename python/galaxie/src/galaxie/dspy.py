@@ -15,6 +15,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequenc
 from contextlib import aclosing
 from contextvars import ContextVar
 from dataclasses import dataclass, field, fields
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -275,6 +276,17 @@ def _refuse_runless() -> None:
             active = _active_runs > 0
         if active:
             raise _LMError('unsupported')
+
+
+def _refuse_provider_lm(lm: dspy.BaseLM) -> None:
+    if isinstance(lm, GalaxieLM):
+        return
+    run = _run.get() or _foreign_run()
+    if run is not None:
+        run.check()
+        run.record('unsupported')
+        raise _LMError('unsupported')
+    _refuse_runless()
 
 
 async def branches(group: Mapping[str, Callable[[], Awaitable[Any]]]) -> dict[str, Any]:
@@ -1117,3 +1129,27 @@ def prepare_executor(value: Any, *, state_binding: str | None = None) -> Executo
         raise GalaxieError('unsupported')
     value._state_binding = state_binding
     return value
+
+
+def _install_provider_lm_guard() -> None:
+    # Keep DSPy's callback wrappers and coroutine identity; reload must not stack.
+    if getattr(dspy.BaseLM.acall, '_galaxie_provider_guard', False):
+        return
+    original_call, original_acall = dspy.BaseLM.__call__, dspy.BaseLM.acall
+
+    @wraps(original_call)
+    def call(self: dspy.BaseLM, *args: Any, **kwargs: Any) -> Any:
+        _refuse_provider_lm(self)
+        return original_call(self, *args, **kwargs)
+
+    @wraps(original_acall)
+    async def acall(self: dspy.BaseLM, *args: Any, **kwargs: Any) -> Any:
+        _refuse_provider_lm(self)
+        return await original_acall(self, *args, **kwargs)
+
+    setattr(acall, '_galaxie_provider_guard', True)
+    dspy.BaseLM.__call__ = call
+    dspy.BaseLM.acall = acall
+
+
+_install_provider_lm_guard()

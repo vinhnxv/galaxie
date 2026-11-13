@@ -9,13 +9,18 @@ import {
 } from '../../examples/rag-browser/test/support/python.node.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
 import type { DspyTranscript } from './support/dspy.js';
-import { dspyGoldenCases, dspyGoldenSpecs, executeDspyGolden } from './support/dspy-golden.js';
+import {
+  dspyGoldenCases,
+  dspyGoldenFamily,
+  dspyGoldenSpecs,
+  executeDspyGolden,
+} from './support/dspy-golden.js';
 import { dspyGoldenSources } from './support/dspy-golden-sources.node.js';
 import { MemoryByteCheckpoints } from './support/memory-byte-checkpoints.js';
 
 const timeout = 900000;
 async function golden(name: string): Promise<DspyTranscript> {
-  const family = name.startsWith('rt-') ? 'runtime' : 'retrieval';
+  const family = dspyGoldenFamily(name);
   return JSON.parse(
     await readFile(
       new URL(`./golden-dspy-${family}/${dspyGoldenSpecs[name]?.golden}`, import.meta.url),

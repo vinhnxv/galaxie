@@ -21,6 +21,7 @@ import {
   type PyodideAdapterOptions,
   type PyodideAgent,
 } from '../../../packages/adapter-pyodide/src/adapter.js';
+import providerLm from '../cases-dspy/provider-lm-golden-cases.json' with { type: 'json' };
 import retrieval from '../cases-dspy/retrieval-golden-cases.json' with { type: 'json' };
 import runtime from '../cases-dspy/runtime-golden-cases.json' with { type: 'json' };
 import type { DspyTranscript } from './dspy.js';
@@ -33,8 +34,19 @@ interface GoldenSpec {
   readonly resumes?: readonly { readonly action: string; readonly payload: string }[];
   readonly capability?: (typeof retrieval)['rag-docs-search']['capability'];
 }
-export const dspyGoldenSpecs: Readonly<Record<string, GoldenSpec>> = { ...runtime, ...retrieval };
+export const dspyGoldenSpecs: Readonly<Record<string, GoldenSpec>> = {
+  ...runtime,
+  ...retrieval,
+  ...providerLm,
+};
 export const dspyGoldenCases: readonly string[] = Object.keys(dspyGoldenSpecs);
+
+export function dspyGoldenFamily(name: string): 'runtime' | 'retrieval' | 'provider-lm' {
+  if (Object.hasOwn(runtime, name)) return 'runtime';
+  if (Object.hasOwn(retrieval, name)) return 'retrieval';
+  if (Object.hasOwn(providerLm, name)) return 'provider-lm';
+  throw new Error('The DSPy golden case is unknown.');
+}
 export interface GoldenStore {
   readonly checkpoints: { request(value: unknown): Promise<unknown> };
   readonly recovery: RecoveryStore;
