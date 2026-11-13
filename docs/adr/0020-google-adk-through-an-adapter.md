@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates. 2026-11-13: measured host inventories ship on Python and fixed toolsets on Go; both JavaScript candidates take the registered refusal path. 2026-11-13: the read-only admission rerun registers its outcome rule before measurement and records REFUSED after copied temporary-state parity fails on both admission variants.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates. 2026-11-13: measured host inventories ship on Python and fixed toolsets on Go; both JavaScript candidates take the registered refusal path. 2026-11-14: the last-child resume rerun registered its outcome rule before measurement. 2026-11-13: the read-only admission rerun registers its outcome rule before measurement and records REFUSED after copied temporary-state parity fails on both admission variants.
 
 ## Context
 
@@ -495,6 +495,67 @@ across both lifetimes. Literal checkpoint tests pin the unchanged version-one
 format. Existing goldens, matrices and locks are unchanged. No new pause shape
 or resumable production Runner ships. Firefox, WebKit and real models remain
 unmeasured for these checks.
+
+#### Last-child rerun with an admission-capable seam (2026-11)
+
+##### Outcome rule registered before measurement (2026-11-14)
+
+The candidate keeps today's pause rule for every shape it accepts and adds one route, `in-place`, for a pause in the last leaf of a tree made only of `SequentialAgent` nodes and leaf `LlmAgent` nodes (KTD6). At resume, an `in-place` pause runs through a second Runner with `resumabilityConfig: {isResumable: true}`; every other admitted pause keeps the default Runner. The candidate is a test-only copy of the adapter (KTD5). All models are scripted. Firefox and WebKit are recorded separately and never inferred from Chromium. Real models are unmeasured.
+
+Candidate shapes (Seq is `SequentialAgent`; every leaf is an `LlmAgent` with a gated `capabilityTool` unless noted; `requireConfirmation: true` unless noted):
+
+| ID | Tree and pause | Today on adk-js |
+| --- | --- | --- |
+| L1 | `Seq[a, b]`; `b` pauses on a confirmation; approve | refused |
+| L2 | `Seq[a, b]`; same pause; deny (zero tool bodies) | refused |
+| L3 | `Seq[a, Seq[b, c]]`; `c` pauses | refused |
+| L4 | `Seq[a, b]`; `b` pauses, approve, then `b` pauses again | refused |
+| L5 | `Seq[a, b]`; `b` calls a long-running tool; the author `resume` returns the external result | refused |
+| L6 | `Seq[a, Seq[b, Seq[c, d]]]`; `d` pauses | refused |
+| L7 | `Seq[a, b]`; `b` raises two gated calls in one turn; one answer with `indexes: [0, 1]` | refused |
+| L8 | `Seq[writer, b]`; `writer` performs a confirmed host write, then `b` pauses | refused |
+| L9 | `Seq[a, b]`; `a` has a non-`temp:` `outputKey` that `b`'s instruction reads; `b` pauses | refused |
+
+Controls (must stay on the default Runner with unchanged behavior): C1 `Seq[first(tool), second]`; C2 `Seq[Seq[inner(tool), b], c]` pausing `inner`; C3 transfer chain `parent[child(tool)]`; C4 a lone agent.
+
+Refusals (must keep failing `unsupported`): R1 `Seq[a, b, c]` pausing `b`; R2 `Seq[a, Seq[b, c]]` pausing `b`; R3 `Seq[a(outputKey temp:saved), b]` pausing `b`; R4 `Loop(2)[worker]`; R5 `Loop(2)[writer, checker]` pausing `checker`; R6 the four `Par` shapes of the PR 218 table (`left` first, `right` first, `Par` last, both confirm); R7 `Seq[a, b, c]` with a long-running `b`; R8 `Seq[a, parent[child], c]` pausing `child`; R9 `Seq[a, parent[child]]` pausing `child`; R10 `Seq[Loop(2)[w], b]` pausing `b`.
+
+Gates, each measured per shape, recorded as PASS, FAIL, NA with a reason, or UNMEASURED:
+
+| Gate | Required evidence |
+| --- | --- |
+| N1 native continuity | With `resumabilityConfig` on ADK's own Runner, after the answer every unfinished agent runs once, no finished agent is asked again, and ordered model requests equal the same script run uninterrupted. L1, L2, L3, L4, L5 reuse the PR 218 native file. |
+| N2 native tool once | The gated tool body runs once per logical call, and zero times on deny. |
+| N3 native state | Non-`temp:` state written before the pause is visible after the resume. `temp:` visibility is recorded (informational). |
+| G0 seam faithfulness | With the shipped policy substituted, the candidate reproduces the shipped adapter on C1 to C4 (requests, writes, scopes, interaction props, output); the resumable Runner is used only for `in-place` resumes; a probe resume routes to the answered author. G0 failing makes the outcome INCOMPLETE. |
+| G1 live parity | Output, ordered model requests, capability calls and the published interaction equal native resumable: exactly one interaction per pause, no capability before the answer. |
+| G2 reload parity | Dispose and recreate the runtime over the same bytes (memory on Node, real IndexedDB on Chromium and the other engines); the same interaction ID is republished with zero requests and zero writes at restore; the answer finishes with the live transcript. |
+| G3 writes once, scope stable | With recovery and host confirmations: host invocations equal logical writes across approve, reload, and an approved write followed by a model failure and an automatic replay; the resumed write's effect scope equals the uninterrupted run's (conversation ID normalized). L8's earlier write runs once. |
+| G4 restore admission | A stored last-child pause restored into a tree where the author is a middle child, a loop worker, beside a `ParallelAgent`, unknown, non-leaf, under a tree with a `temp:` key, or missing an earlier leaf's history fails `unrecoverable` before any model or capability call with stored rows unchanged. The same record through the shipped adapter as it stands before U6 (the pre-change `src/`, measured in U5) fails `unrecoverable`. Forged `agentState` and `endOfAgent` fail `unrecoverable`. The existing G4 `last` row keeps rejecting. |
+| G5 refusals and controls | Every refusal shape ends `unsupported` at the pause with no interaction, no host invocation after the pause, no stored checkpoint, and a clean fresh start; C1 to C4 are unchanged. |
+
+Per-engine rule: Node and headless Chromium gate the outcome. Firefox and WebKit are run locally and recorded PASS, DIVERGED or NOT RUN. A shape that DIVERGED on an engine that ran is not shipped.
+
+Outcome mapping, applied once, in this order. The base shapes are L1, L2, L4 and L8.
+
+| Order | Outcome | Condition | Shipped result |
+| --- | --- | --- | --- |
+| 1 | INCOMPLETE | G0 fails, or a gate of any candidate shape is UNMEASURED on Node or Chromium with no FAIL on any measured gate (NA with a stated reason counts as not failing) | No source change; the gap and blocker recorded |
+| 2 | REFUSED | A gate of a base shape FAILS, or any G4 restore-admission case or any G5 refusal or control shape FAILS (a failure of the registered predicate itself), or the failing shapes cannot be isolated by one predicate (below), or shipping would need an edit outside the sanctioned list | No source change beyond the author derivation; evidence and refusal recorded |
+| 3 | SUPPORTED | Every candidate shape passes every gate on Node and Chromium, and on every engine that ran | `in-place` route for all of L1 to L9, same predicate at pause and restore, docs |
+| 4 | ALTERNATIVE | All base shapes pass and some of L3, L5, L6, L7, L9 fail, and the failing ones are excluded by a predicate over tree structure, pause kind and call count that is evaluated identically at pause time and restore | `in-place` route for exactly the passing set, docs stating what stays refused |
+
+A shipping outcome additionally requires the shipped-adapter lane after U6 to pass the admitted-shape gates (G1 to G3, G4 changed-tree rejection and forged-marker cases, G5, and the `last` row); failure converts it to REFUSED. The pre-U6 clauses (the shipped adapter rejecting a candidate record, and the shipped-lane refusal assertions for the L shapes) are measured in U5 against the pre-change `src/` and do not apply after U6. Existing goldens, matrices (except the sanctioned string), locks and assertions (except the sanctioned lifts) stay byte-identical. Candidate and measurement commits stay in history if removed from the final tree.
+
+Predictions, fixed before any probe:
+
+- P0 mechanism: resumability changes only routing; workflow agents write no `agentState`, `endOfAgent` or `nodeInfo`; a resumed last leaf has no context branch, as in an uninterrupted run, so effect scopes equal.
+- P1 native: L1, L2, L3, L4, L5 hold (already recorded in PR 218; L3 requests `a,b,c,c`). Fresh predictions: L6 `a,b,c,d,d`; L7 `a,b,b`, two bodies once each; L8 `writer,writer,b,b`, one `writer` write and one `b` write; L9 `a,b,b` with the `a` value visible after the resume. R10 natively resumes the loop's `b` alone and is excluded by the rule regardless.
+- P2 seam: G0 passes.
+- P3 candidate on Node and Chromium: G1, G2, G3 and G4 pass for L1 to L9; G5 passes for every refusal and control, including the `last` G4 row.
+- P4 least certain: L7 (ADK routes by the first function response in the answer message) and L4 (the second pause after an in-place resume). A miss on L7 gives ALTERNATIVE; a miss on L4 gives REFUSED.
+- P5 engines: Firefox and WebKit PASS every gate they run; a divergence is a finding.
+- P6 overall: SUPPORTED. Forward compatibility: a record stored under the candidate fails `unrecoverable` on the shipped (older) adapter by construction.
 
 ### Confirmation-beside-calls and request-input spike (2026-11)
 
