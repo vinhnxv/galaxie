@@ -540,6 +540,36 @@ test.each(shapes.filter(control))(
 
 // G4 starts from a real default-runner pause. Moving its same-named author
 // models changed author code without forging the integrity stamps.
+async function storedPause(id: string) {
+  // Mutable memory bytes are intentional here, on both projects, to measure
+  // forged actions. Reload above separately uses real IndexedDB in Chromium.
+  const bytes = new MemoryByteCheckpoints();
+  const recovery = new MemoryRecoveryStore();
+  const store = { checkpoints: bytes, recovery, close() {} };
+  const l = await life({ id: 'solo', tree: 'b', paused: ['b'] }, store);
+  const sessionId = l.instance.sessionId;
+  let pending: string | undefined;
+  try {
+    await l.instance.start({ prompt: 'go' });
+    await segment(l);
+    pending = l.instance.getSnapshot().run?.pending?.interactionId;
+  } finally {
+    await l.close();
+  }
+  if (['agentState', 'endOfAgent'].includes(id)) {
+    const row = [...bytes.rows.values()][0];
+    if (row === undefined) throw new Error('Missing stored pause.');
+    const body = JSON.parse(new TextDecoder().decode(row.checkpoint.bytes));
+    body.events[0].actions[id] = id === 'agentState' ? { b: { progress: 1 } } : true;
+    bytes.rows.set(JSON.stringify([sessionId, '', row.id]), {
+      ...row,
+      checkpoint: { ...row.checkpoint, bytes: new TextEncoder().encode(JSON.stringify(body)) },
+    });
+  }
+  const before = structuredClone([...bytes.rows]);
+  return { bytes, store, sessionId, pending, before };
+}
+
 test.each([
   { id: 'last', tree: { seq: ['a', 'b'] } },
   { id: 'middle', tree: { seq: ['a', 'b', 'c'] } },
@@ -549,58 +579,44 @@ test.each([
   { id: 'unknown', tree: 'other' },
   { id: 'agentState', tree: 'b' },
   { id: 'endOfAgent', tree: 'b' },
-  { id: 'first', tree: { seq: ['b', 'c'] } },
 ] as { id: string; tree: Tree }[])(
-  'restore admission: $id is rejected before publication unless admitted',
+  'restore admission: $id is rejected before publication',
   async ({ id, tree }) => {
-    // Mutable memory bytes are intentional here, on both projects, to measure
-    // forged actions. Reload above separately uses real IndexedDB in Chromium.
-    const bytes = new MemoryByteCheckpoints();
-    const recovery = new MemoryRecoveryStore();
-    const store = { checkpoints: bytes, recovery, close() {} };
-    let l = await life({ id: 'solo', tree: 'b', paused: ['b'] }, store);
+    const { bytes, store, sessionId, before } = await storedPause(id);
+    const l = await life({ id, tree, paused: ['b'] }, store, {
+      sessionId,
+      duplicatePrepare: id === 'duplicate',
+    });
     try {
-      await l.instance.start({ prompt: 'go' });
-      await segment(l);
-      const sessionId = l.instance.sessionId;
-      const pending = l.instance.getSnapshot().run?.pending?.interactionId;
-      await l.close();
-      if (['agentState', 'endOfAgent'].includes(id)) {
-        const row = [...bytes.rows.values()][0];
-        if (row === undefined) throw new Error('Missing stored pause.');
-        const body = JSON.parse(new TextDecoder().decode(row.checkpoint.bytes));
-        body.events[0].actions[id] = id === 'agentState' ? { b: { progress: 1 } } : true;
-        bytes.rows.set(JSON.stringify([sessionId, '', row.id]), {
-          ...row,
-          checkpoint: { ...row.checkpoint, bytes: new TextEncoder().encode(JSON.stringify(body)) },
-        });
-      }
-      const before = structuredClone([...bytes.rows]);
-      l = await life({ id, tree, paused: ['b'] }, store, {
-        sessionId,
-        duplicatePrepare: id === 'duplicate',
-      });
-      if (id !== 'first') {
-        if (id !== 'duplicate')
-          await expect(l.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
-        expect(l.requests).toEqual([]);
-        expect(l.writes).toEqual([]);
-        expect(l.instance.getSnapshot().run?.pending).toBeUndefined();
-        expect([...bytes.rows]).toEqual(before);
-        return;
-      }
-      await l.instance.restore();
-      await waitForRunStatus(l.instance, 'waiting_input');
+      if (id !== 'duplicate')
+        await expect(l.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
       expect(l.requests).toEqual([]);
       expect(l.writes).toEqual([]);
-      expect(l.instance.getSnapshot().run?.pending?.interactionId).toBe(pending);
+      expect(l.instance.getSnapshot().run?.pending).toBeUndefined();
       expect([...bytes.rows]).toEqual(before);
-      const end = await answer(l);
-      expect(l.requests).toEqual(['b', 'c']);
-      expect(l.writes).toEqual(['b']);
-      expect(end.at(-1)?.type).toBe('output');
     } finally {
       await l.close();
     }
   },
 );
+
+test('restore admission: the first-child control restores and completes', async () => {
+  const { bytes, store, sessionId, pending, before } = await storedPause('first');
+  const l = await life({ id: 'first', tree: { seq: ['b', 'c'] }, paused: ['b'] }, store, {
+    sessionId,
+  });
+  try {
+    await l.instance.restore();
+    await waitForRunStatus(l.instance, 'waiting_input');
+    expect(l.requests).toEqual([]);
+    expect(l.writes).toEqual([]);
+    expect(l.instance.getSnapshot().run?.pending?.interactionId).toBe(pending);
+    expect([...bytes.rows]).toEqual(before);
+    const end = await answer(l);
+    expect(l.requests).toEqual(['b', 'c']);
+    expect(l.writes).toEqual(['b']);
+    expect(end.at(-1)?.type).toBe('output');
+  } finally {
+    await l.close();
+  }
+});
