@@ -10,6 +10,7 @@ import pytest
 
 from galaxie import GalaxieError, _bridge, capabilities
 import galaxie.dspy as face
+from test_dspy import FINISH, LOOKUP, SCHEMA, Question, fields, transport_for
 
 
 PAUSE = {'surfaceId': 'review', 'viewRevision': '1', 'component': 'ui.review/v1', 'props': {}}
@@ -310,3 +311,229 @@ def test_streaming_refusal_survives_author_catch_without_transport():
     with pytest.raises(GalaxieError) as caught:
         asyncio.run(executor.run({'question': 'test'}, 'c', 5, on_stream=lambda *_: None))
     assert caught.value.code == 'unsupported'
+
+
+@pytest.fixture
+def calling_tasks(monkeypatch):
+    observed = []
+    original = face._Run.begin
+    def begin(run, kind, payload):
+        branch = face._branch.get()
+        observed.append((kind, branch.key if branch else None, asyncio.current_task()))
+        return original(run, kind, payload)
+    monkeypatch.setattr(face._Run, 'begin', begin)
+    return observed
+
+
+@pytest.mark.parametrize('inline', [False, True])
+@pytest.mark.parametrize('shape', ['predict', 'react', 'wait_for', 'timeout'])
+def test_sequential_branch_calling_task_identity(monkeypatch, calling_tasks, inline, shape):
+    if inline:
+        async def to_thread(function, /, *args, **kwargs):
+            await asyncio.sleep(0)
+            return function(*args, **kwargs)
+        monkeypatch.setattr(asyncio, 'to_thread', to_thread)
+    seen = []
+    transport_for([LOOKUP, 'receipt', FINISH] if shape == 'react' else
+                  [{'content': fields(answer='ok')}] * 3, seen)
+    module = (dspy.ReAct(Question, tools=[face.capability_tool('lookup@1', 'Look up', SCHEMA, tool_name='lookup')], max_iters=1)
+              if shape == 'react' else dspy.Predict(Question))
+    module.set_lm(face.GalaxieLM('answer'))
+    owners = []
+    async def branch():
+        owners.append(asyncio.current_task())
+        if shape == 'react':
+            return (await module.acall(question='q')).answer
+        answers = []
+        for _ in range(3):
+            if shape == 'wait_for':
+                result = await asyncio.wait_for(module.acall(question='q'), 60)
+            elif shape == 'timeout':
+                async with asyncio.timeout(60):
+                    result = await module.acall(question='q')
+            else:
+                result = await module.acall(question='q')
+            answers.append(result.answer)
+        return answers
+    async def body():
+        return await face.branches({'a': branch})
+    assert asyncio.run(execute(body).run({}, 'c', 50)) == {'answer': {'a': 'Paris' if shape == 'react' else ['ok'] * 3}}
+    assert [message['op'] for message in seen] == (['model', 'capability', 'model'] if shape == 'react' else ['model'] * 3)
+    assert [(kind, key) for kind, key, _ in calling_tasks] == [(message['op'], 'a') for message in seen]
+    assert all(task is owners[0] for _, _, task in calling_tasks)
+
+
+@pytest.fixture
+def first_caller_proposal(monkeypatch):
+    """Reproduce the rejected guard without changing the shipped helper."""
+    original = face._Run.begin
+    tasks, runs = {}, []
+    def begin(run, kind, payload):
+        run.check()
+        branch = face._branch.get()
+        if branch is not None:
+            key = (id(run), branch.group, branch.key)
+            task = asyncio.current_task()
+            if key not in tasks:
+                tasks[key] = task
+                runs.append(run)
+            if task is None or tasks[key] is not task:
+                run.refuse()
+        return original(run, kind, payload)
+    monkeypatch.setattr(face._Run, 'begin', begin)
+
+
+@pytest.mark.parametrize('reverse', [False, True])
+def test_first_caller_proposal_refuses_immediate_overlap_but_one_write_already_ran(first_caller_proposal, reverse):
+    seen = []
+    transport_for(['receipt'] * 3, seen)
+    async def branch():
+        order = ['b', 'a'] if reverse else ['a', 'b']
+        await asyncio.gather(*(capabilities.call('write@1', {'query': key}) for key in order))
+    async def body():
+        try:
+            await face.branches({'a': branch})
+        except BaseException:
+            pass
+        return await capabilities.call('write@1', {'query': 'caught'})
+    with pytest.raises(GalaxieError) as caught:
+        asyncio.run(execute(body).run({}, 'c', 50))
+    assert caught.value.code == 'unsupported'
+    assert len(seen) == 1
+    assert seen[0]['payload']['input'] == {'query': 'b' if reverse else 'a'}
+
+
+def test_first_caller_proposal_poisoning_on_reversed_retry(first_caller_proposal):
+    async def scenario():
+        effects, seen = {}, []
+        async def transport(raw):
+            message = json.loads(raw)
+            payload = message['payload']
+            seen.append(message)
+            code = None
+            if message['op'] == 'model':
+                result = {'content': fields(answer='ok')}
+            else:
+                scope, digest = payload['effectScope'], face._digest(payload['input'])
+                if scope in effects and effects[scope] != digest:
+                    code = 'unrecoverable'
+                else:
+                    effects[scope] = digest
+                result = 'receipt'
+            return json.dumps({**{key: message[key] for key in ('v', 'id', 'op')}, 'kind': 'response', 'ok': code is None,
+                               **({'error': {'code': code}} if code else {'payload': result})})
+        _bridge.install_transport(transport)
+        reverse = False
+        predict = dspy.Predict(Question)
+        predict.set_lm(face.GalaxieLM('answer'))
+        async def branch():
+            gates = {key: asyncio.Event() for key in ('a', 'b')}
+            order = ['b', 'a'] if reverse else ['a', 'b']
+            gates[order[0]].set()
+            async def write(key):
+                await gates[key].wait()
+                try:
+                    await predict.acall(question=key)
+                    return await capabilities.call('write@1', {'query': key})
+                finally:
+                    gates[order[1]].set()
+            await asyncio.gather(*(write(key) for key in order))
+        async def body():
+            face.request_interaction(PAUSE)
+            return await face.branches({'a': branch})
+        original = execute(body)
+        assert await original.run({}, 'c', 50) is None
+        checkpoint, metadata = original._snapshot('c', 'session')
+        outcomes = []
+        for reverse in (False, True):
+            restored = execute(body)
+            restored._restore(checkpoint, metadata, 'session')
+            pending = restored.pending('c')
+            assert pending is not None
+            with pytest.raises(GalaxieError) as caught:
+                await restored.run(None, 'c', 50, resume={'interactionId': pending['id'], 'action': 'continue', 'payload': None})
+            outcomes.append(caught.value.code)
+            assert restored._sessions['c'].unrecoverable is reverse
+        assert outcomes == ['unsupported', 'unrecoverable']
+        writes = [message['payload'] for message in seen if message['op'] == 'capability']
+        assert [write['input'] for write in writes] == [{'query': 'a'}, {'query': 'b'}]
+        assert [write['effectScope'] for write in writes] == ['dspy/c/1/0/a/1'] * 2
+        assert len(effects) == 1
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize('bare', [False, True])
+def test_first_caller_proposal_leaves_an_author_child_but_blocks_later_requests(first_caller_proposal, bare):
+    async def scenario():
+        seen, children, outcomes = [], [], []
+        started, release = asyncio.Event(), asyncio.Event()
+        transport_for(['receipt'] * 3, seen)
+        async def child():
+            children.append(asyncio.current_task())
+            started.set()
+            await release.wait()
+            try:
+                await capabilities.call('write@1', {'query': 'late'})
+            except BaseException as error:
+                outcomes.append(face.error_code(error))
+        async def overlap():
+            await started.wait()
+            await asyncio.gather(capabilities.call('write@1', {'query': 'a'}),
+                                 capabilities.call('write@1', {'query': 'b'}))
+        async def branch():
+            if bare:
+                asyncio.create_task(child())
+                await overlap()
+            else:
+                await asyncio.gather(child(), overlap())
+        async def body():
+            return await face.branches({'a': branch})
+        baseline = asyncio.all_tasks()
+        try:
+            with pytest.raises(GalaxieError) as caught:
+                await execute(body).run({}, 'c', 50)
+            assert caught.value.code == 'unsupported'
+            for _ in range(3):
+                await asyncio.sleep(0)
+            assert len(seen) == 1
+            assert asyncio.all_tasks() - baseline == set(children)
+            assert len(children) == 1
+            release.set()
+            await asyncio.gather(*children)
+            assert outcomes == ['unsupported'] and len(seen) == 1
+            assert asyncio.all_tasks() == baseline
+        finally:
+            for task in children:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*children, return_exceptions=True)
+    asyncio.run(scenario())
+
+
+def test_single_helper_task_keeps_sequential_calls_and_replay(calling_tasks):
+    async def scenario():
+        seen, owners = [], []
+        transport_for(['receipt'] * 3, seen)
+        async def branch():
+            owners.append(asyncio.current_task())
+            async def inner():
+                return [await capabilities.call('write@1', {'query': key}) for key in ('a', 'b', 'c')]
+            return await asyncio.create_task(inner())
+        async def body():
+            result = await face.branches({'a': branch})
+            face.request_interaction(PAUSE)
+            return result
+        original = execute(body)
+        assert await original.run({}, 'c', 50) is None
+        checkpoint, metadata = original._snapshot('c', 'session')
+        restored = execute(body)
+        restored._restore(checkpoint, metadata, 'session')
+        pending = restored.pending('c')
+        assert pending is not None
+        assert await restored.run(None, 'c', 50, resume={'interactionId': pending['id'], 'action': 'continue', 'payload': None}) == {'answer': {'a': ['receipt'] * 3}}
+        assert len(seen) == 3
+        tasks = [task for _, key, task in calling_tasks if key == 'a']
+        for index, owner in enumerate(owners):
+            calls = tasks[index * 3:(index + 1) * 3]
+            assert len(set(calls)) == 1 and calls[0] is not owner
+    asyncio.run(scenario())

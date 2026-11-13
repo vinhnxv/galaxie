@@ -1,5 +1,17 @@
 # Project status
 
+On 2026-11-13, the DSPy branch task-identity guard attempt records **refused**.
+Scripted CPython probes preserve the calling task for sequential Predict,
+ReAct/tool, `wait_for` and `timeout` calls. A first-caller guard lets one write
+run before refusal; reversing arrival on retry ends `unrecoverable`. Capturing
+the branch task blocks that write but falsely refuses a supported sequential
+helper task, so production source stays unchanged. Residue probes record one
+parked author child with no further dispatch. Node Pyodide adds fewer-calls
+divergence evidence with one poison row and no redispatch. Root guards, Worker
+task identities, ReAct replay, Chromium divergence reload, Firefox, WebKit and
+real models remain unmeasured. Existing goldens, fixtures, matrices and locks
+are unchanged. See the [guard refusal evidence](../tests/conformance/README.md#branch-task-identity-guard-refusal).
+
 On 2026-11-13, `galaxie.dspy.branches` ships keyed async fan-out with deterministic
 branch scopes and journal bytes. Scripted CPython and Node Pyodide tests cover
 reversed arrival, silent replay, receipt reuse after Worker loss, malformed
