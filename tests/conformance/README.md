@@ -1574,7 +1574,7 @@ before the new runs. The evidence vocabulary is:
 - **EXISTING:** an existing unchanged measurement was run again.
 - **UNMEASURED:** not attempted, with the cause stated. A skipped test is never PASS.
 
-The new engine file ran 10 tests on Chromium and 21 on each other engine; the
+The initial engine file ran 10 tests on Chromium and 21 on each other engine; the
 counts include two harness unit tests per engine. Chromium passed all 10 and
 WebKit all 21. Firefox passed 12 and diverged on nine reload tests. The new Node
 files passed all 10 tests; the focused native scope/order and branch suite passed
@@ -1585,6 +1585,11 @@ baseline passed 443 tests, and the unchanged recorders checked 41 live cases plu
 five states and seven state cases. The same nine Firefox failures reproduced in
 a second run before registration; no scenario was skipped.
 
+The 2026-11-13 header follow-up reran the full engine file with a third harness
+test for wire-level revalidation: Chromium passed all 11 tests, Firefox all 22
+and WebKit all 22, with zero expected failures, skips or `cspMismatch` lines.
+The tables below reflect that follow-up; the initial counts above are history.
+
 ### Paused-state binding by engine
 
 All seven existing binding scenarios keep their names and expectations. A
@@ -1593,14 +1598,14 @@ unchanged checkpoint, pending-write and effect rows; original bytes still resume
 
 | Scenario | Native CPython | Node Pyodide | Chromium | Firefox | WebKit |
 | --- | --- | --- | --- | --- | --- |
-| `bind-early-same` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
-| `bind-early-inert` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
-| `bind-late-same` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
-| `bind-late-prompt` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
-| `bind-late-inert` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
-| `bind-early-prompt` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
-| `bind-legacy-late-prompt` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
-| `bind-legacy-repause` | EXISTING: native shape | PASS | PASS | DIVERGED: header equality | PASS |
+| `bind-early-same` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `bind-early-inert` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `bind-late-same` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `bind-late-prompt` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `bind-late-inert` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `bind-early-prompt` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `bind-legacy-late-prompt` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `bind-legacy-repause` | EXISTING: native shape | PASS | PASS | PASS | PASS |
 
 The new re-pause case strips only `stateBinding` from the first paused record,
 restores in a fresh Worker and obtains the independent expected 64-hex binding
@@ -1608,6 +1613,7 @@ at the second pause. Changing `unrelated.json` from `{}` to `[]` refuses with no
 traffic or stored-row changes. Restoring `{}` completes with one replay and no
 repeated capability effect. Node, Chromium and WebKit reached the final assertion;
 Firefox reached these behavior assertions and then failed header equality.
+The header follow-up below passes every assertion on Firefox too.
 The eight-scenario legacy state-swap family and native-only
 `bind-fingerprint-inert` were not extended to Firefox or WebKit.
 
@@ -1634,17 +1640,18 @@ Thread-pool APIs remain refused.
 | `fanout-single` | EXISTING | EXISTING | EXISTING | PASS | PASS |
 | `fanout-write` | EXISTING | EXISTING | EXISTING | PASS | PASS |
 | `fanout-multi` | EXISTING | EXISTING | EXISTING | PASS | PASS |
-| `fanout-reload` | EXISTING: driver restore | EXISTING: fresh Worker | EXISTING | DIVERGED: header equality | PASS |
+| `fanout-reload` | EXISTING: driver restore | EXISTING: fresh Worker | EXISTING | PASS | PASS |
 
 The live cases compare with the three unchanged native goldens. Reload reopens
 the same principal-scoped IndexedDB in a fresh page and Worker, silently replays
 the joined group once and dispatches only the later three model calls in reversed
 arrival order. WebKit reached every assertion; Firefox reached the output,
 replay-count, request and task-cleanup assertions before header equality failed.
+The follow-up passes the unchanged header equality assertion on Firefox.
 
 ### Firefox reload finding
 
-All nine Firefox reload rows failed the unchanged final assertion
+In the initial measurement, all nine Firefox reload rows failed the unchanged final assertion
 `expect(headers.every((value) => value === dspyHeader)).toBe(true)` with:
 
 ```text
@@ -1654,15 +1661,33 @@ AssertionError: expected false to be true // Object.is equality
 The repeat diagnostics observed HTTP 304 responses after reload for cached
 `/python/wheels/*.whl`, `/python/runtime/python_stdlib.zip` and
 `/python/runtime/pyodide.asm.wasm`: Playwright's `response.headers()` omitted
-`content-security-policy`, captured as an empty string. Preview still uses
-`cspHeader('mock')`. This is a Playwright 304-header observation, not proof that
-the effective document CSP was absent. CSP violations and external requests were
-empty, and the behavior assertions held. None of these nine rows is PASS.
-The separate [DSPy failure registry](dspy-engine-known-failures.json) retains the
-full failed titles with `test.fails`; a future unexpected pass fails the suite.
-The original browser-engine known-failure list is unchanged. A follow-up should
-establish the Firefox/Playwright cache-header behavior without weakening CSP or
-the current assertions.
+`content-security-policy`, captured as an empty string. CSP violations and
+external requests were empty, and the behavior assertions held. At that point,
+none of these nine rows was PASS and their full titles were registered with
+`test.fails`.
+
+**Follow-up, 2026-11-13:** reproduction found 27 mismatches for `bind-early-same`
+and 405 across all nine titles: every mismatch was status 304 with an absent
+header, on the same 25 wheel paths and two runtime paths above. No non-304
+response mismatched. The expected value was the full `cspHeader('mock')`; the
+observed value was `null` on the wire and `''` in the Playwright diagnostic.
+Vite 8.3.4's bundled sirv handler (`build_default$1`, installed
+`vite/dist/node/chunks/node.js:17924`) calls `writeHead(304)` and ends before
+`setHeaders`, where Vite applies configured preview headers. The omission was
+therefore on the wire, rather than solely a Playwright reporting difference.
+The focused Chromium probe (including legacy re-pause) reported 145 Python asset
+responses and the WebKit probe reported 87: all were 200, with no
+`If-None-Match` header reported and no mismatch.
+
+The test preview now sets the identical CSP header in middleware before Vite's
+static handler. A plain fetch test verifies 200, an ETag, then conditional 304
+with exactly that header on both responses; it failed on the missing 304 header
+before the fix. Full reruns passed 11 Chromium, 22 Firefox and 22 WebKit tests,
+with no `cspMismatch` output. The [DSPy failure registry](dspy-engine-known-failures.json)
+now has three empty arrays. Both per-response header assertions, CSP directives
+and Trusted Types settings are unchanged. Production hosting uses the generated
+`_headers` file, not this test preview. The original browser-engine known-failure
+list is unchanged. These remain local macOS scripted-model results.
 
 ### Scope, order and version limits
 
@@ -1693,7 +1718,8 @@ This is NOT RUN, not a passing or failing assertion. No source workaround or
 Worker dependency change was made. Real-model runs remain unmeasured: no model
 access in this environment.
 
-The other predictions held except for Firefox's reload header equality. Pauses
+The other predictions held except for Firefox's reload header equality, resolved
+by the test-preview header follow-up above. Pauses
 inside groups and a `Parallel`-shaped adapter were considered and not built:
 partial groups need a new persisted design, and an adapter adds a public API.
 A test-only adapter adds no evidence beyond the existing native `asyncio.gather`

@@ -444,9 +444,12 @@ This is a consistency check against accidental swaps, not integrity protection:
 metadata is unauthenticated. The shipped native, Node Pyodide and Chromium reload
 probes retain the spike's refusal, unchanged-row, rollback and legacy outcomes.
 The later local [engine measurements](../../tests/conformance/README.md#dspy-engine-measurements)
-add WebKit binding and legacy re-pause on Node, Chromium and WebKit. Firefox
-reloads reach the behavior assertions but diverge at unchanged CSP-header
-equality checks on reported cached HTTP 304 responses. Real models, concurrent
+add WebKit binding and legacy re-pause on Node, Chromium and WebKit. A same-day
+follow-up passes Firefox reloads with the unchanged CSP-header equality checks:
+Vite preview omitted configured headers on cached HTTP 304 responses, and the
+test preview now sets the identical header earlier, with a wire-level regression
+test. All 22 Firefox engine tests pass locally with no CSP-header mismatch.
+Real models, concurrent
 tabs, forged metadata and large many-file descriptors remain unmeasured; the
 other-version attempt could not collect tests. ADR-0012 guarantees are unchanged; this ADR stays
 Proposed. See the [shipped evidence](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
@@ -631,8 +634,11 @@ replay, write receipts and divergence; headless Chromium matches three new live
 goldens and reopens IndexedDB in a fresh page and Worker to replay a joined group
 without redispatch. State-binding reload tests also pass. Later local
 [engine measurements](../../tests/conformance/README.md#dspy-engine-measurements)
-add Firefox/WebKit live goldens, WebKit reload and a Firefox reload header finding,
-with native/Node absolute scope and journal-order pins. Chromium divergence
+add Firefox/WebKit live goldens and reload, with native/Node absolute scope and
+journal-order pins. The same-day header follow-up passes 11 Chromium, 22 Firefox
+and 22 WebKit engine tests locally: preview middleware supplies the unchanged CSP
+header on 304 responses before Vite's static handler; a wire-level test guards it.
+Production hosting uses generated `_headers`. Chromium divergence
 reload, real models and ReAct branches remain unmeasured; the other-version
 attempt could not collect tests. No existing golden, fixture entry, matrix entry or lock changes.
 This ADR stays Proposed.

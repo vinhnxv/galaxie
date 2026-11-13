@@ -40,6 +40,14 @@ The [hosted RAG demo](../examples/rag-browser/README.md#hosted-demo-build) is a 
 
 ## Mock-model runs on Firefox and WebKit
 
+**Header follow-up, 2026-11-13:** the DSPy test preview now sets the unchanged CSP
+header before Vite's static handler, which omitted configured headers on 304
+revalidations. A wire-level test pins 200/304 equality. Local macOS full reruns
+pass all 11 Chromium, 22 Firefox and 22 WebKit tests, including all nine reload
+rows that originally diverged, with zero CSP-header mismatches. Production
+hosting uses generated `_headers`. These are scripted-model results, separate
+from Linux CI and real-device evidence. The original measurement below is history.
+
 The later [DSPy engine measurements](../tests/conformance/README.md#dspy-engine-measurements)
 (2026-11-13) run selected Pyodide paths locally on arm64 macOS 27.2: all WebKit
 rows pass, Firefox live fan-out and thread-pool rows pass, and nine Firefox reload

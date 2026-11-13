@@ -3,9 +3,13 @@
 On 2026-11-13, local scripted DSPy engine measurements add WebKit binding and
 legacy re-pause evidence, Chromium legacy re-pause evidence, thread-pool probes
 on all three engines and Firefox/WebKit live fan-out goldens. WebKit reload
-passes; nine Firefox reload scenarios diverge only at unchanged CSP-header
-equality assertions after Playwright exposes cached HTTP 304 responses without
-that header. They remain recorded findings. Native and Node tests pin absolute
+passes; a same-day follow-up also passes all nine Firefox reload scenarios with
+the unchanged CSP-header equality assertions. Vite preview omitted the header
+on HTTP 304 responses before applying configured headers; the test harness now
+sets it earlier, with a wire-level 200/304 regression test. Full local reruns
+pass 11 Chromium, 22 Firefox and 22 WebKit tests with no CSP-header mismatches;
+the DSPy failure registry is empty. Production hosting uses generated `_headers`.
+Native and Node tests pin absolute
 effect scopes and journal order; native tests pin the first recorded terminal
 failure code. An offline DSPy 3.2.1 overlay imports but cannot collect the native
 suites because `dspy.lm15` is absent. Real models remain unmeasured: no model
