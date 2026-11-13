@@ -33,6 +33,8 @@
     "outcomes": { "parallel": "alternative", "threadedEvaluate": "alternative" }
   },
   "scenarios": [
+    "par-refuse-bare-context",
+    "par-wrapped-thread-start",
     "par-verbatim-parallel-threads",
     "par-verbatim-parallel-sequential",
     "par-verbatim-evaluate-threads",

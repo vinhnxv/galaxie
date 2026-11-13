@@ -21,6 +21,8 @@
     }
   ],
   "threadPool": [
+    "par-refuse-bare-context",
+    "par-wrapped-thread-start",
     "par-verbatim-thread-start",
     "par-verbatim-parallel-threads",
     "par-verbatim-parallel-sequential",
@@ -30,6 +32,7 @@
   ],
   "fanout": ["fanout-single", "fanout-write", "fanout-multi", "fanout-reload"],
   "predictions": {
+    "rawThread": "Empty-context async model calls and explicitly wrapped Thread.start failures end unsupported with zero requests on Node Pyodide and all three browsers; the empty-context refusal also holds natively.",
     "stateBinding": "Firefox and WebKit match the seven existing Chromium outcomes.",
     "legacyRepause": "Node and all three browsers bind the second pause, refuse changed JSON without traffic or writes, and complete after rollback.",
     "threadPool": "All three browsers match Node: thread and pool starts raise RuntimeError; the other five probes refuse unsupported with zero requests.",
