@@ -497,7 +497,10 @@ and arguments before ChatAdapter, JSONAdapter or ReAct parses them.
 Thread-pool fan-out through `dspy.Parallel` or `dspy.Evaluate` is refused with
 fixed `unsupported`: the Worker cannot start threads, and a synchronous LM entry
 cannot await the bridge. Sequential `await module.acall(...)` loops remain valid;
-use the keyed helper below for concurrent async calls.
+use the keyed helper below for concurrent async calls. Async LM calls that lose
+both run context and live DSPy settings refuse before bridge dispatch while any
+DSPy run is active; the unidentified run is not terminated, and standalone calls
+outside all active runs retain their behavior.
 
 `streaming`, `interrupts`, `resume` and `checkpoints` are true; `subgraphs` is
 false. Nested modules have no checkpoint namespaces, interrupt propagation or

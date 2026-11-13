@@ -26,6 +26,7 @@
 
   2026-11-11: recorded provider-string LM, schema-output and service-retrieval alternatives and embedding refusal; status stays Proposed.
   2026-11-12: shipped fixed `unsupported` refusal for DSPy thread-pool fan-out; status stays Proposed.
+  2026-11-13: accepted unchanged DSPy refusal logging and added run-less async-call refusal and bounded thread-start exception-chain classification; status stays Proposed.
   2026-11-13: refused shipping the DSPy async branch helper after measuring its conflict with persistent divergence markers; no production source or checkpoint format change, status stays Proposed.
   2026-11-13: shipped the DSPy keyed async branch helper with optional journal markers, native/Node replay and Chromium reload evidence; status stays Proposed.
   2026-11-13: accepted the existing DSPy runtime divergence poison checkpoint and revised the gate for a separately scoped helper retry, with sequential and branch persistence pins; status stays Proposed.
@@ -666,16 +667,46 @@ the same way. Supported tasks keep their ContextVar and follow the existing path
 no journal format, metadata field, error text, public symbol or core contract
 changes. ADR-0012 controls remain in JavaScript and are unchanged.
 
-Raw author-created threads without DSPy's settings remain unattributed natively;
-a thread-start error caught by author code is invisible to the executor. DSPy's
-own logger is unchanged: the threaded refusal produced no per-item records in the
-measured native probe, while sequential refusal and an `n > 1` async call from a
-worker thread can still log item text. Items already queued in a native pool may
-keep running author callables after the run ended; their LM calls stay refused. An
-author's own `await asyncio.to_thread(...)` that fails to start a thread in the
-Worker is also reported as `unsupported`, and an error re-raised or wrapped
-without the `Thread.start` frame still ends `executor_error`.
-The six probes now pass on Chromium, Firefox and WebKit in the local
+While any DSPy run is active in the interpreter, async LM completion and streaming
+without either the run ContextVar or a live settings handle refuse with fixed
+`unsupported` before payload construction or bridge dispatch. A locked active-run
+count covers overlapping runs and resets on success, failure and cancellation.
+The call cannot identify its owner, so it does not terminate a run. Standalone
+async calls outside every active run retain their existing behavior. A run-less
+standalone call during an unrelated run is also refused: this is the deliberate
+fail-closed trade for the one-Worker, one-interpreter lane. Stale weak settings cannot
+terminate a later run.
+
+Thread-start classification follows each exception-group leaf's explicit cause,
+otherwise its unsuppressed context, with cycle detection and a 32-exception bound.
+It reads traceback code objects only. Explicit `raise ... from None` hides the
+start failure and stays `executor_error`; an ordinary author error does too.
+A swallowed start failure remains invisible: no thread or model call was created,
+and a legitimate sequential fallback remains possible. No global thread patch or
+owner heuristic is installed. Native `asyncio.to_thread` and
+`Thread(context=copy_context())` carry the ContextVar and journal normally; Pyodide
+cannot start real threads. Native threads that outlive every run are outside the
+active-run guard. Attributing their creation or terminating a guessed owner would
+require a global patch or break run isolation.
+
+DSPy's logger is accepted unchanged, pinned on DSPy 3.4.1: sequential Parallel
+refusal over three examples emits one `dspy.utils.parallelizer` record containing
+the first author's item and the exact suffix:
+
+```text
+: This operation is unsupported.. Set `provide_traceback=True` for traceback.
+```
+
+Threaded Parallel and a pool-worker async `n=2` call emit zero records and send
+zero requests; no galaxie logger records are added. galaxie neither suppresses,
+redacts nor adds log text. In the Worker, Python stdout and stderr are discarded
+by the host-created Pyodide instance (source-read in the production, test and
+DSPy-gate Worker constructors, not runtime-measured). Natively the text goes to
+the process's own stderr and contains the author's own item plus galaxie's fixed
+message. Suppression or redaction would mutate global logging or a DSPy-owned
+handler, which DSPy can recreate, with no benefit on the shipped Worker lane.
+
+The eight thread-pool/context probes now pass on Chromium, Firefox and WebKit in the local
 [engine measurements](../../tests/conformance/README.md#dspy-engine-measurements).
 Real models remain unmeasured; the other-version attempt could not collect tests.
 Use sequential `await module.acall(...)` loops or the keyed async branch helper

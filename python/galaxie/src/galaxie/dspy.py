@@ -251,6 +251,8 @@ class _Run:
 
 
 _run: ContextVar[_Run | None] = ContextVar('galaxie_dspy_run', default=None)
+_active_runs = 0
+_active_runs_lock = threading.Lock()
 _branch: ContextVar[_Branch | None] = ContextVar('galaxie_dspy_branch', default=None)
 _tool_name: ContextVar[str | None] = ContextVar('galaxie_dspy_tool_name', default=None)
 
@@ -265,6 +267,14 @@ def _refuse_foreign() -> None:
     if _run.get() is None and (run := _foreign_run()) is not None:
         run.record('unsupported')
         raise _Termination('unsupported')
+
+
+def _refuse_runless() -> None:
+    if _run.get() is None and _foreign_run() is None:
+        with _active_runs_lock:
+            active = _active_runs > 0
+        if active:
+            raise _LMError('unsupported')
 
 
 async def branches(group: Mapping[str, Callable[[], Awaitable[Any]]]) -> dict[str, Any]:
@@ -554,6 +564,7 @@ class _AsyncEngine:
 
     async def complete(self, value: Request) -> Response:
         _refuse_foreign()
+        _refuse_runless()
         run = _run.get()
         entry = None
         try:
@@ -582,6 +593,7 @@ class _AsyncEngine:
 
     async def stream(self, value: Request) -> AsyncIterator[Any]:
         _refuse_foreign()
+        _refuse_runless()
         run = _run.get()
         entry = None
         task = None
@@ -693,6 +705,7 @@ class GalaxieLM(dspy.LM):
 
     async def acall(self, prompt: Any = None, *, messages: Any = None, **kwargs: Any) -> Any:
         _refuse_foreign()
+        _refuse_runless()
         run = _run.get()
         if run is not None:
             run.check()
@@ -752,12 +765,24 @@ def _exception_leaves(error: BaseException) -> list[BaseException]:
 
 def _thread_start_failed(error: BaseException) -> bool:
     for leaf in _exception_leaves(error):
-        if isinstance(leaf, RuntimeError):
-            traceback = leaf.__traceback__
-            while traceback is not None:
-                if traceback.tb_frame.f_code is threading.Thread.start.__code__:
-                    return True
-                traceback = traceback.tb_next
+        seen: set[int] = set()
+        current: BaseException | None = leaf
+        for _ in range(32):
+            if current is None or id(current) in seen:
+                break
+            seen.add(id(current))
+            if isinstance(current, RuntimeError):
+                traceback = current.__traceback__
+                while traceback is not None:
+                    if traceback.tb_frame.f_code is threading.Thread.start.__code__:
+                        return True
+                    traceback = traceback.tb_next
+            if current.__cause__ is not None:
+                current = current.__cause__
+            elif current.__suppress_context__:
+                current = None
+            else:
+                current = current.__context__
     return False
 
 
@@ -1001,6 +1026,7 @@ class Executor:
         return result
 
     async def run(self, value: Any, conversation: str, steps: int, *, on_stream: Callable[[str, Any], None] | None = None, resume: dict[str, Any] | None = None) -> Any:
+        global _active_runs
         dspy.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
         _validate(self.module, self.adapter, self.lm)
         state = self._sessions.setdefault(conversation, _Session())
@@ -1026,6 +1052,8 @@ class Executor:
         token = _run.set(run)
         observer = capabilities.failures.set(run.record)
         dispatcher = capabilities.dispatch.set(run.capability)
+        with _active_runs_lock:
+            _active_runs += 1
         try:
             state.bounded()
             value = _json(state.value)
@@ -1074,6 +1102,8 @@ class Executor:
             capabilities.dispatch.reset(dispatcher)
             capabilities.failures.reset(observer)
             _run.reset(token)
+            with _active_runs_lock:
+                _active_runs -= 1
 
 
 def prepare_executor(value: Any, *, state_binding: str | None = None) -> Executor:
