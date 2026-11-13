@@ -1803,6 +1803,80 @@ python/.venv/bin/python -I scripts/record-dspy-state-conformance.py --check
 pnpm check:docs
 ```
 
+## DSPy runtime-constructed provider LM refusal
+
+Measured locally on 2026-11-13 with DSPy 3.4.1, CPython 3.14.5, Node 24.15.0,
+Pyodide 314.0.7 and Playwright 1.64.1: Chromium 156.0.8078.4, Firefox 157.0,
+WebKit 27.2. **PASS** means executed with all assertions passing; **DIVERGED**
+means an unchanged assertion failed; **NOT RUN** means launch failed;
+**UNMEASURED** means no attempt; **EXISTING** means prior evidence only.
+
+The [predictions](cases-dspy/provider-lm-predictions.json) were committed before
+measurement. Five new [cases](cases-dspy/provider-lm-golden-cases.json) have
+separate [goldens](golden-dspy-provider-lm/) and native driver probes. Each ends
+`{code: 'unsupported', message: 'This operation is unsupported.'}` with zero
+model requests, capability requests and recorded egress attempts (M0, E0).
+
+| Scenario | Native | Node | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- |
+| `pe-lm-runtime-set` | PASS | PASS | PASS | PASS | PASS |
+| `pe-lm-runtime-context` | PASS | PASS | PASS | PASS | PASS |
+| `pe-lm-runtime-nokey` | PASS | PASS | PASS | PASS | PASS |
+| `pe-lm-runtime-engine` | PASS | PASS | PASS | PASS | PASS |
+| `pe-lm-runtime-caught` | PASS | PASS | PASS | PASS | PASS |
+
+The native golden pins the fixed refusal under a socket assertion patch; it is
+not evidence of native provider reachability. Separate native driver probes run
+all five programs. Native unit tests additionally cover sync calls, pool settings
+attribution, an unattributed task beside a live run, standalone use after success,
+failure and cancellation, routed calls and reload idempotence. The native socket
+tripwire uses the Worker's local model-metadata snapshot setting; dependency
+metadata refresh is outside the call-time guard.
+
+Idempotent wrappers on `BaseLM.__call__` and async `acall` check before DSPy's
+payload construction and engine. They allow `GalaxieLM`, use the existing run
+handle and terminal latch, and preserve the first failure when an author catches
+the LM error. A run-less call during another run refuses without poisoning that
+run. Plain DSPy outside all runs remains available. The existing routed control,
+per-call configuration refusal and prepare-time `refused-lm` remain unchanged.
+
+Only three superseded assertion sites changed: the native provider error-code
+branch, its native egress-attempt branch, and the Node provider error-code branch.
+Each points to the immutable P2-P4 predictions in `provider-fixtures.json`.
+Existing goldens (including the retrieval/runtime families), compatibility
+matrices, fixtures and locks remain byte-identical. The retrieval recorder now
+passes both probes on all three browsers under the unchanged strict CSP (outcome
+A above). All browser cases keep zero external routes and exact CSP headers.
+
+This covers base LM entries, including custom in-process engines. Custom
+`BaseLM` subclasses overriding both entries, arbitrary Python requests, network
+retrievers and author code importing `js` remain trusted code. ColBERT keeps its
+existing fixed error; use host-bound `docs.search@1` for retrieval. Worker egress
+policy is not decided here; ADR-0018 decision 9 is unchanged. XMLHttpRequest,
+real services and real models remain UNMEASURED.
+
+The focused native unit command passes 159 tests; the native conformance command
+passes 264 tests. The five-file Node command passes 119 tests. Each
+golden browser command passes 12 tests. Reproduce from the repository root:
+
+```sh
+node scripts/build-python-wheels.ts
+pnpm check:python-wheels
+node scripts/test-python.ts galaxie/tests/test_dspy_provider_lm_refusal.py galaxie/tests/test_dspy.py galaxie/tests/test_dspy_thread_attribution.py galaxie/tests/test_dspy_gate.py galaxie/tests/test_dspy_lint.py
+node scripts/test-python.ts ../tests/conformance/cases-dspy
+(cd python && .venv/bin/python -I ../scripts/record-dspy-conformance.py --check && .venv/bin/python -I ../scripts/record-dspy-state-conformance.py --check && .venv/bin/python -I ../scripts/record-dspy-runtime-conformance.py --check && .venv/bin/python -I ../scripts/record-dspy-retrieval-conformance.py --check && .venv/bin/python -I ../scripts/record-dspy-provider-lm-conformance.py --check)
+pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 tests/conformance/dspy-golden.node.test.ts tests/conformance/dspy-runtime.node.test.ts tests/conformance/dspy-provider.node.test.ts tests/conformance/dspy-parallel.node.test.ts tests/conformance/dspy.node.test.ts
+GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts
+GALAXIE_BROWSER=firefox pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts
+GALAXIE_BROWSER=webkit pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts
+```
+
+Run each engine again with `examples/rag-browser/test/dspy-engines.node.test.ts`
+for the unchanged harness. Use at least 900000 ms per process and 1800000 ms for
+`pnpm check`, with the pinned Go 1.27.3 toolchain first in PATH and
+`GOTOOLCHAIN=local`. Initialize only missing new goldens with the new recorder's
+`--check --write-new`; existing files are checked and never overwritten.
+
 ## DSPy golden runtime optimizer and retrieval cases
 
 Measured locally on 2026-11-13 with scripted replies: macOS arm64 27.2,
@@ -1833,8 +1907,8 @@ Concatenated requests, responses, interactions and events match the native golde
 
 | Retrieval case | Native | Node Pyodide | Chromium | Firefox | WebKit |
 | --- | --- | --- | --- | --- | --- |
-| `pe-retrieve-local-rm` | PASS | PASS | DIVERGED | DIVERGED | DIVERGED |
-| `pe-retrieve-colbert` | PASS | PASS | DIVERGED | DIVERGED | DIVERGED |
+| `pe-retrieve-local-rm` | PASS | PASS | PASS | PASS | PASS |
+| `pe-retrieve-colbert` | PASS | PASS | PASS | PASS | PASS |
 | `rag-docs-search` | PASS | PASS | PASS | PASS | PASS |
 
 The native ColBERT transcript uses the existing fixed-error stand-in convention;
@@ -1845,33 +1919,26 @@ or capability requests on native/Node. Host-bound retrieval calls the read-kind
 answers through the routed `rag.answer` model. The hosted capability input and
 model transcript equal the native golden.
 
-Finding for both `pe-retrieve-*` cases on Chromium, Firefox and WebKit: the first
-failing assertion is `expected [ 'require-trusted-types-for' ] to deeply equal []`.
-The reused provider probe's egress recorder calls `pyodide.code.run_js`, which
-wraps JavaScript `eval`. Strict Trusted Types rejects that instrumentation.
-Both browser cases end with fixed `invalid`, null output and zero model/capability
-requests, rather than the native transcript. The local-RM side update reports
-`recorder: false`; ColBERT emits no egress update. Instrumented browser egress
-counts are therefore **UNMEASURED**, not zero. Each exact failing title is in the
-[DSPy failure registry](dspy-engine-known-failures.json) and runs as `test.fails`;
-no assertion or CSP directive was loosened. A follow-up needs a CSP-compatible
-test recorder before these two browser transcripts can be promoted to PASS.
+The 2026-11-13 recorder follow-up replaces script evaluation with a Python
+`create_proxy` installed as `globalThis.fetch`, restored and destroyed afterwards.
+Both probes now pass on Chromium, Firefox and WebKit with `recorder: true`,
+`unexpected: false` and no CSP violations. Local RM records zero attempts;
+ColBERT records one rejected `127.0.0.1:9` attempt per browser and keeps its
+`executor_error` transcript. This is outcome A: all six titles leave the
+[DSPy failure registry](dspy-engine-known-failures.json), which is now empty.
 
-Egress counts stay outside goldens: the existing native ColBERT probe records one
-rejected loopback attempt; Node records zero locally on macOS (Ubuntu CI previously
-recorded one). The Node test permits only zero or one attempts to `127.0.0.1:9`.
-All three browser runs assert zero external route requests and strict CSP on every
-response, including the DIVERGED cases. No external request received a response;
-the conditional ColBERT route exception was not needed.
+Egress counts stay outside goldens: the native ColBERT probe records one rejected
+loopback attempt; Node records zero locally on macOS (Ubuntu CI previously
+recorded one). The unchanged Node assertion permits zero or one. All browser
+runs assert zero external routes and the unchanged strict CSP on every response.
+The test recorder rejects the attempted fetch before it reaches the host route.
 
-The new engine file runs seven tests per engine: five ordinary passes and two
-registered expected failures. The Chromium lane is headless and included in
-`pnpm check`; Firefox and WebKit are local macOS measurements, not CI jobs.
-The unchanged engine harness also passes: Chromium 11 tests, Firefox 22, WebKit 22.
-The new native pytest passes four tests and Node passes six.
-Real models are **UNMEASURED: no model access here**. Firefox/WebKit CI, other DSPy
-versions, offline MIPROv2/COPRO/GEPA output and the no-rebind
-`rt-opt-labeled-naive` golden remain UNMEASURED; those were outside this promotion.
+With the provider-LM family below, the golden engine file passes 12 tests per
+engine; the native golden file passes five tests and Node golden replay passes
+11. The unchanged engine harness passes Chromium 13, Firefox 24 and WebKit 24.
+These are scripted local macOS measurements; real models/services, Firefox/WebKit
+CI, other DSPy versions, offline MIPROv2/COPRO/GEPA output and the no-rebind
+`rt-opt-labeled-naive` golden remain UNMEASURED.
 
 Reproduce from the repository root with current local wheels. Rebuild wheels
 only after changing shipped Python/Pyodide code. Allow each process at least
@@ -2057,6 +2124,11 @@ interaction. Node additionally asserts zero Worker errors and only fixture-origi
 | `pe-retrieve-local-rm` | `['local a', 'local b']`, M0, E0 | As predicted | As predicted |
 | `pe-retrieve-colbert` | `executor_error`, M0; native E≥1, Node E only if fetch reached | As predicted; E1 | `executor_error`, M0; E0 locally on macOS, E1 in Ubuntu CI; same fixed refusal and zero bridge requests |
 
+**Superseded on 2026-11-13:** the three `pe-lm-runtime-*` rows above record the
+pre-refusal measurement. The [runtime provider-LM refusal](#dspy-runtime-constructed-provider-lm-refusal)
+now ends `unsupported`, M0, E0 on every measured lane; the fixture and dated table
+cells remain unchanged.
+
 The schema-shape probe runs plain DSPy with a scripted schema-advertising LM,
 not through the galaxie driver. Its object schema is design input, not evidence
 that galaxie forwards a provider constraint. Native and Node parity references
@@ -2079,12 +2151,11 @@ clears the predictor's LM inside `aforward` after prepare so the context supplie
 the effective LM; otherwise
 the placeholder wins and the probe measures the routed control instead.
 
-A provider LM bound before prepare is refused, but runtime construction is outside
-that validation and bypasses the router's grants, budgets and destination policy.
-Native rejected connection attempts demonstrate that path. Zero Node fetch
-attempts do **not** establish containment or successful fetch transport: this is
-the trusted-code limit of ADR-0018 decision 9. Explicit FetchTransport,
-XMLHttpRequest and real-service reachability are unmeasured. The Worker recorder
+A provider LM bound before prepare is refused. Runtime construction is invisible
+to that validation; the follow-up below now refuses calls at BaseLM entry before
+payload or engine execution. Trusted author code can override both entries or
+import `js` under ADR-0018 decision 9. Explicit FetchTransport, XMLHttpRequest
+and real-service reachability remain unmeasured. The Worker recorder
 installed successfully in every scenario; absent instrumentation would have made
 egress visibility unmeasured, while the fixture guard still rejects external fetch.
 

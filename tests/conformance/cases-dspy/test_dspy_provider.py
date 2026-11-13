@@ -162,9 +162,11 @@ def test_native_provider_probe(name):
     elif name == 'pe-retrieve-local-rm':
         assert result == {'ok': True, 'output': {'passages': ['local a', 'local b']}}
     else:
-        code = 'unsupported' if name in ('pe-lm-kwargs', 'pe-schema-response-format') else 'executor_error'
+        # Superseded by the provider-LM refusal; P2-P4 in provider-fixtures.json record the pre-refusal measurement.
+        code = 'unsupported' if name in ('pe-lm-kwargs', 'pe-schema-response-format', 'pe-lm-runtime-set', 'pe-lm-runtime-context', 'pe-lm-runtime-nokey') else 'executor_error'
         assert result == {'ok': False, 'code': code}
-    if name in ('pe-lm-runtime-set', 'pe-lm-runtime-context', 'pe-retrieve-colbert'):
+    # Superseded by the provider-LM refusal; P2-P4 in provider-fixtures.json record the pre-refusal measurement.
+    if name == 'pe-retrieve-colbert':
         assert len(evidence['attempts']) >= 1
     else:
         assert evidence['attempts'] == []

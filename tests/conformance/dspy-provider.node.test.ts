@@ -127,7 +127,14 @@ test.each(scenarios)(
         expect(result.error).toBeUndefined();
         expect(result.output).toEqual({ passages: ['local a', 'local b'] });
       } else {
-        const code = ['pe-lm-kwargs', 'pe-schema-response-format'].includes(name)
+        // Superseded by the provider-LM refusal; P2-P4 in provider-fixtures.json record the pre-refusal measurement.
+        const code = [
+          'pe-lm-kwargs',
+          'pe-schema-response-format',
+          'pe-lm-runtime-set',
+          'pe-lm-runtime-context',
+          'pe-lm-runtime-nokey',
+        ].includes(name)
           ? 'unsupported'
           : 'executor_error';
         expect(result.error).toEqual({

@@ -22,6 +22,7 @@ spec.loader.exec_module(native)
 
 RUNTIME = json.loads(Path(__file__).with_name('runtime-golden-cases.json').read_text())
 RETRIEVAL = json.loads(Path(__file__).with_name('retrieval-golden-cases.json').read_text())
+PROVIDER_LM = json.loads(Path(__file__).with_name('provider-lm-golden-cases.json').read_text())
 RUNTIME_PROBES = json.loads(Path(__file__).with_name('runtime-fixtures.json').read_text())
 PROVIDER_PROBES = json.loads(Path(__file__).with_name('provider-fixtures.json').read_text())
 
@@ -96,6 +97,9 @@ async def record(name, case, runtime):
         with patch('socket.socket.connect', side_effect=AssertionError('Native golden conformance forbids network.')), dspy.context(
             adapter=dspy.ChatAdapter(use_json_adapter_fallback=False), disable_history=True, trace=None, callbacks=[],
         ):
+            if name in PROVIDER_LM:
+                # Pin the wrapper's fixed refusal; native provider reachability is not the oracle.
+                raise native.Termination('unsupported')
             if name == 'pe-retrieve-colbert':
                 # The provider probe measures rejected transport separately. Pin only its fixed public error.
                 raise native.Termination('executor_error')
@@ -132,3 +136,7 @@ async def record_runtime(name):
 
 async def record_retrieval(name):
     return await record(name, RETRIEVAL[name], False)
+
+
+async def record_provider_lm(name):
+    return await record(name, PROVIDER_LM[name], False)

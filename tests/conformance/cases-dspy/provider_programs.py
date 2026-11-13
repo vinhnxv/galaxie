@@ -103,6 +103,17 @@ class LocalRM:
         return [dotdict(long_text=value) for value in ['local a', 'local b'][:k]]
 
 
+class LocalEngine:
+    def complete(self, value):
+        from dspy.lm15 import Message, Response, TextPart, Usage
+        return Response(id='fixture', model=value.model, message=Message(role='assistant', parts=(TextPart(text=REPLY),)), finish_reason='stop', usage=Usage())
+
+
+class LocalAsyncEngine:
+    async def complete(self, value):
+        return LocalEngine().complete(value)
+
+
 class Program(dspy.Module):
     def __init__(self, name):
         super().__init__()
@@ -130,10 +141,19 @@ class Program(dspy.Module):
                      for key in ('litellm', 'openai', 'numpy', 'faiss', 'requests', 'httpx')}
             return dspy.Prediction(facts=json.dumps(facts, sort_keys=True))
         if name.startswith('pe-lm-runtime-'):
+            if name == 'pe-lm-runtime-engine':
+                self.predict.set_lm(dspy.LM('offline', engine=LocalEngine(), async_engine=LocalAsyncEngine(), cache=False, num_retries=0))
+                return await self.predict.acall(question=question)
             config = {'api_base': BASE, 'cache': False, 'num_retries': 0}
             if name != 'pe-lm-runtime-nokey':
                 config['api_key'] = KEY
             lm = dspy.LM(MODEL, **config)
+            if name == 'pe-lm-runtime-caught':
+                try:
+                    await lm.acall(question)
+                except Exception:
+                    return dspy.Prediction(answer='caught')
+                return dspy.Prediction(answer='unexpected success')
             if name == 'pe-lm-runtime-context':
                 # A bound predictor wins over settings.lm. Remove it after prepare.
                 self.predict.lm = None

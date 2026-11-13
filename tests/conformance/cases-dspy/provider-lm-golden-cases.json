@@ -1,0 +1,7 @@
+{
+  "pe-lm-runtime-set": { "golden": "pe-lm-runtime-set.json" },
+  "pe-lm-runtime-context": { "golden": "pe-lm-runtime-context.json" },
+  "pe-lm-runtime-nokey": { "golden": "pe-lm-runtime-nokey.json" },
+  "pe-lm-runtime-engine": { "golden": "pe-lm-runtime-engine.json" },
+  "pe-lm-runtime-caught": { "golden": "pe-lm-runtime-caught.json" }
+}

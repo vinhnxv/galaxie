@@ -84,6 +84,10 @@
     {
       "root": "scripts/record-dspy-retrieval-conformance.py",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
+    },
+    {
+      "root": "scripts/record-dspy-provider-lm-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
     }
   ]
 }

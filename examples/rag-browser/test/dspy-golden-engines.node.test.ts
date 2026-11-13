@@ -10,6 +10,7 @@ import failures from '../../../tests/conformance/dspy-engine-known-failures.json
 import type { DspyTranscript } from '../../../tests/conformance/support/dspy.js';
 import {
   dspyGoldenCases,
+  dspyGoldenFamily,
   dspyGoldenSpecs,
   type GoldenResult,
 } from '../../../tests/conformance/support/dspy-golden.js';
@@ -114,10 +115,7 @@ async function result(page: Page): Promise<PageResult> {
   return value;
 }
 async function golden(name: string): Promise<DspyTranscript> {
-  const directory =
-    name === 'predict'
-      ? 'golden-dspy'
-      : `golden-dspy-${name.startsWith('rt-') ? 'runtime' : 'retrieval'}`;
+  const directory = name === 'predict' ? 'golden-dspy' : `golden-dspy-${dspyGoldenFamily(name)}`;
   const file = name === 'predict' ? 'predict.json' : dspyGoldenSpecs[name]?.golden;
   return JSON.parse(
     await readFile(

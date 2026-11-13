@@ -10,10 +10,12 @@ from pathlib import Path
 import pytest
 
 from golden_native import RETRIEVAL, RUNTIME, record_retrieval, record_runtime
+from golden_native import PROVIDER_LM, record_provider_lm
 
 
 @pytest.mark.parametrize('family,cases,recorder', [
     ('runtime', RUNTIME, record_runtime), ('retrieval', RETRIEVAL, record_retrieval),
+    ('provider-lm', PROVIDER_LM, record_provider_lm),
 ])
 def test_native_golden_family(family, cases, recorder):
     directory = Path(__file__).parent.parent / f'golden-dspy-{family}'
