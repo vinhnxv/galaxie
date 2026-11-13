@@ -164,6 +164,7 @@ async function boot(input: BootPayload): Promise<number> {
     },
   });
   py.globals['set']('_galaxie_module', input.module);
+  if (framework === 'adk') py.globals['set']('_galaxie_roles', JSON.stringify(input.roles ?? []));
   py.globals['set']('_galaxie_entry', input.entry);
   py.globals['set']('_galaxie_durable', input.checkpoints === true);
   await py.runPythonAsync(

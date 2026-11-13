@@ -29,7 +29,7 @@ import sys, json, asyncio, importlib, uuid, base64
 from datetime import datetime, timezone
 from galaxie._bridge import install_transport, GalaxieError, receive_model_chunk, notify_stream_data, request
 from _galaxie_transport import request as _transport, notify as _notify
-from galaxie.adk import prepare_executor, quiet, CHECKPOINT_TYPE, STATE_TYPE
+from galaxie.adk import prepare_executor, quiet, CHECKPOINT_TYPE, STATE_TYPE, _declare_roles
 sys.path.insert(0, '/agent')
 async def _galaxie_request(raw):
     return await _transport(raw)
@@ -38,6 +38,7 @@ _galaxie_conversations = {}
 _galaxie_revisions = {}
 try:
     with quiet():
+        _declare_roles(json.loads(_galaxie_roles))
         _galaxie_executor = prepare_executor(getattr(importlib.import_module(_galaxie_module), _galaxie_entry)())
     if _galaxie_durable:
         _galaxie_executor.durable = True

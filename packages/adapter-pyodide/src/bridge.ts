@@ -51,6 +51,7 @@ export type BridgeMessage = Envelope &
 export interface BootPayload {
   readonly framework?: PythonFramework;
   readonly checkpoints?: boolean;
+  readonly roles?: readonly string[];
   readonly runtimeUrl: string;
   readonly wheelsUrl: string;
   readonly localWheels: readonly LockedWheel[];
@@ -240,7 +241,7 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
         keys(
           value,
           ['runtimeUrl', 'wheelsUrl', 'localWheels', 'sources', 'module', 'entry'],
-          ['checkpoints', 'framework'],
+          ['checkpoints', 'framework', 'roles'],
         ) &&
         (value['framework'] === undefined ||
           value['framework'] === 'langgraph' ||
@@ -248,6 +249,13 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
           value['framework'] === 'dspy' ||
           value['framework'] === 'adk') &&
         (value['checkpoints'] === undefined || typeof value['checkpoints'] === 'boolean') &&
+        (value['roles'] === undefined ||
+          (value['framework'] === 'adk' &&
+            Array.isArray(value['roles']) &&
+            value['roles'].length <= 256 &&
+            value['roles'].every(
+              (role: unknown) => typeof role === 'string' && role.length > 0 && role.length <= 128,
+            ))) &&
         text(value['runtimeUrl']) &&
         text(value['wheelsUrl']) &&
         Array.isArray(value['localWheels']) &&
