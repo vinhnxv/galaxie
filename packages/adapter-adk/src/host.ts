@@ -68,6 +68,23 @@ export type AdkAgent = (host: AdkHost) => BaseAgent | AdkEntry;
 export interface HostRegistry {
   readonly models: WeakSet<object>;
   readonly tools: WeakSet<object>;
+  readonly pausing: WeakSet<object>;
+  readonly wrappers: WeakMap<object, BaseAgent>;
+  readonly capabilities: WeakMap<object, string>;
+}
+
+interface HostInternals {
+  readonly registry: HostRegistry;
+  readonly active: () => RunState | undefined;
+}
+
+const hosts = new WeakMap<AdkHost, HostInternals>();
+
+/** Internal lookup without adding a key to the author-facing host. */
+export function hostInternals(host: AdkHost): HostInternals {
+  const internals = hosts.get(host);
+  if (internals === undefined) throw failure('invalid');
+  return internals;
 }
 
 const TOOL_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
@@ -123,7 +140,13 @@ export function createHost(
     if (provider === undefined || (typeof provider === 'function') !== descriptor.credential)
       throw new GalaxieError('invalid', 'The routed model implementations must be valid.');
   }
-  const registry: HostRegistry = { models: new WeakSet(), tools: new WeakSet() };
+  const registry: HostRegistry = {
+    models: new WeakSet(),
+    tools: new WeakSet(),
+    pausing: new WeakSet(),
+    wrappers: new WeakMap(),
+    capabilities: new WeakMap(),
+  };
   const routed = new Map<string, GalaxieLlm>();
   for (const role of models?.roles ?? []) {
     const llm = new GalaxieLlm({
@@ -215,13 +238,18 @@ export function createHost(
             ? new LongRunningFunctionTool(options)
             : new FunctionTool(options);
         registry.tools.add(tool);
+        registry.capabilities.set(tool, name);
+        if (spec.requireConfirmation === true || spec.longRunning === true)
+          registry.pausing.add(tool);
         return tool;
       },
       requestInput() {
         registry.tools.add(requestInputTool);
+        registry.pausing.add(requestInputTool);
         return requestInputTool as FunctionTool;
       },
     },
   };
+  hosts.set(host, { registry, active });
   return { host, registry };
 }

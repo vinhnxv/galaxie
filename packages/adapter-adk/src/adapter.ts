@@ -22,6 +22,7 @@ import {
   setLogger,
   ToolCallIntegrityPlugin,
 } from '@google/adk';
+import { admitCapabilities } from './agent-tool.js';
 import { adapterError, failure } from './errors.js';
 import { type AdkAgent, type AdkServices, createHost, validServices } from './host.js';
 import {
@@ -48,7 +49,7 @@ import { RunState, toGalaxieError } from './run.js';
 import { ensureAdkRuntimeEnv } from './runtime-shim.js';
 import { GalaxieSessionService } from './session.js';
 import { StreamProjector } from './stream.js';
-import { validateAgentTree } from './validate.js';
+import { validateAgentTree, validatedInnerCapabilities } from './validate.js';
 
 const APP_NAME = 'galaxie';
 const USER_ID = 'galaxie';
@@ -382,6 +383,12 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
             return;
           }
           try {
+            admitCapabilities(validatedInnerCapabilities(root, registry), request.capabilities);
+          } catch {
+            yield* refuse('unsupported');
+            return;
+          }
+          try {
             await hydrate(sessionId, request.registerRestoredData);
           } catch (error) {
             const fatal = toGalaxieError(error, 'unavailable', request.signal);
@@ -501,15 +508,20 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
                 });
             }
             before = session.events.length;
-            run.seedCallIds(
-              session.events.reduce(
-                (count, event) =>
-                  count +
-                  (event.content?.parts ?? []).filter((part) => part.functionCall !== undefined)
-                    .length,
-                0,
-              ),
+            const seed = session.events.reduce(
+              (seed, event) => {
+                for (const part of event.content?.parts ?? []) {
+                  const call = part.functionCall;
+                  if (call === undefined) continue;
+                  seed.count += 1;
+                  const match = /^galaxie-(\d+)$/.exec(call.id ?? '');
+                  if (match !== null) seed.next = Math.max(seed.next, Number(match[1]) + 1);
+                }
+                return seed;
+              },
+              { count: 0, next: 0 },
             );
+            run.seedCallIds(Math.max(seed.count, seed.next));
             for await (const event of runnerFor(sessionId).runAsync({
               userId: USER_ID,
               sessionId,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export { createAdkAdapter } from './adapter.js';
+export { agentTool } from './agent-tool.js';
 export type { AdkAgent, AdkHost, AdkServices, CapabilityToolSpec } from './host.js';
 export type {
   AdkDecision,
