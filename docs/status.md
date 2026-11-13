@@ -13,6 +13,17 @@ violations. Shipped runtime source, existing goldens, matrices and locks stay
 unchanged; `subgraphs` stays false. The old 23-script Go lane on Firefox/WebKit,
 Linux CI engine results, real models and real devices remain unmeasured.
 
+On 2026-11-13, five new DSPy [runtime optimizer and retrieval goldens](../tests/conformance/README.md#dspy-golden-runtime-optimizer-and-retrieval-cases)
+pass independent native recording and Node Pyodide replay. Rebound runtime
+LabeledFewShot, its two-stage replay frontier and host-bound `docs.search@1`
+pass on local Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2, including
+real IndexedDB page reloads. Both reused `pe-retrieve-*` browser probes are
+DIVERGED: Trusted Types blocks their eval-based egress recorder, each ends
+`invalid` with zero model/capability requests, and browser egress counts remain
+UNMEASURED. Six exact titles are registered as expected failures with assertions
+and CSP unchanged. All runs use scripted models; real services and real models
+remain unmeasured. No shipped source, existing golden, matrix, fixture or lock changed.
+
 On 2026-11-13, local scripted DSPy engine measurements add WebKit binding and
 legacy re-pause evidence, Chromium legacy re-pause evidence, thread-pool probes
 on all three engines and Firefox/WebKit live fan-out goldens. WebKit reload
@@ -21,7 +32,8 @@ the unchanged CSP-header equality assertions. Vite preview omitted the header
 on HTTP 304 responses before applying configured headers; the test harness now
 sets it earlier, with a wire-level 200/304 regression test. Full local reruns
 pass 11 Chromium, 22 Firefox and 22 WebKit tests with no CSP-header mismatches;
-the DSPy failure registry is empty. Production hosting uses generated `_headers`.
+the DSPy failure registry was empty before the golden measurements above.
+Production hosting uses generated `_headers`.
 Native and Node tests pin absolute
 effect scopes and journal order; native tests pin the first recorded terminal
 failure code. An offline DSPy 3.2.1 overlay imports but cannot collect the native
@@ -114,7 +126,7 @@ lm15 outside the router: native set/context probes each attempt one rejected
 loopback connection; Node records zero fetch attempts because the default
 transport is sockets. Both end `executor_error`. Typed signatures match plain
 DSPy without provider constraints; an invalid typed reply fails after one request.
-The host-bound RAG retrieval replacement reuses existing evidence. ColBERT records
+The host-bound RAG retrieval replacement now has the new golden evidence above. ColBERT records
 zero Node fetch attempts locally on macOS and one rejected loopback fetch in
 Ubuntu CI (Node 24.22.2; CPython 3.14.6 references), with the same fixed failure
 and zero bridge requests. The exact
@@ -122,7 +134,8 @@ transport difference is unmeasured; a Worker egress decision remains follow-up
 work under ADR-0018 decision 9. The Worker has `requests` but no `httpx`, `openai`,
 `litellm`, `numpy` or `faiss`. No shipped
 source, core contract, golden, matrix or lock changed; conditional refusal was
-unneeded. New Chromium, Firefox/WebKit probes, real services and the other
+unneeded. The browser retrieval outcomes are recorded above; other new browser
+provider probes, real services and the other
 [unmeasured shapes and predictions](../tests/conformance/README.md#dspy-provider-strings-schema-output-embeddings-and-retrievers-spike)
 remain unmeasured. See the [author recipes](../packages/adapter-pyodide/README.md#provider-strings-schema-output-embeddings-and-retrievers).
 
@@ -136,7 +149,8 @@ without requests in native CPython and Node Pyodide; `rt-opt-gepa` is
 seeded demos and replay without redispatch; omitting the rebind ends
 `executor_error`. All measured shapes leave no tasks or post-termination requests.
 Evidence uses DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7;
-no shipped source or core contract changed. Chromium, Firefox, WebKit runtime
+no shipped source or core contract changed. The two rebound runtime goldens now
+have the browser measurements above. Other Chromium, Firefox, WebKit runtime
 probes, real models, other DSPy versions, offline MIPROv2/COPRO/GEPA output,
 KNNFewShot/Ensemble/SIMBA/BetterTogether/fine-tuning optimizers and optimizers
 given an in-Worker plain `dspy.LM` remain unmeasured. See the

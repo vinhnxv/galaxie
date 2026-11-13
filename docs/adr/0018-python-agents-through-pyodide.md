@@ -32,6 +32,7 @@
 
   2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement; subsequent evidence records five text-protocol alternatives and neighbouring-shape refusal, with no production source shipped.
   2026-11-13: registered the LangGraph Python execution-identity rerun before measurement, then recorded refusal after read-identity and abrupt-recovery failures; no production helper shipped.
+  2026-11-13: added independent DSPy runtime LabeledFewShot and retrieval goldens; native/Node pass, runtime and host-bound retrieval pass on all three local browsers, and the two eval-instrumented service probes diverge under Trusted Types. No shipped source or Decision text changed; status stays Proposed.
 
 ## Context
 
@@ -709,10 +710,12 @@ so the conditional shipped refusal did not fire. No core contract change is need
 The earlier thread-start evidence is reused. Blocking the single Worker's bridge
 reply loop would starve cancellation and budget checks; that is reasoning, not
 a measured blocking bridge. Author code must be deterministic apart from
-journaled calls. Chromium, Firefox and WebKit runtime probes, real models, other
+journaled calls. On 2026-11-13, the two rebound cases gained
+[goldens passing all three local browsers](../../tests/conformance/README.md#dspy-golden-runtime-optimizer-and-retrieval-cases),
+including the two-stage IndexedDB page-reload frontier. Other browser runtime probes, real models, other
 DSPy versions, offline MIPROv2/COPRO/GEPA output, KNNFewShot/Ensemble/SIMBA/
 BetterTogether/fine-tuning optimizers and optimizers given an in-Worker plain
-`dspy.LM` remain unmeasured. Shipped source, goldens, matrices, locks and Decision
+`dspy.LM` remain unmeasured. Shipped source, existing goldens, matrices, locks and Decision
 text are unchanged. ADR-0012 controls are unchanged; this ADR stays Proposed.
 
 ### DSPy provider strings, schema output, embeddings and retrievers spike (2026-11)
@@ -747,7 +750,13 @@ capability replacement and the [author recipes](../../packages/adapter-pyodide/R
 
 The Worker package probe finds `requests` but not `httpx`; native CPython has
 both. The committed predictions remain unchanged beside these differences.
-New Chromium, Firefox/WebKit probes, real models/services, other DSPy versions,
+On 2026-11-13, [independent retrieval goldens](../../tests/conformance/README.md#dspy-golden-runtime-optimizer-and-retrieval-cases)
+pass natively and on Node. Host-bound `docs.search@1` passes local Chromium,
+Firefox and WebKit; both reused `pe-retrieve-*` browser probes are DIVERGED.
+Trusted Types blocks their eval-based egress recorder; both end `invalid`
+without bridge requests, and browser egress counts stay UNMEASURED. Assertions
+and CSP stay unchanged, with six exact expected-failure registry entries.
+Other new browser provider probes, real models/services, other DSPy versions,
 LiteLLM/declared-provider routes, Databricks/Weaviate, vector capabilities,
 undeclared roles and multimodal shapes remain unmeasured. Prior Chromium evidence
 is reused only for existing goldens/RAG cases. ADR-0012 controls and Decision text

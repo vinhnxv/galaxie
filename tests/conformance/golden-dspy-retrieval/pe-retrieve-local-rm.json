@@ -4,10 +4,7 @@
   "capabilities": [],
   "interactions": [],
   "output": {
-    "passages": [
-      "local a",
-      "local b"
-    ]
+    "passages": ["local a", "local b"]
   },
   "error": null
 }

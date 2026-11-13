@@ -757,9 +757,12 @@ For model-calling optimizers, or to avoid shipping a large runtime trainset:
 | `MIPROv2`, `COPRO`, `GEPA` | Offline output unmeasured; the runtime refusals above do not establish state round trips. |
 | `KNNFewShot`, `Ensemble`, `SIMBA`, `BetterTogether`, fine-tuning optimizers | Runtime and offline output unmeasured. |
 
-Chromium, Firefox and WebKit runtime probes, real models, other DSPy versions and
-optimizers given an in-Worker plain `dspy.LM` remain unmeasured. Runtime support
-here is measured shipped behavior, not a new golden conformance family.
+The two rebound runtime cases gained independent goldens on 2026-11-13, passing
+native CPython, Node Pyodide and local headless Chromium, Firefox and WebKit,
+including a real IndexedDB page reload for the two-stage case. See the
+[golden measurements](../../tests/conformance/README.md#dspy-golden-runtime-optimizer-and-retrieval-cases).
+Other browser runtime probes, real models, other DSPy versions and optimizers
+given an in-Worker plain `dspy.LM` remain unmeasured.
 
 ### Provider strings, schema output, embeddings and retrievers
 
@@ -853,8 +856,14 @@ XMLHttpRequest reachability or real-service behavior.
 
 `pe-env-facts` finds `requests` in both lanes, `httpx` and `openai` only natively,
 and no `litellm`, `numpy` or `faiss` in either. A package being in the shared lock
-does not imply it is installed in the DSPy closure. New Chromium, Firefox and
-WebKit probes, real models/services, other DSPy versions, `engine='litellm'`,
+does not imply it is installed in the DSPy closure. On 2026-11-13, host-bound
+`docs.search@1` gained an independent golden passing native, Node and local
+Chromium/Firefox/WebKit. Both `pe-retrieve-*` browser probes are DIVERGED because
+Trusted Types blocks their eval-based test egress recorder; they end `invalid`
+without bridge requests, and browser egress counts remain UNMEASURED. The
+[golden measurements](../../tests/conformance/README.md#dspy-golden-runtime-optimizer-and-retrieval-cases)
+record the assertions and expected-failure registry. Other new browser provider
+probes, real models/services, other DSPy versions, `engine='litellm'`,
 `dspy.lm15.register_provider` declarations, Databricks/Weaviate retrievers,
 vector-returning capabilities, undeclared-role refusal and multimodal inputs
 remain unmeasured. Existing Chromium golden/RAG evidence is reused only where

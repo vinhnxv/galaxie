@@ -49,7 +49,9 @@
       }
     },
     "replies": [
-      { "text": "[[ ## answer ## ]]\nIn the browser on the user's own machine. [1]\n[[ ## completed ## ]]" }
+      {
+        "text": "[[ ## answer ## ]]\nIn the browser on the user's own machine. [1]\n[[ ## completed ## ]]"
+      }
     ]
   }
 }

@@ -1752,6 +1752,95 @@ python/.venv/bin/python -I scripts/record-dspy-state-conformance.py --check
 pnpm check:docs
 ```
 
+## DSPy golden runtime optimizer and retrieval cases
+
+Measured locally on 2026-11-13 with scripted replies: macOS arm64 27.2,
+Playwright 1.64.1, Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2,
+CPython 3.14.5, Node 24.15.0, Pyodide 314.0.7 and DSPy 3.4.1.
+The new [runtime cases](cases-dspy/runtime-golden-cases.json) and
+[retrieval cases](cases-dspy/retrieval-golden-cases.json) have independent native
+recorders and separate [runtime](golden-dspy-runtime/) and
+[retrieval](golden-dspy-retrieval/) transcripts. Existing goldens, matrices,
+locks, fixtures and assertions are unchanged.
+
+Vocabulary: **PASS** means this run executed the lane and all its assertions
+passed; **DIVERGED** means it ran and an unchanged assertion failed;
+**NOT RUN** means it could not start; **EXISTING** means earlier evidence only;
+**UNMEASURED** means it was not attempted. An expected failure stays DIVERGED.
+
+| Runtime optimizer case | Native | Node Pyodide | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- |
+| `rt-opt-labeled` | PASS | PASS | PASS | PASS | PASS |
+| `rt-opt-labeled-two-stage` | PASS | PASS | PASS | PASS | PASS |
+
+LabeledFewShot compiles with two seeded demos, Tokyo then Rome, and rebinds the
+LM before `acall`. The two-stage program has one interaction between two distinct
+model replies. Node restores in a fresh Worker; all three browsers perform a real
+page reload and reopen IndexedDB. The second lifetime emits exactly one
+`replayed` event, dispatches nothing before it and sends only request two.
+Concatenated requests, responses, interactions and events match the native golden.
+
+| Retrieval case | Native | Node Pyodide | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- |
+| `pe-retrieve-local-rm` | PASS | PASS | DIVERGED | DIVERGED | DIVERGED |
+| `pe-retrieve-colbert` | PASS | PASS | DIVERGED | DIVERGED | DIVERGED |
+| `rag-docs-search` | PASS | PASS | PASS | PASS | PASS |
+
+The native ColBERT transcript uses the existing fixed-error stand-in convention;
+it does not claim native service reachability. The separate provider probes
+measure rejected transport. Local retrieval returns two passages without model
+or capability requests on native/Node. Host-bound retrieval calls the read-kind
+`docs.search@1` once with `{query, mode, k: 10}`, receives passage objects and
+answers through the routed `rag.answer` model. The hosted capability input and
+model transcript equal the native golden.
+
+Finding for both `pe-retrieve-*` cases on Chromium, Firefox and WebKit: the first
+failing assertion is `expected [ 'require-trusted-types-for' ] to deeply equal []`.
+The reused provider probe's egress recorder calls `pyodide.code.run_js`, which
+wraps JavaScript `eval`. Strict Trusted Types rejects that instrumentation.
+Both browser cases end with fixed `invalid`, null output and zero model/capability
+requests, rather than the native transcript. The local-RM side update reports
+`recorder: false`; ColBERT emits no egress update. Instrumented browser egress
+counts are therefore **UNMEASURED**, not zero. Each exact failing title is in the
+[DSPy failure registry](dspy-engine-known-failures.json) and runs as `test.fails`;
+no assertion or CSP directive was loosened. A follow-up needs a CSP-compatible
+test recorder before these two browser transcripts can be promoted to PASS.
+
+Egress counts stay outside goldens: the existing native ColBERT probe records one
+rejected loopback attempt; Node records zero locally on macOS (Ubuntu CI previously
+recorded one). The Node test permits only zero or one attempts to `127.0.0.1:9`.
+All three browser runs assert zero external route requests and strict CSP on every
+response, including the DIVERGED cases. No external request received a response;
+the conditional ColBERT route exception was not needed.
+
+The new engine file runs seven tests per engine: five ordinary passes and two
+registered expected failures. The Chromium lane is headless and included in
+`pnpm check`; Firefox and WebKit are local macOS measurements, not CI jobs.
+The unchanged engine harness also passes: Chromium 11 tests, Firefox 22, WebKit 22.
+The new native pytest passes four tests and Node passes six.
+Real models are **UNMEASURED: no model access here**. Firefox/WebKit CI, other DSPy
+versions, offline MIPROv2/COPRO/GEPA output and the no-rebind
+`rt-opt-labeled-naive` golden remain UNMEASURED; those were outside this promotion.
+
+Reproduce from the repository root with current local wheels. Rebuild wheels
+only after changing shipped Python/Pyodide code. Allow each process at least
+900000 ms; allow `pnpm check` at least 1800000 ms.
+
+```sh
+pnpm check:python-wheels
+python/.venv/bin/python -I scripts/record-dspy-runtime-conformance.py --check
+python/.venv/bin/python -I scripts/record-dspy-retrieval-conformance.py --check
+python/.venv/bin/python -I scripts/record-dspy-conformance.py --check
+python/.venv/bin/python -I scripts/record-dspy-state-conformance.py --check
+node scripts/test-python.ts ../tests/conformance/cases-dspy
+pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 tests/conformance/dspy-golden.node.test.ts tests/conformance/dspy-runtime.node.test.ts tests/conformance/dspy-provider.node.test.ts
+GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts
+GALAXIE_BROWSER=firefox pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts
+GALAXIE_BROWSER=webkit pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts
+pnpm check:docs
+PATH="$HOME/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.3.darwin-arm64/bin:$PATH" GOTOOLCHAIN=local pnpm check
+```
+
 ## DSPy sync entry points and runtime optimizers spike
 
 The 2026-11-11 spike records sync entry points **refused**, model-calling runtime
@@ -1817,7 +1906,8 @@ compile and uses `acall`. The naive copy has no default LM and fails. The two-st
 program re-compiles on restore without changing the first request's digest, emits
 one `replayed` event before live work and dispatches only the second request.
 Author code must be deterministic apart from journaled calls. Runtime support is
-measured behavior under shipped code; promotion to golden cases is separate work.
+measured behavior under shipped code. On 2026-11-13, the two rebound cases gained
+[goldens and measured browser lanes](#dspy-golden-runtime-optimizer-and-retrieval-cases).
 
 | Evidence | Reused or new | Lanes and scope |
 | --- | --- | --- |
@@ -1832,10 +1922,10 @@ The [offline recipe](../../packages/adapter-pyodide/README.md#runtime-optimizers
 uses optimize, JSON save, ship, load and LM rebind. Verified offline producers
 remain LabeledFewShot, scripted-LM BootstrapFewShot, ReAct demos and an
 instructions-only stand-in. Offline MIPROv2/COPRO/GEPA output is **unmeasured**.
-Chromium, Firefox and WebKit runtime probes, real models, other DSPy versions,
+The other Chromium, Firefox and WebKit runtime probes, real models, other DSPy versions,
 KNNFewShot/Ensemble/SIMBA/BetterTogether/fine-tuning optimizers and optimizers
 given an in-Worker plain `dspy.LM` are **unmeasured**. No core contract change is
-needed; ADR-0012 controls, shipped source, goldens, matrices and locks are unchanged.
+needed; ADR-0012 controls, shipped source, existing goldens, matrices and locks are unchanged.
 
 Reproduce from the repository root (rebuild wheels before any Worker tests):
 
@@ -1977,13 +2067,15 @@ than vectors; no embedding role or vector capability is established here.
 | Host-bound retrieval and routed answer | RAG `test_dspy_agent.py`, `dspy-agent.node.test.ts`, `dspy-conformance.node.test.ts`, `dspy-gate.node.test.ts`; `test_dspy.py` capability tool | Native/Node regression rerun; previous Chromium RAG evidence only |
 | Offline state, descriptor binding, parallel and runtime | PRs #196, #213, #214, #215 | Existing native/Node suites rerun; only previously measured state/binding cases have Chromium evidence |
 
-New Chromium, Firefox and WebKit probes are **unmeasured**. Real models/services,
+On 2026-11-13, the two service-retriever probes and host-bound `docs.search@1`
+gained [goldens and measured browser outcomes](#dspy-golden-runtime-optimizer-and-retrieval-cases).
+Other new Chromium, Firefox and WebKit provider probes are **unmeasured**. Real models/services,
 other DSPy versions, `engine='litellm'`, `dspy.lm15.register_provider` declarations,
 Databricks/Weaviate retrievers, vector-returning host capabilities,
 undeclared-role refusal and multimodal inputs are unmeasured. No network access
 beyond rejected loopback attempts is needed. Existing Chromium evidence is reused
 only for the rows above; the full gate's browser regressions do not measure the
-new `pe-*` family.
+rest of the `pe-*` family.
 
 Reproduce from the repository root (wheel rebuild precedes Worker tests):
 
