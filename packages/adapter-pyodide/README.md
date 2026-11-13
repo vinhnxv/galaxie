@@ -798,7 +798,7 @@ DSPy outside every active run remains unchanged. Calls without an attributable
 run refuse while another run is active, without terminating that run.
 
 This guards the base LM entries; custom subclasses overriding both entries,
-network retrievers, arbitrary Python requests and author code importing `js`
+direct `forward` or `aforward` calls, direct `lm15` or `litellm` calls, network retrievers, arbitrary Python requests and author code importing `js`
 remain trusted code under [ADR-0018 decision 9](../../docs/adr/0018-python-agents-through-pyodide.md#decision).
 The syntax-only lint flags literals, not arbitrary runtime construction. Worker
 egress policy is not decided here; decision 9 is unchanged. Real services and

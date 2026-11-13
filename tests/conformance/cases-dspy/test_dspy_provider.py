@@ -165,10 +165,10 @@ def test_native_provider_probe(name):
         # Superseded by the provider-LM refusal; P2-P4 in provider-fixtures.json record the pre-refusal measurement.
         code = 'unsupported' if name in ('pe-lm-kwargs', 'pe-schema-response-format', 'pe-lm-runtime-set', 'pe-lm-runtime-context', 'pe-lm-runtime-nokey') else 'executor_error'
         assert result == {'ok': False, 'code': code}
-    # Superseded by the provider-LM refusal; P2-P4 in provider-fixtures.json record the pre-refusal measurement.
     if name == 'pe-retrieve-colbert':
         assert len(evidence['attempts']) >= 1
     else:
+        # Superseded by the provider-LM refusal; P2-P4 in provider-fixtures.json record the pre-refusal measurement.
         assert evidence['attempts'] == []
     print(json.dumps({'scenario': name, 'lane': 'native', 'requests': store.requests,
                       'capabilities': store.capability_requests, 'result': result, **evidence}, sort_keys=True))

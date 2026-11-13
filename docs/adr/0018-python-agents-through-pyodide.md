@@ -815,8 +815,9 @@ browsers with zero CSP violations and zero external routes; Node ColBERT records
 zero fetch attempts locally. Existing retrieval goldens remain byte-identical.
 
 This is accident-proofing under decision 9. Custom `BaseLM` subclasses overriding
-both entries, network retrievers, arbitrary requests and `import js` can bypass
-the guard. XMLHttpRequest and real models/services remain unmeasured. Use
+both entries, direct `forward` or `aforward` calls, direct `lm15` or `litellm`
+calls, network retrievers, arbitrary requests and `import js` can bypass the
+guard. XMLHttpRequest and real models/services remain unmeasured. Use
 host-bound `docs.search@1` for retrieval. Worker egress policy is not decided
 here; decision 9 and decision 11 text remain unchanged, as in the prior refusal
 follow-up. ADR-0012 and the core/bridge contracts are unchanged.
