@@ -456,11 +456,19 @@ def _messages(value: Request) -> list[dict[str, Any]]:
     return messages
 
 
-def _options(value: Request, native: bool) -> dict[str, Any]:
+def _options(value: Request, native: bool, schema_output: bool = False) -> dict[str, Any]:
     config = value.config
-    if any(getattr(config, field.name) is not None for field in fields(config) if field.name not in {'stop', 'tool_choice'}):
+    allowed = {'stop', 'tool_choice', 'response_format'} if schema_output else {'stop', 'tool_choice'}
+    if any(getattr(config, field.name) is not None for field in fields(config) if field.name not in allowed):
         raise GalaxieError('unsupported')
     options: dict[str, Any] = {}
+    if config.response_format is not None:
+        format_ = config.response_format
+        if (not isinstance(format_, dict) or format_.get('type') != 'json_schema'
+            or set(format_) - {'type', 'schema', 'name', 'strict'}
+            or not isinstance(format_.get('schema'), dict) or not format_['schema'] or value.tools):
+            raise GalaxieError('unsupported')
+        options['jsonSchema'] = _json(format_['schema'])
     if config.stop:
         options['stop'] = list(config.stop)
     if value.tools:
@@ -571,8 +579,8 @@ class _SyncEngine:
 
 
 class _AsyncEngine:
-    def __init__(self, role: str, native: bool) -> None:
-        self.role, self.native = role, native
+    def __init__(self, role: str, native: bool, schema_output: bool = False) -> None:
+        self.role, self.native, self.schema_output = role, native, schema_output
 
     async def complete(self, value: Request) -> Response:
         _refuse_foreign()
@@ -580,7 +588,7 @@ class _AsyncEngine:
         run = _run.get()
         entry = None
         try:
-            options = _options(value, self.native)
+            options = _options(value, self.native, self.schema_output)
             payload = {'role': self.role, 'messages': _messages(value), 'options': options}
             entry, replayed = run.begin('model', payload) if run is not None else ({}, False)
             if replayed:
@@ -610,7 +618,9 @@ class _AsyncEngine:
         entry = None
         task = None
         try:
-            options = _options(value, self.native)
+            options = _options(value, self.native, self.schema_output)
+            if 'jsonSchema' in options:
+                raise GalaxieError('unsupported')
             payload = {'role': self.role, 'messages': _messages(value), 'options': options}
             entry, replayed = run.begin('model', payload) if run is not None else ({}, False)
             if replayed:
@@ -685,11 +695,11 @@ class _AsyncEngine:
 class GalaxieLM(dspy.LM):
     """Use a routed JavaScript model role; DSPy never owns a connection."""
 
-    def __init__(self, role: str, native_tools: bool = False) -> None:
-        if not isinstance(role, str) or not role or type(native_tools) is not bool:
+    def __init__(self, role: str, native_tools: bool = False, schema_output: bool = False) -> None:
+        if not isinstance(role, str) or not role or type(native_tools) is not bool or type(schema_output) is not bool:
             raise GalaxieError('invalid')
-        self.role, self.native_tools = role, native_tools
-        super().__init__(role, engine=_SyncEngine(), async_engine=_AsyncEngine(role, native_tools), cache=False, num_retries=0, temperature=None, max_tokens=None)
+        self.role, self.native_tools, self.schema_output = role, native_tools, schema_output
+        super().__init__(role, engine=_SyncEngine(), async_engine=_AsyncEngine(role, native_tools, schema_output), cache=False, num_retries=0, temperature=None, max_tokens=None)
 
     @property
     def supports_function_calling(self) -> bool:
@@ -697,7 +707,7 @@ class GalaxieLM(dspy.LM):
 
     @property
     def supports_response_schema(self) -> bool:
-        return False
+        return self.schema_output
 
     @property
     def supports_reasoning(self) -> bool:
@@ -705,7 +715,7 @@ class GalaxieLM(dspy.LM):
 
     @property
     def supported_params(self) -> set[str]:
-        return {'stop', 'tool_choice'} if self.native_tools else {'stop'}
+        return ({'stop', 'tool_choice'} if self.native_tools else {'stop'}) | ({'response_format'} if self.schema_output else set())
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         _refuse_foreign()

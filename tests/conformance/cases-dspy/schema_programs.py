@@ -51,6 +51,11 @@ class Program(dspy.Module):
         self.predict.set_lm(lm)
 
     async def aforward(self, question):
+        if self.name == 'so-schema-tools-refused':
+            # ChatAdapter owns tool planning and drops arbitrary predictor tools;
+            # exercise an actual tools-bearing LM request instead.
+            await self.predict.lm.acall(messages=[{'role': 'user', 'content': question}], response_format=AnswerModel, tools=[TOOL])
+            return dspy.Prediction(answer='done')
         result = await self.predict.acall(question=question)
         if self.pause:
             request_interaction({'surfaceId': 'main', 'viewRevision': 'schema', 'component': 'test.Review/v1', 'props': {'answer': result.answer}})

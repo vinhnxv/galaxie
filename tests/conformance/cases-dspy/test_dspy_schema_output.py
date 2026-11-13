@@ -117,3 +117,35 @@ def test_local_schema_probe_reaches_forward_refusal_and_replay_gates(monkeypatch
         result = execute(store.boot_schema(lm=ProbeLM('answer'), pause=True, changed=changed), before)
         assert result == ({'ok': False, 'code': 'unrecoverable'} if changed else {'ok': True, 'output': {'answer': 'done'}})
         assert store.requests == 1
+
+
+@pytest.mark.parametrize('name,reply,code,count', [
+    ('so-json-adapter-schema', JSON_REPLY, None, 1),
+    ('so-explicit-response-format', CHAT_REPLY, None, 1),
+    ('so-typed-violation', '{"answer":"wrong"}', 'executor_error', 1),
+    ('so-mock-ignores-schema', 'plain prose', 'executor_error', 1),
+    ('so-json-object-refused', '{"answer":{}}', 'unsupported', 0),
+    ('so-schema-tools-refused', CHAT_REPLY, 'unsupported', 0),
+    ('so-stream-schema-refused', CHAT_REPLY, 'unsupported', 0),
+])
+def test_shipped_schema_gates(name, reply, code, count):
+    store = Store(reply)
+    result = execute(store.boot_schema(name))
+    assert result == ({'ok': False, 'code': code} if code else {'ok': True, 'output': {'answer': 'done'}})
+    assert store.requests == count and store.calls == []
+    if count:
+        twin, _ = asyncio.run(measure(name, reply))
+        assert store.payloads[0]['options'] == {'jsonSchema': twin['requests'][0]['jsonSchema']}
+        assert result.get('output') == twin['output']
+
+
+@pytest.mark.parametrize('changed', [False, True])
+def test_shipped_schema_restore_and_changed_signature(changed):
+    store = Store()
+    context = store.boot_schema(pause=True)
+    assert execute(context) == {'ok': True, 'interrupted': True}
+    before = pending(context)
+    assert before is not None
+    result = execute(store.boot_schema(pause=True, changed=changed), before)
+    assert result == ({'ok': False, 'code': 'unrecoverable'} if changed else {'ok': True, 'output': {'answer': 'done'}})
+    assert store.requests == 1
