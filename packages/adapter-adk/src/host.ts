@@ -10,6 +10,8 @@ import {
 import {
   type BaseAgent,
   type BaseLlm,
+  type BaseTool,
+  BaseToolset,
   FunctionTool,
   LongRunningFunctionTool,
   requestInputTool,
@@ -68,6 +70,61 @@ export type AdkAgent = (host: AdkHost) => BaseAgent | AdkEntry;
 export interface HostRegistry {
   readonly models: WeakSet<object>;
   readonly tools: WeakSet<object>;
+  readonly toolsets?: WeakSet<object>;
+}
+
+const hosts = new WeakMap<AdkHost, HostRegistry>();
+
+class FixedToolset extends BaseToolset {
+  readonly members: readonly BaseTool[];
+
+  constructor(members: BaseTool[]) {
+    super([]);
+    Object.freeze(this.toolFilter);
+    this.members = Object.freeze(members);
+    Object.freeze(this);
+  }
+
+  override async getTools(): Promise<BaseTool[]> {
+    return [...this.members];
+  }
+
+  override async close(): Promise<void> {}
+}
+
+/** Reads a host-owned inventory without expanding an author toolset. */
+export function fixedToolsetMembers(
+  value: object,
+  registry: HostRegistry,
+): readonly BaseTool[] | undefined {
+  return registry.toolsets?.has(value) === true ? (value as FixedToolset).members : undefined;
+}
+
+/** Groups this host's capability tools into one fixed, ordered ADK inventory. */
+export function adkToolset(host: AdkHost, tools: readonly BaseTool[]): BaseToolset {
+  const registry = hosts.get(host);
+  if (registry === undefined || !Array.isArray(tools)) throw failure('invalid');
+  if (tools.length === 0) throw failure('unsupported');
+  const members: BaseTool[] = [];
+  const names = new Set<string>();
+  for (let index = 0; index < tools.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(tools, index);
+    const tool: unknown =
+      descriptor !== undefined && 'value' in descriptor ? descriptor.value : undefined;
+    if (
+      typeof tool !== 'object' ||
+      tool === null ||
+      !registry.tools.has(tool) ||
+      tool === requestInputTool ||
+      names.has((tool as BaseTool).name)
+    )
+      throw failure('unsupported');
+    names.add((tool as BaseTool).name);
+    members.push(tool as BaseTool);
+  }
+  const toolset = new FixedToolset(members);
+  registry.toolsets?.add(toolset);
+  return toolset;
 }
 
 const TOOL_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
@@ -123,7 +180,11 @@ export function createHost(
     if (provider === undefined || (typeof provider === 'function') !== descriptor.credential)
       throw new GalaxieError('invalid', 'The routed model implementations must be valid.');
   }
-  const registry: HostRegistry = { models: new WeakSet(), tools: new WeakSet() };
+  const registry: HostRegistry = {
+    models: new WeakSet(),
+    tools: new WeakSet(),
+    toolsets: new WeakSet(),
+  };
   const routed = new Map<string, GalaxieLlm>();
   for (const role of models?.roles ?? []) {
     const llm = new GalaxieLlm({
@@ -223,5 +284,6 @@ export function createHost(
       },
     },
   };
+  hosts.set(host, registry);
   return { host, registry };
 }

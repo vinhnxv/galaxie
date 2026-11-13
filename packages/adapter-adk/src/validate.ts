@@ -4,6 +4,7 @@
 import { LlmAgent, LoopAgent, ParallelAgent, SequentialAgent } from '@google/adk';
 import { failure } from './errors.js';
 import type { HostRegistry } from './host.js';
+import { fixedToolsetMembers } from './host.js';
 
 const MAX_DEPTH = 16;
 const MAX_AGENTS = 256;
@@ -23,7 +24,7 @@ function object(value: unknown): value is Record<string, unknown> {
 /**
  * Fails closed unless every agent, model and tool in the tree is one the adapter can govern
  * (KTD5). A string or foreign model, a built-in or author-built tool, a remote or custom agent,
- * a toolset, a planner and a code executor fail `unsupported`.
+ * an unregistered toolset, a planner and a code executor fail `unsupported`.
  */
 type ProcessorField = 'contextCompactors' | 'requestProcessors' | 'responseProcessors';
 
@@ -73,8 +74,19 @@ export function validateAgentTree(root: unknown, registry: HostRegistry): void {
         throw failure('unsupported');
       if (!defaultsOnly(agent, 'responseProcessors')) throw failure('unsupported');
       if (!Array.isArray(agent.tools)) throw failure('invalid');
-      for (const tool of agent.tools)
-        if (!object(tool) || !registry.tools.has(tool)) throw failure('unsupported');
+      const names = new Set<string>();
+      const grouped = agent.tools.some((tool) => object(tool) && registry.toolsets?.has(tool));
+      for (const tool of agent.tools) {
+        if (!object(tool)) throw failure('unsupported');
+        const members = fixedToolsetMembers(tool, registry);
+        if (members === undefined && !registry.tools.has(tool)) throw failure('unsupported');
+        for (const member of members ?? [tool]) {
+          if (!registry.tools.has(member)) throw failure('unsupported');
+          const name = member.name as string;
+          if (grouped && names.has(name)) throw failure('unsupported');
+          names.add(name);
+        }
+      }
     }
     if (!Array.isArray(agent['subAgents'])) throw failure('invalid');
     path.add(agent);

@@ -3,6 +3,7 @@
 
 export { createAdkAdapter } from './adapter.js';
 export type { AdkAgent, AdkHost, AdkServices, CapabilityToolSpec } from './host.js';
+export { adkToolset } from './host.js';
 export type {
   AdkDecision,
   AdkEntry,
