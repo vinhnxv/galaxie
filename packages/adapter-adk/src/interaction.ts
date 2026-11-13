@@ -38,6 +38,8 @@ export type AdkDecision =
 
 export interface AdkEntryOptions {
   readonly agent: BaseAgent;
+  /** Interpret exact model strings as declared host roles in a host-owned agent tree. */
+  readonly roleStrings?: true;
   /**
    * Builds the four-field display request (surface, view revision, component, props) for the
    * pending calls. Without it a run that pauses fails `unsupported`.
@@ -66,7 +68,8 @@ export function defineAdkEntry(options: AdkEntryOptions): AdkEntry {
     typeof options.agent !== 'object' ||
     options.agent === null ||
     (options.interaction !== undefined && typeof options.interaction !== 'function') ||
-    (options.resume !== undefined && typeof options.resume !== 'function')
+    (options.resume !== undefined && typeof options.resume !== 'function') ||
+    (options.roleStrings !== undefined && options.roleStrings !== true)
   )
     throw failure('invalid');
   const entry: AdkEntry = Object.freeze({ ...options });
