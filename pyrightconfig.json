@@ -76,6 +76,14 @@
     {
       "root": "scripts/record-adk-python-conformance.py",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-adk-python"]
+    },
+    {
+      "root": "scripts/record-dspy-runtime-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
+    },
+    {
+      "root": "scripts/record-dspy-retrieval-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
     }
   ]
 }

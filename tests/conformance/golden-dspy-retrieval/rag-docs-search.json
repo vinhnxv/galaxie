@@ -1,0 +1,44 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "Your input fields are:\n1. `question` (str): \n2. `passages` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## passages ## ]]\n{passages}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `passages`, produce the fields `answer`."
+        },
+        {
+          "role": "user",
+          "content": "[[ ## question ## ]]\nWhere do agent pipelines run?\n\n[[ ## passages ## ]]\n[{\"id\": \"overview\", \"title\": \"Browser agents\", \"text\": \"Agent pipelines run in the browser on the user's own machine.\"}]\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`."
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "content": "[[ ## answer ## ]]\nIn the browser on the user's own machine. [1]\n[[ ## completed ## ]]",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "docs.search@1",
+      "input": {
+        "query": "Where do agent pipelines run?",
+        "mode": "fulltext",
+        "k": 10
+      }
+    }
+  ],
+  "interactions": [],
+  "output": {
+    "answer": "In the browser on the user's own machine. [1]",
+    "passages": [
+      {
+        "id": "overview",
+        "title": "Browser agents",
+        "text": "Agent pipelines run in the browser on the user's own machine."
+      }
+    ]
+  },
+  "error": null
+}

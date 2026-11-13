@@ -1,0 +1,11 @@
+{
+  "requests": [],
+  "responses": [],
+  "capabilities": [],
+  "interactions": [],
+  "output": null,
+  "error": {
+    "code": "executor_error",
+    "message": "The executor or agent code failed."
+  }
+}
