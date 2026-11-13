@@ -189,6 +189,10 @@ receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `fal
   a formerly admitted author into a refused position cannot republish its interaction.
 - `AgentTool` and `Workflow` fail `unsupported` at prepare. Re-admitting `AgentTool` needs an
   adapter-owned wrapper with its own run config, integrity plugin and session keying.
+  The [read-only admission rerun](../../docs/adr/0020-google-adk-through-an-adapter.md#read-only-admission-rerun-2026-11-13)
+  measured both admission variants on Node and Chromium and recorded **REFUSED**:
+  run-port admission passed, but copied temporary input state differed from native ADK.
+  No wrapper ships.
 
 ### Porting models and static toolsets
 
