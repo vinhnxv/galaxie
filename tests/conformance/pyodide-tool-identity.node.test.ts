@@ -259,7 +259,10 @@ function requests(f: Awaited<ReturnType<typeof fixture>>, op: string): unknown[]
     .filter((message) => message.kind === 'request' && message.op === op);
 }
 
-function nativeReference(parallel: boolean): {
+function nativeReference(
+  parallel: boolean,
+  mixed = false,
+): {
   final: string;
   messages: unknown[];
   calls: unknown[];
@@ -275,7 +278,7 @@ function nativeReference(parallel: boolean): {
         `import asyncio,json,sys
 sys.path.insert(0,'tests/conformance/cases-python')
 from tool_identity_reference import record
-print(json.dumps(asyncio.run(record(parallel=${parallel ? 'True' : 'False'}))))`,
+print(json.dumps(asyncio.run(record(parallel=${parallel ? 'True' : 'False'},mixed=${mixed ? 'True' : 'False'}))))`,
       ],
       {
         cwd: fileURLToPath(new URL('../../', import.meta.url)),
@@ -565,6 +568,7 @@ test.skipIf(!pythonWheelsAvailable).each([undefined, 'auto', 'none', 'required',
 test.skipIf(!pythonWheelsAvailable).each([false, true])(
   'G5.3/G5.4: byte restore and receipts (node replay=%s)',
   async (replay) => {
+    const reference = nativeReference(true, true);
     const f = await fixture();
     const store = { checkpoints: new MemoryByteCheckpoints(), recovery: new MemoryRecoveryStore() };
     const first = await runtimeInstance(f, { store });
@@ -605,9 +609,15 @@ test.skipIf(!pythonWheelsAvailable).each([false, true])(
           payload: false,
         }),
       ).toMatchObject({ status: 'accepted' });
-      expect(output(await collect(second.instance.events(restored.runId)))).toMatchObject({
-        final: 'done',
+      const actual = output(await collect(second.instance.events(restored.runId))) as {
+        final: string;
+        messages: unknown[];
+      };
+      expect({ final: actual.final, messages: actual.messages }).toEqual({
+        final: reference.final,
+        messages: reference.messages,
       });
+      if (!replay) expect([...first.calls, ...second.calls]).toEqual(reference.calls);
       expect(second.counts().writes).toBe(0);
       if (!replay) expect(second.counts().attempts).toBe(0);
       // Reads dispatch again and receive fresh IDs; only writes have receipts.

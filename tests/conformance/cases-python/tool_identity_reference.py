@@ -14,7 +14,7 @@ from langgraph.prebuilt import ToolNode
 from test_tool_call_replies_native import ToolReplyModel, projection
 
 
-async def record(parallel=False, write_only=False):
+async def record(parallel=False, write_only=False, mixed=False):
     broker = []
 
     async def read(value: int, config: RunnableConfig):
@@ -30,11 +30,12 @@ async def record(parallel=False, write_only=False):
     calls = [{'id': 'call-1', 'name': 'write' if write_only else 'read',
               'args': {'value': 4 if write_only else 2}}]
     if parallel:
-        calls.append({'id': 'call-2', 'name': 'read', 'args': {'value': 4}})
+        calls.append({'id': 'call-2', 'name': 'write' if mixed else 'read', 'args': {'value': 4}})
     model = ToolReplyModel(calls=calls)
 
     async def choose(state, config: RunnableConfig):
-        history = [HumanMessage('parallel' if parallel else 'write' if write_only else 'read', id='human')]
+        scenario = 'parallel-write' if mixed else 'parallel' if parallel else 'write' if write_only else 'read'
+        history = [HumanMessage(scenario, id='human')]
         reply = await model.ainvoke(history, config)
         reply.id = 'calls'
         return {'messages': [*history, reply]}
