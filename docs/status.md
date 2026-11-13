@@ -1,5 +1,17 @@
 # Project status
 
+On 2026-11-13, local scripted DSPy engine measurements add WebKit binding and
+legacy re-pause evidence, Chromium legacy re-pause evidence, thread-pool probes
+on all three engines and Firefox/WebKit live fan-out goldens. WebKit reload
+passes; nine Firefox reload scenarios diverge only at unchanged CSP-header
+equality assertions after Playwright exposes cached HTTP 304 responses without
+that header. They remain recorded findings. Native and Node tests pin absolute
+effect scopes and journal order; native tests pin the first recorded terminal
+failure code. An offline DSPy 3.2.1 overlay imports but cannot collect the native
+suites because `dspy.lm15` is absent. Real models remain unmeasured: no model
+access in this environment. This changes tests and docs only. See the
+[per-engine measurements and limits](../tests/conformance/README.md#dspy-engine-measurements).
+
 On 2026-11-13, the [ADK request-input guide](guides/adk-request-input.md) and
 [models-and-tools guide](guides/adk-models-and-tools.md) add test-checked author
 examples without runtime changes. A Node equality test ties every executable
@@ -41,9 +53,12 @@ cover real/inlined thread hops, frozen legacy bytes and the actual old reader.
 Three new live goldens match on Node and headless Chromium; a fresh Chromium page
 and Worker reopen IndexedDB and replay the joined group without redispatch.
 Thread-pool fan-out, branch pauses, nested groups and streaming remain refused.
-Code outside journaled calls must be deterministic. Chromium divergence reload,
-Firefox, WebKit, real models, other DSPy versions and ReAct branches remain
-unmeasured. Existing goldens, fixture/matrix entries and locks are unchanged.
+Code outside journaled calls must be deterministic. Later local
+[engine measurements](../tests/conformance/README.md#dspy-engine-measurements)
+add Firefox/WebKit live evidence, WebKit reload and a Firefox reload finding.
+Chromium divergence reload, real models and ReAct branches remain unmeasured;
+the other-version attempt could not collect tests. Existing goldens,
+fixture/matrix entries and locks are unchanged.
 See the [shipped helper evidence and limits](../tests/conformance/README.md#shipped-async-branch-helper).
 
 On 2026-11-13, the DSPy async branch-helper shipping attempt records **refused**.
@@ -115,8 +130,11 @@ On 2026-11-12, DSPy thread-pool fan-out gained fixed `unsupported` refusal in
 native CPython and Node Pyodide. `Parallel` and `Evaluate`, including their default
 thread count, end without model or capability requests; author catches cannot
 turn an attributed LM refusal into a successful fallback. Supported programs keep
-their snapshot bytes, replay and outputs. Chromium, Firefox, WebKit, real models
-and other DSPy versions remain unmeasured. Raw author-created threads remain
+their snapshot bytes, replay and outputs. The six browser probes now pass in
+Chromium, Firefox and WebKit in the local
+[engine measurements](../tests/conformance/README.md#dspy-engine-measurements).
+Real models remain unmeasured; the other-version attempt could not collect tests.
+Raw author-created threads remain
 unattributed natively; a caught thread-start error is invisible to the executor.
 The later async-helper shipping attempt is refused as recorded above. See the
 [refusal evidence and limits](../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
@@ -147,10 +165,12 @@ its outcomes. Old library code refuses bound records until newer code returns.
 The author fingerprint recipe covers Python sources and other files outside JSON.
 This is a consistency check against accidental swaps, not integrity protection;
 metadata is unauthenticated. Scripted native CPython, Node Pyodide and Chromium
-IndexedDB reload tests cover the binding. Native CPython also measures an unbound
-session gaining a binding at its next pause. Firefox, WebKit, real models, other
-DSPy versions, concurrent tabs, forged metadata, large many-file descriptors and
-legacy sessions that pause again outside native CPython remain unmeasured. See
+IndexedDB reload tests cover the binding. Later local
+[engine measurements](../tests/conformance/README.md#dspy-engine-measurements)
+add WebKit binding and legacy re-pause on Node, Chromium and WebKit; Firefox
+reload assertions diverge on reported CSP headers. Real models, concurrent tabs,
+forged metadata and large many-file descriptors remain unmeasured; the
+other-version attempt could not collect tests. See
 [shipped evidence and the spike record](../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
 
 Earlier on 2026-11-11, the automatic-binding spike recorded **supported** (design

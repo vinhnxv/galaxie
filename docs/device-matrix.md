@@ -40,6 +40,14 @@ The [hosted RAG demo](../examples/rag-browser/README.md#hosted-demo-build) is a 
 
 ## Mock-model runs on Firefox and WebKit
 
+The later [DSPy engine measurements](../tests/conformance/README.md#dspy-engine-measurements)
+(2026-11-13) run selected Pyodide paths locally on arm64 macOS 27.2: all WebKit
+rows pass, Firefox live fan-out and thread-pool rows pass, and nine Firefox reload
+rows diverge on unchanged CSP-header equality assertions for reported cached
+HTTP 304 responses. Those measurements are separate from the Linux CI job below;
+the remaining Pyodide and Go WebAssembly paths still have no engine evidence from
+that job.
+
 The `test-browser-engines` CI job runs the Vitest browser project on Playwright 1.64.1 Firefox and WebKit builds on `ubuntu-24.04`. It runs the `general` group: every browser case except the Pyodide and Go WebAssembly groups, so those Worker and WebAssembly paths have no Firefox or WebKit evidence yet. The cases use scripted models, a fake `LanguageModel` and loopback fixtures, with no GPU and no model weights. Chromium in `test-general` stays the engine that gates a change; the engine job fails only on a case that is not in [the known-failure list](../tests/browser-engines-known-failures.json). No CSP or Trusted Types setting is relaxed for these runs.
 
 This is mock-model evidence from Playwright's builds, not device evidence. Playwright's WebKit is not Safari, and its Firefox is not a release build. Each run reports every case in the CI log, and no case of the group is a known failure now.
