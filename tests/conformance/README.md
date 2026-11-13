@@ -1910,3 +1910,78 @@ pnpm run test:python ../tests/conformance/cases-python/test_tool_call_replies_al
 pnpm exec vitest run --project node tests/conformance/pyodide-tool-calls.node.test.ts --testTimeout 900000
 python/.venv/bin/python -I scripts/record-python-conformance.py --check
 ```
+
+### Execution identity rerun
+
+The [registered execution-identity rule and complete gate table](../../docs/adr/0018-python-agents-through-pyodide.md#execution-identity-rerun-2026-11-13)
+record **REFUSED** for the LangGraph Python helper. A driver-installed test-local
+`ContextVar` scope reaches model nodes, parallel tools, subgraphs and author
+tasks. The first fixed failure survives both tool handlers and silent graph
+completion; later helper/model calls stop before transport. Cleanup and fresh
+executions, including two real-core sessions on one test-owned prepared Worker,
+pass. No production source or helper surface changes.
+
+Two replay requirements fail. Replayed reads retain their effect scope but get
+fresh effect IDs. Two parallel confirmed writes do retain distinct succeeded
+receipts across a recorded pause and fresh-Worker replay. However, abrupt Worker
+loss after a write and before its `ToolMessage` checkpoint leaves no pending run
+for public core restore; an adopted session cannot start a saved-step retry.
+This failing write-recovery gate requires an excluded core contract change and
+selects refusal. The characterization test passes by asserting that measured
+failure; it is not a passing recovery gate.
+
+The post-latch observation also matters: an already parked sibling confirmation
+can still invoke one host write if approved after the latch. At least one further
+checkpoint row commits, and failed tool history later ends `unsupported` without
+provider dispatch. The native observation records three post-latch saver calls,
+one in-flight sibling completion and zero extra requests on failed-history retry.
+A Python checkpointer guard does not cancel a JavaScript-owned confirmation.
+
+Evidence files are additive:
+
+- [`test_tool_identity_native.py`](cases-python/test_tool_identity_native.py)
+  measures identity propagation without depending on the helper candidate.
+- [`tool_scope.py`](cases-python/tool_scope.py),
+  [`tool_scoped_candidate.py`](cases-python/tool_scoped_candidate.py) and
+  [`tool_scoped_floor.py`](cases-python/tool_scoped_floor.py) are the unshipped
+  scope, helper extension and graph wrapper. The closed scope uses identity zero
+  so it retains only `id` and one fixed failure code.
+- [`test_langchain_tool_identity.py`](../../python/galaxie/tests/test_langchain_tool_identity.py)
+  and [`test_langchain_tool_identity_gates.py`](../../python/galaxie/tests/test_langchain_tool_identity_gates.py)
+  cover the end rule, six terminal codes, both handlers, later-model/later-helper
+  and silent-end shapes, budgets, refusals and bounded hostile-input handling.
+- [`pyodide-tool-identity.node.test.ts`](pyodide-tool-identity.node.test.ts)
+  exercises real core and the unchanged Worker. Its native parity reference is
+  [`tool_identity_reference.py`](cases-python/tool_identity_reference.py);
+  [`tool_identity_probes.py`](cases-python/tool_identity_probes.py) supplies
+  Worker context/refusal probes. Malformed model replies are injected at the
+  adapter-to-Worker response boundary. The ADR identifies natural versus injected
+  failure codes and each gate's applicability.
+
+All required native and Node gates were measured, including G5.1/G5.2 failures.
+The four native text-protocol comparisons and all 12 existing Node spike tests
+remain unchanged and pass. The replacement stays authoritative for its measured
+paused recovery shapes; it does not claim arbitrary in-flight crash recovery.
+Trusted author Python and direct `capabilities.call` remain outside the guard;
+the Worker is not an isolation boundary. In-flight siblings and checkpoint writes
+can outlive a latch. Start a new session after failed tool history. Streamed
+tool-call deltas remain refused; the checked text-stream recipe still applies.
+
+Measurements use LangGraph 1.2.16, langgraph-prebuilt 1.1.1, langchain-core 1.7.0,
+CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7, with scripted models only.
+New Chromium identity/reload, Firefox, WebKit, real models, other versions and
+other executors are unmeasured. Existing adapter tests also pass on Chromium;
+those tests do not establish Chromium execution-identity behavior. No wheel
+rebuild was needed because production Python and Worker sources are unchanged.
+All existing goldens, matrices, fixtures, case lists, recorders and locks are
+byte-identical.
+
+```sh
+pnpm run test:python ../tests/conformance/cases-python/test_tool_identity_native.py
+pnpm run test:python galaxie/tests/test_langchain_tool_identity.py galaxie/tests/test_langchain_tool_identity_gates.py
+pnpm run test:python ../tests/conformance/cases-python/test_tool_call_replies_native.py galaxie/tests/test_langchain_tool_calls.py galaxie/tests/test_langchain.py galaxie/tests/test_bridge.py galaxie/tests/test_checkpointer.py
+pnpm run test:python ../tests/conformance/cases-python/test_tool_call_replies_alternative.py
+pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 tests/conformance/pyodide-tool-identity.node.test.ts tests/conformance/pyodide-tool-calls.node.test.ts
+# From python/; this is the recorder for the affected LangGraph Python family.
+.venv/bin/python -I ../scripts/record-python-conformance.py --check
+```

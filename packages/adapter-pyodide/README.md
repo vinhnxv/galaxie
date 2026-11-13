@@ -87,10 +87,12 @@ static breakpoints and reusing an answered interaction fail `unsupported`.
 
 The November 2026 spike records **alternative** for binding/replies, streamed
 replies, confirmed writes, the safety floor and durable replay. It ships no
-`galaxie.langchain.capability_tool` or `bind_tools` implementation. A test-local
-candidate could not preserve terminal broker failures across explicit `ToolNode`
-error handlers: task namespaces differ between tools and models, while `thread_id`
-repeats across runs. A thread-keyed latch would affect later runs. The unchanged
+`galaxie.langchain.capability_tool` or `bind_tools` implementation. The
+[execution-identity rerun](../../docs/adr/0018-python-agents-through-pyodide.md#execution-identity-rerun-2026-11-13)
+records **refused**: a test-local driver scope preserves swallowed terminal codes,
+but read effect IDs change on replay and abrupt loss before a tool checkpoint has
+no public saved-step retry path. An already parked sibling confirmation can still
+invoke its host write after a failure latch. The unchanged
 proxy refuses tool history as `unsupported` and reply tool parts as `invalid`;
 inherited `bind_tools` raises `NotImplementedError` in CPython. The Worker maps an
 uncaught bind failure at boot to `unavailable`, or during a run to `executor_error`.

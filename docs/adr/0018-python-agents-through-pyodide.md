@@ -31,7 +31,7 @@
   2026-11-13: accepted the existing DSPy runtime divergence poison checkpoint and revised the gate for a separately scoped helper retry, with sequential and branch persistence pins; status stays Proposed.
 
   2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement; subsequent evidence records five text-protocol alternatives and neighbouring-shape refusal, with no production source shipped.
-  2026-11-13: registered the LangGraph Python execution-identity rerun rule and predictions before measurement.
+  2026-11-13: registered the LangGraph Python execution-identity rerun before measurement, then recorded refusal after read-identity and abrupt-recovery failures; no production helper shipped.
 
 ## Context
 
@@ -996,3 +996,91 @@ remain unmeasured. Author Python is trusted and can import `js`; the Worker is n
 an isolation boundary. A retained helper must document direct-call exclusions,
 in-flight siblings, post-failure checkpoint rows, starting a new session after a
 failed run, and streaming refusal. ADR-0012 controls remain in JavaScript.
+
+##### Measured outcome
+
+**REFUSED**, under outcome row 2. Execution identity works, but it does not supply
+the required replay contract. Replayed reads receive fresh broker effect IDs
+(G5.1 FAIL). More decisively, abrupt Worker loss after a succeeded write receipt
+and before its `ToolMessage` checkpoint leaves no pending interaction for core
+to restore. `restore()` returns no run; `start(null)` on the adopted session is
+refused `invalid` (G5.2 FAIL). A general saved-step retry would require changing
+core's adopted-session contract, an excluded change. No production scope, helper,
+Worker edit, wheel rebuild, new golden or matrix entry ships. The text-protocol
+recipe remains the supported replacement for its measured, explicitly paused
+recovery shapes; it does not establish arbitrary in-flight crash recovery.
+
+The rule is in `930a9b1`, native premises in `8408d1c`, the test-local scope/helper
+in `767c71b`, native gates in `551790f`, and Worker gates and the candidate decision
+in `e8d7538`; `f1ed9a0` adds full native message-state comparison after restore.
+The candidate remains in measurement files only. All applicable
+native and Node gates were reached; none was skipped. NA means that the registered
+applicability excludes that lane. New Chromium execution-identity/reload probes,
+Firefox, WebKit, real models, other versions and other executors remain unmeasured.
+
+| Gate | L1 native CPython | L2 Node Pyodide/core |
+| --- | --- | --- |
+| N1 | PASS: 78 unchanged premise tests, including the nine native tests. | NA: native-only premise. |
+| N3 | PASS: four probes cover copied contexts, shared mutation, subgraphs, gather, cleanup/early close and distinct executions. | PASS: model, parallel tools, subgraph and gather share identity; mutation, early close and unscoped refusal pass. |
+| G1.1 | PASS: declarations, all choices, IDs, arguments and history. | PASS: the same five choices and ordered wire values. |
+| G1.2 | NA: needs core routing. | PASS: missing tool-calling feature ends `unavailable`, missing `bindTools` ends `unsupported`, both with zero provider calls. |
+| G1.3 | NA: supplies the native reference instead. | PASS: read and parallel-read final text, explicit graph message IDs, call IDs, arguments, ordered host calls and counters match the live CPython reference. |
+| G1.4 | PASS: all five malformed reply shapes fail `invalid` before capabilities. | PASS: malformed replies injected at the adapter-to-Worker response boundary fail `invalid` before capabilities. |
+| G1.5 | PASS: tool-less behavior and unbound-history refusal; unchanged text proxy tests and recorder pass. | PASS: text and checked text-stream calls; unbound tool history is `unsupported`; unchanged adapter/Python suites pass. |
+| G3.1 | NA: needs host confirmation. | PASS: frozen arguments, no pre-approval write, one approved write. |
+| G3.2 | NA: needs host confirmation. | PASS: fixed denial text, completed model loop and zero declined writes. |
+| G3.3 | NA: needs real bindings. | PASS: missing confirmation/coverage and undeclared binding end `invalid`, zero writes. |
+| G3.4 difference | PASS: dict-schema arguments reach transport, then fail `invalid`. Observation only. | PASS: broker rejects invalid arguments with no host invocation. Observation only. |
+| G3.5 | NA: needs host confirmation. | PASS: cancellation during confirmation settles `cancelled`, clears confirmations and writes nothing. |
+| G4.1 | PASS: swallowed model denial still ends the run before capabilities. | PASS: blocked output ends `denied`, with no capability dispatch. |
+| G4.2 | PASS: default handler propagates the budget failure. | PASS: natural tool budget exhaustion stops before dispatch under the default handler. |
+| G4.3 | PASS: recursion exception and four bounded model/capability operations. | PASS: recursion maps to `budget_exceeded`, with bounded host/model counts. |
+| G4.4 | PASS: refused post-result model request ends `denied`. | PASS: private-user result prevents the next host-server provider dispatch; provider count stays one. |
+| G4.5 | PASS: six codes, two handlers, later-model, silent-end and later-helper shapes retain the exact code. | PASS for those shapes: six codes under both handlers; no later helper/write/model request. Budget, timeout and cancellation also run through natural core paths. Already-started sibling limit below. |
+| G4.6 | PASS: same prepared graph, same and another session recover with no stale latch. | PASS: same Worker after injected failures; a test-owned shared prepared adapter also runs two distinct real-core sessions sequentially on one Worker. Natural budget/cancellation can dispose the Worker as before. |
+| G4.7 observation | Three saver calls after the latch; one already-started sibling completes; failed-history retry adds zero bridge requests and ends `unsupported`. | At least one additional checkpoint row commits after the latch. Two capability requests were already started; approving the parked sibling afterwards invokes one host write. Run still ends `unavailable`; failed-history retry ends `unsupported` without another provider call. |
+| G4.8 | PASS: exactly `id`/`failure`, unknown/hostile errors normalize, no marker or post-latch request. | PASS: hostile arguments yield a fixed code; scope fields stay bounded, one rejected capability request and zero later model/capability requests. |
+| G5.1 | NA: needs broker receipts. | FAIL for replayed reads: same effect scope, fresh effect ID. Two parallel confirmed writes separately pass distinct-receipt, stable-journal and no-redispatch checks. |
+| G5.2 | NA: needs real Worker loss and recovery. | FAIL: receipt persists across abrupt loss, but public restore publishes no run and adopted-session start is refused. Zero second host writes does not constitute successful recovery. |
+| G5.3 | NA: needs Worker restore. | PASS: completed-node pause restores on a fresh Worker with no repeated tool node and full message-state/native parity; paused-node replay retains the write receipt. |
+| G5.4 | NA: needs byte bridge. | PASS: message state restores through bytes; an oversized result is `unsupported` with no partial oversized checkpoint. A finite 4 MiB payload budget lets this probe reach the 1 MiB bridge bound. |
+| G6.1 | PASS: binding, name, schema and function-output refusals before transport. | PASS: the refusal matrix plus fixed streaming refusal, with zero requests. |
+| G6.2 | PASS: unsupported message shapes and orphan IDs before transport. | PASS: the same history refusal matrix, fixed content-free errors. |
+| AL | PASS: four unchanged text-protocol comparisons. | PASS: all 12 unchanged tool-spike/replacement tests. |
+
+The six-code Worker matrix uses host-thrown codes for `unavailable`, `cancelled`,
+`timeout`, `outcome_unknown` and `unrecoverable`; core normalizes a host-thrown
+`budget_exceeded` to `unavailable`, so the budget probe exhausts the real tool-call
+budget instead. Separate timeout and abort probes exercise natural cancellation
+under both handlers and both graph endings. Explicit model/graph IDs in the parity
+fixture avoid comparing framework-generated random message IDs. Malformed reply
+injection is identified above; it does not claim a real provider emits those shapes.
+
+The parked-confirmation observation disproves the predicted absence of post-latch
+host writes: the capability request began before the latch, and JavaScript still
+owns its approval. A Python checkpointer guard cannot cancel that already-dispatched
+confirmation. No guard is added on this record-only branch. This is a limit of the
+candidate, not permission to weaken confirmations, budgets or recovery fencing.
+
+| Prediction | Result |
+| --- | --- |
+| P1 visibility | Held in both lanes; the config-carried fallback was unnecessary. |
+| P2 original failure code | Held for all registered sequential swallow/end shapes, including no later proxy request. |
+| P3 fresh execution | Held; scope state does not contaminate later executions or sessions. |
+| P4 checkpoint/write limit | Did not hold: checkpoint writes and failed-history refusal occur, but a previously parked sibling can begin host invocation after approval following the latch. |
+| P5 parallel effect identity | Did not hold for reads: IDs regenerate on replay. Parallel write receipts are stable in the measured pause/replay shape. |
+| P6 routing | Held: zero dispatch without the feature; missing binding method is `unsupported`. |
+| P7 dict schema | Held: broker validation ends `invalid`. |
+| P8 supported overall | Did not hold: G5.1/G5.2 fail; the excluded core change selects REFUSED. |
+
+The scope uses zero as a closed identity, preserving exactly two fields rather
+than retaining a third `closed` field. Its mutable object propagates across copied
+contexts; child tasks that outlive cleanup fail closed. A latch is enforced before
+helper/model requests and when the wrapper ends. Direct author `capabilities.call`
+stays outside the guard. Trusted author Python can import `js`; this is not an
+isolation boundary. In-flight siblings and checkpoint writes remain observable.
+Start a new session after failed tool history; streaming tool deltas stay refused.
+The shipped text proxy and all its refusal behavior remain unchanged. The only
+package-file changes are documentation; core, bridge shapes, policy, stored
+formats, existing goldens, matrices, case lists, recorders and locks are unchanged.
+This ADR remains Proposed.

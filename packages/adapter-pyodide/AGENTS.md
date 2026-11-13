@@ -45,8 +45,11 @@ streaming from Python `ainvoke`. Growing text and final text are checked in Java
 before forwarding; earlier allowed deltas cannot be retracted after a block.
 The LangGraph proxy supports asynchronous text-only model calls and streaming;
 model-chosen calls use the measured [text-protocol replacement](README.md#langgraph-python-model-chosen-calls-through-text).
-Native tool binding remains unimplemented after the swallowed-failure floor failed;
-do not promote the test-local candidate. Other Python faces support routed
+Native tool binding remains unimplemented. The execution-identity rerun preserves
+swallowed codes test-locally but refuses promotion after read-identity and abrupt
+recovery failures; a parked sibling confirmation also survives the latch. Keep
+the candidate test-only; see the [decision and limits](../../docs/adr/0018-python-agents-through-pyodide.md#execution-identity-rerun-2026-11-13).
+Other Python faces support routed
 schema-constrained replies. A bridge `repairAttempt` must be a positive safe integer beside
 `jsonSchema`; forward it to `ModelPort.begin` so native-output retries consume the
 host's route and run repair limits. Python code
