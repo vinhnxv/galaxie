@@ -3,7 +3,7 @@
 
 """Shared scripted schema-output programs, with an explicitly supplied LM."""
 
-from typing import Literal
+from typing import Any, Literal
 
 import dspy
 from galaxie.dspy import Executor, GalaxieLM, request_interaction
@@ -44,9 +44,7 @@ class Program(dspy.Module):
         super().__init__()
         self.name, self.pause = name, pause
         signature = MappingAnswer if name == 'so-json-object-refused' else ChangedAnswer if changed else LiteralAnswer
-        config = {'response_format': AnswerModel} if isinstance(adapter_for(name), dspy.ChatAdapter) and not isinstance(adapter_for(name), dspy.JSONAdapter) else {}
-        if name == 'so-schema-tools-refused':
-            config['tools'] = [TOOL]
+        config: dict[str, Any] = {'response_format': AnswerModel} if isinstance(adapter_for(name), dspy.ChatAdapter) and not isinstance(adapter_for(name), dspy.JSONAdapter) else {}
         self.predict = dspy.Predict(signature, **config)
         self.predict.set_lm(lm)
 
@@ -54,6 +52,7 @@ class Program(dspy.Module):
         if self.name == 'so-schema-tools-refused':
             # ChatAdapter owns tool planning and drops arbitrary predictor tools;
             # exercise an actual tools-bearing LM request instead.
+            assert self.predict.lm is not None
             await self.predict.lm.acall(messages=[{'role': 'user', 'content': question}], response_format=AnswerModel, tools=[TOOL])
             return dspy.Prediction(answer='done')
         result = await self.predict.acall(question=question)
