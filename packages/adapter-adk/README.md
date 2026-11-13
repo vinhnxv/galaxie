@@ -162,13 +162,14 @@ const agent: AdkAgent = (host) =>
   stay in memory, as before. The effect scope of a write is position-derived, so an approved write
   whose run crashed replays its receipt after the restore. One active owner per session applies, as for
   the other executors; the example host is a later stage.
-  Before registering or loading a stored pause, restore derives its author from the call events
-  and applies the live pause-position rule; a missing, ambiguous or refused author fails
-  `unrecoverable` before any interaction or model/capability call. Any defined
+  Live and restore use one author derivation from stored call events: confirmation requests and
+  their gated calls must have one defined, agreeing author, and missing, disagreeing or refused
+  stored authors fail `unrecoverable` before registration, loading or publication. Any defined
   `actions.agentState` or `actions.endOfAgent` (including `false` and `null`) fails encoding
   `unsupported` and restore `unrecoverable`, even without a pause; `nodeInfo` remains refused.
-  The stored format is unchanged. These checks use scripted Node and Chromium tests;
-  Firefox, WebKit and real models remain unmeasured.
+  The stored format is unchanged; invalid older pauses with missing or disagreeing gated authors
+  now fail closed, while ordinary author-unified records remain readable by older adapters.
+  These checks have scripted Node/Chromium and local Firefox/WebKit evidence; real models remain unmeasured.
 
 ## Supported agent shapes
 
@@ -189,6 +190,9 @@ receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `fal
   a chain of `LlmAgent`s linked by transfer, resumes in place and survives a reload.
   The same predicate re-checks stored pauses at restore (`unrecoverable` on refusal), so moving
   a formerly admitted author into a refused position cannot republish its interaction.
+  The [admission-capable last-child rerun](../../docs/adr/0020-google-adk-through-an-adapter.md#measured-outcome-refused-2026-11-14)
+  records **REFUSED** after a second-write scope mismatch and early long-running invocation;
+  the measured later-child pauses remain refused, with no resumable production Runner.
 - `AgentTool` and `Workflow` fail `unsupported` at prepare. Re-admitting `AgentTool` needs an
   adapter-owned wrapper with its own run config, integrity plugin and session keying.
   The [read-only admission rerun](../../docs/adr/0020-google-adk-through-an-adapter.md#read-only-admission-rerun-2026-11-13)

@@ -722,8 +722,12 @@ work at restore. A changed tree whose paused author is no longer admitted fails 
 before publication; Node also checks repeated workflow-state rejection, unchanged stored rows
 and another session's readability. The codec rejects any defined `actions.agentState` or
 `actions.endOfAgent` on write (`unsupported`) and read (`unrecoverable`), with or without a pause.
-These scripted Node/Chromium checks leave the record format unchanged; Firefox, WebKit and
-real models remain unmeasured for them.
+Live and restore now derive one defined, agreeing author from confirmation-request and gated-call
+events; invalid older pauses with missing or differing gated authors fail `unrecoverable`, while
+the unchanged format keeps ordinary author-unified records readable by older adapters.
+These author/restore checks and the [refused last-child rerun](../../docs/adr/0020-google-adk-through-an-adapter.md#measured-outcome-refused-2026-11-14)
+have scripted Node/Chromium and local Firefox/WebKit evidence; real models remain unmeasured,
+and no new pause admission ships.
 
 Agent shapes (`SequentialAgent`, `LoopAgent`, `ParallelAgent`, transfer) are compared with native ADK in [agents.test.ts](../../packages/adapter-adk/test/agents.test.ts), which also covers parallel write branches re-dispatched with reversed arrival and the refused pauses; the first-child pause reload is in `adk-restore.test.ts`.
 
