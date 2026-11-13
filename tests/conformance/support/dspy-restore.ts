@@ -34,6 +34,7 @@ export const dspyRejectedRestoreCases = ['durable-url-input', 'durable-url-resul
 export interface DspyReloadStep {
   readonly name: string;
   readonly sessionId?: string;
+  readonly start?: boolean;
   readonly accepted?: boolean;
   readonly crashAfterWrite?: boolean;
 }
@@ -205,7 +206,7 @@ export async function executeDspyReloadStep(
     await instance.prepare();
     stopApproving = autoApprove(instance);
     const run =
-      step.sessionId === undefined
+      step.sessionId === undefined || step.start
         ? await instance.start({ question: 'RESTORED_INPUT_SECRET' })
         : await instance.restore();
     const restored = step.sessionId === undefined ? undefined : instance.getSnapshot().run?.pending;
