@@ -22,7 +22,6 @@ import {
   setLogger,
   ToolCallIntegrityPlugin,
 } from '@google/adk';
-import { admitCapabilities } from './agent-tool.js';
 import { adapterError, failure } from './errors.js';
 import { type AdkAgent, type AdkServices, createHost, validServices } from './host.js';
 import {
@@ -49,7 +48,7 @@ import { RunState, toGalaxieError } from './run.js';
 import { ensureAdkRuntimeEnv } from './runtime-shim.js';
 import { GalaxieSessionService } from './session.js';
 import { StreamProjector } from './stream.js';
-import { validateAgentTree, validatedInnerCapabilities } from './validate.js';
+import { validateAgentTree } from './validate.js';
 
 const APP_NAME = 'galaxie';
 const USER_ID = 'galaxie';
@@ -380,12 +379,6 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
             request.signal.aborted ? [] : [{ type: 'error', error: adapterError(code) }];
           if (active !== undefined) {
             yield* refuse('invalid');
-            return;
-          }
-          try {
-            admitCapabilities(validatedInnerCapabilities(root, registry), request.capabilities);
-          } catch {
-            yield* refuse('unsupported');
             return;
           }
           try {
