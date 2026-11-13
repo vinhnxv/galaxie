@@ -1,4 +1,23 @@
 {
+  "toolset-fixed": {
+    "entry": "toolset-fixed",
+    "prompt": "Double 21.",
+    "answers": [{ "action": "approve", "payload": { "indexes": [0] } }],
+    "replies": [
+      {
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "p1",
+            "type": "function",
+            "function": { "name": "math_double_1", "arguments": "{\"value\":21}" }
+          }
+        ]
+      },
+      { "content": "The result is 42." }
+    ],
+    "capabilities": { "math.double@1": { "result": { "value": 42 } } }
+  },
   "plain-text": {
     "entry": "single",
     "prompt": "Say hello.",

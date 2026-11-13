@@ -48,6 +48,7 @@ func Definitions() map[string]galaxie.Definition {
 	definitions["confirm-sequential"] = galaxie.Definition{Build: confirmLast, Interaction: approval}
 	definitions["confirm-sequential-first"] = galaxie.Definition{Build: confirmFirst, Interaction: approval}
 	definitions["long-running"] = galaxie.Definition{Build: longRunning, Interaction: approval, Resume: completion}
+	definitions["toolset-fixed"] = galaxie.Definition{Build: toolsetFixed, Interaction: approval}
 	return definitions
 }
 
@@ -81,6 +82,28 @@ func leaf(name string, tools ...tool.Tool) (agent.Agent, error) {
 }
 
 func single() (agent.Agent, error) { return leaf("agent") }
+
+func toolsetFixed() (agent.Agent, error) {
+	var tools []tool.Tool
+	for _, capability := range []string{"flat@1", "math.double@1", "last@1"} {
+		created, err := galaxie.CapabilityTool(capability, galaxie.ToolSpec{
+			Description: "Double an integer.", Schema: doubleSchema,
+			RequireConfirmation: capability == "math.double@1",
+		})
+		if err != nil {
+			return nil, err
+		}
+		tools = append(tools, created)
+	}
+	set, err := galaxie.Toolset(tools[1:]...)
+	if err != nil {
+		return nil, err
+	}
+	return galaxie.LlmAgent(llmagent.Config{
+		Name: "agent", Model: galaxie.Model("answer"), Instruction: "Answer briefly.",
+		Tools: tools[:1], Toolsets: []tool.Toolset{set},
+	})
+}
 
 func singleTool() (agent.Agent, error) {
 	double, err := galaxie.CapabilityTool("math.double@1", galaxie.ToolSpec{

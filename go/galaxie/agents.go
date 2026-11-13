@@ -4,6 +4,8 @@
 package galaxie
 
 import (
+	"slices"
+
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/agent/workflowagents/loopagent"
@@ -24,14 +26,14 @@ func Model(role string) *llm.LLM {
 }
 
 // LlmAgent creates an ADK LlmAgent. Its Model must come from Model and its Tools from
-// CapabilityTool or ExitLoop; toolsets are not supported.
+// CapabilityTool or ExitLoop. Toolsets must come from Toolset in the same build.
 func LlmAgent(config llmagent.Config) (agent.Agent, error) {
 	r := active()
 	if r == nil {
 		return nil, llm.NewError("unsupported")
 	}
 	model, ok := config.Model.(*llm.LLM)
-	if !ok || !r.models[model] || len(config.Toolsets) > 0 {
+	if !ok || !r.models[model] {
 		return nil, llm.NewError("unsupported")
 	}
 	for _, each := range config.Tools {
@@ -39,6 +41,30 @@ func LlmAgent(config llmagent.Config) (agent.Agent, error) {
 			return nil, llm.NewError("unsupported")
 		}
 	}
+	tools := slices.Clone(config.Tools)
+	for _, each := range config.Toolsets {
+		set, ok := each.(*fixedToolset)
+		if !ok || !r.toolsets[set] {
+			return nil, llm.NewError("unsupported")
+		}
+		for _, member := range set.tools {
+			if !r.capabilityTools[member] {
+				return nil, llm.NewError("unsupported")
+			}
+		}
+		tools = append(tools, set.tools...)
+	}
+	if len(config.Toolsets) > 0 {
+		names := make(map[string]bool, len(tools))
+		for _, each := range tools {
+			if names[each.Name()] {
+				return nil, llm.NewError("unsupported")
+			}
+			names[each.Name()] = true
+		}
+	}
+	config.Tools = tools
+	config.Toolsets = nil
 	created, err := llmagent.New(config)
 	if err != nil {
 		return nil, err
