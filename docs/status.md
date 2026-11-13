@@ -1,5 +1,17 @@
 # Project status
 
+On 2026-11-13, the LangGraph Python execution-identity rerun records **refused**.
+Scripted native CPython and Node Pyodide probes establish a driver-installed
+test-local scope that preserves terminal codes through explicit tool handlers,
+including silent graph completion. Replayed reads receive fresh effect IDs;
+abrupt loss after a succeeded write receipt but before its tool checkpoint has
+no public core step-retry path. A previously parked confirmation can also invoke
+a sibling write after the latch. No production helper ships. The text-protocol
+replacement and its measured paused recovery remain available; existing goldens,
+matrices, case lists and locks are unchanged. New Chromium identity/reload,
+Firefox, WebKit, real models, other versions and other executors are unmeasured.
+See the [registered rule, gates and limits](adr/0018-python-agents-through-pyodide.md#execution-identity-rerun-2026-11-13).
+
 On 2026-11-13, the DSPy branch task-identity guard attempt records **refused**.
 Scripted CPython probes preserve the calling task for sequential Predict,
 ReAct/tool, `wait_for` and `timeout` calls. A first-caller guard lets one write
