@@ -13,12 +13,16 @@ def create_agent(variant='original'):
 
     class Program(dspy.Module):
         def __init__(self):
+            self.entries = 0
             self.predict = dspy.Predict('question: str -> answer: str')
             self.predict.set_lm(GalaxieLM('answer'))
 
         async def aforward(self, question):
+            self.entries += 1
             if variant != 'removed':
                 query = catalog.VALUE if catalog is not None and variant == 'data-request' else 'changed' if variant == 'changed' else 'before'
+                if variant == 'same-instance':
+                    query = 'before' if self.entries == 1 else 'changed'
                 await capabilities.call('docs.lookup@1', {'query': query})
             request_interaction({'surfaceId': 'main', 'viewRevision': 'first', 'component': 'test.Review/v1', 'props': {}})
             await capabilities.call('docs.lookup@1', {'query': 'after'})

@@ -3,7 +3,13 @@
 
 import { readFile } from 'node:fs/promises';
 
-export type PoisonVariant = 'original' | 'changed' | 'removed' | 'data' | 'data-request';
+export type PoisonVariant =
+  | 'original'
+  | 'changed'
+  | 'removed'
+  | 'data'
+  | 'data-request'
+  | 'same-instance';
 
 export async function poisonSources(
   variant: PoisonVariant,

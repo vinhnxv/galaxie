@@ -4,6 +4,7 @@
 import '../../../src/host/zod-config.js';
 import type { PyodideAdapterOptions } from '@galaxie-ai/adapter-pyodide';
 import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
+import { executePoisonRetry } from '../../../../../tests/conformance/support/dspy-poison-retry.js';
 import {
   type DspyReloadResult,
   type DspyReloadStep,
@@ -21,6 +22,7 @@ const result: {
   workerErrors: string[];
   commands: string[];
   reload?: DspyReloadResult;
+  retry?: Awaited<ReturnType<typeof executePoisonRetry>>;
   bindTraffic?: { models: number; capabilities: number; replayed: number };
 } = { done: false, violations: [], workerErrors: [], commands: [] };
 Reflect.set(globalThis, 'dspyDivergenceConformance', result);
@@ -39,12 +41,16 @@ factory.createPolicy('default', {
 });
 try {
   const variant = new URLSearchParams(location.search).get('variant') ?? 'changed';
-  if (variant !== 'changed' && variant !== 'removed')
+  if (variant !== 'changed' && variant !== 'removed' && variant !== 'same-instance')
     throw new Error('Unknown divergence variant.');
   const saved = sessionStorage.getItem('dspyDivergenceStep');
   const step: DspyReloadStep & { program: string; variant: string } = saved
     ? JSON.parse(saved)
-    : { name: 'poison-original', program: 'original', variant };
+    : {
+        name: 'poison-original',
+        program: variant === 'same-instance' ? 'same-instance' : 'original',
+        variant,
+      };
   const observed = observeStateBind({
     runtimeUrl: new URL('/python/runtime/', location.href).href,
     wheelsUrl: new URL('/python/wheels/', location.href).href,
@@ -72,17 +78,41 @@ try {
     principalScope: 'fixture',
   });
   try {
-    result.reload = await executeDspyReloadStep(
-      observed.options,
-      {
-        baseUrl: new URL(`/conformance/poison-${step.program}/`, location.href).href,
-        files: ['binding_poison_programs.py', 'selected.py'],
-        module: 'selected',
-        entry: 'create_agent',
-      },
-      { recovery: saver.recovery, checkpoints: saver.byteRecords },
-      step,
-    );
+    const agent = {
+      baseUrl: new URL(`/conformance/poison-${step.program}/`, location.href).href,
+      files: ['binding_poison_programs.py', 'selected.py'],
+      module: 'selected',
+      entry: 'create_agent',
+    };
+    const store = { recovery: saver.recovery, checkpoints: saver.byteRecords };
+    if (variant === 'same-instance')
+      result.retry = await executePoisonRetry(observed.options, agent, store, async () => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(`dspy-divergence-${variant}`);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        try {
+          const stores = ['checkpoints', 'writes', 'journal'];
+          const tx = db.transaction(stores, 'readonly');
+          const rows = await Promise.all(
+            stores.map(
+              (name) =>
+                new Promise<unknown>((resolve, reject) => {
+                  const request = tx.objectStore(name).getAll();
+                  request.onsuccess = () => resolve(request.result);
+                  request.onerror = () => reject(request.error);
+                }),
+            ),
+          );
+          return JSON.stringify(rows, (_key, value: unknown) =>
+            value instanceof Uint8Array ? [...value] : value,
+          );
+        } finally {
+          db.close();
+        }
+      });
+    else result.reload = await executeDspyReloadStep(observed.options, agent, store, step);
   } finally {
     saver.close();
   }

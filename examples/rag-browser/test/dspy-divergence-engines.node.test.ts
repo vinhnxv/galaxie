@@ -6,6 +6,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import failures from '../../../tests/conformance/dspy-engine-known-failures.json' with {
   type: 'json',
 };
+import type { executePoisonRetry } from '../../../tests/conformance/support/dspy-poison-retry.js';
 import { poisonSources } from '../../../tests/conformance/support/dspy-poison-sources.node.js';
 import type { DspyReloadResult } from '../../../tests/conformance/support/dspy-restore.js';
 import {
@@ -22,6 +23,7 @@ type Measured = {
   workerErrors: string[];
   commands: string[];
   reload?: DspyReloadResult;
+  retry?: Awaited<ReturnType<typeof executePoisonRetry>>;
   bindTraffic: { models: number; capabilities: number; replayed: number };
 };
 type Envelope = { type: string; bytes: number[] };
@@ -39,7 +41,7 @@ let booted = false;
 
 beforeAll(async () => {
   const cases: Record<string, Record<string, string>> = {};
-  for (const program of ['original', 'changed', 'removed'] as const)
+  for (const program of ['original', 'changed', 'removed', 'same-instance'] as const)
     cases[`poison-${program}`] = await poisonSources(program);
   built = await buildDspyPage(new URL('./support/dspy-divergence/', import.meta.url), cases);
   browser = await launchDspyEngine();
@@ -266,3 +268,53 @@ for (const variant of ['changed', 'removed'] as const)
       );
     });
   });
+
+engineTest('bounds same-instance public start after poison', async () => {
+  await withPage(async (page) => {
+    await page.goto(`${built.origin}/?variant=same-instance`);
+    const measured = await result(page);
+    expect(measured.error).toBeUndefined();
+    expect(measured.retry?.errors).toEqual(
+      Array.from({ length: 3 }, () => ({
+        code: 'unrecoverable',
+        message: 'Stored state cannot be recovered.',
+      })),
+    );
+    expect(measured.retry?.calls).toEqual(['before']);
+    expect(measured.retry?.requests).toBe(0);
+    expect(measured.bindTraffic).toEqual({ models: 0, capabilities: 1, replayed: 0 });
+    expect(measured.retry?.snapshots).toHaveLength(3);
+    const first = measured.retry?.snapshots[0];
+    if (first === undefined) throw new Error('The first poison snapshot is missing.');
+    const saved = JSON.parse(first) as Stored;
+    expect(saved[0]).toHaveLength(2);
+    expect(saved[1]).toHaveLength(2);
+    const marker = saved[0][1];
+    if (!marker) throw new Error('The first poison checkpoint is missing.');
+    expect(marker.parentId).toBe(saved[0][0]?.key[4]);
+    expect(decode(marker.checkpoint)).toMatchObject({
+      status: 'unrecoverable',
+      input: null,
+      journal: [],
+    });
+    expect(Object.keys(decode(marker.metadata) as object).sort()).toEqual([
+      'adapter',
+      'dspy',
+      'session',
+      'v',
+    ]);
+    const writes = saved[1].filter(
+      (row) => JSON.stringify(row.key.slice(0, 5)) === JSON.stringify(marker.key),
+    );
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.key[6]).toBe(-3);
+    expect(writes[0]?.channel).toBe('__interrupt__');
+    expect(writes[0]?.value.type).toBe('json');
+    expect(writes[0] && decode(writes[0].value)).toBeNull();
+    expect(measured.retry?.snapshots).toEqual([first, first, first]);
+    expect(await stored(page, 'same-instance')).toBe(first);
+    console.info(
+      JSON.stringify({ engine: dspyEngine, sameInstancePublicStart: 'PASS', markerRows: 1 }),
+    );
+  });
+});

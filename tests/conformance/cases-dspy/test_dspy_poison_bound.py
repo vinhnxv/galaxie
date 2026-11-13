@@ -52,7 +52,7 @@ def assert_poison_pending(store, context):
 
 @pytest.mark.parametrize('variant', ['changed', 'removed'])
 @pytest.mark.parametrize('fresh', [False, True], ids=['same-driver', 'fresh-driver'])
-def test_direct_execute_repeats_are_characterization_not_a_public_bound(variant, fresh):
+def test_direct_execute_repeats_preserve_the_first_poison_marker(variant, fresh):
     store = Store()
     original = store.boot('poison-bound')
     assert execute(original) == {'ok': True, 'interrupted': True}
@@ -63,11 +63,13 @@ def test_direct_execute_repeats_are_characterization_not_a_public_bound(variant,
     assert pending(context) == before
     assert execute(context, before) == {'ok': False, 'code': 'unrecoverable'}
     assert_marker(store, rows, writes)
+    poisoned = copy.deepcopy((store.rows, store.writes, store.effects))
     traffic = copy.deepcopy((store.calls, store.requests, store.effects))
     for answer in (before, None, before):
         if fresh:
             context = store.boot('poison-bound', changed=variant)
         assert execute(context, answer) == {'ok': False, 'code': 'unrecoverable'}
+        assert (store.rows, store.writes, store.effects) == poisoned
         assert (store.calls, store.requests, store.effects) == traffic
     print(json.dumps({'lane': 'native-fresh-driver' if fresh else 'native-same-driver', 'variant': variant, 'markersAfterRepeats': len(store.rows) - len(rows)}))
     assert_poison_pending(store, store.boot('poison-bound'))
@@ -93,6 +95,10 @@ def test_failed_first_marker_commit_is_retried_before_pending_refuses(variant, f
         context = store.boot('poison-bound', changed=variant)
     assert execute(context, before) == {'ok': False, 'code': 'unrecoverable'}
     assert_marker(store, rows, writes)
+    assert (store.calls, store.requests, store.effects) == traffic
+    poisoned = copy.deepcopy((store.rows, store.writes, store.effects))
+    assert execute(context, before) == {'ok': False, 'code': 'unrecoverable'}
+    assert (store.rows, store.writes, store.effects) == poisoned
     assert (store.calls, store.requests, store.effects) == traffic
     # Public recovery reads pending before execute; a committed poison cannot advance it.
     assert_poison_pending(store, context)

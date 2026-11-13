@@ -70,7 +70,7 @@ def test_sequential_divergence_appends_one_compact_poison_checkpoint_and_is_neve
     assert store.calls == calls and store.requests == requests
     assert store.rows == poisoned_rows and store.writes == poisoned_writes
 
-    # Repeated execute currently appends another marker; its count is not a contract.
+    # Repeated poison executes are bounded by the dedicated poison-bound tests.
     assert execute(context, before) == {'ok': False, 'code': 'unrecoverable'}
     assert store.calls == calls and store.requests == requests
     print(json.dumps({'variant': changed, 'markersAfterSecondExecute': len(store.rows) - len(rows)}))

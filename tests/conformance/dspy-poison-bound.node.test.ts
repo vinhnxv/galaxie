@@ -4,6 +4,7 @@
 import { expect, test } from 'vitest';
 import { createPythonFixture } from '../../examples/rag-browser/test/support/python.node.js';
 import { MemoryRecoveryStore } from '../../packages/core/test/support/memory-recovery-store.js';
+import { executePoisonRetry } from './support/dspy-poison-retry.js';
 import { type PoisonVariant, poisonSources } from './support/dspy-poison-sources.node.js';
 import { executeDspyReloadStep } from './support/dspy-restore.js';
 import { observeStateBind } from './support/dspy-state-bind.js';
@@ -121,3 +122,48 @@ for (const variant of ['changed', 'removed'] as const) {
     }
   }, 900000);
 }
+
+test('Node Pyodide bounds public starts on the original poisoned instance', async () => {
+  const worker = await createPythonFixture({
+    framework: 'dspy',
+    module: 'selected',
+    sources: await poisonSources('same-instance'),
+  });
+  const store = { checkpoints: new MemoryByteCheckpoints(), recovery: new MemoryRecoveryStore() };
+  const observed = observeStateBind(worker.options);
+  try {
+    const result = await executePoisonRetry(observed.options, worker.agent, store, async () =>
+      JSON.stringify(
+        {
+          rows: [...store.checkpoints.rows],
+          writes: [...store.checkpoints.writes],
+          journal: [...store.recovery.journal],
+        },
+        (_key, value: unknown) => (value instanceof Uint8Array ? [...value] : value),
+      ),
+    );
+    expect(result.errors).toEqual(
+      Array.from({ length: 3 }, () => ({
+        code: 'unrecoverable',
+        message: 'Stored state cannot be recovered.',
+      })),
+    );
+    expect(result.calls).toEqual(['before']);
+    expect(result.requests).toBe(0);
+    expect(observed.traffic).toEqual({ models: 0, capabilities: 1, replayed: 0 });
+    expect(result.snapshots).toHaveLength(3);
+    expect(result.snapshots[1]).toBe(result.snapshots[0]);
+    expect(result.snapshots[2]).toBe(result.snapshots[0]);
+    expect(store.checkpoints.rows.size).toBe(2);
+    expect(store.checkpoints.writes.size).toBe(2);
+    const marker = [...store.checkpoints.rows.values()].at(-1);
+    expect(JSON.parse(new TextDecoder().decode(marker?.checkpoint.bytes))).toMatchObject({
+      status: 'unrecoverable',
+      input: null,
+      journal: [],
+    });
+    expect(worker.workerErrors).toEqual([]);
+  } finally {
+    await worker.cleanup();
+  }
+}, 900000);
