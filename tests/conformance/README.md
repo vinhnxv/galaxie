@@ -688,6 +688,13 @@ real-model format reliability, hands-on review and device performance are unmeas
 
 ## Google ADK conversations
 
+The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
+keeps JavaScript strings and toolsets refused. New `role-inventory.test.ts` probes
+show that writable exact-class Proxies can defeat rollback; real prepare refuses
+without changing the tree. The fixed-toolset candidate failed the protected exact
+host-API assertion, so it ships no source or golden. The new toolset refusal file
+covers static, dynamic, nested, throwing and network sets before expansion or requests.
+
 The separate [ADK matrix](compatibility-matrix-adk.json) lists twelve cases for the `adk-js`
 adapter: plain text, one and two sequential capability tool calls, an output schema with an output
 key, a capability denial, an output-safety block on a function-call argument, the step budget,
@@ -724,7 +731,22 @@ Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformanc
 
 ## Google ADK Python conversations
 
-The separate [ADK Python matrix](compatibility-matrix-adk-python.json) lists 39 scripted cases for
+Host inventories add `model-string` and `toolset-fixed`. The native string case
+registers a scripted ADK model for the exact role; the native toolset case uses a
+real `BaseToolset`. The new [inventory Worker tests](adk-python-role-inventory.node.test.ts)
+compare mapped/helper streams, requests, checks, labels and budgets, sequential
+and concurrent prepares, and full decoded records through confirmation/reload.
+Only the random integrity key and MAC are excluded; fixture clocks and ID sources
+are deterministic. Toolset pause and refusal coverage also runs on CPython.
+
+Reproduce with `pnpm run test:python`, rebuild changed Python source with
+`node scripts/build-python-wheels.ts`, then run
+`pnpm exec vitest run --project node tests/conformance/adk-python-role-inventory.node.test.ts`
+and `uv run --locked --offline python -I ../scripts/record-adk-python-conformance.py --check`
+from `python/` for the recorder. The existing Chromium subset remains regression
+evidence; Firefox, WebKit, real models and devices remain unmeasured for these shapes.
+
+The separate [ADK Python matrix](compatibility-matrix-adk-python.json) lists 41 scripted cases for
 the `adk-python` executor against pinned `google-adk` 2.12.0 in the Pyodide Worker: text, tools,
 denials, streaming, confirmations, long-running tools, durable restore, and the agent shapes
 `agents-sequential`, `stream-agents-sequential`, `agents-parallel`, `agents-loop`,
@@ -778,6 +800,15 @@ pnpm exec vitest run --project node examples/rag-browser/test/adk-python-conform
 ```
 
 ## Google ADK Go conversations
+
+The new `toolset-fixed` case groups same-build capability tools, with flat tools
+first and a confirming member. Native Go and wasm/Node live and restored lanes
+reproduce its golden. `go/galaxie/toolset_test.go` separately compares a real ADK
+toolset with the helper and flat list, including declaration order, copies,
+refusals, pause timing, effect scopes and interaction identity across reload.
+Run `pnpm run test:go` and the `adk-go.node.test.ts`, `adk-go-agents.node.test.ts`,
+`adk-go-restore.node.test.ts` and `adk-go-run.node.test.ts` Node lanes with Go 1.27.3
+first on PATH and `GOTOOLCHAIN=local`. Model strings are not applicable in native Go.
 
 The separate [ADK Go matrix](compatibility-matrix-adk-go.json) lists the scripted cases for the
 `adk-go` executor against pinned `google.golang.org/adk` v1.9.0 compiled to WebAssembly: text, tools,

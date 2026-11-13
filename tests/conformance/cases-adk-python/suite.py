@@ -18,6 +18,7 @@ CASES = (
     'agents-confirm-first', 'agents-confirm-middle', 'agents-confirm-nested',
     'agents-confirm-parallel', 'agents-confirm-parallel-reversed', 'agents-long-running-middle',
 )
+CASES += ('model-string', 'toolset-fixed')
 # Cases whose agent tree has several agents; the scripted model answers by agent name.
 SHAPES = (
     'agents-sequential', 'agents-parallel', 'agents-loop', 'agents-transfer', 'stream-agents-sequential',
@@ -41,6 +42,7 @@ TOOL_CASES = (
     'capability', 'sequential-tools', 'capability-denial', 'argument-block', 'step-budget', 'stream-tools',
     *INTERACTION_CASES,
 )
+TOOL_CASES += ('toolset-fixed',)
 
 
 class Answer(BaseModel):
@@ -108,10 +110,15 @@ def factory(name, model=None, tool=None, ordinary=()):
     if worker:
         from galaxie.adk import capability_tool, llm
         model = llm('answer')
+        if name == 'model-string':
+            model = 'answer'
         tool = capability_tool(
             'double', 'math.double@1', PARAMETERS, 'Double an integer.',
             require_confirmation=name in CONFIRMATION_CASES, long_running=name in LONG_RUNNING_CASES,
         )
+        if name == 'toolset-fixed':
+            from galaxie.adk import toolset
+            tool = toolset([tool])
         if name in BESIDE_CASES:
             ordinary = tuple(capability_tool(
                 sibling, 'math.double@1', PARAMETERS, 'Double an integer without an ADK confirmation.',

@@ -192,11 +192,12 @@ receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `fal
 
 ### Porting models and static toolsets
 
-The [model/toolset/built-in spike](../../docs/adr/0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11)
-records **ALTERNATIVE** for models and static toolsets. Raw strings, Gemini/foreign
-models and toolsets still fail `unsupported` at prepare. Build fresh agent objects
-inside the factory: a tree mapped during an earlier prepare belongs to that earlier
-host and fails the next host's registry check.
+The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
+keeps string mapping **REFUSED**: a Proxy can pass exact-class and writable-property
+checks and defeat rollback after a later assignment fails. Raw strings and
+Gemini/foreign models still fail `unsupported` at prepare without mutation or
+requests. Build fresh agent objects inside the factory with the explicit model
+helper; model objects belong to the host that created them.
 
 | Native sample | galaxie replacement |
 | --- | --- |
@@ -211,6 +212,12 @@ const agent: AdkAgent = (host) => new LlmAgent({
   tools: specs.map(({ name, ...spec }) => host.adk.capabilityTool(name, spec)),
 });
 ```
+
+The fixed-toolset helper is also **REFUSED** under this change's unchanged-assertion
+gate: adding `host.adk.toolset` fails the existing exact host-API inventory test on
+Node and Chromium. No helper or new JavaScript golden ships. Static, dynamic,
+foreign and network toolsets remain refused before requests; the flat-list
+alternative keeps the broker and existing pause rules.
 
 The role names host policy, not a provider client. MCP-backed entries use host
 `tools-mcp` capability bindings. Per-turn dynamic tool lists and network toolsets

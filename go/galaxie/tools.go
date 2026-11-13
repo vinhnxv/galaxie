@@ -5,6 +5,8 @@ package galaxie
 
 import (
 	"encoding/json"
+	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -65,11 +67,41 @@ func CapabilityTool(capability string, spec ToolSpec) (tool.Tool, error) {
 		return nil, err
 	}
 	r.tools[created] = true
+	r.capabilityTools[created] = true
 	r.pausing = r.pausing || spec.RequireConfirmation || spec.LongRunning
 	if spec.LongRunning {
 		r.longRunning[created] = true
 	}
 	return created, nil
+}
+
+// Toolset groups capability tools from the current build into a fixed ordered list.
+// Control tools, foreign tools and duplicate names are refused before anything runs.
+func Toolset(tools ...tool.Tool) (tool.Toolset, error) {
+	r := active()
+	if r == nil || len(tools) == 0 {
+		return nil, llm.NewError("unsupported")
+	}
+	names := make(map[string]bool, len(tools))
+	for _, each := range tools {
+		if !reflect.ValueOf(each).Comparable() || !r.capabilityTools[each] {
+			return nil, llm.NewError("unsupported")
+		}
+		if names[each.Name()] {
+			return nil, llm.NewError("unsupported")
+		}
+		names[each.Name()] = true
+	}
+	set := &fixedToolset{tools: slices.Clone(tools)}
+	r.toolsets[set] = true
+	return set, nil
+}
+
+type fixedToolset struct{ tools []tool.Tool }
+
+func (*fixedToolset) Name() string { return "galaxie_fixed" }
+func (set *fixedToolset) Tools(agent.ReadonlyContext) ([]tool.Tool, error) {
+	return slices.Clone(set.tools), nil
 }
 
 // ExitLoop creates ADK's exit_loop tool, which ends the enclosing LoopAgent.

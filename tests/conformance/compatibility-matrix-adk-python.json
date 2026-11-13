@@ -51,10 +51,13 @@
     "agents-confirm-nested",
     "agents-confirm-parallel",
     "agents-confirm-parallel-reversed",
+    "model-string",
+    "toolset-fixed",
     "agents-long-running-middle"
   ],
   "differences": [],
   "normalizations": [
+    "Host inventories (2026-11-13): MS-py and TS-py SHIPPED. An ADK-only optional boot role list admits exact declared strings, with whole-tree validation, verified assignment/rollback and a Gemini-name guard; each prepare boots an independent interpreter. Fixed toolsets contain only same-boot registered capability tools and preserve authored declaration order and flat-list pause rules. Native scripted model-string/toolset-fixed oracles match the Worker lane. Inventory tests cover repeated prepares, router/stream/check/label/budget parity and complete decoded confirmation/reload records, excluding only the independently random key and MAC. Existing 39 goldens, matrix entries, assertions, formats and locks remain unchanged. Built-ins, foreign models, planners, executors and unregistered/dynamic/network toolsets remain refused. The existing Chromium subset is regression evidence; new inventory-specific Chromium, Firefox, WebKit, real models and devices remain unmeasured.",
     "Model/toolset/builtin spike: M-py and T-py ALTERNATIVE through explicit llm(role) and flat capability lists; N-py/X-py/L-py REFUSED. Prepare has no role inventory; galaxie/gemini-* satisfies the native name predicate, but builtins remain refused. Provider tool config is rejected, not silently dropped. New CPython characterizations only; no runtime, golden or existing case changes.",
     "Stream namespace spike: A-py/C-py ALTERNATIVE (unique-name message attribution only; GA3 duplicate-name ambiguity); B-py REFUSED (manifest-only routing and full routed replacement not established). New probes are CPython only; subgraphs remains false and all stream paths remain empty.",
     "Provider call IDs are runtime-generated on each side (ADK uses adk-<uuid>, galaxie uses galaxie-<n>), so request messages number them by first appearance.",

@@ -34,7 +34,10 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools import FunctionTool, exit_loop
 from google.adk.tools.base_tool import BaseTool
+from google.adk.tools.base_toolset import BaseToolset
+from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.tool_context import ToolContext
+from google.adk.utils.model_name_utils import is_gemini_model
 from google.genai import types
 from pydantic import BaseModel, TypeAdapter
 from pydantic_core import to_jsonable_python
@@ -126,6 +129,19 @@ class _Registry:
 
 _models = _Registry()
 _tools = _Registry()
+_toolsets = _Registry()
+_roles: frozenset[str] = frozenset()
+
+
+def _declare_roles(roles: Any) -> None:
+    """Receive the host's bounded role inventory before the entry factory runs."""
+    global _roles
+    if (not isinstance(roles, list) or len(roles) > 256
+        or any(not isinstance(role, str) or not role or len(role) > 128 for role in roles)):
+        raise GalaxieError('invalid')
+    if len(set(roles)) != len(roles):
+        raise GalaxieError('unsupported')
+    _roles = frozenset(roles)
 
 
 def _galaxie_error(error: BaseException | None) -> GalaxieError | None:
@@ -545,11 +561,64 @@ def loop_exit() -> BaseTool:
     return tool
 
 
+class _FixedToolset(BaseToolset):
+    """A host-owned, context-independent grouping of registered capability tools."""
+
+    def __init__(self, members: tuple[BaseTool, ...]) -> None:
+        super().__init__()
+        # The inherited final listing method must not reuse a mutable returned array.
+        self._use_invocation_cache = False
+        self._members = members
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if '_members' in self.__dict__ and name not in ('_cached_invocation_id', '_cached_prefixed_tools'):
+            raise GalaxieError('unsupported')
+        super().__setattr__(name, value)
+
+    async def get_tools(self, readonly_context: ReadonlyContext | None = None) -> list[BaseTool]:
+        return list(self._members)
+
+    async def close(self) -> None:
+        pass
+
+
+def toolset(tools: list[BaseTool]) -> BaseToolset:
+    """Group this host's capability tools in a fixed order, without filters or a prefix."""
+    if not isinstance(tools, list):
+        raise GalaxieError('invalid')
+    if not tools or any(type(tool) is not _CapabilityTool or tool not in _tools for tool in tools):
+        raise GalaxieError('unsupported')
+    if len({tool.name for tool in tools}) != len(tools):
+        raise GalaxieError('unsupported')
+    group = _FixedToolset(tuple(tools))
+    _toolsets.add(group)
+    return group
+
+
+def _flatten_tools(tools: list[Any]) -> list[Any]:
+    result: list[Any] = []
+    grouped = False
+    for tool in tools:
+        if type(tool) is _FixedToolset and tool in _toolsets:
+            grouped = True
+            if tool.tool_filter is not None or tool.tool_name_prefix is not None or not tool._members:
+                raise GalaxieError('unsupported')
+            if any(type(member) is not _CapabilityTool or member not in _tools for member in tool._members):
+                raise GalaxieError('unsupported')
+            result.extend(tool._members)
+        else:
+            result.append(tool)
+    names = [tool.name for tool in result if type(tool) is _CapabilityTool and tool in _tools or _is_exit(tool)]
+    if grouped and len(set(names)) != len(names):
+        raise GalaxieError('unsupported')
+    return result
+
+
 def _is_exit(tool: Any) -> bool:
     return type(tool) is FunctionTool and tool.func is exit_loop and tool in _tools
 
 
-def _validate(root: Any) -> tuple[frozenset[str], bool]:
+def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str]]]:
     """Fail closed unless every agent, model and tool in the tree is one galaxie can govern.
 
     Returns the pausing agents and whether their positions need ADK's resumable runner.
@@ -562,6 +631,7 @@ def _validate(root: Any) -> tuple[frozenset[str], bool]:
     resumable = False
     resumable_refused = False
     parallel_pauses: dict[int, int] = {}
+    assignments: list[tuple[LlmAgent, str]] = []
 
     def walk(agent: Any, inherited: bool, depth: int, path: set[int], lineage: tuple[tuple[Any, int], ...]) -> bool:
         nonlocal visited, resumable, resumable_refused
@@ -577,11 +647,18 @@ def _validate(root: Any) -> tuple[frozenset[str], bool]:
         known = inherited
         exits = False
         pauses = False
+        tools: list[Any] = []
         if isinstance(agent, LlmAgent):
             resumable_refused = resumable_refused or bool(agent.sub_agents) or bool(
                 agent.output_key and agent.output_key.startswith('temp:'))
             if agent.model != '':
-                if type(agent.model) is not _GalaxieLlm or agent.model not in _models:
+                if isinstance(agent.model, str):
+                    if (agent.model not in _roles or is_gemini_model(f'galaxie/{agent.model}')
+                        or agent.model_config.get('frozen') or fields['model'].frozen
+                        or type(agent.__dict__) is not dict or 'model' not in agent.__dict__):
+                        raise GalaxieError('unsupported')
+                    assignments.append((agent, agent.model))
+                elif type(agent.model) is not _GalaxieLlm or agent.model not in _models:
                     raise GalaxieError('unsupported')
                 known = True
             # An agent with no model of its own and none above it would fall back to ADK's registry.
@@ -594,7 +671,8 @@ def _validate(root: Any) -> tuple[frozenset[str], bool]:
                 raise GalaxieError('unsupported')
             if not isinstance(agent.tools, list):
                 raise GalaxieError('invalid')
-            for tool in agent.tools:
+            tools = _flatten_tools(agent.tools)
+            for tool in tools:
                 if type(tool) is _CapabilityTool and tool in _tools:
                     pauses = pauses or cast(_CapabilityTool, tool).pauses
                     continue
@@ -616,7 +694,7 @@ def _validate(root: Any) -> tuple[frozenset[str], bool]:
                 if isinstance(parent, ParallelAgent):
                     parallel_pauses[id(parent)] = parallel_pauses.get(id(parent), 0) + 1
                     if parallel_pauses[id(parent)] > 1 or any(
-                        isinstance(tool, _CapabilityTool) and tool.is_long_running for tool in agent.tools
+                        isinstance(tool, _CapabilityTool) and tool.is_long_running for tool in tools
                     ):
                         raise GalaxieError('unsupported')
             resumable = resumable or any(
@@ -638,7 +716,21 @@ def _validate(root: Any) -> tuple[frozenset[str], bool]:
         raise GalaxieError('unsupported')
     if resumable and (resumable_refused or len(pausing) > 1):
         raise GalaxieError('unsupported')
-    return frozenset(pausing), resumable
+    return frozenset(pausing), resumable, assignments
+
+
+def _assign_models(assignments: list[tuple[LlmAgent, str]]) -> None:
+    """Assign only after admission succeeds, restoring data directly on a failed assignment."""
+    models = [(agent, role, llm(role)) for agent, role in assignments]
+    try:
+        for agent, _, model in models:
+            agent.model = model
+        if any(agent.model is not model for agent, _, model in models):
+            raise GalaxieError('unsupported')
+    except Exception:
+        for agent, role, _ in models:
+            vars(agent)['model'] = role
+        raise GalaxieError('unsupported') from None
 
 
 def _event_size(event: Event) -> int:
@@ -1111,7 +1203,7 @@ class Executor:
         resume: Callable[[list[dict[str, Any]], str, Any], list[dict[str, Any]]] | None = None,
     ) -> None:
         with quiet():
-            self._pausing, self._resumable = _validate(agent)
+            self._pausing, self._resumable, assignments = _validate(agent)
         # A pause with nowhere to show it would run its capability and then fail, so refuse it first.
         if self._pausing and interaction is None:
             raise GalaxieError('unsupported')
@@ -1123,6 +1215,7 @@ class Executor:
         self._keys: dict[str, bytes] = {}
         self._pauses: dict[str, int] = {}
         self._pending: dict[str, _Pending] = {}
+        _assign_models(assignments)
 
     @property
     def durable(self) -> bool:

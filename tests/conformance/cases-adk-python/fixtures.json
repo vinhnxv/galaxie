@@ -1,4 +1,32 @@
 {
+  "model-string": {
+    "prompt": "plain text",
+    "replies": [
+      {
+        "text": "A plain answer."
+      }
+    ]
+  },
+  "toolset-fixed": {
+    "prompt": "one tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "double",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The result is 6."
+      }
+    ]
+  },
   "confirm-beside-after-approve": {
     "prompt": "confirm-beside-after-approve",
     "replies": [

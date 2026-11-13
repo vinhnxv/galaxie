@@ -39,6 +39,9 @@ type recorder struct {
 	tools   map[tool.Tool]bool
 	models  map[*llm.LLM]bool
 	pausing bool
+	// capabilityTools excludes control tools such as ExitLoop from fixed toolsets.
+	capabilityTools map[tool.Tool]bool
+	toolsets        map[*fixedToolset]bool
 	// longRunning holds the tools that run before they pause.
 	longRunning map[tool.Tool]bool
 }
@@ -52,10 +55,12 @@ func record(build func() (agent.Agent, error)) (agent.Agent, *recorder, error) {
 	buildMu.Lock()
 	defer buildMu.Unlock()
 	current = &recorder{
-		agents:      map[agent.Agent]node{},
-		tools:       map[tool.Tool]bool{},
-		models:      map[*llm.LLM]bool{},
-		longRunning: map[tool.Tool]bool{},
+		agents:          map[agent.Agent]node{},
+		tools:           map[tool.Tool]bool{},
+		models:          map[*llm.LLM]bool{},
+		longRunning:     map[tool.Tool]bool{},
+		capabilityTools: map[tool.Tool]bool{},
+		toolsets:        map[*fixedToolset]bool{},
 	}
 	defer func() { current = nil }()
 	root, err := build()

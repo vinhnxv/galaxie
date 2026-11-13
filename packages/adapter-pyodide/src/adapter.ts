@@ -685,6 +685,13 @@ export function createPyodideAdapter(
             module: agent.module,
             entry: agent.entry,
             ...(services.checkpoints === undefined ? {} : { checkpoints: true }),
+            ...(framework === 'adk' && preparation.models?.roles.length
+              ? {
+                  roles: preparation.models.roles
+                    .filter((role) => role.length > 0 && role.length <= 128)
+                    .slice(0, 256),
+                }
+              : {}),
           };
           const ready = (await client.request('boot', payload)) as { coldStartMs: number };
           options.onBoot?.({ phase: 'ready', coldStartMs: ready.coldStartMs });
