@@ -13,6 +13,8 @@ const ALLOWED: ReadonlySet<object> = new Set([
 ]);
 const MAX_DEPTH = 16;
 const MAX_AGENTS = 256;
+/** Bounds an author array before any element is read. */
+const MAX_ARRAY = 4096;
 
 interface Snapshot {
   readonly prototype: object;
@@ -23,12 +25,13 @@ interface Snapshot {
 /** Indexed data reads avoid array iterators, accessors, constructors and species. */
 function arrayCopy(value: unknown[]): unknown[] {
   const length: unknown = Object.getOwnPropertyDescriptor(value, 'length')?.value;
-  if (typeof length !== 'number' || !Number.isInteger(length) || length < 0 || length > 2 ** 32 - 1)
+  if (typeof length !== 'number' || !Number.isInteger(length) || length < 0 || length > MAX_ARRAY)
     throw failure('unsupported');
   const copy: unknown[] = [];
   for (let index = 0; index < length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-    if (descriptor === undefined || !('value' in descriptor)) throw failure('unsupported');
+    if (descriptor === undefined || !Object.hasOwn(descriptor, 'value'))
+      throw failure('unsupported');
     copy.push(descriptor.value);
   }
   return copy;
@@ -38,7 +41,8 @@ function fieldsOf(value: object): Map<PropertyKey, PropertyDescriptor> {
   const fields = new Map<PropertyKey, PropertyDescriptor>();
   for (const key of Reflect.ownKeys(value)) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (descriptor === undefined || !('value' in descriptor)) throw failure('unsupported');
+    if (descriptor === undefined || !Object.hasOwn(descriptor, 'value'))
+      throw failure('unsupported');
     fields.set(key, {
       value: Array.isArray(descriptor.value) ? arrayCopy(descriptor.value) : descriptor.value,
       enumerable: descriptor.enumerable === true,

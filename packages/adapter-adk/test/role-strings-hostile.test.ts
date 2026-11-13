@@ -390,3 +390,49 @@ test.each(['tools', 'subAgents', 'beforeModelCallback'])(
     }
   },
 );
+
+test('an oversized author array is refused before any element is read', () => {
+  const { host } = createHost(
+    services(),
+    models,
+    () => undefined,
+    () => 's',
+  );
+  const reads = vi.fn();
+  const root = new LlmAgent({ name: 'root', model: 'answer' });
+  const tools = new Proxy([] as unknown[], {
+    getOwnPropertyDescriptor(target, key) {
+      reads(key);
+      if (key === 'length') return { value: 2 ** 32 - 1, writable: true };
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  Object.defineProperty(root, 'tools', { value: tools, configurable: true, writable: true });
+  expect(() => admitRoleStrings(root, host, models.roles)).toThrow(
+    expect.objectContaining({ code: 'unsupported' }),
+  );
+  expect(reads.mock.calls.filter(([key]) => key !== 'length')).toEqual([]);
+});
+
+test('an accessor stays refused when Object.prototype carries a value field', () => {
+  const { host } = createHost(
+    services(),
+    models,
+    () => undefined,
+    () => 's',
+  );
+  const root = new LlmAgent({ name: 'root', model: 'answer' });
+  Object.defineProperty(root, 'instruction', { get: () => 'x', configurable: true });
+  Object.defineProperty(Object.prototype, 'value', {
+    value: 'polluted',
+    configurable: true,
+    writable: true,
+  });
+  try {
+    expect(() => admitRoleStrings(root, host, models.roles)).toThrow(
+      expect.objectContaining({ code: 'unsupported' }),
+    );
+  } finally {
+    Reflect.deleteProperty(Object.prototype, 'value');
+  }
+});
