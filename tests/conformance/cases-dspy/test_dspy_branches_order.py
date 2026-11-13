@@ -4,7 +4,9 @@
 """Absolute scope and journal-order pins for the unordered golden programs."""
 
 import asyncio
+import importlib.util
 import json
+from pathlib import Path
 import sys
 import uuid
 
@@ -12,8 +14,16 @@ import pytest
 
 from galaxie import _bridge
 import shipped_branches
-from suite import factory
 from test_dspy_parallel_baseline import LABELS, Store, programs
+
+
+suite_spec = importlib.util.spec_from_file_location('dspy_order_suite', Path(__file__).with_name('suite.py'))
+if suite_spec is None or suite_spec.loader is None:
+    raise ImportError('The conformance module cannot be loaded.')
+suite = importlib.util.module_from_spec(suite_spec)
+sys.modules[suite_spec.name] = suite
+suite_spec.loader.exec_module(suite)
+factory = suite.factory
 
 
 CONVERSATION = '55de87eb-28d7-466f-9222-de0713ae5d68'
