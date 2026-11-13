@@ -837,7 +837,7 @@ fallback disabled, or non-streaming JSONAdapter:
 ```python
 from typing import Literal
 import dspy
-from galaxie.dspy import GalaxieLM
+from galaxie.dspy import Executor, GalaxieLM
 
 class Answer(dspy.Signature):
     question: str = dspy.InputField()
@@ -857,7 +857,7 @@ This alone does not constrain provider decoding. With the default LM, explicit
 output, opt in explicitly:
 
 ```python
-predict = dspy.Predict(TypedAnswer)
+predict = dspy.Predict(Answer)
 predict.set_lm(GalaxieLM('answer', schema_output=True))
 executor = Executor(predict, adapter=dspy.JSONAdapter())
 ```
