@@ -1,0 +1,16 @@
+{
+  "rt-opt-labeled": {
+    "golden": "rt-opt-labeled.json",
+    "input": { "question": "Capital of France?" },
+    "replies": [{ "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]" }]
+  },
+  "rt-opt-labeled-two-stage": {
+    "golden": "rt-opt-labeled-two-stage.json",
+    "input": { "question": "Capital of France?" },
+    "replies": [
+      { "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]" },
+      { "text": "[[ ## answer ## ]]\nReviewed Paris\n[[ ## completed ## ]]" }
+    ],
+    "resumes": [{ "action": "continue", "payload": "Review the capital" }]
+  }
+}
