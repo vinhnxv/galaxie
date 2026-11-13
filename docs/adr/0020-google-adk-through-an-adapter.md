@@ -1644,8 +1644,16 @@ Executable evidence is in `role-strings.test.ts`, `role-strings-hostile.test.ts`
 extensibility through prepare, run and dispose, with zero calls to all five
 write-class Proxy traps. Exact-class copies retain every live own field, plain
 copied arrays, ADK brands, lookup and parent traversal; construction config and
-author clone/constructor methods do not drive execution. Arrays with holes or
-accessor elements refuse without invoking their accessors or species.
+author clone/constructor methods do not drive execution. Arrays with holes,
+accessor elements or malformed lengths refuse without invoking accessors,
+coercion hooks or species.
+
+Review found that malformed Proxy array lengths could silently omit tools or
+children from the copy, or create an empty fixed toolset. Four new regression
+cases failed before correction. Both boundaries now snapshot and validate the
+own numeric array length before traversing indexed descriptors. The corrected
+copy-fidelity and inventory gates pass on Node, Chromium, Firefox and WebKit;
+the outcomes above describe this corrected implementation.
 
 The two new conformance cases use a native registry-registered scripted model and
 a real native `BaseToolset` respectively. Their new goldens match the galaxie
@@ -1653,8 +1661,8 @@ lanes. All twelve existing JavaScript goldens, Python/Go goldens and locks remai
 byte-identical. Matrix entries and the allowed golden registrations only gain
 lines; every other existing test is unchanged.
 
-The integrated Node/Chromium ADK selection passes **83 files, 974 tests, seven
-skipped**. The five new test files plus `adk.test.ts` pass **six files, 104 tests**
+The integrated Node/Chromium ADK selection passes **83 files, 982 tests, seven
+skipped**. The five new test files plus `adk.test.ts` pass **six files, 108 tests**
 on each of local Firefox and WebKit. Both TypeScript compiler lanes and lint pass.
 The final local `pnpm check` passes, including Python/Go regressions, builds and
 dependency, documentation and size checks. Reproduce commands are in the

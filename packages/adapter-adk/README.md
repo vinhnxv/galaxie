@@ -249,7 +249,7 @@ config is omitted and instruction text cannot reproduce PlanReAct final retaggin
 under the same script. A host-bound read capability is general network-data guidance,
 not the same-script outcome for a provider-native tool. No generated code runs.
 Scripted evidence covers Node and Chromium, plus the five new test files and
-golden suite on local Firefox and WebKit (104 tests per engine). Browser durability
+golden suite on local Firefox and WebKit (108 tests per engine). Browser durability
 recreates the runtime and reopens IndexedDB; it does not navigate the page. Real
 models, device measurements and Worker-hosted JavaScript remain unmeasured.
 

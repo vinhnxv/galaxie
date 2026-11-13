@@ -122,6 +122,41 @@ test.each([
   expect(accessor).not.toHaveBeenCalled();
 });
 
+test.each(['tools', 'subAgents'])(
+  'malformed %s array lengths refuse before requests',
+  async (field) => {
+    const provider = services();
+    const store = { request: vi.fn(async () => null) };
+    const coerce = vi.fn(() => 1);
+    for (const length of [NaN, -1, 0.5, Infinity, 2 ** 32, '1', { valueOf: coerce }]) {
+      const author = new LlmAgent({ name: 'root', model: 'answer' });
+      const foreign = {};
+      const source = [foreign];
+      const members = new Proxy(source, {
+        getOwnPropertyDescriptor(target, key) {
+          const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+          return key === 'length' && descriptor !== undefined
+            ? { ...descriptor, value: length }
+            : descriptor;
+        },
+      });
+      Reflect.set(author, field, members);
+      await expect(
+        createAdkAdapter().prepare(
+          () => defineAdkEntry({ agent: author, roleStrings: true }),
+          { ...provider, checkpoints: store },
+          options,
+        ),
+      ).rejects.toMatchObject({ code: 'unsupported' });
+      expect(Reflect.get(author, field)).toBe(members);
+      expect(source).toEqual([foreign]);
+    }
+    expect(provider.chatModels.mock.seen).toEqual([]);
+    expect(store.request).not.toHaveBeenCalled();
+    expect(coerce).not.toHaveBeenCalled();
+  },
+);
+
 test('hostile exact-class Proxies receive no write-class operations through prepare run or dispose', async () => {
   const writes = vi.fn(() => {
     throw new Error('Author writes are forbidden.');

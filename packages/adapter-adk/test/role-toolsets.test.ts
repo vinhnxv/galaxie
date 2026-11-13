@@ -96,6 +96,47 @@ test('the helper refuses foreign members empty lists duplicates and malformed ar
   expect(() => adkToolset(host, {} as never)).toThrow(expect.objectContaining({ code: 'invalid' }));
 });
 
+test('fixed toolsets cannot hide foreign members behind a trapped length read', () => {
+  const { host } = setup();
+  const reads = vi.fn();
+  const foreign = new FunctionTool({
+    name: 'foreign',
+    description: 'Unused.',
+    execute: async () => ({}),
+  });
+  const members = new Proxy([foreign], {
+    get(target, key, receiver) {
+      if (key === 'length') {
+        reads();
+        return NaN;
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  expect(() => adkToolset(host, members)).toThrow(expect.objectContaining({ code: 'unsupported' }));
+  expect(reads).not.toHaveBeenCalled();
+});
+
+test('fixed toolsets refuse malformed own array lengths without coercion', () => {
+  const { host } = setup();
+  const tool = host.adk.capabilityTool('read.first@1', spec);
+  const coerce = vi.fn(() => 1);
+  for (const length of [NaN, -1, 0.5, Infinity, 2 ** 32, '1', { valueOf: coerce }]) {
+    const members = new Proxy([tool], {
+      getOwnPropertyDescriptor(target, key) {
+        const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+        return key === 'length' && descriptor !== undefined
+          ? { ...descriptor, value: length }
+          : descriptor;
+      },
+    });
+    expect(() => adkToolset(host, members)).toThrow(
+      expect.objectContaining({ code: 'unsupported' }),
+    );
+  }
+  expect(coerce).not.toHaveBeenCalled();
+});
+
 test('an author toolset never expands during admission', () => {
   const { host, registry } = setup();
   let expansions = 0;

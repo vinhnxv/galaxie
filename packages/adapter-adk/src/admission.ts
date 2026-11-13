@@ -22,7 +22,9 @@ interface Snapshot {
 
 /** Indexed data reads avoid array iterators, accessors, constructors and species. */
 function arrayCopy(value: unknown[]): unknown[] {
-  const length = Object.getOwnPropertyDescriptor(value, 'length')?.value as number;
+  const length: unknown = Object.getOwnPropertyDescriptor(value, 'length')?.value;
+  if (typeof length !== 'number' || !Number.isInteger(length) || length < 0 || length > 2 ** 32 - 1)
+    throw failure('unsupported');
   const copy: unknown[] = [];
   for (let index = 0; index < length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));

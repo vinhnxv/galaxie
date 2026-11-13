@@ -104,10 +104,12 @@ export function fixedToolsetMembers(
 export function adkToolset(host: AdkHost, tools: readonly BaseTool[]): BaseToolset {
   const registry = hosts.get(host);
   if (registry === undefined || !Array.isArray(tools)) throw failure('invalid');
-  if (tools.length === 0) throw failure('unsupported');
+  const length: unknown = Object.getOwnPropertyDescriptor(tools, 'length')?.value;
+  if (typeof length !== 'number' || !Number.isInteger(length) || length < 1 || length > 2 ** 32 - 1)
+    throw failure('unsupported');
   const members: BaseTool[] = [];
   const names = new Set<string>();
-  for (let index = 0; index < tools.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(tools, index);
     const tool: unknown =
       descriptor !== undefined && 'value' in descriptor ? descriptor.value : undefined;

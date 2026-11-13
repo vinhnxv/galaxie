@@ -753,8 +753,8 @@ timestamps, revisions, ordinals and pauses; only the random key and MAC differ.
 Node uses memory storage; browsers close/reopen IndexedDB and recreate the runtime,
 without navigating the page. Effects and interaction IDs match with one host write.
 
-Measured locally: the integrated Node/Chromium selection passes 974 tests in 83
-files, with seven skipped. The five new files and golden suite pass 104 tests in
+Measured locally: the integrated Node/Chromium selection passes 982 tests in 83
+files, with seven skipped. The five new files and golden suite pass 108 tests in
 six files on each of Firefox and WebKit. No divergence was observed. Real models,
 device performance and Worker-hosted JavaScript remain unmeasured. No existing
 host API key or no-opt-in string assertion changes.

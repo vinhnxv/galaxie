@@ -69,6 +69,6 @@ Run `pnpm check` before reporting the integrated change as finished.
 The pause-author, restore-admission and new last-child measurement files have scripted Node/Chromium
 and local Firefox/WebKit evidence; the older native L1-L5 file is cited from Node/Chromium only.
 The five role-string/toolset files and JavaScript golden suite also pass locally
-on Firefox and WebKit (104 tests per engine); the integrated Node/Chromium ADK
-selection passes 974 tests, with seven skipped.
+on Firefox and WebKit (108 tests per engine); the integrated Node/Chromium ADK
+selection passes 982 tests, with seven skipped.
 Real models remain unmeasured, and the retained last-child suite pins shipped refusals.
