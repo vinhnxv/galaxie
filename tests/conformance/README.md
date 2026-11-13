@@ -1033,9 +1033,11 @@ use legacy unbound rows, while identical-state cases also exercise bound rows.
 
 Any descriptor JSON edit counts, even unused JSON or whitespace. Python sources
 remain outside the manifest. This is a consistency check against accidental swaps,
-not integrity protection: metadata is unauthenticated. Firefox, WebKit, real models,
-other DSPy versions, concurrent tabs, forged metadata, large many-file descriptors
-and legacy sessions that pause again outside native CPython remain unmeasured.
+not integrity protection: metadata is unauthenticated. The later
+[engine measurements](#dspy-engine-measurements) cover WebKit binding, legacy
+re-pause on Node/Chromium/WebKit and Firefox reload findings. Real models,
+concurrent tabs, forged metadata and large many-file descriptors remain unmeasured;
+the other-version attempt could not collect tests.
 
 Shipped verification:
 
@@ -1202,7 +1204,9 @@ The helper returns results in input order, caps groups at 32 branches and runs a
 1000 non-empty groups, and accepts keys matching `[A-Za-z0-9_.-]{1,64}`. Branches
 must await journaled calls sequentially; code outside journaled calls must be
 deterministic. Ordinary author exceptions wait for siblings and raise in input
-order; terminal failures and outer cancellation drain siblings. Cancelling a
+order; terminal failures and outer cancellation drain siblings. Native-only tests
+pin that two concurrent terminal failures report the first recorded code rather
+than the first code in input order. Cancelling a
 replayed group preserves its stored pause for retry, proven natively and in a
 fresh Node Worker; unconsumed entries on cancellation are not divergence.
 Cancellation is recorded before cleanup, so a branch that catches it cannot
@@ -1242,9 +1246,11 @@ pnpm run check:docs
 ```
 
 Give DSPy test processes at least 900000 ms. The evidence uses scripted models on
-DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. Chromium divergence
-reload, Firefox, WebKit, real models, other DSPy versions and ReAct branches remain
-unmeasured. Pauses within groups require a new partial-group design. No core,
+DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. Later local
+[engine measurements](#dspy-engine-measurements) add Firefox/WebKit live goldens,
+WebKit reload and a Firefox reload finding. Chromium divergence reload, real
+models and ReAct branches remain unmeasured; the other-version attempt could not
+collect tests. Pauses within groups require a new partial-group design. No core,
 bridge, driver, lock or third-party wheel input changed.
 
 #### Branch task-identity guard refusal
@@ -1510,10 +1516,12 @@ Residual limits: raw author-created threads without DSPy's propagated settings a
 unattributed natively; a thread-start error caught by author code is invisible to
 the executor. Stale settings hold only a weak reference and cannot affect a later
 run. Any `RuntimeError` raised inside `Thread.start`, including misuse, maps to
-`unsupported` if it reaches the executor. Chromium, Firefox, WebKit, real models
-and other DSPy versions are **unmeasured** for these probes. Thread-pool fan-out
-remains unsupported; use sequential `await module.acall(...)` loops. Supported
-async fan-out remains follow-up `galaxie-fv4.3.17`. ADR-0012 controls are unchanged.
+`unsupported` if it reaches the executor. The six probes now pass in Chromium,
+Firefox and WebKit in the local [engine measurements](#dspy-engine-measurements).
+Real models remain **unmeasured**; the other-version attempt could not collect
+tests. Thread-pool fan-out remains unsupported; use sequential
+`await module.acall(...)` loops or the [shipped keyed async helper](#shipped-async-branch-helper).
+ADR-0012 controls are unchanged.
 
 ### Reproduce the thread-pool refusal
 
@@ -1540,6 +1548,176 @@ pnpm typecheck
 pnpm typecheck:ts6
 VITEST_MAX_WORKERS=4 pnpm check
 git diff --name-status main
+```
+
+## DSPy engine measurements
+
+On 2026-11-13, scripted DSPy 3.4.1 measurements ran locally on arm64 macOS 27.2
+(build 26B123), CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. Playwright
+1.64.1 launched headless Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2.
+Each engine booted the existing `predict` page under the unchanged strict CSP and
+Trusted Types policy and ran the executor in a module Worker. These are local
+macOS results, not the Linux CI engine job or real-device evidence.
+
+| Engine | `typeof trustedTypes` | `typeof WebAssembly` | `typeof indexedDB` | Module Worker / DSPy boot |
+| --- | --- | --- | --- | --- |
+| Chromium 156.0.8078.4 | `object` | `object` | `object` | PASS / PASS |
+| Firefox 157.0 | `object` | `object` | `object` | PASS / PASS |
+| WebKit 27.2 | `object` | `object` | `object` | PASS / PASS |
+
+The [registered predictions](cases-dspy/engine-fixtures.json) were committed
+before the new runs. The evidence vocabulary is:
+
+- **PASS:** ran through its final assertion successfully.
+- **DIVERGED:** ran, but an unchanged assertion failed; a finding remains.
+- **NOT RUN:** launch, boot, installation or collection prevented the measurement.
+- **EXISTING:** an existing unchanged measurement was run again.
+- **UNMEASURED:** not attempted, with the cause stated. A skipped test is never PASS.
+
+The new engine file ran 10 tests on Chromium and 21 on each other engine; the
+counts include two harness unit tests per engine. Chromium passed all 10 and
+WebKit all 21. Firefox passed 12 and diverged on nine reload tests. The new Node
+files passed all 10 tests; the focused native scope/order and branch suite passed
+59 tests. The unchanged Node files passed 166 tests; their opt-in boot-boundary
+and load-cost probe was UNMEASURED because `GALAXIE_DSPY_STATE_MEASURE` was unset.
+The unchanged Chromium files passed all 93 tests. The native DSPy
+baseline passed 443 tests, and the unchanged recorders checked 41 live cases plus
+five states and seven state cases. The same nine Firefox failures reproduced in
+a second run before registration; no scenario was skipped.
+
+### Paused-state binding by engine
+
+All seven existing binding scenarios keep their names and expectations. A
+refusal must have fixed `unrecoverable`, zero model/capability/replay traffic and
+unchanged checkpoint, pending-write and effect rows; original bytes still resume.
+
+| Scenario | Native CPython | Node Pyodide | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- |
+| `bind-early-same` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
+| `bind-early-inert` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
+| `bind-late-same` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
+| `bind-late-prompt` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
+| `bind-late-inert` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
+| `bind-early-prompt` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
+| `bind-legacy-late-prompt` | EXISTING | EXISTING | EXISTING | DIVERGED: header equality | PASS |
+| `bind-legacy-repause` | EXISTING: native shape | PASS | PASS | DIVERGED: header equality | PASS |
+
+The new re-pause case strips only `stateBinding` from the first paused record,
+restores in a fresh Worker and obtains the independent expected 64-hex binding
+at the second pause. Changing `unrelated.json` from `{}` to `[]` refuses with no
+traffic or stored-row changes. Restoring `{}` completes with one replay and no
+repeated capability effect. Node, Chromium and WebKit reached the final assertion;
+Firefox reached these behavior assertions and then failed header equality.
+The eight-scenario legacy state-swap family and native-only
+`bind-fingerprint-inert` were not extended to Firefox or WebKit.
+
+### Thread-pool probes by engine
+
+| Probe | Native CPython | Node Pyodide | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- |
+| `par-verbatim-thread-start` | EXISTING: threads start, zero requests | EXISTING: both `RuntimeError` | PASS: both `RuntimeError` | PASS: both `RuntimeError` | PASS: both `RuntimeError` |
+| `par-verbatim-parallel-threads` | EXISTING | EXISTING | PASS | PASS | PASS |
+| `par-verbatim-parallel-sequential` | EXISTING | EXISTING | PASS | PASS | PASS |
+| `par-verbatim-evaluate-threads` | EXISTING | EXISTING | PASS | PASS | PASS |
+| `par-verbatim-evaluate-sequential` | EXISTING | EXISTING | PASS | PASS | PASS |
+| `par-refuse-context` | EXISTING | EXISTING | PASS | PASS | PASS |
+
+The last five rows end with fixed `unsupported`, no output, no model or capability
+request, no request after termination and no Worker error. Browser probes also
+require zero CSP violations, zero external requests and exact header equality.
+Thread-pool APIs remain refused.
+
+### Async fan-out by engine
+
+| Scenario | Native CPython | Node Pyodide | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- |
+| `fanout-single` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `fanout-write` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `fanout-multi` | EXISTING | EXISTING | EXISTING | PASS | PASS |
+| `fanout-reload` | EXISTING: driver restore | EXISTING: fresh Worker | EXISTING | DIVERGED: header equality | PASS |
+
+The live cases compare with the three unchanged native goldens. Reload reopens
+the same principal-scoped IndexedDB in a fresh page and Worker, silently replays
+the joined group once and dispatches only the later three model calls in reversed
+arrival order. WebKit reached every assertion; Firefox reached the output,
+replay-count, request and task-cleanup assertions before header equality failed.
+
+### Firefox reload finding
+
+All nine Firefox reload rows failed the unchanged final assertion
+`expect(headers.every((value) => value === dspyHeader)).toBe(true)` with:
+
+```text
+AssertionError: expected false to be true // Object.is equality
+```
+
+The repeat diagnostics observed HTTP 304 responses after reload for cached
+`/python/wheels/*.whl`, `/python/runtime/python_stdlib.zip` and
+`/python/runtime/pyodide.asm.wasm`: Playwright's `response.headers()` omitted
+`content-security-policy`, captured as an empty string. Preview still uses
+`cspHeader('mock')`. This is a Playwright 304-header observation, not proof that
+the effective document CSP was absent. CSP violations and external requests were
+empty, and the behavior assertions held. None of these nine rows is PASS.
+The separate [DSPy failure registry](dspy-engine-known-failures.json) retains the
+full failed titles with `test.fails`; a future unexpected pass fails the suite.
+The original browser-engine known-failure list is unchanged. A follow-up should
+establish the Firefox/Playwright cache-header behavior without weakening CSP or
+the current assertions.
+
+### Scope, order and version limits
+
+| Measurement | Native CPython | Node Pyodide | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- |
+| Absolute scopes and canonical journal order | PASS | PASS | UNMEASURED: no browser pin planned | UNMEASURED: no browser pin planned | UNMEASURED: no browser pin planned |
+| First recorded terminal failure | PASS | UNMEASURED: native-only probe | UNMEASURED: native-only probe | UNMEASURED: native-only probe | UNMEASURED: native-only probe |
+| DSPy 3.2.1 overlay | NOT RUN: collection failure | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged |
+| Real models | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access |
+
+New native and Node tests pin absolute scopes for the three unordered golden
+shapes with forward and reversed model/capability responses. Scopes follow
+`dspy/<conversation>/<run.ordinal>/<group>/<key>/<call>`; model calls count toward
+the zero-based local ordinal. `fanout-single` has no capability scope;
+`fanout-write` uses call 0 and `fanout-multi` call 1. Native non-compact snapshots
+pin the completed journal's input-key/local-ordinal order; compact completion
+snapshots have no journal. Both lanes also pin absolute markers at the
+`par-fan-two-stage-multi` pause. Native-only event-gated tests show that two
+concurrent terminal failures report the first recorded code, rather than the
+first in input order, and drain both siblings.
+
+The prediction that DSPy 3.2.1 was not installable offline was disproved: an
+overlay of 18 cached archive roots imported it on CPython 3.14.5, without changing
+the locked DSPy 3.4.1 environment. Both prescribed native suites then stopped
+during collection, with exit 2, zero tests run and one collection error each:
+`ModuleNotFoundError: No module named 'dspy.lm15'` at `galaxie/dspy.py:22`.
+This is NOT RUN, not a passing or failing assertion. No source workaround or
+Worker dependency change was made. Real-model runs remain unmeasured: no model
+access in this environment.
+
+The other predictions held except for Firefox's reload header equality. Pauses
+inside groups and a `Parallel`-shaped adapter were considered and not built:
+partial groups need a new persisted design, and an adapter adds a public API.
+A test-only adapter adds no evidence beyond the existing native `asyncio.gather`
+comparison. An accepted product design in an ADR is needed before either ships.
+Chromium divergence reload, ReAct branches, concurrent tabs, forged metadata and
+large many-file descriptors remain unmeasured. No shipped source, existing
+golden, matrix, fixture entry, recorder or lock changed.
+
+### Reproduce the engine measurements
+
+Run from the repository root with the current local wheels. Give each test
+process at least 900000 ms; the new tests and hooks carry that explicit timeout.
+Recorder commands always include `--check`.
+
+```sh
+node scripts/test-python.ts galaxie/tests/test_dspy_branches.py ../tests/conformance/cases-dspy/test_dspy_branches_order.py
+pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 tests/conformance/dspy-state-repause.node.test.ts tests/conformance/dspy-branches-order.node.test.ts
+GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 examples/rag-browser/test/dspy-engines.node.test.ts
+GALAXIE_BROWSER=firefox pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 examples/rag-browser/test/dspy-engines.node.test.ts
+GALAXIE_BROWSER=webkit pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 examples/rag-browser/test/dspy-engines.node.test.ts
+pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 examples/rag-browser/test/dspy-conformance.node.test.ts examples/rag-browser/test/dspy-state-conformance.node.test.ts
+python/.venv/bin/python -I scripts/record-dspy-conformance.py --check
+python/.venv/bin/python -I scripts/record-dspy-state-conformance.py --check
+pnpm check:docs
 ```
 
 ## DSPy sync entry points and runtime optimizers spike

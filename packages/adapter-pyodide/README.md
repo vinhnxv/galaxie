@@ -535,7 +535,9 @@ after Worker loss. Pause only after the join: interaction requests inside branch
 nested groups and streaming with branches end fixed `unsupported`. Root journaled
 calls during a group and overlapping journaled calls inside one branch are refused
 only when the overlap is observed in flight; otherwise a later resume can end
-`unrecoverable`, so await each branch's calls sequentially.
+`unrecoverable`, so await each branch's calls sequentially. Native-only tests pin
+that two concurrent terminal failures report the first recorded code rather than
+the first in input order, and both siblings drain.
 
 Removing/renaming a recorded key, changing a request or adding a journaled call
 on replay ends `unrecoverable` before dispatch. Earlier rows stay unchanged and
@@ -550,6 +552,10 @@ Threaded verbatim calls, including the default thread count, now end fixed
 requests. With one thread both still end `unsupported`. Raw author-created threads
 are not attributed natively, and a thread-start error caught by author code is
 invisible to the executor. See the [shipped refusal evidence](../../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
+The six thread-pool probes also pass on local Chromium, Firefox and WebKit.
+The [engine measurements](../../tests/conformance/README.md#dspy-engine-measurements)
+add Firefox/WebKit live fan-out goldens and WebKit reload; Firefox reload reaches
+the behavior assertions but diverges at unchanged CSP-header equality checks.
 Plain single-call `asyncio.gather` replays in the measured
 Node cases but fails natively; multi-call re-dispatch can repeat a write before
 `unrecoverable`. Author code must be deterministic apart from journaled calls.
@@ -879,7 +885,8 @@ start a new run under changed state. New code accepts legacy unbound records. Th
 metadata version stays `v: 1` and the byte type tags stay unchanged. Older library
 code refuses bound records without writing; rolling back the library leaves those
 pauses unreadable until the newer code returns. A legacy session that pauses again
-gains the current binding (measured natively only).
+gains the current binding (measured natively and on Node, Chromium and WebKit;
+Firefox's final reload header equality check diverges).
 
 The key adds exactly 82 JSON bytes, about 110 base64 characters, to a paused row.
 The existing 1 MiB bridge check counts it, leaving about 110 bytes less pause
@@ -929,9 +936,10 @@ remain refused under the original state. The recipe adds no independent integrit
 check to public build assets.
 
 Measured with DSPy 3.4.1 and scripted models on CPython, Node Pyodide and Chromium.
-Firefox, WebKit, real models, other DSPy versions, concurrent tabs, forged metadata,
-large many-file descriptors and legacy sessions that pause again outside native
-CPython remain unmeasured. See the
+Later local [engine measurements](../../tests/conformance/README.md#dspy-engine-measurements)
+add WebKit binding, legacy re-pause on Node/Chromium/WebKit and a Firefox reload
+header finding. Real models, concurrent tabs, forged metadata and large many-file
+descriptors remain unmeasured; the other-version attempt could not collect tests. See the
 [spike record and shipped evidence](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
 
 ## Google ADK (Python) agents

@@ -443,10 +443,12 @@ fingerprint recipe covers them and other files.
 This is a consistency check against accidental swaps, not integrity protection:
 metadata is unauthenticated. The shipped native, Node Pyodide and Chromium reload
 probes retain the spike's refusal, unchanged-row, rollback and legacy outcomes.
-Native CPython also measures a legacy session gaining the binding at its next
-pause. Firefox, WebKit, real models, other DSPy versions, concurrent tabs, forged
-metadata, large many-file descriptors and legacy sessions that pause again outside
-native CPython remain unmeasured. ADR-0012 guarantees are unchanged; this ADR stays
+The later local [engine measurements](../../tests/conformance/README.md#dspy-engine-measurements)
+add WebKit binding and legacy re-pause on Node, Chromium and WebKit. Firefox
+reloads reach the behavior assertions but diverge at unchanged CSP-header
+equality checks on reported cached HTTP 304 responses. Real models, concurrent
+tabs, forged metadata and large many-file descriptors remain unmeasured; the
+other-version attempt could not collect tests. ADR-0012 guarantees are unchanged; this ADR stays
 Proposed. See the [shipped evidence](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
 
 ### DSPy parallel and threaded Evaluate spike (2026-11)
@@ -581,7 +583,9 @@ are `dspy/{conversation}/{run.ordinal}/{group}/{key}/{call}` and leave root
 counters alone. The join sorts its journal slice by input key order and local
 call ordinal, including on failure. Ordinary author exceptions wait for siblings
 and raise the first exception in input order; recorded failures and outer
-cancellation cancel and drain siblings.
+cancellation cancel and drain siblings. Native-only tests pin that two concurrent
+terminal failures report the first recorded code rather than the first in input
+order.
 
 Metadata remains `v: 1`. Decision 7's reader-first migration rule concerns the
 `RecoverySession` envelope; these bytes are the executor's opaque journal.
@@ -625,9 +629,12 @@ The [shipped evidence](../../tests/conformance/README.md#shipped-async-branch-he
 uses scripted models on DSPy 3.4.1: CPython and Node Pyodide cover arrival order,
 replay, write receipts and divergence; headless Chromium matches three new live
 goldens and reopens IndexedDB in a fresh page and Worker to replay a joined group
-without redispatch. State-binding reload tests also pass. Chromium divergence
-reload, Firefox, WebKit, real models, other DSPy versions and ReAct branches
-remain unmeasured. No existing golden, fixture entry, matrix entry or lock changes.
+without redispatch. State-binding reload tests also pass. Later local
+[engine measurements](../../tests/conformance/README.md#dspy-engine-measurements)
+add Firefox/WebKit live goldens, WebKit reload and a Firefox reload header finding,
+with native/Node absolute scope and journal-order pins. Chromium divergence
+reload, real models and ReAct branches remain unmeasured; the other-version
+attempt could not collect tests. No existing golden, fixture entry, matrix entry or lock changes.
 This ADR stays Proposed.
 
 ### DSPy thread-pool fan-out refusal (2026-11, shipped)
@@ -661,9 +668,11 @@ keep running author callables after the run ended; their LM calls stay refused. 
 author's own `await asyncio.to_thread(...)` that fails to start a thread in the
 Worker is also reported as `unsupported`, and an error re-raised or wrapped
 without the `Thread.start` frame still ends `executor_error`.
-Chromium, Firefox, WebKit, real models and other DSPy versions are unmeasured.
-Use sequential `await module.acall(...)` loops; the branch journal remains a
-separate follow-up. See the [tests and limits](../../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
+The six probes now pass on Chromium, Firefox and WebKit in the local
+[engine measurements](../../tests/conformance/README.md#dspy-engine-measurements).
+Real models remain unmeasured; the other-version attempt could not collect tests.
+Use sequential `await module.acall(...)` loops or the keyed async branch helper
+above. See the [tests and limits](../../tests/conformance/README.md#dspy-thread-pool-fan-out-refusal).
 This ADR remains Proposed.
 
 ### DSPy sync entry points and runtime optimizers spike (2026-11)

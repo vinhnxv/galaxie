@@ -1,0 +1,43 @@
+{
+  "rule": {
+    "PASS": "Ran and reached its final assertion successfully; a test that did not reach its final assertion is not PASS.",
+    "DIVERGED": "Ran with an unchanged assertion that failed; record the finding and first failing message.",
+    "NOT RUN": "Launch, boot or installation failed; record the error without per-scenario claims.",
+    "EXISTING": "An existing unchanged measurement was run again.",
+    "UNMEASURED": "Not attempted; state the cause."
+  },
+  "engines": ["chromium", "firefox", "webkit"],
+  "scenarios": [
+    {
+      "name": "bind-legacy-repause",
+      "program": "durable-two",
+      "descriptor": "unrelated.json",
+      "steps": [
+        "Pause with a descriptor binding, then remove only stateBinding from metadata.",
+        "Restore in a fresh Worker, answer and pause again with the independent expected binding.",
+        "Change unrelated.json from {} to []; refuse unrecoverable with zero traffic and unchanged rows.",
+        "Restore original JSON in a fresh Worker; complete with one replay and no repeated capability effect."
+      ]
+    }
+  ],
+  "threadPool": [
+    "par-verbatim-thread-start",
+    "par-verbatim-parallel-threads",
+    "par-verbatim-parallel-sequential",
+    "par-verbatim-evaluate-threads",
+    "par-verbatim-evaluate-sequential",
+    "par-refuse-context"
+  ],
+  "fanout": ["fanout-single", "fanout-write", "fanout-multi", "fanout-reload"],
+  "predictions": {
+    "stateBinding": "Firefox and WebKit match the seven existing Chromium outcomes.",
+    "legacyRepause": "Node and all three browsers bind the second pause, refuse changed JSON without traffic or writes, and complete after rollback.",
+    "threadPool": "All three browsers match Node: thread and pool starts raise RuntimeError; the other five probes refuse unsupported with zero requests.",
+    "fanout": "Firefox and WebKit match all three goldens and reload with exactly one replay notification.",
+    "otherVersions": "DSPy 3.2.1 is not installable offline.",
+    "additionalAdapters": "Pause-capable groups and a Parallel-shaped adapter are considered, not built; both require a shipped-source design.",
+    "order": "Scopes count every local journaled call; joins sort by input key order, then local ordinal, independent of arrival order.",
+    "terminalFailures": "The first recorded terminal code wins, independent of input order, measured natively.",
+    "realModels": "Unmeasured: no model access in this environment."
+  }
+}

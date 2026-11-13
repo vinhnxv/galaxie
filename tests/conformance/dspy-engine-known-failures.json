@@ -1,0 +1,15 @@
+{
+  "chromium": [],
+  "firefox": [
+    "firefox binds a legacy session when it pauses again",
+    "firefox replays a joined fanout after a real IndexedDB reload: fanout-reload",
+    "firefox binds paused DSPy state before replay: bind-early-same",
+    "firefox binds paused DSPy state before replay: bind-early-inert",
+    "firefox binds paused DSPy state before replay: bind-late-same",
+    "firefox binds paused DSPy state before replay: bind-late-prompt",
+    "firefox binds paused DSPy state before replay: bind-late-inert",
+    "firefox binds paused DSPy state before replay: bind-early-prompt",
+    "firefox binds paused DSPy state before replay: bind-legacy-late-prompt"
+  ],
+  "webkit": []
+}
