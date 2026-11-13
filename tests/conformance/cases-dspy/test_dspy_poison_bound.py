@@ -16,7 +16,7 @@ from test_dspy_durable import Store, durable, execute, pending
 
 @pytest.fixture(autouse=True)
 def selected_program(monkeypatch):
-    monkeypatch.setattr(durable, 'factory', lambda name, changed=False: create_agent(changed or 'original'))
+    monkeypatch.setattr(durable, 'factory', lambda name, changed=False: create_agent(changed if isinstance(changed, str) else 'original'))
 
 
 def decoded(value):

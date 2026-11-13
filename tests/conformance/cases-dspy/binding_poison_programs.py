@@ -18,7 +18,7 @@ def create_agent(variant='original'):
 
         async def aforward(self, question):
             if variant != 'removed':
-                query = catalog.VALUE if variant == 'data-request' else 'changed' if variant == 'changed' else 'before'
+                query = catalog.VALUE if catalog is not None and variant == 'data-request' else 'changed' if variant == 'changed' else 'before'
                 await capabilities.call('docs.lookup@1', {'query': query})
             request_interaction({'surfaceId': 'main', 'viewRevision': 'first', 'component': 'test.Review/v1', 'props': {}})
             await capabilities.call('docs.lookup@1', {'query': 'after'})
