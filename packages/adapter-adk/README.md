@@ -104,6 +104,8 @@ cycles and retries have no demonstrated replacement here.
 
 ## Pauses and resume
 
+See the [ADK request-input guide](../../docs/guides/adk-request-input.md) for a tested host and agent question example and the reserved-name limit.
+
 A tool created with `requireConfirmation: true`, or with `longRunning: true`, can stop the run to
 wait for the user. The factory may return `defineAdkEntry({ agent, interaction, resume })` instead of
 a bare agent:
@@ -195,6 +197,8 @@ receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `fal
   No wrapper ships.
 
 ### Porting models and static toolsets
+
+See the [ADK models-and-tools guide](../../docs/guides/adk-models-and-tools.md) for tested fresh-factory and flat-list examples across executors.
 
 The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
 keeps string mapping **REFUSED**: a Proxy can pass exact-class and writable-property

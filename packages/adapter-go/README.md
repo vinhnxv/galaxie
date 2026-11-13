@@ -46,6 +46,8 @@ Rename agents for a fresh tree; no Go behavior, stored format or flag changed.
 
 ## Interactions
 
+See the [ADK request-input guide](../../docs/guides/adk-request-input.md#go-and-evidence-limits) for the pinned Go source fact and the limits of the input measurements.
+
 A tool created with `RequireConfirmation` (the tool does not run before approval) or `LongRunning` (the
 tool returns its pending result, and the real result arrives with the answer) ends the run with one
 interaction. The Go author supplies a `galaxie.Definition`: `Interaction` builds the four-field request
@@ -144,6 +146,8 @@ an agent, model, function tool or toolset built directly with ADK, and a tree ou
 `go/galaxie/shapes_test.go`; see the [limits](../../docs/unsupported.md#google-adk-go).
 
 ### Porting models and static toolsets
+
+See the [ADK models-and-tools guide](../../docs/guides/adk-models-and-tools.md) for native-tested explicit-model and fixed-toolset examples across executors.
 
 The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
 adds fixed capability toolsets. Native Go has no

@@ -1827,6 +1827,14 @@ unmeasured; the fixed-rule table distinguishes skipped gates from passes.
 
 ### ADK model, toolset and built-in tool measurements
 
+The [request-input](../../docs/guides/adk-request-input.md) and
+[models-and-tools](../../docs/guides/adk-models-and-tools.md) author guides use
+new [JavaScript](../../packages/adapter-adk/test/author-guides.test.ts),
+[CPython](../../python/galaxie/tests/test_adk_author_guides.py) and
+[native Go](../../go/galaxie/author_guides_test.go) snippet tests.
+[The Node equality check](adk-author-guides.node.test.ts) detects guide drift
+without changing existing conformance cases, goldens or matrices.
+
 The [pre-registered rule and measured gate table](../../docs/adr/0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11)
 record model and static-toolset **ALTERNATIVE** outcomes on all three executors,
 with network built-ins, code executors and planners **REFUSED**. No runtime source,

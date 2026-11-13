@@ -984,6 +984,8 @@ pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) 
 
 ### Porting ADK models and static toolsets
 
+See the [ADK models-and-tools guide](../../docs/guides/adk-models-and-tools.md) for tested declared-role and fixed-toolset examples across executors.
+
 The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
 adds exact declared-role strings and fixed capability toolsets. With `answer` in
 the host's existing role declaration, `model='answer'` uses the same router-backed
@@ -1064,6 +1066,8 @@ those tests do not replace the host's grants, write confirmations or recovery
 store. Dynamic routes, cycles and node retries have no demonstrated replacement.
 
 ### Asking for input
+
+See the [ADK request-input guide](../../docs/guides/adk-request-input.md) for a tested Python city-question factory and its validation and restore evidence.
 
 A confirmation beside ordinary tool calls already works: the ordinary bodies run before the
 ADK answer, and a denied gated body never runs. Both call orders and two siblings match native
