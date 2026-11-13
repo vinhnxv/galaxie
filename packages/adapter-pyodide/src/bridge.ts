@@ -253,9 +253,7 @@ function requestPayload(op: BridgeOp, value: unknown): boolean {
           (value['framework'] === 'adk' &&
             Array.isArray(value['roles']) &&
             value['roles'].length <= 256 &&
-            value['roles'].every(
-              (role: unknown) => typeof role === 'string' && role.length > 0 && role.length <= 128,
-            ))) &&
+            value['roles'].every((role: unknown) => text(role) && role.length <= 128))) &&
         text(value['runtimeUrl']) &&
         text(value['wheelsUrl']) &&
         Array.isArray(value['localWheels']) &&
