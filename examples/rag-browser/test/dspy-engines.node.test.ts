@@ -196,6 +196,19 @@ test('engine selection refuses unknown names with the configuration error', () =
   );
 }, 900000);
 
+test('answers revalidation with the strict CSP header', async () => {
+  const url = `${engine.origin}/conformance/bind-legacy-repause/unrelated.json`;
+  const initial = await fetch(url);
+  expect(initial.status).toBe(200);
+  expect(initial.headers.get('content-security-policy')).toBe(dspyHeader);
+  const etag = initial.headers.get('etag');
+  expect(etag, 'The preview must supply an ETag for conditional revalidation.').toBeTruthy();
+  await initial.arrayBuffer();
+  const revalidated = await fetch(url, { headers: { 'If-None-Match': etag ?? '' } });
+  expect(revalidated.status).toBe(304);
+  expect(revalidated.headers.get('content-security-policy')).toBe(dspyHeader);
+}, 900000);
+
 async function reloadResult(page: Page): Promise<{
   reload: DspyReloadResult;
   bindTraffic?: { models: number; capabilities: number; replayed: number };

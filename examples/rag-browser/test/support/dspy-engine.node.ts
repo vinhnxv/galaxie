@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, firefox, webkit } from 'playwright';
-import { build, type PreviewServer, preview } from 'vite';
+import type { Plugin, PreviewServer } from 'vite';
+import { build, preview } from 'vite';
 import { cspHeader } from '../../src/host/csp.js';
 
 type DspyEngine = 'chromium' | 'firefox' | 'webkit';
@@ -96,6 +97,18 @@ export async function buildDspyPage(
       mode: 'mock',
       logLevel: 'silent',
       build: { outDir },
+      plugins: [
+        {
+          name: 'dspy-engine-csp',
+          configurePreviewServer(server): void {
+            // Vite answers conditional requests with 304 before applying configured headers.
+            server.middlewares.use((_request, response, next) => {
+              response.setHeader('Content-Security-Policy', dspyHeader);
+              next();
+            });
+          },
+        } satisfies Plugin,
+      ],
       preview: {
         host: '127.0.0.1',
         port: 0,
