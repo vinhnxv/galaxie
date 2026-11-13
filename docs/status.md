@@ -1,5 +1,14 @@
 # Project status
 
+On 2026-11-13, the [ADK request-input guide](guides/adk-request-input.md) and
+[models-and-tools guide](guides/adk-models-and-tools.md) add test-checked author
+examples without runtime changes. A Node equality test ties every executable
+code block to its test-owned source. Scripted JavaScript examples run on Node
+and headless Chromium; Python input, restore, models, toolsets and planner
+examples run on CPython; Go model and toolset snippets run natively on pinned
+Go 1.27.3. These examples add no Python Worker or Go wasm scenario. Firefox,
+WebKit, real models and devices remain unmeasured for the guides.
+
 On 2026-11-13, the LangGraph Python execution-identity rerun records **refused**.
 Scripted native CPython and Node Pyodide probes establish a driver-installed
 test-local scope that preserves terminal codes through explicit tool handlers,
