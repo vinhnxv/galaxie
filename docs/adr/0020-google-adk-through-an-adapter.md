@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section).
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates.
 
 ## Context
 
@@ -1060,3 +1060,83 @@ suites provide regression evidence only. Firefox, WebKit, real models, devices,
 Worker-hosted JavaScript, new Python/Go Worker-specific probes, exhaustive external
 toolsets, cloud/container execution and full skipped support gates remain
 unmeasured. A dependency bump reruns the native and executor measurements.
+
+### Host role inventories for model strings and fixed toolsets (2026-11)
+
+#### Outcome rule registered before implementation (2026-11-13)
+
+This follow-up measures declared-role string admission and host-created fixed
+toolsets separately on each executor. It does not promote partial spike evidence.
+The gates GM1–GM8 and GT1–GT5 above must all be measured for their respective
+families, with the existing GN3, GX3 and GL3 refusal rows passing unchanged.
+
+Three gates change because the candidate now includes host-owned inventories:
+
+- GM5 requires JavaScript dispose-then-reprepare of the same author objects to
+  succeed identically. A concurrent second host refuses `unsupported` and the
+  first remains usable. Disposing during an in-flight run must never restore a
+  string or reach ADK's registry. Python prepares use independent Workers:
+  sequential and concurrent prepares of the same sources must work independently.
+  This replaces the old unqualified idempotence gate with each executor's actual
+  ownership model.
+- GM7 compares decoded records across reload, including events, ordinals, pauses,
+  revisions, effect scopes and interaction IDs, excluding only the random
+  per-session integrity key and its MAC. Independently created sessions cannot
+  have equal random key bytes; the persisted formats remain unchanged.
+- GT5 permits only the named fixed-toolset helpers (`host.adk.toolset`,
+  `galaxie.adk.toolset`, `galaxie.Toolset`), string acceptance and an optional
+  `roles` field on the existing ADK Python boot payload. The spike's no-new-surface
+  gate would preclude the helper by definition; no other new surface is allowed.
+
+A cell is **SHIPPED** only when every family gate is measured and passes and its
+source, cases and goldens land. A failed gate yields **REFUSED**, cites the failure,
+keeps executable refusal evidence and ships no candidate source. An unmeasured
+gate yields **INCOMPLETE**, names the missing measurement and its reason and ships
+no candidate source. Go model strings are **not applicable** because its model
+field has no string form; the explicit-model alternative remains available.
+
+| Cell | Prediction | Required evidence that could overturn it |
+| --- | --- | --- |
+| MS-js | SHIPPED | Whole-tree refusal without mutation, disposed-owner remapping, live-owner refusal and disposal during a run |
+| MS-py | SHIPPED | Fresh interpreters, bounded role delivery, atomic assignment, independent repeated prepares and Gemini-name refusal |
+| MS-go | Not applicable | `llmagent.Config.Model` is a `model.LLM`, with no native string form |
+| TS-js | SHIPPED | Fixed registered members, native expansion order, unchanged request surface and pause/reload parity |
+| TS-py | SHIPPED | Fixed registered members, native expansion order, unchanged request surface and pause/reload parity |
+| TS-go | SHIPPED | Native flat-then-toolset order, pause parity, pinned wasm reference build and Node lane |
+
+Network built-ins, code executors, planners, provider configuration and foreign
+models remain refused. A failed safety gate selects refusal; an unavailable Go
+wasm or Node gate selects INCOMPLETE, even if native unit tests pass. Neither
+outcome can be relabelled to fit a prediction.
+
+Admission validates the entire bounded tree before assigning any model. Exact
+classes and writable data properties are required; assignment is verified and
+rolled back on failure. JavaScript records mapped models with their owning host
+and never writes a string back on disposal. Toolset membership uses the host
+registry, with only registered capability tools, fixed order, no filters and no
+duplicate names. Python string mapping additionally refuses display names that
+satisfy ADK's Gemini predicate; explicit model helpers keep their current behavior.
+
+Premises checked before implementation:
+
+- `adapter-pyodide/src/adapter.ts:651–700` creates a new connection and calls
+  `createWorker()` inside each prepare's boot closure. The Worker calls
+  `loadPyodide` (`src/worker.ts:80`) and the ADK driver imports the entry factory
+  once at boot (`src/adk-python-driver.ts:41`). Workers and interpreters are not
+  shared between prepares.
+- ADK JavaScript 2.3.0 registers `supportedModels` regexes and resolves strings
+  lazily; reassignment changes the inherited canonical model. The native test
+  restores both registry and resolution cache. Python 2.12.0 registers regexes
+  from `supported_models()`; its native string tests provide the same oracle.
+- JavaScript and Python expand a toolset at its position in the authored list.
+  Go v1.9.0 `internal/llminternal/tools_processor.go:39–50` copies flat tools then
+  appends each toolset's members. New conformance cases must verify these orders.
+- Existing string/toolset refusal subjects declare no matching inventory. They
+  must continue passing without assertion edits; the census is reported in the PR.
+
+Additive entries in measured executors' matrices and conformance case lists, new fixtures, registrations and golden files are permitted; existing entries, fixtures, goldens and locks stay byte-identical, with documentation of changed refusal reasons recorded separately.
+
+The predictions and this rule are fixed before source changes. Results will be
+appended below. ADR-0012, core contracts, stored records, effect-scope strings,
+interaction IDs and the bridge version remain unchanged. Firefox, WebKit, real
+models, devices and Worker-hosted JavaScript remain unmeasured by this work.
