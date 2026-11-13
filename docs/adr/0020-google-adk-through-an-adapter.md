@@ -222,9 +222,9 @@ admission hooks, ID-seeding change and every candidate-dependent test. No
 conformance cases, goldens, matrix entries, locks or existing assertions change.
 
 Both variants ran against the pinned ADK 2.3.0 web bundle with scripted models on
-Node and headless Chromium. The primary gate command had 108 passing assertions
-and two failing assertions (one copied-state parity failure per project). The
-entry-only command had 106 passing assertions and the same two failures; its
+Node and headless Chromium. The primary gate command had 108 passing tests
+and two failing tests (one copied-state parity failure per project). The
+entry-only command had 106 passing tests and the same two failures; its
 live-mutation entry check also passed separately on both projects. Native premise
 tests were rerun unchanged in both commands.
 
