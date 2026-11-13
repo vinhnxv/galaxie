@@ -66,6 +66,6 @@ Still open, so the status stays Proposed: a real-device measurement of boot, mem
 
 The [stream namespace spike](0020-google-adk-through-an-adapter.md#stream-namespaces-workflow-agents-and-subgraphs-spike-2026-11) records this executor's measured attribution and Workflow limits; its subgraphs flag and runtime remain unchanged.
 
-The [model/toolset/built-in spike](0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11) records explicit-model and static capability-list alternatives, with provider tools, code executors and planners refused; this executor's runtime stays unchanged.
+The [host inventory outcome](0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11) adds `galaxie.Toolset` over same-build capability tools, with native declaration-order, pause/effect/reload and pinned wasm/Node evidence. Model strings are not applicable; `Model(role)` remains the explicit form. Foreign/native/dynamic toolsets and provider tools remain refused, and the pinned config has no planner or code-executor field. The prior model/toolset spike remains the historical record.
 
 The [duplicate-identity outcome](0020-google-adk-through-an-adapter.md#duplicate-identity-measured-outcome-2026-11-13) confirms the existing native global-name refusal before dispatch; Go source and tests remain unchanged.

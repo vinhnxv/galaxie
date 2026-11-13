@@ -20,7 +20,7 @@ Google modules), BSD-3-Clause modules (`golang.org/x/*`, protobuf, `wasm_exec.js
 BSD-2-Clause ones; `wasm.lock` has the license of each. Build with the command in the
 [adapter README](../packages/adapter-go/README.md#build-and-licenses).
 
-The [model/toolset porting recipes](../packages/adapter-go/README.md#porting-models-and-static-toolsets) describe the measured explicit-model and flat capability-list alternatives; no new constructor ships. Provider-native tools, planners and code executors remain refused or absent at the pinned version.
+The [model/toolset porting recipes](../packages/adapter-go/README.md#porting-models-and-static-toolsets) use `Model(role)` and `Toolset(tools...)` over capability tools from the current build. Fixed toolsets expand after flat tools and retain the same confirmation, effect and reload behavior. Native Go has no string-model form. Foreign models and toolsets, provider-native tools, planners and code executors remain refused or absent at the pinned version.
 
 ## Commands
 

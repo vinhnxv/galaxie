@@ -56,6 +56,12 @@ and `agents.go` validate the tree when it is built: unknown agents, models and t
 only with a native Go case in `go/conformance/cases` and a golden, a refusal test in `go/galaxie`, and the
 matrix entry; never lift a refusal to make a case pass. `subgraphs` stays false.
 
+`galaxie.Toolset` groups only capability tools from the current build. Preserve
+flat-then-toolset order, copied slices and registry membership; control tools,
+foreign or nested sets, empty groups and duplicate names remain refused. Include
+members in the existing pause scan and clear native `Toolsets` before constructing
+the ADK agent. String models are not applicable in Go.
+
 ## Tests
 
 Run `pnpm exec vitest run packages/adapter-go tests/conformance/adk-go.node.test.ts tests/conformance/adk-go-run.node.test.ts

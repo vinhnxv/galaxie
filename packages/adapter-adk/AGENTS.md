@@ -43,6 +43,12 @@ ambiguous or refused author before registration or loading (`unrecoverable`). An
 record metadata and must never be logged, put in a span or error, or exported. Author code sees positional requests only; never expose ADK call IDs. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle, so
 hosts must apply the build define.
 
+String mapping remains refused: writable exact-class Proxies cannot guarantee
+rollback after a failed assignment. The fixed-toolset helper attempt also remains
+refused because adding a host API key fails an existing assertion that this change
+must preserve. Build fresh trees with explicit `host.adk.llm(role)` models and flat
+capability-tool lists. Native, author-defined and dynamic toolsets remain refused.
+
 ## Tests
 
 Run `pnpm exec vitest run packages/adapter-adk tests/conformance/adk.test.ts

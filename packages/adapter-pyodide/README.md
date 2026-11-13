@@ -982,26 +982,40 @@ pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) 
 
 ### Porting ADK models and static toolsets
 
-The [model/toolset/built-in spike](../../docs/adr/0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11)
-records **ALTERNATIVE** for explicit models and static capability lists. Replace
-`model='gemini-2.5-flash'` or a foreign model with `model=llm('answer')`; the host
-must declare and route `answer`. Prepare has no declared-role list, so string
-mapping cannot fail closed there without a new bridge field. Prefer role names
-such as `answer`: ADK treats the display name `galaxie/gemini-*` as Gemini-like,
-although built-ins still fail at prepare regardless of that name.
+The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
+adds exact declared-role strings and fixed capability toolsets. With `answer` in
+the host's existing role declaration, `model='answer'` uses the same router-backed
+model type as `llm('answer')`. Unknown, case/whitespace variants, display names,
+Gemini objects and foreign models fail fixed `unsupported` at prepare, before
+model, capability or store access. The whole tree is validated before assignment;
+a failed assignment restores its original model fields.
+
+The optional ADK-only boot inventory contains at most 256 roles of 1–128 characters.
+The host omits invalid-length roles and takes the first 256 remaining declarations;
+strings naming omitted roles stay refused. Duplicate inventory entries refuse
+`unsupported`; malformed boot inventories fail `invalid`. A mapped role whose
+`galaxie/<role>` display name satisfies ADK's Gemini predicate is refused. Prefer
+names such as `answer`; the explicit `llm(role)` helper keeps its existing behavior.
 
 ```python
 from google.adk.agents import LlmAgent
-from galaxie.adk import capability_tool, llm
+from galaxie.adk import capability_tool, toolset
 
 SPECS = [('search', 'docs.search@1', {'type': 'object', 'properties': {'q': {'type': 'string'}}, 'required': ['q']}, 'Search documents.')]
 
 def create():
-    return LlmAgent(name='root', model=llm('answer'), tools=[
+    return LlmAgent(name='root', model='answer', tools=[toolset([
         capability_tool(name, capability, parameters, description)
         for name, capability, parameters, description in SPECS
-    ])
+    ])])
 ```
+
+Each prepare boots an independent Worker and interpreter; sequential or concurrent
+prepares of the same sources do not share author objects. The role declaration is
+trusted Python configuration, not an isolation boundary. `toolset` copies a non-empty
+list of this boot's capability tools, expands at its position and preserves the
+existing pause rules. Empty, nested, foreign, control-tool and duplicate-name groups
+(including collisions with flat tools) fail `unsupported`.
 
 Keep the table static and construct tools inside the entry factory. MCP-backed
 entries use the host's `tools-mcp` bindings. Per-turn dynamic lists and network
@@ -1010,8 +1024,8 @@ and both planners remain **REFUSED**: provider tool config is rejected before th
 bridge; thinking config is omitted; instruction text does not reproduce PlanReAct
 final retagging under the same script. Use a narrow host-bound read capability for
 network data as general guidance, not as this spike's same-script alternative.
-New probes ran on CPython only; existing Worker/browser suites are regression
-evidence. No new Worker support, real-model, Firefox or WebKit result is claimed.
+Scripted CPython and Node Pyodide tests cover these inventories and reload behavior.
+Firefox, WebKit, real models and devices remain unmeasured for this addition.
 
 ### ADK message attribution
 

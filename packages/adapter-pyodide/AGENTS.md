@@ -67,6 +67,14 @@ Keep `subgraphs` false and keep the parallel-write replay test
 (`tests/conformance/adk-python-agents.node.test.ts`) green when changing effect scopes.
 Rebuild the wheel (`node scripts/build-python-wheels.ts`) after changing `python/galaxie`.
 
+ADK Python also accepts exact declared-role strings through the optional ADK-only
+boot inventory (at most 256 roles, 1–128 characters). Keep whole-tree validation
+before verified model assignment, fixed failure codes and the Gemini-name guard.
+Each prepare owns a fresh interpreter; this trusted declaration is not isolation.
+`galaxie.adk.toolset` admits only fixed same-boot capability tools; preserve order,
+duplicate checks and flattened pause scanning. Native, dynamic and foreign
+toolsets, built-ins, planners and code executors remain refused.
+
 ## Tests
 
 Run the focused bridge and adapter tests with Vitest on Node and Chromium. Real

@@ -130,6 +130,7 @@ program registers entries with `galaxie.Serve` (or `ServeWith` for entries that 
 | `Model(role)` | The model of an `LlmAgent`: every request goes to the page's router for that role. |
 | `LlmAgent`, `SequentialAgent`, `ParallelAgent`, `LoopAgent(config, maxIterations)` | ADK's agents, wrapped so the tree can be checked. `LlmAgent` sub-agents give ADK's transfer. |
 | `CapabilityTool(name, spec)` | A function tool that calls a host capability through the broker. `spec` sets the description, the JSON schema and `RequireConfirmation` or `LongRunning`. |
+| `Toolset(tools...)` | A fixed, ordered grouping of capability tools created during this build; returns the toolset and an error. |
 | `ExitLoop()` | The tool that ends a `LoopAgent`; a loop needs it or a non-zero iteration limit. |
 | `Definition{Build, Interaction, Resume}` | Pairs an entry with the hooks that turn paused calls into a request and an answer into decisions. |
 
@@ -144,8 +145,8 @@ an agent, model, function tool or toolset built directly with ADK, and a tree ou
 
 ### Porting models and static toolsets
 
-The [model/toolset/built-in spike](../../docs/adr/0020-google-adk-through-an-adapter.md#string-models-toolsets-code-executors-planners-and-built-in-tools-spike-2026-11)
-records **ALTERNATIVE** for models and static capability lists. Native Go has no
+The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
+adds fixed capability toolsets. Native Go has no
 string-model form. Replace a foreign `model.LLM` with `galaxie.Model("answer")`;
 the host declares and routes `answer`. A foreign model or native toolset still
 fails `unsupported` before requests. Create fresh values inside `Definition.Build`.
@@ -161,18 +162,29 @@ func build() (agent.Agent, error) {
         if err != nil { return nil, err }
         tools = append(tools, created)
     }
-    return galaxie.LlmAgent(llmagent.Config{Name: "root", Model: galaxie.Model("answer"), Tools: tools})
+    group, err := galaxie.Toolset(tools...)
+    if err != nil { return nil, err }
+    return galaxie.LlmAgent(llmagent.Config{Name: "root", Model: galaxie.Model("answer"), Toolsets: []tool.Toolset{group}})
 }
 ```
+
+`galaxie.Toolset` accepts a non-empty list of capability tools from the current
+build, copies it and returns fresh slices. `LlmAgent` appends toolset members after
+flat tools, in toolset order, then clears native `Toolsets` before constructing the
+agent. Empty, nested, foreign, control-tool and duplicate-name groups refuse
+`unsupported`; names must also be distinct from flat tools and other groups.
+Grouped tools obey the existing pause and replay rules. Native ADK toolsets,
+dynamic lists and network toolsets stay refused.
 
 This uses the existing `agent`, `llmagent`, `tool` and `galaxie` imports. MCP-backed
 entries use the host's `tools-mcp` capability bindings. Dynamic lists and network
 toolsets have no proven replacement. Built-in network/code tools remain **REFUSED**:
 `RequestToWire` rejects provider tool configuration. The pinned agent config has
 no planner or code-executor field. Host-bound network reads are general guidance,
-not a same-script replacement for provider-native tools. New evidence is native
-Go only; existing Worker/restore suites remain regression coverage. Firefox,
-WebKit, real models and new Worker-specific measurements remain unmeasured.
+not a same-script replacement for provider-native tools. Scripted native Go and
+Node Worker tests cover fixed-toolset declaration order, confirmation, reload and
+effect identity. Firefox, WebKit, real models and devices remain unmeasured for
+these shapes.
 
 ## Build and licenses
 
