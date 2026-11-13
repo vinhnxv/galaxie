@@ -31,6 +31,7 @@
   2026-11-13: accepted the existing DSPy runtime divergence poison checkpoint and revised the gate for a separately scoped helper retry, with sequential and branch persistence pins; status stays Proposed.
 
   2026-11-12: the LangGraph Python tool-call replies spike registered its outcome rule before measurement; subsequent evidence records five text-protocol alternatives and neighbouring-shape refusal, with no production source shipped.
+  2026-11-13: registered the LangGraph Python execution-identity rerun rule and predictions before measurement.
 
 ## Context
 
@@ -825,6 +826,7 @@ Native evidence is in `2db3ae2`, the CPython candidate in `78f0434`, and real
 Node Pyodide/core evidence in `84c6638`. No candidate is promoted: the
 swallowed-failure floor failed. No production source, existing golden, case list,
 stored format, identity derivation or lock changed; no wheel rebuild was needed.
+The execution-identity rerun below tests a driver-installed replacement for the missing run key.
 
 | Cell | Outcome | Measured replacement or refusal |
 | --- | --- | --- |
@@ -893,3 +895,104 @@ No new goldens are awarded to alternatives. The adapter
 states the missing ToolNode/schema-choice/tool-delta behavior, sequential calls,
 uncaught-error requirement and direct-call tool-policy limit. Decision 3 and
 ADR-0012 remain unchanged; this ADR stays Proposed.
+
+#### Execution identity rerun (2026-11-13)
+
+##### Outcome rule registered before measurement
+
+This rerun tests an explicit execution scope installed before the driver iterates
+each `astream`, including resume. A private `ContextVar` carries one mutable object
+into copied node/tool contexts. Its content is bounded: an integer identity and
+at most one fixed key from `ERROR_MESSAGES`; unknown codes normalize to `invalid`.
+The first helper failure other than `denied`, or any tool-model request/validation
+failure, wins. Both entry points check it before validation or transport. Only a
+helper's `denied` becomes fixed model-visible text.
+
+At execution end, a latch replaces normal completion or a later `GalaxieError`
+with its original code. An exception already carrying that code, or any other
+exception type (including recursion and cancellation), propagates unchanged to
+the existing driver mapping. Cleanup closes the scope and resets the variable.
+Direct author `capabilities.call` remains outside this guard; the driver does not
+install `capabilities.failures`. Already-started sibling tools may complete.
+Checkpoint writes after the latch are observed, not blocked, unless the experiment
+finds a host write starting afterwards or silent success.
+
+The candidate is test-local first: a graph wrapper supplies the driver scope.
+Only a passing decision promotes it to a new tool-model surface beside the
+unchanged `GalaxieChatModel`. Streaming tool deltas remain `unsupported`.
+If context propagation fails, try a config-carried identity once in the failing
+lane, requiring forwarded config and refusing a missing identity `unsupported`.
+No thread or task namespace is substituted for execution identity.
+
+L1 is native CPython 3.14 with the pinned LangGraph environment. L2 is Node
+Pyodide through real core and the real adapter. Every applicable gate is measured,
+even after a failure, as PASS, FAIL or UNMEASURED (with the blocking reason).
+An inapplicable lane is NA. A skipped test is UNMEASURED, never PASS.
+
+| Gate | Favorable condition | Applicable lanes |
+| --- | --- | --- |
+| N1 native premise | The nine native tool-call tests and unchanged proxy, bridge and checkpointer premise files pass. A failing native premise makes matching L2 gates NA. | L1 |
+| N3 identity visibility | The same scope reaches model nodes, tool coroutines, parallel tools, subgraphs and author `gather` children. It disappears after normal completion and early close; sequential executions have distinct identities. | L1, L2 |
+| G1.1 wire fidelity | Ordered declarations, descriptions and JSON Schema, four tool choices, JSON-string assistant arguments, tool-role IDs and decoded calls retain their values. | L1, L2 |
+| G1.2 routing | A tool-calling provider runs; missing feature fails before dispatch; missing `bindTools` fails `unsupported` (record the measured code). | L2 |
+| G1.3 parity | Final state, message projection, ordered broker calls and counters match a native reference produced at test time; differences are named. | L2 |
+| G1.4 reply validity | Non-object/non-JSON arguments, duplicate IDs, empty names and unoffered names fail fixed `invalid` before tool execution. | L1, L2 |
+| G1.5 unchanged behavior | Existing tool-less, schema and text-stream behavior passes unchanged; tool history without binding has a recorded outcome. | L1, L2 |
+| G3.1 approval | A covered write with `approval: 'confirm'` runs once on frozen arguments after approval only. | L2 |
+| G3.2 decline | Decline produces fixed tool text, bounded continuation and zero writes. | L2 |
+| G3.3 refused writes | Missing confirmation, missing coverage and unbound capabilities end `invalid`, with zero host writes. | L2 |
+| G3.4 difference | Dict-schema tools skip native validation; schema-invalid arguments reach the broker and end `invalid`, unlike the JavaScript helper's tool text. Record the difference, not a pass gate. | L1, L2 |
+| G3.5 cancellation | Aborting pending confirmation settles `cancelled`, with no unsettled lease or write. | L2 |
+| G4.1 output checks | Blocked arguments or IDs end `denied` before any tool body or broker call. Floor gate. | L1, L2 |
+| G4.2 tool budget | Call n+1 ends `budget_exceeded` before host dispatch under the default handler. Floor gate. | L1, L2 |
+| G4.3 step budget | An endless loop stops at the recursion limit with bounded broker calls and no later model request; L1 asserts the exception and L2 its `budget_exceeded` mapping. | L1, L2 |
+| G4.4 labels | A private-user tool result cannot reach a refused model destination; the next request ends `denied` without provider dispatch. Floor gate. | L1, L2 |
+| G4.5 swallowed failures | All six terminal codes survive boolean and callable handlers, with and without a subsequent proxy request; no model/helper/host write starts afterwards. Floor gate. | L1, L2 |
+| G4.6 fresh executions | After failure, the same prepared Worker issues requests normally on fresh executions in the same and another session. Floor gate. | L1, L2 |
+| G4.7 observation | Record checkpoint/host writes and already-started sibling completions after failure, plus reused-session behavior. No independent pass condition. | L1, L2 |
+| G4.8 bounded identity | Only the integer identity and fixed failure code persist; hostile error/message/argument text never appears in scope, errors or post-latch bridge requests. Floor gate. | L1, L2 |
+| G5.1 parallel identity | Two calls have distinct effect IDs and receipts, stable across replay of that step. | L2 |
+| G5.2 crash after write | Worker loss after a write but before the tool checkpoint replays with one host write overall. Floor-equivalent write-once gate. | L2 |
+| G5.3 restore | A fresh Worker restores a completed loop and pause through bytes without rerunning the completed tool node; state matches native reconstruction. | L2 |
+| G5.4 serialization | AI/tool messages round-trip within 1 MiB; oversized results fail `unsupported` without partial checkpoints. | L2 |
+| G6.1 binding refusals | Ordinary tools/callables/dicts/classes, function output, extra kwargs, bad choices, duplicate/invalid names and oversized schemas fail fixed codes before transport. | L1, L2 |
+| G6.2 history refusals | Multimodal/non-string/artifact/error-status tool history and orphan IDs fail fixed codes before transport. Native models and direct trusted calls stay outside the guard. | L1, L2 |
+| AL text protocol | The four unchanged CPython comparisons and existing Node text-protocol tests still pass. | L1, L2 |
+
+The six terminal codes are `budget_exceeded`, `cancelled`, `timeout`,
+`unavailable`, `outcome_unknown` and `unrecoverable`. The floor gates are G4.1,
+G4.2, G4.4, G4.5, G4.6, G4.8 and G5.2. Apply these outcome rows once, in order,
+over both applicable lanes:
+
+| Order | Outcome | Condition and shipped result |
+| --- | --- | --- |
+| 1 | SUPPORTED | Every gate except the G3.4 difference and G4.7 observation passes in every applicable lane, no stop condition fired, and promotion re-runs the gates successfully against shipped code. Ship the whole helper, driver scope, new cases/goldens and docs. |
+| 2 | REFUSED | Otherwise, identity visibility fails for both attempted designs in a lane, progress needs a core/bridge/protected-artifact change or weaker ADR-0012 control, or AL fails. Ship evidence and refusal only. |
+| 3 | ALTERNATIVE | Otherwise, at least one gate fails and AL passes in both lanes. Ship evidence and the existing text-protocol recipe only. |
+| 4 | INCOMPLETE | All remaining combinations, including unmeasured required gates or a failure while AL is unmeasured. Ship no candidate source and state what would unblock measurement. |
+
+A failed or unmeasured floor gate never permits promotion. There is no read-only
+partial promotion: narrowing would require an excluded bridge change. A premise
+disagreement takes the record branch (ALTERNATIVE if AL passes, otherwise
+INCOMPLETE). Existing-test or recorder drift must be fixed or the candidate
+removed. Existing goldens, fixtures, case lists, matrix entries and locks stay
+byte-identical; only new entries/files may be added. Rule, premise, candidate,
+gate and decision commits remain separately identifiable. The decision record
+will cite the evidence commits.
+
+| Prediction | Registered expectation |
+| --- | --- |
+| P1 | Context visibility passes in L1 and L2, including subgraphs and author-created tasks. |
+| P2 | G4.5 retains all six codes under both handlers, including graphs with no later model request. |
+| P3 | G4.6 passes because scope lifetime is one execution with cleanup in `finally`. |
+| P4 | Checkpoint writes can follow the latch, but host capability writes cannot start afterwards; reused failed history ends fixed `unsupported` at the next model call. |
+| P5 | Parallel effect ordinals are deterministic and G5.1 passes. This is the least certain prediction. |
+| P6 | Missing tool-calling support prevents dispatch; the missing-`bindTools` code is recorded. |
+| P7 | Dict schemas skip native validation and broker rejection ends `invalid`. |
+| P8 | The overall outcome is SUPPORTED; G5.1/G5.2 are the likeliest counterexamples. |
+
+Chromium reload, Firefox, WebKit, real models, other versions and other executors
+remain unmeasured. Author Python is trusted and can import `js`; the Worker is not
+an isolation boundary. A retained helper must document direct-call exclusions,
+in-flight siblings, post-failure checkpoint rows, starting a new session after a
+failed run, and streaming refusal. ADR-0012 controls remain in JavaScript.
