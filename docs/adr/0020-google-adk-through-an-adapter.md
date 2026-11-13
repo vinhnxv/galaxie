@@ -1486,6 +1486,10 @@ models, devices and Worker-hosted JavaScript remain unmeasured by this work.
 
 #### Host inventory measured outcome (2026-11-13)
 
+The [JavaScript retry below](#javascript-host-inventory-retry-2026-11) supersedes
+the JavaScript outcomes for opted-in strings and exported fixed toolsets; this
+section retains the earlier attempt's evidence.
+
 The rule above was committed as `a374352` before candidate source changes. The
 baseline passed JavaScript Node/Chromium (667 tests, six existing skips), Python
 (1536 tests), ADK Python Workers (79 tests) and pinned Go 1.27.3. No Beads writes
@@ -1619,6 +1623,61 @@ four classes have only own data fields (40, 19, 19 and 20 keys respectively). It
 clone reads construction config and `this.constructor`; the Runner does not invoke
 it. String canonicalization uses ADK's registry lazily, toolsets expand in place,
 and an empty tool filter selects all. Executable retry tests must retain these facts.
+
+#### JavaScript retry measured outcome (2026-11-14)
+
+| Cell | Outcome | Evidence |
+| --- | --- | --- |
+| MS-js-opt | **SHIPPED** | GM1–GM9 pass: exact-role admission, class-first refusal, untouched ADK registry/cache, helper-equivalent routing, streams, output checks, labels and budget boundaries, independent repeated/concurrent prepares, native Gemini-name refusals, decoded reload equality and copy fidelity. |
+| MS-js-auto | **REFUSED** | GM8 fails by the protected declared-role control in `role-inventory.test.ts`: without the opt-in, the same string tree must refuse `unsupported` before writes, model or store access. No automatic mapper ships. |
+| TS-js | **SHIPPED** | GT1–GT5 pass: frozen same-host capability membership, native/flat declaration and result parity, unchanged confirmation/long-running pause positions, effect and interaction identity, one confirmed write across reload, neighbouring-shape refusals and unchanged host keys. |
+
+All three registered predictions held. Built-in network tools, provider tool
+configuration, code executors and planners remain refused; their existing tests
+run unmodified, with additional role-string refusal rows. No shipped cell has a
+failed or unmeasured family gate. Real models, device measurements and
+Worker-hosted JavaScript remain outside these scripted gates and unmeasured.
+
+Executable evidence is in `role-strings.test.ts`, `role-strings-hostile.test.ts`,
+`role-strings-native.test.ts`, `role-strings-durability.test.ts` and
+`role-toolsets.test.ts`. The hostile tests preserve descriptors, array contents and
+extensibility through prepare, run and dispose, with zero calls to all five
+write-class Proxy traps. Exact-class copies retain every live own field, plain
+copied arrays, ADK brands, lookup and parent traversal; construction config and
+author clone/constructor methods do not drive execution. Arrays with holes or
+accessor elements refuse without invoking their accessors or species.
+
+The two new conformance cases use a native registry-registered scripted model and
+a real native `BaseToolset` respectively. Their new goldens match the galaxie
+lanes. All twelve existing JavaScript goldens, Python/Go goldens and locks remain
+byte-identical. Matrix entries and the allowed golden registrations only gain
+lines; every other existing test is unchanged.
+
+The integrated Node/Chromium ADK selection passes **83 files, 974 tests, seven
+skipped**. The five new test files plus `adk.test.ts` pass **six files, 104 tests**
+on each of local Firefox and WebKit. Both TypeScript compiler lanes and lint pass.
+The final local `pnpm check` passes, including Python/Go regressions, builds and
+dependency, documentation and size checks. Reproduce commands are in the
+[conformance guide](../../tests/conformance/README.md#javascript-host-inventory-retry).
+Go regression steps use pinned Go 1.27.3 with `GOTOOLCHAIN=local`.
+
+Durability recreates the runtime over one store, reopening IndexedDB in browsers;
+it does not navigate the page. Deterministic UUID, event-ID and clock providers
+preserve complete record equality, including event IDs, timestamps, revision IDs,
+ordinals and pauses, excluding only the independently random integrity key and
+MAC. The same interaction ID and capability effect scope survive confirmation
+reload, with one host write. Public runtime snapshots expose no numeric budget
+counters: request counts, usage/step spans and step/token/tool-call exhaustion
+boundaries provide the counter evidence alongside route, labels and output checks.
+
+The run executes a host-owned copy, so author agent identity is not preserved.
+Opt-in strings can reuse author trees across hosts; explicit helper models still
+belong to one host. The exported toolset helper adds no host key. ADR-0012 is
+unchanged: mapped models are the existing router-backed objects, no network path
+is added, and provider features retain their refusals. Core, persisted formats,
+effect-scope strings, interaction-ID derivation and bridge versions are unchanged.
+Unconditional string mapping needs explicit authorization to change the protected
+control; a future ADK upgrade must rerun the shape and copy-fidelity evidence.
 
 ### Engine measurements and the native Go identity oracle (2026-11)
 

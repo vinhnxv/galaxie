@@ -688,18 +688,19 @@ real-model format reliability, hands-on review and device performance are unmeas
 
 ## Google ADK conversations
 
-The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
-keeps JavaScript strings and toolsets refused. New `role-inventory.test.ts` probes
-show that writable exact-class Proxies can defeat rollback; real prepare refuses
-without changing the tree. The fixed-toolset candidate failed the protected exact
-host-API assertion, so it ships no source or golden. The new toolset refusal file
-covers static, dynamic, nested, throwing and network sets before expansion or requests.
+The [JavaScript host inventory retry](../../docs/adr/0020-google-adk-through-an-adapter.md#javascript-host-inventory-retry-2026-11)
+ships opt-in `roleStrings` through a host-owned tree and exported `adkToolset` over
+fixed same-host capability tools. The earlier host-inventory attempt remains a
+historical refusal: writable exact-class Proxies defeat rollback, and a host API
+key broke the exact inventory assertion. Its existing tests remain unchanged;
+strings without the opt-in and author-defined, dynamic, nested, throwing and
+network toolsets still refuse before expansion or requests.
 
-The separate [ADK matrix](compatibility-matrix-adk.json) lists twelve cases for the `adk-js`
+The separate [ADK matrix](compatibility-matrix-adk.json) lists fourteen cases for the `adk-js`
 adapter: plain text, one and two sequential capability tool calls, an output schema with an output
 key, a capability denial, an output-safety block on a function-call argument, the step budget,
 abort, two streaming cases (text only, and a tool turn) and two approval cases (a confirmation
-that is approved, and one that is denied). The reference is the pinned ADK 2.3.0 web bundle driven by its own `Runner` with a scripted
+that is approved, and one that is denied), plus declared-role strings and a fixed toolset. The reference is the pinned ADK 2.3.0 web bundle driven by its own `Runner` with a scripted
 `BaseLlm` ([native lane](adk-native.node.test.ts), which writes the `golden-adk` files). The
 [galaxie lane](adk.test.ts) runs the same agent through the adapter, router and broker on Node and
 in headless Chromium and compares ADK-side requests, responses, capability calls, output and error
@@ -732,6 +733,44 @@ and no new pause admission ships.
 Agent shapes (`SequentialAgent`, `LoopAgent`, `ParallelAgent`, transfer) are compared with native ADK in [agents.test.ts](../../packages/adapter-adk/test/agents.test.ts), which also covers parallel write branches re-dispatched with reversed arrival and the refused pauses; the first-child pause reload is in `adk-restore.test.ts`.
 
 Run it with `pnpm exec vitest run tests/conformance/adk.test.ts tests/conformance/adk-native.node.test.ts`. To rewrite the goldens on purpose, set `ADK_UPDATE_GOLDEN=1` for the native test, run `pnpm format` and review the diff.
+
+### JavaScript host inventory retry
+
+The additive `model-string` case runs the plain-text script through
+`defineAdkEntry({ agent, roleStrings: true })`; its native oracle registers a
+scripted `BaseLlm` under `answer` and restores the registry and resolution cache
+afterwards. `toolset-fixed` runs the capability script through exported
+`adkToolset(host, tools)` against a native `BaseToolset`. Existing goldens, matrix
+entries and refusal assertions stay byte-identical.
+
+The five new adapter files cover exact-role admission, registry isolation,
+hostile Proxy write traps, copy fidelity and live fields, independent repeated
+prepares, native/flat declarations, neighbouring refusals and confirmation and
+long-running pause positions. Real runtime tests compare routed requests, checked
+streams, labels, output checks, usage/step spans and budget-exhaustion boundaries.
+Confirmation reload compares complete decoded records, including event IDs,
+timestamps, revisions, ordinals and pauses; only the random key and MAC differ.
+Node uses memory storage; browsers close/reopen IndexedDB and recreate the runtime,
+without navigating the page. Effects and interaction IDs match with one host write.
+
+Measured locally: the integrated Node/Chromium selection passes 974 tests in 83
+files, with seven skipped. The five new files and golden suite pass 104 tests in
+six files on each of Firefox and WebKit. No divergence was observed. Real models,
+device performance and Worker-hosted JavaScript remain unmeasured. No existing
+host API key or no-opt-in string assertion changes.
+
+```sh
+pnpm exec vitest run --testTimeout=900000 packages/adapter-adk tests/conformance/adk.test.ts tests/conformance/adk-native.node.test.ts tests/conformance/adk-restore.test.ts
+GALAXIE_BROWSER=firefox pnpm exec vitest run --testTimeout=900000 --project 'browser (firefox)' tests/conformance/adk.test.ts packages/adapter-adk/test/role-strings.test.ts packages/adapter-adk/test/role-strings-hostile.test.ts packages/adapter-adk/test/role-strings-native.test.ts packages/adapter-adk/test/role-strings-durability.test.ts packages/adapter-adk/test/role-toolsets.test.ts
+GALAXIE_BROWSER=webkit pnpm exec vitest run --testTimeout=900000 --project 'browser (webkit)' tests/conformance/adk.test.ts packages/adapter-adk/test/role-strings.test.ts packages/adapter-adk/test/role-strings-hostile.test.ts packages/adapter-adk/test/role-strings-native.test.ts packages/adapter-adk/test/role-strings-durability.test.ts packages/adapter-adk/test/role-toolsets.test.ts
+ADK_UPDATE_GOLDEN=1 pnpm exec vitest run --testTimeout=900000 --project node tests/conformance/adk-native.node.test.ts -t 'model-string|toolset-fixed'
+```
+
+The recorder command selects only the two new goldens; run `pnpm format` after
+recording. For the full local gate, put Go 1.27.3 first on `PATH`, set
+`GOTOOLCHAIN=local`, rebuild the ignored wheels with
+`node scripts/build-python-wheels.ts`, then run `pnpm check` with at least a
+30-minute process timeout.
 
 ## Google ADK Python conversations
 
