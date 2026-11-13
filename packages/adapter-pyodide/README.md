@@ -1001,6 +1001,13 @@ strings naming omitted roles stay refused. Duplicate inventory entries refuse
 `galaxie/<role>` display name satisfies ADK's Gemini predicate is refused. Prefer
 names such as `answer`; the explicit `llm(role)` helper keeps its existing behavior.
 
+Omission produces no host-visible error: a string naming an omitted role fails
+`unsupported` at prepare. A repeated role in a hand-built boot payload fails the
+whole boot `unsupported`; a failed declaration preserves the previous inventory.
+Model strings must be exact `str` values. ADK normalizes `StrEnum` members and
+plain `str` subclasses during construction; a subclass assigned afterwards is
+refused at prepare before any model field is replaced.
+
 ```python
 from google.adk.agents import LlmAgent
 from galaxie.adk import capability_tool, toolset

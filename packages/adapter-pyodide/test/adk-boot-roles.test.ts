@@ -103,3 +103,41 @@ test('the host omits out-of-bound roles, caps valid roles and sends the inventor
     fetch.mockRestore();
   }
 });
+
+test('ADK boot admits a 128-character role and keeps the first 256 valid declarations in order', async () => {
+  const origin = typeof location === 'undefined' ? 'http://127.0.0.1:1234' : location.origin;
+  const fetch = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(async () => new Response('def create_agent(): pass'));
+  const boundary = 'x'.repeat(128);
+  const roles = Array.from({ length: 256 }, (_, index) => `role${index}`);
+  const worker = new BootWorker();
+  try {
+    const prepared = await createPyodideAdapter({
+      framework: 'adk',
+      createWorker: () => worker,
+      runtimeUrl: `${origin}/python/`,
+      wheelsUrl: `${origin}/wheels/`,
+      localWheels: [],
+    }).prepare(
+      {
+        baseUrl: `${origin}/agent/`,
+        files: ['agent.py'],
+        module: 'agent',
+        entry: 'create_agent',
+      },
+      { chatModels: {} },
+      {
+        signal: new AbortController().signal,
+        models: { roles: [boundary, '', 'x'.repeat(129), ...roles], providers: {} },
+      },
+    );
+    try {
+      expect(worker.payload?.roles).toEqual([boundary, ...roles.slice(0, 255)]);
+    } finally {
+      await prepared.dispose();
+    }
+  } finally {
+    fetch.mockRestore();
+  }
+});

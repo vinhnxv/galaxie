@@ -651,8 +651,8 @@ def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str
         if isinstance(agent, LlmAgent):
             resumable_refused = resumable_refused or bool(agent.sub_agents) or bool(
                 agent.output_key and agent.output_key.startswith('temp:'))
-            if agent.model != '':
-                if isinstance(agent.model, str):
+            if type(agent.model) is not str or agent.model != '':
+                if type(agent.model) is str:
                     if (agent.model not in _roles or is_gemini_model(f'galaxie/{agent.model}')
                         or agent.model_config.get('frozen') or fields['model'].frozen
                         or type(agent.__dict__) is not dict or 'model' not in agent.__dict__):

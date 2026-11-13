@@ -247,3 +247,98 @@ def test_the_lint_aid_accepts_role_strings_and_still_refuses_provider_imports():
         lint_source('from google.adk.models.google_llm import Gemini')
     with pytest.raises(ValueError):
         lint_source("from google.adk.agents import LlmAgent\nLlmAgent(name='root', model='google:gemini')")
+
+
+@pytest.mark.parametrize('kind', ['plain', 'lying-role', 'lying-empty'])
+@pytest.mark.parametrize('position', ['root', 'inherited', 'sibling'])
+def test_assigned_string_subclasses_refuse_without_requests_or_tree_mutation(kind, position):
+    class Role(str):
+        pass
+
+    class LyingRole(str):
+        def __eq__(self, other):
+            return other == ('answer' if kind == 'lying-role' else '')
+
+        def __ne__(self, other):
+            return False
+
+        def __hash__(self):
+            return hash('answer' if kind == 'lying-role' else '')
+
+        def __format__(self, spec):
+            return 'answer'
+
+    value = Role('answer') if kind == 'plain' else LyingRole('gemini-2.5-flash')
+    candidate = LlmAgent(name='candidate', model='answer')
+    vars(candidate)['model'] = value
+    sibling = LlmAgent(name='sibling', model='answer')
+    if position == 'inherited':
+        root = LlmAgent(name='root', model=llm('answer'), sub_agents=[candidate])
+    elif position == 'sibling':
+        root = SequentialAgent(name='root', sub_agents=[sibling, candidate])
+    else:
+        root = candidate
+    seen = []
+
+    async def transport(raw):
+        seen.append(raw)
+        raise AssertionError('Prepare must not dispatch.')
+
+    _bridge.install_transport(transport)
+    unsupported(lambda: Executor(root))
+    assert candidate.model is value
+    assert sibling.model == 'answer'
+    assert seen == []
+
+
+@pytest.mark.parametrize('kind', ['enum', 'subclass'])
+def test_normal_construction_normalizes_role_constants_to_exact_strings(kind):
+    from enum import StrEnum
+
+    class NamedRole(StrEnum):
+        ANSWER = 'answer'
+
+    class Role(str):
+        pass
+
+    value = NamedRole.ANSWER if kind == 'enum' else Role('answer')
+    root = LlmAgent(name='root', model=value)
+    assert type(root.model) is str
+    assert root.model == 'answer'
+    assert Executor(root)
+    assert root.model == llm('answer')
+    assert type(getattr(root.model, 'role')) is str
+
+
+@pytest.mark.parametrize('length', [128, 129])
+def test_model_string_inventory_length_boundary(length):
+    role = 'x' * length
+    if length == 128:
+        face._declare_roles([role])
+    root = LlmAgent(name='root', model=role)
+    seen = []
+
+    async def transport(raw):
+        seen.append(raw)
+        raise AssertionError('Prepare must not dispatch.')
+
+    _bridge.install_transport(transport)
+    if length == 128:
+        assert Executor(root)
+        assert root.model == llm(role)
+    else:
+        unsupported(lambda: Executor(root))
+        assert root.model == role
+    assert seen == []
+
+
+@pytest.mark.parametrize(('roles', 'code'), [
+    (['answer', 'answer'], 'unsupported'),
+    (['answer', 'x' * 129], 'invalid'),
+])
+def test_failed_role_declaration_preserves_the_previous_inventory(roles, code):
+    before = face._roles
+    with pytest.raises(GalaxieError) as error:
+        face._declare_roles(roles)
+    assert error.value.code == code
+    assert face._roles == before == frozenset({'answer', 'x', 'gemini-2.5-flash'})
