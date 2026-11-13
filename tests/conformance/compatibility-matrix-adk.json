@@ -20,6 +20,8 @@
     "streaming-text",
     "streaming-tool",
     "approval-approve",
+    "model-string",
+    "toolset-fixed",
     "approval-deny"
   ],
   "differences": [],
@@ -42,6 +44,7 @@
     "All model replies are deterministic scripts; no real model, network request or download takes part.",
     "The Chromium lane runs under the vitest browser project, not a page with the strict mock CSP; the strict-CSP bundle probe in packages/adapter-adk covers the bundle alone.",
     "Agent shapes: SequentialAgent, LoopAgent, ParallelAgent and an LlmAgent with sub-agents and transfer match native ADK in model requests and output (packages/adapter-adk/test/agents.test.ts), and parallel write branches replay their own receipts after a re-dispatch with reversed arrival. ADK resumes directly at the paused agent only when it and all its ancestors are LlmAgents, and otherwise restarts from the root (native SequentialAgent evidence in agents.test.ts), so a pause inside a loop, a later sequential child, under an LlmAgent inside a workflow agent, in a tree containing a ParallelAgent, or by an unknown or duplicate-named agent fails unsupported; a pause in the first child at every sequential step, or in an LlmAgent chain linked by transfer, resumes in place and survives a reload. subgraphs stays false: ADK events carry author and branch, not LangGraph namespaces, and nested stream paths and nested-pause parity are not built. AgentTool and Workflow fail unsupported at prepare.",
+    "JavaScript host-inventory retry (2026-11-14), superseding the earlier attempt for opted-in entries: roleStrings true maps exact declared roles through a host-owned tree, and adkToolset groups fixed same-host capability tools without adding host object keys. Strings without the opt-in, foreign or dynamic toolsets, provider tools, executors and planners remain refused. The model-string and toolset-fixed scripts compare against native registry and BaseToolset oracles; full gate and engine outcomes are recorded in ADR-0020.",
     "ADK drops the function responses of sibling calls that ran beside a confirmation-gated call in the same model turn, so the adapter fails such a turn as unsupported, as it does a confirmation beside a long-running call, a pause inside a ParallelAgent and a long-running call whose result never arrives. ADK also hides adk_request_input calls and answers from an LlmAgent, so a pause on that tool fails as unsupported."
   ]
 }

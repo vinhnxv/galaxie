@@ -13,8 +13,10 @@ import {
 import { createMockLatch, MockChatModel, type MockScript } from '@galaxie-ai/models/mock';
 import {
   BaseLlm,
+  BaseToolset,
   FunctionTool,
   InMemoryRunner,
+  LLMRegistry,
   LlmAgent,
   type LlmRequest,
   type LlmResponse,
@@ -24,6 +26,7 @@ import type { ToolCall } from '@langchain/core/messages';
 import { z } from 'zod';
 import {
   type AdkAgent,
+  adkToolset,
   createAdkAdapter,
   defineAdkEntry,
 } from '../../../packages/adapter-adk/src/index.js';
@@ -42,6 +45,8 @@ export const adkCases = [
   'streaming-tool',
   'approval-approve',
   'approval-deny',
+  'model-string',
+  'toolset-fixed',
 ] as const;
 export type AdkCase = (typeof adkCases)[number];
 
@@ -144,6 +149,20 @@ function newTranscript(name: AdkCase): AdkTranscript {
 const instruction = 'Use the supplied tools and answer briefly.';
 
 function agentFor(name: AdkCase, model: BaseLlm, tool: FunctionTool | undefined): LlmAgent {
+  if (name === 'model-string')
+    return new LlmAgent({
+      name: 'agent',
+      model: 'answer',
+      instruction,
+      ...(tool === undefined ? {} : { tools: [tool] }),
+    });
+  if (name === 'toolset-fixed' && tool !== undefined)
+    return new LlmAgent({
+      name: 'agent',
+      model,
+      instruction,
+      tools: [new NativeFixedToolset(tool)],
+    });
   return new LlmAgent({
     name: 'agent',
     model,
@@ -154,6 +173,56 @@ function agentFor(name: AdkCase, model: BaseLlm, tool: FunctionTool | undefined)
         ? {}
         : { tools: [tool] }),
   });
+}
+
+/** Native ADK expands a real toolset at its authored position. */
+class NativeFixedToolset extends BaseToolset {
+  readonly #tool: FunctionTool;
+
+  constructor(tool: FunctionTool) {
+    super([]);
+    this.#tool = tool;
+  }
+
+  override async getTools(): Promise<FunctionTool[]> {
+    return [this.#tool];
+  }
+
+  override async close(): Promise<void> {}
+}
+
+/** Register the native string oracle for one invocation, preserving all prior registry state. */
+function registerNativeRole(model: BaseLlm): () => void {
+  const registry = Reflect.get(LLMRegistry, 'llmRegistryDict') as Map<unknown, unknown>;
+  const cache = Reflect.get(Reflect.get(LLMRegistry, 'resolveCache'), 'cache') as Map<
+    unknown,
+    unknown
+  >;
+  const saved = new Map(registry);
+  const savedCache = new Map(cache);
+  class NativeRoleModel extends BaseLlm {
+    static override supportedModels = [/^answer$/];
+
+    override async *generateContentAsync(
+      request: LlmRequest,
+      stream?: boolean,
+      abortSignal?: AbortSignal,
+    ): AsyncGenerator<LlmResponse, void> {
+      yield* model.generateContentAsync(request, stream, abortSignal);
+    }
+
+    override async connect(): Promise<never> {
+      throw new Error('The scripted model has no live connection.');
+    }
+  }
+  LLMRegistry.register(NativeRoleModel);
+  cache.clear();
+  return () => {
+    registry.clear();
+    for (const [key, value] of saved) registry.set(key, value);
+    cache.clear();
+    for (const [key, value] of savedCache) cache.set(key, value);
+  };
 }
 
 /** The fixed text the capability broker returns to the model for a denial or invalid input. */
@@ -233,6 +302,7 @@ export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
     },
   });
   const model = new ScriptedLlm(spec, transcript, latch);
+  let restoreRole: (() => void) | undefined;
   const agent = agentFor(name, model, tool);
   const runner = new InMemoryRunner({ agent, appName: 'conformance' });
   const session = await runner.sessionService.createSession({
@@ -302,6 +372,7 @@ export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
     return waiting;
   };
   try {
+    if (name === 'model-string') restoreRole = registerNativeRole(model);
     const events = (async () => {
       const waiting = await drive({ role: 'user', parts: [{ text: spec.prompt }] });
       if (waiting !== undefined)
@@ -329,6 +400,7 @@ export async function runAdkNative(name: AdkCase): Promise<AdkTranscript> {
   } catch {
     transcript.error = { code: 'unavailable' };
   } finally {
+    restoreRole?.();
     latch?.release();
   }
   return JSON.parse(JSON.stringify(transcript)) as AdkTranscript;
@@ -374,6 +446,21 @@ export async function runAdkGalaxie(name: AdkCase): Promise<AdkTranscript> {
         throw error;
       }
     };
+    if (name === 'toolset-fixed')
+      return new LlmAgent({
+        name: 'agent',
+        model: llm,
+        instruction,
+        tools: [
+          adkToolset(host, [
+            host.adk.capabilityTool('math.double@1', {
+              toolName: TOOL,
+              description: TOOL_DESCRIPTION,
+              parameters,
+            }),
+          ]),
+        ],
+      });
     const root = agentFor(
       name,
       llm,
@@ -384,6 +471,7 @@ export async function runAdkGalaxie(name: AdkCase): Promise<AdkTranscript> {
         ...(isApproval(name) ? { requireConfirmation: true } : {}),
       }),
     );
+    if (name === 'model-string') return defineAdkEntry({ agent: root, roleStrings: true });
     return isApproval(name)
       ? defineAdkEntry({
           agent: root,
