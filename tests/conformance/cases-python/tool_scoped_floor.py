@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
+from langgraph.config import get_stream_writer
 
 from galaxie import GalaxieError
 from galaxie.langgraph import checkpointer, request_interaction
@@ -41,7 +42,13 @@ def create_agent():
         def instrument(coroutine, kind):
             async def invoke(config: RunnableConfig, **arguments):
                 observed.append([kind, check().id])
-                return await coroutine(config=config, **arguments)
+                try:
+                    return await coroutine(config=config, **arguments)
+                except GalaxieError:
+                    scope = current.get()
+                    if scope is not None and scope.failure is not None:
+                        get_stream_writer()({'latched': scope.failure, 'fields': list(type(scope).__slots__)})
+                    raise
             return invoke
 
         tools.append(helper.model_copy(update={'coroutine': instrument(original, name)}))
@@ -77,8 +84,10 @@ def create_agent():
         }
         node = ToolNode(tools, **options)
         result = await node.ainvoke({'messages': state['messages']}, config)
+        for message in result['messages']:
+            message.id = f'tool-{message.tool_call_id}'
         if state.get('again'):
-            await tools[0].ainvoke({'value': 2}, config)
+            await tools[1 if state['again'] == 'write' else 0].ainvoke({'value': 2}, config)
         if state.get('replay'):
             request_interaction(REQUEST, config)
         return {**state, 'messages': [*state['messages'], *result['messages']]}

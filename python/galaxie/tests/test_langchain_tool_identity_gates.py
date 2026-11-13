@@ -201,6 +201,9 @@ def test_g47_observe_inflight_sibling_checkpoints_and_failed_history():
             await run(graph, value=None)
         assert error.value.code == 'unsupported'
         assert operations == before
+        print(json.dumps({'gate': 'G4.7', 'post_latch_saver_calls': sum(
+            code == 'unavailable' for _, code in writes), 'inflight_siblings_completed': len(completed),
+            'bridge_operations': operations, 'failed_history_extra_requests': len(operations) - len(before)}))
 
     asyncio.run(exercise())
 
