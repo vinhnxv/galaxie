@@ -4,6 +4,7 @@
 - **Date:** 2026-10-30
 - **Related:** brief §6.2, §7.4, §7.5, §16.2, §16.7; ADR-0002, ADR-0003, ADR-0005, ADR-0006, ADR-0012, ADR-0016, ADR-0017
 - **Revisions:** 2026-10-30: added pydantic-ai as the second framework, ahead of DSPy, and the rule for framework-owned instrumentation.
+  2026-11-13: bounded repeated DSPy poison markers after measuring original-instance public retries, and recorded the Python data-module binding alternative; no exclusion option ships, status stays Proposed.
   2026-11-13: added fixed runtime provider-LM refusal and a Python-side strict-CSP probe recorder; status stays Proposed.
   2026-10-30: recorded the use case that opened the brief §16.7 gate.
   2026-10-30: designed the executor-aware `RecoverySession` contract in decision 7.
@@ -457,6 +458,61 @@ tabs, forged metadata and large many-file descriptors remain unmeasured; the
 other-version attempt could not collect tests. ADR-0012 guarantees are unchanged; this ADR stays
 Proposed. See the [shipped evidence](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
 
+### DSPy repeated poison marker bound (2026-11)
+
+The outcome is **supported** with a driver-only bound. Before the change, native
+direct-driver characterization produced four markers after the first divergence
+and three further executes, for changed requests and removed calls in both the
+same and fresh drivers. Adopted-session probes alone missed a public path: an
+original instance can replay a nondeterministic program into divergence, then
+call `start` again on its unchanged session id. A Node probe measured checkpoint
+counts 2, 3, 4 after the first poison and two public starts, all ending fixed
+`unrecoverable` with no further traffic. This reopened the contingent bound.
+
+The driver records whether the session loaded from storage was already
+unrecoverable and suppresses only that repeated marker commit. Native direct
+repeats now retain one marker. The condition uses the stored status, not a stale
+in-memory flag: a failed first commit leaves the stored pause in place, so the
+next execute re-detects divergence and commits the first marker. Subsequent
+start/resume forms preserve stored rows and writes and remain unrecoverable.
+
+The public API refuses `start` on an adopted session with `invalid` before a
+Worker execution command. Restoring the poisoned session under the original
+program refuses `unrecoverable`, with no model/capability requests or new rows,
+pending writes or effects. Core and adapter resume/submit paths read pending
+before execution. Original-instance starts reach the driver and are now bounded;
+the [lane measurements](../../tests/conformance/README.md#dspy-poison-marker-bound-and-divergence-engine-probes)
+separate that path from adopted-session refusals. Suppressing the first marker
+would lose retry protection; an arbitrary marker-count cap adds no useful contract.
+No adapter guard, core
+change, metadata key or version change is introduced: metadata stays `v: 1`.
+Checkpoint validation checks consistency, not integrity; metadata remains
+unauthenticated. ADR-0012 controls are unchanged.
+
+### DSPy binding exclusion list decision (2026-11)
+
+The outcome is **alternative**. Put editable non-state data in a descriptor
+Python module, using a literal or `json.loads` over an embedded string, or read
+it through a host capability. Native and Node pins show that a data-module edit
+can change the output after resume with one replay notification, while an edit
+to descriptor JSON refuses before requests/replay and leaves stored rows
+unchanged. A Python-data edit changing a journaled request still poisons through
+the existing divergence rule. Data edits that change no journaled request are
+not detected; the author fingerprint recipe remains available for source drift.
+
+The test-only candidate validates at most 16 explicit, sorted, unique descriptor
+JSON paths, binds the exclusion list into its digest, preserves the shipped
+digest for an empty list and keeps the existing metadata envelope. Its cost is
+measured with actual `Module.load`: excluding a real state file permits a state
+swap that the shipped binding refuses. No exclusion option, descriptor key,
+driver global or digest envelope ships. Patterns and directory prefixes would
+hide typos; renaming data to another non-Python extension is unavailable because
+the descriptor accepts only `.py` and `.json`. Reopen only for an author need
+that a data module or host capability cannot meet. The default digest and
+metadata `v: 1` remain byte-identical. This binding checks consistency, not
+integrity, and does not authenticate checkpoint metadata. See the
+[candidate and alternative evidence](../../tests/conformance/README.md#dspy-poison-marker-bound-and-divergence-engine-probes).
+
 ### DSPy parallel and threaded Evaluate spike (2026-11)
 
 The recorded outcome is **alternative** for `dspy.Parallel` and **alternative**
@@ -560,9 +616,9 @@ Changing the driver rule for branch divergence is rejected: it needs production
 source and new session state to distinguish branches, leaves divergence
 retryable, and gives branches rollback recovery that sequential programs lack.
 The cost of retaining the marker is explicit: a divergent session cannot resume,
-even after rollback, and the user must start over. Repeated execute calls on an
-already poisoned session are characterized separately; their marker count is
-not part of this gate.
+even after rollback, and the user must start over. The
+[repeated-marker decision](#dspy-repeated-poison-marker-bound-2026-11) distinguishes
+direct driver characterization from public calls that refuse before execution.
 
 Evidence uses scripted models in native CPython and Node Pyodide on DSPy 3.4.1,
 CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. The new sequential pin is
