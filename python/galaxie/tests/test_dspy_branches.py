@@ -537,3 +537,33 @@ def test_single_helper_task_keeps_sequential_calls_and_replay(calling_tasks):
             calls = tasks[index * 3:(index + 1) * 3]
             assert len(set(calls)) == 1 and calls[0] is not owner
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize('first', ['a', 'b'])
+def test_concurrent_terminal_failures_report_first_recorded_code_and_drain(first):
+    async def scenario():
+        started = {key: asyncio.Event() for key in ('a', 'b')}
+        release = asyncio.Event()
+        failures, drained = [], []
+        codes = {'a': 'denied', 'b': 'unavailable'}
+        async def fail(key):
+            started[key].set()
+            await started['b' if key == 'a' else 'a'].wait()
+            try:
+                if key == first:
+                    release.set()
+                else:
+                    await release.wait()
+                failures.append(key)
+                raise GalaxieError(codes[key])
+            finally:
+                drained.append(key)
+        async def body():
+            return await face.branches({'a': lambda: fail('a'), 'b': lambda: fail('b')})
+        with pytest.raises(GalaxieError) as caught:
+            await execute(body).run({}, 'conversation', 5)
+        assert failures == [first, 'b' if first == 'a' else 'a']
+        assert caught.value.code == codes[first]
+        assert sorted(drained) == ['a', 'b']
+        assert not [task for task in asyncio.all_tasks() if task is not asyncio.current_task() and not task.done()]
+    asyncio.run(scenario())
