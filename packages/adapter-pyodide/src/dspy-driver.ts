@@ -93,7 +93,8 @@ async def _galaxie_execute():
         if conversation is None:
             _galaxie_conversations[session] = str(uuid.uuid4())
         else:
-            already_poisoned = _galaxie_executor._sessions[conversation].unrecoverable
+            known = _galaxie_executor._sessions.get(conversation)
+            already_poisoned = known is not None and known.unrecoverable
         output = await _galaxie_executor.run(
             payload.get('input'), _galaxie_conversations[session], payload['steps'],
             on_stream=lambda mode, data: notify_stream_data([], mode, data),

@@ -1609,14 +1609,14 @@ could not be measured and that executor ships no source.
 | --- | --- | --- | --- | --- | --- |
 | Native CPython | changed | PASS | 4 → 1, same and fresh drivers | PASS, pending refuses with unchanged rows | UNMEASURED, no core in this harness |
 | Native CPython | removed | PASS | 4 → 1, same and fresh drivers | PASS, pending refuses with unchanged rows | UNMEASURED, no core in this harness |
-| Node Pyodide | changed | PASS | UNREACHABLE through core | PASS, `unrecoverable`, unchanged rows/writes/effects | UNREACHABLE, `invalid`, unchanged storage |
-| Node Pyodide | removed | PASS | UNREACHABLE through core | PASS, `unrecoverable`, unchanged rows/writes/effects | UNREACHABLE, `invalid`, unchanged storage |
-| Chromium 156.0.8078.4 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | UNREACHABLE, `invalid`, unchanged IndexedDB |
-| Chromium 156.0.8078.4 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | UNREACHABLE, `invalid`, unchanged IndexedDB |
-| Firefox 157.0 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | UNREACHABLE, `invalid`, unchanged IndexedDB |
-| Firefox 157.0 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | UNREACHABLE, `invalid`, unchanged IndexedDB |
-| WebKit 27.2 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | UNREACHABLE, `invalid`, unchanged IndexedDB |
-| WebKit 27.2 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | UNREACHABLE, `invalid`, unchanged IndexedDB |
+| Node Pyodide | changed | PASS | UNREACHABLE through core | PASS, `unrecoverable`, unchanged rows/writes/effects | REFUSED before the driver, `invalid`, unchanged storage |
+| Node Pyodide | removed | PASS | UNREACHABLE through core | PASS, `unrecoverable`, unchanged rows/writes/effects | REFUSED before the driver, `invalid`, unchanged storage |
+| Chromium 156.0.8078.4 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| Chromium 156.0.8078.4 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| Firefox 157.0 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| Firefox 157.0 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| WebKit 27.2 | changed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
+| WebKit 27.2 | removed | PASS | UNREACHABLE through core | PASS, real reload, unchanged IndexedDB | REFUSED before the driver, `invalid`, unchanged IndexedDB |
 
 The pre-change native count was one first marker plus three direct executes,
 mixing start and resume forms. After the bound, all four same/fresh-driver and

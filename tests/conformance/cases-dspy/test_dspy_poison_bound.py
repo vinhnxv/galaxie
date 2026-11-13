@@ -116,3 +116,24 @@ def test_unchanged_program_completes_without_poison():
     assert store.calls == ['before', 'after'] and store.requests == 1
     assert pending(store.boot('poison-control')) is None
     assert all(decoded(row['checkpoint'])['status'] != 'unrecoverable' for row in store.rows.values())
+
+
+def test_non_durable_repeat_after_early_failure_keeps_the_ordinary_outcome(monkeypatch):
+    # A session id is registered before run() creates its state; the bound must not assume the state exists.
+    import galaxie.dspy as galaxie_dspy
+
+    store = Store()
+    context = store.boot('poison-control')
+    context['_galaxie_durable'] = False
+    real = galaxie_dspy._validate
+    calls = []
+
+    def flaky(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise galaxie_dspy.GalaxieError('unsupported')
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(galaxie_dspy, '_validate', flaky)
+    assert execute(context) == {'ok': False, 'code': 'unsupported'}
+    assert execute(context) == {'ok': True, 'interrupted': True}
