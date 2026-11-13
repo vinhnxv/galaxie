@@ -1415,3 +1415,29 @@ runner. Duplicated-name trees are stronger native construction refusals; the
 existing A-go, B-go and C-go outcomes stand. New test-side reference entries must
 pass existing pins before they ship. No shipped runtime, persisted contract,
 existing golden, matrix entry, lock, security control or feature flag changes.
+
+#### Measured outcome (2026-11-13)
+
+The rule and predictions were committed in `280d6c1` before measurement.
+Every registered PASS prediction held on local macOS arm64 with scripted models:
+Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2. Each engine passed all 16
+Python and 12 Go engine tests with no skipped or expected failures. The six
+Python ordinary-sibling cases had only prior live/restored Node Worker evidence;
+Chromium, Firefox and WebKit are new measurements here. The
+[per-case record](../../tests/conformance/README.md#adk-engine-measurements)
+lists each live/reload row, boot features, byte count and cold-start observations.
+
+The native Go revision is a restated unique-name oracle plus stronger native
+construction refusals for duplicate leaves, root/descendant names and shared
+instances. Six new test-side reference entries match native text-bearing authors
+on all three engines, retaining empty paths for every stream event. The nested
+last-child confirmation matches the reviewed pause transcript and finishes live
+and after reopened IndexedDB plus a new Worker in the same page. Existing
+reference goldens and lock checks pass unchanged; no shipped runtime changes.
+A-go, B-go and C-go remain REFUSED under the earlier registered rule; the new
+admitted-domain oracle does not retroactively satisfy its duplicated-name premise.
+
+The Go lane does not reload the page. The existing 23 Go scripts on Firefox and
+WebKit, Linux CI engine runs, real models, real devices and `subgraphs` support
+remain unmeasured. No bridge tree/path field, persisted namespace or new feature
+flag ships. ADR-0012 controls remain unchanged.

@@ -1089,7 +1089,11 @@ See the [ADK request-input guide](../../docs/guides/adk-request-input.md) for a 
 
 A confirmation beside ordinary tool calls already works: the ordinary bodies run before the
 ADK answer, and a denied gated body never runs. Both call orders and two siblings match native
-ADK in six new live/reloaded Node Worker cases. Writes still need their own host confirmation
+ADK in six live/reloaded Node Worker cases. The same six cases now PASS live and
+after real page reloads on local Chromium, Firefox and WebKit; see the
+[per-engine record](../../tests/conformance/README.md#adk-engine-measurements).
+Real models, devices and browser input/write-retry measurements remain unmeasured.
+Writes still need their own host confirmation
 and matching checkpoint/recovery stores. The spike's sibling write-retry measurements use a
 fake host receipt journal in CPython; they do not add broker integration evidence for this shape.
 A confirmation beside a long-running call stays refused because native ADK loses the real answer

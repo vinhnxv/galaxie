@@ -33,3 +33,22 @@ model, the step budget, a blocked argument, abort, a panic (contained and report
 `executor_error`), `os.Exit` (the Worker dies, the run fails `unavailable`) and a loop that ignores its
 context (the Worker is terminated and the session is unrecoverable). `../adk-go-scan.node.test.ts` scans
 the bridge traffic, events, snapshots and spans for a per-call provider credential.
+
+## Dedicated identity engine measurements
+
+The separate `identity-scripts.json` and reviewed `identity-oracle.json` add six
+unique-name shapes without changing `scripts.json`, its matrix or goldens.
+`go/conformance/identity_test.go` builds independent native ADK trees and pins
+native author/branch lists, text-bearing authors and duplicate/shared-instance
+construction refusals. `IdentityDefinitions()` contributes only new reference
+entries, with a disjointness check against the existing definitions.
+
+The [engine lane](../../../examples/rag-browser/test/adk-go-engines.node.test.ts)
+passes all 12 tests on local Chromium, Firefox and WebKit with scripted models.
+It checks message authors, every stream event's empty path, one nested Approval
+and the reviewed pause transcript. Durable execution reopens IndexedDB and starts
+a new Worker in the same page, then compares the full live transcript and streams.
+It does not reload the page. The existing 23 scripts remain prior native/Node/
+Chromium evidence; their Firefox/WebKit runs, Linux CI engine runs, real models
+and real devices are unmeasured. See the
+[per-engine record and commands](../README.md#adk-engine-measurements).
