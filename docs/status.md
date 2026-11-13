@@ -77,7 +77,14 @@ parked author child with no further dispatch. Node Pyodide adds fewer-calls
 divergence evidence with one poison row and no redispatch. Root guards, Worker
 task identities, ReAct replay, Chromium divergence reload, Firefox, WebKit and
 real models remain unmeasured. Existing goldens, fixtures, matrices and locks
-are unchanged. See the [guard refusal evidence](../tests/conformance/README.md#branch-task-identity-guard-refusal).
+are unchanged. The 2026-11-14 follow-up accepts the overlap limit with a per-branch
+`asyncio.Lock` recipe: native and Node Pyodide preserve marks and checkpoint bytes
+under reversed completion timing, replay without redispatch and accept one awaited
+helper task. A test-local owner candidate refuses the second entry before its
+dispatch but may already have dispatched the first model; no branch handle ships.
+Unguarded calls retain arrival-order divergence. See the
+[guard refusal evidence](../tests/conformance/README.md#branch-task-identity-guard-refusal)
+and [lock recipe decision](../tests/conformance/README.md#dspy-schema-output-and-branch-handle-decision).
 
 On 2026-11-13, `galaxie.dspy.branches` ships keyed async fan-out with deterministic
 branch scopes and journal bytes. Scripted CPython and Node Pyodide tests cover
@@ -142,7 +149,16 @@ CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7. The 2026-11-13 follow-up refus
 runtime-created provider LM calls with fixed `unsupported` before engine execution,
 with zero bridge requests or egress attempts on native, Node and all three browsers.
 Use host-mapped `GalaxieLM` roles. Typed signatures match plain
-DSPy without provider constraints; an invalid typed reply fails after one request.
+DSPy without provider constraints by default; an invalid typed reply fails after one
+request. The 2026-11-14 follow-up supports opt-in
+`GalaxieLM(role, schema_output=True)`: JSONAdapter and explicit pydantic response
+models send the schema through the existing structured-output router feature.
+Open mappings, tools beside a schema and schema streaming stay refused; a route
+without the feature fails before the provider. Native and Node gates cover exact
+schema forwarding, no retry, restored replay and changed-schema divergence; the
+[new evidence table](../tests/conformance/README.md#dspy-schema-output-and-branch-handle-decision)
+records browser lanes and limits. The mock ignores the schema; real-provider
+constraint enforcement remains unmeasured.
 The host-bound RAG retrieval replacement now has the new golden evidence above. ColBERT records
 zero Node fetch attempts locally on macOS and one rejected loopback fetch in
 Ubuntu CI (Node 24.22.2; CPython 3.14.6 references), with the same fixed failure

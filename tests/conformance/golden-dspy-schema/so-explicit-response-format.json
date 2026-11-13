@@ -15,17 +15,12 @@
         "additionalProperties": false,
         "properties": {
           "answer": {
-            "enum": [
-              "done",
-              "other"
-            ],
+            "enum": ["done", "other"],
             "title": "Answer",
             "type": "string"
           }
         },
-        "required": [
-          "answer"
-        ],
+        "required": ["answer"],
         "title": "AnswerModel",
         "type": "object"
       }

@@ -46,7 +46,7 @@ class Store(DurableStore):
             return self.boot('schema')
 
 
-@pytest.mark.parametrize('name,reply', [('so-json-adapter-schema', JSON_REPLY), ('so-explicit-response-format', CHAT_REPLY), ('so-json-object-refused', '{"answer":{}}')])
+@pytest.mark.parametrize('name,reply', [('so-json-adapter-schema', JSON_REPLY), ('so-explicit-response-format', CHAT_REPLY), ('so-schema-tools-refused', CHAT_REPLY), ('so-json-object-refused', '{"answer":{}}')])
 def test_plain_dspy_schema_format(name, reply):
     value, formats = asyncio.run(measure(name, reply))
     assert value['error'] is None
@@ -70,6 +70,8 @@ def test_default_lm_remains_unconstrained_and_explicit_format_refused():
     lm = face.GalaxieLM('answer')
     assert lm.supported_params == {'stop'}
     assert lm.supports_response_schema is False
+    assert face.GalaxieLM('answer', native_tools=True).supported_params == {'stop', 'tool_choice'}
+    assert face.GalaxieLM('answer', native_tools=True).supports_response_schema is False
     store = Store()
     assert execute(store.boot_schema(lm=lm)) == {'ok': True, 'output': {'answer': 'done'}}
     assert store.payloads[0]['options'] == {}
