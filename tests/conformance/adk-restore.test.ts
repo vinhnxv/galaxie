@@ -13,7 +13,7 @@ import {
   type UserInteractionEvent,
 } from '@galaxie-ai/core';
 import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
-import { LlmAgent, SequentialAgent } from '@google/adk';
+import { LlmAgent, ParallelAgent, SequentialAgent } from '@google/adk';
 import { AIMessage } from '@langchain/core/messages';
 import { afterEach, expect, test } from 'vitest';
 import { z } from 'zod';
@@ -682,6 +682,159 @@ test.skipIf(durable)(
       expect([...bytes.rows]).toEqual(before);
     }
     const fine = await life(store, saving, { sessionId: other.sessionId });
+    expect(await fine.instance.restore()).toBeDefined();
+    expect((await approval(fine)).interactionId).toBe(untouched.interactionId);
+    expect(fine.model.seen).toEqual([]);
+    expect(fine.writes).toEqual([]);
+  },
+);
+
+test('moving a paused author beside a ParallelAgent rejects restore before anything runs', async () => {
+  const source = shared('adk-restore-parallel-tree');
+  const store = await source.open();
+  const first = await life(store, saving);
+  await first.instance.start({ prompt: 'go' });
+  await approval(first);
+  const request = { op: 'get', executor: 'adk-js', sessionId: first.sessionId, namespace: '' };
+  const before = structuredClone(await store.checkpoints.request(request));
+  await first.runtime.dispose();
+  const changed: AdkAgent = (host) =>
+    defineAdkEntry({
+      agent: new SequentialAgent({
+        name: 'flow',
+        subAgents: [
+          new LlmAgent({
+            name: 'agent',
+            model: host.adk.llm('agent'),
+            tools: [host.adk.capabilityTool('docs.save@1', save)],
+          }),
+          new ParallelAgent({
+            name: 'parallel',
+            subAgents: ['left', 'right'].map(
+              (name) => new LlmAgent({ name, model: host.adk.llm('agent') }),
+            ),
+          }),
+        ],
+      }),
+      interaction: () => ({
+        surfaceId: 'main',
+        viewRevision: 'r1',
+        component: 'conformance.Approval/v1',
+        props: { count: 1 },
+      }),
+    });
+  const second = await life(store, saving, { sessionId: first.sessionId, factory: changed });
+  await expect(second.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
+  expect(second.model.seen).toEqual([]);
+  expect(second.writes).toEqual([]);
+  expect(second.instance.getSnapshot().run?.pending).toBeUndefined();
+  expect(await store.checkpoints.request(request)).toEqual(before);
+});
+
+test('two gated calls reload as one interaction and finish after one answer', async () => {
+  const source = shared('adk-restore-two-gated');
+  const script: Reply = (seen) =>
+    seen.messages.some((message) => message.type === 'tool')
+      ? new AIMessage({ content: 'finished' })
+      : new AIMessage({
+          content: '',
+          tool_calls: [0, 1].map((index) => ({
+            id: `call_${index}`,
+            name: 'docs_save_1',
+            args: { q: `note_${index}` },
+          })),
+        });
+  const first = await life(await source.open(), script);
+  await first.instance.start({ prompt: 'go' });
+  const submitted = await approval(first);
+  expect(first.instance.getSnapshot().run?.pending).toMatchObject({ props: { count: 2 } });
+  expect(first.writes).toEqual([]);
+  await first.runtime.dispose();
+  const second = await life(await source.open(), script, { sessionId: first.sessionId });
+  expect(await second.instance.restore()).toBeDefined();
+  const restored = await approval(second);
+  expect(restored.interactionId).toBe(submitted.interactionId);
+  expect(second.instance.getSnapshot().run?.pending).toMatchObject({ props: { count: 2 } });
+  expect(second.model.seen).toEqual([]);
+  expect(second.writes).toEqual([]);
+  expect(
+    (await second.instance.dispatch({ ...restored, payload: { indexes: [0, 1] } })).status,
+  ).toBe('accepted');
+  await waitForRunStatus(second.instance, 'succeeded');
+  expect(second.writes).toEqual([{ q: 'note_0' }, { q: 'note_1' }]);
+  expect(second.model.seen).toHaveLength(1);
+});
+
+test.skipIf(durable)(
+  'a transfer confirmation rejects disagreement with either call author without affecting another session',
+  async () => {
+    const bytes = new MemoryByteCheckpoints();
+    const store: Store = { checkpoints: bytes, recovery: new MemoryRecoveryStore(), close() {} };
+    const transfer: AdkAgent = (host) =>
+      defineAdkEntry({
+        agent: new LlmAgent({
+          name: 'parent',
+          model: host.adk.llm('agent'),
+          instruction: 'role=parent;',
+          subAgents: [
+            new LlmAgent({
+              name: 'child',
+              model: host.adk.llm('agent'),
+              instruction: 'role=child;',
+              tools: [host.adk.capabilityTool('docs.save@1', save)],
+            }),
+          ],
+        }),
+        interaction: (requests) => ({
+          surfaceId: 'main',
+          viewRevision: 'r1',
+          component: 'conformance.Approval/v1',
+          props: { count: requests.length },
+        }),
+      });
+    const script: Reply = (seen) => {
+      if (JSON.stringify(seen.messages[0]?.content).includes('role=parent;'))
+        return new AIMessage({
+          content: '',
+          tool_calls: [
+            { id: 'transfer', name: 'transfer_to_agent', args: { agent_name: 'child' } },
+          ],
+        });
+      return saving(seen, 0);
+    };
+    const other = await life(store, script, { factory: transfer });
+    await other.instance.start({ prompt: 'go' });
+    const untouched = await approval(other);
+    await other.runtime.dispose();
+    for (const tool of ['docs_save_1', 'adk_request_confirmation']) {
+      const first = await life(store, script, { factory: transfer });
+      await first.instance.start({ prompt: 'go' });
+      await approval(first);
+      await first.runtime.dispose();
+      const row = [...bytes.rows.values()].find((value) => value.sessionId === first.sessionId);
+      if (row === undefined) throw new Error('No record was stored.');
+      const body = JSON.parse(new TextDecoder().decode(row.checkpoint.bytes));
+      const held = body.events.filter(
+        (event: { content?: { parts?: { functionCall?: { name?: string } }[] } }) =>
+          event.content?.parts?.some((part) => part.functionCall?.name === tool),
+      );
+      expect(held).toHaveLength(1);
+      held[0].author = 'parent';
+      bytes.rows.set(JSON.stringify([first.sessionId, '', row.id]), {
+        ...row,
+        checkpoint: { ...row.checkpoint, bytes: new TextEncoder().encode(JSON.stringify(body)) },
+      });
+      const before = structuredClone([...bytes.rows]);
+      const broken = await life(store, script, { sessionId: first.sessionId, factory: transfer });
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await expect(broken.instance.restore()).rejects.toMatchObject({ code: 'unrecoverable' });
+        expect(broken.model.seen).toEqual([]);
+        expect(broken.writes).toEqual([]);
+        expect(broken.instance.getSnapshot().run?.pending).toBeUndefined();
+        expect([...bytes.rows]).toEqual(before);
+      }
+    }
+    const fine = await life(store, script, { sessionId: other.sessionId, factory: transfer });
     expect(await fine.instance.restore()).toBeDefined();
     expect((await approval(fine)).interactionId).toBe(untouched.interactionId);
     expect(fine.model.seen).toEqual([]);

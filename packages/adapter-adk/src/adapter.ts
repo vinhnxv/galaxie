@@ -13,6 +13,7 @@ import {
 import {
   type BaseAgent,
   createEvent,
+  type Event,
   isFinalResponse,
   LlmAgent,
   ParallelAgent,
@@ -187,6 +188,11 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
       const known = new Set<string>();
       const loading = new Map<string, Promise<void>>();
       let disposed = false;
+      const authorOf = (
+        sessionId: SessionId,
+        calls: readonly PausedCall[],
+        events: readonly Event[] = sessions.eventsOf(APP_NAME, USER_ID, sessionId),
+      ): string | undefined => pauseAuthor(calls, events);
       const runnerFor = (sessionId: SessionId): Runner => {
         let runner = runners.get(sessionId);
         if (runner === undefined) {
@@ -229,7 +235,7 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               !pauseAdmitted(
                 root as BaseAgent,
                 parallel,
-                pauseAuthor(stored.pause.calls, stored.events),
+                authorOf(sessionId, stored.pause.calls, stored.events),
               )
             )
               throw failure('unrecoverable');
@@ -526,7 +532,14 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
               let paused = false;
               try {
                 paused = tracker.observe(event);
-                if (paused && !pauseAdmitted(root as BaseAgent, parallel, event.author))
+                if (
+                  paused &&
+                  !pauseAdmitted(
+                    root as BaseAgent,
+                    parallel,
+                    authorOf(sessionId, tracker.calls ?? []),
+                  )
+                )
                   throw failure('unsupported');
               } catch (error) {
                 run.fail(error);
