@@ -150,7 +150,7 @@ These shapes run: a single `LlmAgent` with capability tools, `SequentialAgent`, 
 `LoopAgent` trees up to 16 levels deep, transfer to a sub-agent, and a confirmation or long-running tool
 where the pause rule accepts it ("Interactions"). Branches of a `ParallelAgent` get branch-local effect
 scopes, so the order in which they reach the broker does not change what a write receives, and a restore after a later pause does not run them again;
-the order of their events does vary. These shapes fail `unsupported` before anything runs: raw `agenttool.New` and the unshipped galaxie wrapper,
+the order of their events does vary. These shapes fail `unsupported` before anything runs: raw `agenttool.New`,
 an agent, model, function tool or toolset built directly with ADK, and a tree outside the limits above.
 `subgraphs` stays false. Every shape is recorded with its native result in `tests/conformance` and
 `go/galaxie/shapes_test.go`; see the [limits](../../docs/unsupported.md#google-adk-go).

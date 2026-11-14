@@ -392,8 +392,9 @@ failure latch, and keeps inner events out of the outer stream and stored record.
 Native plugin inheritance and parent-owned close are measured separately; the
 helper deliberately installs its own inner integrity plugin. Inner effect scopes
 are distinct, and the next outer call ID is seeded from the maximum stored ID,
-including gaps. Declaration, copied ordinary and temporary state, forwarded
-ordinary deltas and omitted temporary deltas match native ADK 2.12.0.
+including gaps. Declaration, copied ordinary state, exclusion of temporary and `_adk` input,
+forwarded ordinary deltas and omitted temporary output deltas match native ADK
+2.12.0.
 
 | Rule T gate, Python V1 | CPython | Node Worker live | Fresh Worker / restored | Chromium |
 | --- | --- | --- | --- | --- |
