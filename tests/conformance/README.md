@@ -1956,7 +1956,7 @@ list is unchanged. These remain local macOS scripted-model results.
 | --- | --- | --- | --- | --- | --- |
 | Absolute scopes and canonical journal order | PASS | PASS | UNMEASURED: no browser pin planned | UNMEASURED: no browser pin planned | UNMEASURED: no browser pin planned |
 | First recorded terminal failure | PASS | UNMEASURED: native-only probe | UNMEASURED: native-only probe | UNMEASURED: native-only probe | UNMEASURED: native-only probe |
-| DSPy 3.2.1 overlay | NOT RUN: collection failure | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged |
+| DSPy 3.2.1 overlay | Historical NOT RUN: collection failure; [fresh native measurement](#dspy-other-version-and-real-model-measurement-2026-11-14) COLLECTION-FAILS (`dspy.lm15` absent) | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged |
 | Real models | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access |
 
 New native and Node tests pin absolute scopes for the three unordered golden
@@ -1970,7 +1970,9 @@ snapshots have no journal. Both lanes also pin absolute markers at the
 concurrent terminal failures report the first recorded code, rather than the
 first in input order, and drain both siblings.
 
-The prediction that DSPy 3.2.1 was not installable offline was disproved: an
+The earlier offline-install prediction was disproved by the historical overlay;
+the [fresh network attempt](#dspy-other-version-and-real-model-measurement-2026-11-14)
+stopped at control baseline installation. An
 overlay of 18 cached archive roots imported it on CPython 3.14.5, without changing
 the locked DSPy 3.4.1 environment. Both prescribed native suites then stopped
 during collection, with exit 2, zero tests run and one collection error each:
@@ -1988,6 +1990,73 @@ comparison. An accepted product design in an ADR is needed before either ships.
 Chromium divergence reload, ReAct branches, concurrent tabs, forged metadata and
 large many-file descriptors remain unmeasured. No shipped source, existing
 golden, matrix, fixture entry, recorder or lock changed.
+
+### DSPy other-version and real-model measurement (2026-11-14)
+
+The [registered rules and full results](../../docs/adr/0018-python-agents-through-pyodide.md#dspy-branch-helper-versions-real-models-and-parallel-adapter-decision-2026-11-14)
+precede this measurement in commit `c46464c`. Native CPython 3.14.5 on macOS
+27.2.1 arm64 with uv 0.11.23 ran each DSPy version in a throwaway environment
+outside the checkout. Suite A is `test_dspy_branches.py` and
+`test_dspy_branch_handle.py`; suite B is the five `cases-dspy` branch,
+divergence and fan-out files named in the ADR.
+
+| Target | Suite A | Suite B |
+| --- | --- | --- |
+| 3.4.1 control (pinned) | PASS: 59 passed | PASS: 83 passed |
+| 3.2.1 | COLLECTION-FAILS: `ModuleNotFoundError: No module named 'dspy.lm15'` at `galaxie/src/galaxie/dspy.py:23` | COLLECTION-FAILS: same import, 5 errors, zero tests |
+| 3.5.0 | DIVERGED, BEHAVIORAL: 16 failed, 43 passed | DIVERGED, BEHAVIORAL: 60 failed, 23 passed |
+
+The 3.5.0 failures start with DSPy's own `TypeError: lm(messages=[...]) was
+removed in DSPy 3.5`. The first attempt with the registered `--no-config`
+resolver method failed with two exact resolver conflicts (recorded in the ADR)
+because it omits the repository's ADK pin overrides; the corrected method below
+needs no ADK package. The first attempt's `-I` flag also hides sibling imports
+and was dropped. Worker, Node Pyodide and all browser lanes remain UNMEASURED for
+other versions: their locked wheel closure needs a maintainer lock decision.
+
+Reproduce from the repository root. Keep the scratch directory outside the
+checkout and never run these steps against the repository environment.
+
+```sh
+REPO="$PWD"
+SCRATCH=$(mktemp -d /tmp/galaxie-dspy-versions.XXXXXX)
+uv pip freeze --python "$REPO/python/.venv/bin/python" | grep -v '^-e \|^dspy==' > "$SCRATCH/base.txt"
+for VERSION in 3.4.1 3.2.1 3.5.0; do
+  uv --no-config venv --python "$HOME/.pyenv/versions/3.14.5/bin/python" "$SCRATCH/$VERSION"
+  PY="$SCRATCH/$VERSION/bin/python"
+  uv --no-config pip install --python "$PY" --no-deps -r "$SCRATCH/base.txt"
+  uv --no-config pip install --python "$PY" "dspy==$VERSION"
+  SITE=$("$PY" -c 'import site; print(site.getsitepackages()[0])')
+  printf '%s\n' "$REPO/python/galaxie/src" "$REPO/python/standins/ormsgpack/src" \
+    "$REPO/python/standins/litellm" > "$SITE/galaxie-source.pth"
+  (cd "$REPO/python" && "$PY" -m pytest -p no:cacheprovider \
+    galaxie/tests/test_dspy_branches.py galaxie/tests/test_dspy_branch_handle.py -q)
+  (cd "$REPO/python" && "$PY" -m pytest -p no:cacheprovider \
+    ../tests/conformance/cases-dspy/test_dspy_branches_shipped.py \
+    ../tests/conformance/cases-dspy/test_dspy_branches_order.py \
+    ../tests/conformance/cases-dspy/test_dspy_divergence_persistence.py \
+    ../tests/conformance/cases-dspy/test_dspy_fanout.py \
+    ../tests/conformance/cases-dspy/test_dspy_parallel_baseline.py -q)
+done
+```
+
+Trust another version's result only after the 3.4.1 control reports 59 and 83
+passed. Do not collect `galaxie/tests/test_dspy.py` (it holds literal version
+assertions) or the full `cases-dspy` directory on another version. No lock,
+dependency file or recorder script changes in the repository.
+
+Real models are **UNMEASURED**: no model access for the agent in this
+environment. A maintainer runs these scripted baselines first, then replaces the
+scripted model with a host-routed provider for `fanout-single`, `fanout-write`
+and `fanout-multi` in `cases-dspy/shipped_branches.py`, using `golden-dspy/` for
+call shape, plus the `par-fan-two-stage-multi` pause/reload case. Keep keys
+host-side under ADR-0012; this needs a provider key and a Worker egress decision,
+and no real-provider harness is supplied here. Record keyed join order, absolute
+scopes, pause/reload replay, first-recorded-failure code under a provider error,
+and N-branch latency against sequential `await module.acall(...)` calls. Record
+an outcome word per case with model and provider named and no secret.
+Pause-capable groups and a `Parallel`-shaped adapter remain **not built; reopen
+only on evidence**, as specified in the ADR decision.
 
 ### Reproduce the engine measurements
 

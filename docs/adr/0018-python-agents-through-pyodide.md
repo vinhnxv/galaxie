@@ -39,6 +39,7 @@
   2026-11-13: added independent DSPy runtime LabeledFewShot and retrieval goldens; native/Node pass, runtime and host-bound retrieval pass on all three local browsers, and the two eval-instrumented service probes diverge under Trusted Types. No shipped source or Decision text changed; status stays Proposed.
 
   2026-11-14: registered offline optimizer state measurement rules before running COPRO, GEPA or MIPROv2; status stays Proposed.
+  2026-11-14: registered branch-helper version outcome rules, measured DSPy 3.2.1 (collection fails), 3.4.1 (control passes) and 3.5.0 (diverges) natively, and recorded the real-model and Parallel adapter decisions; status stays Proposed.
 
 ## Context
 
@@ -991,6 +992,188 @@ dictionary loading; `eddccbd` proved all four Chromium cases. The
 [measurement commands](../../tests/conformance/README.md#dspy-offline-optimizer-state-measurements)
 and [author recipe](../../packages/adapter-pyodide/README.md#offline-optimized-program-state)
 describe reproduction and the default/optimizer environment split.
+
+### DSPy branch helper versions, real models and Parallel adapter decision (2026-11-14)
+
+#### Outcome rules registered before measurement
+
+These rules precede the measurements. Suite A comprises
+`test_dspy_branches.py` and `test_dspy_branch_handle.py`; suite B comprises
+`test_dspy_branches_shipped.py`, `test_dspy_branches_order.py`,
+`test_dspy_divergence_persistence.py`, `test_dspy_fanout.py` and
+`test_dspy_parallel_baseline.py`. The unrelated literal-version assertions in
+`test_dspy.py` are not collected; that module supplies imported helpers only.
+
+| Outcome | Rule |
+| --- | --- |
+| UNMEASURED | If a cell cannot run because of network, interpreter availability, time or a disagreeing control, record that word and the exact cause. |
+| INSTALL-FAILS | If the network is reachable but installation fails, record the resolver or installer error verbatim. Permit one retry relaxing the failing transitive pin in the throwaway environment only; record both attempts. |
+| COLLECTION-FAILS | If installation succeeds but pytest exits 2 during collection with zero tests run, record the exception class, message and first galaxie source line verbatim. This is an import finding, not an assertion result. |
+| DIVERGED | If collection succeeds and a test fails or errors, record its id and first assertion verbatim. Classify literal-version or legitimately version-dependent fields as VERSION-PINNED, everything else as BEHAVIORAL. A count different from the control also means DIVERGED. Never repair, skip or weaken an assertion. |
+| PASS | If all collected tests pass and their counts equal the control, record PASS. |
+
+The native CPython lane uses throwaway environments outside the repository,
+the repository interpreter and a `.pth` pointing to the current Python source.
+DSPy 3.4.1 is the control and must match the in-repository counts before other
+rows are trusted. Targets are 3.2.1 and 3.5.0; 3.4.0 is a bisect-only extra if
+3.5.0 diverges or cannot collect and time remains. The frozen repository package
+list supplies the baseline, with copied metadata-only workspace stand-ins
+installed first. Only dependency changes forced by DSPy are permitted there.
+Worker, Node Pyodide and browser lanes for other versions remain UNMEASURED:
+the locked Worker wheel closure requires a separate maintainer lock decision.
+The measurement makes no support promise or pin-bump decision.
+
+Predictions, retained even if disproved: **Q1**, network access and a real
+3.2.1 install will succeed, superseding the offline-install limitation;
+**Q2**, `import dspy` will succeed on 3.2.1 but `import dspy.lm15` and both
+suites will fail with `ModuleNotFoundError: No module named 'dspy.lm15'`, at
+`galaxie/dspy.py:22` for collection (exit 2, zero tests); **Q3**, the 3.4.1
+control will match both in-repository counts; **Q4**, 3.5.0 will install and
+collect, with approximately even odds of all tests passing and any likely
+failure being BEHAVIORAL drift in lm15 or streaming types; **Q5**, real models
+will remain UNMEASURED without model access; **Q6**, no lock, dependency or
+repository environment byte will change.
+
+Measurement has a 25-minute budget, within a 40-minute rules-to-results limit;
+cut 3.5.0 first if necessary and record UNMEASURED with the cause. Stop an
+environment if it would require a source workaround, a lock or pyproject edit,
+or real `litellm`/`ormsgpack` in place of the stand-ins. An unexplained control
+disagreement after ten minutes makes the target rows UNMEASURED. Wheel rebuilding
+and the final local gates follow this limit. ADR-0012 controls remain mandatory.
+
+#### Real-model run (unmeasured)
+
+Outcome: **UNMEASURED**, cause: "no model access for the agent in this
+environment". There is no real-provider DSPy probe harness here. Creating one
+requires a provider key and a Worker egress decision under decision 9; this
+measurement settles neither.
+
+A maintainer first runs the scripted suites from `python/` as the control,
+then replays `fanout-single`, `fanout-write` and `fanout-multi` from
+`tests/conformance/cases-dspy/shipped_branches.py`, using the corresponding
+`tests/conformance/golden-dspy/` records for call shape, plus the
+`par-fan-two-stage-multi` pause and reload case. Replace the scripted model with
+a routed provider whose key stays host-side under ADR-0012. Real reply content
+will differ. Record keyed join order, absolute effect scopes, pause/reload
+replay, the first recorded failure code under a provider error, and wall-clock
+time for N branches against sequential `await module.acall(...)` calls.
+Reopening is complete when every case has an outcome word above, with model and
+provider named and no secret recorded. The reproduction recipe belongs in the
+conformance measurement record alongside the native version commands.
+
+#### Pause-capable groups and a Parallel-shaped adapter (decision)
+
+Decision: **not built; reopen only on evidence**. Branch pauses, nested groups
+and streaming with branches already end fixed `unsupported`; persisted groups
+contain completed calls only. A pause-capable group needs a partial-group
+record and a decision about optional keys versus a version bump under decision
+7. Its divergence must still issue zero further requests, retain byte-identical
+earlier rows and writes, append exactly one compact poison checkpoint and refuse
+later restore without another row. A version measurement cannot settle that
+persisted design.
+
+A `Parallel`-shaped adapter would add a public API over
+`galaxie.dspy.branches`. The branch overlap decision already accepts a measured
+author recipe without a permanent symbol. Sequential `await module.acall(...)`
+loops, `branches` and the per-branch lock recipe cover the existing author need;
+threaded verbatim `dspy.Parallel` and `dspy.Evaluate` remain refused. A test-only
+adapter supplies no evidence beyond the existing native `asyncio.gather`
+comparison. This reasoning is grounded in this ADR's branch-helper, overlap and
+divergence decisions.
+
+Reopen on a recorded author program needing a pause inside fan-out that cannot
+use join-then-pause or sequential execution; a real-model measurement showing a
+stated latency need that sequential calls and `branches` cannot meet; an
+accepted partial-group design settling decision 7 and the divergence gate; or
+a maintainer request for a `Parallel`-shaped surface with its public contract
+written first.
+
+#### Measured outcome
+
+Rules commit `c46464c` was pushed before any probe ran. On 2026-11-14 the
+in-repository DSPy 3.4.1 baseline passed suite A (59 tests) and suite B (83
+tests), each with exit 0. CPython was 3.14.5, uv was 0.11.23, and the platform
+was macOS 27.2.1 arm64. PyPI returned HTTP 200 and release selection uses PyPI
+alone; no DSPy documentation or GitHub release-note confirmation was made.
+
+**First attempt, as registered: INSTALL-FAILS.** The registered scratch method
+used `--no-config` and installed the frozen package list through the resolver.
+That omits the repository's ADK pin overrides, so the control stopped at the
+resolver before DSPy was installed. The two attempts (the second removed only
+the `websockets` pin) failed with:
+
+```text
+  × No solution found when resolving dependencies:
+  ╰─▶ Because google-adk==2.12.0 depends on websockets>=15.0.1,<16 and
+      you require google-adk==2.12.0, we can conclude that you require
+      websockets>=15.0.1,<16.
+      And because you require websockets==17.3, we can conclude that your
+      requirements are unsatisfiable.
+  ╰─▶ Because google-adk==2.12.0 depends on opentelemetry-api>=1.39,<=1.42.1
+      and you require google-adk==2.12.0, we can conclude that you require
+      opentelemetry-api>=1.39,<=1.42.1.
+      And because you require opentelemetry-api==1.45.1, we can conclude that
+      your requirements are unsatisfiable.
+```
+
+**Corrected method (a recorded amendment; the rules above are unchanged).** The
+frozen list is already a complete solution, so it was installed with
+`--no-deps` in a throwaway environment outside the checkout. The same CPython
+3.14.5 was used, `google-adk` and the DSPy-independent workspace entries were
+left out, and the stand-ins and `python/galaxie/src` were added by a `.pth`
+file. Then `dspy==VERSION` was installed through the resolver. The registered
+pytest invocation also passed `-I`, which ignores the sibling-module imports the
+suites need: on the 3.4.1 control, suite B then reported 81 passed and 2 failed
+(`test_dspy_fanout.py`), so it was dropped. Without `-I` the control matched the
+in-repository counts, which is the precondition for trusting the other rows.
+
+| DSPy version, native CPython | Install and import facts | Suite A | Suite B |
+| --- | --- | --- | --- |
+| 3.4.1 control | Installed; imports succeeded | PASS: 59 passed | PASS: 83 passed |
+| 3.2.1 | Real install succeeded (the resolver also pulled `litellm` 1.109.1); `import dspy` works, `dspy.lm15` is absent | COLLECTION-FAILS: 2 errors, exit 2, zero tests run | COLLECTION-FAILS: 5 errors, exit 2, zero tests run |
+| 3.5.0 | Installed; collection succeeded | DIVERGED: 16 failed, 43 passed | DIVERGED: 60 failed, 23 passed |
+
+3.2.1 fails at `galaxie/src/galaxie/dspy.py:23` with `ModuleNotFoundError: No
+module named 'dspy.lm15'`. This is an import finding, not an assertion result.
+
+3.5.0 fails with a `TypeError` raised from DSPy's own `dspy/clients/execution.py`
+(`prepare`, reached through `BaseLM.acall`): `lm(messages=[...]) was removed in
+DSPy 3.5. Build a dspy.lm15.Request with Message objects ... and call lm(request)`.
+The first failing assertions end as `executor_error` (for example
+`test_shipped_divergence_is_refused_before_dispatch[removed]` and
+`test_lock_recipe_preserves_bytes_under_reversed_transport_completions`). The
+classification is BEHAVIORAL: DSPy 3.5 removed the messages-style call form the
+tests and the scripted model path use, so this is an API removal in DSPy, not a
+literal-version assertion. Whether the shipped model proxy itself would also
+need to change for 3.5 is not established by these suites. DSPy 3.4.0 was not run
+because the 3.5.0 cause is explained by the removal above, and 3.3.0 and 3.3.1
+were neither run nor inspected.
+
+Prediction scorecard: **Q1** holds (network and a real 3.2.1 install succeeded).
+**Q2** holds with one correction: the failing import is at line 23, not 22.
+**Q3** holds (control equals 59 and 83 once `-I` is dropped). **Q4** is
+disproved: 3.5.0 installed and collected but diverged. **Q5** holds: no model
+access. **Q6** holds: before/after lock and pyproject SHA-256 values, the
+repository package freeze and clean Git status are identical. No assertion,
+source, golden, matrix or repository dependency changed. The minimum known
+working version is 3.4.1 (the pinned control); 3.2.1 and 3.5.0 are not supported,
+and this measurement makes no pin-bump decision. Worker, Node Pyodide and
+browser lanes for other versions remain UNMEASURED: their locked wheel closure
+needs a separate maintainer lock decision.
+
+#### Outcomes by item
+
+- Real models: **UNMEASURED**, no model access for the agent in this environment;
+  the maintainer recipe above specifies the evidence needed to reopen.
+- Other DSPy versions: **measured natively**. 3.2.1 is COLLECTION-FAILS
+  (`dspy.lm15` absent) and 3.5.0 is DIVERGED, BEHAVIORAL (messages-style LM call
+  removed). The 3.4.1 control passes. Worker, Node Pyodide and browser targets
+  remain UNMEASURED.
+- Pause-capable groups and a `Parallel`-shaped adapter: **not built; reopen only
+  on evidence**, under the decision above. No newly run probe changes its premises.
+
+See the [commands and limits](../../tests/conformance/README.md#dspy-other-version-and-real-model-measurement-2026-11-14)
+for the reproduction recipe and the maintainer recipe.
 
 ### DSPy provider strings, schema output, embeddings and retrievers spike (2026-11)
 
