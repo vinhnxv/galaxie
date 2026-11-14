@@ -1,0 +1,26 @@
+{
+  "traces": [],
+  "train": [],
+  "demos": [],
+  "signature": {
+    "instructions": "Answer with the capital city using the offline GEPA instruction.",
+    "fields": [
+      {
+        "prefix": "Question:",
+        "description": "${question}"
+      },
+      {
+        "prefix": "Answer:",
+        "description": "${answer}"
+      }
+    ]
+  },
+  "lm": null,
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

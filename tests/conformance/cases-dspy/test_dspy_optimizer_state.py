@@ -54,6 +54,10 @@ def test_optimizer_state_hygiene_and_prompt(name):
         assert saved['signature']['fields'][-1]['prefix'] == 'Offline capital:'
         assert 'Offline capital:' not in system
         assert saved['demos'] == []
+    if name == 'optstate-gepa':
+        baseline = native.suite.build(name).dump_state()
+        assert saved['signature']['fields'] == baseline['signature']['fields']
+        assert saved['demos'] == saved['traces'] == saved['train'] == []
 
 
 def test_optimizer_state_missing_rebind_fails_before_network():

@@ -48,8 +48,11 @@ class ScriptedEngine:
         outputs = system.split('Your output fields are:', 1)[1].split('All interactions', 1)[0]
         fields = re.findall(r'`(\w+)`', outputs)
         values = self.fixture['proposals']
-        text = '\n'.join(f'[[ ## {field} ## ]]\n{values[field] if field != "answer" else (self.fixture["trainset"][0]["answer"] if values["proposed_instruction"] in system else "Unknown")}' for field in fields)
-        text += '\n[[ ## completed ## ]]'
+        answers = {field: values[field] if field != 'answer' else (self.fixture['trainset'][0]['answer'] if values['proposed_instruction'] in system else 'Unknown') for field in fields}
+        if 'Outputs will be a JSON object' in system:
+            text = json.dumps(answers)
+        else:
+            text = '\n'.join(f'[[ ## {field} ## ]]\n{value}' for field, value in answers.items()) + '\n[[ ## completed ## ]]'
         return Response(id=None, model=request.model, message=Message(role='assistant', parts=(TextPart(text),)), finish_reason='stop', usage=Usage(input_tokens=2, output_tokens=2, total_tokens=4))
 
 
@@ -68,7 +71,21 @@ def optimize(name):
     trainset = [dspy.Example(**row).with_inputs('question') for row in fixture['trainset']]
     dspy.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
     with patch('socket.socket.connect', side_effect=AssertionError('Offline optimization forbids network.')), dspy.context(lm=lm, adapter=dspy.ChatAdapter(use_json_adapter_fallback=False), disable_history=True, callbacks=[]):
-        module = dspy.COPRO(prompt_model=lm, metric=lambda expected, actual, trace=None: expected.answer == actual.answer,
+        def metric(expected, actual, trace=None):
+            return float(expected.answer == actual.answer)
+        if fixture['optimizer'] == 'GEPA':
+            metric_calls = []
+            def gepa_metric(expected, actual, trace=None, pred_name=None, pred_trace=None):
+                metric_calls.append(pred_name)
+                return metric(expected, actual, trace)
+            module = dspy.GEPA(metric=gepa_metric, reflection_lm=lm, max_metric_calls=3,
+                               reflection_minibatch_size=1, num_threads=1, seed=0).compile(
+                               suite.build(name), trainset=trainset, valset=trainset)
+            # GEPA checks its stop condition between iterations, not each score.
+            assert len(metric_calls) == fixture['expectedMetricCalls']
+            assert sum(value is None for value in metric_calls) == fixture['expectedScoringCalls']
+        else:
+            module = dspy.COPRO(prompt_model=lm, metric=metric,
                             breadth=2, depth=1).compile(suite.build(name), trainset=trainset,
                             eval_kwargs={'num_threads': 1, 'display_progress': False, 'display_table': False})
         if engine.calls != fixture['expectedEngineCalls'] or engine.calls == 0:
