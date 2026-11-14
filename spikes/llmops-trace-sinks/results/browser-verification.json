@@ -93,6 +93,21 @@
       "testsPassed": 63,
       "liveTestsSkipped": 6,
       "browserLaunched": false
+    },
+    {
+      "command": "pnpm check",
+      "outcome": "passed on full rerun",
+      "exitCode": 0,
+      "goVersion": "1.27.3",
+      "javascriptTestFilesPassed": 507,
+      "javascriptTestsPassed": 7469,
+      "javascriptExpectedFailures": 2,
+      "javascriptTestsSkipped": 165,
+      "pythonTestsPassed": 1968,
+      "pythonTestsSkipped": 1,
+      "goTests": "passed",
+      "remainingGates": "license, dependency licenses, wheels, lint, both TypeScript checks, Python typecheck, build, dependencies, docs and size passed",
+      "precedingFailure": "The untouched local-only template readiness poll timed out in the first full run; its six isolated tests and this full rerun passed without assertion or timeout changes. The original failure is retained below."
     }
   ],
   "ports": {
@@ -174,7 +189,8 @@
     "The pinned live SDK uses an options-object processor constructor and manual API/context registration; the guide web SDK constructor and register() work in the scratch sets.",
     "A short experiment identifier collided with the standardized Chromium navigation preference bit. A failing regression preceded the scanner correction; secret/canary scans still cover that header and arbitrary identifier headers still fail.",
     "Lifecycle callbacks relayed during document destruction are incomplete observations; only backend span counts define the close measurements.",
-    "The preview receiver observed a keepalive export during navigation that Playwright did not report; full receiver headers and body bytes were also scanned."
+    "The preview receiver observed a keepalive export during navigation that Playwright did not report; full receiver headers and body bytes were also scanned.",
+    "The backend-response scans check the routed canary and fixture text; generated credentials are checked in the bundle, requests and saved results, not complete backend bodies. Review corrected the broader README claim."
   ],
   "developmentCorrections": [
     {
@@ -256,7 +272,7 @@
     "filesCompared": 14,
     "byteIdentical": true,
     "verificationFileIncludedInExternalComparison": true,
-    "hashNote": "The hash manifest omits this verification file to avoid self-reference. It was included in the external before/after byte comparison.",
+    "hashNote": "The hash manifest omits this verification file to avoid self-reference. It was included in the external before/after byte comparison before final repository-check receipts were appended.",
     "sha256": {
       "browser-close.json": "20f3fdc95d68e164a03403502fd9fd119b9247d8b62dc97dd941e278676c8c11",
       "browser-evidence.json": "584313817fb78010b4cd2a180d4e75b277bd8883188a5ec901793f3c6e9a8e90",

@@ -302,9 +302,12 @@ segments, query values and header values, excluding Chromium's standardized
 `upgrade-insecure-requests` protocol bit. That bit still receives all credential
 and canary checks. Bodies and bundle numbers are not interpreted as experiment
 identifiers. Synthetic positive controls exercise both scanners. No generated
-credential or canary appeared in a page request or either backend readback.
+credential appeared in the bundle or either request capture. No page request or
+complete backend response contained the routed canary. Generated credentials in
+complete backend responses were not scanned; the separate static guard checks
+all saved results against generated `.env` values.
 
-The direct-export control uses only the collector origin and records three
+The direct-export control uses only the collector origin and records four
 `connect-src` violations, zero collector requests observed by Playwright and
 zero spans in either backend throughout a 15-second observation window after a
 later proxied run was successfully read back. The exporter reports one flush
