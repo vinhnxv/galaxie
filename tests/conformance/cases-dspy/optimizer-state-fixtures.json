@@ -1,0 +1,20 @@
+{
+  "optstate-copro": {
+    "optimizer": "COPRO",
+    "state": "optstate-copro",
+    "question": "What is the capital of France?",
+    "trainset": [{ "question": "What is the capital of Spain?", "answer": "Madrid" }],
+    "proposals": {
+      "proposed_instruction": "Answer with the capital city using the offline COPRO instruction.",
+      "proposed_prefix_for_output_field": "Offline capital:"
+    },
+    "expectedEngineCalls": 3,
+    "replies": [{ "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]" }]
+  },
+  "optstate-forgot-lm": {
+    "optimizer": "refusal",
+    "state": "optstate-copro",
+    "question": "What is the capital of France?",
+    "replies": []
+  }
+}

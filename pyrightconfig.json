@@ -62,6 +62,10 @@
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
     },
     {
+      "root": "scripts/record-dspy-optimizer-state-conformance.py",
+      "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
+    },
+    {
       "root": "scripts/record-dspy-conformance.py",
       "extraPaths": ["python/galaxie/src", "tests/conformance/cases-dspy"]
     },
