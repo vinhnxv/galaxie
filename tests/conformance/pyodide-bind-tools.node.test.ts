@@ -28,8 +28,8 @@ def graph():
 `;
 
 test.each([
-  ['factory', 'unavailable'],
-  ['graph', 'executor_error'],
+  ['factory', 'unsupported'],
+  ['graph', 'unsupported'],
 ])(
   'bind_tools refusal at %s has a characterized fixed code',
   async (entry, code) => {

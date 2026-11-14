@@ -5,11 +5,17 @@ import asyncio
 from collections.abc import AsyncGenerator
 from typing import Any
 
+from langchain_core.language_models import LanguageModelInput
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from langchain_core.runnables import Runnable
 
 from ._bridge import GalaxieError, request
+
+
+class _BindToolsRefused(GalaxieError, NotImplementedError):
+    """Fixed refusal compatible with native binding fallback handlers."""
 
 
 class GalaxieChatModel(BaseChatModel):
@@ -20,6 +26,11 @@ class GalaxieChatModel(BaseChatModel):
     @property
     def _llm_type(self) -> str:
         return "galaxie"
+
+    def bind_tools(
+        self, tools: Any, *, tool_choice: Any = None, **kwargs: Any,
+    ) -> Runnable[LanguageModelInput, AIMessage]:
+        raise _BindToolsRefused("unsupported")
 
     def _generate(
         self, messages: list[BaseMessage], stop: list[str] | None = None,
