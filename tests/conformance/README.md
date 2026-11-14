@@ -20,6 +20,8 @@ The reload tests pause `interrupt-resume`, `interrupt-subgraph` and both durabil
 
 Additional tests in this directory run on both Node and Chromium unless their filename ends in `.node.test.ts` or they are the Chromium-only `indexeddb.test.ts`. They cover runtime controls beyond transcript parity. The single guarantee-to-code-and-test map is in [system design §9](../../docs/system-design.md#9-security-baseline-map).
 
+[`trace-context.test.ts`](trace-context.test.ts) checks opt-in host HTTP/MCP trace parenting and post-call refresh omission on Node and Chromium; its global-baggage case is Node-only. See the [tracing guide](../../docs/guides/tracing.md#send-trace-context-to-your-backend) for controls and limits.
+
 ## Static-breakpoint refusal and gate replacement
 
 [`gate-replacement.node.test.ts`](gate-replacement.node.test.ts) owns three new
