@@ -12,6 +12,7 @@ import {
 import { type ErrorCode, GalaxieError, toErrorInfo } from './errors.js';
 import type { DestinationClass } from './policy.js';
 import { DEFAULT_BUDGETS } from './policy.js';
+import { injectTraceContext } from './tracing.js';
 import { isHttpDestination, isLoopback, isPrivateAddress } from './urls.js';
 
 interface Placeholder {
@@ -158,6 +159,7 @@ async function readBody(response: Response, cap: number): Promise<string> {
  * in Access-Control-Allow-Headers, plus Idempotency-Key when retry is 'idempotency-key'. A failed
  * preflight fails with unreachable for user-device or local/private user-endpoint destinations,
  * and with unavailable for other destinations, following the existing network error rule.
+ * Opting into propagateTraceContext also requires traceparent and tracestate in that allowlist.
  * Headers never authorize. */
 export function httpCapability<Input = unknown, Output = unknown>(
   supplied: HttpCapabilityOptions,
@@ -167,11 +169,17 @@ export function httpCapability<Input = unknown, Output = unknown>(
   const hostname = new URL(compiled.origin).hostname;
   const validateDestination = (binding: Pick<CapabilityBinding, 'destination'>): void => {
     if (
+      (options.propagateTraceContext === true && binding.destination !== 'host-server') ||
       binding.destination === 'in-browser' ||
       (binding.destination === 'user-device' && !isLoopback(new URL(compiled.origin).hostname))
     )
       fail('invalid');
   };
+  if (
+    options.propagateTraceContext !== undefined &&
+    typeof options.propagateTraceContext !== 'boolean'
+  )
+    fail('invalid');
   validateDestination(options);
   if (!['GET', 'DELETE', 'POST', 'PUT', 'PATCH'].includes(options.method)) fail('invalid');
   const descriptor: HttpDescriptor = {
@@ -201,6 +209,8 @@ export function httpCapability<Input = unknown, Output = unknown>(
       for (const [key, value] of Object.entries(attributionHeaders(context)))
         headers.set(key, value);
       if (options.retry === 'idempotency-key') headers.set('Idempotency-Key', context.effectId);
+      if (options.propagateTraceContext === true && destination === 'host-server')
+        injectTraceContext(context, headers);
       if (context.signal.aborted) fail('cancelled');
       let response: Response;
       try {

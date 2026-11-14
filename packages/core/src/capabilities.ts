@@ -111,6 +111,8 @@ export interface HttpCapabilityOptions extends Omit<CapabilityBinding, 'invoke'>
   readonly url: string;
   readonly method: 'GET' | 'DELETE' | 'POST' | 'PUT' | 'PATCH';
   readonly headers?: (context: CapabilityContext) => HeadersInit | Promise<HeadersInit>;
+  /** Send traceparent and tracestate for live calls; allowed only for host-server destinations. */
+  readonly propagateTraceContext?: boolean;
   readonly credentials?: RequestCredentials;
   readonly fetch?: typeof globalThis.fetch;
 }
