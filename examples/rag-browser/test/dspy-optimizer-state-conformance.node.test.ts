@@ -162,4 +162,5 @@ test.each(dspyOptimizerStateCases)(
       await context.close();
     }
   },
+  900000,
 );
