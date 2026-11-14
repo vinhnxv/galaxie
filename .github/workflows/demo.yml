@@ -49,5 +49,33 @@ jobs:
           path: examples/rag-browser/dist
           retention-days: 14
           if-no-files-found: error
+      # GitHub Pages serves a project site under /<repository>/, so this second build sets the
+      # base path. It runs only for a push to main, which is the only event that deploys.
+      - name: Build the mock demo for GitHub Pages
+        if: github.event_name == 'push'
+        run: pnpm --filter @galaxie-ai/example-rag-browser exec vite build --mode mock --outDir dist-pages --emptyOutDir
+        env:
+          VITE_GALAXIE_DEMO: "1"
+          GALAXIE_DEMO_BASE: /${{ github.event.repository.name }}/
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: github.event_name == 'push'
+        with:
+          path: examples/rag-browser/dist-pages
 
-# Add a deploy job only after the maintainer chooses a demo host and accepts the header limit.
+  deploy-demo:
+    if: github.event_name == 'push'
+    needs: build-demo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

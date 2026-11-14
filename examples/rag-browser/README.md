@@ -24,8 +24,11 @@ Mock mode indexes 12 synthetic passages on load and uses deterministic embedding
 
 The [demo workflow](../../.github/workflows/demo.yml) builds mock mode with
 `VITE_GALAXIE_DEMO=1` and uploads `examples/rag-browser/dist` as the `demo-dist`
-artifact for 14 days. It builds the same Python assets as `dev:mock` and deploys
-nothing. This artifact uses mock models and the synthetic corpus only. Real
+artifact for 14 days. It builds the same Python assets as `dev:mock`. A push to
+`main` also builds a second copy with `GALAXIE_DEMO_BASE=/<repository>/` and
+deploys it to GitHub Pages at `https://vinhnxv.github.io/galaxie/`. That variable
+sets the Vite `base` and the runtime asset paths; unset, the build keeps root
+paths. This artifact uses mock models and the synthetic corpus only. Real
 models need a local default-mode build, without the demo flag.
 
 The demo flag initially checks **Review passages before answering**; visitors can
@@ -46,10 +49,12 @@ default-mode build output is unchanged.
 
 Hosts that cannot send headers, such as GitHub Pages, use only the meta policy
 and have no `frame-ancestors` protection. This is a recorded limit of this
-mock-only demo that the maintainer must explicitly accept before deployment.
+mock-only demo, accepted by the maintainer on 2026-11-14 (GitHub Pages, no
+credentials or model data in the build). A header-capable host can serve
+`dist/_headers` to restore it.
 The meta policy does not provide response headers for Worker scripts; this
 artifact demonstrates the same-origin mock flow, not default-mode model loading.
-No demo host or deployment is selected by this workflow.
+The deployed site is a mock-only demonstration with no device or model measurements.
 
 Build locally from the repository root after installing dependencies (build the
 [Python wheel cache](#optional-python-build) first to include Python):

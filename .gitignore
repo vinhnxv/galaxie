@@ -31,3 +31,4 @@ __pycache__/
 
 # Vitest browser-mode failure screenshots and attachments
 /.vitest/
+dist-pages/
