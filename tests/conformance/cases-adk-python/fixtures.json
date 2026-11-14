@@ -1164,5 +1164,136 @@
         }
       }
     ]
+  },
+  "agent-tool": {
+    "unordered": true,
+    "order": [
+      ["outer#1:response", "inner#1:request"],
+      ["inner#1:response", "inner#2:request"],
+      ["inner#2:response", "outer#2:request"]
+    ],
+    "prompt": "ask the specialist",
+    "agents": {
+      "outer": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "inner_1",
+              "name": "inner",
+              "args": {
+                "request": "double three"
+              }
+            }
+          ]
+        },
+        {
+          "text": "The specialist found 6."
+        }
+      ],
+      "inner": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "The result is 6."
+        }
+      ]
+    }
+  },
+  "stream-agent-tool": {
+    "unordered": true,
+    "order": [
+      ["outer#1:response", "inner#1:request"],
+      ["inner#1:response", "inner#2:request"],
+      ["inner#2:response", "outer#2:request"]
+    ],
+    "prompt": "ask the specialist",
+    "agents": {
+      "outer": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "inner_1",
+              "name": "inner",
+              "args": {
+                "request": "double three"
+              }
+            }
+          ]
+        },
+        {
+          "text": "The specialist found 6."
+        }
+      ],
+      "inner": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "The result is 6."
+        }
+      ]
+    }
+  },
+  "agent-tool-failure": {
+    "unordered": true,
+    "order": [["outer#1:response", "inner#1:request"], ["inner#1:response", "inner#2:request"]],
+    "prompt": "ask the specialist",
+    "agents": {
+      "outer": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "inner_1",
+              "name": "inner",
+              "args": {
+                "request": "double three"
+              }
+            }
+          ]
+        },
+        {
+          "text": "The specialist found 6."
+        }
+      ],
+      "inner": [
+        {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "double_1",
+              "name": "double",
+              "args": {
+                "value": 3
+              }
+            }
+          ]
+        },
+        {
+          "text": "BLOCKED_TEXT"
+        }
+      ]
+    }
   }
 }

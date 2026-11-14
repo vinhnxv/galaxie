@@ -62,6 +62,9 @@ export const adkPythonCases = [
   'agents-long-running-middle',
   'model-string',
   'toolset-fixed',
+  'agent-tool',
+  'stream-agent-tool',
+  'agent-tool-failure',
 ] as const;
 /** The Chromium lane repeats these; the Node lane runs all of them. */
 export const adkPythonBrowserCases = [
@@ -73,6 +76,9 @@ export const adkPythonBrowserCases = [
   'confirm-approve',
   'agents-sequential',
   'agents-confirm-last',
+  'agent-tool',
+  'stream-agent-tool',
+  'agent-tool-failure',
 ] as const;
 const stepLimit = 2;
 export interface AgentReply {

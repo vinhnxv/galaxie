@@ -1,0 +1,217 @@
+{
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are an agent. Your internal name is \"inner\". The description about you is \"Double one integer.\"."
+        },
+        {
+          "role": "user",
+          "content": "double three"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "agent": "inner"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are an agent. Your internal name is \"inner\". The description about you is \"Double one integer.\"."
+        },
+        {
+          "role": "user",
+          "content": "double three"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call-1",
+              "type": "function",
+              "function": {
+                "name": "double",
+                "arguments": "{\"value\":3}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-1",
+          "content": "{\"value\":6}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "double",
+            "description": "Double an integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": ["value"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "agent": "inner"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are an agent. Your internal name is \"outer\"."
+        },
+        {
+          "role": "user",
+          "content": "ask the specialist"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "inner",
+            "description": "Double one integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "request": {
+                  "type": "string"
+                }
+              },
+              "required": ["request"]
+            }
+          }
+        }
+      ],
+      "agent": "outer"
+    },
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are an agent. Your internal name is \"outer\"."
+        },
+        {
+          "role": "user",
+          "content": "ask the specialist"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call-1",
+              "type": "function",
+              "function": {
+                "name": "inner",
+                "arguments": "{\"request\":\"double three\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call-1",
+          "content": "{\"result\":\"The result is 6.\"}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "inner",
+            "description": "Double one integer.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "request": {
+                  "type": "string"
+                }
+              },
+              "required": ["request"]
+            }
+          }
+        }
+      ],
+      "agent": "outer"
+    }
+  ],
+  "responses": [
+    {
+      "agent": "inner",
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "double_1",
+          "name": "double",
+          "args": {
+            "value": 3
+          }
+        }
+      ]
+    },
+    {
+      "agent": "inner",
+      "content": "The result is 6.",
+      "toolCalls": []
+    },
+    {
+      "agent": "outer",
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "inner_1",
+          "name": "inner",
+          "args": {
+            "request": "double three"
+          }
+        }
+      ]
+    },
+    {
+      "agent": "outer",
+      "content": "The specialist found 6.",
+      "toolCalls": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "math.double@1",
+      "input": {
+        "value": 3
+      }
+    }
+  ],
+  "interactions": [],
+  "output": "The specialist found 6.",
+  "error": null
+}
