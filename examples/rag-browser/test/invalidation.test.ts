@@ -3,6 +3,8 @@
 
 import { type InvalidationWatcher, watchInvalidation } from '@galaxie-ai/core/browser';
 import { afterEach, expect, test, vi } from 'vitest';
+import { waitForAbort } from '../../../tests/conformance/support/abort-signal.js';
+import { createNotifier, waitForState } from '../../../tests/conformance/support/state-wait.js';
 import { IndexCache } from '../src/retrieval/cache.js';
 import { RetrievalClient } from '../src/retrieval/client.js';
 import { emptySnapshot, type InitInput, type RetrievalEvent } from '../src/retrieval/protocol.js';
@@ -31,13 +33,30 @@ function watch(appId: string, principalScope: string): InvalidationWatcher {
 async function fixture(appId: string, principalScope = 'visitor') {
   const input: InitInput = { appId, principalScope, mock: true, corpus: null };
   const events: RetrievalEvent[] = [];
-  const service = new RetrievalService((event) => events.push(event));
+  const eventNotifier = createNotifier();
+  const service = new RetrievalService((event) => {
+    events.push(event);
+    eventNotifier.notify();
+  });
   services.push(service);
-  const cache = new IndexCache(appId, principalScope);
+  const clearedEpochs: number[] = [];
+  const clearNotifier = createNotifier();
+  const cache = new IndexCache(appId, principalScope, (epoch) => {
+    clearedEpochs.push(epoch);
+    clearNotifier.notify();
+  });
   caches.push(cache);
   await service.handle({ id: 1, type: 'init', input });
   expect(events.at(-1)).toMatchObject({ type: 'result', result: { status: 'ready' } });
-  return { input, service, events, cache };
+  return {
+    input,
+    service,
+    events,
+    cache,
+    subscribeEvents: eventNotifier.subscribe,
+    clearedEpochs,
+    subscribeClears: clearNotifier.subscribe,
+  };
 }
 
 test.skipIf(typeof indexedDB === 'undefined')(
@@ -58,9 +77,12 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const announcer = watch(appId, 'visitor');
     const epoch = await first.cache.currentEpoch();
     announcer.announce();
-    await vi.waitFor(async () => expect(await first.cache.currentEpoch()).toBe(epoch + 2));
-    for (const events of [first.events, peer.events])
-      await vi.waitFor(() =>
+    await waitForState(first.subscribeClears, () =>
+      expect(first.clearedEpochs).toContain(epoch + 2),
+    );
+    expect(await first.cache.currentEpoch()).toBe(epoch + 2);
+    for (const { events, subscribeEvents } of [first, peer])
+      await waitForState(subscribeEvents, () =>
         expect(events.at(-1)).toEqual({
           type: 'progress',
           snapshot: { ...emptySnapshot, corpusMissing: true },
@@ -85,8 +107,11 @@ test.skipIf(typeof indexedDB === 'undefined')(
       result: { status: 'ready', count: 1, pastedCount: 1 },
     });
     announcer.announce();
-    await vi.waitFor(async () => expect(await first.cache.currentEpoch()).toBe(epoch + 4));
-    await vi.waitFor(() =>
+    await waitForState(first.subscribeClears, () =>
+      expect(first.clearedEpochs).toContain(epoch + 4),
+    );
+    expect(await first.cache.currentEpoch()).toBe(epoch + 4);
+    await waitForState(first.subscribeEvents, () =>
       expect(first.events.at(-1)).toEqual({
         type: 'progress',
         snapshot: { ...emptySnapshot, corpusMissing: true },
@@ -105,7 +130,7 @@ test.skipIf(typeof indexedDB === 'undefined')(
   'a failed stored wipe still drops in-memory data, reports failure and retries on the next notice',
   async () => {
     const appId = `test-invalidation-${crypto.randomUUID()}`;
-    const { service, events, cache } = await fixture(appId);
+    const { service, events, cache, subscribeEvents } = await fixture(appId);
     await service.handle({
       id: 2,
       type: 'paste',
@@ -116,22 +141,41 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const failing = vi
       .spyOn(IndexCache.prototype, 'clear')
       .mockRejectedValueOnce(new Error('The retrieval cache is unavailable.'));
+    const NativeChannel = BroadcastChannel;
+    const channels: BroadcastChannel[] = [];
+    const channelNotifier = createNotifier();
+    vi.stubGlobal(
+      'BroadcastChannel',
+      class extends NativeChannel {
+        constructor(name: string) {
+          super(name);
+          if (name === `galaxie:${appId}:invalidation`) {
+            channels.push(this);
+            channelNotifier.notify();
+          }
+        }
+      },
+    );
+    const beforeAnnounce = channels.length;
     announcer.announce();
-    await vi.waitFor(() => expect(failing).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() =>
+    await waitForState(subscribeEvents, () =>
       expect(events.at(-1)).toMatchObject({
         type: 'progress',
         snapshot: { status: 'failed', message: 'The retrieval cache is unavailable.' },
       }),
     );
+    expect(failing).toHaveBeenCalledTimes(1);
+    await waitForState(channelNotifier.subscribe, () =>
+      expect(channels.length).toBeGreaterThan(beforeAnnounce),
+    );
     announcer.announce();
-    await vi.waitFor(async () => expect(await cache.currentEpoch()).toBe(epoch + 1));
-    await vi.waitFor(() =>
+    await waitForState(subscribeEvents, () =>
       expect(events.at(-1)).toEqual({
         type: 'progress',
         snapshot: { ...emptySnapshot, corpusMissing: true },
       }),
     );
+    expect(await cache.currentEpoch()).toBe(epoch + 1);
     await service.handle({
       id: 3,
       type: 'search',
@@ -157,7 +201,9 @@ test.skipIf(typeof indexedDB === 'undefined').each(['principal', 'app'] as const
     const delivery = watch(otherApp, otherPrincipal);
     const before = first.events.length;
     announcer.announce();
-    await vi.waitFor(() => expect(delivery.signal.aborted).toBe(true));
+    await waitForAbort(delivery.signal);
+    expect(delivery.signal.aborted).toBe(true);
+    await first.cache.currentEpoch();
     expect(first.events).toHaveLength(before);
     await first.service.handle({
       id: 3,
@@ -219,7 +265,8 @@ test.skipIf(typeof indexedDB === 'undefined')(
       type: 'init',
       input: { ...first.input, principalScope: 'other' },
     });
-    caches.push(new IndexCache(appId, 'other'));
+    const otherCache = new IndexCache(appId, 'other');
+    caches.push(otherCache);
     expect(closeOld).toHaveBeenCalledOnce();
     expect(old.onmessage).toBeNull();
     const current = channels.findLast((channel) => channel.name === old.name);
@@ -228,7 +275,9 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const beforeOldNotice = first.events.length;
     const oldDelivery = watch(appId, 'visitor');
     watch(appId, 'visitor').announce();
-    await vi.waitFor(() => expect(oldDelivery.signal.aborted).toBe(true));
+    await waitForAbort(oldDelivery.signal);
+    expect(oldDelivery.signal.aborted).toBe(true);
+    await first.cache.currentEpoch();
     expect(first.events).toHaveLength(beforeOldNotice);
     const closeCurrent = vi.spyOn(current, 'close');
     await first.service.dispose();
@@ -237,7 +286,9 @@ test.skipIf(typeof indexedDB === 'undefined')(
     const before = first.events.length;
     const delivery = watch(appId, 'other');
     watch(appId, 'other').announce();
-    await vi.waitFor(() => expect(delivery.signal.aborted).toBe(true));
+    await waitForAbort(delivery.signal);
+    expect(delivery.signal.aborted).toBe(true);
+    await otherCache.currentEpoch();
     expect(first.events).toHaveLength(before);
   },
 );
@@ -271,7 +322,7 @@ test.skipIf(typeof indexedDB === 'undefined' || typeof Worker === 'undefined')(
       await client.init({ appId, principalScope: 'visitor', mock: true, corpus: null });
       await client.paste('Cobalt observatories count seven comets.');
       watch(appId, 'visitor').announce();
-      await vi.waitFor(() =>
+      await waitForState(client.subscribe, () =>
         expect(client.getSnapshot()).toEqual({ ...emptySnapshot, corpusMissing: true }),
       );
       expect((await client.search({ query: 'Cobalt', mode: 'fulltext', k: 10 })).passages).toEqual(
