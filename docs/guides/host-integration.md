@@ -530,6 +530,16 @@ watcher at teardown. Clear the host's own storage too; model assets are shared
 and are not deleted by this API. Broadcast delivery can be delayed or missed;
 transaction fencing and persisted `pageshow` checks provide the documented limits.
 
+For a cookie-session model proxy, also call its end-session route at sign-out and
+on a change of user: page code cannot clear an HttpOnly cookie. In
+[host-remote](../../examples/host-remote/README.md), `POST /api/v1/session/end`
+revokes the session identified by the current agent cookie, including its
+capability bearer token, and expires that cookie. A session issued before the
+last renewal lapses within 60 seconds. End-session alone does not prevent new
+issuance: the demo has no accounts and leaves `POST /api/session` open. A real
+host must require its own sign-in on session issue and refuse issuance after
+sign-out, alongside the invalidation and cleanup above.
+
 ## Host confirmations
 
 Use `approval: 'confirm'` for significant write bindings and configure
@@ -674,7 +684,9 @@ bound capabilities ([baseline B10](../adr/0012-security-baseline.md)). The
   [host-remote](../../examples/host-remote/src/runtime.ts) does. The default
   `credentials: 'same-origin'` also sends the user's session cookie on same-origin
   requests, and backend endpoints that serve agent capabilities must not accept that
-  cookie as authority. Core sets `content-type`, the attribution headers and `Idempotency-Key`
+  cookie as authority. The model-proxy cookie described below is a separate agent
+  session, and capability endpoints must not accept it either. Core sets
+  `content-type`, the attribution headers and `Idempotency-Key`
   after your headers, so you cannot replace them. `headers(context)` does not
   receive the input. A header that depends on the request body, such as an HMAC
   signature, uses the binding's `fetch` option or a host-written binding with its
@@ -688,13 +700,17 @@ bound capabilities ([baseline B10](../adr/0012-security-baseline.md)). The
   call. Other headers go through the server's `fetch` option, which applies to every
   request to that server. Tools that need different authentication use separate
   server entries, or a gateway that decides by tool and token scope.
-- **Remote models.** `getCredential` supplies the bearer per call.
+- **Remote models.** `getCredential` supplies the bearer per call, or a fixed
+  non-empty placeholder when an HttpOnly agent-session cookie authenticates a
+  same-origin host proxy (see below). The proxy ignores the incoming Authorization
+  value and substitutes its server-only upstream key.
   `openAICompatible` `headers` may add static headers but rejects `authorization`,
   `cookie` and `host`. A provider with another authentication scheme uses `fetch`
   or a host proxy that speaks the OpenAI-compatible format.
 - **Where keys live.** Application keys (model providers, partner APIs, third-party
   MCP credentials) stay in your backend, proxy or MCP gateway, and the browser holds
-  only the short-lived token. A user's own key for their own endpoint
+  only a short-lived token or the separate HttpOnly model-session cookie.
+  A user's own key for their own endpoint
   (`user-endpoint`) comes through `getCredential`, bound to that endpoint's origin;
   never send a host-proxy token to a URL from user settings. galaxie stores no key,
   and you do. Direct browser calls to commercial model providers and OAuth to
@@ -721,8 +737,10 @@ bound capabilities ([baseline B10](../adr/0012-security-baseline.md)). The
 }),
 ```
 
-Same-origin code can read a credential during its call. Short lifetimes, narrow
-scopes, spending limits at your proxy and backend authorization contain that.
+In the bearer-token variant, same-origin code can read a credential during its
+call. Short lifetimes, narrow scopes, spending limits at your proxy and backend
+authorization contain that. The cookie variant keeps the model credential out
+of page code, but page scripts can still call the proxy while the session lasts.
 Custom headers sent cross-origin need `Access-Control-Allow-Headers` on the server
 and the origin in your CSP `connect-src`.
 
@@ -830,10 +848,50 @@ to a URL supplied in user settings. Even local endpoints currently require a
 non-empty bearer credential.
 
 Issue short-lived scoped tokens from the host, never long-lived provider keys
-in bundles or storage. Page code can read a credential during its call.
-Backends authorize each operation and enforce spending limits; router token
+in bundles or storage. In that bearer-token variant, page code can read the
+credential during its call.
+
+[Host-remote](../../examples/host-remote/README.md) demonstrates an alternative:
+`POST /api/session` issues a dedicated 300-second agent-session cookie, separate
+from the host's sign-in cookie and the capability bearer token. It is HttpOnly,
+SameSite=Strict, has Path `/api/v1` and Max-Age=300, and sets no Domain. The shared
+session getter renews it before a model call; `getCredential` then returns a fixed
+non-empty placeholder. Only `POST /api/v1/chat/completions` uses the cookie to
+authorize a model request. The proxy ignores the incoming Authorization value
+and substitutes a server-only upstream key. `POST /api/v1/session/end` uses the
+cookie only to identify the session to revoke. Capability routes retain bearer
+authentication and `credentials: 'omit'`.
+
+Every route that issues or accepts the cookie must reject a missing or
+non-matching Origin. Compare against a configured exact page origin, never an
+origin derived from the request's Host header or a site/suffix match. The demo
+uses its actual loopback listening origin. SameSite=Strict does not separate
+sibling ports or subdomains. Bearer-only capability routes allow a missing Origin
+but reject a supplied mismatch. The session fetch uses same-origin credentials
+so the browser stores Set-Cookie; its explicit Origin supports Node callers,
+while browsers ignore a script-set Origin and supply their own.
+
+Add `Secure` on HTTPS. Cookie Path scopes where the browser sends the cookie;
+it is not a confidentiality boundary: HttpOnly prevents page JavaScript from
+reading the value. A Path-scoped cookie cannot use the `__Host-` prefix and
+remains exposed to same-site cookie tossing. The example rejects duplicate
+agent-session cookie names rather than choosing one. Prefer an HTTPS `__Host-`
+cookie where the host's routes allow Path `/`. This guide documents a same-site
+proxy, with a same-origin example. A cross-site variant would need
+`credentials: 'include'`, third-party-cookie support and a different SameSite
+and CSRF design; the example does not demonstrate that deployment.
+
+Build the upstream request from an allowlist: the demo forwards only
+`content-type`, `accept` and its own `authorization`, never Cookie or the incoming
+Authorization. For a real upstream, also use a fixed URL and path, refuse
+redirects, forward only allowlisted response headers and replace upstream error
+bodies with a fixed body. The in-process stub does not demonstrate those network
+and response-handling controls.
+
+Script running in the page can still call the proxy for the session's lifetime.
+Only spending limits at the proxy bound that use; this example enforces none,
+so hosts must add them. Backends authorize each operation; router token
 reservations and cancellation do not enforce billing or guarantee the provider
 stops. Cross-origin proxies also need the SDK's documented CORS header set.
-[Host-remote](../../examples/host-remote/README.md) is a worked stub integration,
-not a real upstream-provider result. Consult the [device matrix](../device-matrix.md)
-for the tested scope.
+This is a worked stub integration, with no real upstream-provider result.
+Consult the [device matrix](../device-matrix.md) for the tested scope.
