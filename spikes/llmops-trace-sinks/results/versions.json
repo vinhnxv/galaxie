@@ -25,7 +25,9 @@
     "postgres": "postgres (PostgreSQL) 17.12 (Debian 17.12-1.pgdg13+1)",
     "clickhouse": "ClickHouse local version 26.3.62.3 (official build).",
     "redis": "Redis server v=7.4.12 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=6009b0a18fd35b30",
-    "minio": "minio version RELEASE.2026-11-12T01-15-23Z (commit-id=a60e2a7b026ab48e41a23a4230aad773c4eae2e0)\nRuntime: go1.27.4 linux/arm64\nLicense: GNU AGPLv3 - https://www.gnu.org/licenses/agpl-3.0.html\nCopyright: 2015-2026 MinIO, Inc."
+    "minio": "minio version RELEASE.2026-11-12T01-15-23Z (commit-id=a60e2a7b026ab48e41a23a4230aad773c4eae2e0)\nRuntime: go1.27.4 linux/arm64\nLicense: GNU AGPLv3 - https://www.gnu.org/licenses/agpl-3.0.html\nCopyright: 2015-2026 MinIO, Inc.",
+    "otlpHttpExporter": "0.301.0",
+    "sdkTrace": "3.1.0"
   },
   "images": [
     {
@@ -131,13 +133,25 @@
     "traceDestinations": ["local Langfuse", "local MLflow"]
   },
   "notMeasured": [
-    "galaxie runtime runs",
-    "browser lane",
-    "workflows",
-    "real models or prompt content",
+    "browser export",
+    "other executors or executor coverage",
+    "real models or real prompts",
+    "budget exhaustion or cancellation",
     "feedback scores",
     "MLflow evaluation",
-    "performance, capacity or delivery under failure",
+    "session grouping workflow",
+    "retries, delivery guarantees, capacity, latency or failure recovery",
     "vendor usage telemetry payloads or all container egress"
-  ]
+  ],
+  "nodeHostMeasurement": {
+    "date": "2026-11-15",
+    "backendVersionsRechecked": true,
+    "command": "docker compose exec -T langfuse-web node -p require(\"./package.json\").version; docker compose exec -T mlflow mlflow --version; docker compose exec -T collector /otelcol-contrib --version",
+    "collectorMappingChanged": false,
+    "model": "ScriptedChatModel fixture-1",
+    "developmentTraceTextDestination": "host-server",
+    "liveLabels": ["public"],
+    "node": "v26.13.0",
+    "pnpm": "11.21.0"
+  }
 }
