@@ -42,7 +42,6 @@ func LlmAgent(config llmagent.Config) (agent.Agent, error) {
 		}
 	}
 	tools := slices.Clone(config.Tools)
-	wrapAllowed := config.InputSchema == nil && config.OutputSchema == nil && len(config.Toolsets) == 0
 	for _, each := range config.Toolsets {
 		set, ok := each.(*fixedToolset)
 		if !ok || !r.toolsets[set] {
@@ -70,7 +69,7 @@ func LlmAgent(config llmagent.Config) (agent.Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.agents[created] = node{kind: kindLLM, model: model, tools: config.Tools, wrapAllowed: wrapAllowed}
+	r.agents[created] = node{kind: kindLLM, model: model, tools: config.Tools}
 	return created, nil
 }
 
