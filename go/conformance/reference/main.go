@@ -15,8 +15,5 @@ func main() {
 	for name, definition := range cases.IdentityDefinitions() {
 		definitions[name] = definition
 	}
-	for name, definition := range cases.AgentToolDefinitions() {
-		definitions[name] = definition
-	}
 	galaxie.ServeWith(definitions)
 }
