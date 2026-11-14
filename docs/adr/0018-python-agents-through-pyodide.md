@@ -39,6 +39,7 @@
   2026-11-13: added independent DSPy runtime LabeledFewShot and retrieval goldens; native/Node pass, runtime and host-bound retrieval pass on all three local browsers, and the two eval-instrumented service probes diverge under Trusted Types. No shipped source or Decision text changed; status stays Proposed.
 
   2026-11-14: registered offline optimizer state measurement rules before running COPRO, GEPA or MIPROv2; status stays Proposed.
+  2026-11-14: registered branch-helper version outcome rules and recorded the real-model and Parallel adapter decisions; status stays Proposed.
 
 ## Context
 
@@ -991,6 +992,101 @@ dictionary loading; `eddccbd` proved all four Chromium cases. The
 [measurement commands](../../tests/conformance/README.md#dspy-offline-optimizer-state-measurements)
 and [author recipe](../../packages/adapter-pyodide/README.md#offline-optimized-program-state)
 describe reproduction and the default/optimizer environment split.
+
+### DSPy branch helper versions, real models and Parallel adapter decision (2026-11-14)
+
+#### Outcome rules registered before measurement
+
+These rules precede the measurements. Suite A comprises
+`test_dspy_branches.py` and `test_dspy_branch_handle.py`; suite B comprises
+`test_dspy_branches_shipped.py`, `test_dspy_branches_order.py`,
+`test_dspy_divergence_persistence.py`, `test_dspy_fanout.py` and
+`test_dspy_parallel_baseline.py`. The unrelated literal-version assertions in
+`test_dspy.py` are not collected; that module supplies imported helpers only.
+
+| Outcome | Rule |
+| --- | --- |
+| UNMEASURED | If a cell cannot run because of network, interpreter availability, time or a disagreeing control, record that word and the exact cause. |
+| INSTALL-FAILS | If the network is reachable but installation fails, record the resolver or installer error verbatim. Permit one retry relaxing the failing transitive pin in the throwaway environment only; record both attempts. |
+| COLLECTION-FAILS | If installation succeeds but pytest exits 2 during collection with zero tests run, record the exception class, message and first galaxie source line verbatim. This is an import finding, not an assertion result. |
+| DIVERGED | If collection succeeds and a test fails or errors, record its id and first assertion verbatim. Classify literal-version or legitimately version-dependent fields as VERSION-PINNED, everything else as BEHAVIORAL. A count different from the control also means DIVERGED. Never repair, skip or weaken an assertion. |
+| PASS | If all collected tests pass and their counts equal the control, record PASS. |
+
+The native CPython lane uses throwaway environments outside the repository,
+the repository interpreter and a `.pth` pointing to the current Python source.
+DSPy 3.4.1 is the control and must match the in-repository counts before other
+rows are trusted. Targets are 3.2.1 and 3.5.0; 3.4.0 is a bisect-only extra if
+3.5.0 diverges or cannot collect and time remains. The frozen repository package
+list supplies the baseline, with copied metadata-only workspace stand-ins
+installed first. Only dependency changes forced by DSPy are permitted there.
+Worker, Node Pyodide and browser lanes for other versions remain UNMEASURED:
+the locked Worker wheel closure requires a separate maintainer lock decision.
+The measurement makes no support promise or pin-bump decision.
+
+Predictions, retained even if disproved: **Q1**, network access and a real
+3.2.1 install will succeed, superseding the offline-install limitation;
+**Q2**, `import dspy` will succeed on 3.2.1 but `import dspy.lm15` and both
+suites will fail with `ModuleNotFoundError: No module named 'dspy.lm15'`, at
+`galaxie/dspy.py:22` for collection (exit 2, zero tests); **Q3**, the 3.4.1
+control will match both in-repository counts; **Q4**, 3.5.0 will install and
+collect, with approximately even odds of all tests passing and any likely
+failure being BEHAVIORAL drift in lm15 or streaming types; **Q5**, real models
+will remain UNMEASURED without model access; **Q6**, no lock, dependency or
+repository environment byte will change.
+
+Measurement has a 25-minute budget, within a 40-minute rules-to-results limit;
+cut 3.5.0 first if necessary and record UNMEASURED with the cause. Stop an
+environment if it would require a source workaround, a lock or pyproject edit,
+or real `litellm`/`ormsgpack` in place of the stand-ins. An unexplained control
+disagreement after ten minutes makes the target rows UNMEASURED. Wheel rebuilding
+and the final local gates follow this limit. ADR-0012 controls remain mandatory.
+
+#### Real-model run (unmeasured)
+
+Outcome: **UNMEASURED**, cause: "no model access for the agent in this
+environment". There is no real-provider DSPy probe harness here. Creating one
+requires a provider key and a Worker egress decision under decision 9; this
+measurement settles neither.
+
+A maintainer first runs the scripted suites from `python/` as the control,
+then replays `fanout-single`, `fanout-write` and `fanout-multi` from
+`tests/conformance/cases-dspy/shipped_branches.py`, using the corresponding
+`tests/conformance/golden-dspy/` records for call shape, plus the
+`par-fan-two-stage-multi` pause and reload case. Replace the scripted model with
+a routed provider whose key stays host-side under ADR-0012. Real reply content
+will differ. Record keyed join order, absolute effect scopes, pause/reload
+replay, the first recorded failure code under a provider error, and wall-clock
+time for N branches against sequential `await module.acall(...)` calls.
+Reopening is complete when every case has an outcome word above, with model and
+provider named and no secret recorded. The reproduction recipe belongs in the
+conformance measurement record alongside the native version commands.
+
+#### Pause-capable groups and a Parallel-shaped adapter (decision)
+
+Decision: **not built; reopen only on evidence**. Branch pauses, nested groups
+and streaming with branches already end fixed `unsupported`; persisted groups
+contain completed calls only. A pause-capable group needs a partial-group
+record and a decision about optional keys versus a version bump under decision
+7. Its divergence must still issue zero further requests, retain byte-identical
+earlier rows and writes, append exactly one compact poison checkpoint and refuse
+later restore without another row. A version measurement cannot settle that
+persisted design.
+
+A `Parallel`-shaped adapter would add a public API over
+`galaxie.dspy.branches`. The branch overlap decision already accepts a measured
+author recipe without a permanent symbol. Sequential `await module.acall(...)`
+loops, `branches` and the per-branch lock recipe cover the existing author need;
+threaded verbatim `dspy.Parallel` and `dspy.Evaluate` remain refused. A test-only
+adapter supplies no evidence beyond the existing native `asyncio.gather`
+comparison. This reasoning is grounded in this ADR's branch-helper, overlap and
+divergence decisions.
+
+Reopen on a recorded author program needing a pause inside fan-out that cannot
+use join-then-pause or sequential execution; a real-model measurement showing a
+stated latency need that sequential calls and `branches` cannot meet; an
+accepted partial-group design settling decision 7 and the divergence gate; or
+a maintainer request for a `Parallel`-shaped surface with its public contract
+written first.
 
 ### DSPy provider strings, schema output, embeddings and retrievers spike (2026-11)
 
