@@ -211,7 +211,6 @@ class ScriptedLlm(BaseLlm):
         if self.case == 'argument-block':
             raise GalaxieError('denied')
         if self.case == 'agent-tool-failure' and agent == 'inner' and turn == 2:
-            # The reference emulates the host output check before publishing the blocked reply.
             raise GalaxieError('denied')
         if stream and self.case.startswith('stream-'):
             # The router checks growing text before the model sees it; the fixture emulates that check.
