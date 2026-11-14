@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { AssertionError } from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import { readEnv } from './secrets.js';
 
@@ -136,10 +137,19 @@ export async function waitForReadback(
   spanIds?: readonly string[],
   inspect?: (response: unknown) => void,
 ): Promise<Readback> {
-  const deadline = Date.now() + 120_000;
+  const deadline = Date.now() + 90_000;
   let latest: Readback = { observations: [], traces: [], spans: [] };
+  let transient: unknown;
   while (Date.now() < deadline) {
-    latest = await readBack(traceId, inspect);
+    try {
+      latest = await readBack(traceId, inspect);
+    } catch (error) {
+      // Scan failures are results, not transient errors.
+      if (error instanceof AssertionError) throw error;
+      transient = error;
+      await setTimeout(1000);
+      continue;
+    }
     if (
       spanIds === undefined
         ? latest.observations.length >= 2 && latest.spans.length >= 2
@@ -155,6 +165,6 @@ export async function waitForReadback(
     await setTimeout(1000);
   }
   throw new Error(
-    `Readback timed out: ${latest.observations.length} observations, ${latest.traces.length} traces, ${latest.spans.length} spans; missing Langfuse: ${spanIds?.filter((id) => !latest.observations.some((span) => span.id === id)).join(', ') ?? 'count'}; missing MLflow: ${spanIds?.filter((id) => !latest.spans.some((span) => Buffer.from(span.span_id, 'base64').toString('hex') === id)).join(', ') ?? 'count'}`,
+    `Readback timed out${transient instanceof Error ? ` (last transient error: ${transient.message})` : ''}: ${latest.observations.length} observations, ${latest.traces.length} traces, ${latest.spans.length} spans; missing Langfuse: ${spanIds?.filter((id) => !latest.observations.some((span) => span.id === id)).join(', ') ?? 'count'}; missing MLflow: ${spanIds?.filter((id) => !latest.spans.some((span) => Buffer.from(span.span_id, 'base64').toString('hex') === id)).join(', ') ?? 'count'}`,
   );
 }

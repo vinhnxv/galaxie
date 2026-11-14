@@ -64,7 +64,10 @@ export function normalize(value: unknown, source: Smoke | readonly ReadableSpan[
     if (item !== null && typeof item === 'object')
       return Object.fromEntries(
         Object.entries(item)
-          .filter(([name]) => !/authorization|password|secret|^(?:access_)?token$/i.test(name))
+          .filter(
+            ([name]) =>
+              !/authorization|password|secret|^(?:access_|refresh_|id_|api_)?token$/i.test(name),
+          )
           .map(([name, child]) => [name, visit(child, name)]),
       );
     return item;

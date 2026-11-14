@@ -34,6 +34,28 @@ interface StoredSpan {
   endTime: string | number;
 }
 
+const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+// Span and trace counts come from the bead acceptance, not from observed backend output.
+const expectedShape: Record<string, { spans: number; traces: number }> = {
+  linear: { spans: 3, traces: 1 },
+  'tool-call': { spans: 5, traces: 1 },
+  'interrupt-resume': { spans: 8, traces: 2 },
+  'model-failure': { spans: 3, traces: 1 },
+};
+
+// Differences the maintainer recorded as vendor representation, not galaxie defects. Anything
+// else that differs from the in-memory oracle fails the run.
+function isKnownFinding(finding: Finding): boolean {
+  if (finding.expectation.endsWith(': gen_ai.tool.call.arguments')) return true;
+  return (
+    finding.backend === 'Langfuse' &&
+    finding.expectation === 'emitted span name retained' &&
+    typeof finding.expected === 'string' &&
+    finding.expected.startsWith('execute_tool ')
+  );
+}
+
 function orderSpansParentFirst(spans: readonly ReadableSpan[]): ReadableSpan[] {
   const visit = (parent: ReadableSpan): ReadableSpan[] => [
     parent,
@@ -41,7 +63,7 @@ function orderSpansParentFirst(spans: readonly ReadableSpan[]): ReadableSpan[] {
       .filter((span) => span.parentSpanContext?.spanId === parent.spanContext().spanId)
       .sort(
         (a, b) =>
-          a.name.localeCompare(b.name) ||
+          compare(a.name, b.name) ||
           Number(a.attributes['galaxie.node.step'] ?? 0) -
             Number(b.attributes['galaxie.node.step'] ?? 0),
       )
@@ -60,11 +82,11 @@ function attributes(value: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key]) =>
-        /^(galaxie\.|gen_ai\.|session\.id$|langfuse\.observation\.|mlflow\.(spanType|spanInputs|spanOutputs|chat\.tokenUsage|llm\.))/.test(
+        /^(galaxie\.|gen_ai\.|session\.id$|langfuse\.observation\.|error\.type$|mlflow\.(spanType|spanInputs|spanOutputs|chat\.tokenUsage|llm\.))/.test(
           key,
         ),
       )
-      .sort(([a], [b]) => a.localeCompare(b)),
+      .sort(([a], [b]) => compare(a, b)),
   );
 }
 
@@ -73,6 +95,10 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
   assert.ok(result.credentialCalls > 0, 'getCredential was never called');
   const oracle = orderSpansParentFirst(result.spans);
   assert.equal(oracle.length, result.spans.length, 'Oracle ordering omitted spans');
+  const shape = expectedShape[result.name];
+  assert.ok(shape, `Unknown scenario ${result.name}`);
+  assert.equal(oracle.length, shape.spans, 'Unexpected emitted span count');
+  assert.equal(result.traceIds.length, shape.traces, 'Unexpected emitted trace count');
   const scan = (value: unknown): void => {
     const serialized = JSON.stringify(value);
     assert.ok(!serialized.includes(canary), 'Credential canary appeared in backend readback');
@@ -99,6 +125,21 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
         scan,
       ),
     );
+  // Positive controls: the scan above only means something if the opted-in text is visible here.
+  const rawText = JSON.stringify(raw);
+  if (result.text) {
+    assert.ok(rawText.includes(prompt), 'Opted-in prompt missing from backend readback');
+    assert.equal(
+      rawText.includes(reply),
+      result.name !== 'model-failure',
+      'Opted-in reply presence differs from the scenario',
+    );
+    if (result.name === 'tool-call')
+      assert.ok(
+        rawText.includes('synthetic lookup argument'),
+        'Opted-in tool argument missing from backend readback',
+      );
+  }
   const findings: Finding[] = [];
   const measure = (
     backend: string,
@@ -115,6 +156,17 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
   };
   const langfuse = raw.flatMap((item) => item.observations);
   const mlflow = raw.flatMap((item) => item.spans);
+  const oracleIds = oracle.map((span) => span.spanContext().spanId).sort(compare);
+  assert.deepEqual(
+    langfuse.map((span) => span.id).sort(compare),
+    oracleIds,
+    'Langfuse span set differs from the oracle',
+  );
+  assert.deepEqual(
+    mlflow.map((span) => Buffer.from(span.span_id, 'base64').toString('hex')).sort(compare),
+    oracleIds,
+    'MLflow span set differs from the oracle',
+  );
   const records: Record<string, StoredSpan[]> = { langfuse: [], mlflow: [] };
   for (const source of oracle) {
     const id = source.spanContext().spanId;
@@ -274,7 +326,8 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
       assert.ok(!span.status?.message, 'Backend added an error status message');
     }
   }
-  let runQuery: unknown = null;
+  let runQuery: { mode: string; filter: unknown; traceIds: string[]; segments: number[] } | null =
+    null;
   if (result.name === 'interrupt-resume') {
     const filter = JSON.stringify([
       {
@@ -289,11 +342,10 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
     const matchingRoots = matches.filter(
       (span) => span.metadata['galaxie.run.id'] === result.runId,
     );
-    measure(
-      'Langfuse',
-      'run-ID metadata filter returns only matching observations',
+    assert.equal(
       matches.length,
       matchingRoots.length,
+      'Run-ID metadata filter returned observations of another run',
     );
     assert.deepEqual(
       new Set(matchingRoots.map((span) => span.traceId)),
@@ -306,9 +358,18 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
       traceIds: matchingRoots
         .map((span) => span.traceId)
         .sort((a, b) => result.traceIds.indexOf(a) - result.traceIds.indexOf(b)),
-      segments: matchingRoots.map((span) => span.metadata['attributes.galaxie.run.segment']).sort(),
+      segments: matchingRoots
+        .map((span) => Number(span.metadata['attributes.galaxie.run.segment']))
+        .sort((a, b) => a - b),
     };
+    assert.deepEqual(runQuery.segments, [0, 1], 'Run-ID query did not return both segments');
   }
+  const unexpected = findings.filter((finding) => !isKnownFinding(finding));
+  assert.deepEqual(
+    unexpected,
+    [],
+    'Backend output differs from the oracle beyond recorded findings',
+  );
   return normalize(
     {
       scenario: result.name,

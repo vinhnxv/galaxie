@@ -67,7 +67,7 @@
       "scenarioHashes": {
         "node-interrupt-resume.json": "6246c152d5ea453686cccea9ea33d76641195ab424cb3be482871c1ba9647e95",
         "node-linear.json": "68edcad6cf84142f42e6c851719c8cab48a391509bfad379a7f0c80325d202a3",
-        "node-model-failure.json": "335626589af8d00d046de304e9c2f1b59fc1301096a563e4a57be76720e8f2d2",
+        "node-model-failure.json": "ee5827b4c530000369e783e2f81a7ef0e14b2255e16508232566b76b0dd03fe6",
         "node-tool-call.json": "5f591fcb8c61755f0f22fd7d99b196e7d505a1a6c9f4362e3e5392bc778c6812"
       }
     },
@@ -91,7 +91,7 @@
     },
     {
       "command": "pnpm check",
-      "pathPrefix": "/Users/vinhnxv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.3.darwin-arm64/bin",
+      "pathPrefix": "<go-1.27.3-toolchain>/bin",
       "outcome": "passed",
       "python": {
         "passed": 1968,
@@ -162,7 +162,7 @@
   "developmentCorrections": [
     {
       "command": "pnpm exec vitest run test/scenarios.test.ts",
-      "failure": "Error: Cannot find module '../src/node-host.js' imported from /Users/vinhnxv/Desktop/repos/galaxie/spikes/llmops-trace-sinks/test/scenarios.test.ts",
+      "failure": "Error: Cannot find module '../src/node-host.js' imported from <repo>/spikes/llmops-trace-sinks/test/scenarios.test.ts",
       "reason": "Expected proof-first failure before adding the host."
     },
     {
@@ -172,7 +172,7 @@
     },
     {
       "command": "pnpm exec vitest run",
-      "failure": "Error: Cannot find package '@langchain/langgraph/web' imported from /Users/vinhnxv/Desktop/repos/galaxie/packages/adapter-langgraph/dist/adapter.js",
+      "failure": "Error: Cannot find package '@langchain/langgraph/web' imported from <repo>/packages/adapter-langgraph/dist/adapter.js",
       "correction": "Use package-export-aware single-copy resolution in the spike runner."
     },
     {
@@ -202,7 +202,7 @@
     },
     {
       "command": "pnpm exec vitest run test/scenarios.test.ts",
-      "failure": "AssertionError: promise resolved \"{ observations: [], \u2026(3) }\" instead of rejecting\nAssertionError: promise resolved \"[]\" instead of rejecting",
+      "failure": "AssertionError: promise resolved \"{ observations: [], …(3) }\" instead of rejecting\nAssertionError: promise resolved \"[]\" instead of rejecting",
       "reason": "Expected proof-first failures for complete-response inspection; 5 failed and 4 passed before the fix, all 9 pass afterward."
     }
   ],
@@ -259,5 +259,20 @@
     "stoppedStackLiveCommand": "Expected exit 1, four tests failed with Error: connect ECONNREFUSED 127.0.0.1:4318",
     "gitleaksReviewFixCommit": "passed; no leaks found"
   },
-  "browserUiCheck": "No affected application routes. Browser exporter lane is outside scope; the root gate separately passed its configured Chromium tests."
+  "browserUiCheck": "No affected application routes. Browser exporter lane is outside scope; the root gate separately passed its configured Chromium tests.",
+  "pullRequestReview": {
+    "reviewer": "one local adversarial subagent; no external peer",
+    "fixes": [
+      "Live suite hard-asserts every acceptance expectation; only the recorded vendor tool-representation differences may remain as findings.",
+      "Span and trace counts (3/5/8/3 spans, 1/1/2/1 traces) are pinned from the acceptance and each backend span set must equal the oracle set.",
+      "Opted-in prompt, reply and tool argument must be visible in raw backend responses before absence claims count.",
+      "error.type is stored, so results/node-model-failure.json now shows it.",
+      "Run-ID server filter and segments [0,1] are hard assertions.",
+      "Transient readback errors are retried; scan failures still fail at once.",
+      "Locale-independent ordering, numeric segment sort, stricter secret-key filter, local paths removed from this file.",
+      "results/smoke.json regenerated for the wider Langfuse field set."
+    ],
+    "liveRunsAfterFixes": 2,
+    "byteIdenticalAfterFixes": true
+  }
 }
