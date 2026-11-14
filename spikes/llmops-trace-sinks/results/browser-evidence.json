@@ -1,0 +1,193 @@
+{
+  "demonstration": true,
+  "browser": "156.0.8078.4",
+  "sharedPackageCopies": {
+    "@opentelemetry/api": 1,
+    "@langchain/core": 1,
+    "@langchain/langgraph": 1
+  },
+  "csp": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'",
+  "proxy": {
+    "method": "Vite preview of minified production bundle",
+    "pagePath": "/otel/v1/traces",
+    "upstreamPath": "/v1/traces",
+    "upstream": "loopback collector",
+    "collectorMappingChanged": false
+  },
+  "credentialPositiveControls": [
+    {
+      "scenario": "linear",
+      "text": false,
+      "calls": 1
+    },
+    {
+      "scenario": "linear",
+      "text": true,
+      "calls": 1
+    },
+    {
+      "scenario": "interrupt-resume",
+      "text": false,
+      "calls": 2
+    },
+    {
+      "scenario": "interrupt-resume",
+      "text": true,
+      "calls": 2
+    }
+  ],
+  "laneSpecificAttributes": [],
+  "scans": {
+    "bundleFiles": ["assets/index-CWsBx5Of.js", "index.html"],
+    "bundleHits": [],
+    "requestHits": [],
+    "bundlePositiveControlDetected": true,
+    "requestPositiveControlDetected": true,
+    "requests": [
+      {
+        "count": 8,
+        "method": "GET",
+        "path": "/",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "if-none-match",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "sec-fetch-user",
+          "upgrade-insecure-requests",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "GET",
+        "path": "/",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "sec-fetch-user",
+          "upgrade-insecure-requests",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 8,
+        "method": "GET",
+        "path": "/assets/index-CWsBx5Of.js",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "if-modified-since",
+          "if-none-match",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "GET",
+        "path": "/assets/index-CWsBx5Of.js",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 6,
+        "method": "POST",
+        "path": "/otel/v1/traces",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      }
+    ]
+  },
+  "cspControl": {
+    "oracleSpans": 3,
+    "exportErrors": {
+      "flush": 1,
+      "shutdown": 0
+    },
+    "violations": [
+      {
+        "directive": "connect-src",
+        "blockedURI": "<collector-origin>/v1/traces"
+      },
+      {
+        "directive": "connect-src",
+        "blockedURI": "<collector-origin>/v1/traces"
+      },
+      {
+        "directive": "connect-src",
+        "blockedURI": "<collector-origin>/v1/traces"
+      }
+    ],
+    "collectorRequests": 0,
+    "laterProxiedRunReadBack": true,
+    "absenceWindowAfterPositiveControlMillis": 15000,
+    "delivered": {
+      "langfuse": 0,
+      "mlflow": 0
+    }
+  },
+  "violations": [
+    {
+      "directive": "connect-src",
+      "blockedURI": "<collector-origin>/v1/traces"
+    }
+  ],
+  "consoleErrors": [
+    "Connecting to '<collector-origin>/v1/traces' violates the following Content Security Policy directive: \"connect-src 'self'\". The action has been blocked.",
+    "Fetch API cannot load <collector-origin>/v1/traces. Refused to connect because it violates the document's Content Security Policy."
+  ],
+  "findings": []
+}

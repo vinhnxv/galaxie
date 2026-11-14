@@ -79,11 +79,16 @@ export function scanRequests(
       hits.push('credential-canary');
     for (const name of Object.keys(request.headers))
       if (forbiddenHeaders.has(name.toLowerCase())) hits.push(`header:${name.toLowerCase()}`);
+    // Chromium's standardized navigation preference is a protocol bit, not an identifier.
+    // It still passes through the secret and canary scans above.
     const id = env['MLFLOW_EXPERIMENT_ID'];
     if (id) {
       const url = new URL(request.url);
       if (
-        Object.values(request.headers).some((value) => value === id) ||
+        Object.entries(request.headers).some(
+          ([name, value]) =>
+            value === id && !(name.toLowerCase() === 'upgrade-insecure-requests' && value === '1'),
+        ) ||
         url.pathname.split('/').some((segment) => decodeURIComponent(segment) === id) ||
         [...url.searchParams.values()].some((value) => value === id)
       )

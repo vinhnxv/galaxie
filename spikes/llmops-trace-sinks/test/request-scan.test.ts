@@ -135,3 +135,20 @@ test('request capture keeps full headers and bytes for scanning, and summaries o
     /synthetic body|hidden|4318|application/,
   );
 });
+
+test('a Chromium navigation preference is not an experiment identifier, while a custom identifier header is', () => {
+  const numericEnv = { ...env, MLFLOW_EXPERIMENT_ID: '1' };
+  expect(
+    scanRequests([request({ headers: { 'upgrade-insecure-requests': '1' } })], numericEnv, canary),
+  ).toEqual([]);
+  expect(
+    scanRequests([request({ headers: { 'x-experiment': '1' } })], numericEnv, canary),
+  ).toContain('request[0]:experiment-id');
+  expect(
+    scanRequests(
+      [request({ headers: { 'upgrade-insecure-requests': secret } })],
+      numericEnv,
+      canary,
+    ),
+  ).toContain('request[0]:secret:POSTGRES_PASSWORD');
+});

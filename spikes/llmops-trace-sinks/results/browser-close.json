@@ -1,0 +1,50 @@
+{
+  "demonstration": true,
+  "observationOnly": true,
+  "cases": [
+    {
+      "mechanism": "close-no-auto-flush",
+      "scheduledDelayMillis": 60000,
+      "autoFlushOnHide": false,
+      "explicitFlush": false,
+      "oracleSpans": 3,
+      "windowMillis": 15000,
+      "lifecycle": [],
+      "delivered": {
+        "langfuse": 0,
+        "mlflow": 0
+      }
+    },
+    {
+      "mechanism": "navigate-default-auto-flush",
+      "scheduledDelayMillis": 60000,
+      "autoFlushOnHide": true,
+      "explicitFlush": false,
+      "oracleSpans": 3,
+      "windowMillis": 15000,
+      "lifecycle": [
+        {
+          "type": "beforeunload",
+          "visibility": "visible"
+        }
+      ],
+      "delivered": {
+        "langfuse": 3,
+        "mlflow": 3
+      }
+    },
+    {
+      "mechanism": "explicit-flush-close",
+      "scheduledDelayMillis": 60000,
+      "autoFlushOnHide": true,
+      "explicitFlush": true,
+      "oracleSpans": 3,
+      "windowMillis": 15000,
+      "lifecycle": [],
+      "delivered": {
+        "langfuse": 3,
+        "mlflow": 3
+      }
+    }
+  ]
+}
