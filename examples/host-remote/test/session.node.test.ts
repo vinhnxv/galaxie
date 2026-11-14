@@ -9,6 +9,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+test('session issue sends its exact Origin and permits same-origin cookies', async () => {
+  const origin = 'http://127.0.0.1:4321';
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(Response.json({ token: 'demo-token', expiresAt: Date.now() + 300_000 }));
+  vi.stubGlobal('fetch', fetchMock);
+  await expect(createSession(origin)()).resolves.toBe('demo-token');
+  expect(fetchMock).toHaveBeenCalledWith(`${origin}/api/session`, {
+    method: 'POST',
+    headers: { origin },
+    credentials: 'same-origin',
+    redirect: 'error',
+    cache: 'no-store',
+    signal: expect.any(AbortSignal),
+  });
+});
+
 test('a stalled session request ends at its deadline and a later call starts a new request', async () => {
   const deadline = new AbortController();
   vi.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);

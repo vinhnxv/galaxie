@@ -29,6 +29,8 @@ import {
 import { MemorySaver } from '@langchain/langgraph/web';
 import { createSession } from './session.js';
 
+const modelCredentialPlaceholder = 'host-remote-placeholder';
+
 export interface RemoteHost {
   readonly runtime: Runtime;
   readonly registry: Registry;
@@ -138,7 +140,10 @@ export async function createRemoteHost(
             'tutor.feedback': { providers: ['feedback'], allow: ['in-browser'], maxTokens: 1000 },
           },
           consent,
-          getCredential: token,
+          getCredential: async () => {
+            await token();
+            return modelCredentialPlaceholder;
+          },
         },
         bindings,
         ui: registry.bindings({ surfaces: ['lesson-main'] }),

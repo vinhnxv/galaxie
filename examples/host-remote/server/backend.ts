@@ -8,6 +8,28 @@ import type { Server } from 'node:net';
 import type { Plugin } from 'vite';
 import { lesson, quiz } from './fixtures.js';
 
+const processUpstreamKey = randomUUID();
+const cookieName = 'galaxie-agent-session';
+
+interface Session {
+  token: string;
+  cookie: string;
+  learnerId: string;
+  expiresAt: number;
+}
+
+function agentCookie(header: string | undefined): string | undefined {
+  const matches = (header ?? '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => part.slice(0, part.indexOf('=')) === cookieName);
+  return matches.length === 1 ? matches[0]?.slice(cookieName.length + 1) : undefined;
+}
+
+function sessionCookie(value: string, maxAge: number): string {
+  return `${cookieName}=${value}; HttpOnly; SameSite=Strict; Path=/api/v1; Max-Age=${maxAge}`;
+}
+
 interface ProgressInput {
   lessonId: string;
   score: number;
@@ -48,8 +70,10 @@ async function body(request: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
 }
 
-export function backend(options: { now?: () => number } = {}): Plugin {
+export function backend(options: { now?: () => number; upstreamKey?: string } = {}): Plugin {
   const now = options.now ?? Date.now;
+  const upstreamKey =
+    options.upstreamKey ?? process.env['HOST_REMOTE_UPSTREAM_KEY'] ?? processUpstreamKey;
   let testMode = false;
   function middleware(
     server: Server,
@@ -62,8 +86,10 @@ export function backend(options: { now?: () => number } = {}): Plugin {
     };
     if (server.listening) listening();
     else server.once('listening', listening);
-    const sessions = new Map<string, { learnerId: string; expiresAt: number }>();
+    const sessions = new Map<string, Session>();
+    const cookieSessions = new Map<string, Session>();
     const proxyBodies: unknown[] = [];
+    const proxyHeaderNames: string[][] = [];
     const progress: (ProgressInput & { learnerId: string })[] = [];
     const requests: Record<string, number> = {};
     const count = (route: string): void => {
@@ -74,34 +100,58 @@ export function backend(options: { now?: () => number } = {}): Plugin {
       response: ServerResponse,
       path: string,
     ): Promise<void> {
+      const route = `${request.method} ${path}`;
+      const modelRoute = route === 'POST /api/v1/chat/completions';
+      const endRoute = route === 'POST /api/v1/session/end';
+      const issueRoute = route === 'POST /api/session';
       if (
         !authority ||
         request.headers.host !== authority ||
-        (request.headers.origin !== undefined && request.headers.origin !== `http://${authority}`)
+        (request.headers.origin !== undefined &&
+          request.headers.origin !== `http://${authority}`) ||
+        ((issueRoute || modelRoute || endRoute) && request.headers.origin === undefined)
       ) {
         json(response, 403, { error: 'forbidden' });
         return;
       }
-      const route = `${request.method} ${path}`;
-      if (route === 'POST /api/session') {
+      if (issueRoute) {
+        // Demo-only open issuance: a real host must require its own signed-in user here.
         count(route);
         const token = randomUUID();
+        const cookie = randomUUID();
         const expiresAt = now() + 300_000;
-        sessions.set(token, { learnerId: 'demo-learner', expiresAt });
+        const session = { token, cookie, learnerId: 'demo-learner', expiresAt };
+        sessions.set(token, session);
+        cookieSessions.set(cookie, session);
+        response.setHeader('set-cookie', sessionCookie(cookie, 300));
         json(response, 200, { token, expiresAt });
         return;
       }
+      const cookie = agentCookie(request.headers.cookie);
+      const cookieSession = cookie === undefined ? undefined : cookieSessions.get(cookie);
+      if (endRoute) {
+        count(route);
+        if (cookieSession) {
+          sessions.delete(cookieSession.token);
+          cookieSessions.delete(cookieSession.cookie);
+        }
+        response.setHeader('set-cookie', sessionCookie('', 0));
+        json(response, 200, { ended: true });
+        return;
+      }
       const authorization = request.headers.authorization;
-      const session = authorization?.startsWith('Bearer ')
-        ? sessions.get(authorization.slice(7))
-        : undefined;
+      const session = modelRoute
+        ? cookieSession
+        : authorization?.startsWith('Bearer ')
+          ? sessions.get(authorization.slice(7))
+          : undefined;
       if (!session || session.expiresAt <= now()) {
         json(response, 401, { error: 'unauthorized' });
         return;
       }
       if (route === 'GET /api/__test/state' && testMode) {
         count(route);
-        json(response, 200, { proxyBodies, progress, requests });
+        json(response, 200, { proxyBodies, proxyHeaderNames, progress, requests });
       } else if (request.method === 'GET' && path.startsWith('/api/lessons/')) {
         count('GET /api/lessons/:lessonId');
         json(
@@ -122,7 +172,7 @@ export function backend(options: { now?: () => number } = {}): Plugin {
         }
         progress.push({ ...input, learnerId: session.learnerId });
         json(response, 200, { saved: true });
-      } else if (route === 'POST /api/v1/chat/completions') {
+      } else if (modelRoute) {
         count(route);
         const input = await body(request);
         if (typeof input !== 'object' || input === null || Array.isArray(input)) {
@@ -130,50 +180,63 @@ export function backend(options: { now?: () => number } = {}): Plugin {
           return;
         }
         proxyBodies.push(input);
-        const streaming = 'stream' in input && input.stream === true;
-        const content = JSON.stringify(quiz);
-        const usage = { prompt_tokens: 10, completion_tokens: 30, total_tokens: 40 };
-        const envelope = { id: 'demo-quiz', created: 0, model: 'host-quiz' };
-        if (!streaming) {
-          json(response, 200, {
-            ...envelope,
-            object: 'chat.completion',
-            choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content } }],
-            usage,
-          });
-          return;
-        }
-        response.writeHead(200, {
-          'content-type': 'text/event-stream',
-          'cache-control': 'no-store',
+        const headers = new Headers({
+          'content-type': request.headers['content-type'] ?? 'application/json',
+          accept: request.headers.accept ?? 'application/json',
+          authorization: `Bearer ${upstreamKey}`,
         });
-        const frame = (value: unknown): void => {
-          response.write(`data: ${JSON.stringify(value)}\n\n`);
-        };
-        for (let offset = 0; offset < content.length; offset += 80) {
-          frame({
-            ...envelope,
-            object: 'chat.completion.chunk',
-            choices: [
-              {
-                index: 0,
-                delta: {
-                  ...(offset === 0 ? { role: 'assistant' } : {}),
-                  content: content.slice(offset, offset + 80),
-                },
-                finish_reason: null,
-              },
-            ],
-          });
-        }
+        if (testMode) proxyHeaderNames.push([...headers.keys()]);
+        stubUpstream(headers, input, response);
+      } else json(response, 404, { error: 'not_found' });
+    }
+    function stubUpstream(headers: Headers, input: object, response: ServerResponse): void {
+      if (headers.get('authorization') !== `Bearer ${upstreamKey}`) {
+        json(response, 401, { error: 'unauthorized' });
+        return;
+      }
+      const streaming = 'stream' in input && input.stream === true;
+      const content = JSON.stringify(quiz);
+      const usage = { prompt_tokens: 10, completion_tokens: 30, total_tokens: 40 };
+      const envelope = { id: 'demo-quiz', created: 0, model: 'host-quiz' };
+      if (!streaming) {
+        json(response, 200, {
+          ...envelope,
+          object: 'chat.completion',
+          choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content } }],
+          usage,
+        });
+        return;
+      }
+      response.writeHead(200, {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-store',
+      });
+      const frame = (value: unknown): void => {
+        response.write(`data: ${JSON.stringify(value)}\n\n`);
+      };
+      for (let offset = 0; offset < content.length; offset += 80) {
         frame({
           ...envelope,
           object: 'chat.completion.chunk',
-          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+          choices: [
+            {
+              index: 0,
+              delta: {
+                ...(offset === 0 ? { role: 'assistant' } : {}),
+                content: content.slice(offset, offset + 80),
+              },
+              finish_reason: null,
+            },
+          ],
         });
-        frame({ ...envelope, object: 'chat.completion.chunk', choices: [], usage });
-        response.end('data: [DONE]\n\n');
-      } else json(response, 404, { error: 'not_found' });
+      }
+      frame({
+        ...envelope,
+        object: 'chat.completion.chunk',
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+      });
+      frame({ ...envelope, object: 'chat.completion.chunk', choices: [], usage });
+      response.end('data: [DONE]\n\n');
     }
     return (request, response, next): void => {
       const path = request.url?.split('?')[0] ?? '';
