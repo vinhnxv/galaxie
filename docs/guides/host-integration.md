@@ -477,11 +477,27 @@ without determining the browser's exact cause. It does not silently fall back.
 
 For `httpCapability`, a cross-origin server must allow `X-Galaxie-Agent` and
 `X-Galaxie-Run` in `Access-Control-Allow-Headers`, plus `Idempotency-Key` when
-the binding declares `retry: 'idempotency-key'`. Headers never authorize.
+the binding declares `retry: 'idempotency-key'`. With `propagateTraceContext: true`,
+also allow `traceparent` and `tracestate`. Headers never authorize.
 galaxie sets the key to `CapabilityContext.effectId` after the host's
 `headers(context)` callback and attribution headers, overriding a host-supplied
 key for that retry policy. Other retry policies leave host-supplied keys alone
 and add none themselves.
+
+For MCP, `createMcpServer({ ..., propagateTraceContext: true })` likewise requires
+`traceparent` and `tracestate` in the server's `Access-Control-Allow-Headers`.
+Both options default to off and require `destination: 'host-server'`. Without
+the opt-in, galaxie's headers are unchanged. See the
+[backend tracing example](tracing.md#send-trace-context-to-your-backend).
+
+Browser-supplied trace IDs are forgeable correlation hints, never authorization,
+audit identity or rate-limit keys. Backends must apply their own sampling policy
+and must not let a browser-supplied sampled flag force sampling. `host-server`
+is the host's own declaration; galaxie does not check that a URL is host-owned.
+Galaxie's helper ignores the global propagator and never adds baggage.
+Host-installed fetch instrumentation or a global propagator wrapped around the
+page's `fetch` can add trace or baggage headers to any destination outside
+these controls.
 
 For write bindings, the key stays stable across a replay only with recovery
 and deterministic call order within each executor task. Without recovery,

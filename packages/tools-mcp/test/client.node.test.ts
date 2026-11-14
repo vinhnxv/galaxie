@@ -1,10 +1,18 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { CapabilityBinding, CapabilityContext } from '@galaxie-ai/core';
+import { type CapabilityBinding, type CapabilityContext, galaxieField } from '@galaxie-ai/core';
 import { afterEach, expect, test } from 'vitest';
+import { z } from 'zod';
 import { startMcpServer } from '../../../examples/mcp-server/src/index.js';
-import { createMcpServer, type McpEvent, toolPin } from '../src/index.js';
+import {
+  brokerFixture,
+  collect,
+  deferred,
+  recordingTracer,
+  type Script,
+} from '../../core/test/fake-executor.js';
+import { createMcpServer, type McpEvent, type McpServerOptions, toolPin } from '../src/index.js';
 
 const origin = 'http://127.0.0.1:63315';
 const token: string = crypto.randomUUID();
@@ -34,7 +42,10 @@ function context(principal = 'one', signal = new AbortController().signal): Capa
 const originFetch: typeof fetch = (url, init) =>
   fetch(url, { ...init, headers: { ...Object.fromEntries(new Headers(init?.headers)), origin } });
 
-async function setup(customFetch: typeof fetch = originFetch): Promise<{
+async function setup(
+  customFetch: typeof fetch = originFetch,
+  overrides: Partial<McpServerOptions> = {},
+): Promise<{
   server: Awaited<ReturnType<typeof startMcpServer>>;
   client: ReturnType<typeof createMcpServer>;
   binding: CapabilityBinding;
@@ -52,6 +63,7 @@ async function setup(customFetch: typeof fetch = originFetch): Promise<{
     destination: 'user-device',
     token: ({ principalScope }) => (principalScope === 'two' ? other : token),
     fetch: customFetch,
+    ...overrides,
     onEvent: (event) => {
       events.push(event);
     },
@@ -552,4 +564,297 @@ test('serializes rotating credentials across each principal listing and dispatch
     { method: 'tools/list', credential: 'second' },
     { method: 'tools/call', credential: 'second' },
   ]);
+});
+
+interface RecordedRequest {
+  readonly method: string;
+  readonly headers: Headers;
+}
+
+async function traceFixture(
+  bound: CapabilityBinding,
+  script: Script,
+): Promise<{
+  fixture: Awaited<ReturnType<typeof brokerFixture>>;
+  exporter: ReturnType<typeof recordingTracer>['exporter'];
+}> {
+  const { provider, exporter } = recordingTracer();
+  cleanup.push(() => provider.shutdown());
+  const fixture = await brokerFixture({
+    tracerProvider: provider,
+    input: z.string().meta(galaxieField({ label: 'public' })),
+    bindings: { 'mcp.lessons.lesson.lookup@1': bound },
+    requests: {
+      'mcp.lessons.lesson.lookup@1': {
+        kind: 'read',
+        input: z.object({ lessonId: z.enum(['lesson-1']) }),
+        output: z.unknown(),
+      },
+    },
+    scripts: [script],
+  });
+  cleanup.push(() => fixture.runtime.dispose());
+  return { fixture, exporter };
+}
+
+function recordRequest(sent: RecordedRequest[], init: RequestInit | undefined): string {
+  const method =
+    typeof init?.body === 'string'
+      ? ((JSON.parse(init.body) as { method?: string }).method ?? init?.method ?? 'GET')
+      : (init?.method ?? 'GET');
+  sent.push({ method, headers: new Headers(init?.headers) });
+  return method;
+}
+
+test.each([true, false])(
+  'MCP trace context is scoped to each broker call when opted in: %s',
+  async (enabled) => {
+    const sent: RecordedRequest[] = [];
+    const { binding, client } = await setup(
+      (url, init) => {
+        recordRequest(sent, init);
+        return originFetch(url, init);
+      },
+      { destination: 'host-server', ...(enabled ? { propagateTraceContext: true } : {}) },
+    );
+    const boundaries: number[] = [];
+    const { fixture, exporter } = await traceFixture(binding, async function* ({ capabilities }) {
+      for (let call = 0; call < 2; call++) {
+        expect(
+          await capabilities.call('mcp.lessons.lesson.lookup@1', { lessonId: 'lesson-1' }),
+        ).toHaveProperty('lessonId', 'lesson-1');
+        boundaries.push(sent.length);
+      }
+      yield { type: 'output', output: null };
+    });
+    const { runId } = await fixture.instance.start('input');
+    await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    const spans = exporter.getFinishedSpans();
+    const root = spans.find((span) => span.name.startsWith('invoke_agent'));
+    const calls = spans.filter((span) => span.name.startsWith('execute_tool'));
+    expect(calls).toHaveLength(2);
+    expect(sent.map(({ method }) => method)).toEqual(
+      expect.arrayContaining(['initialize', 'tools/list', 'tools/call', 'GET']),
+    );
+    const first = sent.slice(0, boundaries[0]);
+    const second = sent.slice(boundaries[0], boundaries[1]);
+    for (const [index, requests] of [first, second].entries()) {
+      const expected = enabled
+        ? `00-${root?.spanContext().traceId}-${calls[index]?.spanContext().spanId}-01`
+        : null;
+      expect(requests.length).toBeGreaterThan(1);
+      for (const { headers } of requests) {
+        expect(headers.get('traceparent')).toBe(expected);
+        expect(headers.has('tracestate')).toBe(false);
+        expect(headers.has('baggage')).toBe(false);
+      }
+    }
+    expect(calls[0]?.spanContext().spanId).not.toBe(calls[1]?.spanContext().spanId);
+    const beforeClose = sent.length;
+    await client.closePrincipal('test-user');
+    await client.close();
+    expect(sent.slice(beforeClose).every(({ headers }) => !headers.has('traceparent'))).toBe(true);
+  },
+);
+
+test('a list_changed refresh queued during a broker call carries no settled trace context', async () => {
+  const sent: RecordedRequest[] = [];
+  const entered = deferred<void>();
+  const release = deferred<void>();
+  const notification = deferred<void>();
+  const { binding, server } = await setup(
+    async (url, init) => {
+      const method = recordRequest(sent, init);
+      if (method === 'tools/call') {
+        entered.resolve();
+        await release.promise;
+      }
+      const response = await originFetch(url, init);
+      if (method !== 'GET' || response.body === null) return response;
+      const decoder = new TextDecoder();
+      let observed = '';
+      const stream = response.body.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller): void {
+            observed += decoder.decode(chunk, { stream: true });
+            if (observed.includes('notifications/tools/list_changed')) notification.resolve();
+            controller.enqueue(chunk);
+          },
+        }),
+      );
+      return new Response(stream, { status: response.status, headers: response.headers });
+    },
+    { destination: 'host-server', propagateTraceContext: true },
+  );
+  const { fixture } = await traceFixture(binding, async function* ({ capabilities }) {
+    await capabilities.call('mcp.lessons.lesson.lookup@1', { lessonId: 'lesson-1' });
+    yield { type: 'output', output: null };
+  });
+  const { runId } = await fixture.instance.start('input');
+  await entered.promise;
+  expect(sent.find(({ method }) => method === 'tools/call')?.headers.has('traceparent')).toBe(true);
+  const before = sent.length;
+  await server.admin.changeDescription('lesson.lookup', 'changed metadata');
+  await notification.promise;
+  expect(sent.slice(before).filter(({ method }) => method === 'tools/list')).toHaveLength(0);
+  release.resolve();
+  await collect(fixture.instance.events(runId));
+  expect(fixture.scriptErrors).toEqual([]);
+  await expect
+    .poll(() => sent.slice(before).filter(({ method }) => method === 'tools/list').length)
+    .toBe(1);
+  const refresh = sent.slice(before).find(({ method }) => method === 'tools/list');
+  expect(refresh?.headers.has('traceparent')).toBe(false);
+  expect(refresh?.headers.has('tracestate')).toBe(false);
+});
+
+test.each(['error', 'abort'] as const)(
+  'clears MCP trace context after a broker call %s',
+  async (mode) => {
+    const sent: RecordedRequest[] = [];
+    const entered = deferred<void>();
+    const controller = new AbortController();
+    let first = true;
+    const { binding } = await setup(
+      async (url, init) => {
+        const method = recordRequest(sent, init);
+        if (method === 'tools/call' && first) {
+          first = false;
+          entered.resolve();
+          if (mode === 'error') return new Response(null, { status: 503 });
+          return new Promise<Response>((_resolve, reject) => {
+            const abort = (): void => reject(new Error('Test request aborted.'));
+            if (init?.signal?.aborted) abort();
+            else init?.signal?.addEventListener('abort', abort, { once: true });
+          });
+        }
+        return originFetch(url, init);
+      },
+      { destination: 'host-server', propagateTraceContext: true },
+    );
+    const { fixture } = await traceFixture(binding, async function* ({ capabilities }) {
+      await expect(
+        capabilities.call(
+          'mcp.lessons.lesson.lookup@1',
+          { lessonId: 'lesson-1' },
+          { signal: controller.signal },
+        ),
+      ).rejects.toMatchObject({ code: mode === 'error' ? 'unavailable' : 'cancelled' });
+      yield { type: 'output', output: null };
+    });
+    const { runId } = await fixture.instance.start('input');
+    await entered.promise;
+    if (mode === 'abort') controller.abort();
+    await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    expect(sent.find(({ method }) => method === 'tools/call')?.headers.has('traceparent')).toBe(
+      true,
+    );
+    const before = sent.length;
+    expect(await binding.invoke({ lessonId: 'lesson-1' }, context('test-user'))).toHaveProperty(
+      'lessonId',
+      'lesson-1',
+    );
+    expect(sent.slice(before).length).toBeGreaterThan(0);
+    for (const { headers } of sent.slice(before)) {
+      expect(headers.has('traceparent')).toBe(false);
+      expect(headers.has('tracestate')).toBe(false);
+    }
+  },
+);
+
+test.each(['closePrincipal', 'close'] as const)(
+  'clears the in-flight context before %s aborts the transport',
+  async (method) => {
+    const sent: RecordedRequest[] = [];
+    const entered = deferred<void>();
+    const { binding, client } = await setup(
+      async (url, init) => {
+        if (recordRequest(sent, init) === 'tools/call') {
+          entered.resolve();
+          return new Promise<Response>((_resolve, reject) => {
+            const abort = (): void => reject(new Error('Test request aborted.'));
+            if (init?.signal?.aborted) abort();
+            else init?.signal?.addEventListener('abort', abort, { once: true });
+          });
+        }
+        return originFetch(url, init);
+      },
+      { destination: 'host-server', propagateTraceContext: true },
+    );
+    const { fixture } = await traceFixture(binding, async function* ({ capabilities }) {
+      await expect(
+        capabilities.call('mcp.lessons.lesson.lookup@1', { lessonId: 'lesson-1' }),
+      ).rejects.toMatchObject({ code: 'cancelled' });
+      yield { type: 'output', output: null };
+    });
+    const { runId } = await fixture.instance.start('input');
+    await entered.promise;
+    expect(sent.find(({ method }) => method === 'tools/call')?.headers.has('traceparent')).toBe(
+      true,
+    );
+    const before = sent.length;
+    if (method === 'closePrincipal') await client.closePrincipal('test-user');
+    else await client.close();
+    await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    expect(
+      sent
+        .slice(before)
+        .every(({ headers }) => !headers.has('traceparent') && !headers.has('tracestate')),
+    ).toBe(true);
+  },
+);
+
+test('does not propagate from an MCP binding copied to a non-host destination', async () => {
+  const sent: RecordedRequest[] = [];
+  const { binding } = await setup(
+    (url, init) => {
+      recordRequest(sent, init);
+      return originFetch(url, init);
+    },
+    { destination: 'host-server', propagateTraceContext: true },
+  );
+  const { fixture } = await traceFixture(
+    { ...binding, destination: 'third-party' },
+    async function* ({ capabilities }) {
+      await capabilities.call('mcp.lessons.lesson.lookup@1', { lessonId: 'lesson-1' });
+      yield { type: 'output', output: null };
+    },
+  );
+  const { runId } = await fixture.instance.start('input');
+  await collect(fixture.instance.events(runId));
+  expect(fixture.scriptErrors).toEqual([]);
+  expect(sent.length).toBeGreaterThan(0);
+  expect(
+    sent.every(({ headers }) => !headers.has('traceparent') && !headers.has('tracestate')),
+  ).toBe(true);
+});
+
+test.each(['in-browser', 'user-device', 'user-endpoint', 'third-party'] as const)(
+  'rejects trace context opt-in for an MCP %s destination',
+  (destination) => {
+    expect(() =>
+      createMcpServer({
+        id: 'lessons',
+        url: 'http://127.0.0.1:1/',
+        destination,
+        token: () => token,
+        propagateTraceContext: true,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'invalid' }));
+  },
+);
+
+test.each(['yes', null, 1])('rejects a non-boolean MCP trace context option: %j', (value) => {
+  expect(() =>
+    createMcpServer({
+      id: 'lessons',
+      url: 'http://127.0.0.1:1/',
+      destination: 'host-server',
+      token: () => token,
+      propagateTraceContext: value as unknown as boolean,
+    }),
+  ).toThrow(expect.objectContaining({ code: 'invalid' }));
 });

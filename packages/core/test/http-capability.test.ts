@@ -1,7 +1,18 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { expect, test, vi } from 'vitest';
+import { createTraceState, trace } from '@opentelemetry/api';
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from '@opentelemetry/sdk-trace';
+import { afterEach, expect, test, vi } from 'vitest';
+
+afterEach(() => {
+  trace.disable();
+});
+
 import { z } from 'zod';
 import {
   attributionHeaders,
@@ -108,10 +119,12 @@ async function call(
   schema: Schema,
   input: unknown,
   payloadBytes?: number,
+  tracerProvider?: TracerProvider,
 ): Promise<{ value: unknown; error: unknown; publicFields: string }> {
   let value: unknown;
   let error: unknown;
   const fixture = await brokerFixture({
+    ...(tracerProvider === undefined ? {} : { tracerProvider }),
     input: z.string().meta(galaxieField({ label: 'public' })),
     requests: { 'http@1': { input: schema, output: z.unknown(), kind: bound.kind } },
     bindings: { 'http@1': bound },
@@ -424,3 +437,123 @@ test('creating the helper, runtime and prepared instance never calls fetch', asy
   expect(fetch).not.toHaveBeenCalled();
   await fixture.runtime.dispose();
 });
+
+test.each(['in-browser', 'third-party', 'user-endpoint', 'user-device'] as const)(
+  'rejects trace context opt-in for %s at construction',
+  (destination) => {
+    expect(() =>
+      httpCapability(
+        options({ destination, propagateTraceContext: true, url: 'http://localhost/lessons/{id}' }),
+      ),
+    ).toThrow(expect.objectContaining({ code: 'invalid' }));
+  },
+);
+
+test('rejects a non-boolean trace context option', () => {
+  expect(() =>
+    httpCapability(options({ propagateTraceContext: 'yes' as unknown as boolean })),
+  ).toThrow(expect.objectContaining({ code: 'invalid' }));
+});
+
+test('rejects a shallow copied opt-in binding with a changed destination', async () => {
+  const original = httpCapability(
+    options({ propagateTraceContext: true, fetch: async () => Response.json(null) }),
+  );
+  await expect(
+    call({ ...original, destination: 'third-party' }, inputSchema, { id: 'a/b' }),
+  ).rejects.toMatchObject({ code: 'invalid' });
+});
+
+test.each(['injected', 'global', 'none', 'off', 'rewrapped'] as const)(
+  'HTTP trace context uses the execute_tool parent with provider mode %s',
+  async (mode) => {
+    const exporter = new InMemorySpanExporter();
+    const provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
+    });
+    if (mode === 'global') trace.setGlobalTracerProvider(provider);
+    let saved: CapabilityContext | undefined;
+    let sent = new Headers();
+    const original = httpCapability(
+      options({
+        propagateTraceContext: mode !== 'off',
+        retry: 'idempotency-key',
+        headers: (ctx) => {
+          saved = ctx;
+          return {};
+        },
+        fetch: async (_url, init) => {
+          sent = new Headers(init?.headers);
+          return Response.json({ ok: true });
+        },
+      }),
+    );
+    const bound: CapabilityBinding =
+      mode === 'rewrapped'
+        ? {
+            ...original,
+            destination: 'third-party',
+            invoke: (input, ctx) => original.invoke(input, ctx),
+          }
+        : original;
+    const result = await call(
+      bound,
+      inputSchema,
+      { id: 'a/b' },
+      undefined,
+      mode === 'none' || mode === 'global' ? undefined : provider,
+    );
+    expect(result.error).toBeUndefined();
+    const expected = {
+      'x-galaxie-agent': `${saved?.agent.id}@${saved?.agent.version}`,
+      'x-galaxie-run': saved?.runId,
+      'idempotency-key': saved?.effectId,
+    };
+    if (mode === 'injected' || mode === 'global') {
+      const spans = exporter.getFinishedSpans();
+      const root = spans.find((span) => span.name.startsWith('invoke_agent'));
+      const tool = spans.find((span) => span.name.startsWith('execute_tool'));
+      expect(Object.fromEntries(sent)).toEqual({
+        ...expected,
+        traceparent: `00-${root?.spanContext().traceId}-${tool?.spanContext().spanId}-01`,
+      });
+    } else expect(Object.fromEntries(sent)).toEqual(expected);
+    await provider.shutdown();
+  },
+);
+
+test.each([false, true])(
+  'overwrites host trace headers only when span tracestate exists: %s',
+  async (withState) => {
+    const provider = new TracerProvider({
+      sampler: {
+        shouldSample: () => ({
+          decision: 2,
+          ...(withState ? { traceState: createTraceState('a=1,b=2') } : {}),
+        }),
+        toString: () => 'test-state',
+      },
+    });
+    let sent = new Headers();
+    const result = await call(
+      httpCapability(
+        options({
+          propagateTraceContext: true,
+          headers: () => ({ traceparent: 'host-parent', tracestate: 'host=keep' }),
+          fetch: async (_url, init) => {
+            sent = new Headers(init?.headers);
+            return Response.json(null);
+          },
+        }),
+      ),
+      inputSchema,
+      { id: 'a/b' },
+      undefined,
+      provider,
+    );
+    expect(result.error).toBeUndefined();
+    expect(sent.get('traceparent')).toMatch(/^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/);
+    expect(sent.get('tracestate')).toBe(withState ? 'a=1,b=2' : 'host=keep');
+    await provider.shutdown();
+  },
+);

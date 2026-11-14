@@ -8,6 +8,7 @@ import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config
 import {
   mcpAdminCommand,
   mcpCorpusAdminCommand,
+  mcpTraceAdminCommand,
 } from './tests/conformance/support/mcp-commands.node.js';
 
 const alias = {
@@ -271,7 +272,11 @@ const config: ViteUserConfig = defineConfig({
           ),
           browser: {
             enabled: true,
-            commands: { mcpAdmin: mcpAdminCommand, mcpCorpusAdmin: mcpCorpusAdminCommand },
+            commands: {
+              mcpAdmin: mcpAdminCommand,
+              mcpCorpusAdmin: mcpCorpusAdminCommand,
+              mcpTraceAdmin: mcpTraceAdminCommand,
+            },
             provider: playwright(),
             headless: true,
             instances: [{ browser: browserName, name: `browser (${browserName})` }],

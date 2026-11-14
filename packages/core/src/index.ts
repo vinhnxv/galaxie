@@ -174,4 +174,5 @@ export {
   surfaceFromRequest,
 } from './surfaces.js';
 export type { RunTrace, TraceHandle, TraceResult, TraceStep } from './trace.js';
+export { injectTraceContext } from './tracing.js';
 export { normalizeUrlAllowlist } from './urls.js';

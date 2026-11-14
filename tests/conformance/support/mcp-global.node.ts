@@ -63,17 +63,27 @@ export async function createFixture(): Promise<McpControl> {
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const control = await createFixture();
   const corpus = await createFixture();
+  const trace = await createFixture();
   const http = await createHttpFixture();
   const openaiHttp = await createHttpFixture();
   mcpFixtures(project).set(control.fixture.url, control);
   mcpFixtures(project).set(corpus.fixture.url, corpus);
+  mcpFixtures(project).set(trace.fixture.url, trace);
   project.provide('mcp', control.fixture);
   project.provide('mcpCorpus', corpus.fixture);
+  project.provide('mcpTrace', trace.fixture);
   project.provide('http', http.fixture);
   project.provide('openaiHttp', openaiHttp.fixture);
   return async (): Promise<void> => {
     mcpFixtures(project).delete(control.fixture.url);
     mcpFixtures(project).delete(corpus.fixture.url);
-    await Promise.all([control.close(), corpus.close(), http.close(), openaiHttp.close()]);
+    mcpFixtures(project).delete(trace.fixture.url);
+    await Promise.all([
+      control.close(),
+      corpus.close(),
+      trace.close(),
+      http.close(),
+      openaiHttp.close(),
+    ]);
   };
 }

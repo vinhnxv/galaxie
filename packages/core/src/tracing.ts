@@ -5,12 +5,13 @@ import {
   type Attributes,
   type Context,
   type Span,
+  type SpanContext,
   SpanKind,
   SpanStatusCode,
   type Tracer,
   trace,
 } from '@opentelemetry/api';
-import type { CapabilityKind } from './capabilities.js';
+import type { CapabilityContext, CapabilityKind } from './capabilities.js';
 import type { ErrorCode, ErrorInfo } from './errors.js';
 import type { RunStatus } from './lifecycle.js';
 import {
@@ -90,6 +91,30 @@ function errorType(value: string | undefined): string {
   return value !== undefined && /^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/.test(value) ? value : '_OTHER';
 }
 
+const capabilityContexts = new WeakMap<CapabilityContext, () => SpanContext | undefined>();
+
+export function bindTraceContext(
+  context: CapabilityContext,
+  spanContext: () => SpanContext | undefined,
+): void {
+  const current = spanContext();
+  if (current !== undefined && trace.isSpanContextValid(current))
+    capabilityContexts.set(context, spanContext);
+}
+
+/** Add only W3C trace context for a live, broker-created host-server invocation.
+ * Unregistered, ended or invalid contexts leave headers unchanged. Never injects baggage. */
+export function injectTraceContext(context: CapabilityContext, headers: Headers): void {
+  const current = capabilityContexts.get(context)?.();
+  if (current === undefined || !trace.isSpanContextValid(current)) return;
+  headers.set(
+    'traceparent',
+    `00-${current.traceId}-${current.spanId}-${current.traceFlags.toString(16).padStart(2, '0')}`,
+  );
+  const state = current.traceState?.serialize();
+  if (state !== undefined && state !== '') headers.set('tracestate', state);
+}
+
 export interface RunMetadata {
   readonly appId: string;
   readonly agentId: string;
@@ -106,6 +131,7 @@ export type CapabilityResult =
   | { readonly status: 'ok' | 'cancelled' }
   | { readonly status: 'error'; readonly code: ErrorCode };
 export interface CapabilitySpan {
+  spanContext(): SpanContext | undefined;
   arguments(value: unknown): void;
   end(result: CapabilityResult): void;
 }
@@ -275,7 +301,7 @@ export function startRunTrace(
       },
     },
     startCapability(meta, parentHandle): CapabilitySpan {
-      if (closed) return { arguments: () => {}, end: () => {} };
+      if (closed) return { spanContext: () => undefined, arguments: () => {}, end: () => {} };
       const ancestor = parentHandle === undefined ? undefined : steps.get(parentHandle);
       const span = tracer.startSpan(
         meta.name === undefined ? 'execute_tool' : `execute_tool ${safeName(meta.name)}`,
@@ -298,6 +324,7 @@ export function startRunTrace(
         ended: false,
       };
       const handle: CapabilitySpan = {
+        spanContext: () => (closed || record.ended ? undefined : span.spanContext()),
         arguments(value): void {
           if (!record.ended) text(span, 'gen_ai.tool.call.arguments', value);
         },

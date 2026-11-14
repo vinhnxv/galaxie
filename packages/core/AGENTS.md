@@ -18,6 +18,8 @@ provenance for materialized pending surfaces. Legacy requests retain their old p
   types from [src/browser.ts](src/browser.ts).
 - `createRuntime`, `defineAgentDefinition` and `createManifest` construct runtime,
   definition and build-time manifest data respectively.
+- `injectTraceContext(context, headers)` adds only W3C trace context for live
+  broker-created host-server calls; custom bindings may opt in through the main entry.
 - `httpCapability` and `galaxieField` support host bindings and schema annotations
   through the main entry. Import `acquireOwnership` and `watchInvalidation` from
   `@galaxie-ai/core/browser` for host lifecycle wiring.

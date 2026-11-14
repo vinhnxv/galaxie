@@ -1,6 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import type { TracerProvider as ApiTracerProvider } from '@opentelemetry/api';
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from '@opentelemetry/sdk-trace';
 import { z } from 'zod';
 import {
   type AgentInstance,
@@ -19,6 +25,13 @@ import {
   type Runtime,
   type Schema,
 } from '../src/index.js';
+
+/** Shared recording harness for package tests without an SDK dependency of their own. */
+export function recordingTracer(): { provider: TracerProvider; exporter: InMemorySpanExporter } {
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  return { provider, exporter };
+}
 
 export interface Deferred<Value> {
   readonly promise: Promise<Value>;
@@ -175,6 +188,7 @@ export async function brokerFixture(
     readonly scripts?: Script[];
     readonly budgets?: Partial<BudgetLimits>;
     readonly dataPolicy?: DataPolicy;
+    readonly tracerProvider?: ApiTracerProvider;
   } = {},
 ): Promise<{
   readonly runtime: Runtime<readonly [FakeExecutor]>;
@@ -200,6 +214,7 @@ export async function brokerFixture(
   const diagnostics: DiagnosticEvent[] = [];
   const runtime = createRuntime({
     appId: 'broker-tests',
+    ...(options.tracerProvider === undefined ? {} : { tracerProvider: options.tracerProvider }),
     executors: [executor],
     diagnostics: (event) => diagnostics.push(event),
     ...(options.budgets === undefined ? {} : { budgets: options.budgets }),

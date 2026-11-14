@@ -42,6 +42,27 @@ Approvals bind the principal, capability, frozen canonical arguments, effect ID,
 
 Calls carry `galaxie.dev/agent` (`id@version`), `galaxie.dev/run` and `galaxie.dev/effect` in MCP `_meta`. Attribution is not an HTTP header and never authorizes a call. Server-to-client requests, including sampling, elicitation and roots, receive `-32601`; the client advertises no such capabilities.
 
+For a host-owned backend, set `destination: 'host-server'` and
+`propagateTraceContext: true` in `createMcpServer`. The default is off; non-boolean
+values and an opt-in with any other destination fail `invalid`. With a valid
+tracer provider, requests made during a broker tool call carry only W3C
+`traceparent` and optional `tracestate`, parented to that call's `execute_tool`
+span. This includes lazy initialization, listings and the standalone SSE `GET`
+opened by the SDK during the first call. That stream keeps its original request
+context for its whole life, so a backend span for it remains a child of the
+earlier call. A later notification-driven listing and session close carry no
+call context; each subsequent call uses its own span. galaxie does not inject
+`baggage` or use the host's global propagator.
+
+A cross-origin MCP server must allow `traceparent` and `tracestate` in
+`Access-Control-Allow-Headers` when opting in. `host-server` is a host declaration;
+galaxie does not verify ownership of the URL. Browser-supplied trace IDs are
+forgeable correlation hints, never authorization, audit identity or rate-limit
+keys. Backends must decide sampling themselves and must not let the browser's
+sampled flag force it. Host fetch instrumentation can add trace or baggage
+headers independently, outside galaxie's control. See the
+[tracing guide](../../docs/guides/tracing.md#send-trace-context-to-your-backend).
+
 The [MCP conformance tests](../../tests/conformance/mcp.test.ts) separately inject sampling and elicitation requests on the tool-call SSE stream on Node and headless Chromium. Both receive `-32601` while the tool call completes. The elicitation case also verifies that initialization advertises neither capability and that the probe text reaches no agent result, MCP event, runtime event, span, diagnostic or snapshot. This is loopback evidence with mock tools, without real inference or third-party servers.
 
 Results are untrusted data. The default returns `structuredContent`; `result: 'text'` returns `{ text }` from text blocks only. `isError` fails `unavailable`; missing structured data or non-text blocks in text mode fail `invalid`. A schema-valid result can contain instruction-shaped text. It cannot grant, approve or trigger a capability: each follow-on call independently passes the broker. Hosts must render model-produced props as React text and keep server data out of diagnostic and display callbacks that interpret markup or actions.

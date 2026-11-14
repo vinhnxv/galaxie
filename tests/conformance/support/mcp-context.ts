@@ -39,11 +39,13 @@ declare module 'vitest' {
   interface ProvidedContext {
     mcp: McpFixture;
     mcpCorpus: McpFixture;
+    mcpTrace: McpFixture;
   }
 }
 declare module 'vitest/browser' {
   interface BrowserCommands {
     mcpAdmin(action: McpAction): Promise<McpAdminState>;
     mcpCorpusAdmin(action: McpAction): Promise<McpAdminState>;
+    mcpTraceAdmin(action: McpAction): Promise<McpAdminState>;
   }
 }

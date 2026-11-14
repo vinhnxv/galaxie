@@ -19,6 +19,8 @@ export interface McpServerOptions {
   readonly id: string;
   readonly url: string;
   readonly destination: DestinationClass;
+  /** Send traceparent and tracestate during broker calls, only to host-server destinations. */
+  readonly propagateTraceContext?: boolean;
   readonly token: (request: {
     readonly principalScope: string;
     readonly signal: AbortSignal;
@@ -78,6 +80,9 @@ export function createMcpServer(supplied: McpServerOptions): McpServer {
       supplied.destination,
     ) ||
     (supplied.destination === 'user-device' && !loopback) ||
+    (supplied.propagateTraceContext !== undefined &&
+      typeof supplied.propagateTraceContext !== 'boolean') ||
+    (supplied.propagateTraceContext === true && supplied.destination !== 'host-server') ||
     typeof supplied.token !== 'function' ||
     (supplied.fetch !== undefined && typeof supplied.fetch !== 'function') ||
     (supplied.onEvent !== undefined && typeof supplied.onEvent !== 'function') ||
