@@ -93,7 +93,6 @@ function errorType(value: string | undefined): string {
 
 const capabilityContexts = new WeakMap<CapabilityContext, () => SpanContext | undefined>();
 
-/** Internal broker link; span objects never cross the capability boundary. */
 export function bindTraceContext(
   context: CapabilityContext,
   spanContext: () => SpanContext | undefined,

@@ -673,13 +673,12 @@ test('a list_changed refresh queued during a broker call carries no settled trac
       const response = await originFetch(url, init);
       if (method !== 'GET' || response.body === null) return response;
       const decoder = new TextDecoder();
+      let observed = '';
       const stream = response.body.pipeThrough(
         new TransformStream<Uint8Array, Uint8Array>({
           transform(chunk, controller): void {
-            if (
-              decoder.decode(chunk, { stream: true }).includes('notifications/tools/list_changed')
-            )
-              notification.resolve();
+            observed += decoder.decode(chunk, { stream: true });
+            if (observed.includes('notifications/tools/list_changed')) notification.resolve();
             controller.enqueue(chunk);
           },
         }),
