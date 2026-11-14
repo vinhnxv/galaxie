@@ -59,15 +59,21 @@ async function collect(source: AsyncIterable<ExecutorEvent>): Promise<ExecutorEv
   return events;
 }
 
-async function fixture(count = 2) {
+async function fixture(count = 2, failAfter?: number) {
   const saver = new MemorySaver();
   const entered = vi.fn();
+  let failed = false;
   const graph = new StateGraph(Annotation.Root({ answers: Annotation<unknown[]> }))
     .addNode('questions', (_, config) => {
       entered();
-      const answers = Array.from({ length: count }, (_, index) =>
-        requestInteraction({ ...question, viewRevision: `r${index + 1}` }, config),
-      );
+      const answers = Array.from({ length: count }, (_, index) => {
+        const value = requestInteraction({ ...question, viewRevision: `r${index + 1}` }, config);
+        if (!failed && index + 1 === failAfter) {
+          failed = true;
+          throw new Error('private-error-canary');
+        }
+        return value;
+      });
       return { answers };
     })
     .addEdge(START, 'questions')
@@ -82,6 +88,119 @@ async function fixture(count = 2) {
   );
   return { saver, graph, executor, entered };
 }
+
+test.each([1, 2])(
+  'an errored task with %i committed answers keeps or refuses its identity',
+  async (count) => {
+    const { executor, graph, saver } = await fixture(count, count);
+    await collect(executor.run(request({ type: 'start', input: {} })));
+    const first = (await executor.pending(sessionId))!;
+    let pending = first;
+    for (let index = 0; index < count; index++) {
+      const events = await collect(
+        executor.run(request({ type: 'resume', interactionId: pending.interactionId, ...answer })),
+      );
+      if (index + 1 < count) {
+        pending = (await executor.pending(sessionId, { registerRestoredData: () => {} }))!;
+      } else
+        expect(events.at(-1)).toMatchObject({ type: 'error', error: { code: 'executor_error' } });
+    }
+    const config = { configurable: { thread_id: sessionId } };
+    const task = (await graph.getState(config)).tasks[0]!;
+    const writes = (await saver.getTuple(config))!.pendingWrites!;
+    expect(writes).toContainEqual([
+      task.id,
+      '__resume__',
+      Array.from({ length: count }, () => answer),
+    ]);
+    expect(writes.some(([id, channel]) => id === task.id && channel === '__error__')).toBe(true);
+    const restored: unknown[] = [];
+    const read = executor.pending(sessionId, {
+      registerRestoredData: (value) => restored.push(value),
+    });
+    if (count === 1) {
+      await expect(read).resolves.toEqual(first);
+      expect(restored).toContainEqual(answer);
+      const events = await collect(
+        executor.run(request({ type: 'resume', interactionId: first.interactionId, ...answer })),
+      );
+      expect(events.at(-1)).toMatchObject({ type: 'output', output: { answers: [answer] } });
+    } else await expect(read).rejects.toMatchObject(toErrorInfo('unsupported'));
+  },
+);
+
+test('retrying an errored answered pause preserves its resume list and refuses the next question', async () => {
+  const { executor, graph, saver } = await fixture(2, 1);
+  await collect(executor.run(request({ type: 'start', input: {} })));
+  const first = (await executor.pending(sessionId))!;
+  const command = { type: 'resume', interactionId: first.interactionId, ...answer } as const;
+  expect((await collect(executor.run(request(command)))).at(-1)).toMatchObject({
+    type: 'error',
+    error: { code: 'executor_error' },
+  });
+  const config = { configurable: { thread_id: sessionId } };
+  const task = (await graph.getState(config)).tasks[0]!;
+  const before = (await saver.getTuple(config))!.pendingWrites!;
+  expect(before).toContainEqual([task.id, '__resume__', [answer]]);
+  const events = await collect(executor.run(request(command)));
+  expect(events.at(-1)).toMatchObject({ type: 'error', error: toErrorInfo('unsupported') });
+  expect(events.some(({ type }) => type === 'interaction' || type === 'output')).toBe(false);
+  expect(JSON.stringify(events.filter(({ type }) => type === 'error'))).not.toContain('private-');
+  const state = await graph.getState(config);
+  expect(state.values).toEqual({});
+  expect(state.tasks[0]!.interrupts[0]!.value).toMatchObject({ viewRevision: 'r2' });
+  const after = (await saver.getTuple(config))!.pendingWrites!;
+  expect(after.filter(([id, channel]) => id === task.id && channel === '__resume__')).toEqual([
+    [task.id, '__resume__', [answer]],
+  ]);
+  expect(after.filter(([id, channel]) => id === task.id && channel === '__error__')).toEqual(
+    before.filter(([id, channel]) => id === task.id && channel === '__error__'),
+  );
+});
+
+test('an errored retry refuses a new interrupt before parsing its request', async () => {
+  const { executor, graph } = await fixture(2, 1);
+  await collect(executor.run(request({ type: 'start', input: {} })));
+  const first = (await executor.pending(sessionId))!;
+  const command = { type: 'resume', interactionId: first.interactionId, ...answer } as const;
+  await collect(executor.run(request(command)));
+  const getState = graph.getState.bind(graph);
+  vi.spyOn(graph, 'getState').mockImplementation(async (config) => {
+    const state = await getState(config);
+    return {
+      ...state,
+      tasks: state.tasks.map((task) => ({
+        ...task,
+        interrupts: task.interrupts.map((pause) => ({
+          ...pause,
+          value: (pause.value as { viewRevision: string }).viewRevision === 'r2' ? {} : pause.value,
+        })),
+      })),
+    };
+  });
+  const events = await collect(executor.run(request(command)));
+  expect(events.at(-1)).toMatchObject({ type: 'error', error: toErrorInfo('unsupported') });
+  expect(events.some(({ type }) => type === 'interaction' || type === 'output')).toBe(false);
+});
+
+test('an error marker without a committed answer keeps the bare ID and accepts an ordinary resume', async () => {
+  const { executor, graph, saver } = await fixture(1);
+  await collect(executor.run(request({ type: 'start', input: {} })));
+  const first = (await executor.pending(sessionId))!;
+  const config = { configurable: { thread_id: sessionId } };
+  const task = (await graph.getState(config)).tasks[0]!;
+  const tuple = (await saver.getTuple(config))!;
+  await saver.putWrites(
+    tuple.config,
+    [['__error__', { message: 'private-error-canary' }]],
+    task.id,
+  );
+  expect(await executor.pending(sessionId)).toEqual(first);
+  const events = await collect(
+    executor.run(request({ type: 'resume', interactionId: first.interactionId, ...answer })),
+  );
+  expect(events.at(-1)).toMatchObject({ type: 'output', output: { answers: [answer] } });
+});
 
 test.each([2, 3])(
   'publishes %i questions with checkpoint-derived ordinals and routes bare-key answers',

@@ -69,6 +69,11 @@ first raw interrupt ID preserved and later IDs derived from committed resume val
 Parallel interrupts, repeated child-graph pauses, later-ordinal surface records and
 repeated ID-less requests remain unsupported. Hosts answer snapshot pending IDs;
 the adapter validates each ID and resumes under the raw engine key.
+An error after an answered request in a node that asks again ends the run
+`unsupported`: LangGraph's retained error marker makes the new question ambiguous.
+Errored tasks with zero or one committed answer keep the bare ID; a committed
+answer is replayed with `null` input, never appended again. Error markers with two
+or more committed answers are refused. See [the error-retry limit](README.md#several-requests-in-one-node).
 One strict ID-less request on a root checkpoint task is supported, including the
 measured body-invoked child with no child namespace; compiled child namespaces are
 refused. Exact valid NodeInterrupt/raw GraphInterrupt requests publish once and

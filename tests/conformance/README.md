@@ -954,6 +954,11 @@ checks host IDs against the known answer count, not adapter derivation code.
 covers two and three requests, ten stable reads, reversed saver writes, raw-key
 resume payloads, missing hooks, registration before return, forged and answered
 IDs, abort identity, invalid values, stale writes and retained refusal guards.
+Error-marker tests preserve the bare ID with zero or one committed answer and
+refuse two or more. Retrying after one answered request leaves exactly one saved
+answer, reaches the second question without answering it, and ends with fixed
+`unsupported` because the retained error marker cannot distinguish its identity.
+The unchanged reconciliation and single-question recovery tests retain their meaning.
 The former `twice` rejection in [`adapter.node.test.ts`](adapter.node.test.ts) now
 proves two identical requests complete; parallel and invalid shapes still fail.
 

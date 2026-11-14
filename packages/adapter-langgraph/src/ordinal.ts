@@ -18,7 +18,7 @@ export async function readOrdinalPending(
   sessionId: string,
   checkpointer: Pick<BaseCheckpointSaver, 'getTuple'>,
   registerRestoredData?: (value: unknown) => void,
-): Promise<{ interaction: PendingInteraction; rawId: string }> {
+): Promise<{ interaction: PendingInteraction; rawId: string; retryCommittedAnswer: boolean }> {
   const unsupported = (): never => {
     throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
   };
@@ -53,21 +53,34 @@ export async function readOrdinalPending(
     )
   )
     return unsupported();
+  const count = committedResumeValues(writes, task.id).length;
+  const errored = writes?.some(([id, channel]) => id === task.id && channel === '__error__');
+  if (errored && count >= 2) return unsupported();
   const restored = committedResumeValues(writes);
   if (restored.length > 0 && registerRestoredData === undefined) return unsupported();
   for (const value of restored) registerRestoredData?.(value);
-  const ordinal = committedResumeValues(writes, task.id).length;
-  if (ordinal > 0 && task.state !== undefined) return unsupported();
+  if (count > 0 && task.state !== undefined) return unsupported();
+  // An error marker cannot distinguish an answered pause from a new question on retry.
+  const ordinal = errored ? 0 : count;
+  const retryCommittedAnswer = errored === true && count > 0;
   const interactionId = (
     ordinal === 0 ? interrupt.id : `${interrupt.id}:${ordinal}`
   ) as InteractionId;
   const request = parseInteractionRequest(interrupt.value);
   if (request !== undefined)
-    return { interaction: { interactionId, ...request }, rawId: interrupt.id };
+    return {
+      interaction: { interactionId, ...request },
+      rawId: interrupt.id,
+      retryCommittedAnswer,
+    };
   const surface = parseSurfaceRecord(interrupt.value);
   if (surface !== undefined) {
-    if (ordinal > 0) return unsupported();
-    return { interaction: pendingFromSurface(interactionId, surface), rawId: interrupt.id };
+    if (count > 0) return unsupported();
+    return {
+      interaction: pendingFromSurface(interactionId, surface),
+      rawId: interrupt.id,
+      retryCommittedAnswer,
+    };
   }
   throw new GalaxieError('invalid', 'The interaction request is invalid.');
 }

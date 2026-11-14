@@ -12,8 +12,12 @@ before publication or replay; stale completed-task writes cannot publish a phant
 third question. In `exit` mode those final writes are not yet persisted before the
 final checkpoint, so the second pause remains. Core, existing goldens, the matrix
 and unrelated locks are unchanged. Parallel interrupts, repeated child pauses,
-later-ordinal surfaces and ID-less repeats remain refused. Deterministic question
-construction is required; request-digest binding, loop revisits, real models and
+later-ordinal surfaces and ID-less repeats remain refused. Errored tasks retain
+the bare ID with zero or one committed answer and refuse two or more; retrying an
+already committed answer uses null input, and another interrupt ends `unsupported`
+because its identity is ambiguous. Existing single-question recovery is preserved.
+Deterministic question construction is required; request-digest binding, loop
+revisits, real models and
 Python remain unmeasured. See [author limits](../packages/adapter-langgraph/README.md#several-requests-in-one-node)
 and [conformance evidence](../tests/conformance/README.md#several-requests-in-one-node).
 

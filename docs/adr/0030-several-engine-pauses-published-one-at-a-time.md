@@ -92,3 +92,10 @@ final checkpoint; the original second pause remains. None publishes a phantom
 third interaction. Adapter tests also cover three requests, repeated reads, forged
 IDs, missing registration hooks, registration before publication, abort identity,
 invalid requests and the retained surface/parallel/child/ID-less refusals.
+
+Error-marker tests on LangGraph 1.5.1 retain existing single-question recovery:
+zero or one committed answer keeps the bare ID, while two or more fail fixed
+`unsupported`. Retrying an already committed answer uses null input and leaves
+the resume list unchanged. If that retry reaches another question, it fails
+`unsupported`: the same retained error marker and resume count describe both
+the stale answered pause and the new question, so identity is ambiguous.

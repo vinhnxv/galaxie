@@ -340,6 +340,15 @@ values fail `unsupported` without that hook. A completed task's stale interrupt 
 refused rather than published as another question. Earlier answers already folded
 into graph state remain outside this adapter's registration scope.
 
+An error after an answered request, in a node that asks again, ends the run
+`unsupported`. LangGraph 1.5.1 retains the same error marker and resume count for
+both the old answered question and the new question reached on retry, so their
+identities cannot be distinguished. An errored task with zero or one committed
+answer keeps the bare raw ID for existing single-question recovery. A retry with
+one committed answer uses `null` input to replay that answer without appending it
+again; if it reaches another interrupt, the adapter refuses it. An error marker
+with two or more committed answers also fails with fixed `unsupported`.
+
 Parallel interrupts, repeated child-graph pauses, surface records at ordinal one
 or later, and repeated ID-less requests remain refused with fixed `unsupported`.
 A surface record at ordinal zero retains its existing path. Loop revisits of a

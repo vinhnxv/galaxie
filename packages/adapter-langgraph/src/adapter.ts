@@ -116,7 +116,10 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
       const readPending = async (
         sessionId: string,
         options?: Pick<RunRequest, 'registerRestoredData'>,
-      ): Promise<{ interaction: PendingInteraction; rawId?: string } | undefined> => {
+      ): Promise<
+        | { interaction: PendingInteraction; rawId?: string; retryCommittedAnswer?: boolean }
+        | undefined
+      > => {
         if (graph === undefined)
           throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');
         const state = await graph.getState({ configurable: { thread_id: sessionId } });
@@ -161,25 +164,28 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
             const command = request.command;
             const idless = command.type === 'resume' && command.interactionId.startsWith('idless:');
             let rawId: string = '';
+            let retryCommittedAnswer = false;
             if (command.type === 'resume') {
               const pause = await readPending(request.sessionId, request);
               if (pause === undefined || pause.interaction.interactionId !== command.interactionId)
                 throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
               rawId = pause.rawId ?? command.interactionId;
+              retryCommittedAnswer = pause.retryCommittedAnswer === true;
             }
-            const input =
-              command.type === 'start'
-                ? command.input
-                : new Command({
-                    resume: idless
-                      ? { action: command.action, payload: command.payload }
-                      : {
-                          [rawId]: {
-                            action: command.action,
-                            payload: command.payload,
-                          },
-                        },
-                  });
+            let input: unknown;
+            if (command.type === 'start') input = command.input;
+            else if (retryCommittedAnswer) input = null;
+            else
+              input = new Command({
+                resume: idless
+                  ? { action: command.action, payload: command.payload }
+                  : {
+                      [rawId]: {
+                        action: command.action,
+                        payload: command.payload,
+                      },
+                    },
+              });
             const source = async function* (): AsyncGenerator<unknown> {
               yield input;
             };
@@ -213,6 +219,8 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
             }
             if (!request.signal.aborted) {
               if (interrupted) {
+                if (retryCommittedAnswer)
+                  throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
                 const interaction = await pending(request.sessionId, request);
                 if (
                   interaction === undefined ||
