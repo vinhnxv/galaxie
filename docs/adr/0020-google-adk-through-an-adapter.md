@@ -1071,7 +1071,7 @@ write confirmation remains independent and required. The measurement's succeeded
 receipt journal prevents repeated host invocation on retry; without matching recovery
 storage, writes can repeat. Output checks, grants, labels, host confirmations and
 the broker path are unchanged. No candidate rewrites the model-visible history or
-depends on ADR-0030's proposed serialized publication contract.
+depends on the serialized publication contract of ADR-0030 (Accepted).
 
 Admission is enforced where the calls become known, rather than uniformly at prepare:
 JavaScript observes the pause at run time; Python rejects the mixed long-running turn

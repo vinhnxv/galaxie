@@ -222,7 +222,7 @@ use only one hoisting child over its whole execution. A second is refused before
 its own request or write; if reached after resume, the first approved child may
 already have written. Put the hoisting child first to avoid replaying earlier
 children. These limits retain the single-pending-interaction contract while
-[ADR-0030](0030-several-engine-pauses-published-one-at-a-time.md) remains Proposed.
+[ADR-0030](0030-several-engine-pauses-published-one-at-a-time.md) is Accepted; its implementation is pending.
 
 Other author metadata remains unvalidated, as the original probe-local hoist
 probes demonstrate. Snapshot bytes are not authenticated: a checkpoint-store

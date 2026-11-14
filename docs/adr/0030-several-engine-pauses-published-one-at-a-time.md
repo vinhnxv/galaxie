@@ -1,6 +1,6 @@
 # ADR-0030: Several engine pauses published one at a time
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-14)
 - **Date:** 2026-11-10
 - **Related:** ADR-0004, ADR-0012, ADR-0017, ADR-0027
 
@@ -30,7 +30,7 @@ These obligations do not weaken ADR-0012 or replace deterministic, side-effect-f
 | Gap | Outcome | Evidence |
 | --- | --- | --- |
 | Parallel interrupts | **refused** | Native N5 fails in every durability mode. Successful N4, N6, N7, C6–C9, L3, L4, L6 and L7 do not resolve the missing completion evidence. |
-| Several interaction requests in one node | **supported: design proven, implementation pending review** | N1–N3, N8, C1–C5, C10, L1, L2, L5 and L8 pass for the measured top-level four-field requests. |
+| Several interaction requests in one node | **supported: design proven, implementation pending (ADR-0030 is Accepted)** | N1–N3, N8, C1–C5, C10, L1, L2, L5 and L8 pass for the measured top-level four-field requests. |
 
 Repeated child-graph pauses remain refused: N9 did not establish deterministic discovery of the child namespace's resume values through the dynamically invoked child's parent state. The spike executor implements top-level fixtures only and declares `subgraphs: false`.
 
@@ -57,11 +57,15 @@ In the confirmed prefix-write probe, three B-prefix executions caused three appr
 
 Restore uses the same pick rule as publication. The negative control shows that unstable picks can lose an accepted answer even though inbox deduplication still works. Earlier committed answers also need explicit registration: the no-recovery L5 controls show that suppressing registration permits a private-value URL and a bounded outbound argument that core otherwise denies. No request-digest check is added here; deterministic question construction remains an author obligation.
 
-## Open questions
+## Decisions on the open questions (2026-11-14)
 
-- **Q1:** Accept serialized publication as the executor contract rule, with the first interaction ID preserved and later identities derived from committed engine state?
-- **Q2:** Require a request-digest check binding a replayed answer to the question it answered, rather than relying only on deterministic node prefixes? This remains follow-up design work; the existing single-pause path has the same nondeterministic-prefix exposure.
-- **Q3:** Do materialized surfaces in multi-pause sets or at later ordinals need a separate ADR for revision and region arbitration?
+The maintainer delegated these decisions to the assistant, which recorded the recommended option for each. They are revisable only through a new ADR (see the ADR README rules).
+
+- **Q1: accepted.** Serialized publication is the executor contract rule for engines that raise several pauses, with the first interaction ID preserved and later identities derived from committed engine state. Reason: it needs no core type change, the spike proved it for top-level repeated requests, and the alternatives change `RunSnapshot`, `ExecutorAgent` or `RunCommand` for every host. Acceptance covers the measured top-level repeated-request design only. Parallel interrupts stay **refused** while native probe N5 is unresolved, and repeated child-graph pauses stay refused (N9).
+- **Q2: required, as follow-up design, not a blocker.** A request-digest check that binds a replayed answer to the question it answered is required before the design is described as hardened against nondeterministic prefixes. The shipped single-pause path has the same exposure today, so the implementation issue does not wait for it; it is tracked as its own spike.
+- **Q3: yes, a separate ADR.** A surface record in a multi-pause set or at a later ordinal keeps failing with the fixed `unsupported` error until a separate ADR settles revision and region arbitration. This ADR grants no surface support.
+
+Implementation is unblocked for the measured top-level repeated-request design, with the obligations and verification below. Nothing in this decision weakens ADR-0012.
 
 ## Verification
 
@@ -69,4 +73,4 @@ The [spike result](../../spikes/parallel-interrupts/README.md), [native observat
 
 Native and integration probes cover all three durability modes. Core fake probes cover duplicate/stale dispatch, acceptance before commit, commit before publication, stable-order restore, the changed-order negative control, approval reuse, prefix counts and surface refusal. L5 isolates restored-value registration with and without the hook, without a recovery store or network access.
 
-The implementation follow-up must add Node and Chromium conformance cases with new goldens, preserve existing goldens and unrelated matrices/locks, repeat critical crash/reload tests with a reopened IndexedDB saver, update runtime validation and the adapter's documented limits, and pass `pnpm check`. Parallel implementation is not proposed while N5 is unresolved. This ADR remains Proposed until the maintainer decides Q1–Q3.
+The implementation follow-up must add Node and Chromium conformance cases with new goldens, preserve existing goldens and unrelated matrices/locks, repeat critical crash/reload tests with a reopened IndexedDB saver, update runtime validation and the adapter's documented limits, and pass `pnpm check`. Parallel implementation is not proposed while N5 is unresolved. The maintainer decision on Q1–Q3 is recorded above.
