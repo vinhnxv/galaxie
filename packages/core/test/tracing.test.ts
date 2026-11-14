@@ -1,8 +1,17 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { context, ROOT_CONTEXT, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
 import {
+  context,
+  createTraceState,
+  propagation,
+  ROOT_CONTEXT,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from '@opentelemetry/api';
+import {
+  AlwaysOffSampler,
   InMemorySpanExporter,
   SimpleSpanProcessor,
   StackContextManager,
@@ -12,6 +21,7 @@ import { afterEach, expect, test } from 'vitest';
 import { z } from 'zod';
 import {
   type CapabilityBinding,
+  type CapabilityContext,
   type CapabilityRequests,
   createRuntime,
   DEFAULT_DATA_POLICY,
@@ -19,12 +29,14 @@ import {
   GalaxieError,
   galaxieField,
   httpCapability,
+  injectTraceContext,
   type TraceHandle,
 } from '../src/index.js';
 import { startRunTrace } from '../src/tracing.js';
 import { VERSION } from '../src/version.js';
 import {
   binding,
+  brokerFixture,
   collect,
   deferred,
   definition,
@@ -37,6 +49,7 @@ import { assertSpanTree, serializeSpans } from './span-tree.js';
 afterEach(() => {
   trace.disable();
   context.disable();
+  propagation.disable();
 });
 
 async function recorded(script: Script): Promise<InMemorySpanExporter> {
@@ -596,3 +609,246 @@ test('trace text omits non-serializable input without throwing and defaults to n
     /gen_ai\.(input.messages|output.messages|tool.call.arguments)|without opt-in/,
   );
 });
+
+test.each(['injected', 'global', 'dropped'] as const)(
+  'injects the live capability parent with a %s provider and expires after settlement',
+  async (mode) => {
+    const exporter = new InMemorySpanExporter();
+    const provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
+      ...(mode === 'dropped' ? { sampler: new AlwaysOffSampler() } : {}),
+    });
+    if (mode === 'global') trace.setGlobalTracerProvider(provider);
+    let saved: CapabilityContext | undefined;
+    const headers = new Headers({ 'x-host': 'keep' });
+    const fixture = await brokerFixture({
+      ...(mode === 'global' ? {} : { tracerProvider: provider }),
+      bindings: {
+        'echo@1': binding({
+          destination: 'host-server',
+          invoke: async (input, ctx) => {
+            saved = ctx;
+            injectTraceContext(ctx, headers);
+            return input;
+          },
+        }),
+      },
+      scripts: [
+        async function* ({ capabilities }) {
+          await capabilities.call('echo@1', 'value');
+          const late = new Headers();
+          injectTraceContext(saved as CapabilityContext, late);
+          expect([...late]).toEqual([]);
+          yield { type: 'output', output: null };
+        },
+      ],
+    });
+    const { runId } = await fixture.instance.start('input');
+    await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    await fixture.runtime.dispose();
+    const parent = headers.get('traceparent');
+    expect(parent).toMatch(
+      new RegExp(`^00-[a-f0-9]{32}-[a-f0-9]{16}-${mode === 'dropped' ? '00' : '01'}$`),
+    );
+    expect(headers.get('x-host')).toBe('keep');
+    expect(headers.has('tracestate')).toBe(false);
+    if (mode !== 'dropped') {
+      const spans = exporter.getFinishedSpans();
+      const root = spans.find((span) => span.name.startsWith('invoke_agent'));
+      const tool = spans.find((span) => span.name.startsWith('execute_tool'));
+      expect(parent).toBe(`00-${root?.spanContext().traceId}-${tool?.spanContext().spanId}-01`);
+    }
+    const late = new Headers();
+    injectTraceContext(saved as CapabilityContext, late);
+    expect([...late]).toEqual([]);
+    await provider.shutdown();
+  },
+);
+
+test.each(['in-browser', 'third-party', 'user-device', 'user-endpoint'] as const)(
+  'does not register a %s capability context',
+  async (destination) => {
+    const headers = new Headers();
+    const provider = new TracerProvider();
+    const fixture = await brokerFixture({
+      tracerProvider: provider,
+      input: z.string().meta(galaxieField({ label: 'public' })),
+      bindings: {
+        'echo@1': binding({
+          destination,
+          invoke: async (input, ctx) => {
+            injectTraceContext(ctx, headers);
+            return input;
+          },
+        }),
+      },
+      scripts: [
+        async function* ({ capabilities }) {
+          await capabilities.call('echo@1', 'query');
+          yield { type: 'output', output: null };
+        },
+      ],
+    });
+    const { runId } = await fixture.instance.start('input');
+    await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    await fixture.runtime.dispose();
+    await provider.shutdown();
+    expect([...headers]).toEqual([]);
+  },
+);
+
+test.each([false, true])(
+  'no-op provider propagates only a valid external parent: %s',
+  async (external) => {
+    context.setGlobalContextManager(new StackContextManager().enable());
+    const parent = {
+      traceId: 'a'.repeat(32),
+      spanId: 'b'.repeat(16),
+      traceFlags: 1,
+      traceState: createTraceState('a=1,b=2'),
+    };
+    const headers = new Headers({ 'x-host': 'keep' });
+    const fixture = await brokerFixture({
+      bindings: {
+        'echo@1': binding({
+          destination: 'host-server',
+          invoke: async (input, ctx) => {
+            injectTraceContext(ctx, headers);
+            return input;
+          },
+        }),
+      },
+      scripts: [
+        async function* ({ capabilities }) {
+          await capabilities.call('echo@1', 'value');
+          yield { type: 'output', output: null };
+        },
+      ],
+    });
+    const { runId } = await context.with(
+      external ? trace.setSpanContext(ROOT_CONTEXT, parent) : ROOT_CONTEXT,
+      () => fixture.instance.start('input'),
+    );
+    await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    expect(Object.fromEntries(headers)).toEqual(
+      external
+        ? {
+            'x-host': 'keep',
+            traceparent: `00-${parent.traceId}-${parent.spanId}-01`,
+            tracestate: 'a=1,b=2',
+          }
+        : { 'x-host': 'keep' },
+    );
+    await fixture.runtime.dispose();
+  },
+);
+
+test('ignores active baggage and a global propagator while retaining span tracestate', async () => {
+  context.setGlobalContextManager(new StackContextManager().enable());
+  propagation.setGlobalPropagator({
+    inject(_context, carrier, setter): void {
+      setter.set(carrier, 'baggage', 'secret=value');
+      setter.set(carrier, 'x-custom', 'secret');
+    },
+    extract: (ctx) => ctx,
+    fields: () => ['baggage', 'x-custom'],
+  });
+  const parent = trace.setSpanContext(ROOT_CONTEXT, {
+    traceId: 'a'.repeat(32),
+    spanId: 'b'.repeat(16),
+    traceFlags: 1,
+    traceState: createTraceState('a=1,b=2'),
+  });
+  const active = propagation.setBaggage(
+    parent,
+    propagation.createBaggage({ secret: { value: 'value' } }),
+  );
+  const headers = new Headers();
+  const exporter = new InMemorySpanExporter();
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  const fixture = await brokerFixture({
+    tracerProvider: provider,
+    bindings: {
+      'echo@1': binding({
+        destination: 'host-server',
+        invoke: async (input, ctx) => {
+          injectTraceContext(ctx, headers);
+          return input;
+        },
+      }),
+    },
+    scripts: [
+      async function* ({ capabilities }) {
+        await capabilities.call('echo@1', 'value');
+        yield { type: 'output', output: null };
+      },
+    ],
+  });
+  const { runId } = await context.with(active, () => fixture.instance.start('input'));
+  await collect(fixture.instance.events(runId));
+  expect(fixture.scriptErrors).toEqual([]);
+  expect([...headers.keys()].sort()).toEqual(['traceparent', 'tracestate']);
+  expect(headers.get('tracestate')).toBe('a=1,b=2');
+  expect(headers.get('traceparent')).toContain('a'.repeat(32));
+  await fixture.runtime.dispose();
+  await provider.shutdown();
+});
+
+test('leaves an unregistered context untouched', () => {
+  const headers = new Headers({ traceparent: 'host-value', tracestate: 'a=1' });
+  injectTraceContext({} as CapabilityContext, headers);
+  expect(Object.fromEntries(headers)).toEqual({ traceparent: 'host-value', tracestate: 'a=1' });
+});
+
+test.each(['success', 'error', 'timeout', 'cancel'] as const)(
+  'expires a registered context after capability %s',
+  async (outcome) => {
+    const exporter = new InMemorySpanExporter();
+    const provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
+    });
+    const entered = deferred<void>();
+    const release = deferred<void>();
+    const controller = new AbortController();
+    let saved: CapabilityContext | undefined;
+    const fixture = await brokerFixture({
+      tracerProvider: provider,
+      bindings: {
+        'echo@1': binding({
+          destination: 'host-server',
+          timeoutMs: outcome === 'timeout' ? 20 : 1000,
+          invoke: async (input, ctx) => {
+            saved = ctx;
+            const headers = new Headers();
+            injectTraceContext(ctx, headers);
+            expect(headers.has('traceparent')).toBe(true);
+            entered.resolve();
+            if (outcome === 'error') throw new Error('test failure');
+            if (outcome === 'timeout' || outcome === 'cancel') await release.promise;
+            return input;
+          },
+        }),
+      },
+      scripts: [
+        async function* ({ capabilities }) {
+          await capabilities.call('echo@1', 'value', { signal: controller.signal }).catch(() => {});
+          const headers = new Headers();
+          injectTraceContext(saved as CapabilityContext, headers);
+          expect([...headers]).toEqual([]);
+          yield { type: 'output', output: null };
+        },
+      ],
+    });
+    const { runId } = await fixture.instance.start('input');
+    await entered.promise;
+    if (outcome === 'cancel') controller.abort();
+    await collect(fixture.instance.events(runId));
+    expect(fixture.scriptErrors).toEqual([]);
+    release.resolve();
+    await fixture.runtime.dispose();
+    await provider.shutdown();
+  },
+);

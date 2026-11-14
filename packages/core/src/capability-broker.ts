@@ -35,7 +35,7 @@ import {
 } from './recovery.js';
 import type { DiagnosticEvent } from './runtime.js';
 import type { Schema } from './schema.js';
-import type { RunInstrumentation } from './tracing.js';
+import { bindTraceContext, type RunInstrumentation } from './tracing.js';
 
 type Policy = Readonly<Record<DataLabel, DestinationAllowlist>>;
 
@@ -646,6 +646,8 @@ export class CapabilityBroker {
                 principalScope: this.#principal,
                 agent: this.#agent,
               };
+              if (binding.destination === 'host-server')
+                bindTraceContext(context, () => span.spanContext());
               let execution: Promise<unknown>;
               try {
                 invoked = true;
