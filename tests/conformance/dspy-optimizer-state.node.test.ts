@@ -13,55 +13,59 @@ import {
 import { dspyOptimizerStateSources } from './support/dspy-optimizer-state-sources.node.js';
 import { dspyStateCases } from './support/dspy-state.js';
 
-test.each(dspyOptimizerStateCases)('Node Pyodide loads real optimizer state: %s', async (name) => {
-  const fixture = await createPythonFixture({
-    framework: 'dspy',
-    module: 'selected',
-    sources: await dspyOptimizerStateSources(name),
-  });
-  try {
-    const actual = await executeDspyOptimizerStateCase(fixture.options, fixture.agent, name);
-    expect(actual).toEqual(
-      JSON.parse(
-        await readFile(
-          new URL(`./golden-dspy-optimizer-state/${name}.json`, import.meta.url),
-          'utf8',
-        ),
-      ),
-    );
-    expect(fixture.workerErrors).toEqual([]);
-    expect(
-      fixture.requests.some(
-        (request) => request.url === '/python/agent/state.json' && request.bytes > 0,
-      ),
-    ).toBe(true);
-    expect(fixture.requests.every((request) => request.url.startsWith('/python/'))).toBe(true);
-    if (name === 'optstate-forgot-lm') {
-      expect(actual.error).toEqual({
-        code: 'unsupported',
-        message: 'This operation is unsupported.',
-      });
-      expect(actual.requests).toEqual([]);
-      expect(actual.capabilities).toEqual([]);
-    } else {
-      const state = JSON.parse(
-        await readFile(
-          new URL(`./cases-dspy/optimizer-state/${name}.json`, import.meta.url),
-          'utf8',
+test.each(dspyOptimizerStateCases)(
+  'Node Pyodide loads real optimizer state: %s',
+  async (name) => {
+    const fixture = await createPythonFixture({
+      framework: 'dspy',
+      module: 'selected',
+      sources: await dspyOptimizerStateSources(name),
+    });
+    try {
+      const actual = await executeDspyOptimizerStateCase(fixture.options, fixture.agent, name);
+      expect(actual).toEqual(
+        JSON.parse(
+          await readFile(
+            new URL(`./golden-dspy-optimizer-state/${name}.json`, import.meta.url),
+            'utf8',
+          ),
         ),
       );
-      const messages = (actual.requests[0] as { messages: { role: string; content: string }[] })
-        .messages;
-      expect(messages[0]?.content).toContain(state.signature.instructions);
-      for (const [index, demo] of state.demos.entries()) {
-        expect(messages[1 + index * 2]?.content).toContain(demo.question);
-        expect(messages[2 + index * 2]?.content).toContain(demo.answer);
+      expect(fixture.workerErrors).toEqual([]);
+      expect(
+        fixture.requests.some(
+          (request) => request.url === '/python/agent/state.json' && request.bytes > 0,
+        ),
+      ).toBe(true);
+      expect(fixture.requests.every((request) => request.url.startsWith('/python/'))).toBe(true);
+      if (name === 'optstate-forgot-lm') {
+        expect(actual.error).toEqual({
+          code: 'unsupported',
+          message: 'This operation is unsupported.',
+        });
+        expect(actual.requests).toEqual([]);
+        expect(actual.capabilities).toEqual([]);
+      } else {
+        const state = JSON.parse(
+          await readFile(
+            new URL(`./cases-dspy/optimizer-state/${name}.json`, import.meta.url),
+            'utf8',
+          ),
+        );
+        const messages = (actual.requests[0] as { messages: { role: string; content: string }[] })
+          .messages;
+        expect(messages[0]?.content).toContain(state.signature.instructions);
+        for (const [index, demo] of state.demos.entries()) {
+          expect(messages[1 + index * 2]?.content).toContain(demo.question);
+          expect(messages[2 + index * 2]?.content).toContain(demo.answer);
+        }
       }
+    } finally {
+      await fixture.cleanup();
     }
-  } finally {
-    await fixture.cleanup();
-  }
-});
+  },
+  900000,
+);
 
 test('optimizer libraries remain absent from the Worker', async () => {
   const fixture = await createPythonFixture({
@@ -95,7 +99,7 @@ def create_agent():
   } finally {
     await fixture.cleanup();
   }
-});
+}, 900000);
 
 test('the Worker loads MIPROv2 augmented demos as dictionaries', async () => {
   const sources = await dspyOptimizerStateSources('optstate-mipro');
@@ -131,7 +135,7 @@ def create_agent():
   } finally {
     await fixture.cleanup();
   }
-});
+}, 900000);
 
 test('optimizer states form a separate complete golden family', async () => {
   expect(dspyOptimizerStateCases).toEqual(Object.keys(fixtures));

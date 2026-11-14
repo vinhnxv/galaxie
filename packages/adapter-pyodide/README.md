@@ -683,8 +683,17 @@ scripted LM, ReAct with demos on both predictors and an instructions-only
 stand-in loads through `Module.load` on CPython, Node Pyodide and headless
 Chromium. The seven separate state cases compare native transcripts, including
 demo prompts, one capability tool call and fail-closed LM refusals. These are
-scripted-model results; they say nothing about real-model answer quality or
-MIPROv2, COPRO or GEPA output.
+scripted-model results; they say nothing about real-model answer quality.
+A separate [optimizer-state measurement](../../tests/conformance/README.md#dspy-offline-optimizer-state-measurements)
+supports offline COPRO, GEPA and MIPROv2 state with the same recipe on native
+CPython, Node Pyodide and headless Chromium. COPRO changes instructions and an
+inert ChatAdapter prefix; GEPA changes instructions; MIPROv2 changes instructions
+and adds an augmented demo, loaded as a dictionary with the demo pair in order.
+The optimizers run natively with scripted engines and network denied. GEPA,
+optuna and numpy never enter the Worker. MIPROv2 is produced in the separate
+non-default optimizers dependency-group environment; default CI verifies its
+loading and golden parity but skips its re-derivation. Firefox, WebKit and
+real-model quality remain unmeasured for these states.
 
 Save portable state offline with no LM attached (`module.set_lm(None)` then
 `module.save('state.json')`). List `state.json` alongside the Python files in the
@@ -798,7 +807,9 @@ For model-calling optimizers, or to avoid shipping a large runtime trainset:
 | Offline state producer | Verification |
 | --- | --- |
 | `LabeledFewShot`, scripted-LM `BootstrapFewShot`, ReAct demos, instructions-only stand-in | Existing seven state cases on native CPython, Node Pyodide and headless Chromium; native/Node regression gates rerun here. |
-| `MIPROv2`, `COPRO`, `GEPA` | Offline output unmeasured; the runtime refusals above do not establish state round trips. |
+| `COPRO` | SUPPORTED-OFFLINE: real scripted optimizer, native/Node/Chromium state parity; instruction applies and the saved prefix is inert under ChatAdapter. |
+| `GEPA` | SUPPORTED-OFFLINE: real scripted optimizer with locked gepa 0.1.4, native/Node/Chromium instruction-state parity. |
+| `MIPROv2` | SUPPORTED-OFFLINE: real scripted optimizer in the non-default optimizers environment, native/Node/Chromium instruction and augmented-demo parity. Default CI checks loading, not re-derivation. |
 | `KNNFewShot`, `Ensemble`, `SIMBA`, `BetterTogether`, fine-tuning optimizers | Runtime and offline output unmeasured. |
 
 The two rebound runtime cases gained independent goldens on 2026-11-13, passing

@@ -213,11 +213,21 @@ seeded demos and replay without redispatch; omitting the rebind ends
 Evidence uses DSPy 3.4.1, CPython 3.14.5, Node 24.15.0 and Pyodide 314.0.7;
 no shipped source or core contract changed. The two rebound runtime goldens now
 have the browser measurements above. Other Chromium, Firefox, WebKit runtime
-probes, real models, other DSPy versions, offline MIPROv2/COPRO/GEPA output,
+probes, real models, other DSPy versions,
 KNNFewShot/Ensemble/SIMBA/BetterTogether/fine-tuning optimizers and optimizers
 given an in-Worker plain `dspy.LM` remain unmeasured. See the
 [predictions and observations](../tests/conformance/README.md#dspy-sync-entry-points-and-runtime-optimizers-spike)
 and [offline recipe](../packages/adapter-pyodide/README.md#runtime-optimizers-and-the-offline-recipe).
+
+On 2026-11-14, offline COPRO, GEPA and MIPROv2 state records **SUPPORTED-OFFLINE**
+with the unchanged JSON save/load/rebind recipe. Scripted real optimizers produce
+changed instructions; COPRO also changes an inert prefix and MIPROv2 saves an
+augmented demo. Native CPython, Node Pyodide and headless Chromium match independent
+goldens. The Worker has no gepa, optuna, numpy or litellm. MIPROv2 re-derivation
+passes in a separate local optimizers dependency-group environment; default CI
+verifies loading and goldens and skips that re-derivation. No runtime source or
+ADR-0012 control changes; Firefox, WebKit and real-model quality remain unmeasured
+for these states. See the [gate record](adr/0018-python-agents-through-pyodide.md#dspy-offline-optimizer-state-measurements-2026-11-14).
 
 On 2026-11-12, DSPy thread-pool fan-out gained fixed `unsupported` refusal in
 native CPython and Node Pyodide. `Parallel` and `Evaluate`, including their default

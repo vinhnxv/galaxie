@@ -35,7 +35,7 @@ def test_optimizer_state_reproducible_and_nonvacuous(name):
 
 
 @pytest.mark.parametrize('name', sorted({fixture['state'] for fixture in native.FIXTURES.values()}))
-def test_optimizer_state_hygiene_and_prompt(name):
+def test_optimizer_state_hygiene_and_prompt(name, caplog):
     path = native.STATES / f'{name}.json'
     saved = json.loads(path.read_text(encoding='utf-8'))
     assert saved['metadata']['dependency_versions']['dspy'] == dspy.__version__
@@ -55,6 +55,7 @@ def test_optimizer_state_hygiene_and_prompt(name):
     check(saved)
     transcript = asyncio.run(native.record(name))
     system = transcript['requests'][0]['messages'][0]['content']
+    assert not [record for record in caplog.records if 'version' in record.getMessage().lower()]
     assert saved['signature']['instructions'] in system
     if name == 'optstate-copro':
         assert saved['signature']['fields'][-1]['prefix'] == 'Offline capital:'
