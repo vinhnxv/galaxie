@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { SpanStatusCode } from '@opentelemetry/api';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace';
-import { canary } from './node-host.js';
+import { canary } from './host.js';
 import { normalize } from './normalize.js';
 import { decodeValue, observationsQuery, waitForReadback } from './readback.js';
 import { errorText, prompt, reply, type ScenarioResult } from './scenarios.js';

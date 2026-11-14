@@ -11,7 +11,7 @@ import {
   FixtureModelError,
   ScriptedChatModel,
 } from '../../../tests/conformance/support/scripted-chat-model.js';
-import { createNodeHost } from './node-host.js';
+import { createHost, type Host, type HostOptions } from './host.js';
 
 export const scenarios = ['linear', 'tool-call', 'interrupt-resume', 'model-failure'] as const;
 export type Scenario = (typeof scenarios)[number];
@@ -26,11 +26,12 @@ export interface ScenarioResult {
   traceIds: string[];
   runId: string;
   credentialCalls: number;
+  exportErrors: Host['exportErrors'];
 }
 
 export async function runScenario(
   name: Scenario,
-  options: { text: boolean; live: boolean },
+  options: HostOptions & { onHost?: (host: Host) => void },
 ): Promise<ScenarioResult> {
   const model = new ScriptedChatModel({
     [prompt]:
@@ -42,10 +43,11 @@ export async function runScenario(
             usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
           },
   });
-  const host = createNodeHost(model, {
+  const host = createHost(model, {
     ...options,
     key: `${name}-${options.text ? 'text' : 'plain'}`,
   });
+  options.onHost?.(host);
   try {
     const instance = await host.runtime.create(
       defineAgentDefinition({
@@ -157,9 +159,10 @@ export async function runScenario(
       traceIds: [...new Set(spans.map((span) => span.spanContext().traceId))],
       runId,
       credentialCalls: host.credentialCalls(),
+      exportErrors: host.exportErrors,
     };
   } finally {
     await host.runtime.dispose();
-    await host.provider.shutdown();
+    await host.shutdown();
   }
 }
