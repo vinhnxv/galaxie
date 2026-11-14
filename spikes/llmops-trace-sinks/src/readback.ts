@@ -13,6 +13,12 @@ export interface Observation {
   metadata: Record<string, unknown>;
   startTime: string;
   endTime: string;
+  type?: string;
+  level?: string;
+  model?: string | null;
+  usageDetails?: Record<string, number>;
+  input?: unknown;
+  output?: unknown;
 }
 
 export interface OtlpSpan {
@@ -22,16 +28,37 @@ export interface OtlpSpan {
   name: string;
   attributes: {
     key: string;
-    value: { string_value?: string; int_value?: number; bool_value?: boolean };
+    value: OtlpValue;
   }[];
   start_time_unix_nano: number;
   end_time_unix_nano: number;
+  status?: { code?: string | number; message?: string };
+  kind?: string;
+}
+
+export interface OtlpValue {
+  string_value?: string;
+  int_value?: number;
+  double_value?: number;
+  bool_value?: boolean;
+  array_value?: { values?: OtlpValue[] };
+  kvlist_value?: { values?: { key: string; value: OtlpValue }[] };
+}
+
+export function decodeValue(value: OtlpValue): unknown {
+  if (value.array_value) return (value.array_value.values ?? []).map(decodeValue);
+  if (value.kvlist_value)
+    return Object.fromEntries(
+      (value.kvlist_value.values ?? []).map(({ key, value }) => [key, decodeValue(value)]),
+    );
+  return value.string_value ?? value.int_value ?? value.double_value ?? value.bool_value ?? null;
 }
 
 export interface Readback {
   observations: Observation[];
   traces: { trace_id: string }[];
   spans: OtlpSpan[];
+  detail?: unknown;
 }
 
 async function json<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -44,17 +71,12 @@ async function json<T>(url: string, options: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function readBack(traceId: string): Promise<Readback> {
+export async function readBack(traceId: string, includeDetail = false): Promise<Readback> {
   const env = readEnv();
   if (!/^\d{4,5}$/.test(env['MLFLOW_PORT'] ?? '') || Number(env['MLFLOW_PORT']) > 65535)
     throw new Error('Invalid local MLflow port');
   const mlflow = `http://127.0.0.1:${env['MLFLOW_PORT']}`;
-  const observations = await json<{ data: Observation[]; meta: { cursor?: string } }>(
-    `http://127.0.0.1:3000/api/public/v2/observations?traceId=${traceId}&limit=100&fields=basic,metadata,time`,
-    { headers: { Authorization: env['LANGFUSE_AUTH_HEADER'] ?? '' } },
-  );
-  if (observations.meta.cursor)
-    throw new Error('Unexpected additional observation page for two-span smoke');
+  const observations = await observationsQuery({ traceId });
   const search = await json<{ traces?: { trace_id: string }[] }>(
     `${mlflow}/api/3.0/mlflow/traces/search`,
     {
@@ -73,22 +95,62 @@ export async function readBack(traceId: string): Promise<Readback> {
     },
   );
   const traces = search.traces ?? [];
-  if (traces.length === 0) return { observations: observations.data, traces, spans: [] };
+  if (traces.length === 0) return { observations, traces, spans: [] };
   const detail = await json<{ trace: { spans?: OtlpSpan[] } }>(
     `${mlflow}/api/3.0/mlflow/traces/get?trace_id=${encodeURIComponent(traces[0]?.trace_id ?? '')}`,
   );
-  return { observations: observations.data, traces, spans: detail.trace.spans ?? [] };
+  return {
+    observations,
+    traces,
+    spans: detail.trace.spans ?? [],
+    ...(includeDetail ? { detail } : {}),
+  };
 }
 
-export async function waitForReadback(traceId: string): Promise<Readback> {
+export async function observationsQuery(query: Record<string, string>): Promise<Observation[]> {
+  const env = readEnv();
+  const all: Observation[] = [];
+  let cursor: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      ...query,
+      limit: '100',
+      fields: 'basic,metadata,time,model,usage,io',
+      ...(cursor ? { cursor } : {}),
+    });
+    const page = await json<{ data: Observation[]; meta: { cursor?: string } }>(
+      `http://127.0.0.1:3000/api/public/v2/observations?${params}`,
+      { headers: { Authorization: env['LANGFUSE_AUTH_HEADER'] ?? '' } },
+    );
+    all.push(...page.data);
+    cursor = page.meta.cursor;
+  } while (cursor);
+  return all;
+}
+
+export async function waitForReadback(
+  traceId: string,
+  spanIds?: readonly string[],
+): Promise<Readback> {
   const deadline = Date.now() + 120_000;
   let latest: Readback = { observations: [], traces: [], spans: [] };
   while (Date.now() < deadline) {
-    latest = await readBack(traceId);
-    if (latest.observations.length >= 2 && latest.spans.length >= 2) return latest;
+    latest = await readBack(traceId, spanIds !== undefined);
+    if (
+      spanIds === undefined
+        ? latest.observations.length >= 2 && latest.spans.length >= 2
+        : spanIds.every(
+            (id) =>
+              latest.observations.some((span) => span.id === id) &&
+              latest.spans.some(
+                (span) => Buffer.from(span.span_id, 'base64').toString('hex') === id,
+              ),
+          )
+    )
+      return latest;
     await setTimeout(1000);
   }
   throw new Error(
-    `Readback timed out: ${latest.observations.length} observations, ${latest.traces.length} traces, ${latest.spans.length} spans`,
+    `Readback timed out: ${latest.observations.length} observations, ${latest.traces.length} traces, ${latest.spans.length} spans; missing Langfuse: ${spanIds?.filter((id) => !latest.observations.some((span) => span.id === id)).join(', ') ?? 'count'}; missing MLflow: ${spanIds?.filter((id) => !latest.spans.some((span) => Buffer.from(span.span_id, 'base64').toString('hex') === id)).join(', ') ?? 'count'}`,
   );
 }

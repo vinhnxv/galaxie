@@ -1,20 +1,49 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import type { ReadableSpan } from '@opentelemetry/sdk-trace';
 import type { Smoke } from './smoke.js';
 
-export function normalize(value: unknown, smoke: Smoke): unknown {
-  const ids = [
-    [`tr-${smoke.traceId}`, 'mlflow-trace-1'],
-    [smoke.traceId, 'trace-1'],
-    [Buffer.from(smoke.traceId, 'hex').toString('base64'), 'trace-1'],
-    [smoke.rootId, 'root-span-1'],
-    [Buffer.from(smoke.rootId, 'hex').toString('base64'), 'root-span-1'],
-    [smoke.childId, 'child-span-1'],
-    [Buffer.from(smoke.childId, 'hex').toString('base64'), 'child-span-1'],
-    [smoke.sessionId, 'session-1'],
-    [smoke.runId, 'run-1'],
-  ] as const;
+export function normalize(value: unknown, source: Smoke | readonly ReadableSpan[]): unknown {
+  const ids: (readonly [string, string])[] = [];
+  if (Array.isArray(source)) {
+    const traces = new Map<string, string>();
+    const identities = new Set<string>();
+    for (const [index, span] of source.entries()) {
+      const { traceId, spanId } = span.spanContext();
+      if (!traces.has(traceId)) traces.set(traceId, `trace-${traces.size + 1}`);
+      const trace = traces.get(traceId) ?? '';
+      ids.push(
+        [`tr-${traceId}`, `mlflow-${trace}`],
+        [traceId, trace],
+        [Buffer.from(traceId, 'hex').toString('base64'), trace],
+        [spanId, `span-${index + 1}`],
+        [Buffer.from(spanId, 'hex').toString('base64'), `span-${index + 1}`],
+      );
+      for (const kind of ['run', 'session', 'instance']) {
+        const id = span.attributes[`galaxie.${kind}.id`];
+        if (typeof id === 'string' && !identities.has(id)) {
+          identities.add(id);
+          ids.push([id, `${kind}-1`]);
+        }
+      }
+    }
+  } else {
+    const smoke = source as Smoke;
+    ids.push(
+      ...([
+        [`tr-${smoke.traceId}`, 'mlflow-trace-1'],
+        [smoke.traceId, 'trace-1'],
+        [Buffer.from(smoke.traceId, 'hex').toString('base64'), 'trace-1'],
+        [smoke.rootId, 'root-span-1'],
+        [Buffer.from(smoke.rootId, 'hex').toString('base64'), 'root-span-1'],
+        [smoke.childId, 'child-span-1'],
+        [Buffer.from(smoke.childId, 'hex').toString('base64'), 'child-span-1'],
+        [smoke.sessionId, 'session-1'],
+        [smoke.runId, 'run-1'],
+      ] as const),
+    );
+  }
   const times = new Map<string, string>();
   const visit = (item: unknown, key = ''): unknown => {
     if (
@@ -22,6 +51,7 @@ export function normalize(value: unknown, smoke: Smoke): unknown {
       (/time_unix_nano$/.test(key) || /^\d{4}-\d{2}-\d{2}T/.test(String(item)))
     ) {
       const time = String(item);
+      if (Array.isArray(source)) return '<timestamp>';
       if (!times.has(time)) times.set(time, `time-${times.size + 1}`);
       return times.get(time);
     }
@@ -34,7 +64,7 @@ export function normalize(value: unknown, smoke: Smoke): unknown {
     if (item !== null && typeof item === 'object')
       return Object.fromEntries(
         Object.entries(item)
-          .filter(([name]) => !/authorization|password|secret|token/i.test(name))
+          .filter(([name]) => !/authorization|password|secret|^(?:access_)?token$/i.test(name))
           .map(([name, child]) => [name, visit(child, name)]),
       );
     return item;
