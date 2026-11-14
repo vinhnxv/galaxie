@@ -7,12 +7,17 @@ import { defineConfig } from 'vitest/config';
 const shared = ['@opentelemetry/api', '@langchain/core', '@langchain/langgraph'];
 
 export default defineConfig({
-  resolve: {
-    dedupe: shared,
-    alias: shared.map((name) => ({
-      find: name,
-      replacement: fileURLToPath(new URL(`node_modules/${name}`, import.meta.url)),
-    })),
-  },
-  test: { environment: 'node', fileParallelism: false, testTimeout: 180_000 },
+  resolve: { dedupe: shared },
+  plugins: [
+    {
+      name: 'spike-single-copy',
+      enforce: 'pre',
+      resolveId(source) {
+        if (shared.some((name) => source === name || source.startsWith(`${name}/`)))
+          return fileURLToPath(import.meta.resolve(source));
+        return null;
+      },
+    },
+  ],
+  test: { environment: 'node', fileParallelism: false, testTimeout: 400_000 },
 });

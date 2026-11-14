@@ -1,0 +1,278 @@
+{
+  "demonstration": true,
+  "date": "2026-11-15",
+  "scope": "Scripted galaxie LangGraph runs on a Node host, both development trace text modes.",
+  "daemonSelection": "DOCKER_HOST=unix://$HOME/.colima/default/docker.sock",
+  "checks": [
+    {
+      "command": "pnpm install && pnpm build",
+      "location": "repository root",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "location": "isolated spike",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run stack:up",
+      "outcome": "passed",
+      "services": 8
+    },
+    {
+      "command": "pnpm run node-host",
+      "outcome": "passed",
+      "scenarios": 4,
+      "variants": 8,
+      "oracleSpans": 38,
+      "traces": 10
+    },
+    {
+      "command": "pnpm format",
+      "outcome": "passed",
+      "warnings": 45,
+      "informationalDiagnostics": 1595
+    },
+    {
+      "command": "pnpm exec tsc --noEmit && pnpm exec tsc -p tsconfig.scripts.json",
+      "location": "isolated spike",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm exec vitest run",
+      "location": "isolated spike, with stack stopped",
+      "outcome": "passed",
+      "testsPassed": 19,
+      "liveTestsSkipped": 5
+    },
+    {
+      "command": "pnpm exec vitest run test/static.test.ts",
+      "location": "isolated spike, .env present",
+      "outcome": "passed",
+      "testsPassed": 11
+    },
+    {
+      "command": "pnpm run node-host (two consecutive live runs)",
+      "outcome": "passed",
+      "scenarios": 4,
+      "variants": 8,
+      "oracleSpans": 38,
+      "traces": 10
+    },
+    {
+      "command": "SHA-256 of results/* before and after second live run",
+      "outcome": "passed",
+      "allResultsFilesCompared": 8,
+      "byteIdentical": true,
+      "scenarioHashes": {
+        "node-interrupt-resume.json": "6246c152d5ea453686cccea9ea33d76641195ab424cb3be482871c1ba9647e95",
+        "node-linear.json": "68edcad6cf84142f42e6c851719c8cab48a391509bfad379a7f0c80325d202a3",
+        "node-model-failure.json": "ee5827b4c530000369e783e2f81a7ef0e14b2255e16508232566b76b0dd03fe6",
+        "node-tool-call.json": "5f591fcb8c61755f0f22fd7d99b196e7d505a1a6c9f4362e3e5392bc778c6812"
+      }
+    },
+    {
+      "command": "pnpm run stack:down",
+      "outcome": "passed",
+      "remainingProjectContainers": 0,
+      "remainingProjectVolumes": 0,
+      "remainingProjectNetworks": 0
+    },
+    {
+      "command": "pnpm run node-host (stack stopped)",
+      "outcome": "expected failure",
+      "testsFailed": 4,
+      "output": "Error: connect ECONNREFUSED 127.0.0.1:4318",
+      "exitCode": 1
+    },
+    {
+      "command": "pnpm run check:docs",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm check",
+      "pathPrefix": "<go-1.27.3-toolchain>/bin",
+      "outcome": "passed",
+      "python": {
+        "passed": 1968,
+        "skipped": 1
+      },
+      "remainingGates": "Source and dependency licenses, Python wheels, Biome, TypeScript 7 and 6, Node/Chromium, Python/Go tests, Python typecheck, builds, dependency boundaries, documentation and size gates passed.",
+      "sourceCommit": "e85ef32ea37aeb309e92fecaeb45f70253d2f4a6",
+      "nodeAndChromium": {
+        "filesPassed": 507,
+        "testsPassed": 7469,
+        "expectedFailures": 2,
+        "skippedTests": 165
+      }
+    },
+    {
+      "command": "git commit -s (implementation e85ef32)",
+      "outcome": "passed",
+      "gitleaksPreCommit": "no leaks found",
+      "dcoSignoff": true
+    },
+    {
+      "command": "pnpm exec vitest run",
+      "location": "isolated spike after full-response scan fix",
+      "outcome": "passed",
+      "testsPassed": 24,
+      "liveTestsSkipped": 5
+    },
+    {
+      "command": "pnpm run node-host (two consecutive live runs after review fix)",
+      "outcome": "passed",
+      "variants": 8,
+      "oracleSpans": 38,
+      "traces": 10,
+      "allResultsFilesCompared": 8,
+      "byteIdentical": true,
+      "sameScenarioHashesAsBeforeFix": true
+    }
+  ],
+  "ports": {
+    "commands": [
+      "docker compose ps --format json",
+      "docker compose port langfuse-web 3000",
+      "docker compose port mlflow 5100",
+      "docker compose port collector 4318",
+      "lsof -nP -iTCP:3000 -iTCP:5100 -iTCP:4318 -sTCP:LISTEN"
+    ],
+    "bindings": [
+      {
+        "service": "langfuse-web",
+        "address": "127.0.0.1",
+        "port": 3000
+      },
+      {
+        "service": "mlflow",
+        "address": "127.0.0.1",
+        "port": 5100
+      },
+      {
+        "service": "collector",
+        "address": "127.0.0.1",
+        "port": 4318
+      }
+    ],
+    "wildcardListeners": false,
+    "servicesRunning": 8,
+    "backendServicesHealthy": 7
+  },
+  "developmentCorrections": [
+    {
+      "command": "pnpm exec vitest run test/scenarios.test.ts",
+      "failure": "Error: Cannot find module '../src/node-host.js' imported from <repo>/spikes/llmops-trace-sinks/test/scenarios.test.ts",
+      "reason": "Expected proof-first failure before adding the host."
+    },
+    {
+      "command": "pnpm exec tsc --noEmit",
+      "failure": "src/scenarios.ts(41,15): error TS7006: Parameter 'context' implicitly has an 'any' type.",
+      "correction": "Annotate the LangGraphHost factory parameter."
+    },
+    {
+      "command": "pnpm exec vitest run",
+      "failure": "Error: Cannot find package '@langchain/langgraph/web' imported from <repo>/packages/adapter-langgraph/dist/adapter.js",
+      "correction": "Use package-export-aware single-copy resolution in the spike runner."
+    },
+    {
+      "command": "pnpm exec vitest run",
+      "failure": "GalaxieError: The executor or agent code failed.",
+      "correction": "Build only the reachable nodes in each scenario graph."
+    },
+    {
+      "command": "pnpm exec vitest run",
+      "failure": "AssertionError: expected 'Error' to be 'FixtureModelError' // Object.is equality\n\nExpected: \"FixtureModelError\"\nReceived: \"Error\"",
+      "correction": "Trace the existing credential-failure classification and assert its exact Error type; do not change galaxie."
+    },
+    {
+      "command": "pnpm run node-host",
+      "failure": "AssertionError: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'lookup@1'\n- 'execute_tool lookup@1'\n\nExpected: \"execute_tool lookup@1\"\nReceived: \"lookup@1\"",
+      "correction": "Record the vendor name mapping as an observed finding while retaining capability-name and parent assertions."
+    },
+    {
+      "command": "pnpm run check:docs",
+      "failure": "spikes/llmops-trace-sinks/README.md:232: missing target: results/node-verification.json",
+      "correction": "Write this evidence file before the final documentation gate."
+    },
+    {
+      "command": "pnpm run node-host",
+      "failure": "Error: Command failed: pnpm exec biome format --stdin-file-path results/node-linear.json\nError: Command failed: pnpm exec biome format --stdin-file-path results/node-tool-call.json\nError: Command failed: pnpm exec biome format --stdin-file-path results/node-interrupt-resume.json\nError: Command failed: pnpm exec biome format --stdin-file-path results/node-model-failure.json",
+      "correction": "Invoke the existing root-installed Biome binary explicitly; no new root dependency."
+    },
+    {
+      "command": "pnpm exec vitest run test/scenarios.test.ts",
+      "failure": "AssertionError: promise resolved \"{ observations: [], …(3) }\" instead of rejecting\nAssertionError: promise resolved \"[]\" instead of rejecting",
+      "reason": "Expected proof-first failures for complete-response inspection; 5 failed and 4 passed before the fix, all 9 pass afterward."
+    }
+  ],
+  "preexistingArtifact": {
+    "path": "tests/conformance/support/scripted-chat-model.js",
+    "tracked": false,
+    "handling": "Preserved outside the checkout during gates, then restored byte-for-byte. It shadows the tracked TypeScript fixture and fails formatting; it is not part of this PR."
+  },
+  "notMeasured": [
+    "browser export and other executors",
+    "real models, real prompts and answer quality",
+    "budget exhaustion and cancellation",
+    "feedback scores, MLflow evaluation and session grouping workflows",
+    "retry delivery guarantees, capacity, latency and failure recovery",
+    "vendor usage telemetry payloads and all container egress"
+  ],
+  "stabilityFormatting": "The live writer emits Biome-formatted JSON; root formatting leaves scenario results unchanged.",
+  "review": {
+    "runId": "20261115-024553-501a66ea",
+    "sourceCommit": "e85ef32ea37aeb309e92fecaeb45f70253d2f4a6",
+    "confirmedFindingsFixed": 1,
+    "fix": "Inspect every complete observation page, search response and detail response before extracting fields, including polling and run-ID query responses.",
+    "proof": "Five envelope-injection regression tests failed before the reader fix and pass afterward. Two fresh live runs with the fix passed and retained all scenario hashes.",
+    "liveLeakageObserved": false,
+    "advisoryTestingGap": "Tool inputs are recorded, but decoded vendor tool-input values are not independently compared with the oracle arguments. The review retained this as advisory coverage, not an acceptance omission."
+  },
+  "finalVerification": {
+    "sourceCommit": "e588ac5",
+    "command": "pnpm check",
+    "outcome": "passed",
+    "nodeAndChromium": {
+      "filesPassed": 507,
+      "filesSkipped": 10,
+      "testsPassed": 7469,
+      "expectedFailures": 2,
+      "testsSkipped": 165
+    },
+    "python": {
+      "passed": 1968,
+      "skipped": 1
+    },
+    "otherGates": "Go, Python typecheck, builds, dependency boundaries, documentation and size gates passed.",
+    "focusedOfflineTestsPassed": 24,
+    "liveTestsSkippedByDefault": 5,
+    "liveVariantsPassed": 8,
+    "liveOracleSpans": 38,
+    "liveTraces": 10,
+    "postFixLiveRunsByteIdentical": true,
+    "teardown": {
+      "containers": 0,
+      "volumes": 0,
+      "networks": 0
+    },
+    "stoppedStackLiveCommand": "Expected exit 1, four tests failed with Error: connect ECONNREFUSED 127.0.0.1:4318",
+    "gitleaksReviewFixCommit": "passed; no leaks found"
+  },
+  "browserUiCheck": "No affected application routes. Browser exporter lane is outside scope; the root gate separately passed its configured Chromium tests.",
+  "pullRequestReview": {
+    "reviewer": "one local adversarial subagent; no external peer",
+    "fixes": [
+      "Live suite hard-asserts every acceptance expectation; only the recorded vendor tool-representation differences may remain as findings.",
+      "Span and trace counts (3/5/8/3 spans, 1/1/2/1 traces) are pinned from the acceptance and each backend span set must equal the oracle set.",
+      "Opted-in prompt, reply and tool argument must be visible in raw backend responses before absence claims count.",
+      "error.type is stored, so results/node-model-failure.json now shows it.",
+      "Run-ID server filter and segments [0,1] are hard assertions.",
+      "Transient readback errors are retried; scan failures still fail at once.",
+      "Locale-independent ordering, numeric segment sort, stricter secret-key filter, local paths removed from this file.",
+      "results/smoke.json regenerated for the wider Langfuse field set."
+    ],
+    "liveRunsAfterFixes": 2,
+    "byteIdenticalAfterFixes": true
+  }
+}

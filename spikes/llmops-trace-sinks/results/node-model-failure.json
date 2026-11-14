@@ -1,0 +1,421 @@
+{
+  "demonstration": true,
+  "variants": [
+    {
+      "scenario": "model-failure",
+      "developmentTraceText": false,
+      "credentialCalls": 1,
+      "credentialCanaryAbsent": true,
+      "defaultTextAbsent": true,
+      "errorMessageAbsent": true,
+      "emittedSpanCount": 3,
+      "backends": {
+        "langfuse": [
+          {
+            "id": "span-1",
+            "traceId": "trace-1",
+            "parentId": null,
+            "name": "invoke_agent spike/model-failure",
+            "type": "AGENT",
+            "kind": null,
+            "status": "ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.agent.version": "1.0.0",
+              "galaxie.app.id": "llmops-model-failure-plain",
+              "galaxie.error.code": "executor_error",
+              "galaxie.executor.id": "langgraph-js",
+              "galaxie.executor.version": "0.1.0",
+              "galaxie.instance.id": "instance-1",
+              "galaxie.run.id": "run-1",
+              "galaxie.run.labels": ["public"],
+              "galaxie.run.segment": 0,
+              "galaxie.run.status": "failed",
+              "galaxie.session.id": "session-1",
+              "gen_ai.agent.name": "spike/model-failure",
+              "gen_ai.operation.name": "invoke_agent",
+              "session.id": "session-1"
+            },
+            "model": null,
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          },
+          {
+            "id": "span-2",
+            "traceId": "trace-1",
+            "parentId": "span-1",
+            "name": "galaxie.node respond",
+            "type": "SPAN",
+            "kind": null,
+            "status": "ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.node.name": "respond",
+              "galaxie.node.step": 1,
+              "galaxie.step.status": "error"
+            },
+            "model": null,
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          },
+          {
+            "id": "span-3",
+            "traceId": "trace-1",
+            "parentId": "span-2",
+            "name": "chat fixture-1",
+            "type": "GENERATION",
+            "kind": null,
+            "status": "ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.destination.class": "host-server",
+              "galaxie.model.provider": "assistant",
+              "galaxie.output_safety": "unset",
+              "galaxie.step.status": "error",
+              "gen_ai.operation.name": "chat",
+              "gen_ai.provider.name": "galaxie-fixture",
+              "gen_ai.request.model": "fixture-1"
+            },
+            "model": "fixture-1",
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          }
+        ],
+        "mlflow": [
+          {
+            "id": "span-1",
+            "traceId": "trace-1",
+            "parentId": null,
+            "name": "invoke_agent spike/model-failure",
+            "type": "AGENT",
+            "kind": "SPAN_KIND_INTERNAL",
+            "status": "STATUS_CODE_ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.agent.version": "1.0.0",
+              "galaxie.app.id": "llmops-model-failure-plain",
+              "galaxie.error.code": "executor_error",
+              "galaxie.executor.id": "langgraph-js",
+              "galaxie.executor.version": "0.1.0",
+              "galaxie.instance.id": "instance-1",
+              "galaxie.run.id": "run-1",
+              "galaxie.run.labels": ["public"],
+              "galaxie.run.segment": 0,
+              "galaxie.run.status": "failed",
+              "galaxie.session.id": "session-1",
+              "gen_ai.agent.name": "spike/model-failure",
+              "gen_ai.operation.name": "invoke_agent",
+              "langfuse.observation.metadata.galaxie.run.id": "run-1",
+              "mlflow.spanType": "AGENT",
+              "session.id": "session-1"
+            },
+            "model": null,
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          },
+          {
+            "id": "span-2",
+            "traceId": "trace-1",
+            "parentId": "span-1",
+            "name": "galaxie.node respond",
+            "type": null,
+            "kind": "SPAN_KIND_INTERNAL",
+            "status": "STATUS_CODE_ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.node.name": "respond",
+              "galaxie.node.step": 1,
+              "galaxie.step.status": "error"
+            },
+            "model": null,
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          },
+          {
+            "id": "span-3",
+            "traceId": "trace-1",
+            "parentId": "span-2",
+            "name": "chat fixture-1",
+            "type": "CHAT_MODEL",
+            "kind": "SPAN_KIND_CLIENT",
+            "status": "STATUS_CODE_ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.destination.class": "host-server",
+              "galaxie.model.provider": "assistant",
+              "galaxie.output_safety": "unset",
+              "galaxie.step.status": "error",
+              "gen_ai.operation.name": "chat",
+              "gen_ai.provider.name": "galaxie-fixture",
+              "gen_ai.request.model": "fixture-1",
+              "mlflow.llm.model": "fixture-1",
+              "mlflow.llm.provider": "galaxie-fixture",
+              "mlflow.spanType": "CHAT_MODEL"
+            },
+            "model": "fixture-1",
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          }
+        ]
+      },
+      "rootText": {
+        "langfuse": [
+          {
+            "inputPresent": false,
+            "outputPresent": false
+          }
+        ],
+        "mlflow": [
+          {
+            "inputPresent": false,
+            "outputPresent": false
+          }
+        ]
+      },
+      "runQuery": null,
+      "findings": []
+    },
+    {
+      "scenario": "model-failure",
+      "developmentTraceText": true,
+      "credentialCalls": 1,
+      "credentialCanaryAbsent": true,
+      "defaultTextAbsent": false,
+      "errorMessageAbsent": true,
+      "emittedSpanCount": 3,
+      "backends": {
+        "langfuse": [
+          {
+            "id": "span-1",
+            "traceId": "trace-1",
+            "parentId": null,
+            "name": "invoke_agent spike/model-failure",
+            "type": "AGENT",
+            "kind": null,
+            "status": "ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.agent.version": "1.0.0",
+              "galaxie.app.id": "llmops-model-failure-text",
+              "galaxie.error.code": "executor_error",
+              "galaxie.executor.id": "langgraph-js",
+              "galaxie.executor.version": "0.1.0",
+              "galaxie.instance.id": "instance-1",
+              "galaxie.run.id": "run-1",
+              "galaxie.run.labels": ["public"],
+              "galaxie.run.segment": 0,
+              "galaxie.run.status": "failed",
+              "galaxie.session.id": "session-1",
+              "gen_ai.agent.name": "spike/model-failure",
+              "gen_ai.operation.name": "invoke_agent",
+              "session.id": "session-1"
+            },
+            "model": null,
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          },
+          {
+            "id": "span-2",
+            "traceId": "trace-1",
+            "parentId": "span-1",
+            "name": "galaxie.node respond",
+            "type": "SPAN",
+            "kind": null,
+            "status": "ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.node.name": "respond",
+              "galaxie.node.step": 1,
+              "galaxie.step.status": "error"
+            },
+            "model": null,
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          },
+          {
+            "id": "span-3",
+            "traceId": "trace-1",
+            "parentId": "span-2",
+            "name": "chat fixture-1",
+            "type": "GENERATION",
+            "kind": null,
+            "status": "ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.destination.class": "host-server",
+              "galaxie.model.provider": "assistant",
+              "galaxie.output_safety": "unset",
+              "galaxie.step.status": "error",
+              "gen_ai.operation.name": "chat",
+              "gen_ai.provider.name": "galaxie-fixture",
+              "gen_ai.request.model": "fixture-1"
+            },
+            "model": "fixture-1",
+            "usage": {},
+            "input": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Synthetic Node host prompt\"}]}]",
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          }
+        ],
+        "mlflow": [
+          {
+            "id": "span-1",
+            "traceId": "trace-1",
+            "parentId": null,
+            "name": "invoke_agent spike/model-failure",
+            "type": "AGENT",
+            "kind": "SPAN_KIND_INTERNAL",
+            "status": "STATUS_CODE_ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.agent.version": "1.0.0",
+              "galaxie.app.id": "llmops-model-failure-text",
+              "galaxie.error.code": "executor_error",
+              "galaxie.executor.id": "langgraph-js",
+              "galaxie.executor.version": "0.1.0",
+              "galaxie.instance.id": "instance-1",
+              "galaxie.run.id": "run-1",
+              "galaxie.run.labels": ["public"],
+              "galaxie.run.segment": 0,
+              "galaxie.run.status": "failed",
+              "galaxie.session.id": "session-1",
+              "gen_ai.agent.name": "spike/model-failure",
+              "gen_ai.operation.name": "invoke_agent",
+              "langfuse.observation.metadata.galaxie.run.id": "run-1",
+              "mlflow.spanType": "AGENT",
+              "session.id": "session-1"
+            },
+            "model": null,
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          },
+          {
+            "id": "span-2",
+            "traceId": "trace-1",
+            "parentId": "span-1",
+            "name": "galaxie.node respond",
+            "type": null,
+            "kind": "SPAN_KIND_INTERNAL",
+            "status": "STATUS_CODE_ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.node.name": "respond",
+              "galaxie.node.step": 1,
+              "galaxie.step.status": "error"
+            },
+            "model": null,
+            "usage": {},
+            "input": null,
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          },
+          {
+            "id": "span-3",
+            "traceId": "trace-1",
+            "parentId": "span-2",
+            "name": "chat fixture-1",
+            "type": "CHAT_MODEL",
+            "kind": "SPAN_KIND_CLIENT",
+            "status": "STATUS_CODE_ERROR",
+            "attributes": {
+              "error.type": "Error",
+              "galaxie.destination.class": "host-server",
+              "galaxie.model.provider": "assistant",
+              "galaxie.output_safety": "unset",
+              "galaxie.step.status": "error",
+              "gen_ai.input.messages": [
+                {
+                  "role": "user",
+                  "parts": [
+                    {
+                      "type": "text",
+                      "content": "Synthetic Node host prompt"
+                    }
+                  ]
+                }
+              ],
+              "gen_ai.operation.name": "chat",
+              "gen_ai.provider.name": "galaxie-fixture",
+              "gen_ai.request.model": "fixture-1",
+              "mlflow.llm.model": "fixture-1",
+              "mlflow.llm.provider": "galaxie-fixture",
+              "mlflow.spanInputs": [
+                {
+                  "role": "user",
+                  "parts": [
+                    {
+                      "type": "text",
+                      "content": "Synthetic Node host prompt"
+                    }
+                  ]
+                }
+              ],
+              "mlflow.spanType": "CHAT_MODEL"
+            },
+            "model": "fixture-1",
+            "usage": {},
+            "input": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "type": "text",
+                    "content": "Synthetic Node host prompt"
+                  }
+                ]
+              }
+            ],
+            "output": null,
+            "startTime": "<timestamp>",
+            "endTime": "<timestamp>"
+          }
+        ]
+      },
+      "rootText": {
+        "langfuse": [
+          {
+            "inputPresent": false,
+            "outputPresent": false
+          }
+        ],
+        "mlflow": [
+          {
+            "inputPresent": false,
+            "outputPresent": false
+          }
+        ]
+      },
+      "runQuery": null,
+      "findings": []
+    }
+  ]
+}

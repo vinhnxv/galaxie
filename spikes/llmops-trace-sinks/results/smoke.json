@@ -18,6 +18,8 @@
         "completionStartTime": null,
         "createdAt": "time-3",
         "updatedAt": "time-3",
+        "input": null,
+        "output": null,
         "metadata": {
           "scope.name": "galaxie.llmops.smoke",
           "resourceAttributes.service.name": "galaxie-llmops-smoke",
@@ -25,7 +27,21 @@
           "attributes.smoke.number": 7,
           "attributes.smoke.string": "local-only"
         },
+        "model": "",
+        "internalModelId": "",
+        "modelParameters": {},
+        "usageDetails": {},
+        "inputUsage": 0,
+        "outputUsage": 0,
+        "totalUsage": 0,
+        "costDetails": {},
+        "inputCost": null,
+        "outputCost": null,
+        "totalCost": null,
+        "usagePricingTierId": null,
+        "usagePricingTierName": null,
         "latency": 0.004,
+        "timeToFirstToken": null,
         "userId": "",
         "sessionId": "",
         "isRootObservation": false,
@@ -52,6 +68,8 @@
         "completionStartTime": null,
         "createdAt": "time-3",
         "updatedAt": "time-3",
+        "input": null,
+        "output": null,
         "metadata": {
           "galaxie.run.id": "run-1",
           "scope.name": "galaxie.llmops.smoke",
@@ -63,7 +81,21 @@
           "attributes.smoke.number": 7,
           "attributes.smoke.string": "local-only"
         },
+        "model": "",
+        "internalModelId": "",
+        "modelParameters": {},
+        "usageDetails": {},
+        "inputUsage": 0,
+        "outputUsage": 0,
+        "totalUsage": 0,
+        "costDetails": {},
+        "inputCost": null,
+        "outputCost": null,
+        "totalCost": null,
+        "usagePricingTierId": null,
+        "usagePricingTierName": null,
         "latency": 0.01,
+        "timeToFirstToken": null,
         "userId": "",
         "sessionId": "session-1",
         "isRootObservation": true,
@@ -91,9 +123,9 @@
           "mlflow.trace.session": "session-1"
         },
         "tags": {
+          "service.name": "galaxie-llmops-smoke",
           "mlflow.artifactLocation": "/mlflow/artifacts/1/traces/mlflow-trace-1/artifacts",
-          "mlflow.trace.spansLocation": "TRACKING_STORE",
-          "service.name": "galaxie-llmops-smoke"
+          "mlflow.trace.spansLocation": "TRACKING_STORE"
         }
       }
     ],

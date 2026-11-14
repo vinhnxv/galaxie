@@ -1,7 +1,7 @@
 {
   "name": "galaxie-spike-llmops-trace-sinks",
   "private": true,
-  "description": "Local trace collector fan-out demonstration with hand-made spans.",
+  "description": "Local collector fan-out measurements with galaxie Node host traces and synthetic spans.",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.21.0",
@@ -13,19 +13,20 @@
     "typecheck": "tsc --noEmit",
     "stack:up": "tsc -p tsconfig.scripts.json && node dist/stack.js up",
     "stack:down": "tsc -p tsconfig.scripts.json && node dist/stack.js down",
-    "smoke": "LLMOPS_STACK=1 vitest run test/stack.test.ts"
+    "smoke": "LLMOPS_STACK=1 vitest run test/stack.test.ts",
+    "node-host": "LLMOPS_STACK=1 vitest run test/node.test.ts"
   },
   "dependencies": {
-    "@galaxie-ai/core": "link:../../packages/core",
-    "@galaxie-ai/ui-protocol": "link:../../packages/ui-protocol",
+    "@galaxie-ai/adapter-adk": "link:../../packages/adapter-adk",
+    "@galaxie-ai/adapter-go": "link:../../packages/adapter-go",
     "@galaxie-ai/adapter-kit": "link:../../packages/adapter-kit",
     "@galaxie-ai/adapter-langgraph": "link:../../packages/adapter-langgraph",
-    "@galaxie-ai/adapter-adk": "link:../../packages/adapter-adk",
     "@galaxie-ai/adapter-pyodide": "link:../../packages/adapter-pyodide",
-    "@galaxie-ai/adapter-go": "link:../../packages/adapter-go",
+    "@galaxie-ai/core": "link:../../packages/core",
     "@galaxie-ai/models": "link:../../packages/models",
     "@galaxie-ai/storage-indexeddb": "link:../../packages/storage-indexeddb",
     "@galaxie-ai/tools-mcp": "link:../../packages/tools-mcp",
+    "@galaxie-ai/ui-protocol": "link:../../packages/ui-protocol",
     "@langchain/core": "1.2.20",
     "@langchain/langgraph": "1.5.1",
     "@langchain/langgraph-checkpoint": "1.2.0",
@@ -33,6 +34,8 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.0",
+    "@opentelemetry/sdk-trace": "3.1.0",
     "@types/node": "24.19.2",
     "typescript": "7.0.2",
     "vite": "8.3.4",
