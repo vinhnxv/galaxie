@@ -235,6 +235,13 @@ it('ends the cookie-identified session and clears the cookie even without a live
   await end(session.cookie);
   const renewed = await issueSession(origin);
   await end(`${renewed.cookie}; galaxie-agent-session=other`);
+  expect(
+    (
+      await fetch(`${origin}/api/lessons/${lesson.id}`, {
+        headers: { authorization: `Bearer ${renewed.token}` },
+      })
+    ).status,
+  ).toBe(200);
   advance();
   await end(renewed.cookie);
 });

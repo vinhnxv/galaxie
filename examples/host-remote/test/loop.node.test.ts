@@ -291,11 +291,17 @@ it('completes the unchanged tutor through the proxy and confirms exactly one pro
       JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]),
     ),
   ];
+  // Positive controls: the scans below only mean something if they saw the traffic.
+  expect(observed.requests.length).toBeGreaterThan(0);
+  expect(observed.responses.length).toBeGreaterThan(0);
+  expect(artifacts[0]).toContain('/api/v1/chat/completions');
+  expect(artifacts[0]).toContain('host-remote-placeholder');
   for (const artifact of artifacts) {
     expect(artifact).not.toContain(upstreamKey);
     expect(artifact).not.toContain(cookieValue as string);
   }
   for (const mode of ['test', 'production']) {
+    let scanned = 0;
     for (const entry of await readdir(join(directory, mode), {
       recursive: true,
       withFileTypes: true,
@@ -303,8 +309,10 @@ it('completes the unchanged tutor through the proxy and confirms exactly one pro
       if (entry.isFile()) {
         const bytes = await readFile(join(entry.parentPath, entry.name));
         expect(bytes.includes(Buffer.from(upstreamKey))).toBe(false);
+        scanned += 1;
       }
     }
+    expect(scanned).toBeGreaterThan(0);
   }
   await assertPage(observed, origin);
   await page.screenshot({ path: '/tmp/galaxie-host-remote-desktop.png', fullPage: true });
