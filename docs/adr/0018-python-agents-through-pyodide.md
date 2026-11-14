@@ -1278,3 +1278,82 @@ The shipped text proxy and all its refusal behavior remain unchanged. The only
 package-file changes are documentation; core, bridge shapes, policy, stored
 formats, existing goldens, matrices, case lists, recorders and locks are unchanged.
 This ADR remains Proposed.
+
+
+#### LangGraph Python tool-call measurements (2026-11-14)
+
+**In progress. Outcome rule registered before measurement.** This record measures
+scripted models only. The retained helper remains REFUSED because execution
+identity does not repair replayed reads or abrupt-loss recovery. Text-protocol
+calls remain the alternative. No helper promotion, core or bridge change,
+existing assertion edit, golden rewrite or lock change is permitted.
+
+L1 is native CPython with the pinned LangChain/LangGraph versions. L2 is Node
+Pyodide through core and the adapter. L3 is a real Chromium page with IndexedDB;
+L4 Firefox and L5 WebKit count only when actually run. Unrun cells are UNMEASURED,
+cut cells INCOMPLETE, and excluded lanes NA. No skipped test counts as PASS.
+
+| Gate | Registered expectation | Lanes |
+| --- | --- | --- |
+| M1 | Text-protocol reload preserves pending interaction, final text, ordered calls and write count, with replay false and true, against native reference. | L3; L4/L5 if run |
+| M2.1 | At least three name/id/argument deltas merge like native AIMessageChunk. | L1/L2 |
+| M2.2 | Two interleaved call indexes preserve both calls and IDs. | L1/L2 |
+| M2.3 | First delta dispatches zero tool bodies or capability requests. | L1/L2 |
+| M2.4 | Inconsistent ID/name/arguments and oversized delta end with a recorded fixed code and no tool body. | L2 |
+| M3 | Parallel writes retain effect IDs; replayed reads get fresh IDs (expected FAIL). | L3 |
+| M4 | Abrupt loss after write receipt before ToolMessage checkpoint cannot recover (expected FAIL). | L3 |
+| M5 | String ToolMessage round-trips; list content, status error and artifact refuse unsupported; unknown tool_call_id refuses invalid. | L1/L2 |
+| A1 | Existing NotImplementedError assertion remains true and byte-identical. | L1 |
+| A2 | bind_tools raises fixed unsupported GalaxieError, also NotImplementedError, with no request. | L1 |
+| A3 | Hostile tools, choices and kwargs cannot change or contaminate the fixed error. | L1 |
+| A4 | Dict and pydantic structured-output refusal changes from NotImplementedError to fixed unsupported. | L1 |
+| A5 | Factory bind_tools refusal changes from unavailable to unsupported. | L2 |
+| A6 | Node bind_tools refusal changes from executor_error to unsupported. | L2 |
+| A7 | Native binding, tool-less proxy and direct capabilities keep existing behavior; golden check passes. | L1/L2 |
+| A8 | Python types and lint accept private dual-inheritance refusal. | static |
+| A9 | Prose agrees with the result; an additive matrix entry supersedes historical text. | docs |
+| O1 | Refused result labels prevent next provider dispatch with denied. | L1/L2 |
+| O2 | Tool budget n refuses n+1 before host dispatch. | L1/L2 |
+| O3 | Covered confirmed write runs once on frozen arguments; uncovered binding refuses invalid. | L2 |
+| O4 | Default ToolNode handler propagates six terminal codes and denied. | L1/L2 |
+| O5 | A body without tool=True lies outside the confirmation check. | L2 |
+| O6 | Explicit swallowing handlers can continue after terminal errors; documented limit, never a pass condition. | L1/L2 |
+| S1 | Pydantic argument validation produces native error text before broker requests or budget use. | L1/L2 |
+| S2 | Dict-schema argument validation reaches broker and ends invalid. | L2 |
+| S3 | Output checks, labels and ungranted capabilities yield denied. | L1/L2 |
+| S4 | Missing coverage, unknown names and invalid tool flags yield fixed invalid/denied. | L2 |
+| S5 | Determine whether codes distinguish schema failures from misconfiguration without changing broker/bridge. | derived |
+
+Normalization is SUPPORTED only if every A gate passes; otherwise REFUSED (failed
+gate) or INCOMPLETE (missing proof), with no production change. Its only allowed
+implementation is a private GalaxieError/NotImplementedError subclass and a
+bind_tools override in langchain.py. Ordinary tools use existing StructuredTool
+bodies with capabilities.call(tool=True), separately from the helper. They are
+ALTERNATIVE if O1 through O5 pass, REFUSED if labels or budgets fail, otherwise
+INCOMPLETE. O6 describes trusted author behavior and is not a pass condition.
+
+A refusal can become model text only when native validation decides its cause
+before the broker, or its code distinguishes it from terminal and binding errors.
+The six terminal codes remain terminal. The baseline retains denied as recoverable
+and latches every other code in the retained helper. Broker invalid becomes
+model text only with a proven distinguishing signal; otherwise that variant is
+REFUSED and the baseline is ALTERNATIVE. Python author code is trusted, can import
+js, and the Worker is not an isolation boundary. ADR-0012 remains unchanged.
+
+| Prediction | Registered expectation |
+| --- | --- |
+| P1 | Chromium M1 passes with both replay settings. |
+| P2 | M2.1–M2.3 pass; M2.4 detects inconsistencies before dispatch. |
+| P3 | Chromium M3/M4 reproduce the known Node failures. |
+| P4 | M5 preserves string content and the four fixed refusals. |
+| P5 | A1–A8 pass with dual inheritance. |
+| P6 | Structured output changes to fixed unsupported without breaking an existing assertion. |
+| P7 | O1–O4 pass; O5/O6 expose documented limits. |
+| P8 | Native pydantic validation is visible text; broker invalid has no distinguishing signal. |
+| P9 | Normalization SUPPORTED, ordinary tools ALTERNATIVE, baseline split kept, helper REFUSED. |
+
+Measurements stop early enough for final records and the full local gate. Cuts
+apply in order: Chromium candidate M3/M4, Firefox/WebKit, L2 serialization and
+ordinary variants beyond O1–O3, then L2 invalid streams. Final records are never
+cut. Candidates failing their gates ship no production change; their evidence
+remains and their own implementation commits are reverted.
