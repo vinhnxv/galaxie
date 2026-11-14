@@ -19,18 +19,15 @@ async def call(
     *,
     effect_scope: str | None = None,
     tool: bool = False,
-    inner: bool = False,
 ) -> Any:
     try:
         if not isinstance(name, str) or not name:
             raise GalaxieError("invalid")
         payload = {"name": name, "input": input}
-        if type(tool) is not bool or type(inner) is not bool:
+        if type(tool) is not bool:
             raise GalaxieError("invalid")
         if tool:
             payload["tool"] = True
-        if inner:
-            payload["inner"] = True
         if effect_scope is not None:
             if not isinstance(effect_scope, str) or not effect_scope or config is not None:
                 raise GalaxieError("invalid")
