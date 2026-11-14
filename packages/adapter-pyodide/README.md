@@ -1216,3 +1216,18 @@ The 29-wheel `adk` set carries the licenses its wheels declare in their dist-inf
 - MPL-2.0: `certifi`. PSF-2.0: `typing-extensions`.
 
 Hosts that serve the wheels keep each wheel's `dist-info` license and notice files with it.
+
+### Python Workflow and AgentTool assessment
+
+The [registered assessment](../../docs/adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
+keeps both shapes **REFUSED**. The AgentTool candidate accepted an inner
+`transfer_to_agent` beside an outer transfer child, colliding with ADK's injected
+tool name; execution then failed `invalid` instead of prepare refusing
+`unsupported`. That shared naming failure disqualifies both the read/none and
+capability-free variants. Workflow's completed graph record fails fresh restore;
+tree replacements match final text and write counts but differ in exact requests.
+No helper, inner marker, adapter policy change, new golden or registration ships.
+Native facts and independent refusal/restore tests remain. Earlier Python
+candidate cases passed native, Node live/restored and Chromium before withdrawal;
+those runs do not establish admission. Firefox, WebKit, real models and devices
+remain unmeasured for these shapes. `subgraphs` stays false.
