@@ -32,7 +32,7 @@ from google.adk.events._internal_metadata import RESTORED_EVENT_KEY
 from google.adk.plugins import ToolCallIntegrityPlugin
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools import FunctionTool, exit_loop
+from google.adk.tools import AgentTool, FunctionTool, exit_loop
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.base_toolset import BaseToolset
 from google.adk.agents.readonly_context import ReadonlyContext
@@ -129,6 +129,7 @@ class _Registry:
 
 _models = _Registry()
 _tools = _Registry()
+_agent_tools = _Registry()
 _toolsets = _Registry()
 _roles: frozenset[str] = frozenset()
 
@@ -456,6 +457,9 @@ def llm(role: str) -> BaseLlm:
     return model
 
 
+_inner_scope: ContextVar[str | None] = ContextVar('galaxie_adk_inner_scope', default=None)
+
+
 def _scope(tool_context: ToolContext, run: _Run) -> str:
     """The write-replay scope: the branch, the branch-local index of the call's event and its part."""
     branch = tool_context.branch or ''
@@ -469,6 +473,8 @@ def _scope(tool_context: ToolContext, run: _Run) -> str:
             continue
         for identifier, position in calls:
             if identifier == tool_context.function_call_id:
+                if (prefix := _inner_scope.get()) is not None:
+                    return f'{prefix}/inner/{branch or "root"}/{ordinal}/{position}'
                 return f'adk-python/{run.conversation}/{branch or "root"}/{ordinal}/{position}'
         ordinal += 1
     raise GalaxieError('invalid')
@@ -526,6 +532,63 @@ class _CapabilityTool(BaseTool):
                     return {'error': ERROR_MESSAGES[error.code]}
                 raise run.fail(error) from None
         return _json(result)
+
+
+class _AgentTool(AgentTool):
+    """An isolated inner runner sharing the outer run's router and fatal-failure slot."""
+
+    async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
+        run = _active.get()
+        if run is None:
+            raise GalaxieError('invalid')
+        if run.failure is not None:
+            raise run.failure
+        if set(args) != {'request'} or not isinstance(args['request'], str):
+            raise run.fail(None, 'invalid')
+        token = _inner_scope.set(_scope(tool_context, run))
+        sessions = InMemorySessionService()
+        runner = Runner(app_name=APP_NAME, agent=self.agent, session_service=sessions,
+                        plugins=[ToolCallIntegrityPlugin(secret_key=secrets.token_bytes(32))])
+        generator: Any = None
+        try:
+            state = {key: value for key, value in tool_context.state.to_dict().items() if not key.startswith('_adk')}
+            session = await sessions.create_session(app_name=APP_NAME, user_id=USER_ID, state=state)
+            generator = runner.run_async(user_id=USER_ID, session_id=session.id,
+                new_message=types.Content(role='user', parts=[types.Part(text=args['request'])]),
+                run_config=RunConfig(max_llm_calls=run.steps + 1, streaming_mode=StreamingMode.NONE))
+            last: types.Content | None = None
+            async for event in generator:
+                if event.error_code is not None:
+                    raise run.fail(None)
+                if run.failure is not None:
+                    raise run.failure
+                tool_context.state.update({key: value for key, value in event.actions.state_delta.items()
+                                           if not key.startswith('temp:')})
+                if event.content is not None:
+                    last = event.content
+            if run.failure is not None:
+                raise run.failure
+            task = asyncio.current_task()
+            if task is not None and task.cancelling():
+                raise asyncio.CancelledError()
+            return '\n'.join(part.text for part in (last.parts or []) if part.text and not part.thought) if last else ''
+        except Exception as error:
+            raise run.fail(error) from None
+        finally:
+            if generator is not None:
+                await generator.aclose()
+            await runner.close()
+            _inner_scope.reset(token)
+
+
+def agent_tool(agent: Any) -> BaseTool:
+    """Wrap one admitted, capability-free agent tree as a tool."""
+    if not isinstance(agent, BaseAgent):
+        raise GalaxieError('invalid')
+    wrapper = _AgentTool(agent)
+    _agent_tools.add(wrapper)
+    _tools.add(wrapper)
+    return wrapper
 
 
 def capability_tool(
@@ -633,7 +696,7 @@ def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str
     parallel_pauses: dict[int, int] = {}
     assignments: list[tuple[LlmAgent, str]] = []
 
-    def walk(agent: Any, inherited: bool, depth: int, path: set[int], lineage: tuple[tuple[Any, int], ...]) -> bool:
+    def walk(agent: Any, inherited: bool, depth: int, path: set[int], lineage: tuple[tuple[Any, int], ...], inner: bool = False) -> bool:
         nonlocal visited, resumable, resumable_refused
         visited += 1
         if depth > MAX_DEPTH or visited > MAX_AGENTS or id(agent) in path:
@@ -649,6 +712,9 @@ def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str
         pauses = False
         tools: list[Any] = []
         if isinstance(agent, LlmAgent):
+            if inner and (agent.input_schema is not None or agent.output_schema is not None
+                          or any(isinstance(tool, BaseToolset) for tool in agent.tools)):
+                raise GalaxieError('unsupported')
             resumable_refused = resumable_refused or bool(agent.sub_agents) or bool(
                 agent.output_key and agent.output_key.startswith('temp:'))
             if type(agent.model) is not str or agent.model != '':
@@ -672,7 +738,16 @@ def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str
             if not isinstance(agent.tools, list):
                 raise GalaxieError('invalid')
             tools = _flatten_tools(agent.tools)
+            if any(isinstance(tool, _AgentTool) for tool in tools) and len({tool.name for tool in tools}) != len(tools):
+                raise GalaxieError('unsupported')
             for tool in tools:
+                if type(tool) is _AgentTool and tool in _agent_tools:
+                    if inner or tool.name != tool.agent.name or tool.skip_summarization or not tool.include_plugins:
+                        raise GalaxieError('unsupported')
+                    walk(tool.agent, False, depth + 1, {*path, id(agent)}, (), True)
+                    continue
+                if inner:
+                    raise GalaxieError('unsupported')
                 if type(tool) is _CapabilityTool and tool in _tools:
                     pauses = pauses or cast(_CapabilityTool, tool).pauses
                     continue
@@ -704,7 +779,7 @@ def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str
             pausing.add(agent.name)
         path.add(id(agent))
         for index, child in enumerate(agent.sub_agents):
-            exits = walk(child, known, depth + 1, path, (*lineage, (agent, index))) or exits
+            exits = walk(child, known, depth + 1, path, (*lineage, (agent, index)), inner) or exits
         path.discard(id(agent))
         if isinstance(agent, LoopAgent) and agent.max_iterations is None and not exits:
             raise GalaxieError('unsupported')
@@ -1385,10 +1460,11 @@ class Executor:
             await self._sessions.create_session(app_name=APP_NAME, user_id=USER_ID, session_id=session)
         stored = self._sessions.sessions[APP_NAME][USER_ID][session]
         mark = self._sessions.mark(session)
-        run = _Run(steps, session, sum(
-            1 for event in stored.events if event.content is not None
-            for part in event.content.parts or [] if part.function_call is not None
-        ))
+        identifiers = [part.function_call.id or '' for event in stored.events if event.content is not None
+                       for part in event.content.parts or [] if part.function_call is not None]
+        seeded = max([len(identifiers), *[int(identifier[8:]) for identifier in identifiers
+                                        if re.fullmatch(r'galaxie-[0-9]+', identifier)]])
+        run = _Run(steps, session, seeded)
         token = _active.set(run)
         generator: Any = None
         thrown: BaseException | None = None
