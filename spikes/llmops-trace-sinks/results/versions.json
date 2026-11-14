@@ -1,0 +1,143 @@
+{
+  "recordedAt": "2026-11-14T17:21:08.914Z",
+  "demonstration": true,
+  "machine": {
+    "os": "darwin",
+    "release": "27.2.0",
+    "architecture": "arm64",
+    "cpu": "Apple M5 Pro",
+    "logicalCpus": 15,
+    "memoryBytes": 25769803776,
+    "node": "v26.13.0",
+    "pnpm": "11.21.0",
+    "dockerServer": "29.5.2",
+    "compose": "5.7.0",
+    "daemon": "colima",
+    "daemonResources": {
+      "cpus": 4,
+      "memoryBytes": 10405429248
+    }
+  },
+  "versions": {
+    "langfuse": "4.80.0",
+    "mlflow": "mlflow, version 3.18.0",
+    "collector": "otelcol-contrib version 0.154.0",
+    "postgres": "postgres (PostgreSQL) 17.12 (Debian 17.12-1.pgdg13+1)",
+    "clickhouse": "ClickHouse local version 26.3.62.3 (official build).",
+    "redis": "Redis server v=7.4.12 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=6009b0a18fd35b30",
+    "minio": "minio version RELEASE.2026-11-12T01-15-23Z (commit-id=a60e2a7b026ab48e41a23a4230aad773c4eae2e0)\nRuntime: go1.27.4 linux/arm64\nLicense: GNU AGPLv3 - https://www.gnu.org/licenses/agpl-3.0.html\nCopyright: 2015-2026 MinIO, Inc."
+  },
+  "images": [
+    {
+      "service": "langfuse-worker",
+      "name": "docker.langfuse.com/langfuse/langfuse-worker",
+      "tag": "4.80.0",
+      "digest": "sha256:da9f618dd784219aa6508ab6941c4a89c4ef6fb429fb1734c4163df3baa8f1ca",
+      "pulledRepoDigests": [
+        "docker.langfuse.com/langfuse/langfuse-worker@sha256:da9f618dd784219aa6508ab6941c4a89c4ef6fb429fb1734c4163df3baa8f1ca"
+      ],
+      "architecture": "arm64",
+      "imageId": "sha256:da9f618dd784219aa6508ab6941c4a89c4ef6fb429fb1734c4163df3baa8f1ca"
+    },
+    {
+      "service": "langfuse-web",
+      "name": "docker.langfuse.com/langfuse/langfuse",
+      "tag": "4.80.0",
+      "digest": "sha256:0814758db3db8e923f733be3884e7d7a9e3afd60568d874a610d78aae47476c5",
+      "pulledRepoDigests": [
+        "docker.langfuse.com/langfuse/langfuse@sha256:0814758db3db8e923f733be3884e7d7a9e3afd60568d874a610d78aae47476c5"
+      ],
+      "architecture": "arm64",
+      "imageId": "sha256:0814758db3db8e923f733be3884e7d7a9e3afd60568d874a610d78aae47476c5"
+    },
+    {
+      "service": "postgres",
+      "name": "postgres",
+      "tag": "17",
+      "digest": "sha256:846a7ddaa67a4b354ae1d21087b683901aa6113a4ed626d3787cfbf6c85e3e07",
+      "pulledRepoDigests": [
+        "postgres@sha256:846a7ddaa67a4b354ae1d21087b683901aa6113a4ed626d3787cfbf6c85e3e07"
+      ],
+      "architecture": "arm64",
+      "imageId": "sha256:846a7ddaa67a4b354ae1d21087b683901aa6113a4ed626d3787cfbf6c85e3e07"
+    },
+    {
+      "service": "clickhouse",
+      "name": "clickhouse/clickhouse-server",
+      "tag": "26.3.62.3",
+      "digest": "sha256:de3e47c64078aa196dae2349e048fc98ba81947f651f5c20e06e46baea8ae40a",
+      "pulledRepoDigests": [
+        "clickhouse/clickhouse-server@sha256:de3e47c64078aa196dae2349e048fc98ba81947f651f5c20e06e46baea8ae40a"
+      ],
+      "architecture": "arm64",
+      "imageId": "sha256:de3e47c64078aa196dae2349e048fc98ba81947f651f5c20e06e46baea8ae40a"
+    },
+    {
+      "service": "redis",
+      "name": "redis",
+      "tag": "7",
+      "digest": "sha256:2e3eb11462c4e3759e6972678dd051d150ff54b1e60714b3c33b701260172a90",
+      "pulledRepoDigests": [
+        "redis@sha256:2e3eb11462c4e3759e6972678dd051d150ff54b1e60714b3c33b701260172a90"
+      ],
+      "architecture": "arm64",
+      "imageId": "sha256:2e3eb11462c4e3759e6972678dd051d150ff54b1e60714b3c33b701260172a90"
+    },
+    {
+      "service": "minio",
+      "name": "cgr.dev/chainguard/minio",
+      "tag": "latest",
+      "digest": "sha256:0f9fda72fbc6bd3560ea903aec2ceefa20f6ba82628d67656f37fb370c39ae9c",
+      "pulledRepoDigests": [
+        "cgr.dev/chainguard/minio@sha256:0f9fda72fbc6bd3560ea903aec2ceefa20f6ba82628d67656f37fb370c39ae9c"
+      ],
+      "architecture": "arm64",
+      "imageId": "sha256:0f9fda72fbc6bd3560ea903aec2ceefa20f6ba82628d67656f37fb370c39ae9c"
+    },
+    {
+      "service": "mlflow",
+      "name": "ghcr.io/mlflow/mlflow",
+      "tag": "v3.18.0",
+      "digest": "sha256:257204c77980b0f3450a26eb6089e487603fcdd4509529eadaf88f90669f5c13",
+      "pulledRepoDigests": [
+        "ghcr.io/mlflow/mlflow@sha256:257204c77980b0f3450a26eb6089e487603fcdd4509529eadaf88f90669f5c13"
+      ],
+      "architecture": "arm64",
+      "imageId": "sha256:257204c77980b0f3450a26eb6089e487603fcdd4509529eadaf88f90669f5c13"
+    },
+    {
+      "service": "collector",
+      "name": "otel/opentelemetry-collector-contrib",
+      "tag": "0.154.0",
+      "digest": "sha256:b3079f45e19bdb7326bf49cdddce6cf60dfd865138db39f2733ea48ab17bc4cb",
+      "pulledRepoDigests": [
+        "otel/opentelemetry-collector-contrib@sha256:b3079f45e19bdb7326bf49cdddce6cf60dfd865138db39f2733ea48ab17bc4cb"
+      ],
+      "architecture": "arm64",
+      "imageId": "sha256:b3079f45e19bdb7326bf49cdddce6cf60dfd865138db39f2733ea48ab17bc4cb"
+    }
+  ],
+  "collectorDecision": {
+    "candidate": "otel/opentelemetry-collector:0.154.0",
+    "candidateDigest": "sha256:ea527f0f9a220c7b595863a658c262f31d08c07e034a16b502bfb2206aa987ff",
+    "command": "docker run --rm otel/opentelemetry-collector:0.154.0 components",
+    "transformPresent": false,
+    "selected": "contrib",
+    "reason": "Core lacks transform. Contrib components lists transform and otlp_http; the otlphttp alias starts successfully.",
+    "mlflowCompression": "none"
+  },
+  "telemetry": {
+    "vendorUsage": "Langfuse and MLflow defaults, by maintainer decision",
+    "traceDestinations": ["local Langfuse", "local MLflow"]
+  },
+  "notMeasured": [
+    "galaxie runtime runs",
+    "browser lane",
+    "workflows",
+    "real models or prompt content",
+    "feedback scores",
+    "MLflow evaluation",
+    "performance, capacity or delivery under failure",
+    "vendor usage telemetry payloads or all container egress"
+  ]
+}

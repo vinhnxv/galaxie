@@ -1,0 +1,230 @@
+{
+  "demonstration": true,
+  "readback": {
+    "observations": [
+      {
+        "id": "child-span-1",
+        "traceId": "trace-1",
+        "startTime": "time-1",
+        "endTime": "time-2",
+        "projectId": "galaxie-smoke",
+        "parentObservationId": "root-span-1",
+        "type": "SPAN",
+        "name": "smoke-child",
+        "level": "DEFAULT",
+        "statusMessage": "",
+        "version": "",
+        "environment": "default",
+        "completionStartTime": null,
+        "createdAt": "time-3",
+        "updatedAt": "time-3",
+        "metadata": {
+          "scope.name": "galaxie.llmops.smoke",
+          "resourceAttributes.service.name": "galaxie-llmops-smoke",
+          "attributes.smoke.boolean": true,
+          "attributes.smoke.number": 7,
+          "attributes.smoke.string": "local-only"
+        },
+        "latency": 0.004,
+        "userId": "",
+        "sessionId": "",
+        "isRootObservation": false,
+        "bookmarked": false,
+        "public": false,
+        "modelId": null,
+        "inputPrice": null,
+        "outputPrice": null,
+        "totalPrice": null
+      },
+      {
+        "id": "root-span-1",
+        "traceId": "trace-1",
+        "startTime": "time-4",
+        "endTime": "time-5",
+        "projectId": "galaxie-smoke",
+        "parentObservationId": null,
+        "type": "SPAN",
+        "name": "smoke-root",
+        "level": "DEFAULT",
+        "statusMessage": "",
+        "version": "",
+        "environment": "default",
+        "completionStartTime": null,
+        "createdAt": "time-3",
+        "updatedAt": "time-3",
+        "metadata": {
+          "galaxie.run.id": "run-1",
+          "scope.name": "galaxie.llmops.smoke",
+          "resourceAttributes.service.name": "galaxie-llmops-smoke",
+          "attributes.session.id": "session-1",
+          "attributes.galaxie.run.id": "run-1",
+          "attributes.galaxie.session.id": "session-1",
+          "attributes.smoke.boolean": true,
+          "attributes.smoke.number": 7,
+          "attributes.smoke.string": "local-only"
+        },
+        "latency": 0.01,
+        "userId": "",
+        "sessionId": "session-1",
+        "isRootObservation": true,
+        "bookmarked": false,
+        "public": false,
+        "modelId": null,
+        "inputPrice": null,
+        "outputPrice": null,
+        "totalPrice": null
+      }
+    ],
+    "traces": [
+      {
+        "trace_id": "mlflow-trace-1",
+        "trace_location": {
+          "type": "MLFLOW_EXPERIMENT",
+          "mlflow_experiment": {
+            "experiment_id": "1"
+          }
+        },
+        "request_time": "time-4",
+        "execution_duration": "0.010s",
+        "state": "OK",
+        "trace_metadata": {
+          "mlflow.trace.session": "session-1"
+        },
+        "tags": {
+          "mlflow.artifactLocation": "/mlflow/artifacts/1/traces/mlflow-trace-1/artifacts",
+          "mlflow.trace.spansLocation": "TRACKING_STORE",
+          "service.name": "galaxie-llmops-smoke"
+        }
+      }
+    ],
+    "spans": [
+      {
+        "trace_id": "trace-1",
+        "span_id": "child-span-1",
+        "parent_span_id": "root-span-1",
+        "name": "smoke-child",
+        "kind": "SPAN_KIND_INTERNAL",
+        "start_time_unix_nano": "time-6",
+        "end_time_unix_nano": "time-7",
+        "attributes": [
+          {
+            "key": "smoke.string",
+            "value": {
+              "string_value": "local-only"
+            }
+          },
+          {
+            "key": "smoke.number",
+            "value": {
+              "int_value": 7
+            }
+          },
+          {
+            "key": "smoke.boolean",
+            "value": {
+              "bool_value": true
+            }
+          },
+          {
+            "key": "mlflow.traceRequestId",
+            "value": {
+              "string_value": "mlflow-trace-1"
+            }
+          }
+        ],
+        "status": {
+          "code": "STATUS_CODE_OK"
+        }
+      },
+      {
+        "trace_id": "trace-1",
+        "span_id": "root-span-1",
+        "name": "smoke-root",
+        "kind": "SPAN_KIND_INTERNAL",
+        "start_time_unix_nano": "time-8",
+        "end_time_unix_nano": "time-9",
+        "attributes": [
+          {
+            "key": "smoke.string",
+            "value": {
+              "string_value": "local-only"
+            }
+          },
+          {
+            "key": "smoke.number",
+            "value": {
+              "int_value": 7
+            }
+          },
+          {
+            "key": "smoke.boolean",
+            "value": {
+              "bool_value": true
+            }
+          },
+          {
+            "key": "galaxie.session.id",
+            "value": {
+              "string_value": "session-1"
+            }
+          },
+          {
+            "key": "galaxie.run.id",
+            "value": {
+              "string_value": "run-1"
+            }
+          },
+          {
+            "key": "session.id",
+            "value": {
+              "string_value": "session-1"
+            }
+          },
+          {
+            "key": "langfuse.observation.metadata.galaxie.run.id",
+            "value": {
+              "string_value": "run-1"
+            }
+          },
+          {
+            "key": "mlflow.traceRequestId",
+            "value": {
+              "string_value": "mlflow-trace-1"
+            }
+          }
+        ],
+        "status": {
+          "code": "STATUS_CODE_OK"
+        }
+      }
+    ]
+  },
+  "ports": {
+    "bindings": [
+      {
+        "service": "collector",
+        "address": "127.0.0.1",
+        "port": 4318
+      },
+      {
+        "service": "langfuse-web",
+        "address": "127.0.0.1",
+        "port": 3000
+      },
+      {
+        "service": "mlflow",
+        "address": "127.0.0.1",
+        "port": 5100
+      }
+    ],
+    "hostListeners": [
+      "TCP 127.0.0.1:5100 (LISTEN)",
+      "TCP 127.0.0.1:3000 (LISTEN)",
+      "TCP 127.0.0.1:4318 (LISTEN)"
+    ],
+    "command": "lsof -nP -iTCP -sTCP:LISTEN",
+    "forwarder": "colima ssh",
+    "wildcardListeners": false
+  },
+  "scope": "One two-span hand-made trace, checked again after two seconds. No galaxie runtime runs."
+}
