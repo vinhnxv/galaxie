@@ -120,8 +120,8 @@ export async function createRagHost(
     createPyodideAdapter({
       framework,
       createWorker: createPyodideWorker,
-      runtimeUrl: new URL('/python/runtime/', location.href).href,
-      wheelsUrl: new URL('/python/wheels/', location.href).href,
+      runtimeUrl: new URL(`${import.meta.env.BASE_URL}python/runtime/`, location.href).href,
+      wheelsUrl: new URL(`${import.meta.env.BASE_URL}python/wheels/`, location.href).href,
       localWheels: pythonBuild.localWheels,
       onBoot(event) {
         if (disposed || executor !== (framework === 'langgraph' ? 'python' : framework)) return;
@@ -145,7 +145,7 @@ export async function createRagHost(
       : {}),
   });
   const pythonAgent = {
-    baseUrl: new URL('/python/agent/', location.href).href,
+    baseUrl: new URL(`${import.meta.env.BASE_URL}python/agent/`, location.href).href,
     files: [
       'rag_agent/__init__.py',
       'rag_agent/graph.py',

@@ -39,7 +39,7 @@ if (import.meta.env.MODE === 'mock') {
   };
 } else {
   try {
-    const response = await fetch('/data/squad-dev.json', {
+    const response = await fetch(`${import.meta.env.BASE_URL}data/squad-dev.json`, {
       credentials: 'omit',
       headers: { Accept: 'application/json' },
       // A stalled response must not hold the first render back.

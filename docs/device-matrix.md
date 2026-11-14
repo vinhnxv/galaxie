@@ -36,7 +36,7 @@ The [browser-built RAG example](../examples/rag-browser/README.md) adds Node and
 
 The [ADK recipe example](../examples/adk-recipes/README.md) adds scripted Node and headless Chromium checks for JavaScript and Go financial pipelines and Python auditor/loan pipelines. Rendered host tests cover the picker, model destinations, checked text, abort-before-switch, loan approval/denial, paused reload and Start over under the strict CSP and Trusted Types policy with same-origin assets. Python and Go use their existing prerequisite gates. These checks add no real-model or device-performance result.
 
-The [hosted RAG demo](../examples/rag-browser/README.md#hosted-demo-build) is a mock-only build artifact and carries no device or model measurements.
+The [hosted RAG demo](../examples/rag-browser/README.md#hosted-demo-build) is a mock-only build, deployed to GitHub Pages from `main`, and carries no device or model measurements. GitHub Pages cannot send response headers, so the demo has no `frame-ancestors` protection and no policy on Worker responses; the maintainer accepted this limit on 2026-11-14 for a build with no credentials or model data.
 
 ## Mock-model runs on Firefox and WebKit
 
