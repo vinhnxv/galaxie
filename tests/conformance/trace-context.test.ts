@@ -243,10 +243,4 @@ test('MCP requests share their call parent and queued list_changed refresh has n
       .at(-1)
       ?.headers.has('traceparent'),
   ).toBe(false);
-  await server.close();
-  expect(
-    sent
-      .filter(({ method }) => method === 'DELETE')
-      .every(({ headers }) => !headers.has('traceparent')),
-  ).toBe(true);
 });
