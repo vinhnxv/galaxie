@@ -1088,6 +1088,88 @@ accepted partial-group design settling decision 7 and the divergence gate; or
 a maintainer request for a `Parallel`-shaped surface with its public contract
 written first.
 
+#### Measured outcome
+
+Rules commit `c46464c` was pushed before any probe ran. On 2026-11-14 the
+in-repository DSPy 3.4.1 baseline passed suite A (59 tests) and suite B (83
+tests), each with exit 0. CPython was 3.14.5, uv was 0.11.23, and the platform
+was macOS 27.2.1 arm64 (`macOS-27.2.1-arm64-arm-64bit-Mach-O`). PyPI returned
+HTTP 200 (curl exit 0); the 3.2.1 installation dry run resolved (exit 0).
+Release selection uses PyPI alone; no DSPy documentation or GitHub release-note
+confirmation was made.
+
+The throwaway 3.4.1 control could not install its frozen baseline. Both copied
+stand-ins built and installed, but the package-list install ended
+**INSTALL-FAILS**, exit 1, before installing DSPy. The resolver error was:
+
+```text
+  × No solution found when resolving dependencies:
+  ╰─▶ Because google-adk==2.12.0 depends on websockets>=15.0.1,<16 and
+      you require google-adk==2.12.0, we can conclude that you require
+      websockets>=15.0.1,<16.
+      And because you require websockets==17.3, we can conclude that your
+      requirements are unsatisfiable.
+```
+
+The single permitted retry removed only `websockets==17.3` from the scratch
+requirements. It also ended **INSTALL-FAILS**, exit 1:
+
+```text
+  × No solution found when resolving dependencies:
+  ╰─▶ Because google-adk==2.12.0 depends on opentelemetry-api>=1.39,<=1.42.1
+      and you require google-adk==2.12.0, we can conclude that you require
+      opentelemetry-api>=1.39,<=1.42.1.
+      And because you require opentelemetry-api==1.45.1, we can conclude that
+      your requirements are unsatisfiable.
+```
+
+`python/pyproject.toml` intentionally overrides these ADK constraints, including
+`websockets` and `opentelemetry-api`, to preserve Pyodide-aligned pins. The
+registered `--no-config` method excludes those overrides. Relaxing further
+unrelated pins or installing the baseline without dependency resolution would
+change that method, so no further install or suite was attempted. This is an
+environment-construction finding, not evidence that a DSPy release cannot
+install in another environment. The 3.2.1 dry run is not a real install.
+
+| DSPy version and lane | Install and import facts | Suite A | Suite B |
+| --- | --- | --- | --- |
+| 3.4.1, repository native baseline | Already installed; suite imports succeeded | PASS: 59 passed, exit 0 | PASS: 83 passed, exit 0 |
+| 3.4.1, throwaway native control | INSTALL-FAILS at frozen baseline, including the one relaxed retry; DSPy and `dspy.lm15` imports not run | UNMEASURED: control environment could not be built | UNMEASURED: control environment could not be built |
+| 3.2.1, throwaway native target | Dry run resolved; real install and imports UNMEASURED because the required control could not be built | UNMEASURED: required control unavailable after the two resolver errors above | UNMEASURED: required control unavailable after the two resolver errors above |
+| 3.5.0, throwaway native target | Install and imports UNMEASURED because the required control could not be built | UNMEASURED: required control unavailable after the two resolver errors above | UNMEASURED: required control unavailable after the two resolver errors above |
+
+The throwaway inventory contains only `litellm` 1.106.2 and `ormsgpack` 1.13.0,
+both built from copied workspace sources, rather than editable installations;
+their versions equal the repository's stand-ins. Every other baseline package,
+including DSPy, is absent there. No completed environment exists from which to
+claim a DSPy-only dependency difference. DSPy 3.4.0 was not run: the bisect
+condition was not reached. Versions 3.3.0 and 3.3.1 were not run or inspected
+in this measurement. No new COLLECTION-FAILS, DIVERGED or browser result is
+claimed. The earlier 3.2.1 overlay collection failure remains historical evidence.
+
+Prediction scorecard: **Q1** holds for network access only; the real-install
+prediction is unmeasured. **Q2** is unmeasured in the fresh layout. **Q3** could
+not be established because construction failed before the control ran.
+**Q4** is unmeasured. **Q5** holds: no model access. **Q6** holds: before/after
+lock and pyproject SHA-256 values, repository package freeze and clean Git status
+are identical. No assertion, source, golden, matrix or repository dependency
+changed. The required `dspy.lm15` import remains the boundary identified by the
+historical overlay; these new results establish no minimum supported version.
+
+#### Outcomes by item
+
+- Real models: **UNMEASURED**, no model access for the agent in this environment;
+  the maintainer recipe above specifies the evidence needed to reopen.
+- Other DSPy versions: **UNMEASURED**, the required throwaway control baseline
+  has the two exact resolver conflicts above. Only the pinned native baseline
+  was measured; Worker, Node Pyodide and browser targets remain UNMEASURED
+  because their locked wheel closure needs a separate maintainer decision.
+- Pause-capable groups and a `Parallel`-shaped adapter: **not built; reopen only
+  on evidence**, under the decision above. No newly run probe changes its premises.
+
+See the [commands and limits](../../tests/conformance/README.md#dspy-other-version-and-real-model-measurement-2026-11-14)
+for the installation attempt, baseline suites and maintainer recipe.
+
 ### DSPy provider strings, schema output, embeddings and retrievers spike (2026-11)
 
 The [provider probes](../../tests/conformance/README.md#dspy-provider-strings-schema-output-embeddings-and-retrievers-spike)

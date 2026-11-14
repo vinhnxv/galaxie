@@ -1956,7 +1956,7 @@ list is unchanged. These remain local macOS scripted-model results.
 | --- | --- | --- | --- | --- | --- |
 | Absolute scopes and canonical journal order | PASS | PASS | UNMEASURED: no browser pin planned | UNMEASURED: no browser pin planned | UNMEASURED: no browser pin planned |
 | First recorded terminal failure | PASS | UNMEASURED: native-only probe | UNMEASURED: native-only probe | UNMEASURED: native-only probe | UNMEASURED: native-only probe |
-| DSPy 3.2.1 overlay | NOT RUN: collection failure | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged |
+| DSPy 3.2.1 overlay | Historical NOT RUN: collection failure; [fresh attempt](#dspy-other-version-and-real-model-measurement-2026-11-14) UNMEASURED after control baseline INSTALL-FAILS | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged | UNMEASURED: locked Worker closure unchanged |
 | Real models | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access | UNMEASURED: no model access |
 
 New native and Node tests pin absolute scopes for the three unordered golden
@@ -1970,7 +1970,9 @@ snapshots have no journal. Both lanes also pin absolute markers at the
 concurrent terminal failures report the first recorded code, rather than the
 first in input order, and drain both siblings.
 
-The prediction that DSPy 3.2.1 was not installable offline was disproved: an
+The earlier offline-install prediction was disproved by the historical overlay;
+the [fresh network attempt](#dspy-other-version-and-real-model-measurement-2026-11-14)
+stopped at control baseline installation. An
 overlay of 18 cached archive roots imported it on CPython 3.14.5, without changing
 the locked DSPy 3.4.1 environment. Both prescribed native suites then stopped
 during collection, with exit 2, zero tests run and one collection error each:
@@ -1988,6 +1990,115 @@ comparison. An accepted product design in an ADR is needed before either ships.
 Chromium divergence reload, ReAct branches, concurrent tabs, forged metadata and
 large many-file descriptors remain unmeasured. No shipped source, existing
 golden, matrix, fixture entry, recorder or lock changed.
+
+### DSPy other-version and real-model measurement (2026-11-14)
+
+The [registered rules and full results](../../docs/adr/0018-python-agents-through-pyodide.md#dspy-branch-helper-versions-real-models-and-parallel-adapter-decision-2026-11-14)
+precede this measurement in commit `c46464c`. Native CPython 3.14.5 on macOS
+27.2.1 arm64 with uv 0.11.23 ran the pinned DSPy 3.4.1 baseline: suite A passed
+59 tests and suite B passed 83, both exit 0. PyPI returned HTTP 200 and the
+3.2.1 install dry run resolved. PyPI alone supplied the release selection.
+
+| Target | Fresh install | Suite A | Suite B |
+| --- | --- | --- | --- |
+| 3.4.1 control | INSTALL-FAILS: frozen baseline conflicts; one relaxed retry also fails | UNMEASURED: no control environment | UNMEASURED: no control environment |
+| 3.2.1 | UNMEASURED: required control unavailable; dry run only | UNMEASURED: required control unavailable | UNMEASURED: required control unavailable |
+| 3.5.0 | UNMEASURED: required control unavailable | UNMEASURED: required control unavailable | UNMEASURED: required control unavailable |
+
+The exact two resolver errors are retained in the ADR. First,
+`google-adk==2.12.0` requires `websockets>=15.0.1,<16` while the frozen list has
+`websockets==17.3`. Removing that one scratch pin exposes its requirement
+`opentelemetry-api>=1.39,<=1.42.1` against `opentelemetry-api==1.45.1`. Both
+attempts exit 1 before DSPy installation. The repository intentionally overrides
+these ADK constraints; the prescribed scratch `--no-config` method omits them.
+No further pin was relaxed and no dependency-resolution bypass was used.
+The scratch environment contains only copied stand-ins, `litellm` 1.106.2 and
+`ormsgpack` 1.13.0; all other frozen packages are absent. No new import or
+assertion outcome for another DSPy version is established. DSPy 3.4.0 was not
+run because the bisect condition was not reached; 3.3.0 and 3.3.1 were neither
+run nor inspected here. Worker, Node Pyodide and all browser lanes remain
+UNMEASURED for other versions: their locked wheel closure requires a maintainer
+lock decision. No new browser measurement is claimed.
+
+Reproduce the baseline and installation attempt from the repository root.
+Keep the scratch directory outside the checkout. These commands use the same
+interpreter, copied stand-ins, freeze exclusions and isolated pytest flags as
+the measurement; no recorder script is added to the repository.
+
+```sh
+REPO="$PWD"
+SCRATCH=$(mktemp -d /tmp/galaxie-dspy-versions.XXXXXX)
+uv pip freeze --python "$REPO/python/.venv/bin/python" > "$SCRATCH/baseline-freeze.txt"
+shasum -a 256 python/uv.lock python/requirements.lock python/pyproject.toml
+cd "$SCRATCH"
+uv --no-config venv --python "$HOME/.pyenv/versions/3.14.5/bin/python" "$SCRATCH/3.4.1/venv"
+PY="$SCRATCH/3.4.1/venv/bin/python"
+curl -sS -m 8 -o /dev/null -w '%{http_code}' https://pypi.org/simple/dspy/
+uv --no-config pip install --dry-run --python "$PY" dspy==3.2.1
+python3 -B - "$REPO" "$SCRATCH" <<'PY'
+from pathlib import Path
+import shutil
+import sys
+repo, scratch = map(Path, sys.argv[1:])
+for name in ('litellm', 'ormsgpack'):
+    shutil.copytree(repo / 'python/standins' / name, scratch / 'standins' / name,
+                    ignore=shutil.ignore_patterns('build', '*.egg-info', '__pycache__', '*.pyc'))
+lines = (scratch / 'baseline-freeze.txt').read_text().splitlines()
+base = [line for line in lines if not line.startswith(('dspy==', 'gepa==', 'litellm==', 'ormsgpack==', '-e '))]
+(scratch / 'base.txt').write_text('\n'.join(base) + '\n')
+(scratch / 'base-relaxed.txt').write_text('\n'.join(line for line in base if not line.startswith('websockets==')) + '\n')
+PY
+uv --no-config pip install --python "$PY" --no-deps "$SCRATCH/standins/litellm"
+uv --no-config pip install --python "$PY" --no-deps "$SCRATCH/standins/ormsgpack"
+uv --no-config pip install --python "$PY" -r "$SCRATCH/base.txt"
+# The first install exited 1; this single relaxed retry also exited 1.
+uv --no-config pip install --python "$PY" -r "$SCRATCH/base-relaxed.txt"
+```
+
+Stop after the second resolver error. The following version-install and `.pth`
+steps specify the registered method for a future corrected environment design;
+they **did not run** here. Use one environment per target in order 3.4.1, 3.2.1,
+3.5.0, with stand-ins and the frozen baseline installed first. Trust a target's
+suite result only after the control matches the in-repository 59/83 counts.
+
+```sh
+# Not reached in this measurement; PY names that target's scratch interpreter.
+uv --no-config pip install --python "$PY" "dspy==$VERSION"
+SITE=$("$PY" -I -B -c 'import site; print(site.getsitepackages()[0])')
+printf '%s\n' "$REPO/python/galaxie/src" > "$SITE/galaxie-source.pth"
+"$PY" -I -B -c 'import dspy, sys, platform; print(dspy.__version__); print(sys.version); print(platform.platform())'
+"$PY" -I -B -c 'import dspy.lm15'
+uv --no-config pip freeze --python "$PY"
+```
+
+The two exact pytest invocations below **did run** for the repository baseline
+using `PY="$REPO/python/.venv/bin/python"`. For a future scratch run, keep its
+interpreter in `PY`. Each invocation has an external 240-second cap. The original
+measurement used `subprocess.run(..., timeout=240)`; use an equivalent process
+timeout when reproducing. Do not collect `galaxie/tests/test_dspy.py` or the full
+`cases-dspy` directory on another version.
+
+```sh
+cd "$REPO/python"
+export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 LANGSMITH_TRACING=false LANGCHAIN_TRACING_V2=false
+"$PY" -I -B -m pytest -p no:cacheprovider galaxie/tests/test_dspy_branches.py galaxie/tests/test_dspy_branch_handle.py
+"$PY" -I -B -m pytest -p no:cacheprovider ../tests/conformance/cases-dspy/test_dspy_branches_shipped.py ../tests/conformance/cases-dspy/test_dspy_branches_order.py ../tests/conformance/cases-dspy/test_dspy_divergence_persistence.py ../tests/conformance/cases-dspy/test_dspy_fanout.py ../tests/conformance/cases-dspy/test_dspy_parallel_baseline.py
+```
+
+Before/after Git status is empty, the repository freeze is identical and all
+three lock/pyproject hashes are unchanged. Real models are **UNMEASURED**: no
+model access for the agent in this environment. A maintainer runs these scripted
+baselines first, then replaces the scripted model with a host-routed provider
+for `fanout-single`, `fanout-write` and `fanout-multi` in
+`cases-dspy/shipped_branches.py`, using `golden-dspy/` for call shape, plus the
+`par-fan-two-stage-multi` pause/reload case. Keep keys host-side under ADR-0012;
+this needs a provider key and a Worker egress decision, and no real-provider
+harness is supplied here. Record keyed join order, absolute scopes, pause/reload
+replay, first-recorded-failure code under a provider error, and N-branch latency
+against sequential `await module.acall(...)` calls. Record an outcome word per
+case with model and provider named and no secret. Pause-capable groups and a
+`Parallel`-shaped adapter remain **not built; reopen only on evidence**, as
+specified in the ADR decision.
 
 ### Reproduce the engine measurements
 

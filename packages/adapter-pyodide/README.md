@@ -1034,7 +1034,10 @@ add WebKit binding and legacy re-pause on Node/Chromium/Firefox/WebKit. The
 same-day preview-header follow-up passes all 11 Chromium, 22 Firefox and 22 WebKit
 engine tests locally, with no CSP-header mismatches and the policy unchanged;
 production hosting uses generated `_headers`. Real models, concurrent tabs, forged metadata and large many-file
-descriptors remain unmeasured; the other-version attempt could not collect tests. See the
+descriptors remain unmeasured; the earlier DSPy 3.2.1 overlay could not collect
+tests, and the [fresh version attempt](../../tests/conformance/README.md#dspy-other-version-and-real-model-measurement-2026-11-14)
+remains UNMEASURED after control baseline INSTALL-FAILS on ADK dependency
+conflicts, including the single relaxed retry. See the
 [spike record and shipped evidence](../../tests/conformance/README.md#dspy-paused-session-state-binding-spike).
 
 ## Google ADK (Python) agents
