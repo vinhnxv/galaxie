@@ -663,44 +663,75 @@ test('pauses after await and resumes the same checkpoint with a false submission
   }
 });
 
-test.each(['parallel', 'twice', 'invalid'] as const)(
-  'rejects the %s interrupt shape',
-  async (kind) => {
-    const state = Annotation.Root({ value: Annotation<number> });
-    const fixture = await ready((host) => {
-      const ask = (_state: unknown, config: LangGraphRunnableConfig) => {
-        if (kind === 'invalid') interrupt({ question: 'x' });
-        requestInteraction(interactionRequest, config);
-        if (kind === 'twice') requestInteraction(interactionRequest, config);
-        return {};
-      };
-      const graph = new StateGraph(state)
-        .addNode('ask', ask)
-        .addEdge(START, 'ask')
-        .addEdge('ask', END);
-      if (kind === 'parallel')
-        graph.addNode('other', ask).addEdge(START, 'other').addEdge('other', END);
-      return graph.compile({
-        checkpointer: host.langchain.checkpointer(),
-      });
+test('answers two identical requests in one node and completes without a pending interaction', async () => {
+  const state = Annotation.Root({ value: Annotation<number>, answers: Annotation<unknown[]> });
+  const fixture = await ready((host) =>
+    new StateGraph(state)
+      .addNode('ask', (_state, config) => ({
+        answers: [
+          requestInteraction(interactionRequest, config),
+          requestInteraction(interactionRequest, config),
+        ],
+      }))
+      .addEdge(START, 'ask')
+      .addEdge('ask', END)
+      .compile({ checkpointer: host.langchain.checkpointer() }),
+  );
+  try {
+    const { runId } = await fixture.instance.start({ value: 1 });
+    const first = await waitForPause(fixture.instance);
+    expect((await fixture.instance.dispatch(first)).status).toBe('accepted');
+    const second = await waitForPause(fixture.instance);
+    expect(second.interactionId).toBe(`${first.interactionId}:1`);
+    expect((await fixture.instance.dispatch(second)).status).toBe('accepted');
+    expect((await collect(fixture.instance.events(runId))).at(-1)).toMatchObject({
+      type: 'output',
+      output: {
+        value: 1,
+        answers: [
+          { action: 'submit', payload: false },
+          { action: 'submit', payload: false },
+        ],
+      },
     });
-    try {
-      const { runId } = await fixture.instance.start({ value: 1 });
-      if (kind === 'twice')
-        expect((await fixture.instance.dispatch(await waitForPause(fixture.instance))).status).toBe(
-          'accepted',
-        );
-      expect((await collect(fixture.instance.events(runId))).at(-1)).toMatchObject({
-        type: 'error',
-        error: { code: kind === 'invalid' ? 'invalid' : 'unsupported' },
-      });
-      expect(fixture.instance.getSnapshot().run?.pending).toBeUndefined();
-    } finally {
-      await fixture.runtime.dispose();
-      await fixture.provider.shutdown();
-    }
-  },
-);
+    expect(fixture.instance.getSnapshot().run?.status).toBe('succeeded');
+    expect(fixture.instance.getSnapshot().run?.pending).toBeUndefined();
+  } finally {
+    await fixture.runtime.dispose();
+    await fixture.provider.shutdown();
+  }
+});
+
+test.each(['parallel', 'invalid'] as const)('rejects the %s interrupt shape', async (kind) => {
+  const state = Annotation.Root({ value: Annotation<number> });
+  const fixture = await ready((host) => {
+    const ask = (_state: unknown, config: LangGraphRunnableConfig) => {
+      if (kind === 'invalid') interrupt({ question: 'x' });
+      requestInteraction(interactionRequest, config);
+      return {};
+    };
+    const graph = new StateGraph(state)
+      .addNode('ask', ask)
+      .addEdge(START, 'ask')
+      .addEdge('ask', END);
+    if (kind === 'parallel')
+      graph.addNode('other', ask).addEdge(START, 'other').addEdge('other', END);
+    return graph.compile({
+      checkpointer: host.langchain.checkpointer(),
+    });
+  });
+  try {
+    const { runId } = await fixture.instance.start({ value: 1 });
+    expect((await collect(fixture.instance.events(runId))).at(-1)).toMatchObject({
+      type: 'error',
+      error: { code: kind === 'invalid' ? 'invalid' : 'unsupported' },
+    });
+    expect(fixture.instance.getSnapshot().run?.pending).toBeUndefined();
+  } finally {
+    await fixture.runtime.dispose();
+    await fixture.provider.shutdown();
+  }
+});
 
 test('cancel abandons a waiting interrupt and the next start runs from START on the same thread', async () => {
   const state = Annotation.Root({ value: Annotation<number> });

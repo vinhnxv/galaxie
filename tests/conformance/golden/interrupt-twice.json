@@ -1,0 +1,222 @@
+{
+  "events": {
+    "values": [
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "id": "<interrupt:1>",
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "First question?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "id": "<interrupt:1>",
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r2",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Second question?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "value": 1,
+          "first": "first",
+          "second": false,
+          "executions": 3
+        }
+      }
+    ],
+    "updates": [
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "id": "<interrupt:1>",
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r1",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "First question?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "__interrupt__": [
+            {
+              "id": "<interrupt:1>",
+              "value": {
+                "surfaceId": "main",
+                "viewRevision": "r2",
+                "component": "conformance.Question/v1",
+                "props": {
+                  "question": "Second question?"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": [],
+        "data": {
+          "askBoth": {
+            "first": "first",
+            "second": false,
+            "executions": 3
+          }
+        }
+      }
+    ],
+    "messages": [],
+    "custom": []
+  },
+  "modes": [
+    "values",
+    "updates",
+    "values",
+    "values",
+    "updates",
+    "values",
+    "values",
+    "updates",
+    "values"
+  ],
+  "final": {
+    "value": 1,
+    "first": "first",
+    "second": false,
+    "executions": 3
+  },
+  "state": {
+    "values": {
+      "value": 1,
+      "first": "first",
+      "second": false,
+      "executions": 3
+    },
+    "next": []
+  },
+  "checkpoints": [
+    {
+      "metadata": {
+        "step": -1,
+        "source": "input"
+      },
+      "next": [
+        "__start__"
+      ],
+      "values": {},
+      "parentCheckpointId": null
+    },
+    {
+      "metadata": {
+        "step": 0,
+        "source": "loop"
+      },
+      "next": [
+        "askBoth"
+      ],
+      "values": {
+        "value": 1
+      },
+      "parentCheckpointId": "<uuid:1>"
+    },
+    {
+      "metadata": {
+        "step": 1,
+        "source": "loop"
+      },
+      "next": [],
+      "values": {
+        "value": 1,
+        "first": "first",
+        "second": false,
+        "executions": 3
+      },
+      "parentCheckpointId": "<uuid:2>"
+    }
+  ],
+  "outcome": {
+    "status": "succeeded"
+  },
+  "pauses": [
+    {
+      "interrupts": [
+        {
+          "id": "<interrupt:1>",
+          "value": {
+            "surfaceId": "main",
+            "viewRevision": "r1",
+            "component": "conformance.Question/v1",
+            "props": {
+              "question": "First question?"
+            }
+          }
+        }
+      ],
+      "historyLength": 2
+    },
+    {
+      "interrupts": [
+        {
+          "id": "<interrupt:1>",
+          "value": {
+            "surfaceId": "main",
+            "viewRevision": "r2",
+            "component": "conformance.Question/v1",
+            "props": {
+              "question": "Second question?"
+            }
+          }
+        }
+      ],
+      "historyLength": 2
+    }
+  ]
+}
