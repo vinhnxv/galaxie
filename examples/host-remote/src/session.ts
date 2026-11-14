@@ -12,7 +12,9 @@ export function createSession(origin: string, now: () => number = Date.now): () 
       try {
         const response = await fetch(`${origin}/api/session`, {
           method: 'POST',
-          credentials: 'omit',
+          credentials: 'same-origin',
+          // Node callers have no ambient Origin; browsers ignore this script-set header.
+          headers: { origin },
           redirect: 'error',
           cache: 'no-store',
           signal: AbortSignal.timeout(10_000),

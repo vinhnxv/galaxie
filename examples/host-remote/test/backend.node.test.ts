@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { randomUUID } from 'node:crypto';
 import { request } from 'node:http';
 import { lessonFixture, ProgressInputSchema } from '@galaxie-ai/example-english-tutor';
 import { createServer, type ViteDevServer } from 'vite';
@@ -17,12 +18,13 @@ afterEach(async () => {
 
 async function serve(
   mode = 'test',
+  upstreamKey?: string,
 ): Promise<{ origin: string; now: () => number; advance: (ms?: number) => void }> {
   let now = Date.now();
   const server = await createServer({
     configFile: false,
     mode,
-    plugins: [backend({ now: () => now })],
+    plugins: [backend({ now: () => now, ...(upstreamKey ? { upstreamKey } : {}) })],
     server: { host: '127.0.0.1', port: 0 },
     logLevel: 'silent',
   });
@@ -40,12 +42,234 @@ async function serve(
 }
 
 async function token(origin: string): Promise<string> {
-  const response = await fetch(`${origin}/api/session`, { method: 'POST' });
+  const response = await fetch(`${origin}/api/session`, { method: 'POST', headers: { origin } });
   expect(response.status).toBe(200);
   const session = (await response.json()) as { token: string; expiresAt: number };
   expect(session.expiresAt).toBeGreaterThan(Date.now());
   return session.token;
 }
+
+async function issueSession(origin: string): Promise<{
+  token: string;
+  cookie: string;
+  cookieValue: string;
+  setCookie: string;
+  responseBody: string;
+}> {
+  const response = await fetch(`${origin}/api/session`, { method: 'POST', headers: { origin } });
+  expect(response.status).toBe(200);
+  const responseBody = await response.text();
+  const setCookie = response.headers.get('set-cookie') ?? '';
+  const cookie = setCookie.split(';')[0] ?? '';
+  expect(cookie).toMatch(/^galaxie-agent-session=.+/);
+  return {
+    token: (JSON.parse(responseBody) as { token: string }).token,
+    cookie,
+    cookieValue: cookie.slice(cookie.indexOf('=') + 1),
+    setCookie,
+    responseBody,
+  };
+}
+
+it('uses a separate HttpOnly model cookie and forwards only allowlisted headers with the server key', async () => {
+  const upstreamKey = randomUUID();
+  const { origin } = await serve('test', upstreamKey);
+  const session = await issueSession(origin);
+  expect(session.setCookie.split(';').map((attribute) => attribute.trim())).toEqual([
+    session.cookie,
+    'HttpOnly',
+    'SameSite=Strict',
+    'Path=/api/v1',
+    'Max-Age=300',
+  ]);
+  expect(session.cookieValue).not.toBe(session.token);
+  const bodies = [session.responseBody];
+  const headers = [session.setCookie];
+  async function capture(path: string, init: RequestInit, status: number): Promise<string> {
+    const response = await fetch(`${origin}${path}`, init);
+    expect(response.status).toBe(status);
+    headers.push(JSON.stringify([...response.headers]));
+    const text = await response.text();
+    bodies.push(text);
+    return text;
+  }
+  const modelPath = '/api/v1/chat/completions';
+  const modelHeaders = {
+    origin,
+    cookie: session.cookie,
+    authorization: 'Bearer host-remote-placeholder',
+    'content-type': 'application/json',
+    accept: 'application/json',
+    'x-forwarded-for': '192.0.2.1',
+    'x-authorization': 'untrusted-header',
+  };
+  for (const stream of [false, true]) {
+    await capture(
+      modelPath,
+      {
+        method: 'POST',
+        headers: modelHeaders,
+        body: JSON.stringify({ stream, messages: [] }),
+      },
+      200,
+    );
+  }
+  await capture(
+    modelPath,
+    {
+      method: 'POST',
+      headers: { ...modelHeaders, authorization: 'arbitrary' },
+      body: '{}',
+    },
+    200,
+  );
+  for (const authorization of [`Bearer ${session.token}`, 'arbitrary']) {
+    await capture(
+      modelPath,
+      {
+        method: 'POST',
+        headers: { origin, authorization },
+        body: '{}',
+      },
+      401,
+    );
+  }
+  await capture(`/api/lessons/${lesson.id}`, { headers: { cookie: session.cookie, origin } }, 401);
+  await capture(
+    '/api/progress',
+    {
+      method: 'POST',
+      headers: { cookie: session.cookie, origin },
+      body: '{}',
+    },
+    401,
+  );
+  await capture(
+    modelPath,
+    {
+      method: 'POST',
+      headers: { ...modelHeaders, origin: 'http://foreign.invalid' },
+      body: '{}',
+    },
+    403,
+  );
+  await capture(
+    '/api/lessons/unknown',
+    {
+      headers: { authorization: `Bearer ${session.token}` },
+    },
+    404,
+  );
+  const state = JSON.parse(
+    await capture(
+      '/api/__test/state',
+      {
+        headers: { authorization: `Bearer ${session.token}` },
+      },
+      200,
+    ),
+  );
+  expect(state.proxyBodies).toEqual([
+    { stream: false, messages: [] },
+    { stream: true, messages: [] },
+    {},
+  ]);
+  expect(state.proxyHeaderNames).toEqual(
+    Array.from({ length: 3 }, () => ['accept', 'authorization', 'content-type']),
+  );
+  expect(JSON.stringify([...bodies, ...headers])).not.toContain(upstreamKey);
+  for (const text of bodies) {
+    expect(text).not.toContain(session.cookieValue);
+    expect(text).not.toContain('host-remote-placeholder');
+    expect(text).not.toContain('untrusted-header');
+  }
+});
+
+it('rejects expired and duplicate model cookies', async () => {
+  const { origin, advance } = await serve();
+  const { cookie } = await issueSession(origin);
+  const post = (value: string): Promise<Response> =>
+    fetch(`${origin}/api/v1/chat/completions`, {
+      method: 'POST',
+      headers: { origin, cookie: value },
+      body: '{}',
+    });
+  expect((await post(`${cookie}; galaxie-agent-session=other`)).status).toBe(401);
+  expect((await post(`galaxie-agent-session=other; ${cookie}`)).status).toBe(401);
+  advance(300_000);
+  expect((await post(cookie)).status).toBe(401);
+});
+
+it('ends the cookie-identified session and clears the cookie even without a live session', async () => {
+  const { origin, advance } = await serve();
+  const session = await issueSession(origin);
+  const end = async (cookie?: string): Promise<void> => {
+    const response = await fetch(`${origin}/api/v1/session/end`, {
+      method: 'POST',
+      headers: { origin, ...(cookie === undefined ? {} : { cookie }) },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toBe(
+      'galaxie-agent-session=; HttpOnly; SameSite=Strict; Path=/api/v1; Max-Age=0',
+    );
+    expect(await response.json()).toEqual({ ended: true });
+  };
+  await end(session.cookie);
+  expect(
+    (
+      await fetch(`${origin}/api/v1/chat/completions`, {
+        method: 'POST',
+        headers: { origin, cookie: session.cookie },
+        body: '{}',
+      })
+    ).status,
+  ).toBe(401);
+  expect(
+    (
+      await fetch(`${origin}/api/lessons/${lesson.id}`, {
+        headers: { authorization: `Bearer ${session.token}` },
+      })
+    ).status,
+  ).toBe(401);
+  await end();
+  await end(session.cookie);
+  const renewed = await issueSession(origin);
+  await end(`${renewed.cookie}; galaxie-agent-session=other`);
+  advance();
+  await end(renewed.cookie);
+});
+
+it('requires an exact Origin on cookie routes while bearer-only routes allow an absent Origin', async () => {
+  const { origin } = await serve();
+  const session = await issueSession(origin);
+  for (const path of ['/api/session', '/api/v1/chat/completions', '/api/v1/session/end']) {
+    for (const supplied of [undefined, 'null', `${origin}.foreign.invalid`, 'http://127.0.0.1:1']) {
+      const response = await fetch(`${origin}${path}`, {
+        method: 'POST',
+        headers: {
+          cookie: session.cookie,
+          ...(supplied === undefined ? {} : { origin: supplied }),
+        },
+        body: '{}',
+      });
+      expect(response.status).toBe(403);
+    }
+  }
+  const headers = { authorization: `Bearer ${session.token}`, 'content-type': 'application/json' };
+  const body = JSON.stringify({ lessonId: lesson.id, score: 2, total: 3 });
+  expect((await fetch(`${origin}/api/progress`, { method: 'POST', headers, body })).status).toBe(
+    200,
+  );
+  expect(
+    (
+      await fetch(`${origin}/api/progress`, {
+        method: 'POST',
+        headers: { ...headers, origin: 'http://foreign.invalid' },
+        body,
+      })
+    ).status,
+  ).toBe(403);
+});
 
 it('serves the tutor fixture and isolates state per server', async () => {
   expect(lesson).toEqual(lessonFixture);
@@ -201,8 +425,13 @@ it('validates progress like the tutor schema and derives the learner from the to
 
 it('answers JSON and complete SSE chat requests with usage', async () => {
   const { origin } = await serve();
+  const issued = await fetch(`${origin}/api/session`, { method: 'POST', headers: { origin } });
+  const cookie = issued.headers.get('set-cookie')?.split(';')[0];
+  expect(cookie).toBeTruthy();
   const headers = {
     authorization: `Bearer ${await token(origin)}`,
+    cookie: cookie as string,
+    origin,
     'content-type': 'application/json',
   };
   for (const stream of [false, true]) {
