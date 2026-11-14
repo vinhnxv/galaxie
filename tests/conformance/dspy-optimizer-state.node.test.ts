@@ -97,6 +97,42 @@ def create_agent():
   }
 });
 
+test('the Worker loads MIPROv2 augmented demos as dictionaries', async () => {
+  const sources = await dspyOptimizerStateSources('optstate-mipro');
+  sources['selected.py'] = `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+# SPDX-License-Identifier: Apache-2.0
+from pathlib import Path
+import dspy
+from galaxie.dspy import Executor
+from optimizer_state_suite import build
+class Catalog(dspy.Module):
+    async def aforward(self, question):
+        module = build('optstate-mipro')
+        module.load(Path(__file__).with_name('state.json'))
+        return dspy.Prediction(dictionaries=all(isinstance(demo, dict) for demo in module.demos), keys=sorted(module.demos[0]))
+def create_agent():
+    return Executor(Catalog())
+`;
+  const fixture = await createPythonFixture({ framework: 'dspy', module: 'selected', sources });
+  try {
+    const actual = await executeDspyOptimizerStateCase(
+      fixture.options,
+      fixture.agent,
+      'optstate-mipro',
+    );
+    expect(actual.error).toBeNull();
+    expect(actual.output).toEqual({
+      dictionaries: true,
+      keys: ['answer', 'augmented', 'question'],
+    });
+    expect(actual.requests).toEqual([]);
+    expect(fixture.workerErrors).toEqual([]);
+    expect(fixture.requests.every((request) => request.url.startsWith('/python/'))).toBe(true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
 test('optimizer states form a separate complete golden family', async () => {
   expect(dspyOptimizerStateCases).toEqual(Object.keys(fixtures));
   expect([...dspyOptimizerStateCases].sort()).toEqual(

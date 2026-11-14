@@ -4,6 +4,7 @@
 """Regenerate or check real optimizer JSON states and native transcripts."""
 
 import asyncio
+import importlib.util
 import json
 from pathlib import Path
 import sys
@@ -28,8 +29,13 @@ def save_or_check(path, value):
 
 
 states = sorted({fixture['state'] for fixture in FIXTURES.values()})
+derived = 0
 for name in states:
+    if FIXTURES[name]['optimizer'] == 'MIPROv2' and importlib.util.find_spec('optuna') is None:
+        print('SKIPPED MIPROv2 re-derivation: needs the optimizers dependency group; loading and goldens still run.')
+        continue
     save_or_check(STATES / f'{name}.json', optimize(name))
+    derived += 1
 for name in FIXTURES:
     save_or_check(goldens / f'{name}.json', asyncio.run(record(name)))
-print(f"{'Checked' if checking else 'Recorded'} {len(states)} DSPy optimizer states and {len(FIXTURES)} native cases.")
+print(f"{'Checked' if checking else 'Recorded'} {derived}/{len(states)} DSPy optimizer producers and {len(FIXTURES)} native cases.")

@@ -4,6 +4,7 @@
 """Independent native parity, optimizer provenance and portable-state facts."""
 
 import asyncio
+import importlib.util
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -21,7 +22,10 @@ def test_optimizer_state_matches_native_golden(name):
     assert asyncio.run(native.record(name)) == json.loads(golden.read_text())
 
 
-@pytest.mark.parametrize('name', sorted({fixture['state'] for fixture in native.FIXTURES.values()}))
+@pytest.mark.parametrize('name', [pytest.param(name, marks=pytest.mark.skipif(
+    name == 'optstate-mipro' and importlib.util.find_spec('optuna') is None,
+    reason='MIPROv2 re-derivation needs the optimizers dependency group'))
+    for name in sorted({fixture['state'] for fixture in native.FIXTURES.values()})])
 def test_optimizer_state_reproducible_and_nonvacuous(name):
     saved = json.loads((native.STATES / f'{name}.json').read_text())
     assert native.optimize(name) == saved
@@ -36,6 +40,8 @@ def test_optimizer_state_hygiene_and_prompt(name):
     saved = json.loads(path.read_text(encoding='utf-8'))
     assert saved['metadata']['dependency_versions']['dspy'] == dspy.__version__
     assert saved['lm'] is None
+    assert saved['signature']['instructions'] == native.FIXTURES[name]['proposals']['proposed_instruction']
+    assert saved['signature']['instructions'] != native.suite.build(name).signature.instructions
     assert path.stat().st_size < 64 * 1024
     assert 'not-a-real-key' not in path.read_text()
     def check(value):
@@ -58,6 +64,17 @@ def test_optimizer_state_hygiene_and_prompt(name):
         baseline = native.suite.build(name).dump_state()
         assert saved['signature']['fields'] == baseline['signature']['fields']
         assert saved['demos'] == saved['traces'] == saved['train'] == []
+    if name == 'optstate-mipro':
+        assert len(saved['demos']) == 1
+        assert set(saved['demos'][0]) == {'augmented', 'question', 'answer'}
+        assert saved['demos'][0]['augmented'] is True
+        loaded = native.suite.build(name)
+        loaded.load(path)
+        assert isinstance(loaded.demos[0], dict)
+        messages = transcript['requests'][0]['messages']
+        assert [message['role'] for message in messages] == ['system', 'user', 'assistant', 'user']
+        assert saved['demos'][0]['question'] in messages[1]['content']
+        assert saved['demos'][0]['answer'] in messages[2]['content']
 
 
 def test_optimizer_state_missing_rebind_fails_before_network():

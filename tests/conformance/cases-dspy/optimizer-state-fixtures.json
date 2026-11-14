@@ -22,7 +22,7 @@
   },
   "optstate-forgot-lm": {
     "optimizer": "refusal",
-    "state": "optstate-copro",
+    "state": "optstate-mipro",
     "question": "What is the capital of France?",
     "replies": []
   },
@@ -48,5 +48,35 @@
     ],
     "expectedMetricCalls": 5,
     "expectedScoringCalls": 4
+  },
+  "optstate-mipro": {
+    "optimizer": "MIPROv2",
+    "state": "optstate-mipro",
+    "question": "What is the capital of France?",
+    "trainset": [
+      {
+        "question": "What is the capital of Spain?",
+        "answer": "Madrid"
+      },
+      {
+        "question": "What is the capital of Italy?",
+        "answer": "Rome"
+      }
+    ],
+    "valset": [
+      {
+        "question": "What is the capital of France?",
+        "answer": "Paris"
+      }
+    ],
+    "proposals": {
+      "proposed_instruction": "Answer with the capital city using the offline MIPROv2 instruction."
+    },
+    "expectedEngineCalls": 6,
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ]
   }
 }

@@ -48,7 +48,12 @@ class ScriptedEngine:
         outputs = system.split('Your output fields are:', 1)[1].split('All interactions', 1)[0]
         fields = re.findall(r'`(\w+)`', outputs)
         values = self.fixture['proposals']
-        answers = {field: values[field] if field != 'answer' else (self.fixture['trainset'][0]['answer'] if values['proposed_instruction'] in system else 'Unknown') for field in fields}
+        answer = self.fixture['trainset'][0]['answer'] if values['proposed_instruction'] in system else 'Unknown'
+        if self.fixture['optimizer'] == 'MIPROv2':
+            question = payload['messages'][-1]['content']
+            rows = self.fixture['trainset'] + (self.fixture['valset'] if values['proposed_instruction'] in system and len(payload['messages']) > 2 else [])
+            answer = next((row['answer'] for row in rows if row['question'] in question), 'Unknown')
+        answers = {field: answer if field == 'answer' else values[field] for field in fields}
         if 'Outputs will be a JSON object' in system:
             text = json.dumps(answers)
         else:
@@ -84,6 +89,16 @@ def optimize(name):
             # GEPA checks its stop condition between iterations, not each score.
             assert len(metric_calls) == fixture['expectedMetricCalls']
             assert sum(value is None for value in metric_calls) == fixture['expectedScoringCalls']
+        elif fixture['optimizer'] == 'MIPROv2':
+            valset = [dspy.Example(**row).with_inputs('question') for row in fixture['valset']]
+            module = dspy.MIPROv2(metric=metric, prompt_model=lm, task_model=lm, auto=None,
+                                  num_candidates=2, num_threads=1, max_bootstrapped_demos=1,
+                                  max_labeled_demos=0, max_errors=3, seed=0).compile(
+                                  suite.build(name), trainset=trainset, valset=valset,
+                                  num_trials=2, minibatch=False, seed=0,
+                                  program_aware_proposer=False, data_aware_proposer=False,
+                                  tip_aware_proposer=False, fewshot_aware_proposer=False,
+                                  requires_permission_to_run=False)
         else:
             module = dspy.COPRO(prompt_model=lm, metric=metric,
                             breadth=2, depth=1).compile(suite.build(name), trainset=trainset,
