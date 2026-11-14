@@ -525,7 +525,8 @@ class _CapabilityTool(BaseTool):
             except GalaxieError as error:
                 raise run.fail(error) from None
             try:
-                result = await capabilities.call(self._capability, _json(args), effect_scope=scope, tool=True)
+                result = await capabilities.call(self._capability, _json(args), effect_scope=scope, tool=True,
+                                                 inner=_inner_scope.get() is not None)
             except GalaxieError as error:
                 # A denial or a validation failure is the model's to see, as a fixed message.
                 if error.code in _MODEL_VISIBLE:
@@ -582,7 +583,7 @@ class _AgentTool(AgentTool):
 
 
 def agent_tool(agent: Any) -> BaseTool:
-    """Wrap one admitted, capability-free agent tree as a tool."""
+    """Wrap an admitted inner tree; inner capabilities require a read/none host policy."""
     if not isinstance(agent, BaseAgent):
         raise GalaxieError('invalid')
     wrapper = _AgentTool(agent)
@@ -746,11 +747,13 @@ def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str
                         raise GalaxieError('unsupported')
                     walk(tool.agent, False, depth + 1, {*path, id(agent)}, (), True)
                     continue
-                if inner:
-                    raise GalaxieError('unsupported')
                 if type(tool) is _CapabilityTool and tool in _tools:
+                    if inner and tool.pauses:
+                        raise GalaxieError('unsupported')
                     pauses = pauses or cast(_CapabilityTool, tool).pauses
                     continue
+                if inner:
+                    raise GalaxieError('unsupported')
                 if _is_exit(tool):
                     exits = True
                     # An escalation inside a parallel agent cancels its other branches, so a resumable
