@@ -473,6 +473,11 @@ export function createPyodideAdapter(
             let payload: unknown;
             if (message.op === 'capability') {
               const input = message.payload as CapabilityPayload;
+              if (input.inner === true) {
+                const policy = capabilityBindingPolicy(run.request.capabilities, input.name);
+                if (policy?.kind !== 'read' || policy.approval !== 'none')
+                  throw adapterFailure('unsupported');
+              }
               if (input.tool === true) {
                 const policy = capabilityBindingPolicy(run.request.capabilities, input.name);
                 if (
