@@ -1,0 +1,122 @@
+{
+  "demonstration": true,
+  "daemonSelection": "DOCKER_HOST=unix://$HOME/.colima/default/docker.sock",
+  "checks": [
+    {
+      "command": "pnpm install && pnpm build",
+      "location": "repository root",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "location": "isolated spike",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm exec vitest run",
+      "outcome": "passed",
+      "tests": 14,
+      "liveTestsSkipped": 1
+    },
+    {
+      "command": "pnpm exec tsc --noEmit",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run stack:up",
+      "outcome": "passed",
+      "services": 8
+    },
+    {
+      "command": "pnpm run smoke",
+      "outcome": "passed",
+      "langfuseObservations": 2,
+      "mlflowTraces": 1,
+      "mlflowSpans": 2
+    },
+    {
+      "command": "docker compose ps --format json; docker compose port; lsof -nP -iTCP -sTCP:LISTEN",
+      "outcome": "passed",
+      "publishedPorts": [3000, 5100, 4318],
+      "address": "127.0.0.1"
+    },
+    {
+      "command": "gitleaks git --pre-commit --staged --redact",
+      "outcome": "passed",
+      "actualPreCommitHook": "passed"
+    },
+    {
+      "command": "pnpm format",
+      "outcome": "passed",
+      "note": "Existing repository warnings and informational diagnostics remain; no check was weakened."
+    },
+    {
+      "command": "pnpm run check:docs",
+      "outcome": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run stack:down",
+      "outcome": "passed",
+      "remainingProjectContainers": 0,
+      "remainingProjectVolumes": 0
+    }
+  ],
+  "cleanCheckout": {
+    "source": "fresh local clone of spike/llmops-trace-sinks-stack",
+    "failedAttempt": {
+      "hostPath": "/private/tmp/galaxie-llmops-clean-checkout",
+      "command": "pnpm run stack:up",
+      "output": "Collector did not become ready within 30 seconds",
+      "bindProbeOutput": "cat: /tmp/collector.yaml: Is a directory",
+      "diagnosis": "Colima does not share /private/tmp on this machine. Docker's short bind syntax created a directory at the missing daemon-side collector.yaml path.",
+      "teardown": "pnpm run stack:down passed; volumes removed"
+    },
+    "successfulAttempt": {
+      "hostPath": "Colima-shared /Users checkout",
+      "commands": [
+        "pnpm install",
+        "pnpm build",
+        "pnpm install --frozen-lockfile",
+        "pnpm exec vitest run test/single-copy.test.ts test/static.test.ts test/lifecycle.test.ts",
+        "pnpm exec tsc --noEmit",
+        "pnpm run stack:up",
+        "pnpm run smoke",
+        "pnpm exec vitest run test/static.test.ts",
+        "pnpm run stack:down"
+      ],
+      "outcome": "passed",
+      "codeCommit": "82ed35d020ec2401c3979db89aa0e7e3f34cb5b5",
+      "freshCloneUnderSharedPath": true,
+      "offlineTests": 14,
+      "postSmokeStaticTests": 10
+    },
+    "correction": "Document the daemon-visible checkout requirement and use bind.create_host_path: false."
+  },
+  "repositoryGate": {
+    "command": "pnpm check",
+    "pathPrefix": "<GOPATH>/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.3.darwin-arm64/bin",
+    "outcome": "passed",
+    "nodeAndChromium": {
+      "filesPassed": 507,
+      "testsPassed": 7469,
+      "expectedFailures": 2,
+      "skippedTests": 165
+    },
+    "python": {
+      "passed": 1968,
+      "skipped": 1
+    },
+    "remainingGates": "Go tests, Python typecheck, builds, dependency boundaries, documentation and size gates passed."
+  },
+  "browserUiCheck": "Not applicable: no application routes changed. The repository gate separately runs its configured Chromium tests.",
+  "limits": "Hand-made spans only. No galaxie runs, browser export, real models, prompts, workflows, scores, evaluation, performance, capacity, failure recovery, retry delivery guarantees or vendor telemetry payload measurements.",
+  "review": {
+    "confirmedFindingsFixed": 3,
+    "remainingFindings": 0,
+    "proof": "CLI boundary tests failed before the fix and pass afterward. A synthetic canary proves the credential scan rejects inclusion; no real credential was written to results."
+  }
+}

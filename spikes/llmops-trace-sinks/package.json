@@ -1,0 +1,42 @@
+{
+  "name": "galaxie-spike-llmops-trace-sinks",
+  "private": true,
+  "description": "Local trace collector fan-out demonstration with hand-made spans.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "stack:up": "tsc -p tsconfig.scripts.json && node dist/stack.js up",
+    "stack:down": "tsc -p tsconfig.scripts.json && node dist/stack.js down",
+    "smoke": "LLMOPS_STACK=1 vitest run test/stack.test.ts"
+  },
+  "dependencies": {
+    "@galaxie-ai/core": "link:../../packages/core",
+    "@galaxie-ai/ui-protocol": "link:../../packages/ui-protocol",
+    "@galaxie-ai/adapter-kit": "link:../../packages/adapter-kit",
+    "@galaxie-ai/adapter-langgraph": "link:../../packages/adapter-langgraph",
+    "@galaxie-ai/adapter-adk": "link:../../packages/adapter-adk",
+    "@galaxie-ai/adapter-pyodide": "link:../../packages/adapter-pyodide",
+    "@galaxie-ai/adapter-go": "link:../../packages/adapter-go",
+    "@galaxie-ai/models": "link:../../packages/models",
+    "@galaxie-ai/storage-indexeddb": "link:../../packages/storage-indexeddb",
+    "@galaxie-ai/tools-mcp": "link:../../packages/tools-mcp",
+    "@langchain/core": "1.2.20",
+    "@langchain/langgraph": "1.5.1",
+    "@langchain/langgraph-checkpoint": "1.2.0",
+    "@opentelemetry/api": "1.10.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.5",
+    "yaml": "2.8.2"
+  }
+}
