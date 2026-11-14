@@ -87,15 +87,15 @@ static breakpoints and reusing an answered interaction fail `unsupported`.
 
 The November 2026 spike records **alternative** for binding/replies, streamed
 replies, confirmed writes, the safety floor and durable replay. It ships no
-`galaxie.langchain.capability_tool` or `bind_tools` implementation. The
+`galaxie.langchain.capability_tool` or native tool-call support. The
 [execution-identity rerun](../../docs/adr/0018-python-agents-through-pyodide.md#execution-identity-rerun-2026-11-13)
 records **refused**: a test-local driver scope preserves swallowed terminal codes,
 but read effect IDs change on replay and abrupt loss before a tool checkpoint has
 no public saved-step retry path. An already parked sibling confirmation can still
-invoke its host write after a failure latch. The unchanged
-proxy refuses tool history as `unsupported` and reply tool parts as `invalid`;
-inherited `bind_tools` raises `NotImplementedError` in CPython. The Worker maps an
-uncaught bind failure at boot to `unavailable`, or during a run to `executor_error`.
+invoke its host write after a failure latch. The proxy refuses tool history as `unsupported` and reply tool parts as `invalid`.
+`bind_tools` and default `with_structured_output` now raise fixed `unsupported`,
+also catchable as `NotImplementedError`. Uncaught factory and graph-node refusals
+retain that code through the Worker; no tool declarations are admitted.
 
 Use an ordinary node with a routed text model, validate a small JSON request
 against author-owned names and argument shapes, then await the broker directly:
@@ -137,9 +137,23 @@ the candidate guard. Plain tools, arbitrary binding forms and multimodal/tool
 message neighbours remain **refused** on this proxy. Scripted CPython tests compare
 the replacement with native tool-call loops; Node Pyodide additionally exercises
 host confirmations, budget termination, private-result destination refusal and
-fresh-Worker restore/replay. New Chromium reload, Firefox, WebKit and real models
-are unmeasured. See the [gate record](../../docs/adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-replies-spike-2026-11)
+fresh-Worker restore/replay. The 2026-11-14 measurements additionally pass both
+text-protocol write reload modes on Chromium, Firefox and WebKit. Real models
+remain unmeasured. See the [gate record](../../docs/adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-replies-spike-2026-11)
 and [executable evidence](../../tests/conformance/README.md#langgraph-python-tool-call-replies-spike).
+
+Ordinary author `StructuredTool` bodies may use `capabilities.call` with
+`tool=True` over this text protocol. Native pydantic argument validation returns
+error text before any broker request; dict schemas reach the broker and retain
+`invalid`. Keep the default ToolNode error handler so terminal GalaxieErrors
+escape. Explicit handlers can swallow a host failure; they do not establish a
+terminal latch. Broker `invalid` also covers binding errors and must not be
+classified as schema-only model text. These are scripted native/Node measurements,
+not native model binding support. Split tool IDs and names expose native merge
+differences; streamed tool deltas remain refused on the shipped proxy. Chromium
+candidate replay retains write receipts but generates fresh read IDs, and abrupt
+loss before a tool checkpoint has no public retry path. See the
+[measurement record](../../docs/adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-measurements-2026-11-14).
 
 For LangGraph Python, `interrupts`, `resume`, `checkpoints`, `streaming` and
 `subgraphs` are true. For durable sessions, supply
@@ -1044,7 +1058,11 @@ host confirmation coverage for it, and it refuses a name with no binding. The re
 `invalid` error and the capability does not run. The ADK helper returns it to the model as a
 fixed message; the DSPy and pydantic-ai helpers end the run with that error. A direct `galaxie.capabilities.call(...)` from
 agent code is not a model-chosen call and is unchanged. A tool you write yourself that calls
-`capabilities.call` without `tool=True` is outside this check.
+`capabilities.call` without `tool=True` is outside this additional adapter check;
+the broker still applies its binding policy, labels, budgets and confirmations.
+An ordinary LangGraph Python tool body can opt into the same check with
+`tool=True`; default ToolNode handling propagates failures, while explicit author
+handlers may swallow them (see the measurement record above).
 
 The conformance cases show these shapes with the same results as native ADK 2.12.0: a single
 `LlmAgent`, a `SequentialAgent`, a `ParallelAgent` (inside a sequence), a `LoopAgent`, and an

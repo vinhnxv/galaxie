@@ -27,6 +27,7 @@
     "New tool-reply probes have no Chromium reload, Firefox, WebKit or real-model measurement. Existing twelve-case projections, case names, golden bytes and locks are unchanged. Inherited Python bind_tools raises NotImplementedError rather than GalaxieError; fixed Worker translation depends on boot versus run.",
     "Pyodide lanes compare projected stream events for eight cases, and pending values and final counters for the four original interrupt cases; complete checkpoint histories are native-only.",
     "Interrupt-subgraph reload compares the same pending ID/value and final counters after reconstruction; accepted-answer reconciliation is covered by the three original reload cases.",
+    "2026-11-14 supersedes the historical bind_tools and browser-measurement limit above: binding and default structured output now raise fixed unsupported GalaxieError, also NotImplementedError, through Worker boot and run. Scripted ordinary tool=True bodies retain broker policy; invalid still conflates schema and binding causes. Text-protocol real reload passes Chromium, Firefox and WebKit. Split streamed metadata and Chromium read replay/abrupt-loss counterexamples retain helper refusal; real models remain unmeasured.",
     "Models and capability replies are deterministic fixtures. No real model or external network is used."
   ]
 }

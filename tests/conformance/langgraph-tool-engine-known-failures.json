@@ -1,0 +1,8 @@
+{
+  "chromium": [
+    "chromium candidate replayed reads retain effect IDs",
+    "chromium candidate abrupt write loss recovers"
+  ],
+  "firefox": [],
+  "webkit": []
+}

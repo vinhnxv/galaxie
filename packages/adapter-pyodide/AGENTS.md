@@ -45,7 +45,13 @@ streaming from Python `ainvoke`. Growing text and final text are checked in Java
 before forwarding; earlier allowed deltas cannot be retracted after a block.
 The LangGraph proxy supports asynchronous text-only model calls and streaming;
 model-chosen calls use the measured [text-protocol replacement](README.md#langgraph-python-model-chosen-calls-through-text).
-Native tool binding remains unimplemented. The execution-identity rerun preserves
+Native tool calls remain refused. `bind_tools` and default structured output
+raise fixed `unsupported`, also catchable as `NotImplementedError`, at construction
+or run. Ordinary author tool bodies may call capabilities with `tool=True` to
+retain the adapter binding check; preserve default ToolNode error handling.
+Broker `invalid` also denotes binding errors, so never turn it into schema-only
+model text. Text-protocol reload passes local Chromium, Firefox and WebKit
+measurements; streamed metadata and arbitrary crash recovery remain refused. The execution-identity rerun preserves
 swallowed codes test-locally but refuses promotion after read-identity and abrupt
 recovery failures; a parked sibling confirmation also survives the latch. Keep
 the candidate test-only; see the [decision and limits](../../docs/adr/0018-python-agents-through-pyodide.md#execution-identity-rerun-2026-11-13).

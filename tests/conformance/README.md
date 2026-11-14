@@ -2528,16 +2528,19 @@ goldens and Chromium load budget are unchanged.
 
 The helper candidate is confined to measurement files. A fresh run can succeed on
 its prepared Worker after failure, but this is not proof of a latch: none was
-built. Inherited shipped `bind_tools` raises `NotImplementedError` in CPython;
-Worker normalization is `unavailable` at boot or `executor_error` during a run.
+built. Shipped `bind_tools` now raises fixed `unsupported` as both GalaxieError
+and NotImplementedError, including default structured output. Uncaught Worker
+construction and run refusals retain `unsupported`; the November 14 measurements
+below supersede the original normalization gap.
 Native model binding and direct trusted capability calls remain outside the
 candidate guard. The [author recipe](../../packages/adapter-pyodide/README.md#langgraph-python-model-chosen-calls-through-text)
 uses plain JSON text and direct broker calls, retains host-confirmed write setup
 and lets terminal errors escape. It supplies no ToolNode, schema-constrained
 choice or streamed tool deltas, and omits the helper tool-policy flag.
 
-New Chromium reload, Firefox, WebKit, real models, other versions and other
-executors remain unmeasured. Existing Chromium coverage remains unchanged.
+The November 14 measurements below add real text-protocol page reloads on
+Chromium, Firefox and WebKit. Real models, other versions and other executors
+remain unmeasured; the existing Chromium harness remains unchanged.
 
 ```sh
 pnpm run test:python ../tests/conformance/cases-python/test_tool_call_replies_native.py
@@ -2942,3 +2945,38 @@ the existing Chromium lane is
 first on PATH with `GOTOOLCHAIN=local`, and a command timeout of at least
 1800000 ms for browser/full runs. All measurements use scripted models; real
 models, devices and unrun engines remain unmeasured.
+
+
+## LangGraph Python tool-call measurements
+
+The [November 14 record](../../docs/adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-measurements-2026-11-14)
+normalizes only the binding refusal; no model-chosen-call helper ships.
+`test_langchain_bind_tools.py` and `pyodide-bind-tools.node.test.ts` retain native
+and Worker before/after characterization. The private refusal remains catchable
+as NotImplementedError and is fixed unsupported without argument inspection.
+`test_langchain_tool_ordinary.py`, `tool_ordinary.py` and
+`pyodide-tool-ordinary.node.test.ts` measure ordinary author bodies over the checked
+text protocol: labels, budgets, grants, confirmation, default and swallowing
+handlers, and pydantic-before-broker versus dict-schema broker validation.
+Schema and binding errors share invalid, so the broker-invalid-as-model-text
+variant remains refused.
+
+The new test-local `tool_streaming_candidate.py`, its native test and
+`pyodide-tool-streaming.node.test.ts` measure split metadata, interleaved argument
+chunks, zero dispatch at the first forwarded delta, malformed/oversized streams
+and five ToolMessage forms. Split IDs do not merge as predicted natively;
+split names merge differently in pinned Python and JavaScript LangChain. Both
+counterexamples end fixed invalid before capabilities. Full initial IDs/names
+and interleaved argument fragments pass. The candidate is evidence only.
+
+The separate `python-tool-engines.node.test.ts` page reuses the unchanged DSPy
+builder and loads the retained text fixture read-only. Both replay settings pass
+native final/call/write comparison across real IndexedDB page reloads on local
+Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2 under strict CSP, with no
+external requests. Chromium also reproduces fresh replayed read IDs and missing
+public recovery after abrupt page loss following a succeeded write receipt.
+Parallel write receipts survive without redispatch. The two failed invariants
+are registered in `langgraph-tool-engine-known-failures.json` and run as
+`test.fails`; separate observation tests identify their failure causes. Those
+candidate cells are unmeasured on Firefox/WebKit: their skipped tests are never
+passes. No existing case, assertion, golden, lock or matrix entry changes.

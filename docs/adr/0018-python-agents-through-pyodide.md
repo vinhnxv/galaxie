@@ -1058,13 +1058,14 @@ residual graph that swallows a failure and makes no further proxy request remain
 outside any proxy latch's observation; it is not claimed as contained.
 
 Premise verification passed 63 unchanged CPython tests and 127 Node
-adapter/Pyodide/JavaScript-tool tests. The proxy has no binding implementation,
-rejects tool history as `unsupported` and reply `toolCalls` as `invalid`; the
-adapter refuses an unsolicited tool reply. One premise prediction was too broad:
-inherited `bind_tools` raises `NotImplementedError`, not fixed Python
-`unsupported`/`invalid`. The Worker maps uncaught construction failure to
-`unavailable` and run failure to `executor_error`. This existing normalization
-gap is retained and handed off, rather than changing source after the veto.
+adapter/Pyodide/JavaScript-tool tests. At that original measurement the proxy
+had no binding implementation, rejected tool history as `unsupported` and reply `toolCalls` as `invalid`; the
+adapter refused an unsolicited tool reply. One premise prediction was too broad:
+inherited `bind_tools` raised `NotImplementedError`, not fixed Python
+`unsupported`/`invalid`. The Worker mapped uncaught construction failure to
+`unavailable` and run failure to `executor_error`. That historical normalization gap was retained after this veto; the
+[2026-11-14 measurement](#langgraph-python-tool-call-measurements-2026-11-14)
+subsequently closes it with a fixed refusal that also remains a NotImplementedError.
 No pre-existing LangGraph Python binding or ToolNode fixture was found. Graphs
 are constructed at Worker boot, so host prepare never sees their tool list.
 
@@ -1278,3 +1279,178 @@ The shipped text proxy and all its refusal behavior remain unchanged. The only
 package-file changes are documentation; core, bridge shapes, policy, stored
 formats, existing goldens, matrices, case lists, recorders and locks are unchanged.
 This ADR remains Proposed.
+
+
+#### LangGraph Python tool-call measurements (2026-11-14)
+
+**Outcome rule registered before measurement.** This record measures
+scripted models only. The retained helper remains REFUSED because execution
+identity does not repair replayed reads or abrupt-loss recovery. Text-protocol
+calls remain the alternative. No helper promotion, core or bridge change,
+existing assertion edit, golden rewrite or lock change is permitted.
+
+L1 is native CPython with the pinned LangChain/LangGraph versions. L2 is Node
+Pyodide through core and the adapter. L3 is a real Chromium page with IndexedDB;
+L4 Firefox and L5 WebKit count only when actually run. Unrun cells are UNMEASURED,
+cut cells INCOMPLETE, and excluded lanes NA. No skipped test counts as PASS.
+
+| Gate | Registered expectation | Lanes |
+| --- | --- | --- |
+| M1 | Text-protocol reload preserves pending interaction, final text, ordered calls and write count, with replay false and true, against native reference. | L3; L4/L5 if run |
+| M2.1 | At least three name/id/argument deltas merge like native AIMessageChunk. | L1/L2 |
+| M2.2 | Two interleaved call indexes preserve both calls and IDs. | L1/L2 |
+| M2.3 | First delta dispatches zero tool bodies or capability requests. | L1/L2 |
+| M2.4 | Inconsistent ID/name/arguments and oversized delta end with a recorded fixed code and no tool body. | L2 |
+| M3 | Parallel writes retain effect IDs; replayed reads get fresh IDs (expected FAIL). | L3 |
+| M4 | Abrupt loss after write receipt before ToolMessage checkpoint cannot recover (expected FAIL). | L3 |
+| M5 | String ToolMessage round-trips; list content, status error and artifact refuse unsupported; unknown tool_call_id refuses invalid. | L1/L2 |
+| A1 | Existing NotImplementedError assertion remains true and byte-identical. | L1 |
+| A2 | bind_tools raises fixed unsupported GalaxieError, also NotImplementedError, with no request. | L1 |
+| A3 | Hostile tools, choices and kwargs cannot change or contaminate the fixed error. | L1 |
+| A4 | Dict and pydantic structured-output refusal changes from NotImplementedError to fixed unsupported. | L1 |
+| A5 | Factory bind_tools refusal changes from unavailable to unsupported. | L2 |
+| A6 | Node bind_tools refusal changes from executor_error to unsupported. | L2 |
+| A7 | Native binding, tool-less proxy and direct capabilities keep existing behavior; golden check passes. | L1/L2 |
+| A8 | Python types and lint accept private dual-inheritance refusal. | static |
+| A9 | Prose agrees with the result; an additive matrix entry supersedes historical text. | docs |
+| O1 | Refused result labels prevent next provider dispatch with denied. | L1/L2 |
+| O2 | Tool budget n refuses n+1 before host dispatch. | L1/L2 |
+| O3 | Covered confirmed write runs once on frozen arguments; uncovered binding refuses invalid. | L2 |
+| O4 | Default ToolNode handler propagates six terminal codes and denied. | L1/L2 |
+| O5 | A body without tool=True lies outside the confirmation check. | L2 |
+| O6 | Explicit swallowing handlers can continue after terminal errors; documented limit, never a pass condition. | L1/L2 |
+| S1 | Pydantic argument validation produces native error text before broker requests or budget use. | L1/L2 |
+| S2 | Dict-schema argument validation reaches broker and ends invalid. | L2 |
+| S3 | Output checks, labels and ungranted capabilities yield denied. | L1/L2 |
+| S4 | Missing coverage, unknown names and invalid tool flags yield fixed invalid/denied. | L2 |
+| S5 | Determine whether codes distinguish schema failures from misconfiguration without changing broker/bridge. | derived |
+
+Normalization is SUPPORTED only if every A gate passes; otherwise REFUSED (failed
+gate) or INCOMPLETE (missing proof), with no production change. Its only allowed
+implementation is a private GalaxieError/NotImplementedError subclass and a
+bind_tools override in langchain.py. Ordinary tools use existing StructuredTool
+bodies with capabilities.call(tool=True), separately from the helper. They are
+ALTERNATIVE if O1 through O5 pass, REFUSED if labels or budgets fail, otherwise
+INCOMPLETE. O6 describes trusted author behavior and is not a pass condition.
+
+A refusal can become model text only when native validation decides its cause
+before the broker, or its code distinguishes it from terminal and binding errors.
+The six terminal codes remain terminal. The baseline retains denied as recoverable
+and latches every other code in the retained helper. Broker invalid becomes
+model text only with a proven distinguishing signal; otherwise that variant is
+REFUSED and the baseline is ALTERNATIVE. Python author code is trusted, can import
+js, and the Worker is not an isolation boundary. ADR-0012 remains unchanged.
+
+| Prediction | Registered expectation |
+| --- | --- |
+| P1 | Chromium M1 passes with both replay settings. |
+| P2 | M2.1–M2.3 pass; M2.4 detects inconsistencies before dispatch. |
+| P3 | Chromium M3/M4 reproduce the known Node failures. |
+| P4 | M5 preserves string content and the four fixed refusals. |
+| P5 | A1–A8 pass with dual inheritance. |
+| P6 | Structured output changes to fixed unsupported without breaking an existing assertion. |
+| P7 | O1–O4 pass; O5/O6 expose documented limits. |
+| P8 | Native pydantic validation is visible text; broker invalid has no distinguishing signal. |
+| P9 | Normalization SUPPORTED, ordinary tools ALTERNATIVE, baseline split kept, helper REFUSED. |
+
+Measurements stop early enough for final records and the full local gate. Cuts
+apply in order: Chromium candidate M3/M4, Firefox/WebKit, L2 serialization and
+ordinary variants beyond O1–O3, then L2 invalid streams. Final records are never
+cut. Candidates failing their gates ship no production change; their evidence
+remains and their own implementation commits are reverted.
+
+
+##### Measured outcome
+
+Normalization is **SUPPORTED**: the only production change is the private
+`GalaxieError`/`NotImplementedError` refusal and `bind_tools` override. Both direct
+binding and default structured-output binding now raise fixed `unsupported`,
+without inspecting or echoing tools, choices or kwargs. Uncaught Worker factory
+and graph-node refusals also retain `unsupported`. Native models with their own
+binding, direct capabilities and text-only proxy behavior retain their tests.
+This admits no model-chosen tool-call shape.
+
+Ordinary author `StructuredTool` bodies are **ALTERNATIVE** over the checked text
+protocol. Calling `capabilities.call(..., tool=True)` preserves the adapter's
+binding-policy check and the broker's labels, budgets, grants, argument freezing
+and host confirmations. Native pydantic argument errors become error ToolMessages
+before the broker. Dict schemas reach broker validation and end `invalid`.
+The baseline refusal split is **ALTERNATIVE**; making broker `invalid` model text
+is **REFUSED** because it also denotes binding/configuration failures. No bridge
+or broker signal distinguishes those causes. Default ToolNode error handling
+propagates GalaxieError; explicit author handlers can swallow a host `unavailable`
+and continue. Natural core budget exhaustion remains terminal in the measured
+handlers. This does not establish a general terminal latch for trusted author code.
+
+The helper and streaming promotion remain **REFUSED**. Splitting a nonempty ID
+across chunks does not produce the predicted native merge. Python retains separate
+chunks at the same index and invalid tool calls. Splitting names with a full ID
+works in native Python, but pinned JavaScript LangChain keeps the later name;
+the candidate refuses the inconsistent result `invalid` before any tool body.
+Full IDs and names followed by three argument fragments, and two interleaved
+indexes, do merge in the measured paths. These narrower passing cells do not
+repair either counterexample or the helper's recovery floor.
+
+The rule precedes all measurements in `568b5aa`. Before-value characterization is
+`ed796ed`; normalization and its after-values are `2921c92`; ordinary tools and
+code classification are `41b5205`. The empty engine registry was committed in
+`e43f302` before browser runs. Chromium text reload is `2507125`, streaming and
+serialization are `0584f2f`, and candidate Chromium evidence/registry entries are
+`9f8842a`. Firefox 157.0 and WebKit 27.2 subsequently ran the same two text reload
+cases. Chromium 156.0.8078.4 was rerun afterwards. All models are scripted, host
+capabilities counted, and browser assets loopback-only under the unchanged CSP.
+
+| Gate | L1 native CPython | L2 Node Pyodide/core | L3 Chromium | L4 Firefox / L5 WebKit |
+| --- | --- | --- | --- | --- |
+| M1 | NA: supplies native expected final/calls/write count. | PASS: unchanged fresh-Worker evidence. | PASS: replay false/true preserve pending identity and native final/calls, with one write across real reload. | PASS in both engines for both text reload modes. |
+| M2.1 | FAIL for split IDs; full-ID split-name/argument reference passes. | FAIL for split IDs and split names, fixed invalid, zero capability dispatch. | UNMEASURED: streaming lane is Node. | UNMEASURED. |
+| M2.2 | PASS: interleaved indexes with complete initial IDs. | PASS: two calls retain IDs, arguments and index order with full initial names. | UNMEASURED. | UNMEASURED. |
+| M2.3 | PASS: zero capability requests while deltas arrive. | PASS: provider is held after first forwarded delta; zero tool bodies/Worker capability requests before release. | UNMEASURED. | UNMEASURED. |
+| M2.4 | NA: registered for Node. | PASS: inconsistent IDs, names and arguments end invalid; oversized delta ends unsupported, all with zero tool bodies. | UNMEASURED. | UNMEASURED. |
+| M3 | NA: broker receipts required. | PASS for the retained failure characterization: identity-rerun evidence unchanged. | FAIL for replayed reads: same scopes, fresh IDs. Parallel confirmed writes separately PASS with two distinct succeeded receipts and no redispatch. | UNMEASURED: candidate tests deliberately not run. |
+| M4 | NA: browser loss required. | PASS for the retained failure characterization: identity-rerun evidence unchanged. | FAIL: page reload after succeeded receipt but before ToolMessage checkpoint leaves no restored run; adopted-session start is invalid. Receipt remains and no second write occurs. | UNMEASURED: candidate tests deliberately not run. |
+| M5 | PASS: string plus four refusal forms. | PASS: string round-trip; list/error/artifact unsupported; orphan ID invalid. | UNMEASURED. | UNMEASURED. |
+| A1 | PASS: existing NotImplementedError assertion unchanged. | NA. | NA. | NA. |
+| A2–A3 | PASS: fixed unsupported, dual class, zero requests and hostile argument independence. | NA: native argument probes. | NA. | NA. |
+| A4 | PASS: dict and pydantic before plain NotImplementedError, after fixed unsupported. | NA. | NA. | NA. |
+| A5–A6 | NA: Worker-only. | PASS: construction unavailable and run executor_error before; both unsupported after. | NA. | NA. |
+| A7 | PASS: native binding, existing proxy/direct-call tests and unchanged golden recorder. | PASS: new refusal probes and unchanged Node evidence in the local suite. | NA. | NA. |
+| A8 | PASS: pyright and lint accept dual inheritance. | NA: static check. | NA. | NA. |
+| A9 | PASS: current prose states fixed unsupported; additive matrix limit supersedes historical wording. | NA. | NA. | NA. |
+| O1–O2 | PASS: counted fake-transport reference matches direct call/refusal paths; real policy is not implemented in Python. | PASS: private result prevents second provider dispatch; budget 2 permits two of three host calls. | NA. | NA. |
+| O3 | NA: host confirmations required. | PASS: approved frozen write runs once, decline writes zero, missing coverage ends invalid. | NA. | NA. |
+| O4 | PASS: all six terminal codes and denied propagate under default handling. | PASS: five host-thrown terminal codes and denied propagate; budget is natural core exhaustion. | NA. | NA. |
+| O5 | NA: adapter policy required. | PASS observation: unflagged call omits tool field, bypasses the extra adapter check, but uncovered confirm-bound write still ends broker unsupported without dispatch. | NA. | NA. |
+| O6 | PASS observation only: both explicit handlers swallow budget_exceeded and finish under the fake transport. | PASS observation only: both swallow host unavailable and continue; natural budget remains terminal. | NA. | NA. |
+| S1 | PASS: pydantic-invalid arguments return native error text with zero broker requests. | PASS: same with zero tool budget and no capability request. | NA. | NA. |
+| S2 | PASS reference: dict schema reaches fake transport and retains invalid. | PASS: broker rejects arguments invalid before host invocation. | NA. | NA. |
+| S3 | PASS reference: fixed denied propagates; counted label reference above. | PASS: output check, sticky labels and missing run grant yield denied. | NA. | NA. |
+| S4 | PASS: non-bool tool flag fails before transport. | PASS: missing coverage, unbound/unknown name and non-bool tool flag yield invalid; zero host invocation. | NA. | NA. |
+| S5 | ALTERNATIVE baseline; broker-invalid-as-text REFUSED, derived from L2's shared code. | Same: no cause-distinguishing signal in the closed error envelope. | NA. | NA. |
+
+All planned units were exercised; no cell was cut as INCOMPLETE. The five skipped
+candidate tests in each Firefox/WebKit run are UNMEASURED, never passes. Two
+Chromium invariant titles first failed with the observed read IDs and missing run,
+then entered `langgraph-tool-engine-known-failures.json` and run as `test.fails`.
+Independent observation tests pin their exact causes so a fixture failure is not
+mistaken for the expected divergence. Each browser case uses one initial page and
+one real reload. No existing golden, matrix entry, lock or assertion changed.
+
+| Prediction | Result |
+| --- | --- |
+| P1 | Held: Chromium text reload passes in both replay modes; Firefox/WebKit also pass. |
+| P2 | Did not hold for metadata fragmentation: split IDs fail natively and split-name merges differ across Python/JavaScript. Interleaved full-ID/name argument deltas and no-early-dispatch pass; invalid streams retain fixed refusals. |
+| P3 | Held: Chromium reproduces fresh read IDs and unrecoverable abrupt loss; parallel write receipts remain stable. |
+| P4 | Held: all five ToolMessage serialization forms retain their result or fixed refusal. |
+| P5 | Held: A1–A8 pass. |
+| P6 | Held: both structured schemas now refuse fixed unsupported and remain catchable as NotImplementedError. |
+| P7 | Held within measured limits: O1–O4 pass; O5/O6 expose the stated exclusions, with natural core budget stronger than a fake transport refusal. |
+| P8 | Held: native validation is text before broker dispatch; broker invalid cannot be safely classified as schema-only. |
+| P9 | Held for normalization, ordinary tools, baseline split and helper refusal. Streaming evidence adds the metadata counterexamples. |
+
+Real models, other versions/devices, general crash recovery, and candidate
+streaming in browsers remain UNMEASURED. Trusted Python can import js and bypass
+SDK paths; a Worker is not an isolation boundary. Already-started siblings and
+post-failure checkpoint activity remain the prior documented limits. No core,
+bridge, policy or stored-format change ships. ADR-0012 is unchanged and this ADR
+remains Proposed.
