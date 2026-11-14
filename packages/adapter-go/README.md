@@ -150,7 +150,7 @@ These shapes run: a single `LlmAgent` with capability tools, `SequentialAgent`, 
 `LoopAgent` trees up to 16 levels deep, transfer to a sub-agent, and a confirmation or long-running tool
 where the pause rule accepts it ("Interactions"). Branches of a `ParallelAgent` get branch-local effect
 scopes, so the order in which they reach the broker does not change what a write receives, and a restore after a later pause does not run them again;
-the order of their events does vary. These shapes fail `unsupported` before anything runs: raw `agenttool.New`,
+the order of their events does vary. These shapes fail `unsupported` before anything runs: `agenttool`,
 an agent, model, function tool or toolset built directly with ADK, and a tree outside the limits above.
 `subgraphs` stays false. Every shape is recorded with its native result in `tests/conformance` and
 `go/galaxie/shapes_test.go`; see the [limits](../../docs/unsupported.md#google-adk-go).
@@ -247,13 +247,3 @@ await adapter.prepare(
   with throwing stubs before the module starts, and discards Go standard output and error. Go code is
   trusted: the stubs catch accidental network use and are not an isolation boundary.
 - A Go exit, panic or Worker error marks the Worker dead. The next `prepare` builds a new Worker.
-
-The [independent AgentTool assessment](../../docs/adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
-records **REFUSED** for the capability-free wrapper: completed restore repeats
-call IDs, and the wasm lane refuses excluded shapes at start rather than prepare.
-The read-capability variant was not built because per-tool confirmation metadata
-is private and the existing tool-constructor seam stays unchanged. No Go wrapper,
-wire flag or adapter change ships. A retained ordinary-tree counterexample shows
-ID reuse while effect scopes advance. New wrapper Chromium, Firefox and WebKit
-cases were NOT RUN; native Go and Node wasm supplied the refusal evidence.
-Scripted models only; real models and devices remain unmeasured.

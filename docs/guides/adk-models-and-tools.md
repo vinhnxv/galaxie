@@ -298,20 +298,7 @@ evidence. Adding instruction text does not reproduce response retagging.
 The JavaScript `AgentTool` wrapper also stays **REFUSED** after the
 [read-only admission rerun](../adr/0020-google-adk-through-an-adapter.md#read-only-admission-rerun-2026-11-13):
 both admission variants failed copied temporary-state parity with native ADK.
-This guide offers no JavaScript wrapper migration.
-
-The [independent Python and Go assessment](../adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
-supports Python's registered `galaxie.adk.agent_tool(inner)` for depth-one inner
-trees with registered models and read/none capability policies. A write,
-confirmed read or missing policy fails `unsupported` at the first offending
-inner call before broker invocation; earlier model calls may have run. Raw
-wrappers, nested wrappers, inner schemas and inner pauses remain refused at
-prepare. The Go wrapper remains refused after completed-restore call-ID reuse
-and the wasm refusal-point mismatch. Python Workflow remains refused after
-completed-record restore fails; tree replacements match final text and write
-counts but differ in exact requests. The Python wrapper's new cases pass native,
-Node live/restored and Chromium with scripted models; Firefox, WebKit, real
-models and devices remain unmeasured for this addition.
+This guide offers no wrapper migration.
 
 ## Evidence and limits
 

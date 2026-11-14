@@ -1056,7 +1056,7 @@ runner. Loop pauses remain refused because native resumability repeats an earlie
 finished tool. Every app refuses repeated agent names at prepare; resumable apps also refuse `temp:` output keys and `LlmAgent`
 transfer children. Two parallel branches
 that call write capabilities keep branch-local replay scopes; recovery tests count one host
-invocation per write across reload, reversed arrival and failed-resume retry. Raw native `Workflow`, raw native `AgentTool` and every
+invocation per write across reload, reversed arrival and failed-resume retry. `Workflow`, `AgentTool` and every
 pause shape the [unsupported list](../../docs/unsupported.md#google-adk-python) names fail
 `unsupported` at prepare. `subgraphs` stays false.
 
@@ -1216,22 +1216,3 @@ The 29-wheel `adk` set carries the licenses its wheels declare in their dist-inf
 - MPL-2.0: `certifi`. PSF-2.0: `typing-extensions`.
 
 Hosts that serve the wheels keep each wheel's `dist-info` license and notice files with it.
-
-### Registered Python AgentTool wrapper
-
-`galaxie.adk.agent_tool(inner)` is **SUPPORTED** for depth-one inner trees with a
-registered model and globally unique agent names. Inner capability calls require
-the host binding policy `kind: read` and `approval: none`; writes, confirmed reads
-and missing policies fail `unsupported` at the first offending call before the
-broker invokes anything or records an effect. Earlier model calls may have run.
-Nested wrappers, inner schemas, pauses, toolsets and exit tools, foreign classes
-and model-less inner roots fail at prepare. Each call gets its own plain inner
-session store and integrity key, shares the outer run budget and fatal failure
-latch, and keeps inner events out of the outer stream and persisted record.
-The three new cases pass native CPython, Node live/restored and Chromium with
-scripted models. Firefox, WebKit, real models and devices are unmeasured.
-
-The [registered assessment](../../docs/adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
-keeps Workflow **REFUSED**: completed graph records fail fresh restore, and tree
-replacements differ in request history despite matching final text and write
-counts. No Workflow helper or nested-stream support ships; `subgraphs` stays false.

@@ -825,8 +825,8 @@ coverage. The [shared spike record](../../docs/adr/0020-google-adk-through-an-ad
 records each gate and the JavaScript Node/Chromium refusals. Native golden verification always
 uses `python -I ../scripts/record-adk-python-conformance.py --check` from `python/`.
 
-[`adk-python-agents.node.test.ts`](adk-python-agents.node.test.ts) asserts that raw native `Workflow`,
-raw native `AgentTool` and the pause shapes ADK cannot resume faithfully fail `unsupported` at prepare, with
+[`adk-python-agents.node.test.ts`](adk-python-agents.node.test.ts) asserts that `Workflow`,
+`AgentTool` and the pause shapes ADK cannot resume faithfully fail `unsupported` at prepare, with
 their non-resumable native results recorded in `cases-adk-python/test_adk_python_refused_shapes.py`.
 `cases-adk-python/test_adk_python_resumable_shapes.py` compares resumed and uninterrupted model/tool
 counts and records why Loop pauses and two confirming Parallel branches remain refused.
@@ -2897,49 +2897,3 @@ GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=90000
 GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts examples/rag-browser/test/dspy-engines.node.test.ts
 pnpm check
 ```
-
-### ADK Workflow and AgentTool measurements on adk-python and adk-go
-
-The [registered rules and measured outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
-support Python AgentTool V1 and its capability-free subset. Python Workflow is
-refused after a completed graph fails fresh restore; AL-W also differs in exact
-request digests. Go AgentTool V2 is refused after completed-restore call-ID reuse
-and the wasm prepare/start refusal mismatch. Go V1 was not built: per-tool
-confirmation metadata is private and the tool-constructor seam stays unchanged.
-Go Workflow remains absent from pinned ADK Go v1.9.0. Failed candidates and their
-dependent measurements are preserved in history and removed by git reverts.
-
-| Evidence | Native CPython / Go | Node live | Fresh executor / Worker | Chromium | Firefox | WebKit |
-| --- | --- | --- | --- | --- | --- | --- |
-| Python AgentTool T1 to T8 | PASS | PASS | PASS | PASS: three new cases | NOT RUN | NOT RUN |
-| Python Workflow Tier 1 | WG1/WG2 PASS; WG6 FAIL | WG1/WG2 PASS | WG6 FAIL | NOT RUN: no shipped tier | NOT RUN | NOT RUN |
-| Workflow replacement AL-W | FAIL: request digests | FAIL: request digests, including retry | UNMEASURED: no separate restore lane | NOT RUN | NOT RUN | NOT RUN |
-| Go AgentTool V2 | T3 FAIL | T6 FAIL | T3/T6 FAIL | NOT RUN: no qualifying variant | NOT RUN | NOT RUN |
-| Go Workflow absence walk | PASS: source absence | NOT APPLICABLE | NOT APPLICABLE | NOT APPLICABLE | NOT APPLICABLE | NOT APPLICABLE |
-
-New `agent-tool`, `stream-agent-tool` and `agent-tool-failure` goldens compare
-native declaration, state and result with the helper. Native isolated sessions
-reuse their own call-ID namespace, so these cases use the existing per-agent ID
-normalization and explicit happens-before checks. The failure case deliberately
-maps native inner-error swallowing to `denied`; independent native tests retain
-the original behavior. Optional `inner: true` capability payloads trigger the
-page's authoritative read/none check before the broker. All other payloads retain
-their existing policy path. There is no new flag in the Go adapter or core.
-
-Run `node scripts/build-python-wheels.ts` before Worker tests and the full gate.
-`node scripts/test-python.ts` covers the retained native and CPython evidence.
-From `python/`, `uv run --locked --offline python -I ../scripts/record-adk-python-conformance.py --check`
-verifies every old and new golden. `pnpm exec vitest run --project node --testTimeout=900000 tests/conformance/adk-python-agent-tool.node.test.ts tests/conformance/adk-python-workflow-replacement.node.test.ts`
-runs the retained Worker measurements; the Chromium golden lane is
-`pnpm exec vitest run --project node --testTimeout=900000 examples/rag-browser/test/adk-python-conformance.node.test.ts`.
-`pnpm run test:go` reruns the native Go facts and ordinary-tree ID counterexample;
-put Go 1.27.3 first on PATH with `GOTOOLCHAIN=local`. `pnpm check` is the full local
-gate. Use a command timeout of at least 1800000 ms for browser and full runs.
-
-The retained Workflow restore-boundary test produces a native graph record
-without a candidate helper and verifies the standing tree restore refusal. The
-ordinary Go control shows repeated IDs across completed restore while effect
-scopes advance. Existing goldens, matrix entries, locks, assertions and other
-executors stay unchanged; allowed harness registrations and matrix facts are
-additions only. The browser failure registry remains empty. Scripted models only;
-real models, devices and unrun engines remain unmeasured.
