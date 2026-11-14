@@ -133,7 +133,7 @@
     "traceDestinations": ["local Langfuse", "local MLflow"]
   },
   "notMeasured": [
-    "browser export",
+    "browser export in the Node lane (see browserLane)",
     "other executors or executor coverage",
     "real models or real prompts",
     "budget exhaustion or cancellation",

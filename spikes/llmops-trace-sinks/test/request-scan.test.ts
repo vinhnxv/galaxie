@@ -138,9 +138,17 @@ test('request capture keeps full headers and bytes for scanning, and summaries o
 
 test('a Chromium navigation preference is not an experiment identifier, while a custom identifier header is', () => {
   const numericEnv = { ...env, MLFLOW_EXPERIMENT_ID: '1' };
+  const navigation = {
+    method: 'GET',
+    url: 'http://127.0.0.1:4173/',
+    body: null,
+    headers: { 'upgrade-insecure-requests': '1', 'sec-fetch-mode': 'navigate' },
+  };
+  expect(scanRequests([request(navigation)], numericEnv, canary)).toEqual([]);
+  // The exemption covers navigations only: the same header on a trace export still counts.
   expect(
     scanRequests([request({ headers: { 'upgrade-insecure-requests': '1' } })], numericEnv, canary),
-  ).toEqual([]);
+  ).toContain('request[0]:experiment-id');
   expect(
     scanRequests([request({ headers: { 'x-experiment': '1' } })], numericEnv, canary),
   ).toContain('request[0]:experiment-id');
@@ -151,4 +159,34 @@ test('a Chromium navigation preference is not an experiment identifier, while a 
       canary,
     ),
   ).toContain('request[0]:secret:POSTGRES_PASSWORD');
+});
+
+test.each([
+  ['bare Basic payload', (value: string) => `x=${value.replace(/^Basic /, '')}`],
+  [
+    'bare payload in base64url form',
+    (value: string) =>
+      value
+        .replace(/^Basic /, '')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, ''),
+  ],
+  ['lower-case scheme', (value: string) => value.replace(/^Basic/, 'basic')],
+])('scanner detects a %s', (_name, make) => {
+  const keyEnv = {
+    ...env,
+    LANGFUSE_AUTH_HEADER: `Basic ${Buffer.from('pk-lf-synthetic?>:sk-lf-synthetic??').toString('base64')}`,
+  };
+  const value = make(keyEnv.LANGFUSE_AUTH_HEADER);
+  expect(scanBundle([value], keyEnv).length).toBeGreaterThan(0);
+  expect(
+    scanRequests([request({ body: Buffer.from(value) })], keyEnv, canary).length,
+  ).toBeGreaterThan(0);
+});
+
+test('a malformed percent escape in a path is reported, not thrown', () => {
+  expect(
+    scanRequests([request({ url: 'http://127.0.0.1:4318/a/%E0%A4%A/x' })], env, canary),
+  ).toContain('request[0]:experiment-id');
 });

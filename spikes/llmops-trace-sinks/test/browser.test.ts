@@ -322,6 +322,22 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
         readFileSync(new URL(`../dist/page/${file}`, import.meta.url)),
       );
       expect(scanBundle(chunks, env)).toEqual([]);
+      // Positive control: the body scan only means something if span bodies were captured.
+      for (const set of [requests, wire]) {
+        const exports = set.filter(
+          (request) =>
+            new URL(request.url).pathname === '/otel/v1/traces' && request.method === 'POST',
+        );
+        expect(exports.length).toBeGreaterThan(0);
+        for (const request of exports) expect(request.body?.length ?? 0).toBeGreaterThan(0);
+        expect(
+          exports.some((request) =>
+            Buffer.from(request.body ?? [])
+              .toString('utf8')
+              .includes('gen_ai.operation.name'),
+          ),
+        ).toBe(true);
+      }
       expect(scanRequests(requests, env, canary)).toEqual([]);
       expect(scanRequests(wire, env, canary)).toEqual([]);
       const secret = env['LANGFUSE_AUTH_HEADER'];

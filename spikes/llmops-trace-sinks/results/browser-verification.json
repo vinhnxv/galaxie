@@ -184,7 +184,7 @@
   ],
   "findings": [
     "No browser versus Node record difference or additional backend mapping difference was observed for linear and interrupt/resume.",
-    "Unflushed abrupt close lost all three pending spans in the sampled window; navigation with default auto flush and explicit flush each delivered all three to both backends.",
+    "Closing the page with auto flush disabled lost all three pending spans in the sampled window (page.close() with default options was not measured); navigation with default auto flush and explicit flush each delivered all three to both backends.",
     "Both verbatim guide scratch package sets exported a single SDK span despite API peer warnings; no second API version was installed. The latest web/base tags were deprecated.",
     "The pinned live SDK uses an options-object processor constructor and manual API/context registration; the guide web SDK constructor and register() work in the scratch sets.",
     "A short experiment identifier collided with the standardized Chromium navigation preference bit. A failing regression preceded the scanner correction; secret/canary scans still cover that header and arbitrary identifier headers still fail.",
@@ -286,7 +286,7 @@
       "node-verification.json": "3a9a955cc320ca826a2de0fc5b563091f06d8be9743f08bfc296ab2b1a56ffe3",
       "smoke.json": "e78f0995778a137835f04f8f8295fe38a9ffb8fbad82537f2bf030adc079be40",
       "verification.json": "4b61848e8d5c5475f9f8489bce750ef94a371e37a1ff3e62da8f53bce87e880d",
-      "versions.json": "f97b09d46eb67f68786bf25b7ca5588645650d45e2a6b396f46869213d211e3a"
+      "versions.json": "29c63e43567856f155781ac69dca7078e8870f6e4479875cf3ba666cf3703a4d"
     },
     "nodeScenarioFilesByteIdenticalToMergedCommit": "5893d4d"
   }
