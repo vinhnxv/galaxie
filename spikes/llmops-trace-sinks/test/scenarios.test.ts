@@ -4,7 +4,7 @@
 import { SpanStatusCode } from '@opentelemetry/api';
 import { afterEach, expect, test, vi } from 'vitest';
 import { assertSpanTree, serializeSpans } from '../../../packages/core/test/span-tree.js';
-import { canary } from '../src/node-host.js';
+import { canary } from '../src/host.js';
 import { observationsQuery, readBack } from '../src/readback.js';
 import { errorText, prompt, reply, runScenario, scenarios } from '../src/scenarios.js';
 

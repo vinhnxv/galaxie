@@ -1,0 +1,293 @@
+{
+  "demonstration": true,
+  "scope": "Built Chromium page with scripted galaxie linear and interrupt/resume runs, both development text modes, through a same-origin preview proxy.",
+  "daemonSelection": "DOCKER_HOST=unix://$HOME/.colima/default/docker.sock",
+  "checks": [
+    {
+      "command": "pnpm install && pnpm build",
+      "location": "repository root",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "location": "isolated spike",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run typecheck && pnpm exec tsc -p tsconfig.scripts.json",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm exec vitest run",
+      "outcome": "passed",
+      "testsPassed": 63,
+      "liveTestsSkipped": 6,
+      "browserLaunched": false
+    },
+    {
+      "command": "pnpm run stack:up",
+      "outcome": "passed",
+      "services": 8
+    },
+    {
+      "command": "pnpm run node-host",
+      "outcome": "passed",
+      "variants": 8,
+      "oracleSpans": 38,
+      "traces": 10,
+      "scenarioFilesByteIdenticalToMergedNodeLane": true
+    },
+    {
+      "command": "pnpm run browser-host",
+      "outcome": "passed",
+      "variants": 4,
+      "oracleSpans": 22,
+      "traces": 6,
+      "laneSpecificAttributes": [],
+      "cspControl": "blocked; zero collector requests and zero backend spans",
+      "closeCountsPerBackend": [0, 3, 3]
+    },
+    {
+      "command": "pnpm run browser-host (two consecutive final live runs)",
+      "outcome": "passed",
+      "allResultsFilesCompared": 14,
+      "byteIdentical": true,
+      "proxyWirePostRequests": 7,
+      "playwrightPostRequests": 6,
+      "wireCredentialHits": 0
+    },
+    {
+      "command": "pnpm exec vitest run test/static.test.ts",
+      "outcome": "passed",
+      "testsPassed": 11,
+      "environmentFilePresent": true
+    },
+    {
+      "command": "pnpm run stack:down",
+      "outcome": "passed",
+      "remainingContainers": 0,
+      "remainingVolumes": 0,
+      "remainingNetworks": 0
+    },
+    {
+      "command": "pnpm run browser-host (stack stopped)",
+      "outcome": "expected failure",
+      "exitCode": 1,
+      "testsFailed": 1,
+      "output": "TypeError: fetch failed\nCaused by: Error: connect ECONNREFUSED 127.0.0.1:<collector-port>",
+      "normalization": "Only the numeric local port is replaced with a destination label in this committed record."
+    },
+    {
+      "command": "pnpm format",
+      "outcome": "passed",
+      "warnings": 45,
+      "informationalDiagnostics": 1602
+    },
+    {
+      "command": "pnpm run check:docs",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm exec vitest run (stack stopped)",
+      "outcome": "passed",
+      "testsPassed": 63,
+      "liveTestsSkipped": 6,
+      "browserLaunched": false
+    },
+    {
+      "command": "pnpm check",
+      "outcome": "passed on full rerun",
+      "exitCode": 0,
+      "goVersion": "1.27.3",
+      "javascriptTestFilesPassed": 507,
+      "javascriptTestsPassed": 7469,
+      "javascriptExpectedFailures": 2,
+      "javascriptTestsSkipped": 165,
+      "pythonTestsPassed": 1968,
+      "pythonTestsSkipped": 1,
+      "goTests": "passed",
+      "remainingGates": "license, dependency licenses, wheels, lint, both TypeScript checks, Python typecheck, build, dependencies, docs and size passed",
+      "precedingFailure": "The untouched local-only template readiness poll timed out in the first full run; its six isolated tests and this full rerun passed without assertion or timeout changes. The original failure is retained below."
+    }
+  ],
+  "ports": {
+    "commands": [
+      "docker compose ps --format json",
+      "docker compose port <service> <container-port>",
+      "lsof -nP -iTCP:<published-port> -sTCP:LISTEN"
+    ],
+    "servicesRunning": 8,
+    "backendServicesHealthy": 7,
+    "publications": [
+      {
+        "service": "collector",
+        "address": "127.0.0.1"
+      },
+      {
+        "service": "langfuse-web",
+        "address": "127.0.0.1"
+      },
+      {
+        "service": "mlflow",
+        "address": "127.0.0.1"
+      }
+    ],
+    "hostListeners": 3,
+    "wildcardListeners": false
+  },
+  "guideDeviations": [
+    {
+      "area": "packages",
+      "code": "TracerProvider, BatchSpanProcessor, StackContextManager from @opentelemetry/sdk-trace 3.1.0; OTLPTraceExporter 0.301.0",
+      "reason": "Keep the browser lane aligned with the Node lane and API 1.10.0."
+    },
+    {
+      "area": "processor constructor",
+      "code": "new BatchSpanProcessor({ exporter })",
+      "guide": "new BatchSpanProcessor(exporter)"
+    },
+    {
+      "area": "registration",
+      "code": "trace.setGlobalTracerProvider(provider); context.setGlobalContextManager(new StackContextManager().enable())",
+      "observation": "The pinned TracerProvider has no register() method; both scratch web SDK sets do."
+    },
+    {
+      "area": "parenting",
+      "code": "RuntimeOptions.tracerProvider plus explicit contexts and forwarded graph config",
+      "limit": "StackContextManager tracks synchronous context only; no async browser context propagation is claimed."
+    },
+    {
+      "area": "oracle",
+      "code": "SimpleSpanProcessor({ exporter: new InMemorySpanExporter() }) beside the batch processor",
+      "reason": "Transport every public span field through the JSON snapshot for independent readback assertions."
+    },
+    {
+      "area": "flush",
+      "code": "await runtime.dispose(); await provider.forceFlush(); await provider.shutdown()",
+      "observation": "Normal runs finish export. The blocked direct control counts export errors. Close observations leave batches pending before the selected close mechanism."
+    },
+    {
+      "area": "close options",
+      "code": "scheduledDelayMillis: 60000; disableAutoFlushOnDocumentHide: true only for abrupt-close case",
+      "reason": "Keep timer exports outside the observation window; retain SDK defaults for navigation and explicit-flush cases."
+    },
+    {
+      "area": "proxy",
+      "code": "preview.proxy['/otel/v1/traces'] with rewrite: () => '/v1/traces'",
+      "reason": "Serve and scan the production bundle while preserving the receiver path."
+    },
+    {
+      "area": "transport",
+      "code": "Browser fetch transport with conditional keepalive and same-origin mode for the proxy",
+      "observation": "Not XHR or sendBeacon; source details are in browser-guide.json."
+    }
+  ],
+  "findings": [
+    "No browser versus Node record difference or additional backend mapping difference was observed for linear and interrupt/resume.",
+    "Closing the page with auto flush disabled lost all three pending spans in the sampled window (page.close() with default options was not measured); navigation with default auto flush and explicit flush each delivered all three to both backends.",
+    "Both verbatim guide scratch package sets exported a single SDK span despite API peer warnings; no second API version was installed. The latest web/base tags were deprecated.",
+    "The pinned live SDK uses an options-object processor constructor and manual API/context registration; the guide web SDK constructor and register() work in the scratch sets.",
+    "A short experiment identifier collided with the standardized Chromium navigation preference bit. A failing regression preceded the scanner correction; secret/canary scans still cover that header and arbitrary identifier headers still fail.",
+    "Lifecycle callbacks relayed during document destruction are incomplete observations; only backend span counts define the close measurements.",
+    "The preview receiver observed a keepalive export during navigation that Playwright did not report; full receiver headers and body bytes were also scanned.",
+    "The backend-response scans check the routed canary and fixture text; generated credentials are checked in the bundle, requests and saved results, not complete backend bodies. Review corrected the broader README claim."
+  ],
+  "developmentCorrections": [
+    {
+      "command": "pnpm exec vitest run test/oracle.test.ts",
+      "output": "Error: Cannot find module '../src/oracle.js' imported from <repo>/spikes/llmops-trace-sinks/test/oracle.test.ts",
+      "reason": "Expected proof-first failure before the snapshot codec existed."
+    },
+    {
+      "command": "pnpm exec vitest run",
+      "output": "Error: ENOENT: no such file or directory, open '<repo>/spikes/llmops-trace-sinks/src/node-host.ts'",
+      "correction": "Stage the source rename so git ls-files reflects the new host path; static guard unchanged."
+    },
+    {
+      "command": "pnpm exec vitest run test/browser-config.test.ts",
+      "output": "Error: Cannot find module '../browser/vite.config.js' imported from <repo>/spikes/llmops-trace-sinks/test/browser-config.test.ts",
+      "reason": "Expected proof-first failure before the page config existed."
+    },
+    {
+      "command": "pnpm run typecheck",
+      "output": "browser/vite.config.ts(11,3): error TS2353: Object literal may only specify known properties, and 'configFile' does not exist in type 'UserConfig'.\ntest/lane-compare.test.ts(6,54): error TS2307: Cannot find module '../src/lane-compare.js' or its corresponding type declarations.\ntest/lane-compare.test.ts(46,39): error TS7006: Parameter 'item' implicitly has an 'any' type.\ntest/request-scan.test.ts(11,8): error TS2307: Cannot find module '../src/request-scan.js' or its corresponding type declarations.",
+      "correction": "Use Vite InlineConfig for programmatic options and run integrated typechecking after the independent scanner unit finished."
+    },
+    {
+      "command": "pnpm exec vitest run test/request-scan.test.ts test/lane-compare.test.ts",
+      "output": "Error: Cannot find module '../src/lane-compare.js' imported from <repo>/spikes/llmops-trace-sinks/test/lane-compare.test.ts\nError: Cannot find module '../src/request-scan.js' imported from <repo>/spikes/llmops-trace-sinks/test/request-scan.test.ts",
+      "reason": "Expected proof-first failures before implementing the scanner and comparator."
+    },
+    {
+      "command": "pnpm run typecheck",
+      "output": "test/browser.test.ts(107,20): error TS18047: 'preview.resolvedUrls' is possibly 'null'.",
+      "correction": "Check the optional preview URL before using it."
+    },
+    {
+      "command": "pnpm run browser-host",
+      "output": "AssertionError: expected [ 'request[0]:experiment-id', …(8) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"request[0]:experiment-id\",\n+   \"request[3]:experiment-id\",\n+   \"request[6]:experiment-id\",\n+   \"request[9]:experiment-id\",\n+   \"request[12]:experiment-id\",\n+   \"request[14]:experiment-id\",\n+   \"request[17]:experiment-id\",\n+   \"request[19]:experiment-id\",\n+   \"request[21]:experiment-id\",\n+ ]",
+      "correction": "An isolated Chromium header probe identified upgrade-insecure-requests as the collision. Treat only its standardized protocol bit as a preference; all existing credential, canary and vendor-header checks remain."
+    },
+    {
+      "command": "pnpm exec vitest run test/request-scan.test.ts",
+      "output": "AssertionError: expected [ 'request[0]:experiment-id' ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"request[0]:experiment-id\",\n+ ]",
+      "reason": "Expected red regression for a real Chromium navigation preference, with positive controls for custom identifier headers and credentials in the same standard header."
+    },
+    {
+      "command": "pnpm run typecheck",
+      "output": "test/browser.test.ts(147,33): error TS7006: Parameter 'chunk' implicitly has an 'any' type.\ntest/browser.test.ts(153,17): error TS2322: Type '{ [k: string]: {} | null; }' is not assignable to type 'Record<string, string>'.\n  'string' index signatures are incompatible.\n    Type '{} | null' is not assignable to type 'string'.\n      Type 'null' is not assignable to type 'string'.",
+      "correction": "Type the passive preview receiver capture as IncomingMessage and its chunks as Buffer."
+    },
+    {
+      "command": "pnpm check",
+      "output": "spikes/llmops-trace-sinks/browser/index.html: does not start with the SPDX header\n[ELIFECYCLE] Command failed with exit code 1.\n[ELIFECYCLE] Command failed with exit code 1.",
+      "correction": "Use the exact combined HTML SPDX comment accepted by scripts/check-license.ts; leave the checker unchanged."
+    },
+    {
+      "command": "pnpm check",
+      "output": "FAIL  |browser (chromium)| ../../templates/local-only/test/app.test.ts > selects WebLLM only after a successful opted-in load and removes the control\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\nCaused by: Error: Matcher did not succeed in time.\n\nTest Files  1 failed | 506 passed | 10 skipped (517)\nTests  1 failed | 7468 passed | 2 expected fail | 165 skipped (7636)",
+      "scope": "Untouched template test at its WebLLM readiness poll; no assertion or timeout changed.",
+      "additionalOutput": "[vitest] Failed to take a screenshot [TimeoutError: locator.screenshot: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator('[data-vitest=\"true\"]').contentFrame().locator('body')\n]"
+    }
+  ],
+  "telemetry": "Langfuse and MLflow vendor telemetry stays at its defaults by maintainer decision. Galaxie trace data and opted-in text reach only the local backends. The credential canary reaches only the local scripted provider and is absent from all page requests and backend readbacks.",
+  "notMeasured": [
+    "browser tool-call and model-failure scenarios",
+    "other executors, Firefox, WebKit and real devices",
+    "real models, real prompts and answer quality",
+    "feedback scores and session grouping",
+    "delivery guarantees, retries, capacity, latency, long-running ingestion and failure recovery",
+    "vendor usage telemetry payloads and container egress",
+    "deployment proxy authentication, request limits and origin policy beyond this local fixture"
+  ],
+  "simplification": {
+    "mode": "full team",
+    "reviewers": ["reuse", "quality", "efficiency", "test value", "comments"],
+    "findings": 0,
+    "changes": 0,
+    "proofTestsPreserved": true
+  },
+  "stability": {
+    "command": "SHA-256 of every results file before and after the second consecutive pnpm run browser-host",
+    "filesCompared": 14,
+    "byteIdentical": true,
+    "verificationFileIncludedInExternalComparison": true,
+    "hashNote": "The hash manifest omits this verification file to avoid self-reference. It was included in the external before/after byte comparison before final repository-check receipts were appended.",
+    "sha256": {
+      "browser-close.json": "20f3fdc95d68e164a03403502fd9fd119b9247d8b62dc97dd941e278676c8c11",
+      "browser-evidence.json": "584313817fb78010b4cd2a180d4e75b277bd8883188a5ec901793f3c6e9a8e90",
+      "browser-guide.json": "5ad537d99628543f43bdd93ab5d9beeb8b2aed8e77fc6183e37067c105ac7125",
+      "browser-interrupt-resume.json": "6246c152d5ea453686cccea9ea33d76641195ab424cb3be482871c1ba9647e95",
+      "browser-linear.json": "68edcad6cf84142f42e6c851719c8cab48a391509bfad379a7f0c80325d202a3",
+      "node-interrupt-resume.json": "6246c152d5ea453686cccea9ea33d76641195ab424cb3be482871c1ba9647e95",
+      "node-linear.json": "68edcad6cf84142f42e6c851719c8cab48a391509bfad379a7f0c80325d202a3",
+      "node-model-failure.json": "ee5827b4c530000369e783e2f81a7ef0e14b2255e16508232566b76b0dd03fe6",
+      "node-tool-call.json": "5f591fcb8c61755f0f22fd7d99b196e7d505a1a6c9f4362e3e5392bc778c6812",
+      "node-verification.json": "3a9a955cc320ca826a2de0fc5b563091f06d8be9743f08bfc296ab2b1a56ffe3",
+      "smoke.json": "e78f0995778a137835f04f8f8295fe38a9ffb8fbad82537f2bf030adc079be40",
+      "verification.json": "4b61848e8d5c5475f9f8489bce750ef94a371e37a1ff3e62da8f53bce87e880d",
+      "versions.json": "29c63e43567856f155781ac69dca7078e8870f6e4479875cf3ba666cf3703a4d"
+    },
+    "nodeScenarioFilesByteIdenticalToMergedCommit": "5893d4d"
+  }
+}

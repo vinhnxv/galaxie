@@ -15,20 +15,28 @@ import {
 export const canary = 'llmops-synthetic-credential-canary';
 export const collectorUrl = 'http://127.0.0.1:4318/v1/traces';
 
-export interface NodeHost {
+export interface HostOptions {
+  text: boolean;
+  live: boolean;
+  exporterUrl?: string;
+  flush?: 'complete' | 'none' | 'tolerate';
+  autoFlushOnHide?: boolean;
+  scheduledDelayMillis?: number;
+}
+
+export interface Host {
   runtime: Runtime;
   provider: TracerProvider;
   oracle: InMemorySpanExporter;
   routing: ModelRouting;
   modelFactory(options: { credential: string }): BaseChatModel;
   credentialCalls(): number;
+  exportErrors: { flush: number; shutdown: number };
   flush(): Promise<void>;
+  shutdown(): Promise<void>;
 }
 
-export function createNodeHost(
-  model: BaseChatModel,
-  options: { key: string; text: boolean; live: boolean },
-): NodeHost {
+export function createHost(model: BaseChatModel, options: HostOptions & { key: string }): Host {
   const oracle = new InMemorySpanExporter();
   const provider = new TracerProvider({
     spanProcessors: [
@@ -37,16 +45,32 @@ export function createNodeHost(
         ? [
             new BatchSpanProcessor({
               exporter: new OTLPTraceExporter({
-                url: collectorUrl,
+                url: options.exporterUrl ?? collectorUrl,
                 headers: {},
                 timeoutMillis: 5000,
               }),
+              ...(options.autoFlushOnHide === undefined
+                ? {}
+                : { disableAutoFlushOnDocumentHide: !options.autoFlushOnHide }),
+              ...(options.scheduledDelayMillis === undefined
+                ? {}
+                : { scheduledDelayMillis: options.scheduledDelayMillis }),
             }),
           ]
         : []),
     ],
   });
   let calls = 0;
+  const exportErrors = { flush: 0, shutdown: 0 };
+  const finish = async (operation: 'flush' | 'shutdown'): Promise<void> => {
+    if (options.flush === 'none') return;
+    try {
+      await (operation === 'flush' ? provider.forceFlush() : provider.shutdown());
+    } catch (error) {
+      if (options.flush !== 'tolerate') throw error;
+      exportErrors[operation]++;
+    }
+  };
   return {
     provider,
     oracle,
@@ -78,8 +102,8 @@ export function createNodeHost(
       return model;
     },
     credentialCalls: () => calls,
-    flush: async () => {
-      await provider.forceFlush();
-    },
+    exportErrors,
+    flush: () => finish('flush'),
+    shutdown: () => finish('shutdown'),
   };
 }

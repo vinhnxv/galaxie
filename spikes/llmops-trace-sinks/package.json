@@ -10,11 +10,12 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p browser/tsconfig.json",
     "stack:up": "tsc -p tsconfig.scripts.json && node dist/stack.js up",
     "stack:down": "tsc -p tsconfig.scripts.json && node dist/stack.js down",
     "smoke": "LLMOPS_STACK=1 vitest run test/stack.test.ts",
-    "node-host": "LLMOPS_STACK=1 vitest run test/node.test.ts"
+    "node-host": "LLMOPS_STACK=1 vitest run test/node.test.ts",
+    "browser-host": "LLMOPS_STACK=1 vitest run test/browser.test.ts"
   },
   "dependencies": {
     "@galaxie-ai/adapter-adk": "link:../../packages/adapter-adk",
@@ -35,11 +36,13 @@
   },
   "devDependencies": {
     "@opentelemetry/exporter-trace-otlp-http": "0.301.0",
+    "@opentelemetry/resources": "3.1.0",
     "@opentelemetry/sdk-trace": "3.1.0",
     "@types/node": "24.19.2",
     "typescript": "7.0.2",
     "vite": "8.3.4",
     "vitest": "5.0.5",
-    "yaml": "2.8.2"
+    "yaml": "2.8.2",
+    "playwright-core": "1.64.1"
   }
 }
