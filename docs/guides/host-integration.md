@@ -534,8 +534,12 @@ For a cookie-session model proxy, also call its end-session route at sign-out an
 on a change of user: page code cannot clear an HttpOnly cookie. In
 [host-remote](../../examples/host-remote/README.md), `POST /api/v1/session/end`
 revokes the session identified by the current agent cookie, including its
-capability bearer token, and expires that cookie. A session issued before the
-last renewal lapses within 60 seconds. End-session alone does not prevent new
+capability bearer token, and expires that cookie. A preceding session replaced
+by renewal through the same shared getter lapses within 60 seconds. Independently
+issued sessions, including those from other tabs or page reloads, can retain
+their bearer authority until their own 300-second expiry. Hosts that need
+sign-out across all tabs must revoke all of the principal's sessions on the
+server. End-session alone does not prevent new
 issuance: the demo has no accounts and leaves `POST /api/session` open. A real
 host must require its own sign-in on session issue and refuse issuance after
 sign-out, alongside the invalidation and cleanup above.
