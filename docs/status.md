@@ -10,7 +10,7 @@ refusal until start; Go V1 was not built because the permitted seam lacks per-to
 confirmation metadata. Go Workflow's absence walk passes again. All candidate
 source, flags, shipping cases and registrations were removed by their own commits'
 reverts. Native facts, refusal/replacement tests and independent counterexamples
-remain. Production source, existing goldens, matrices, locks and assertions are
+remain. Production source, existing goldens, matrix entries, locks and assertions are
 unchanged; matrices gain refusal facts only. No subgraphs or ADR-0012 control
 changes. Historical Python candidate Chromium runs do not establish admission;
 Firefox, WebKit, real models and devices remain unmeasured for these shapes.
