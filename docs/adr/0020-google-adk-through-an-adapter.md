@@ -3,7 +3,7 @@
 - **Status:** Accepted (maintainer decision, 2026-11-08)
 - **Date:** 2026-11-03
 - **Related:** brief §6.2, §7.4; ADR-0002, ADR-0005, ADR-0012, ADR-0016, ADR-0017, ADR-0018, ADR-0022 (the Python sibling), ADR-0023 (the Go sibling)
-- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates. 2026-11-13: measured host inventories ship on Python and fixed toolsets on Go; both JavaScript candidates take the registered refusal path. 2026-11-14: the last-child resume rerun registered its outcome rule before measurement. 2026-11-13: the read-only admission rerun registers its outcome rule before measurement and records REFUSED after copied temporary-state parity fails on both admission variants. 2026-11-14: the admission-capable last-child rerun records REFUSED after a base-shape scope mismatch; live and restore now share one pause-author derivation with gated-call agreement. 2026-11-14: independent Python Workflow and Python/Go AgentTool outcome rules and predictions registered before measurement.
+- **Revisions:** 2026-11-03: created with the stage A1 foundation (decision, dependency pin, bundle-load probe); probe findings recorded. 2026-11-03: stages A2 to A6 evidence recorded (run loop, streaming, interactions, durable sessions, agent shapes). 2026-11-08: accepted. A real-model demonstration on one device is recorded in the [ADK recipes record](../adk-recipes-real-model-record.md); the Python and Go siblings (ADR-0022, ADR-0023) stay Proposed until each has a real-model run, and the adapter order is JavaScript, then Python, then Go. 2026-11-12: the AgentTool wrapper spike registered its outcome rule before measurement and recorded REFUSED; prepare-time read-only admission was not established. 2026-11-12: the workflow-child resume spike registered its outcome rule before measurement and recorded REFUSED; the routing-only seam did not establish last-child admission. 2026-11-12: the confirmation-beside-calls and request-input spike registered its outcome rule before measurement and recorded Python ordinary-sibling support and an input alternative; Go memory-only invalid-answer loss fails its stronger gate and all other cells are refused; production source is unchanged. 2026-11-12: the stream-namespaces, Workflow-agents and subgraphs-flag spike registered its outcome rule before measurement; the result below records message-attribution alternatives for Python and JavaScript, all Workflow cells refused, and every subgraphs flag unchanged. 2026-11-12: the string-models, toolsets, code-executors, planners and built-in-tools spike registered its outcome rule before measurement. The measured result records model and static-toolset alternatives on all three executors, with built-ins, code executors and planners refused; no runtime source changes. 2026-11-13: restore admission and workflow-state rejection shipped with an unchanged persisted format. 2026-11-13: the duplicate-aware agent identity spike registered its outcome rule before measurement and recorded REFUSED for adk-js and adk-python; any repeated agent name, including the root, now fails `unsupported` at prepare. This narrows what the executor accepted before; the remedy is to rename the agents (see the duplicate-identity outcome section). 2026-11-13: host role inventories register a per-executor outcome rule before implementation, with scoped repeated-prepare and decoded-record gates. 2026-11-13: measured host inventories ship on Python and fixed toolsets on Go; both JavaScript candidates take the registered refusal path. 2026-11-14: the last-child resume rerun registered its outcome rule before measurement. 2026-11-13: the read-only admission rerun registers its outcome rule before measurement and records REFUSED after copied temporary-state parity fails on both admission variants. 2026-11-14: the admission-capable last-child rerun records REFUSED after a base-shape scope mismatch; live and restore now share one pause-author derivation with gated-call agreement. 2026-11-14: independent Python Workflow and Python/Go AgentTool outcome rules and predictions registered before measurement; resumed measurements support Python AgentTool V1 and refuse Python Workflow and Go AgentTool.
 
 - **2026-11-14 revision:** JavaScript host inventories register a retry with opt-in role strings, a host-owned tree and an exported fixed-toolset helper before implementation.
 
@@ -359,82 +359,149 @@ Nested pauses are not part of the mapping. They stay refused for both executors;
 
 
 
-#### Incomplete assessment: native harness registration prerequisite (2026-11-14)
+#### Measured outcome (2026-11-14)
 
-The assessment stopped during the Python AgentTool unit. The registered rules
-remain unchanged. No new admission ships. Python Workflow and AgentTool and Go
-AgentTool retain their existing prepare refusals; neither a replacement-parity
-result nor a new Go source-absence measurement is claimed by this assessment.
+Python AgentTool is **SUPPORTED** under rule T row 1, including the capability-free
+subset. Python Workflow is **REFUSED** under rule W row 4: the Tier 1 candidate
+fails completed-record restore and AL-W fails exact request parity. Go AgentTool
+is **REFUSED** under rule T row 3 for the measured V2 candidate; V1 was not built
+because the permitted metadata seam cannot identify per-tool confirmation.
+Go Workflow remains **REFUSED** by the rerun pinned-source absence walk.
 
-The blocking prerequisite is additive conformance registration. The new shipping
-cases must enter `suite.CASES` and pass the existing recorder's `--check`.
-`native._run_case` in
-`tests/conformance/cases-adk-python/native.py` reads only `fixtures.json` and
-constructs agents through `suite.factory`. The existing
-`test_adk_python_cases.py` calls that same `native.run_case` for every case in
-`suite.CASES`. Appending case names alone therefore produces unknown-fixture
-failures. The assessment's edit boundary preserves every existing case fixture
-and script, with only case-list additions allowed in `suite.py`. There is no
-existing registration seam for a new-file native runner. Continuing requires an
-explicitly permitted additive dispatch in the native harness and matching source
-selection in the Worker/browser harnesses. Existing cases and their results must
-remain byte-identical. A separate recorder without the required case-list
-integration would not satisfy T8.
+The first attempt paused at the native-harness registration boundary and resumed
+under the maintainer's 2026-11-14 additive-registration addendum. The registered
+rules and predictions above are unchanged. This assessment takes no time-budget
+cut and does not change either tracker's status.
 
-History preserves registration before implementation: rule commit `b91c6e3`,
-independent native probes `03bbc0b` (typed refinements `9ff36a2`), capability-free
-candidate `877ec08`, and read-policy candidate `413fdee`. The candidates were
-removed with `git revert` in reverse order, commits `20b4924` and `f505df1`.
-Production source, bridge contracts and existing assertions return to their
-pre-assessment state. No candidate-dependent test remains in the final tree.
+History preserves the experiment. Rules precede probes at `b91c6e3`. Python native
+facts are `03bbc0b`, `9ff36a2` and `0a22604`; the original candidates `877ec08` and
+`413fdee` were reverted at `20b4924` and `f505df1`, then restored at `b77d3fc` and
+`14780b2`. Gate measurements are `cfc9ae6`, new native/Worker/Chromium cases are
+`e26e3da`, and registry simplification is `464d395`. Workflow floor and replacement
+evidence are `dc957fb` and `bd61a41`. Go native facts are `620329f`; candidate
+`630a3b1` and measurements `810d073` were removed with reverts `d442f41` and
+`46fed32`. Independent Go restore-ID evidence remains at `b4881b4`.
+Workflow candidate `d628a84` and its measurement commit `cf9644e` were
+removed by `1bdc059` and `d5fa3bb`. Independent
+native-record restore evidence remains at `443cc87`.
 
-The retained native characterizations use scripted models only. They measure the
-`request` declaration, outer/inner/outer request order, inner text as the tool
-result, copied ordinary state, exclusion of copied temporary and `_adk` state,
-forwarded ordinary deltas, omitted temporary output deltas, two independent inner
-sessions, inner error text, consumed inner cancellation, and nested confirmation
-and long-running calls whose inner events are absent from the outer event log.
-The native wrapper's `include_plugins` default is true; actual plugin propagation
-and cancellation-signal propagation are not established by these tests. Nested
-pauses remain refused; the native observations do not supply persisted inner
-state or an inner effect scope for a host resume.
+**Python AgentTool.** `galaxie.adk.agent_tool(inner)` admits depth-one inner trees
+on registered models and tools. A wrapper call uses a fresh plain ADK in-memory
+session service and integrity key, shares the outer run's step budget and fatal
+failure latch, and keeps inner events out of the outer stream and stored record.
+Native plugin inheritance and parent-owned close are measured separately; the
+helper deliberately installs its own inner integrity plugin. Inner effect scopes
+are distinct, and the next outer call ID is seeded from the maximum stored ID,
+including gaps. Declaration, copied ordinary and temporary state, forwarded
+ordinary deltas and omitted temporary deltas match native ADK 2.12.0.
 
-The candidate's nine CPython unit checks passed before its revert. Exploratory
-CPython checks also exercised shared budgets, isolated events, fresh keys, scopes,
-gap-aware IDs, rollback and basic declaration/state parity. These do not establish
-all required scenarios on all lanes. The Worker exploration reached live routed
-execution and isolated outer storage. An adopted session's `start` refusal was a
-harness misuse, not an AgentTool divergence: the core API permits restore only.
-The later provider-error check had an incorrect harness expectation
-(`executor_error` rather than the router's `unavailable`); no failure-code parity
-claim follows from it. Neither harness issue changes a registered expectation or
-counts as a framework gate failure. Exploratory candidate-dependent files were
-discarded, and their observations are not counted as completed gates.
-
-| Track and gates | CPython / native Go | Node live | Node restored | Chromium |
+| Rule T gate, Python V1 | CPython | Node Worker live | Fresh Worker / restored | Chromium |
 | --- | --- | --- | --- | --- |
-| Python AgentTool V1 and V2, T1 | UNMEASURED: retained native facts are partial | UNMEASURED | UNMEASURED | NOT APPLICABLE: browser evidence belongs to T8 |
-| Python AgentTool V1 and V2, T2, T3, T4, T5, T6, T7 | UNMEASURED: exploratory coverage only | UNMEASURED: exploratory coverage only | UNMEASURED | NOT APPLICABLE: browser evidence belongs to T8 |
-| Python AgentTool V1 and V2, T8 | UNMEASURED: registration prerequisite | UNMEASURED | UNMEASURED | UNMEASURED |
-| Python Workflow, WN, WG1, WG2, WG3, WG4, WG5, WG6, WG7, WG8, WG9, AL-W | UNMEASURED: unit not reached | UNMEASURED | UNMEASURED | UNMEASURED |
-| Go AgentTool V1 and V2, T1, T2, T3, T4, T5, T6, T7, T8 | UNMEASURED: unit not reached | UNMEASURED | UNMEASURED | UNMEASURED |
-| Go Workflow absence walk | UNMEASURED: not rerun in this assessment | NOT APPLICABLE: source fact | NOT APPLICABLE: source fact | NOT APPLICABLE: source fact |
+| T1 native premise | PASS | NOT APPLICABLE: native oracle | NOT APPLICABLE: native oracle | NOT APPLICABLE: T8 only |
+| T2 routing, shared budgets, labels and grants | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T3 sessions, keys, IDs, scopes and stream isolation | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T4 declaration, result and state | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T5 fatal errors, abort and model-visible fixed errors | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T6 static and first-offending-call refusal | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T7 completed restore and failed-turn rollback | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T8 new cases and recorder check | PASS | PASS | PASS | PASS |
 
-Rule T row 4 selects **INCOMPLETE** for Python AgentTool: neither variant has all
-required evidence, and no measured framework FAIL establishes REFUSED. Rule W
-row 5 selects **INCOMPLETE** for Python Workflow, whose candidate was not
-attempted. Rule T row 4 selects **INCOMPLETE** for Go AgentTool, whose unit was not
-reached; Go V1 also requires a passing Python V1. The previously recorded Go
-Workflow source-absence refusal is unchanged, without a new verification claim.
-This is a prerequisite stop, not a time-budget cut or a completed assessment.
+The optional `inner: true` capability payload field is emitted only from this
+helper's inner run. The page checks the authoritative host binding policy before
+calling the broker: only `kind: read` with `approval: none` proceeds. A write, a
+confirmed read or a missing policy fails `unsupported` at its first offending
+inner call, with zero binding invocations, journal entries or receipt entries and
+unchanged stored history. Earlier model calls may already have run. Outer calls
+omit the flag and retain their existing checks. Labels, run grants, capability
+budgets and host confirmation still belong to the router and broker.
 
-P1, P2 and P4 remain unresolved; this run does not establish their predicted
-admission outcomes. P3's prepare refusals are unchanged. P5 has no new absence-walk
-result. P6's prediction of a shipping variant or measured replacement was not
-established. Chromium, Firefox, WebKit, real models and devices were NOT RUN for
-the new assessment. The extension decision is to resolve the conformance
-registration edit boundary before resuming the remaining Python gates, then the
-Workflow evidence floor, Go AgentTool and the Workflow candidate in unit order.
+Raw native wrappers, nested wrappers, inner pauses, inner schemas, foreign agent
+classes, inner fixed toolsets and exit tools, model-less inner roots and ambiguous
+names remain refused at prepare. Inner provider/budget/binding failures and error
+events terminate the outer run; native's conversion of an inner error event to
+tool text is measured separately. The new failure golden uses the registered
+native normalization to `denied`. The three new cases use the existing per-agent
+ID normalization because native isolated sessions have separate ID namespaces;
+explicit happens-before assertions preserve causal order. Existing cases and
+goldens are unchanged. V2 adds no gate beyond the measured V1 capability-free
+subset, so the rule does not require a separate V2-only implementation.
+
+**Python Workflow.** Native W1 to W4 facts cover two turns, branch/node paths,
+route events, terminal Join output maps, node state and pause behavior. The Tier 1
+candidate passes closed-list prepare admission and live exact request/result
+parity, including streamed authors. A finished turn saves graph-native
+`nodeInfo.path`, `outputFor` and `messageAsOutput`; a fresh executor refuses those
+fields with `unrecoverable`. The independent retained test constructs that native
+record without any candidate helper and keeps the existing tree restore boundary
+executable. No Workflow helper or restore exception ships.
+
+| Rule W, Tier 1 | CPython | Node Worker live | Fresh Worker / restored | Chromium |
+| --- | --- | --- | --- | --- |
+| WN native facts | PASS | NOT APPLICABLE: native oracle | NOT APPLICABLE: native oracle | NOT APPLICABLE: WG8 only |
+| WG1 closed list | PASS | PASS | PASS: fresh prepare | NOT APPLICABLE: WG8 only |
+| WG2 routing and output parity | PASS: live | PASS: live | UNMEASURED: WG6 prevents continuation | NOT APPLICABLE: WG8 only |
+| WG6 completed durability | FAIL: unrecoverable | NOT APPLICABLE: fresh restore gate | FAIL: unrecoverable | NOT APPLICABLE: WG8 only |
+| WG3, WG4, WG5, WG7, WG8, WG9 | UNMEASURED: outcome fixed by WG6 | UNMEASURED: outcome fixed by WG6 | UNMEASURED: outcome fixed by WG6 | UNMEASURED: outcome fixed by WG6 |
+| AL-W replacement | FAIL: request digests | FAIL: request digests, including retry | UNMEASURED: no separate restore lane | NOT APPLICABLE: floor has no browser gate |
+
+Tier 2 is UNMEASURED, not attempted because Tier 1 failed WG6. The replacement
+chains and fan-out trees preserve final text and write counts, including a failed
+run and retry, but their request digests differ: native downstream nodes receive
+predecessor output, while the tree replacements retain prompt/history and add
+internal-agent instructions. Those trees remain useful authored shapes, without
+an AL-W parity claim. Routes, cycles, retries, timeouts and dynamic nodes have no
+measured replacement. The unchanged raw-Workflow, hidden-model and pause refusals
+remain green; `subgraphs` stays false.
+
+**Go AgentTool.** Plain native sessions retain copied `temp:` input, filter `_adk`
+input and omit inner output-key state deltas. Native inner errors become
+model-visible error text through the outer flow. Nested confirmations and
+long-running inner calls expose no resumable inner events. The V2 candidate
+matches declaration/state/result parity and failure containment, but completed
+restores repeat call IDs. The Node bridge also defers excluded-shape refusal
+until start instead of prepare. Both findings disqualify it.
+
+| Rule T gate, Go V2 | Native Go | Node wasm live | Node wasm restored | Chromium |
+| --- | --- | --- | --- | --- |
+| T1 native premise | PASS | NOT APPLICABLE: native oracle | NOT APPLICABLE: native oracle | NOT APPLICABLE: T8 only |
+| T2 routing and budget | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T3 IDs, scopes and stream isolation | FAIL: repeated adk-6 on restore | PASS: live subset | FAIL: repeated functionCall IDs | NOT APPLICABLE: T8 only |
+| T4 declaration, result and state | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T5 fatal failures and abort | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T6 static refusal point | PASS | FAIL: start, not prepare | FAIL: start, not prepare | NOT APPLICABLE: T8 only |
+| T7 durability and rollback | PASS | PASS | PASS | NOT APPLICABLE: T8 only |
+| T8 ship confirmation | NOT APPLICABLE: no qualifying variant | NOT APPLICABLE | NOT APPLICABLE | NOT APPLICABLE |
+
+V1's capability-specific gates are UNMEASURED. Native functiontool confirmation
+metadata is private, while the existing recorder exposes only global pausing and
+per-tool long-running metadata. A global-pausing guard would falsely refuse an
+outer-only pause; the immutable tool constructor is not changed to obtain a new
+per-tool seam. The common restore-ID failure is observed on V2, not assumed to
+be a V1 measurement. Neither variant qualifies; every measured variant has a
+FAIL, selecting row 3. No Go wrapper, wire flag or adapter policy change ships.
+The independent ordinary-tree control retains ID reuse while effect scopes
+advance from `adk-go/completed-control/root/1/0` to `root/2/0`.
+
+**Predictions and extension decisions.** P1 holds: Python V1 ships with the seed
+fix and policy check, and two wrapper calls need no wrapper-level serialization.
+P2 misses: Go is REFUSED rather than ALTERNATIVE, due to IDs and the prepare
+boundary; declaration and state parity pass. P3 holds at the specified refusal
+points; inner write policies are refused at call time, while static exclusions
+fail prepare. P4 misses its likely ALTERNATIVE: WG6 fails as predicted, but AL-W
+also fails request parity, so Workflow is REFUSED. P5 holds: the Go absence walk
+passes on Go 1.27.3 with `GOTOOLCHAIN=local`. P6 holds: one variant ships and two
+tracks remain refused.
+
+Keep Python's registered helper and its first-offending-call policy check.
+Reconsider Go only with a permitted confirmation-metadata seam, unique IDs across
+completed restore and prepare-time wasm admission. Reconsider Workflow restore
+only as a separately measured change preserving the existing rejection of
+`agentState` and `endOfAgent` for other shapes. JavaScript's earlier AgentTool
+refusal is unchanged. No ADR-0012 control, record format, dependency pin or
+subgraphs flag changes. The shipped cases pass native CPython, Node live/restored
+and headless Chromium; Firefox and WebKit are NOT RUN for these new cases.
+All measurements use scripted models. Real models, devices and unrun engines
+remain unmeasured.
 
 ### Workflow-child resume spike (2026-11)
 
