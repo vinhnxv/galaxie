@@ -12,7 +12,7 @@ import { toErrorInfo } from '@galaxie-ai/core';
 import { Annotation, END, MemorySaver, START, StateGraph } from '@langchain/langgraph/web';
 import { expect, test, vi } from 'vitest';
 import { createLangGraphAdapter } from '../src/adapter.js';
-import { requestInteraction } from '../src/interaction.js';
+import { requestInteraction, requestSurface } from '../src/interaction.js';
 
 const sessionId = 'repeated' as SessionId;
 const question = {
@@ -378,6 +378,41 @@ test('keeps an ordinal-zero surface on its existing publication path', async () 
   expect(await executor.pending(sessionId)).toMatchObject({
     interactionId: 'raw',
     surface: { format: 'galaxie.surface/1' },
+  });
+});
+
+test('an errored ordinal-zero surface keeps its bare ID and recovers on retry', async () => {
+  const saver = new MemorySaver();
+  let failed = false;
+  const graph = new StateGraph(Annotation.Root({ answers: Annotation<unknown[]> }))
+    .addNode('surface', (_, config) => {
+      const submitted = requestSurface(surface, config);
+      if (!failed) {
+        failed = true;
+        throw new Error('private-error-canary');
+      }
+      return { answers: [submitted] };
+    })
+    .addEdge(START, 'surface')
+    .addEdge('surface', END)
+    .compile({ checkpointer: saver });
+  const executor = await createLangGraphAdapter().prepare(
+    () => graph,
+    { chatModels: {} },
+    { signal: new AbortController().signal },
+  );
+  await collect(executor.run(request({ type: 'start', input: {} })));
+  const first = (await executor.pending(sessionId))!;
+  expect(first.surface).toMatchObject({ format: 'galaxie.surface/1' });
+  const command = { type: 'resume', interactionId: first.interactionId, ...answer } as const;
+  expect((await collect(executor.run(request(command)))).at(-1)).toMatchObject({
+    type: 'error',
+    error: { code: 'executor_error' },
+  });
+  expect(await executor.pending(sessionId, { registerRestoredData: () => {} })).toEqual(first);
+  expect((await collect(executor.run(request(command)))).at(-1)).toMatchObject({
+    type: 'output',
+    output: { answers: [answer] },
   });
 });
 

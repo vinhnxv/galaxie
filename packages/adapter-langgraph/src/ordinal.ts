@@ -75,7 +75,7 @@ export async function readOrdinalPending(
     };
   const surface = parseSurfaceRecord(interrupt.value);
   if (surface !== undefined) {
-    if (count > 0) return unsupported();
+    if (ordinal > 0) return unsupported();
     return {
       interaction: pendingFromSurface(interactionId, surface),
       rawId: interrupt.id,
