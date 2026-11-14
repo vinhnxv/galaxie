@@ -139,7 +139,13 @@ services:
     image: otel/opentelemetry-collector-contrib@sha256:b3079f45e19bdb7326bf49cdddce6cf60dfd865138db39f2733ea48ab17bc4cb
     command: [--config=/etc/otelcol/collector.yaml]
     ports: ["127.0.0.1:4318:4318"]
-    volumes: [./collector.yaml:/etc/otelcol/collector.yaml:ro]
+    volumes:
+      - type: bind
+        source: ./collector.yaml
+        target: /etc/otelcol/collector.yaml
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       LANGFUSE_OTEL_ENDPOINT: ${LANGFUSE_OTEL_ENDPOINT}
       LANGFUSE_AUTH_HEADER: ${LANGFUSE_AUTH_HEADER}

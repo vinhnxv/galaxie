@@ -15,10 +15,11 @@ pnpm install
 pnpm build
 cd spikes/llmops-trace-sinks
 pnpm install --frozen-lockfile
-pnpm exec vitest run test/single-copy.test.ts test/static.test.ts
+pnpm exec vitest run test/single-copy.test.ts test/static.test.ts test/lifecycle.test.ts
 pnpm exec tsc --noEmit
 pnpm run stack:up
 pnpm run smoke
+pnpm exec vitest run test/static.test.ts
 pnpm run stack:down
 ```
 
@@ -36,6 +37,11 @@ export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
 colima start --cpu 4 --memory 10 --disk 60
 ```
 
+The Docker daemon must be able to bind-mount this checkout's `collector.yaml`.
+Colima's default shared paths include `/Users`; a clone under `/private/tmp` is
+not shared on the measured setup. Use a clone under `/Users` with that setup.
+The bind mount refuses to create a missing daemon-side path.
+
 `stack:up` generates `.env` with mode 0600 only when absent. Do not copy
 [.env.example](.env.example) over it: that file lists names with empty values.
 Passwords, the headless user email, project keys and collector Basic auth value
@@ -44,6 +50,11 @@ report. Signup is disabled; headless initialization creates the initial user.
 Startup checks the host ports, waits for backend health, looks up or creates
 the `galaxie-smoke` MLflow experiment, updates that one `.env` key, then recreates
 the collector. Run `stack:down` before another `stack:up`.
+
+The helper pins the compose file and project, ignores inherited `COMPOSE_*`
+settings, and makes the local environment file authoritative over conflicting
+shell variables. Teardown also works when `.env` is missing, using the empty
+template without generating credentials.
 
 ## Services and controls
 

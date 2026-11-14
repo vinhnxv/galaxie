@@ -4,6 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { normalize } from '../src/normalize.js';
 import { readBack, waitForReadback } from '../src/readback.js';
@@ -79,9 +80,24 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
         expect(attributes).not.toHaveProperty('langfuse.observation.metadata.galaxie.run.id');
       }
     }
-    const services = execFileSync('docker', ['compose', 'ps', '--format', 'json'], {
-      encoding: 'utf8',
-    })
+    const services = execFileSync(
+      'docker',
+      [
+        'compose',
+        '--project-name',
+        'galaxie-llmops-trace-sinks',
+        '--file',
+        fileURLToPath(new URL('../compose.yaml', import.meta.url)),
+        '--env-file',
+        fileURLToPath(new URL('../.env', import.meta.url)),
+        'ps',
+        '--format',
+        'json',
+      ],
+      {
+        encoding: 'utf8',
+      },
+    )
       .trim()
       .split('\n')
       .map(

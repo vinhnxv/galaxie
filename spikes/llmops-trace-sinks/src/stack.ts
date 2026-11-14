@@ -6,18 +6,38 @@ import { existsSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { setTimeout } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { ensureEnv, envPath, redact, setExperimentId } from './secrets.js';
+import { ensureEnv, envPath, readEnv, redact, setExperimentId } from './secrets.js';
 
 const cwd = fileURLToPath(new URL('../', import.meta.url));
 
 function compose(args: string[]): string {
+  const environmentFile = existsSync(envPath)
+    ? envPath
+    : new URL('../.env.example', import.meta.url);
+  const childEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('COMPOSE_')),
+  );
   try {
-    return execFileSync('docker', ['compose', ...args], {
-      cwd,
-      encoding: 'utf8',
-      stdio: 'pipe',
-      maxBuffer: 20 * 1024 * 1024,
-    });
+    return execFileSync(
+      'docker',
+      [
+        'compose',
+        '--project-name',
+        'galaxie-llmops-trace-sinks',
+        '--file',
+        fileURLToPath(new URL('../compose.yaml', import.meta.url)),
+        '--env-file',
+        fileURLToPath(environmentFile),
+        ...args,
+      ],
+      {
+        cwd,
+        env: { ...childEnv, ...readEnv(environmentFile) },
+        encoding: 'utf8',
+        stdio: 'pipe',
+        maxBuffer: 20 * 1024 * 1024,
+      },
+    );
   } catch (error) {
     const failure = error as Error & { stderr?: Buffer; stdout?: Buffer };
     throw new Error(redact(`${failure.message}\n${failure.stdout ?? ''}\n${failure.stderr ?? ''}`));
@@ -38,10 +58,10 @@ async function waitHttp(url: string, timeout = 240_000): Promise<void> {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     try {
-      if ((await fetch(url, { signal: AbortSignal.timeout(3000), redirect: 'error' })).ok) return;
-    } catch {
-      /* A service may still be starting. */
-    }
+      const response = await fetch(url, { signal: AbortSignal.timeout(3000), redirect: 'error' });
+      await response.body?.cancel().catch(() => {});
+      if (response.ok) return;
+    } catch {}
     await setTimeout(1000);
   }
   throw new Error(`Health timeout at ${url}`);
@@ -49,13 +69,11 @@ async function waitHttp(url: string, timeout = 240_000): Promise<void> {
 
 async function main(): Promise<void> {
   if (process.argv[2] === 'down') {
-    if (existsSync(envPath)) {
-      console.log(redact(compose(['down', '-v', '--remove-orphans'])));
-      setExperimentId('');
-    }
+    console.log(redact(compose(['down', '-v', '--remove-orphans'])));
+    if (existsSync(envPath)) setExperimentId('');
     return;
   }
-  if (process.argv[2] !== 'up') throw new Error('Usage: node src/stack.ts up|down');
+  if (process.argv[2] !== 'up') throw new Error('Usage: pnpm run stack:up|stack:down');
   const env = ensureEnv();
   if (
     env['LANGFUSE_OTEL_ENDPOINT'] !== 'http://langfuse-web:3000/api/public/otel' ||
@@ -86,6 +104,7 @@ async function main(): Promise<void> {
   const base = `http://127.0.0.1:${mlflowPort}/api/2.0/mlflow/experiments`;
   const lookup = await fetch(`${base}/get-by-name?experiment_name=galaxie-smoke`, {
     redirect: 'error',
+    signal: AbortSignal.timeout(5000),
   });
   let id: string;
   if (lookup.ok) {
@@ -100,6 +119,7 @@ async function main(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'galaxie-smoke' }),
       redirect: 'error',
+      signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) throw new Error(`Experiment creation failed: HTTP ${response.status}`);
     id = ((await response.json()) as { experiment_id: string }).experiment_id;
@@ -114,15 +134,14 @@ async function main(): Promise<void> {
         signal: AbortSignal.timeout(1000),
         redirect: 'error',
       });
+      await response.body?.cancel().catch(() => {});
       if (response.status === 405) {
         console.log(
           'Backends and collector are ready. Credentials stay in the mode-0600 .env file.',
         );
         return;
       }
-    } catch {
-      /* The receiver may not yet be listening. */
-    }
+    } catch {}
     await setTimeout(500);
   }
   throw new Error('Collector did not become ready within 30 seconds');

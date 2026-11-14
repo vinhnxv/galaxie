@@ -25,6 +25,19 @@ interface Compose {
 const compose = parse(readFileSync(resolve(root, 'compose.yaml'), 'utf8')) as Compose;
 const collector = parse(readFileSync(resolve(root, 'collector.yaml'), 'utf8'));
 
+function assertNoCredentials(content: string, file: string, env: Record<string, string>): void {
+  const publicKeys = new Set([
+    'MLFLOW_EXPERIMENT_ID',
+    'MLFLOW_PORT',
+    'MLFLOW_OTEL_ENDPOINT',
+    'LANGFUSE_OTEL_ENDPOINT',
+  ]);
+  for (const [key, value] of Object.entries(env)) {
+    if (!publicKeys.has(key) && value)
+      expect(content.includes(value), `Generated ${key} appears in ${file}`).toBe(false);
+  }
+}
+
 function audit(value: Compose): void {
   for (const [name, service] of Object.entries(value.services)) {
     expect(service.image, `${name}: unpinned image`).toMatch(/@sha256:[a-f0-9]{64}$/);
@@ -158,18 +171,15 @@ test('environment template is empty, ignored secrets stay private and results co
   const results = existsSync(resolve(root, 'results'))
     ? readdirSync(resolve(root, 'results')).map((file) => `results/${file}`)
     : [];
-  // Routing values and the short experiment ID are public configuration, not credentials.
-  const publicKeys = new Set([
-    'MLFLOW_EXPERIMENT_ID',
-    'MLFLOW_PORT',
-    'MLFLOW_OTEL_ENDPOINT',
-    'LANGFUSE_OTEL_ENDPOINT',
-  ]);
   for (const file of new Set([...tracked, ...results])) {
-    const content = readFileSync(resolve(root, file), 'utf8');
-    for (const [key, value] of Object.entries(env)) {
-      if (!publicKeys.has(key) && value)
-        expect(content.includes(value), `Generated ${key} appears in ${file}`).toBe(false);
-    }
+    assertNoCredentials(readFileSync(resolve(root, file), 'utf8'), file, env);
   }
+});
+
+test('credential scan rejects an injected synthetic canary', () => {
+  expect(() =>
+    assertNoCredentials('synthetic credential canary', 'synthetic-result', {
+      POSTGRES_PASSWORD: 'synthetic credential canary',
+    }),
+  ).toThrow('Generated POSTGRES_PASSWORD appears in synthetic-result');
 });

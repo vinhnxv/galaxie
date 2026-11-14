@@ -6,9 +6,9 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 export const envPath = new URL('../.env', import.meta.url);
 
-export function readEnv(): Record<string, string> {
+export function readEnv(path: URL = envPath): Record<string, string> {
   return Object.fromEntries(
-    readFileSync(envPath, 'utf8')
+    readFileSync(path, 'utf8')
       .trim()
       .split('\n')
       .filter(Boolean)
