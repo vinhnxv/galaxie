@@ -53,14 +53,10 @@
     "agents-confirm-parallel-reversed",
     "model-string",
     "toolset-fixed",
-    "agent-tool",
-    "stream-agent-tool",
-    "agent-tool-failure",
     "agents-long-running-middle"
   ],
   "differences": [],
   "normalizations": [
-    "AgentTool wrapper (2026-11-14): SUPPORTED for registered depth-one inner trees with read/none capability policies. Native, Worker live/restored and Chromium scripted cases pass; raw AgentTool, nested wrappers, schemas and inner pauses remain refused. Inner failures terminate the outer run, unlike native error-event swallowing. Inner histories have their own call-ID namespace; these new cases use the existing per-agent numbering and explicit happens-before checks. Firefox, WebKit, real models and devices are unmeasured for these cases.",
     "Host inventories (2026-11-13): MS-py and TS-py SHIPPED. An ADK-only optional boot role list admits exact declared strings, with whole-tree validation, verified assignment/rollback and a Gemini-name guard; each prepare boots an independent interpreter. Fixed toolsets contain only same-boot registered capability tools and preserve authored declaration order and flat-list pause rules. Native scripted model-string/toolset-fixed oracles match the Worker lane. Inventory tests cover repeated prepares, router/stream/check/label/budget parity and complete decoded confirmation/reload records, excluding only the independently random key and MAC. Existing 39 goldens, matrix entries, assertions, formats and locks remain unchanged. Built-ins, foreign models, planners, executors and unregistered/dynamic/network toolsets remain refused. The existing Chromium subset is regression evidence; new inventory-specific Chromium, Firefox, WebKit, real models and devices remain unmeasured.",
     "Model/toolset/builtin spike: M-py and T-py ALTERNATIVE through explicit llm(role) and flat capability lists; N-py/X-py/L-py REFUSED. Prepare has no role inventory; galaxie/gemini-* satisfies the native name predicate, but builtins remain refused. Provider tool config is rejected, not silently dropped. New CPython characterizations only; no runtime, golden or existing case changes.",
     "Stream namespace spike: A-py/C-py ALTERNATIVE (unique-name message attribution only; GA3 duplicate-name ambiguity); B-py REFUSED (manifest-only routing and full routed replacement not established). New probes are CPython only; subgraphs remains false and all stream paths remain empty.",
@@ -97,7 +93,6 @@
       "long-running pause inside ParallelAgent": "Refused because interleaved sibling calls can reset the single long-running call tracker.",
       "ambiguous resumable app": "Any duplicate agent name, temp: output key or LlmAgent transfer children in a resumable app is unsupported at prepare: ADK keys progress by name, drops temporary state on resume and transfer resumability is unproven."
     },
-    "registeredAgentTool": "agent_tool(inner) is admitted for registered trees with no schemas, nested wrapper, exit tool, toolset or pausing tool. Every inner capability is checked on the page at the first offending call: only authoritative read/none passes; missing, write or confirmed policies fail unsupported before broker invocation. Capability-free inner trees are a subset.",
     "evidence": "tests/conformance/cases-adk-python/test_adk_python_refused_shapes.py records non-resumable behavior; test_adk_python_resumable_shapes.py records resumable model/tool counts and refused loop/parallel results. New workflow-pause goldens match live and restored Workers; tests/conformance/adk-python-agents.node.test.ts asserts prepare rules and recovery receipt replay."
   }
 }

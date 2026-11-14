@@ -19,8 +19,6 @@ CASES = (
     'agents-confirm-parallel', 'agents-confirm-parallel-reversed', 'agents-long-running-middle',
 )
 CASES += ('model-string', 'toolset-fixed')
-AGENT_TOOL_CASES = ('agent-tool', 'stream-agent-tool', 'agent-tool-failure')
-CASES += AGENT_TOOL_CASES
 # Cases whose agent tree has several agents; the scripted model answers by agent name.
 SHAPES = (
     'agents-sequential', 'agents-parallel', 'agents-loop', 'agents-transfer', 'stream-agents-sequential',
@@ -126,17 +124,6 @@ def factory(name, model=None, tool=None, ordinary=()):
                 sibling, 'math.double@1', PARAMETERS, 'Double an integer without an ADK confirmation.',
             ) for sibling in ('ordinary', 'other'))
     options = {'output_schema': Answer, 'output_key': 'result'} if name == 'output-schema' else {}
-    if name in AGENT_TOOL_CASES:
-        from google.adk.tools import AgentTool
-        if tool is None:
-            raise ValueError('The inner conformance tool is missing.')
-        if worker:
-            from galaxie.adk import agent_tool
-            wrapper = agent_tool
-        else:
-            wrapper = AgentTool
-        inner = LlmAgent(name='inner', model=model, description='Double one integer.', tools=[tool])
-        return LlmAgent(name='outer', model=model, tools=[wrapper(inner)])
     agent = shape(name, model, tool) if name in SHAPES else LlmAgent(
         name='conformance', model=model, instruction='Use the supplied tools and answer briefly.',
         tools=([tool, *ordinary] if name in BESIDE_CASES else [tool])
