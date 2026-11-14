@@ -70,9 +70,10 @@ Production hosting uses generated `_headers`.
 Native and Node tests pin absolute
 effect scopes and journal order; native tests pin the first recorded terminal
 failure code. The historical offline DSPy 3.2.1 overlay imports but cannot collect the native
-suites because `dspy.lm15` is absent; the [fresh version attempt](../tests/conformance/README.md#dspy-other-version-and-real-model-measurement-2026-11-14)
-remains UNMEASURED after the frozen control baseline fails installation on ADK
-dependency conflicts, including the single relaxed retry. Real models remain unmeasured: no model
+suites because `dspy.lm15` is absent; the [fresh native version measurement](../tests/conformance/README.md#dspy-other-version-and-real-model-measurement-2026-11-14)
+confirms collection fails on 3.2.1, finds DSPy 3.5.0 diverges (it removed the
+messages-style LM call) and passes on the pinned 3.4.1 control; Worker and browser
+lanes for other versions stay unmeasured. Real models remain unmeasured: no model
 access in this environment. This changes tests and docs only. See the
 [per-engine measurements and limits](../tests/conformance/README.md#dspy-engine-measurements).
 

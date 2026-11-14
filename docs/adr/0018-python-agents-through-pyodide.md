@@ -39,7 +39,7 @@
   2026-11-13: added independent DSPy runtime LabeledFewShot and retrieval goldens; native/Node pass, runtime and host-bound retrieval pass on all three local browsers, and the two eval-instrumented service probes diverge under Trusted Types. No shipped source or Decision text changed; status stays Proposed.
 
   2026-11-14: registered offline optimizer state measurement rules before running COPRO, GEPA or MIPROv2; status stays Proposed.
-  2026-11-14: registered branch-helper version outcome rules and recorded the real-model and Parallel adapter decisions; status stays Proposed.
+  2026-11-14: registered branch-helper version outcome rules, measured DSPy 3.2.1 (collection fails), 3.4.1 (control passes) and 3.5.0 (diverges) natively, and recorded the real-model and Parallel adapter decisions; status stays Proposed.
 
 ## Context
 
@@ -1093,14 +1093,14 @@ written first.
 Rules commit `c46464c` was pushed before any probe ran. On 2026-11-14 the
 in-repository DSPy 3.4.1 baseline passed suite A (59 tests) and suite B (83
 tests), each with exit 0. CPython was 3.14.5, uv was 0.11.23, and the platform
-was macOS 27.2.1 arm64 (`macOS-27.2.1-arm64-arm-64bit-Mach-O`). PyPI returned
-HTTP 200 (curl exit 0); the 3.2.1 installation dry run resolved (exit 0).
-Release selection uses PyPI alone; no DSPy documentation or GitHub release-note
-confirmation was made.
+was macOS 27.2.1 arm64. PyPI returned HTTP 200 and release selection uses PyPI
+alone; no DSPy documentation or GitHub release-note confirmation was made.
 
-The throwaway 3.4.1 control could not install its frozen baseline. Both copied
-stand-ins built and installed, but the package-list install ended
-**INSTALL-FAILS**, exit 1, before installing DSPy. The resolver error was:
+**First attempt, as registered: INSTALL-FAILS.** The registered scratch method
+used `--no-config` and installed the frozen package list through the resolver.
+That omits the repository's ADK pin overrides, so the control stopped at the
+resolver before DSPy was installed. The two attempts (the second removed only
+the `websockets` pin) failed with:
 
 ```text
   × No solution found when resolving dependencies:
@@ -1109,13 +1109,6 @@ stand-ins built and installed, but the package-list install ended
       websockets>=15.0.1,<16.
       And because you require websockets==17.3, we can conclude that your
       requirements are unsatisfiable.
-```
-
-The single permitted retry removed only `websockets==17.3` from the scratch
-requirements. It also ended **INSTALL-FAILS**, exit 1:
-
-```text
-  × No solution found when resolving dependencies:
   ╰─▶ Because google-adk==2.12.0 depends on opentelemetry-api>=1.39,<=1.42.1
       and you require google-adk==2.12.0, we can conclude that you require
       opentelemetry-api>=1.39,<=1.42.1.
@@ -1123,52 +1116,64 @@ requirements. It also ended **INSTALL-FAILS**, exit 1:
       your requirements are unsatisfiable.
 ```
 
-`python/pyproject.toml` intentionally overrides these ADK constraints, including
-`websockets` and `opentelemetry-api`, to preserve Pyodide-aligned pins. The
-registered `--no-config` method excludes those overrides. Relaxing further
-unrelated pins or installing the baseline without dependency resolution would
-change that method, so no further install or suite was attempted. This is an
-environment-construction finding, not evidence that a DSPy release cannot
-install in another environment. The 3.2.1 dry run is not a real install.
+**Corrected method (a recorded amendment; the rules above are unchanged).** The
+frozen list is already a complete solution, so it was installed with
+`--no-deps` in a throwaway environment outside the checkout. The same CPython
+3.14.5 was used, `google-adk` and the DSPy-independent workspace entries were
+left out, and the stand-ins and `python/galaxie/src` were added by a `.pth`
+file. Then `dspy==VERSION` was installed through the resolver. The registered
+pytest invocation also passed `-I`, which ignores the sibling-module imports the
+suites need: on the 3.4.1 control, suite B then reported 81 passed and 2 failed
+(`test_dspy_fanout.py`), so it was dropped. Without `-I` the control matched the
+in-repository counts, which is the precondition for trusting the other rows.
 
-| DSPy version and lane | Install and import facts | Suite A | Suite B |
+| DSPy version, native CPython | Install and import facts | Suite A | Suite B |
 | --- | --- | --- | --- |
-| 3.4.1, repository native baseline | Already installed; suite imports succeeded | PASS: 59 passed, exit 0 | PASS: 83 passed, exit 0 |
-| 3.4.1, throwaway native control | INSTALL-FAILS at frozen baseline, including the one relaxed retry; DSPy and `dspy.lm15` imports not run | UNMEASURED: control environment could not be built | UNMEASURED: control environment could not be built |
-| 3.2.1, throwaway native target | Dry run resolved; real install and imports UNMEASURED because the required control could not be built | UNMEASURED: required control unavailable after the two resolver errors above | UNMEASURED: required control unavailable after the two resolver errors above |
-| 3.5.0, throwaway native target | Install and imports UNMEASURED because the required control could not be built | UNMEASURED: required control unavailable after the two resolver errors above | UNMEASURED: required control unavailable after the two resolver errors above |
+| 3.4.1 control | Installed; imports succeeded | PASS: 59 passed | PASS: 83 passed |
+| 3.2.1 | Real install succeeded (the resolver also pulled `litellm` 1.109.1); `import dspy` works, `dspy.lm15` is absent | COLLECTION-FAILS: 2 errors, exit 2, zero tests run | COLLECTION-FAILS: 5 errors, exit 2, zero tests run |
+| 3.5.0 | Installed; collection succeeded | DIVERGED: 16 failed, 43 passed | DIVERGED: 60 failed, 23 passed |
 
-The throwaway inventory contains only `litellm` 1.106.2 and `ormsgpack` 1.13.0,
-both built from copied workspace sources, rather than editable installations;
-their versions equal the repository's stand-ins. Every other baseline package,
-including DSPy, is absent there. No completed environment exists from which to
-claim a DSPy-only dependency difference. DSPy 3.4.0 was not run: the bisect
-condition was not reached. Versions 3.3.0 and 3.3.1 were not run or inspected
-in this measurement. No new COLLECTION-FAILS, DIVERGED or browser result is
-claimed. The earlier 3.2.1 overlay collection failure remains historical evidence.
+3.2.1 fails at `galaxie/src/galaxie/dspy.py:23` with `ModuleNotFoundError: No
+module named 'dspy.lm15'`. This is an import finding, not an assertion result.
 
-Prediction scorecard: **Q1** holds for network access only; the real-install
-prediction is unmeasured. **Q2** is unmeasured in the fresh layout. **Q3** could
-not be established because construction failed before the control ran.
-**Q4** is unmeasured. **Q5** holds: no model access. **Q6** holds: before/after
-lock and pyproject SHA-256 values, repository package freeze and clean Git status
-are identical. No assertion, source, golden, matrix or repository dependency
-changed. The required `dspy.lm15` import remains the boundary identified by the
-historical overlay; these new results establish no minimum supported version.
+3.5.0 fails with a `TypeError` raised from DSPy's own `dspy/clients/execution.py`
+(`prepare`, reached through `BaseLM.acall`): `lm(messages=[...]) was removed in
+DSPy 3.5. Build a dspy.lm15.Request with Message objects ... and call lm(request)`.
+The first failing assertions end as `executor_error` (for example
+`test_shipped_divergence_is_refused_before_dispatch[removed]` and
+`test_lock_recipe_preserves_bytes_under_reversed_transport_completions`). The
+classification is BEHAVIORAL: DSPy 3.5 removed the messages-style call form the
+tests and the scripted model path use, so this is an API removal in DSPy, not a
+literal-version assertion. Whether the shipped model proxy itself would also
+need to change for 3.5 is not established by these suites. DSPy 3.4.0 was not run
+because the 3.5.0 cause is explained by the removal above, and 3.3.0 and 3.3.1
+were neither run nor inspected.
+
+Prediction scorecard: **Q1** holds (network and a real 3.2.1 install succeeded).
+**Q2** holds with one correction: the failing import is at line 23, not 22.
+**Q3** holds (control equals 59 and 83 once `-I` is dropped). **Q4** is
+disproved: 3.5.0 installed and collected but diverged. **Q5** holds: no model
+access. **Q6** holds: before/after lock and pyproject SHA-256 values, the
+repository package freeze and clean Git status are identical. No assertion,
+source, golden, matrix or repository dependency changed. The minimum known
+working version is 3.4.1 (the pinned control); 3.2.1 and 3.5.0 are not supported,
+and this measurement makes no pin-bump decision. Worker, Node Pyodide and
+browser lanes for other versions remain UNMEASURED: their locked wheel closure
+needs a separate maintainer lock decision.
 
 #### Outcomes by item
 
 - Real models: **UNMEASURED**, no model access for the agent in this environment;
   the maintainer recipe above specifies the evidence needed to reopen.
-- Other DSPy versions: **UNMEASURED**, the required throwaway control baseline
-  has the two exact resolver conflicts above. Only the pinned native baseline
-  was measured; Worker, Node Pyodide and browser targets remain UNMEASURED
-  because their locked wheel closure needs a separate maintainer decision.
+- Other DSPy versions: **measured natively**. 3.2.1 is COLLECTION-FAILS
+  (`dspy.lm15` absent) and 3.5.0 is DIVERGED, BEHAVIORAL (messages-style LM call
+  removed). The 3.4.1 control passes. Worker, Node Pyodide and browser targets
+  remain UNMEASURED.
 - Pause-capable groups and a `Parallel`-shaped adapter: **not built; reopen only
   on evidence**, under the decision above. No newly run probe changes its premises.
 
 See the [commands and limits](../../tests/conformance/README.md#dspy-other-version-and-real-model-measurement-2026-11-14)
-for the installation attempt, baseline suites and maintainer recipe.
+for the reproduction recipe and the maintainer recipe.
 
 ### DSPy provider strings, schema output, embeddings and retrievers spike (2026-11)
 
