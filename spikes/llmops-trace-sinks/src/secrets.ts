@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 
 export const envPath = new URL('../.env', import.meta.url);
 
@@ -54,19 +54,31 @@ export function ensureEnv(): Record<string, string> {
     );
   }
   chmodSync(envPath, 0o600);
-  return readEnv();
+  const env = readEnv();
+  const template = readFileSync(new URL('../.env.example', import.meta.url), 'utf8')
+    .trim()
+    .split('\n')
+    .map((line) => line.slice(0, line.indexOf('=')));
+  const missing = template.filter((key) => !(key in env));
+  if (missing.length > 0)
+    throw new Error(`.env is missing ${missing.join(', ')}; run stack:down and remove .env`);
+  return env;
 }
 
 export function setExperimentId(id: string): void {
   if (id !== '' && !/^\d+$/.test(id)) throw new Error('Invalid MLflow experiment ID');
   const current = readFileSync(envPath, 'utf8');
-  if (!/^MLFLOW_EXPERIMENT_ID=.*$/m.test(current))
+  if (!/^MLFLOW_EXPERIMENT_ID=.*$/m.test(current)) {
+    if (id === '') return;
     throw new Error('Missing experiment ID key in .env');
+  }
+  const temporary = new URL(`../.env.${process.pid}.tmp`, import.meta.url);
   writeFileSync(
-    envPath,
+    temporary,
     current.replace(/^MLFLOW_EXPERIMENT_ID=.*$/m, `MLFLOW_EXPERIMENT_ID=${id}`),
     { mode: 0o600 },
   );
+  renameSync(temporary, envPath);
 }
 
 export function redact(text: string): string {

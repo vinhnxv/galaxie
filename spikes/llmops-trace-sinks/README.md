@@ -70,6 +70,8 @@ interfaces inside its container; Docker publishes it only on `127.0.0.1`.
 The smoke test checks both Docker publication and host listeners. A wildcard
 host listener fails the test, including one created by a VM port forwarder.
 There is no Docker socket mount, host networking or privileged container.
+Langfuse and MLflow vendor usage telemetry is not disabled here (see the last paragraph of
+this section); container egress is not blocked by this stack.
 Loopback publication does not authenticate other local processes or provide
 an isolation boundary against trusted code on this machine.
 

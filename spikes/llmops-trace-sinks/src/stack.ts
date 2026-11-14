@@ -81,7 +81,13 @@ async function main(): Promise<void> {
   )
     throw new Error('Collector endpoints must remain on the local compose network');
   const mlflowPort = Number(env['MLFLOW_PORT']);
-  if (!Number.isInteger(mlflowPort) || mlflowPort < 1024 || mlflowPort > 65535)
+  if (
+    !Number.isInteger(mlflowPort) ||
+    mlflowPort < 1024 ||
+    mlflowPort > 65535 ||
+    mlflowPort === 3000 ||
+    mlflowPort === 4318
+  )
     throw new Error('Invalid MLFLOW_PORT');
   for (const port of [3000, mlflowPort, 4318]) await freePort(port);
   console.log('Starting local backends; waiting for container health (up to 240 seconds).');

@@ -22,7 +22,9 @@ interface Service {
 interface Compose {
   services: Record<string, Service>;
 }
-const compose = parse(readFileSync(resolve(root, 'compose.yaml'), 'utf8')) as Compose;
+const compose = parse(readFileSync(resolve(root, 'compose.yaml'), 'utf8'), {
+  merge: true,
+}) as Compose;
 const collector = parse(readFileSync(resolve(root, 'collector.yaml'), 'utf8'));
 
 function assertNoCredentials(content: string, file: string, env: Record<string, string>): void {
@@ -36,6 +38,12 @@ function assertNoCredentials(content: string, file: string, env: Record<string, 
     if (!publicKeys.has(key) && value)
       expect(content.includes(value), `Generated ${key} appears in ${file}`).toBe(false);
   }
+}
+
+function resultFiles(): string[] {
+  return existsSync(resolve(root, 'results'))
+    ? readdirSync(resolve(root, 'results')).map((file) => `results/${file}`)
+    : [];
 }
 
 function audit(value: Compose): void {
@@ -70,7 +78,9 @@ function audit(value: Compose): void {
   const command = mlflow?.command ?? [];
   expect(command).not.toContain('--disable-security-middleware');
   const hosts = command[command.indexOf('--allowed-hosts') + 1];
-  expect(hosts).toBe('mlflow:5100,127.0.0.1:${MLFLOW_PORT:-5100},localhost:${MLFLOW_PORT:-5100}');
+  expect(hosts).toBe(
+    'mlflow:5100,127.0.0.1:5100,localhost:5100,127.0.0.1:${MLFLOW_PORT:-5100},localhost:${MLFLOW_PORT:-5100}',
+  );
   expect(command[command.indexOf('--cors-allowed-origins') + 1]).toBe(
     'http://127.0.0.1:${MLFLOW_PORT:-5100},http://localhost:${MLFLOW_PORT:-5100}',
   );
@@ -78,21 +88,29 @@ function audit(value: Compose): void {
 
 test('compose confines publication, pins images and references secrets', () => audit(compose));
 
-test.each(['literal password', 'unpinned image', 'wildcard port', 'Docker socket', 'host network'])(
-  'static guard rejects %s',
-  (mutation) => {
-    const broken = structuredClone(compose);
-    const service = broken.services['postgres'];
-    if (!service) throw new Error('Missing postgres service');
-    if (mutation === 'literal password') service.environment = { POSTGRES_PASSWORD: 'abc' };
-    if (mutation === 'unpinned image') service.image = 'postgres:17';
-    if (mutation === 'wildcard port') service.ports = ['5432:5432'];
-    if (mutation === 'Docker socket')
-      service.volumes = ['/var/run/docker.sock:/var/run/docker.sock'];
-    if (mutation === 'host network') service.network_mode = 'host';
-    expect(() => audit(broken)).toThrow();
-  },
-);
+test.each([
+  'literal password',
+  'inherited literal password',
+  'unpinned image',
+  'wildcard port',
+  'Docker socket',
+  'host network',
+])('static guard rejects %s', (mutation) => {
+  const broken = structuredClone(compose);
+  const service = broken.services['postgres'];
+  if (!service) throw new Error('Missing postgres service');
+  if (mutation === 'literal password') service.environment = { POSTGRES_PASSWORD: 'abc' };
+  if (mutation === 'inherited literal password') {
+    const web = broken.services['langfuse-web'];
+    if (!web?.environment) throw new Error('Missing langfuse-web environment');
+    web.environment['SALT'] = 'abc';
+  }
+  if (mutation === 'unpinned image') service.image = 'postgres:17';
+  if (mutation === 'wildcard port') service.ports = ['5432:5432'];
+  if (mutation === 'Docker socket') service.volumes = ['/var/run/docker.sock:/var/run/docker.sock'];
+  if (mutation === 'host network') service.network_mode = 'host';
+  expect(() => audit(broken)).toThrow();
+});
 
 test('collector maps only present attributes and fans out without MLflow compression', () => {
   expect(collector.receivers.otlp.protocols.http.endpoint).toBe('0.0.0.0:4318');
@@ -160,6 +178,12 @@ test('environment template is empty, ignored secrets stay private and results co
     .filter(Boolean);
   expect(tracked).not.toContain('.env');
   expect(tracked).toContain('.env.example');
+  for (const file of new Set([...tracked, ...resultFiles()])) {
+    const content = readFileSync(resolve(root, file), 'utf8');
+    expect(content, `credential-shaped value in ${file}`).not.toMatch(
+      /\b[ps]k-lf-[0-9a-f-]{32,}|Basic [A-Za-z0-9+/=]{40,}/,
+    );
+  }
   if (!existsSync(envPath)) return;
   expect(statSync(envPath).mode & 0o777).toBe(0o600);
   const env = readEnv();
@@ -168,10 +192,7 @@ test('environment template is empty, ignored secrets stay private and results co
   expect(env['LANGFUSE_AUTH_HEADER']).toBe(
     `Basic ${Buffer.from(`${env['LANGFUSE_INIT_PROJECT_PUBLIC_KEY']}:${env['LANGFUSE_INIT_PROJECT_SECRET_KEY']}`).toString('base64')}`,
   );
-  const results = existsSync(resolve(root, 'results'))
-    ? readdirSync(resolve(root, 'results')).map((file) => `results/${file}`)
-    : [];
-  for (const file of new Set([...tracked, ...results])) {
+  for (const file of new Set([...tracked, ...resultFiles()])) {
     assertNoCredentials(readFileSync(resolve(root, file), 'utf8'), file, env);
   }
 });

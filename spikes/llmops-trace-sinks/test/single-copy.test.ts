@@ -34,7 +34,13 @@ test('linked built packages share the runner module paths', async () => {
         if (typeof link !== 'string' || !link.startsWith('link:')) continue;
         const directory = resolve(root, link.slice(5));
         const pkg = JSON.parse(readFileSync(resolve(directory, 'package.json'), 'utf8'));
-        const entries = Object.values(pkg.exports) as { default: string }[];
+        const entries = Object.values(pkg.exports).map((value) => {
+          const target =
+            typeof value === 'string' ? value : (value as { default?: string }).default;
+          if (typeof target !== 'string')
+            throw new Error(`${linkedName}: export without a default`);
+          return { default: target };
+        });
         for (const exported of entries) {
           const entry = resolve(directory, exported.default);
           expect(

@@ -100,8 +100,9 @@ services:
 
   redis:
     image: redis@sha256:2e3eb11462c4e3759e6972678dd051d150ff54b1e60714b3c33b701260172a90
-    command: [redis-server, --requirepass, "${REDIS_AUTH}", --maxmemory-policy, noeviction]
+    command: [sh, -c, "exec redis-server --requirepass \"$$REDIS_AUTH\" --maxmemory-policy noeviction"]
     environment:
+      REDIS_AUTH: ${REDIS_AUTH}
       REDISCLI_AUTH: ${REDIS_AUTH}
     volumes: [redis-data:/data]
     healthcheck:
@@ -126,7 +127,7 @@ services:
 
   mlflow:
     image: ghcr.io/mlflow/mlflow@sha256:257204c77980b0f3450a26eb6089e487603fcdd4509529eadaf88f90669f5c13
-    command: [mlflow, server, --host, 0.0.0.0, --port, "5100", --backend-store-uri, "sqlite:////mlflow/mlflow.db", --default-artifact-root, /mlflow/artifacts, --allowed-hosts, "mlflow:5100,127.0.0.1:${MLFLOW_PORT:-5100},localhost:${MLFLOW_PORT:-5100}", --cors-allowed-origins, "http://127.0.0.1:${MLFLOW_PORT:-5100},http://localhost:${MLFLOW_PORT:-5100}"]
+    command: [mlflow, server, --host, 0.0.0.0, --port, "5100", --backend-store-uri, "sqlite:////mlflow/mlflow.db", --default-artifact-root, /mlflow/artifacts, --allowed-hosts, "mlflow:5100,127.0.0.1:5100,localhost:5100,127.0.0.1:${MLFLOW_PORT:-5100},localhost:${MLFLOW_PORT:-5100}", --cors-allowed-origins, "http://127.0.0.1:${MLFLOW_PORT:-5100},http://localhost:${MLFLOW_PORT:-5100}"]
     ports: ["127.0.0.1:${MLFLOW_PORT:-5100}:5100"]
     volumes: [mlflow-data:/mlflow]
     healthcheck:

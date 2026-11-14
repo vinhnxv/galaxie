@@ -50,8 +50,8 @@
         "version": "",
         "environment": "default",
         "completionStartTime": null,
-        "createdAt": "time-6",
-        "updatedAt": "time-6",
+        "createdAt": "time-3",
+        "updatedAt": "time-3",
         "metadata": {
           "galaxie.run.id": "run-1",
           "scope.name": "galaxie.llmops.smoke",
@@ -104,8 +104,8 @@
         "parent_span_id": "root-span-1",
         "name": "smoke-child",
         "kind": "SPAN_KIND_INTERNAL",
-        "start_time_unix_nano": "time-7",
-        "end_time_unix_nano": "time-8",
+        "start_time_unix_nano": "time-6",
+        "end_time_unix_nano": "time-7",
         "attributes": [
           {
             "key": "smoke.string",
@@ -141,8 +141,8 @@
         "span_id": "root-span-1",
         "name": "smoke-root",
         "kind": "SPAN_KIND_INTERNAL",
-        "start_time_unix_nano": "time-9",
-        "end_time_unix_nano": "time-10",
+        "start_time_unix_nano": "time-8",
+        "end_time_unix_nano": "time-9",
         "attributes": [
           {
             "key": "smoke.string",
@@ -223,7 +223,6 @@
       "TCP 127.0.0.1:4318 (LISTEN)"
     ],
     "command": "lsof -nP -iTCP -sTCP:LISTEN",
-    "forwarder": "colima ssh",
     "wildcardListeners": false
   },
   "scope": "One two-span hand-made trace, checked again after two seconds. No galaxie runtime runs."

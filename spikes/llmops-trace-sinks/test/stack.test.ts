@@ -136,7 +136,7 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
     result.spans.sort((a, b) => a.name.localeCompare(b.name));
     writeFileSync(
       new URL('smoke.json', folder),
-      `${JSON.stringify({ demonstration: true, readback: normalize(result, smoke), ports: { bindings, hostListeners: selected.map((line) => line.slice(line.indexOf('TCP '))), command: 'lsof -nP -iTCP -sTCP:LISTEN', forwarder: 'colima ssh', wildcardListeners: false }, scope: 'One two-span hand-made trace, checked again after two seconds. No galaxie runtime runs.' }, null, 2)}\n`,
+      `${JSON.stringify({ demonstration: true, readback: normalize(result, smoke), ports: { bindings, hostListeners: selected.map((line) => line.slice(line.indexOf('TCP '))), command: 'lsof -nP -iTCP -sTCP:LISTEN', wildcardListeners: false }, scope: 'One two-span hand-made trace, checked again after two seconds. No galaxie runtime runs.' }, null, 2)}\n`,
     );
   },
 );
