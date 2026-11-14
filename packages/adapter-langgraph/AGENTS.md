@@ -34,7 +34,7 @@ The role and provider must already be declared and bound by the host.
 - Put `host.langchain.decide` and `gateDecision` in separate nodes, storing answers in
   state: an interrupted node re-runs from its start on resume. Gate thresholds and
   interaction text are host-authored; a decision can add a question, never remove a confirmation.
-- Keep one interrupt per node. A single ID-less request uses a verified root task and bare resume; see [ID-less limits](README.md#id-less-interrupts). New surface revisions use a later node and a new interrupt ID, never an in-place pending update.
+- Several strict four-field requests may pause in one top-level node, one at a time, with checkpoint-derived ordinal IDs; see [repeated requests](README.md#several-requests-in-one-node). A single ID-less request uses a verified root task and bare resume; see [ID-less limits](README.md#id-less-interrupts). New surface revisions use a later node and a new interrupt ID, never an in-place pending update.
 - Compile graphs with `host.langchain.checkpointer()` and call tools through
   `host.capabilities.call(name, input, config)`.
 - Pass node `config` to every capability call: its full checkpoint task namespace
@@ -64,7 +64,16 @@ The role and provider must already be declared and bound by the host.
 
 ## Limits
 
-Parallel interrupts and multiple interaction requests per node are unsupported.
+Several strict four-field requests in one top-level node are supported, with the
+first raw interrupt ID preserved and later IDs derived from committed resume values.
+Parallel interrupts, repeated child-graph pauses, later-ordinal surface records and
+repeated ID-less requests remain unsupported. Hosts answer snapshot pending IDs;
+the adapter validates each ID and resumes under the raw engine key.
+An error after an answered request in a node that asks again ends the run
+`unsupported`: LangGraph's retained error marker makes the new question ambiguous.
+Errored tasks with zero or one committed answer keep the bare ID; a committed
+answer is replayed with `null` input, never appended again. Error markers with two
+or more committed answers are refused. See [the error-retry limit](README.md#several-requests-in-one-node).
 One strict ID-less request on a root checkpoint task is supported, including the
 measured body-invoked child with no child namespace; compiled child namespaces are
 refused. Exact valid NodeInterrupt/raw GraphInterrupt requests publish once and

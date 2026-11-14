@@ -52,9 +52,19 @@ Recorded on 2026-11-10, Node.js 24.15.0 and pnpm 11.21.0. Native and LangGraph/c
 | G1: parallel interrupts | **refused** | N5 fails in every mode: a finished no-state-write sibling retains a resume write and stale interrupt without `NO_WRITES`, so the proposed done test cannot classify it. N4, N6, N7, C6–C9, L3, L4, L6 and L7 pass but cannot override that failure. | ADR-0030 is Accepted for the repeated-request design; no parallel implementation issue. |
 | G2: several interaction requests in one node | **supported** | N1–N3, N8, C1–C5, C10, L1, L2, L5 and L8 all pass. Ordinal IDs, raw-ID resumes, recovery and restored-value registration work for the measured top-level nodes. | `Support several interaction requests in one LangGraph node with ordinal interaction IDs`, after ADR review. |
 
-**Supported means design proven, implementation pending (ADR-0030 is Accepted).** Both shapes remain unsupported in the shipped adapter. This spike adds no conformance case, golden or compatibility-matrix entry. [ADR-0030 (Accepted)](../../docs/adr/0030-several-engine-pauses-published-one-at-a-time.md) records the executor obligations and alternatives.
+At the time of this spike, **supported meant design proven, implementation pending**,
+and both shapes were unsupported in the shipped adapter. The subsequent
+[top-level repeated-request implementation](../../packages/adapter-langgraph/README.md#several-requests-in-one-node)
+ships the Accepted ADR-0030 design with independent Node and Chromium conformance
+and reload evidence. Parallel interrupts remain refused. This spike itself adds no
+conformance case, golden or compatibility-matrix entry.
+[ADR-0030 (Accepted)](../../docs/adr/0030-several-engine-pauses-published-one-at-a-time.md)
+records the executor obligations and alternatives.
 
-For parallel graphs, ask the questions before the fan-out, or chain the interrupting branches so at most one task pauses per superstep, with one interaction request per node. For repeated requests in shipped code, split the requests into separate nodes. The existing [interrupt-sequence case](../../tests/conformance/cases/interrupt-sequence.ts) proves that path.
+For parallel graphs, ask the questions before the fan-out, or chain the interrupting
+branches so at most one task pauses per superstep. Splitting sequential questions
+into separate nodes remains an option, proved by the existing
+[interrupt-sequence case](../../tests/conformance/cases/interrupt-sequence.ts).
 
 Repeated child-graph pauses remain refused. N9 did not locate a child snapshot/config through the dynamically invoked child's parent `getState(config, { subgraphs: true })`; deterministic child resume-value discovery was not proven. This is a limit of the measured path, not a claim that every child-graph registration behaves that way. The spike executor declares `subgraphs: false`.
 

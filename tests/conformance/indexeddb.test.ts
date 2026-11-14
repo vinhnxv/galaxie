@@ -1,14 +1,25 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { RecoveryStore, SessionId, Submission } from '@galaxie-ai/core';
+import { createLangGraphAdapter, requestInteraction } from '@galaxie-ai/adapter-langgraph';
+import {
+  type AgentInstance,
+  createRuntime,
+  type PendingInteraction,
+  type RecoveryStore,
+  type RunId,
+  type SessionId,
+  type Submission,
+} from '@galaxie-ai/core';
 import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
 import * as web from '@langchain/langgraph/web';
 import { afterEach, expect, expectTypeOf, test } from 'vitest';
+import { z } from 'zod';
 import { GATE_CASE_NAMES, gateCases } from './cases/gates.js';
 import { IDLESS_CASE_NAMES, idlessCases } from './cases/idless.js';
 import { CASE_NAMES, type CaseName, cases } from './cases/index.js';
+import { interruptTwiceCases, resumes as repeatedAnswers } from './cases/interrupt-twice.js';
 import branching from './golden/branching.json' with { type: 'json' };
 import capability from './golden/capability.json' with { type: 'json' };
 import gateContinue from './golden/gate-continue.json' with { type: 'json' };
@@ -20,6 +31,7 @@ import interruptDurabilitySync from './golden/interrupt-durability-sync.json' wi
 import interruptResume from './golden/interrupt-resume.json' with { type: 'json' };
 import interruptSequence from './golden/interrupt-sequence.json' with { type: 'json' };
 import interruptSubgraph from './golden/interrupt-subgraph.json' with { type: 'json' };
+import interruptTwice from './golden/interrupt-twice.json' with { type: 'json' };
 import linear from './golden/linear.json' with { type: 'json' };
 import modelFailure from './golden/model-failure.json' with { type: 'json' };
 import modelWithoutConfig from './golden/model-without-config.json' with { type: 'json' };
@@ -297,3 +309,186 @@ test.each(IDLESS_CASE_NAMES)('%s restores after IndexedDB close and reopen', asy
     'The conformance session has no pending interaction.',
   );
 });
+
+test('interrupt-twice with IndexedDB matches native with zero differences', async () => {
+  const saver = await open();
+  expect(
+    diff(
+      interruptTwice,
+      normalize(await runGalaxie(interruptTwiceCases['interrupt-twice'], () => saver)),
+    ),
+  ).toEqual([]);
+});
+
+async function repeatedPause(
+  instance: AgentInstance<unknown, unknown>,
+  runId: RunId,
+): Promise<PendingInteraction | undefined> {
+  for await (const event of instance.events(runId)) {
+    if (event.type === 'error') throw new Error(`The reloaded run failed: ${event.error.code}`);
+    const pending = instance.getSnapshot().run?.pending;
+    if (event.type === 'interaction' && pending?.interactionId === event.interaction.interactionId)
+      return pending;
+  }
+  return undefined;
+}
+
+test.each(
+  ['sync', 'async', 'exit'].flatMap((mode) => [0, 1].map((ordinal) => ({ mode, ordinal }))),
+)(
+  'interrupt-twice restores ordinal $ordinal after IndexedDB close and reopen with $mode durability',
+  async ({ mode, ordinal }) => {
+    const databaseName = `galaxie-repeated-restore-${crypto.randomUUID()}`;
+    const active: Array<{ dispose(): Promise<void> }> = [];
+    const order: Array<{ kind: 'registered'; value: unknown } | { kind: 'pending'; id: string }> =
+      [];
+    const make = async (saver: IndexedDBSaver, sessionId?: SessionId) => {
+      const adapter = createLangGraphAdapter();
+      const runtime = createRuntime({
+        appId: 'conformance',
+        executors: [
+          {
+            ...adapter,
+            async prepare(
+              agent: Parameters<typeof adapter.prepare>[0],
+              services: Parameters<typeof adapter.prepare>[1],
+              options: Parameters<typeof adapter.prepare>[2],
+            ) {
+              const executor = await adapter.prepare(agent, services, options);
+              return {
+                ...executor,
+                async pending(id, options) {
+                  const pending = await executor.pending(
+                    id,
+                    options === undefined
+                      ? undefined
+                      : {
+                          registerRestoredData(value) {
+                            order.push({ kind: 'registered', value });
+                            options.registerRestoredData?.(value);
+                          },
+                        },
+                  );
+                  if (pending !== undefined)
+                    order.push({ kind: 'pending', id: pending.interactionId });
+                  return pending;
+                },
+              };
+            },
+          },
+        ],
+      });
+      active.push(runtime);
+      const fixture = interruptTwiceCases['interrupt-twice'];
+      const graph = fixture.factory(web, new ScriptedChatModel(fixture.script), saver, undefined, {
+        request: requestInteraction,
+      });
+      const instance = await runtime.create(
+        {
+          id: 'conformance/repeated-reload',
+          version: '1.0.0',
+          executor: 'langgraph-js',
+          input: z.unknown(),
+        },
+        {
+          principalScope: 'conformance',
+          recovery: saver.recovery,
+          ...(sessionId === undefined ? {} : { sessionId }),
+          agent: () =>
+            (
+              graph as ConformanceGraph & {
+                withConfig(config: { durability: string }): ConformanceGraph;
+              }
+            ).withConfig({ durability: mode }),
+        },
+      );
+      await instance.prepare();
+      return { runtime, instance, graph };
+    };
+    try {
+      const saver = await open(databaseName);
+      const first = await make(saver);
+      const started = await first.instance.start({ value: 1 });
+      const initial = await repeatedPause(first.instance, started.runId);
+      if (initial === undefined) throw new Error('Expected the first persisted question.');
+      let pending = initial;
+      if (ordinal === 1) {
+        expect(
+          await first.instance.dispatch({
+            instanceId: first.instance.instanceId,
+            runId: started.runId,
+            ...pending,
+            ...repeatedAnswers[0],
+          }),
+        ).toMatchObject({ status: 'accepted' });
+        const second = await repeatedPause(first.instance, started.runId);
+        if (second === undefined) throw new Error('Expected the second persisted question.');
+        pending = second;
+      }
+      expect(pending.interactionId).toBe(
+        ordinal === 0 ? initial.interactionId : `${initial.interactionId}:1`,
+      );
+      await first.runtime.dispose();
+      saver.close();
+      order.length = 0;
+      const reopened = await open(databaseName);
+      const restored = await make(reopened, first.instance.sessionId);
+      const run = await restored.instance.restore();
+      if (run === undefined) throw new Error('Expected the persisted question after reload.');
+      expect(restored.instance.getSnapshot().run?.pending).toEqual(pending);
+      if (ordinal === 1) {
+        const registered = order.findIndex(
+          (entry) =>
+            entry.kind === 'registered' &&
+            JSON.stringify(entry.value) === JSON.stringify(repeatedAnswers[0]),
+        );
+        const published = order.findIndex(
+          (entry) => entry.kind === 'pending' && entry.id === pending.interactionId,
+        );
+        expect(registered).toBeGreaterThanOrEqual(0);
+        expect(registered).toBeLessThan(published);
+        expect(restored.instance.getSnapshot().run?.labels).toContain('private-user');
+      }
+      for (let index = ordinal; index < 2; index++) {
+        const current = restored.instance.getSnapshot().run?.pending;
+        if (current === undefined) throw new Error('Expected an unanswered restored question.');
+        expect(current.interactionId).toBe(
+          index === 0 ? initial.interactionId : `${initial.interactionId}:1`,
+        );
+        const answer = repeatedAnswers[index];
+        if (answer === undefined) throw new Error('Expected an answer for the restored question.');
+        expect(
+          await restored.instance.dispatch({
+            instanceId: restored.instance.instanceId,
+            runId: run.runId,
+            ...current,
+            ...answer,
+          }),
+        ).toMatchObject({ status: 'accepted' });
+        await repeatedPause(restored.instance, run.runId);
+      }
+      expect(restored.instance.getSnapshot().run?.status).toBe('succeeded');
+      expect(restored.instance.getSnapshot().run?.pending).toBeUndefined();
+      const state = await restored.graph.getState({
+        configurable: { thread_id: restored.instance.sessionId },
+      });
+      expect(state.values).toEqual({
+        value: 1,
+        first: 'first',
+        second: false,
+        executions: 2 - ordinal,
+      });
+      expect(state.next).toEqual([]);
+      expect(await reopened.recovery.submissions(restored.instance.sessionId)).toMatchObject([
+        { interactionId: initial.interactionId, status: 'consumed' },
+        { interactionId: `${initial.interactionId}:1`, status: 'consumed' },
+      ]);
+      await restored.runtime.dispose();
+      reopened.close();
+      const completed = await make(await open(databaseName), first.instance.sessionId);
+      expect(await completed.instance.restore()).toBeUndefined();
+    } finally {
+      await Promise.all(active.map((runtime) => runtime.dispose()));
+    }
+  },
+);

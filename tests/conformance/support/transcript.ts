@@ -39,7 +39,7 @@ export interface ConformanceTools {
   call(name: string, input: unknown, config?: LangGraphRunnableConfig): Promise<unknown>;
 }
 export interface ConformanceCase {
-  readonly identity?: 'idless';
+  readonly identity?: 'idless' | 'ordinal';
   readonly resumes?: readonly Submission[];
   readonly capabilities?: Readonly<
     Record<
@@ -98,7 +98,7 @@ function rootInterrupt(path: readonly string[], mode: string, data: unknown): bo
 async function readPause(
   graph: ConformanceGraph,
   config: LangGraphRunnableConfig,
-  identity?: 'idless',
+  identity?: ConformanceCase['identity'],
 ): Promise<TranscriptPause> {
   const state = await graph.getState(config);
   const interrupts = state.tasks.flatMap((task) => task.interrupts);
@@ -331,10 +331,15 @@ export async function runGalaxie(
               ? await graph.getState({ configurable: { thread_id: threadId } })
               : undefined;
           const task = state?.tasks.find((task) => task.interrupts.length > 0);
+          const expectedId =
+            fixture.identity === 'idless'
+              ? `idless:${task?.id}:0`
+              : fixture.identity === 'ordinal' && resumeIndex > 1
+                ? `${committed?.id}:${resumeIndex - 1}`
+                : committed?.id;
           if (
             committed === undefined ||
-            interactionId !==
-              (fixture.identity === 'idless' ? `idless:${task?.id}:0` : committed.id) ||
+            interactionId !== expectedId ||
             JSON.stringify(request) !== JSON.stringify(committed.value)
           )
             throw new Error('The pending interaction differs from the committed interrupt.');

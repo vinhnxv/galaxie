@@ -297,7 +297,7 @@ test.each([true, false])(
     expect(JSON.stringify((inputs[0] as { resume: unknown }).resume)).toBe(
       JSON.stringify(idless ? answer : { [id]: answer }),
     );
-    expect(getState).toHaveBeenCalledTimes(idless ? 1 : 0);
+    expect(getState).toHaveBeenCalledTimes(1);
     expect(result.at(-1)).toEqual({ type: 'output', output: { completed: true } });
   },
 );
@@ -339,7 +339,7 @@ test.each([interactionId, '0123456789abcdef' as InteractionId])(
       action: 'submit',
       payload: 'yes',
     });
-    expect(f.transform).toHaveBeenCalledTimes(1);
+    expect(f.transform).toHaveBeenCalledTimes(id === interactionId ? 1 : 0);
     expect(result.filter(({ type }) => type === 'interaction')).toEqual([]);
     expect(result.at(-1)).toMatchObject({ type: 'error', error: toErrorInfo('unsupported') });
   },
