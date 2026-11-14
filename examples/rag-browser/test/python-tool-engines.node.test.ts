@@ -25,8 +25,21 @@ beforeAll(async () => {
     new URL('../../../tests/conformance/cases-python/tool_loop.py', import.meta.url),
     'utf8',
   );
+  const candidate: Record<string, string> = {};
+  for (const name of [
+    'tool_candidate',
+    'tool_scope',
+    'tool_scoped_candidate',
+    'tool_scoped_floor',
+    'tool_identity_probes',
+  ])
+    candidate[`${name}.py`] = await readFile(
+      new URL(`../../../tests/conformance/cases-python/${name}.py`, import.meta.url),
+      'utf8',
+    );
   built = await buildDspyPage(new URL('./support/python-tool-conformance/', import.meta.url), {
     'tool-loop': { 'tool_loop.py': source },
+    candidate,
   });
   browser = await launchDspyEngine();
   console.info(JSON.stringify({ engine: dspyEngine, version: browser.version() }));
@@ -72,7 +85,11 @@ async function result(page: Page): Promise<ToolReloadResult> {
   return report.reload;
 }
 
-const titles = [false, true].map((replay) => `text protocol reload replay=${replay}`);
+const titles = [
+  ...[false, true].map((replay) => `text protocol reload replay=${replay}`),
+  'candidate replayed reads retain effect IDs',
+  'candidate abrupt write loss recovers',
+];
 test('tool engine registry contains only unique registered titles', () => {
   expect(selectDspyEngine(dspyEngine)).toBe(dspyEngine);
   for (const engine of ['chromium', 'firefox', 'webkit'] as const) {
@@ -125,4 +142,128 @@ for (const replay of [false, true]) {
     },
     900_000,
   );
+}
+
+interface CandidateResult {
+  sessionId: string;
+  effects: string[];
+  calls: unknown[];
+  scopes: string[];
+  receipts: unknown[];
+  pending?: unknown;
+  restored?: unknown;
+  final?: unknown;
+  crashReady?: boolean;
+  restoreMissing?: boolean;
+  startCode?: string;
+}
+const candidateRuns = new Map<string, Promise<[CandidateResult, CandidateResult]>>();
+function candidateRun(probe: string): Promise<[CandidateResult, CandidateResult]> {
+  const previous = candidateRuns.get(probe);
+  if (previous) return previous;
+  const run = (async (): Promise<[CandidateResult, CandidateResult]> => {
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    const external: string[] = [];
+    await context.route('**/*', (route) => {
+      if (new URL(route.request().url()).origin === built.origin) return route.continue();
+      external.push(route.request().url());
+      return route.abort();
+    });
+    try {
+      const page = await context.newPage();
+      const read = async (): Promise<CandidateResult> => {
+        await page.waitForFunction(
+          () => Reflect.get(globalThis, 'pythonToolConformance')?.done,
+          undefined,
+          { timeout: 900_000 },
+        );
+        const report = await page.evaluate(() => Reflect.get(globalThis, 'pythonToolConformance'));
+        expect(report.error).toBeUndefined();
+        expect(report.violations).toEqual([]);
+        expect(report.candidate).toBeDefined();
+        return report.candidate;
+      };
+      await page.goto(`${built.origin}/?probe=${probe}`);
+      const first = await read();
+      await page.evaluate(
+        (step) => sessionStorage.setItem('pythonToolCandidateStep', JSON.stringify(step)),
+        first,
+      );
+      await page.reload();
+      const second = await read();
+      expect(external).toEqual([]);
+      return [first, second];
+    } finally {
+      await context.close();
+    }
+  })();
+  candidateRuns.set(probe, run);
+  return run;
+}
+
+test.skipIf(dspyEngine !== 'chromium')(
+  'candidate parallel replay observations identify the read counterexample',
+  async () => {
+    const [first, second] = await candidateRun('reads');
+    expect(first.pending).toBeDefined();
+    expect(second.restored).toEqual(first.pending);
+    expect(first.effects).toHaveLength(2);
+    expect(new Set(first.effects).size).toBe(2);
+    expect(second.effects).toHaveLength(2);
+    expect(second.effects.every((id) => !first.effects.includes(id))).toBe(true);
+    expect(second.scopes).toEqual(first.scopes);
+    expect(second.final).toMatchObject({ final: 'done' });
+  },
+  900_000,
+);
+
+test.skipIf(dspyEngine !== 'chromium')(
+  'candidate parallel write receipts survive real reload and replay',
+  async () => {
+    const [first, second] = await candidateRun('writes');
+    expect(first.pending).toBeDefined();
+    expect(second.restored).toEqual(first.pending);
+    expect(first.effects).toHaveLength(2);
+    expect(new Set(first.effects).size).toBe(2);
+    expect(first.receipts).toHaveLength(2);
+    expect(
+      first.receipts.every((record) => (record as { status: string }).status === 'succeeded'),
+    ).toBe(true);
+    expect(second.receipts).toEqual(first.receipts);
+    expect(second.effects).toEqual([]);
+    expect(second.calls).toEqual([]);
+    expect(second.scopes).toEqual(first.scopes);
+    expect(second.final).toMatchObject({ final: 'done' });
+  },
+  900_000,
+);
+
+test.skipIf(dspyEngine !== 'chromium')(
+  'candidate abrupt-loss observation keeps receipt but refuses adopted-session restart',
+  async () => {
+    const [first, second] = await candidateRun('crash');
+    expect(first.crashReady).toBe(true);
+    expect(first.effects).toHaveLength(1);
+    expect(first.receipts).toMatchObject([{ status: 'succeeded' }]);
+    expect(second.receipts).toEqual(first.receipts);
+    expect(second.restoreMissing).toBe(true);
+    expect(second.startCode).toBe('invalid');
+    expect(second.calls).toEqual([]);
+  },
+  900_000,
+);
+
+for (const [description, probe] of [
+  ['candidate replayed reads retain effect IDs', 'reads'],
+  ['candidate abrupt write loss recovers', 'crash'],
+]) {
+  const title = `${dspyEngine} ${description}`;
+  const registered: readonly string[] = failures[dspyEngine];
+  const run = async (): Promise<void> => {
+    const [first, second] = await candidateRun(probe ?? '');
+    if (probe === 'reads') expect(second.effects).toEqual(first.effects);
+    else expect(second.restoreMissing).toBe(false);
+  };
+  if (dspyEngine !== 'chromium') test.skip(title, run);
+  else (registered.includes(title) ? test.fails : test)(title, run, 900_000);
 }
