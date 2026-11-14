@@ -49,10 +49,10 @@ Recorded on 2026-11-10, Node.js 24.15.0 and pnpm 11.21.0. Native and LangGraph/c
 
 | Gap | Outcome | Deciding evidence | Follow-up |
 | --- | --- | --- | --- |
-| G1: parallel interrupts | **refused** | N5 fails in every mode: a finished no-state-write sibling retains a resume write and stale interrupt without `NO_WRITES`, so the proposed done test cannot classify it. N4, N6, N7, C6–C9, L3, L4, L6 and L7 pass but cannot override that failure. | Maintainer review of Proposed ADR-0030; no parallel implementation issue. |
+| G1: parallel interrupts | **refused** | N5 fails in every mode: a finished no-state-write sibling retains a resume write and stale interrupt without `NO_WRITES`, so the proposed done test cannot classify it. N4, N6, N7, C6–C9, L3, L4, L6 and L7 pass but cannot override that failure. | ADR-0030 is Accepted for the repeated-request design; no parallel implementation issue. |
 | G2: several interaction requests in one node | **supported** | N1–N3, N8, C1–C5, C10, L1, L2, L5 and L8 all pass. Ordinal IDs, raw-ID resumes, recovery and restored-value registration work for the measured top-level nodes. | `Support several interaction requests in one LangGraph node with ordinal interaction IDs`, after ADR review. |
 
-**Supported means design proven, implementation pending review.** Both shapes remain unsupported in the shipped adapter. This spike adds no conformance case, golden or compatibility-matrix entry. [Proposed ADR-0030](../../docs/adr/0030-several-engine-pauses-published-one-at-a-time.md) records the executor obligations and alternatives.
+**Supported means design proven, implementation pending (ADR-0030 is Accepted).** Both shapes remain unsupported in the shipped adapter. This spike adds no conformance case, golden or compatibility-matrix entry. [ADR-0030 (Accepted)](../../docs/adr/0030-several-engine-pauses-published-one-at-a-time.md) records the executor obligations and alternatives.
 
 For parallel graphs, ask the questions before the fan-out, or chain the interrupting branches so at most one task pauses per superstep, with one interaction request per node. For repeated requests in shipped code, split the requests into separate nodes. The existing [interrupt-sequence case](../../tests/conformance/cases/interrupt-sequence.ts) proves that path.
 
