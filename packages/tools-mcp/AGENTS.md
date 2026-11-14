@@ -29,6 +29,7 @@ This only hashes metadata; the host must review and store the approved pin.
 - Configure server URL, final destination, tool policies and per-principal token
   callback in host code with `createMcpServer`.
 - Call bindings through the broker with host-declared input/output schemas.
+- Opt into `propagateTraceContext` only for `host-server`; only requests during a live broker call receive W3C context, never baggage.
 - Mark writes `approval: 'confirm'` and configure `CreateOptions.confirmations`.
 - Call `closePrincipal` at sign-out and `close` at host shutdown.
 - Treat schema-valid results as untrusted data; render model props as React text.

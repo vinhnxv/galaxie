@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { type CapabilityContext, GalaxieError } from '@galaxie-ai/core';
+import { type CapabilityContext, GalaxieError, injectTraceContext } from '@galaxie-ai/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
   StreamableHTTPClientTransport,
@@ -36,6 +36,7 @@ export class PrincipalSession {
   #tail: Promise<unknown> = Promise.resolve();
   #connection: Connection | undefined;
   #token = '';
+  #invocation: CapabilityContext | undefined;
 
   constructor(
     options: SessionOptions,
@@ -84,6 +85,8 @@ export class PrincipalSession {
       fetch: async (url, init) => {
         const headers = new Headers(init?.headers);
         headers.set('authorization', `Bearer ${this.#token}`);
+        if (this.#options.propagateTraceContext === true && this.#invocation !== undefined)
+          injectTraceContext(this.#invocation, headers);
         const signal = AbortSignal.any([
           ...(init?.signal === undefined || init.signal === null ? [] : [init.signal]),
           this.#lifetime.signal,
@@ -203,6 +206,7 @@ export class PrincipalSession {
     await connection?.client.close().catch(() => {});
   }
   async close(): Promise<void> {
+    this.#invocation = undefined;
     this.#lifetime.abort();
     this.#token = '';
     await this.#drop();
@@ -214,6 +218,7 @@ export class PrincipalSession {
     context: CapabilityContext,
   ): Promise<unknown> {
     return this.#serialize(async () => {
+      this.#invocation = context;
       const signal = AbortSignal.any([context.signal, this.#lifetime.signal]);
       try {
         if (signal.aborted) throw failure('cancelled');
@@ -277,6 +282,8 @@ export class PrincipalSession {
               ? 'timeout'
               : 'unavailable',
         );
+      } finally {
+        this.#invocation = undefined;
       }
     });
   }
