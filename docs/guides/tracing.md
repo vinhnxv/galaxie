@@ -57,6 +57,100 @@ a child may start after its parent ended, and no closed span is changed. A faile
 outcome carries `galaxie.render.error.code`. Render failures keep the run paused in
 `waiting_input`; resuming on a failed render is not supported yet.
 
+## Send trace context to your backend
+
+Set `propagateTraceContext: true` on an `httpCapability` binding or a
+`createMcpServer` configuration to send W3C `traceparent` and, when present,
+`tracestate` to your backend. The option defaults to off and is allowed only
+with `destination: 'host-server'`; other destinations fail with `invalid`.
+Existing attribution and idempotency headers keep their meaning.
+
+```ts
+import { httpCapability } from '@galaxie-ai/core';
+
+const lookup = httpCapability({
+  url: 'https://app.example/api/lessons/{id}',
+  method: 'GET',
+  kind: 'read',
+  destination: 'host-server',
+  timeoutMs: 2000,
+  concurrency: 1,
+  grantScope: 'principal',
+  approval: 'none',
+  retry: 'idempotent',
+  propagateTraceContext: true,
+});
+```
+
+A tracer provider is required to create a new trace: register it globally or
+pass it as `RuntimeOptions.tracerProvider`. With no provider and no valid
+external parent at run start, no trace headers are added. A valid inherited
+parent can still propagate through the no-op tracer. The backend extracts the
+W3C context and starts its server span with that parent:
+
+```text
+invoke_agent <agentId>
+  galaxie.node <nodeName>
+    execute_tool <capability>
+      GET /api/lessons             host backend SERVER span
+```
+
+For example, with a host-configured W3C trace-context propagator and backend
+tracer provider (the host installs and configures both):
+
+```ts
+import { propagation, ROOT_CONTEXT, SpanKind, trace } from '@opentelemetry/api';
+
+const backendTracer = trace.getTracer('host-backend');
+
+async function handleLookup(
+  headers: Record<string, string>,
+  readLesson: () => Promise<void>,
+): Promise<void> {
+  const extracted = propagation.extract(ROOT_CONTEXT, headers);
+  const parent = trace.getSpanContext(extracted);
+  const parentContext = parent !== undefined && trace.isSpanContextValid(parent)
+    ? extracted
+    : ROOT_CONTEXT;
+  const span = backendTracer.startSpan('GET /api/lessons', {
+    kind: SpanKind.SERVER,
+  }, parentContext);
+  try {
+    await readLesson();
+  } finally {
+    span.end();
+  }
+}
+```
+
+Configure the backend sampler to apply its own sampling policy: galaxie retains
+the span's sampled flag, including `00` for a dropped trace, but a browser-supplied
+flag must never force backend sampling. Browser trace IDs are forgeable
+correlation hints. Never use them for authorization, audit identity or rate-limit
+keys. `host-server` is the host's declaration; galaxie does not verify URL ownership.
+Cross-origin backends must explicitly allow both headers; see
+[host integration](host-integration.md#user-device-endpoints-and-local-network-access).
+
+The exported `injectTraceContext(context, headers)` helper lets a custom binding
+opt in at request time. It changes only `traceparent` and non-empty `tracestate`,
+using the live `execute_tool` context registered by the broker for a `host-server`
+binding. It overwrites a host-supplied `traceparent`, and overwrites `tracestate`
+when the span has one; a host-supplied `tracestate` stays when the span has none.
+Unregistered contexts and contexts whose call or run has ended change nothing.
+`CapabilityContext` carries no span object. Reconcile hook contexts are not registered.
+
+For MCP, initialization, listing and tool requests made during a call use that
+call's context. A notification-driven `list_changed` refresh after settlement and
+session close carry no context. The standalone SSE `GET` the SDK opens during the
+first call carries that call's context for the stream's whole life: a backend
+span for that stream is parented to the earlier call, even as later calls use it.
+
+The helper does not use the global propagator and never adds `baggage`, vendor
+headers or `X-Request-Id`. Host-installed fetch instrumentation or a propagator
+wrapped around the page's `fetch` is outside galaxie's control and can add trace
+or baggage headers to any destination. Trace context on OpenAI-compatible model
+calls through a host proxy is not included; that SDK owns its fetch.
+
 ## Default filter and development text
 
 By default, spans contain only the allowlisted metadata above. Strings must be
@@ -159,6 +253,12 @@ the bundle. Consult the linked
 for the host's deployment. This slice records no live Langfuse result.
 
 ## Local proof
+
+Run `pnpm test tests/conformance/trace-context.test.ts` for injected-fetch HTTP
+parenting and MCP call/refresh headers on Node and Chromium. The baggage/global
+propagator case runs on Node and is skipped in the browser because it needs a
+global context manager at run start. These are local fixtures, with no live
+collector or backend exporter measurement.
 
 Run `pnpm test tests/conformance/tracing.test.ts` for mock-provider span trees,
 failure hygiene and live-label text omission on Node and headless Chromium.
