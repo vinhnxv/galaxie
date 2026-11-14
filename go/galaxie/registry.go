@@ -27,9 +27,10 @@ const (
 )
 
 type node struct {
-	kind  string
-	model *llm.LLM
-	tools []tool.Tool
+	kind        string
+	model       *llm.LLM
+	tools       []tool.Tool
+	wrapAllowed bool
 }
 
 // recorder collects the values one build function creates. The ADK interfaces have unexported
@@ -44,6 +45,7 @@ type recorder struct {
 	toolsets        map[*fixedToolset]bool
 	// longRunning holds the tools that run before they pause.
 	longRunning map[tool.Tool]bool
+	agentTools  map[tool.Tool]agent.Agent
 }
 
 var (
@@ -61,6 +63,7 @@ func record(build func() (agent.Agent, error)) (agent.Agent, *recorder, error) {
 		longRunning:     map[tool.Tool]bool{},
 		capabilityTools: map[tool.Tool]bool{},
 		toolsets:        map[*fixedToolset]bool{},
+		agentTools:      map[tool.Tool]agent.Agent{},
 	}
 	defer func() { current = nil }()
 	root, err := build()
@@ -76,6 +79,9 @@ func record(build func() (agent.Agent, error)) (agent.Agent, *recorder, error) {
 func (r *recorder) validate(root agent.Agent) error {
 	if root == nil {
 		return llm.NewError("unsupported")
+	}
+	if err := r.validateAgentTools(root); err != nil {
+		return err
 	}
 	return r.walk(root, map[agent.Agent]bool{}, 1)
 }
