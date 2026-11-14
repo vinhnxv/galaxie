@@ -358,6 +358,84 @@ Nested pauses are not part of the mapping. They stay refused for both executors;
 - P6. Overall: at least one track ships a narrow variant or an alternative; at least one of the three outcomes is not SUPPORTED, so follow-ups are listed. Firefox, WebKit and real models stay unmeasured unless the optional local runs are made.
 
 
+
+#### Incomplete assessment: native harness registration prerequisite (2026-11-14)
+
+The assessment stopped during the Python AgentTool unit. The registered rules
+remain unchanged. No new admission ships. Python Workflow and AgentTool and Go
+AgentTool retain their existing prepare refusals; neither a replacement-parity
+result nor a new Go source-absence measurement is claimed by this assessment.
+
+The blocking prerequisite is additive conformance registration. The new shipping
+cases must enter `suite.CASES` and pass the existing recorder's `--check`.
+`native._run_case` in
+`tests/conformance/cases-adk-python/native.py` reads only `fixtures.json` and
+constructs agents through `suite.factory`. The existing
+`test_adk_python_cases.py` calls that same `native.run_case` for every case in
+`suite.CASES`. Appending case names alone therefore produces unknown-fixture
+failures. The assessment's edit boundary preserves every existing case fixture
+and script, with only case-list additions allowed in `suite.py`. There is no
+existing registration seam for a new-file native runner. Continuing requires an
+explicitly permitted additive dispatch in the native harness and matching source
+selection in the Worker/browser harnesses. Existing cases and their results must
+remain byte-identical. A separate recorder without the required case-list
+integration would not satisfy T8.
+
+History preserves registration before implementation: rule commit `b91c6e3`,
+independent native probes `03bbc0b` (typed refinements `9ff36a2`), capability-free
+candidate `877ec08`, and read-policy candidate `413fdee`. The candidates were
+removed with `git revert` in reverse order, commits `20b4924` and `f505df1`.
+Production source, bridge contracts and existing assertions return to their
+pre-assessment state. No candidate-dependent test remains in the final tree.
+
+The retained native characterizations use scripted models only. They measure the
+`request` declaration, outer/inner/outer request order, inner text as the tool
+result, copied ordinary state, exclusion of copied temporary and `_adk` state,
+forwarded ordinary deltas, omitted temporary output deltas, two independent inner
+sessions, inner error text, consumed inner cancellation, and nested confirmation
+and long-running calls whose inner events are absent from the outer event log.
+The native wrapper's `include_plugins` default is true; actual plugin propagation
+and cancellation-signal propagation are not established by these tests. Nested
+pauses remain refused; the native observations do not supply persisted inner
+state or an inner effect scope for a host resume.
+
+The candidate's nine CPython unit checks passed before its revert. Exploratory
+CPython checks also exercised shared budgets, isolated events, fresh keys, scopes,
+gap-aware IDs, rollback and basic declaration/state parity. These do not establish
+all required scenarios on all lanes. The Worker exploration reached live routed
+execution and isolated outer storage. An adopted session's `start` refusal was a
+harness misuse, not an AgentTool divergence: the core API permits restore only.
+The later provider-error check had an incorrect harness expectation
+(`executor_error` rather than the router's `unavailable`); no failure-code parity
+claim follows from it. Neither harness issue changes a registered expectation or
+counts as a framework gate failure. Exploratory candidate-dependent files were
+discarded, and their observations are not counted as completed gates.
+
+| Track and gates | CPython / native Go | Node live | Node restored | Chromium |
+| --- | --- | --- | --- | --- |
+| Python AgentTool V1 and V2, T1 | UNMEASURED: retained native facts are partial | UNMEASURED | UNMEASURED | NOT APPLICABLE: browser evidence belongs to T8 |
+| Python AgentTool V1 and V2, T2, T3, T4, T5, T6, T7 | UNMEASURED: exploratory coverage only | UNMEASURED: exploratory coverage only | UNMEASURED | NOT APPLICABLE: browser evidence belongs to T8 |
+| Python AgentTool V1 and V2, T8 | UNMEASURED: registration prerequisite | UNMEASURED | UNMEASURED | UNMEASURED |
+| Python Workflow, WN, WG1, WG2, WG3, WG4, WG5, WG6, WG7, WG8, WG9, AL-W | UNMEASURED: unit not reached | UNMEASURED | UNMEASURED | UNMEASURED |
+| Go AgentTool V1 and V2, T1, T2, T3, T4, T5, T6, T7, T8 | UNMEASURED: unit not reached | UNMEASURED | UNMEASURED | UNMEASURED |
+| Go Workflow absence walk | UNMEASURED: not rerun in this assessment | NOT APPLICABLE: source fact | NOT APPLICABLE: source fact | NOT APPLICABLE: source fact |
+
+Rule T row 4 selects **INCOMPLETE** for Python AgentTool: neither variant has all
+required evidence, and no measured framework FAIL establishes REFUSED. Rule W
+row 5 selects **INCOMPLETE** for Python Workflow, whose candidate was not
+attempted. Rule T row 4 selects **INCOMPLETE** for Go AgentTool, whose unit was not
+reached; Go V1 also requires a passing Python V1. The previously recorded Go
+Workflow source-absence refusal is unchanged, without a new verification claim.
+This is a prerequisite stop, not a time-budget cut or a completed assessment.
+
+P1, P2 and P4 remain unresolved; this run does not establish their predicted
+admission outcomes. P3's prepare refusals are unchanged. P5 has no new absence-walk
+result. P6's prediction of a shipping variant or measured replacement was not
+established. Chromium, Firefox, WebKit, real models and devices were NOT RUN for
+the new assessment. The extension decision is to resolve the conformance
+registration edit boundary before resuming the remaining Python gates, then the
+Workflow evidence floor, Go AgentTool and the Workflow candidate in unit order.
+
 ### Workflow-child resume spike (2026-11)
 
 #### Outcome rule registered before measurement (2026-11-12)
