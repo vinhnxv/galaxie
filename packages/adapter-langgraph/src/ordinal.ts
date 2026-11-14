@@ -18,7 +18,7 @@ export async function readOrdinalPending(
   sessionId: string,
   checkpointer: Pick<BaseCheckpointSaver, 'getTuple'>,
   registerRestoredData?: (value: unknown) => void,
-): Promise<{ interaction: PendingInteraction; rawId: string; retryCommittedAnswer: boolean }> {
+): Promise<{ interaction: PendingInteraction; rawId: string; retryAnswered: boolean }> {
   const unsupported = (): never => {
     throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
   };
@@ -71,7 +71,7 @@ export async function readOrdinalPending(
     return {
       interaction: { interactionId, ...request },
       rawId: interrupt.id,
-      retryCommittedAnswer,
+      retryAnswered: retryCommittedAnswer,
     };
   const surface = parseSurfaceRecord(interrupt.value);
   if (surface !== undefined) {
@@ -79,7 +79,7 @@ export async function readOrdinalPending(
     return {
       interaction: pendingFromSurface(interactionId, surface),
       rawId: interrupt.id,
-      retryCommittedAnswer,
+      retryAnswered: retryCommittedAnswer,
     };
   }
   throw new GalaxieError('invalid', 'The interaction request is invalid.');

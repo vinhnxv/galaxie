@@ -117,8 +117,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
         sessionId: string,
         options?: Pick<RunRequest, 'registerRestoredData'>,
       ): Promise<
-        | { interaction: PendingInteraction; rawId?: string; retryCommittedAnswer?: boolean }
-        | undefined
+        { interaction: PendingInteraction; rawId?: string; retryAnswered?: boolean } | undefined
       > => {
         if (graph === undefined)
           throw new GalaxieError('invalid', 'The LangGraph instance was disposed.');
@@ -170,7 +169,7 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
               if (pause === undefined || pause.interaction.interactionId !== command.interactionId)
                 throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
               rawId = pause.rawId ?? command.interactionId;
-              retryCommittedAnswer = pause.retryCommittedAnswer === true;
+              retryCommittedAnswer = pause.retryAnswered === true;
             }
             let input: unknown;
             if (command.type === 'start') input = command.input;
@@ -219,9 +218,9 @@ export function createLangGraphAdapter(): ExecutorAdapter<LangGraphAgent, LangGr
             }
             if (!request.signal.aborted) {
               if (interrupted) {
-                if (retryCommittedAnswer)
-                  throw new GalaxieError('unsupported', toErrorInfo('unsupported').message);
-                const interaction = await pending(request.sessionId, request);
+                const interaction = retryCommittedAnswer
+                  ? undefined
+                  : await pending(request.sessionId, request);
                 if (
                   interaction === undefined ||
                   (command.type === 'resume' &&
