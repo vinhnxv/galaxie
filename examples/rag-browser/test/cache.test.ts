@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test, vi } from 'vitest';
+import { createNotifier, waitForState } from '../../../tests/conformance/support/state-wait.js';
 import { fingerprint, IndexCache } from '../src/retrieval/cache.js';
 import { RetrievalIndex } from '../src/retrieval/index.js';
 import { createMockEmbedder } from '../src/retrieval/mock-embedder.js';
@@ -33,12 +34,16 @@ test.skipIf(typeof indexedDB === 'undefined').each(['principal', 'app'] as const
     const a = new IndexCache(appId, 'first');
     const otherClear = vi.fn();
     const ownClear = vi.fn();
+    const { notify, subscribe } = createNotifier();
     const b = new IndexCache(
       different === 'app' ? `${appId}-other` : appId,
       different === 'principal' ? 'second' : 'first',
       otherClear,
     );
-    const peer = new IndexCache(appId, 'first', ownClear);
+    const peer = new IndexCache(appId, 'first', (epoch) => {
+      ownClear(epoch);
+      notify();
+    });
     try {
       expect(a.name).not.toBe(b.name);
       const index = new RetrievalIndex(createMockEmbedder());
@@ -56,7 +61,7 @@ test.skipIf(typeof indexedDB === 'undefined').each(['principal', 'app'] as const
       expect((await b.load(record.fingerprint)).record).toBeUndefined();
       expect(await b.save(second.epoch, record)).toBe(true);
       const cleared = await a.clear();
-      await vi.waitFor(() => expect(ownClear).toHaveBeenCalledWith(cleared));
+      await waitForState(subscribe, () => expect(ownClear).toHaveBeenCalledWith(cleared));
       expect(otherClear).not.toHaveBeenCalled();
       expect(await a.currentEpoch()).toBe(first.epoch + 1);
       expect(await b.currentEpoch()).toBe(second.epoch);
