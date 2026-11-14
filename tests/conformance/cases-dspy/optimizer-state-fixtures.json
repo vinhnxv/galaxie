@@ -1,0 +1,82 @@
+{
+  "optstate-copro": {
+    "optimizer": "COPRO",
+    "state": "optstate-copro",
+    "question": "What is the capital of France?",
+    "trainset": [
+      {
+        "question": "What is the capital of Spain?",
+        "answer": "Madrid"
+      }
+    ],
+    "proposals": {
+      "proposed_instruction": "Answer with the capital city using the offline COPRO instruction.",
+      "proposed_prefix_for_output_field": "Offline capital:"
+    },
+    "expectedEngineCalls": 3,
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ]
+  },
+  "optstate-forgot-lm": {
+    "optimizer": "refusal",
+    "state": "optstate-mipro",
+    "question": "What is the capital of France?",
+    "replies": []
+  },
+  "optstate-gepa": {
+    "optimizer": "GEPA",
+    "state": "optstate-gepa",
+    "question": "What is the capital of France?",
+    "trainset": [
+      {
+        "question": "What is the capital of Spain?",
+        "answer": "Madrid"
+      }
+    ],
+    "proposals": {
+      "proposed_instruction": "Answer with the capital city using the offline GEPA instruction.",
+      "new_instruction": "Answer with the capital city using the offline GEPA instruction."
+    },
+    "expectedEngineCalls": 5,
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ],
+    "expectedMetricCalls": 5,
+    "expectedScoringCalls": 4
+  },
+  "optstate-mipro": {
+    "optimizer": "MIPROv2",
+    "state": "optstate-mipro",
+    "question": "What is the capital of France?",
+    "trainset": [
+      {
+        "question": "What is the capital of Spain?",
+        "answer": "Madrid"
+      },
+      {
+        "question": "What is the capital of Italy?",
+        "answer": "Rome"
+      }
+    ],
+    "valset": [
+      {
+        "question": "What is the capital of France?",
+        "answer": "Paris"
+      }
+    ],
+    "proposals": {
+      "proposed_instruction": "Answer with the capital city using the offline MIPROv2 instruction."
+    },
+    "expectedEngineCalls": 6,
+    "replies": [
+      {
+        "text": "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
+      }
+    ]
+  }
+}

@@ -2141,7 +2141,7 @@ With the provider-LM family below, the golden engine file passes 12 tests per
 engine; the native golden file passes five tests and Node golden replay passes
 11. The unchanged engine harness passes Chromium 13, Firefox 24 and WebKit 24.
 These are scripted local macOS measurements; real models/services, Firefox/WebKit
-CI, other DSPy versions, offline MIPROv2/COPRO/GEPA output and the no-rebind
+CI, other DSPy versions and the no-rebind
 `rt-opt-labeled-naive` golden remain UNMEASURED.
 
 Reproduce from the repository root with current local wheels. Rebuild wheels
@@ -2162,6 +2162,66 @@ GALAXIE_BROWSER=webkit pnpm exec vitest run --project node --testTimeout=900000 
 pnpm check:docs
 PATH="$HOME/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.3.darwin-arm64/bin:$PATH" GOTOOLCHAIN=local pnpm check
 ```
+
+## DSPy offline optimizer state measurements
+
+The separate `optstate-*` family runs the unmodified DSPy 3.4.1 COPRO, GEPA and
+MIPROv2 optimizers on CPython with scripted engines, disabled caches and network
+connections denied. Each optimizer is **SUPPORTED-OFFLINE** through the unchanged
+save/load/rebind recipe. The [registered rules and full gate record](../../docs/adr/0018-python-agents-through-pyodide.md#dspy-offline-optimizer-state-measurements-2026-11-14)
+precede the measurements. Existing case families, goldens, assertions and Worker
+wheels are unchanged.
+
+| Evidence | Native CPython | Node Pyodide | Chromium |
+| --- | --- | --- | --- |
+| Producer and repeatability, P1/P2/P3 | PASS: COPRO 3 calls, GEPA 5, MIPROv2 6 | NA, optimizers never run here | NA, optimizers never run here |
+| JSON hygiene, P4 | PASS for all three states | NA, native artifact check | NA, native artifact check |
+| Load and optimizer text, L1/L2/L3 | PASS | PASS | PASS, strict CSP and Trusted Types |
+| Optimizer package absence, L4 | NA, native packages needed | PASS: gepa/optuna/numpy/litellm absent | UNMEASURED, no separate inventory probe |
+| State catalog, L5 | PASS | PASS, MIPROv2 augmented demos are dictionaries | PASS for prompt parity; dictionary probe UNMEASURED |
+| Missing LM rebind, S1 | PASS | PASS | PASS, no external request |
+| Existing DSPy behavior, S2 | PASS, unchanged | PASS, unchanged | PASS, existing state suite unchanged |
+| Runtime and dependency boundaries, S3/D1-D6 | PASS, additive isolated dependency group | PASS, unchanged wheel inventory | NA, no new dependency runs in the page |
+| MIPROv2 re-derivation in default CI | UNMEASURED, explicit skip | NA, committed state loads | NA, committed state loads |
+
+COPRO changes the instruction and final-field prefix; both native and Worker
+ChatAdapter leave that prefix inert. GEPA changes only the instruction. Its
+native default reflection proposer requests JSON `new_instruction`, and a
+three-call stop budget allows an iteration to finish with four scoring calls
+plus one predictor-feedback callback. MIPROv2 uses two seeded trials because the
+first selected the empty demo set; scripted validation requires both the proposed
+instruction and a demo. Its saved demo contains `augmented`, `question` and
+`answer`; loading retains the extra key but renders only the signature fields.
+No saved state is hand-edited. Missing rebinding ends fixed `unsupported` before
+model requests. All four Chromium cases observe no external requests or CSP
+violations. Native load emits no version warning; Worker warning absence remains
+UNMEASURED because the existing harness discards stderr.
+
+Reproduce from the repository root with Node 24 and the current wheel cache:
+
+- Run `node scripts/build-python-wheels.ts` before Worker tests.
+- Run `python/.venv/bin/python -I scripts/record-dspy-optimizer-state-conformance.py --check` for native goldens and COPRO/GEPA producer repeatability. It explicitly skips only MIPROv2 re-derivation when optuna is absent.
+- From `python/`, run `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -I -m pytest ../tests/conformance/cases-dspy/test_dspy_optimizer_state.py`. Default environment: 10 passed, 1 explicit MIPROv2 re-derivation skip.
+- Run `pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 tests/conformance/dspy-optimizer-state.node.test.ts examples/rag-browser/test/dspy-optimizer-state-conformance.node.test.ts` for the seven Node and four Chromium checks.
+
+The non-default `optimizers` uv group contains optuna 5.0.0 and its seven-package
+closure; it is not part of default `uv sync --project python --locked`. Set
+`UV_PROJECT_ENVIRONMENT="$HOME/.cache/galaxie-optimizers-venv"` when running
+`uv sync --project python --locked --group optimizers` to install it outside the
+repository. Then run `"$HOME/.cache/galaxie-optimizers-venv/bin/python" -I scripts/record-dspy-optimizer-state-conformance.py --check`.
+From `python/`, run `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 "$HOME/.cache/galaxie-optimizers-venv/bin/python" -I -m pytest ../tests/conformance/cases-dspy/test_dspy_optimizer_state.py`.
+Both commands passed on macOS arm64 on 2026-11-14 using CPython 3.14.6; the full
+native test file had 11 passes with no skip. Default CPython 3.14.5 remains
+numpy/optuna-free. CI verifies MIPROv2 loading and goldens, not re-derivation.
+
+The lock adds 164 lines with no deletion or existing pin change, and pyproject
+adds only the non-default group. All added upload times precede 2026-11-03.
+Installed metadata identifies compatible permissive licenses, and OSV returned
+no advisories for the seven exact pins on 2026-11-14. Optimizer packages never
+enter the Worker. Evidence uses DSPy 3.4.1, Node 24.15.0, Pyodide 314.0.7 and
+Chromium 156.0.8078.4. Firefox, WebKit, other DSPy versions, real-model quality and
+device performance remain UNMEASURED for this family. Python author code remains
+trusted, and a Worker is not an isolation boundary.
 
 ## DSPy sync entry points and runtime optimizers spike
 
@@ -2242,8 +2302,9 @@ measured behavior under shipped code. On 2026-11-13, the two rebound cases gaine
 
 The [offline recipe](../../packages/adapter-pyodide/README.md#runtime-optimizers-and-the-offline-recipe)
 uses optimize, JSON save, ship, load and LM rebind. Verified offline producers
-remain LabeledFewShot, scripted-LM BootstrapFewShot, ReAct demos and an
-instructions-only stand-in. Offline MIPROv2/COPRO/GEPA output is **unmeasured**.
+include LabeledFewShot, scripted-LM BootstrapFewShot, ReAct demos, an
+instructions-only stand-in and the separately measured real scripted
+[MIPROv2, COPRO and GEPA producers](#dspy-offline-optimizer-state-measurements).
 The other Chromium, Firefox and WebKit runtime probes, real models, other DSPy versions,
 KNNFewShot/Ensemble/SIMBA/BetterTogether/fine-tuning optimizers and optimizers
 given an in-Worker plain `dspy.LM` are **unmeasured**. No core contract change is

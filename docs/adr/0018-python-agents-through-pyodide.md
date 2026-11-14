@@ -38,6 +38,8 @@
   2026-11-13: registered the LangGraph Python execution-identity rerun before measurement, then recorded refusal after read-identity and abrupt-recovery failures; no production helper shipped.
   2026-11-13: added independent DSPy runtime LabeledFewShot and retrieval goldens; native/Node pass, runtime and host-bound retrieval pass on all three local browsers, and the two eval-instrumented service probes diverge under Trusted Types. No shipped source or Decision text changed; status stays Proposed.
 
+  2026-11-14: registered offline optimizer state measurement rules before running COPRO, GEPA or MIPROv2; status stays Proposed.
+
 ## Context
 
 Agent authors ask for Python frameworks: LangChain and LangGraph for Python, pydantic-ai, DSPy, CrewAI and others. Brief §7.4 places Python in the Experimental tier, and §16.7 gates it on a use case strong enough to pay the compatibility cost. This ADR fixes the boundary a Python executor would use, so that a spike can test it and the gate decision can be made with evidence.
@@ -804,10 +806,13 @@ a measured blocking bridge. Author code must be deterministic apart from
 journaled calls. On 2026-11-13, the two rebound cases gained
 [goldens passing all three local browsers](../../tests/conformance/README.md#dspy-golden-runtime-optimizer-and-retrieval-cases),
 including the two-stage IndexedDB page-reload frontier. Other browser runtime probes, real models, other
-DSPy versions, offline MIPROv2/COPRO/GEPA output, KNNFewShot/Ensemble/SIMBA/
+DSPy versions, KNNFewShot/Ensemble/SIMBA/
 BetterTogether/fine-tuning optimizers and optimizers given an in-Worker plain
 `dspy.LM` remain unmeasured. Shipped source, existing goldens, matrices, locks and Decision
 text are unchanged. ADR-0012 controls are unchanged; this ADR stays Proposed.
+
+Offline MIPROv2/COPRO/GEPA output, unmeasured by that runtime spike, now has the
+[separate offline measurement](#dspy-offline-optimizer-state-measurements-2026-11-14).
 
 ### DSPy schema output mapping (2026-11-14)
 
@@ -857,6 +862,135 @@ The candidate adds no benefit that warrants a permanent API over the measured
 lock recipe. See the [recipe and limits](../../tests/conformance/README.md#dspy-schema-output-and-branch-handle-decision).
 Worker task identities, root-call guards and browser branch-recipe lanes remain
 unmeasured; the candidate is native test-local evidence only.
+
+### DSPy offline optimizer state measurements (2026-11-14)
+
+#### Outcome rule registered before measurement
+
+DSPy 3.4.1 optimizes natively with scripted
+engines, caches disabled, fixed seeds, one optimizer thread and socket connections
+denied. The unchanged author recipe clears the LM, saves JSON, ships the state,
+loads it and binds the host-routed LM. No optimizer runs inside the Worker.
+Native CPython 3.14 is lane L1; Node 24 with Pyodide 314.0.7 is L2. Headless
+Chromium under the existing CSP and Trusted Types is optional L3. Firefox,
+WebKit, real models and answer quality are outside this measurement.
+
+| Gate | Registered expectation | Lane |
+| --- | --- | --- |
+| P1 producer | The unmodified optimizer completes, makes an exact nonzero scripted call count, saves JSON and makes no network connection. | L1 |
+| P2 useful state | COPRO changes instructions and the last field prefix; GEPA changes instructions; MIPROv2 changes instructions and bootstrapped demos. | L1 |
+| P3 repeatability | A second producer run equals the parsed committed state. A miss is recorded DIVERGED but does not decide support. | L1 |
+| P4 hygiene | DSPy version metadata agrees, LM is null, no api_key key or credential sentinel occurs, and UTF-8 JSON is below 64 KiB. | L1 |
+| L1 native load | Load and rebind reproduce the golden, including optimizer text in the first request. | L1 |
+| L2 Worker load | Transcript matches the golden, Worker errors are empty, bundled state bytes are served and requests remain on the fixture origin. | L2 |
+| L3 browser load | Golden parity, zero CSP violations and no external requests. | L3 |
+| L4 inventory | gepa, optuna, numpy and litellm are absent from the Worker. | L2 |
+| L5 catalog | Record extra demo keys, prefixes, traces and config; inert fields shared by native and Worker are limits, not failures. | L1, L2 |
+| S1 missing rebind | Fixed unsupported error with zero model or external requests. | L1, L2; L3 if run |
+| S2 existing behavior | Existing DSPy tests, hostile-LM and missing-rebind refusals pass unchanged. | L1, L2 |
+| S3 boundaries | No runtime source, bridge, existing fixture, golden, matrix, assertion or Worker wheel inventory changes. | Static |
+
+| Dependency gate | Registered expectation for MIPROv2 |
+| --- | --- |
+| D1 additive | Only a non-default optimizers dependency group and additive uv lock lines; no upgrades or removed lines. |
+| D2 closure | optuna 5.0.0, alembic 1.20.1, colorlog 6.12.0, mako 1.4.3, markupsafe 3.0.4, numpy 2.5.4 and sqlalchemy 2.1.6; another additive closure requires unchanged existing pins and uploads before 2026-11-03. |
+| D3 isolation | Default sync excludes optuna and numpy; provider facts and embedding refusals remain unchanged. |
+| D4 licenses | Installed metadata shows compatible permissive licenses, no added Worker wheels, and existing license and wheel gates pass. |
+| D5 advisories | Query OSV or GHSA for every added pin; document applicable residual risk, or abandon the dependency when its reach cannot be bounded. |
+| D6 consistency | Locked sync, lock consistency, wheel and CI scope tests pass without CI changes. |
+
+| Outcome | Rule |
+| --- | --- |
+| INCOMPLETE | Producer cannot finish because of environment or time, or writes unusable or vacuous state after scripted baseline scoring is corrected. |
+| REFUSED | Produced state fails native or Worker loading, inventory or missing-rebind controls, with no author repair; a required ADR-0012 weakening also refuses the candidate. |
+| ALTERNATIVE | Required producer, load, inventory and refusal gates pass but an extra author step or a behaviorally restricted subset is needed. |
+| SUPPORTED-OFFLINE | Producer, non-vacuity, hygiene, both required load lanes, inventory and existing refusals pass with the unchanged recipe. |
+
+A failed dependency gate gets at most about ten minutes for a minimal fix; then
+the entire dependency and MIPROv2 candidate is removed and MIPROv2 remains
+INCOMPLETE. Failed candidates do not ship. Time cuts remove Chromium first,
+MIPROv2 and its dependency second, GEPA third. Documentation and the final full
+gate always run. Cut optimizers remain INCOMPLETE; an unrun lane is UNMEASURED.
+
+Predictions registered before measurement: Q1, COPRO changes instructions and
+prefix, with the prefix inert under ChatAdapter, and is SUPPORTED-OFFLINE. Q2,
+GEPA changes only instructions, needs no lock change and is SUPPORTED-OFFLINE.
+Q3, MIPROv2 changes instructions and demos with extra keys, loaded as dicts and
+rendered in order, and is SUPPORTED-OFFLINE. Q4, states have no non-null LM,
+credential or endpoint and existing refusals hold. Q5, the dependency closure is
+exactly the one above and the default environment stays unchanged. Q6, load
+produces no dependency-version warning. Q7, all three producers repeat exactly,
+with MIPROv2 the least certain. Q8, all three are SUPPORTED-OFFLINE with no runtime
+source change. Scripted evidence makes no real-model quality claim. Python
+author code is trusted; the Worker is not an isolation boundary.
+
+#### Measured outcome
+
+COPRO, GEPA and MIPROv2 are **SUPPORTED-OFFLINE** with the unchanged JSON
+save/load/rebind recipe. No runtime optimizer package enters the Worker and no
+runtime source or ADR-0012 control changes. The evidence uses scripted engines
+on local macOS arm64, DSPy 3.4.1, native CPython 3.14.5 (COPRO/GEPA and loading),
+CPython 3.14.6 in the separate optimizer environment, Node 24.15.0, Pyodide
+314.0.7 and headless Chromium 156.0.8078.4 on 2026-11-14.
+
+| Gate | Lane | COPRO | GEPA | MIPROv2 |
+| --- | --- | --- | --- | --- |
+| P1 real producer | L1 | PASS, 3 LM calls | PASS, 5 LM calls | PASS, 6 LM calls |
+| P2 changed state | L1 | PASS, instruction and prefix | PASS, instruction only | PASS, instruction and one augmented demo |
+| P3 repeatability | L1 | PASS | PASS | PASS, optimizer environment only; default CI UNMEASURED |
+| P4 hygiene | L1 | PASS, 500 bytes | PASS, 490 bytes | PASS, 609 bytes |
+| L1 native load | L1 | PASS | PASS | PASS, including default environment |
+| L2 Worker parity | L2 | PASS | PASS | PASS, instruction and ordered demo pair |
+| L3 browser parity | L3 | PASS | PASS | PASS |
+| L4 absent optimizer packages | L2 | PASS, shared inventory probe | PASS, shared inventory probe | PASS, shared inventory probe |
+| L5 state catalog | L1, L2 | PASS, prefix inert under ChatAdapter | PASS, no demos | PASS, augmented/question/answer dictionary keys |
+| S1 missing rebind | L1, L2, L3 | PASS, shared refusal | PASS, shared refusal | PASS, state used by final refusal case |
+| S2 existing DSPy refusals | L1, L2 | PASS | PASS | PASS |
+| S3 unchanged runtime boundaries | Static | PASS | PASS | PASS |
+| D1 additive lock | Static | NA, no new dependency | NA, already locked | PASS, pyproject +3/-0; lock +164/-0 |
+| D2 closure and cutoff | Static | NA | NA | PASS, exact seven pins, all uploads before cutoff |
+| D3 default environment isolation | L1 | NA | NA | PASS, numpy/optuna absent and 16 provider tests unchanged |
+| D4 licenses and Worker inventory | Static, L2 | NA | NA | PASS, installed permissive licenses and unchanged wheel tests |
+| D5 advisory query | OSV | NA | NA | PASS, no advisories returned for seven exact pins on 2026-11-14 |
+| D6 lock and CI checks | Static, L1 | NA | NA | PASS, locked sync and wheel/CI-scope tests |
+
+The shared refusal initially used COPRO state and now uses MIPROv2 state; it
+loads without rebinding and ends fixed `unsupported` with no model request or
+capability call. Chromium also observes zero external requests and CSP violations
+for every case. No optimizer or lane was cut. Firefox, WebKit, real-model quality,
+other DSPy versions and device performance are UNMEASURED for these new states.
+
+The native GEPA default proposer uses JSONAdapter and a `new_instruction` field,
+rather than the anticipated fenced text. Its budget of three metric calls is a
+stop condition between iterations: completing the accepted iteration makes four
+scoring calls and one predictor-feedback callback. The test records those exact
+counts; the budget is not a hard per-callback ceiling. MIPROv2 needs two seeded
+trials here: the first selects the empty demo set, while the second selects the
+bootstrapped demo. Scripted validation scores the baseline and empty-demo
+candidate below the instruction-plus-demo candidate. No state is hand-edited.
+
+All states contain empty traces and train lists, null LM and dependency-version
+metadata. COPRO's changed prefix is absent from both ChatAdapter system messages;
+GEPA keeps baseline field prefixes. MIPROv2's extra `augmented` key survives JSON
+loading as a dictionary and is not rendered as a prompt field. Native loading
+produces no dependency-version warning; Worker stderr is discarded by the
+existing harness, so Worker warning absence is UNMEASURED.
+
+Predictions Q1, Q2, Q3, Q4, Q5, Q7 and Q8 held for the recorded output and
+support outcomes. Q2's anticipated reflection format did not hold, and Q3 needed
+the two-trial producer adjustment above. Q6 held natively; its Worker warning
+cell remains UNMEASURED. MIPROv2 re-derivation is local evidence, not a CI claim:
+the optimizer-environment recorder `--check` and full native test file passed on
+2026-11-14 on this macOS arm64 machine. Default checks report the explicit
+MIPROv2 re-derivation skip while verifying every saved state and golden.
+
+Evidence commits: `b5a1139` registered the rules before measurement; `317be33`
+recorded COPRO; `64fd8be` recorded GEPA; `252db5a` proved initial Worker parity;
+`4fa7df4` added the isolated dependency group; `dee1e62` recorded MIPROv2 and
+dictionary loading; `eddccbd` proved all four Chromium cases. The
+[measurement commands](../../tests/conformance/README.md#dspy-offline-optimizer-state-measurements)
+and [author recipe](../../packages/adapter-pyodide/README.md#offline-optimized-program-state)
+describe reproduction and the default/optimizer environment split.
 
 ### DSPy provider strings, schema output, embeddings and retrievers spike (2026-11)
 

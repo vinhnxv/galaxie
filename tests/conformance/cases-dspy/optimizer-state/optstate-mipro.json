@@ -1,0 +1,32 @@
+{
+  "traces": [],
+  "train": [],
+  "demos": [
+    {
+      "augmented": true,
+      "question": "What is the capital of Spain?",
+      "answer": "Madrid"
+    }
+  ],
+  "signature": {
+    "instructions": "Answer with the capital city using the offline MIPROv2 instruction.",
+    "fields": [
+      {
+        "prefix": "Question:",
+        "description": "${question}"
+      },
+      {
+        "prefix": "Answer:",
+        "description": "${answer}"
+      }
+    ]
+  },
+  "lm": null,
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}
