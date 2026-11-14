@@ -46,11 +46,20 @@ format keeps ordinary author-unified records readable by older adapters. Any def
 record metadata and must never be logged, put in a span or error, or exported. Author code sees positional requests only; never expose ADK call IDs. The bundle is pinned by SHA-256. Span content capture defaults to on inside the bundle, so
 hosts must apply the build define.
 
-String mapping remains refused: writable exact-class Proxies cannot guarantee
-rollback after a failed assignment. The fixed-toolset helper attempt also remains
-refused because adding a host API key fails an existing assertion that this change
-must preserve. Build fresh trees with explicit `host.adk.llm(role)` models and flat
-capability-tool lists. Native, author-defined and dynamic toolsets remain refused.
+`defineAdkEntry({ agent, roleStrings: true })` admits exact declared-role strings
+through a host-owned tree. Admission checks exact classes first, reads own data
+descriptors, copies arrays without author species or iterators, and never writes
+to author objects. Repeated and concurrent prepares can reuse string trees; agent
+object identity is not preserved. Without the opt-in, strings stay refused. Trees
+without strings keep their original execution path. Explicit `host.adk.llm(role)`
+models still belong to their preparation and need fresh factory-built trees.
+
+The exported `adkToolset(host, tools)` groups a fixed, frozen copy of same-host
+capability tools without adding a host key. Empty, nested, foreign, control-tool
+and duplicate-name groups refuse, including collisions with flat tools or other
+groups. Keep the request-time model trust check and existing pause-position rules.
+Native author-defined and dynamic toolsets, provider tools, planners and executors
+remain refused. ADR-0012 and stored formats are unchanged.
 
 ## Tests
 
@@ -59,4 +68,7 @@ tests/conformance/adk-native.node.test.ts tests/conformance/adk-restore.test.ts`
 Run `pnpm check` before reporting the integrated change as finished.
 The pause-author, restore-admission and new last-child measurement files have scripted Node/Chromium
 and local Firefox/WebKit evidence; the older native L1-L5 file is cited from Node/Chromium only.
+The five role-string/toolset files and JavaScript golden suite also pass locally
+on Firefox and WebKit (108 tests per engine); the integrated Node/Chromium ADK
+selection passes 982 tests, with seven skipped.
 Real models remain unmeasured, and the retained last-child suite pins shipped refusals.

@@ -23,6 +23,7 @@ import {
   setLogger,
   ToolCallIntegrityPlugin,
 } from '@google/adk';
+import { admitRoleStrings } from './admission.js';
 import { adapterError, failure } from './errors.js';
 import { type AdkAgent, type AdkServices, createHost, validServices } from './host.js';
 import {
@@ -172,7 +173,12 @@ export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
       );
       const built: unknown = agent(host);
       const entry: AdkEntry | undefined = isAdkEntry(built) ? built : undefined;
-      const root: unknown = entry === undefined ? built : entry.agent;
+      const root: unknown =
+        entry?.roleStrings === true
+          ? admitRoleStrings(entry.agent, host, options.models?.roles ?? [])
+          : entry === undefined
+            ? built
+            : entry.agent;
       validateAgentTree(root, registry);
       const sessions = new GalaxieSessionService();
       const store = services.checkpoints;

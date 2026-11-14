@@ -204,17 +204,24 @@ receipt, so no write runs twice (needs a recovery store). `subgraphs` stays `fal
 
 See the [ADK models-and-tools guide](../../docs/guides/adk-models-and-tools.md) for tested fresh-factory and flat-list examples across executors.
 
-The [host inventory outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
-keeps string mapping **REFUSED**: a Proxy can pass exact-class and writable-property
-checks and defeat rollback after a later assignment fails. Raw strings and
-Gemini/foreign models still fail `unsupported` at prepare without mutation or
-requests. Build fresh agent objects inside the factory with the explicit model
-helper; model objects belong to the host that created them.
+The [JavaScript host inventory retry](../../docs/adr/0020-google-adk-through-an-adapter.md#javascript-host-inventory-retry-2026-11)
+ships exact declared-role strings behind `defineAdkEntry({ agent, roleStrings: true })`.
+Without that opt-in, strings remain **REFUSED**, including bare agents. Empty,
+undeclared, case/whitespace and display-name variants refuse `unsupported` before
+requests or store access. A role names host policy, so prefer names such as `answer`
+over provider names. Gemini and foreign model objects remain refused.
+
+Admission runs a host-owned copy, preserving live fields without writing to author
+objects. Repeated and concurrent preparations can reuse the same string tree,
+including frozen or sealed agents. Agent identity is not preserved: callbacks,
+parent links and lookups see the copy. Helper-built models still belong to the
+host that created them; build those trees fresh inside the factory.
 
 | Native sample | galaxie replacement |
 | --- | --- |
 | `model: 'gemini-2.5-flash'` or a provider model | `model: host.adk.llm('answer')`, with `answer` declared and routed by the host |
-| Static toolset | A flat array of `host.adk.capabilityTool(...)` built from a static table |
+| Exact host role string | `defineAdkEntry({ agent, roleStrings: true })`, with the role declared and routed by the host |
+| Static toolset | `adkToolset(host, tools)` over this host's capability tools, or the same flat array |
 
 ```ts
 const specs = [{ name: 'docs.search@1', description: 'Search documents.', parameters: z.object({ q: z.string() }) }];
@@ -225,11 +232,14 @@ const agent: AdkAgent = (host) => new LlmAgent({
 });
 ```
 
-The fixed-toolset helper is also **REFUSED** under this change's unchanged-assertion
-gate: adding `host.adk.toolset` fails the existing exact host-API inventory test on
-Node and Chromium. No helper or new JavaScript golden ships. Static, dynamic,
-foreign and network toolsets remain refused before requests; the flat-list
-alternative keeps the broker and existing pause rules.
+Import the exported `adkToolset` function from `@galaxie-ai/adapter-adk` and use
+`tools: [adkToolset(host, tools)]` to group a non-empty fixed list. It freezes a
+copy, returns fresh expansion arrays and preserves declaration order at the
+group's position. It adds no key to the host. Empty, nested, foreign, control-tool
+and duplicate-name groups refuse, including name collisions with flat tools or
+other groups. Author-defined, dynamic and network toolsets remain refused before
+expansion or requests. Confirmations, long-running pause positions, effect scopes
+and decoded reload records match the flat-list equivalent.
 
 The role names host policy, not a provider client. MCP-backed entries use host
 `tools-mcp` capability bindings. Per-turn dynamic tool lists and network toolsets
@@ -238,8 +248,10 @@ planners remain **REFUSED**: provider tools are rejected at the converter, think
 config is omitted and instruction text cannot reproduce PlanReAct final retagging
 under the same script. A host-bound read capability is general network-data guidance,
 not the same-script outcome for a provider-native tool. No generated code runs.
-New evidence is scripted Node and Chromium; Firefox, WebKit, real models and
-Worker-hosted JavaScript remain unmeasured.
+Scripted evidence covers Node and Chromium, plus the five new test files and
+golden suite on local Firefox and WebKit (108 tests per engine). Browser durability
+recreates the runtime and reopens IndexedDB; it does not navigate the page. Real
+models, device measurements and Worker-hosted JavaScript remain unmeasured.
 
 ## Other facts for hosts
 

@@ -6,13 +6,14 @@ recorded six alternatives (explicit models and flat tool lists across three
 executors) and nine refusals (network built-ins, code executors and planners).
 The later [host inventory outcome](../adr/0020-google-adk-through-an-adapter.md#host-role-inventories-for-model-strings-and-fixed-toolsets-2026-11)
 ships declared-role strings and fixed toolsets on Python, and fixed toolsets on
-Go. Both JavaScript candidates remain refused.
+Go. The [JavaScript retry](../adr/0020-google-adk-through-an-adapter.md#javascript-host-inventory-retry-2026-11)
+ships opt-in declared-role strings and the exported fixed-toolset helper.
 
 | Shape | `adk-js` | `adk-python` | `adk-go` |
 | --- | --- | --- | --- |
-| Model string equal to a declared role | **REFUSED**: atomic rollback gate failed; build fresh with `host.adk.llm(role)` | **SHIPPED**: exact declared roles, with Gemini-looking strings refused | Not applicable: `Config.Model` has no string form; use `galaxie.Model(role)` |
+| Model string equal to a declared role | **SHIPPED** with `defineAdkEntry({ agent, roleStrings: true })`; otherwise **REFUSED** | **SHIPPED**: exact declared roles, with Gemini-looking strings refused | Not applicable: `Config.Model` has no string form; use `galaxie.Model(role)` |
 | Gemini or foreign model objects | **REFUSED** before model dispatch | **REFUSED** before model dispatch | **REFUSED** before model dispatch |
-| Fixed toolset of capability tools | **REFUSED**: helper failed the protected host-API assertion; use a flat list | **SHIPPED**: `galaxie.adk.toolset` | **SHIPPED**: `galaxie.Toolset` |
+| Fixed toolset of capability tools | **SHIPPED**: exported `adkToolset(host, tools)`; a flat list also works | **SHIPPED**: `galaxie.adk.toolset` | **SHIPPED**: `galaxie.Toolset` |
 | Dynamic, nested, MCP or OpenAPI toolsets | **REFUSED** | **REFUSED** | **REFUSED** |
 | Built-in network tools: search, URL, retrieval, maps | **REFUSED**: no provider-tool carriage | **REFUSED**: no provider-tool carriage | **REFUSED**: no provider-tool carriage |
 | Code executors | **REFUSED**: no established isolation seam | **REFUSED**: no established isolation seam | **REFUSED**: no native field |
@@ -28,7 +29,7 @@ Role names belong to host policy. They do not select a provider client inside
 the agent. Declare and route `answer` in the host definition and model policy.
 Prefer non-provider role names such as `answer`.
 
-### JavaScript: build a fresh tree
+### JavaScript: opt in to host roles or build a fresh tree
 
 Before: this native sample shape is refused at prepare with zero model requests.
 
@@ -55,9 +56,21 @@ export const modelAfter: AdkAgent = (host) =>
 The [JavaScript guide tests](../../packages/adapter-adk/test/author-guides.test.ts)
 prepare this factory twice sequentially, disposing each result, and twice
 concurrently. Each run finishes `done` with one routed `answer` request.
-Do not cache an agent tree or its host-created model across preparations.
-The refusal of automatic string mapping follows the recorded failed rollback
-gate, including exact-class writable Proxies; this guide adds no mapper.
+Host-created models belong to one preparation, so build helper-based trees in
+the factory. Alternatively, keep `model: 'answer'` on the author tree and return
+`defineAdkEntry({ agent, roleStrings: true })` from the factory. The host must
+declare and route that exact role. Matching does not trim whitespace, fold case
+or interpret a display name as an alias; empty strings and undeclared roles
+refuse `unsupported`. Prefer role names such as `answer` over provider names.
+
+The opt-in states that a string names host policy rather than a provider model.
+Without it, including a factory returning a bare agent, strings remain refused.
+Admission checks exact classes and data fields and runs a host-owned copy without
+writing to the author objects. Repeated and concurrent preparations can reuse a
+string tree, including frozen agents. Agent object identity is not preserved:
+callbacks and ADK traversal see the copy. Live fields changed after construction
+are retained. Models still pass through the same router, labels, consent, output
+checks and budgets; no provider client or network path is added.
 
 ### Python: use a declared role string or explicit helper
 
@@ -120,7 +133,7 @@ The host declares and binds every capability. These are read examples;
 writes still require host-rendered confirmation coverage under
 [ADR-0012](../adr/0012-security-baseline.md).
 
-### JavaScript: pass a flat tool list
+### JavaScript: group a fixed list or pass it flat
 
 <!-- snippet: toolset-js -->
 ```ts
@@ -145,7 +158,17 @@ Bind `math.double@1` as a read with input and output `{ value: number }`.
 The scripted run calls it once with `{ value: 21 }`, receives
 `{ value: 42 }` and finishes `done`. The test compares every model request's
 tool declarations and the final result with a native `BaseToolset` expansion
-under the same script. No `host.adk.toolset` helper ships.
+under the same script. To group that list, import `adkToolset` from
+`@galaxie-ai/adapter-adk` and use `tools: [adkToolset(host, tools)]` instead.
+The exported function leaves the host object's keys unchanged. It copies and
+freezes a non-empty list of this host's capability tools and expands it in order
+at its authored position. Source-array mutation does not change the group.
+Foreign, dynamic, nested, empty, control-tool and duplicate-name groups refuse
+`unsupported`; duplicate names against flat tools or other groups also refuse.
+Confirmation and long-running pause positions, effect scopes and reload records
+match the flat list. Built-in tools, provider configuration, code executors and
+planners remain refused. The new executable proofs live in the adapter's role
+string and toolset tests; the existing guide snippets stay unchanged.
 
 ### Python: group this boot's capability tools
 

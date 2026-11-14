@@ -202,6 +202,34 @@
       }
     ]
   },
+  "model-string": {
+    "prompt": "plain text",
+    "replies": [
+      {
+        "text": "A plain answer."
+      }
+    ]
+  },
+  "toolset-fixed": {
+    "prompt": "one tool",
+    "replies": [
+      {
+        "text": "",
+        "toolCalls": [
+          {
+            "id": "double_1",
+            "name": "math_double_1",
+            "args": {
+              "value": 3
+            }
+          }
+        ]
+      },
+      {
+        "text": "The result is 6."
+      }
+    ]
+  },
   "approval-deny": {
     "prompt": "approval deny",
     "replies": [
