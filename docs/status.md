@@ -1,5 +1,18 @@
 # Project status
 
+On 2026-11-14, the [LangGraph Python tool-call measurements](adr/0018-python-agents-through-pyodide.md#langgraph-python-tool-call-measurements-2026-11-14)
+normalize `bind_tools` and default structured-output refusal to fixed `unsupported`,
+still catchable as `NotImplementedError`. Ordinary author tools over checked text
+retain labels, budgets and host confirmation with `tool=True`; explicit handlers
+can swallow host failures. Schema and binding failures share `invalid`, so that
+code cannot become schema-only model text. Text-protocol page reload passes both
+replay modes on local Chromium, Firefox and WebKit. Streaming metadata exposes
+native Python/JavaScript merge differences; Chromium reproduces fresh replayed
+read IDs and missing recovery after abrupt loss before a tool checkpoint. The
+helper remains refused; only the binding refusal changes production source.
+Existing goldens, locks, matrix entries and assertions remain unchanged. Models
+are scripted; real-model behavior remains unmeasured.
+
 On 2026-11-14, the [resumed ADK Workflow and AgentTool assessment](adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
 records **REFUSED** for all three tracks. Python AgentTool initially passed the
 sampled native, Node live/restored and Chromium cases, but final review exposes
