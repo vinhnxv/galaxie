@@ -53,6 +53,21 @@ def inline_thread_hops() -> Iterator[None]:
         yield
 
 
+@contextmanager
+def reverse_thread_hops(width: int) -> Iterator[None]:
+    ranks: dict[asyncio.Task[Any] | None, int] = {}
+
+    async def to_thread(function: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:
+        task = asyncio.current_task()
+        rank = ranks.setdefault(task, len(ranks))
+        for _ in range(width - rank - 1):
+            await asyncio.sleep(0)
+        return function(*args, **kwargs)
+
+    with patch('asyncio.to_thread', to_thread):
+        yield
+
+
 def payloads(values):
     return Counter(json.dumps(value, sort_keys=True) for value in values)
 
@@ -270,8 +285,23 @@ def test_fan_out_matches_native_dspy_before_replay(name, shape, order):
     assert payloads(store.model_payloads) == payloads(requests)
     assert store.orphans == 0
     if name != 'par-fan-write':
-        assert Counter(store.arrivals[:3]) == Counter(f'{label}:before' for label in LABELS)
+        # Every branch's first request precedes every completion; arrival order is not pinned.
+        assert Counter(store.arrivals[:len(store.labels)]) == Counter(f'{label}:before' for label in store.labels)
         assert store.completions[:3] == [f'{label}:before' for label in FIXTURES['orders'][order]]
+
+
+@pytest.mark.parametrize('order', FIXTURES['orders'])
+def test_eval_loop_matches_native_with_last_branch_arriving_first(order):
+    store = Store(order)
+    with reverse_thread_hops(len(LABELS) + 1):
+        result = complete(store, 'par-fan-eval-loop')
+    expected, requests = native_reference(evaluate=True)
+    assert result == {'ok': True, 'output': expected}
+    assert payloads(store.model_payloads) == payloads(requests)
+    assert store.orphans == 0
+    assert store.arrivals[0] == 'delta:before'
+    assert Counter(store.arrivals[:len(store.labels)]) == Counter(f'{label}:before' for label in store.labels)
+    assert store.completions[:3] == [f'{label}:before' for label in FIXTURES['orders'][order]]
 
 
 @pytest.mark.parametrize('threads', [1, 3])
