@@ -73,16 +73,6 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
   assert.ok(result.credentialCalls > 0, 'getCredential was never called');
   const oracle = orderSpansParentFirst(result.spans);
   assert.equal(oracle.length, result.spans.length, 'Oracle ordering omitted spans');
-  const raw = [];
-  for (const traceId of result.traceIds)
-    raw.push(
-      await waitForReadback(
-        traceId,
-        oracle
-          .filter((span) => span.spanContext().traceId === traceId)
-          .map((span) => span.spanContext().spanId),
-      ),
-    );
   const scan = (value: unknown): void => {
     const serialized = JSON.stringify(value);
     assert.ok(!serialized.includes(canary), 'Credential canary appeared in backend readback');
@@ -98,7 +88,17 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
         assert.ok(!serialized.includes(marker), 'Default trace included text');
   };
   // Scan complete API responses before projection or filtering.
-  scan(raw);
+  const raw = [];
+  for (const traceId of result.traceIds)
+    raw.push(
+      await waitForReadback(
+        traceId,
+        oracle
+          .filter((span) => span.spanContext().traceId === traceId)
+          .map((span) => span.spanContext().spanId),
+        scan,
+      ),
+    );
   const findings: Finding[] = [];
   const measure = (
     backend: string,
@@ -285,8 +285,7 @@ export async function scenarioReadback(result: ScenarioResult): Promise<unknown>
         value: result.runId,
       },
     ]);
-    const matches = await observationsQuery({ filter });
-    scan(matches);
+    const matches = await observationsQuery({ filter }, scan);
     const matchingRoots = matches.filter(
       (span) => span.metadata['galaxie.run.id'] === result.runId,
     );

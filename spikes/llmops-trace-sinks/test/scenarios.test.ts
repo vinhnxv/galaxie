@@ -2,10 +2,58 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { SpanStatusCode } from '@opentelemetry/api';
-import { expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { assertSpanTree, serializeSpans } from '../../../packages/core/test/span-tree.js';
 import { canary } from '../src/node-host.js';
+import { observationsQuery, readBack } from '../src/readback.js';
 import { errorText, prompt, reply, runScenario, scenarios } from '../src/scenarios.js';
+
+vi.mock('../src/secrets.js', () => ({
+  readEnv: () => ({ MLFLOW_PORT: '5100', MLFLOW_EXPERIMENT_ID: '1' }),
+}));
+afterEach(() => vi.unstubAllGlobals());
+
+test.each([
+  'observation page',
+  'later observation page',
+  'MLflow search',
+  'MLflow detail',
+  'run query page',
+])('inspection rejects a canary in the complete %s envelope', async (target) => {
+  let pages = 0;
+  vi.stubGlobal('fetch', async (url: string) => {
+    if (url.includes('/observations?')) {
+      pages++;
+      return Response.json({
+        data: [],
+        meta: target === 'later observation page' && pages === 1 ? { cursor: 'next' } : {},
+        ...(target === 'observation page' ||
+        target === 'run query page' ||
+        (target === 'later observation page' && pages === 2)
+          ? { inspectionProbe: canary }
+          : {}),
+      });
+    }
+    if (url.includes('/traces/search'))
+      return Response.json({
+        traces: [{ trace_id: 'tr-fixture' }],
+        ...(target === 'MLflow search' ? { inspectionProbe: canary } : {}),
+      });
+    return Response.json({
+      trace: { spans: [] },
+      ...(target === 'MLflow detail' ? { inspectionProbe: canary } : {}),
+    });
+  });
+  const inspect = (body: unknown): void => {
+    if (JSON.stringify(body).includes(canary))
+      throw new Error('Envelope inspection detected the credential canary');
+  };
+  const read =
+    target === 'run query page'
+      ? observationsQuery({ filter: 'fixture-run-filter' }, inspect)
+      : readBack('fixture-trace', inspect);
+  await expect(read).rejects.toThrow('Envelope inspection detected the credential canary');
+});
 
 test.each(scenarios)('%s has the expected offline oracle in both text modes', async (name) => {
   for (const text of [false, true]) {

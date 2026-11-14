@@ -58,7 +58,6 @@ export interface Readback {
   observations: Observation[];
   traces: { trace_id: string }[];
   spans: OtlpSpan[];
-  detail?: unknown;
 }
 
 async function json<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -71,12 +70,15 @@ async function json<T>(url: string, options: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function readBack(traceId: string, includeDetail = false): Promise<Readback> {
+export async function readBack(
+  traceId: string,
+  inspect?: (response: unknown) => void,
+): Promise<Readback> {
   const env = readEnv();
   if (!/^\d{4,5}$/.test(env['MLFLOW_PORT'] ?? '') || Number(env['MLFLOW_PORT']) > 65535)
     throw new Error('Invalid local MLflow port');
   const mlflow = `http://127.0.0.1:${env['MLFLOW_PORT']}`;
-  const observations = await observationsQuery({ traceId });
+  const observations = await observationsQuery({ traceId }, inspect);
   const search = await json<{ traces?: { trace_id: string }[] }>(
     `${mlflow}/api/3.0/mlflow/traces/search`,
     {
@@ -94,20 +96,20 @@ export async function readBack(traceId: string, includeDetail = false): Promise<
       }),
     },
   );
+  inspect?.(search);
   const traces = search.traces ?? [];
   if (traces.length === 0) return { observations, traces, spans: [] };
   const detail = await json<{ trace: { spans?: OtlpSpan[] } }>(
     `${mlflow}/api/3.0/mlflow/traces/get?trace_id=${encodeURIComponent(traces[0]?.trace_id ?? '')}`,
   );
-  return {
-    observations,
-    traces,
-    spans: detail.trace.spans ?? [],
-    ...(includeDetail ? { detail } : {}),
-  };
+  inspect?.(detail);
+  return { observations, traces, spans: detail.trace.spans ?? [] };
 }
 
-export async function observationsQuery(query: Record<string, string>): Promise<Observation[]> {
+export async function observationsQuery(
+  query: Record<string, string>,
+  inspect?: (response: unknown) => void,
+): Promise<Observation[]> {
   const env = readEnv();
   const all: Observation[] = [];
   let cursor: string | undefined;
@@ -122,6 +124,7 @@ export async function observationsQuery(query: Record<string, string>): Promise<
       `http://127.0.0.1:3000/api/public/v2/observations?${params}`,
       { headers: { Authorization: env['LANGFUSE_AUTH_HEADER'] ?? '' } },
     );
+    inspect?.(page);
     all.push(...page.data);
     cursor = page.meta.cursor;
   } while (cursor);
@@ -131,11 +134,12 @@ export async function observationsQuery(query: Record<string, string>): Promise<
 export async function waitForReadback(
   traceId: string,
   spanIds?: readonly string[],
+  inspect?: (response: unknown) => void,
 ): Promise<Readback> {
   const deadline = Date.now() + 120_000;
   let latest: Readback = { observations: [], traces: [], spans: [] };
   while (Date.now() < deadline) {
-    latest = await readBack(traceId, spanIds !== undefined);
+    latest = await readBack(traceId, inspect);
     if (
       spanIds === undefined
         ? latest.observations.length >= 2 && latest.spans.length >= 2
