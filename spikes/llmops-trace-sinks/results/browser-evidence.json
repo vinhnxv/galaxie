@@ -149,7 +149,115 @@
           "user-agent"
         ]
       }
-    ]
+    ],
+    "proxyWireRequests": [
+      {
+        "count": 8,
+        "method": "GET",
+        "path": "/",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "if-none-match",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "sec-fetch-user",
+          "upgrade-insecure-requests",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "GET",
+        "path": "/",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "sec-fetch-user",
+          "upgrade-insecure-requests",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 8,
+        "method": "GET",
+        "path": "/assets/index-CWsBx5Of.js",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "if-modified-since",
+          "if-none-match",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "GET",
+        "path": "/assets/index-CWsBx5Of.js",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 7,
+        "method": "POST",
+        "path": "/otel/v1/traces",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      }
+    ],
+    "proxyWireHits": []
   },
   "cspControl": {
     "oracleSpans": 3,
@@ -158,6 +266,10 @@
       "shutdown": 0
     },
     "violations": [
+      {
+        "directive": "connect-src",
+        "blockedURI": "<collector-origin>/v1/traces"
+      },
       {
         "directive": "connect-src",
         "blockedURI": "<collector-origin>/v1/traces"
@@ -189,5 +301,7 @@
     "Connecting to '<collector-origin>/v1/traces' violates the following Content Security Policy directive: \"connect-src 'self'\". The action has been blocked.",
     "Fetch API cannot load <collector-origin>/v1/traces. Refused to connect because it violates the document's Content Security Policy."
   ],
-  "findings": []
+  "findings": [
+    "The preview receiver observed a keepalive export during navigation that Playwright did not report; full receiver headers and body bytes were also scanned."
+  ]
 }

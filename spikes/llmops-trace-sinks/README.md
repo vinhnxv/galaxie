@@ -1,7 +1,8 @@
 # Local trace sinks
 
 This isolated demonstration sends real galaxie LangGraph runs from a Node host
-to a local collector, then reads every emitted span back from Langfuse and MLflow.
+or a built Chromium page to a local collector, then reads every emitted span back
+from Langfuse and MLflow.
 It also retains the original hand-made two-span smoke. Vendor mapping belongs to
 the collector; no galaxie package is changed.
 
@@ -21,6 +22,7 @@ pnpm exec tsc --noEmit
 pnpm run stack:up
 pnpm run smoke
 pnpm run node-host
+pnpm run browser-host
 # Run again and compare the results files (see below).
 pnpm run node-host
 pnpm exec vitest run test/static.test.ts
@@ -234,8 +236,174 @@ checks, stable hashes, publication check and teardown from this run. The default
 `pnpm test` remains offline and skips both live suites. The live command fails
 when the stack is down. Root checks require the project's Go 1.27.3 on PATH.
 
-Not measured: browser export; other executors; budget exhaustion or cancellation;
+The Node lane does not measure browser export; the page measurements follow below.
+Not measured in the Node lane: other executors; budget exhaustion or cancellation;
 real models, real prompts or answer quality; feedback scores or MLflow evaluation;
 session grouping workflows; retries, delivery guarantees, capacity, latency,
 long-running ingestion or failure recovery; vendor usage telemetry payloads or
 all container egress. These are single sampled deliveries with a scripted model.
+
+
+## Chromium page measurements
+
+`pnpm run browser-host` builds a minified Vite page and drives it with the spike's
+pinned `playwright-core` 1.64.1 in headless Chromium 156.0.8078.4 (shell revision
+1248). The browser is installed separately from dependencies. If the matching
+cached shell is absent, install it once in this spike:
+
+```sh
+pnpm exec playwright-core install --only-shell chromium
+```
+
+The page runs the same scripted linear and interrupt/resume scenarios as Node,
+without and with development trace text. The host uses OTLP/HTTP exporter
+0.301.0, SDK 3.1.0, resources 3.1.0 and API 1.10.0; Vite is 8.3.4. Linked galaxie
+packages, API, LangChain and LangGraph resolve through the same single-copy helper
+as the Node runner. The production build independently counts one resolved copy
+of each shared package. No vendor SDK or backend dependency enters a galaxie
+package.
+
+Vite preview binds only loopback on a free port. Its single proxy route rewrites
+`/otel/v1/traces` to the collector's `/v1/traces` receiver path. Preview serves the
+built bundle; it uses the dev proxy's forwarding semantics without a development
+bundle. The collector configuration is unchanged and needs no CORS addition.
+The response policy is:
+
+```text
+default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'
+```
+
+| Scenario, per text variant | Oracle | Langfuse | MLflow |
+| --- | --- | --- | --- |
+| Linear | 3 spans, 1 trace | All IDs and parents; `AGENT`, node, `GENERATION` | All IDs and parents; `AGENT`, node, `CHAT_MODEL` |
+| Interrupt/resume | 8 spans, 2 traces | Both segments returned by the server run-ID metadata filter | Both roots and all children retained |
+
+[browser-linear.json](results/browser-linear.json) and
+[browser-interrupt-resume.json](results/browser-interrupt-resume.json) exactly
+match their Node counterparts, with **no lane-specific attribute exceptions**.
+The shared readback checks compare every backend span with the page's in-memory
+oracle, pin counts independently, inspect complete API responses before
+projection, and require positive credential calls and opted-in text. The JSON
+snapshot round trip retains context, parenting, status, events, links, scope,
+ended state and timing; the existing span-tree guard checks the decoded spans.
+Neither backend adds root input/output. No browser backend representation finding
+was observed for these two scenarios.
+
+[browser-evidence.json](results/browser-evidence.json) records the bundle scan,
+all page request summaries and the CSP control. A passive preview receiver
+capture also scans every incoming request: the measured navigation keepalive
+export reaches that receiver after Playwright stops reporting the page request.
+Both captures persist only summaries. The scanner sees full URLs,
+complete headers and body bytes in memory, but persists only paths, methods,
+header names and counts. It detects nonempty generated credentials in raw,
+URL-encoded and base64 forms, Basic values and patterns, vendor header names,
+and the routed canary. A short numeric experiment identifier is checked in URL
+segments, query values and header values, excluding Chromium's standardized
+`upgrade-insecure-requests` protocol bit. That bit still receives all credential
+and canary checks. Bodies and bundle numbers are not interpreted as experiment
+identifiers. Synthetic positive controls exercise both scanners. No generated
+credential or canary appeared in a page request or either backend readback.
+
+The direct-export control uses only the collector origin and records three
+`connect-src` violations, zero collector requests observed by Playwright and
+zero spans in either backend throughout a 15-second observation window after a
+later proxied run was successfully read back. The exporter reports one flush
+error, which the dedicated control deliberately counts. Proxied runs have no
+`connect-src` violation. No eval or other CSP violation was observed. URLs in the
+recorded control are replaced with destination labels; ports and local paths are
+not persisted.
+
+[browser-close.json](results/browser-close.json) records observations, without a
+delivery assertion. Each case has a 60-second batch delay and a 15-second backend
+observation window:
+
+| Mechanism | Auto flush on document hide | Langfuse / MLflow spans |
+| --- | --- | --- |
+| Close immediately, no explicit flush | Disabled | 0 / 0 of 3 |
+| Navigate away, no explicit flush | SDK default | 3 / 3 of 3 |
+| Explicit force-flush and shutdown, then close | SDK default | 3 / 3 of 3 |
+
+The lifecycle field lists only callbacks successfully relayed to Playwright;
+callbacks during document destruction are not a complete browser event log.
+The counts demonstrate sampled delivery, not a delivery guarantee. No `pagehide`
+or `sendBeacon` mitigation was added.
+
+### Guide probe and differences
+
+[browser-guide.json](results/browser-guide.json) records two scratch installs
+outside the repository. The browser-exporter guide excerpt was tried verbatim,
+then a separate harness created one SDK span and flushed it to a same-origin
+loopback stub. Both package sets passed typechecking, Vite build and Chromium
+export:
+
+| Tags | Web/base SDK | OTLP/HTTP exporter | API |
+| --- | --- | --- | --- |
+| `latest` | 2.12.0 | 0.301.2 | 1.10.0 |
+| `latest-2` | 2.12.1 | 0.223.2 | 1.10.0 |
+
+Both sets emitted unmet API peer warnings; pnpm retained one API version rather
+than installing a second one, and each scratch bundle contained one API copy.
+The `latest` web/base SDK tags were deprecated. The guide's constructor and
+`register()` worked in both sets. These are initialization and one-span stub
+measurements, not galaxie graph or backend parity with the web SDK packages.
+The guide stays unchanged.
+
+The live page instead keeps the Node lane's aligned SDK/exporter pair. Its code
+shape differs from the guide as follows:
+
+- Import `TracerProvider`, `BatchSpanProcessor` and `StackContextManager` from
+  `@opentelemetry/sdk-trace`, rather than the web/base SDK packages.
+- Construct the processor with `new BatchSpanProcessor({ exporter })`. The pinned
+  provider has no `register()` method. Register it with
+  `trace.setGlobalTracerProvider(provider)` and install
+  `context.setGlobalContextManager(new StackContextManager().enable())`; pass the
+  same provider to the runtime. Parenting still uses explicit contexts and the
+  forwarded graph config, not async browser context propagation.
+- Keep an in-memory oracle beside the batch processor. After runtime disposal,
+  call `provider.forceFlush()` and `provider.shutdown()` for normal runs. The
+  close observations deliberately defer those calls; the direct CSP control
+  counts their errors. Only close observations set the 60-second delay or disable
+  auto flush on hide.
+- Use the preview proxy for the built bundle, with an explicit receiver-path
+  rewrite. The exporter uses the browser `fetch` transport with conditional
+  `keepalive`, not XHR or `sendBeacon`.
+
+The first live scan exposed a measurement-harness false positive: a short
+experiment identifier equalled Chromium's standard navigation preference bit.
+A failing offline regression reproduced it before the scanner distinguished
+that protocol flag; arbitrary identifier headers and credentials in that header
+still fail. The original failure is retained in
+[browser-verification.json](results/browser-verification.json).
+
+Langfuse and MLflow vendor telemetry stays at its defaults by maintainer
+decision. Galaxie trace data and opted-in text reach only the local backends;
+the credential canary reaches only the local scripted provider and is absent
+from page requests and backend readbacks.
+
+### Repeat and limits
+
+With the stack running, repeat the browser command and compare every results file:
+
+```sh
+pnpm run browser-host
+shasum -a 256 results/* > /tmp/galaxie-browser-before.sha256
+pnpm run browser-host
+shasum -a 256 results/* > /tmp/galaxie-browser-after.sha256
+diff -u /tmp/galaxie-browser-before.sha256 /tmp/galaxie-browser-after.sha256
+pnpm run node-host
+pnpm exec vitest run test/static.test.ts
+pnpm run stack:down
+```
+
+[browser-verification.json](results/browser-verification.json) records the live
+runs, stable hashes, loopback publication, stopped-stack failure, teardown and
+repository gates. The default offline suite skips all live tests and never
+launches a browser. The enabled browser command fails when the collector is
+unreachable. Teardown removes volumes as well as containers.
+
+Not measured: browser tool-call or model-failure scenarios, other executors,
+Firefox, WebKit, real devices, real models or prompts, answer quality, feedback
+scores, session grouping, delivery guarantees, retries, capacity, latency,
+long-running ingestion, failure recovery, vendor telemetry payloads or container
+egress. Proxy authentication, request limits and origin policy beyond this local
+CSP/loopback fixture are not deployment measurements.

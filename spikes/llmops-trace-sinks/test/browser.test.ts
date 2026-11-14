@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import type { IncomingMessage } from 'node:http';
 import { setTimeout } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { BrowserContext, Page } from 'playwright-core';
@@ -139,6 +140,32 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
       }
       const origin = preview.resolvedUrls?.local[0];
       assert.ok(origin, 'Preview has no loopback URL');
+      const wireRequests: Promise<CapturedRequest>[] = [];
+      preview.httpServer.prependListener('request', (request: IncomingMessage) => {
+        const url = new URL(request.url ?? '/', origin).href;
+        const method = request.method ?? 'GET';
+        const headers = Object.fromEntries(
+          Object.entries(request.headers).flatMap(([name, value]) =>
+            value === undefined ? [] : [[name, Array.isArray(value) ? value.join(', ') : value]],
+          ),
+        );
+        wireRequests.push(
+          new Promise((resolve, reject) => {
+            const chunks: Buffer[] = [];
+            request.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+            request.once('error', reject);
+            const finish = (): void =>
+              resolve({
+                url,
+                method,
+                headers,
+                body: chunks.length === 0 ? null : Buffer.concat(chunks),
+              });
+            request.once('end', finish);
+            request.once('aborted', finish);
+          }),
+        );
+      });
       const context = await browser.newContext();
       const pendingRequests: Promise<CapturedRequest>[] = [];
       const capturedViolations: Violation[] = [];
@@ -269,6 +296,7 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
       }
       await context.close();
       const requests = await Promise.all(pendingRequests);
+      const wire = await Promise.all(wireRequests);
       expect(requests.length).toBeGreaterThan(0);
       expect(
         requests.some(
@@ -295,6 +323,7 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
       );
       expect(scanBundle(chunks, env)).toEqual([]);
       expect(scanRequests(requests, env, canary)).toEqual([]);
+      expect(scanRequests(wire, env, canary)).toEqual([]);
       const secret = env['LANGFUSE_AUTH_HEADER'];
       assert.ok(secret, 'Missing Basic authorization positive control');
       expect(scanBundle([secret], env).length).toBeGreaterThan(0);
@@ -341,6 +370,8 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
           bundlePositiveControlDetected: true,
           requestPositiveControlDetected: true,
           requests: summarizeRequests(requests),
+          proxyWireRequests: summarizeRequests(wire),
+          proxyWireHits: [],
         },
         cspControl: {
           oracleSpans: direct.spans.length,
@@ -359,6 +390,12 @@ test.skipIf(process.env['LLMOPS_STACK'] !== '1')(
         ].map((item) => ({ ...item, blockedURI: normalizeUrl(item.blockedURI) })),
         consoleErrors: [...new Set(consoleErrors)].sort(),
         findings: [
+          ...(wire.filter((request) => request.method === 'POST').length >
+          requests.filter((request) => request.method === 'POST').length
+            ? [
+                'The preview receiver observed a keepalive export during navigation that Playwright did not report; full receiver headers and body bytes were also scanned.',
+              ]
+            : []),
           ...new Set(
             capturedViolations
               .filter((item) => item.directive !== 'connect-src')
