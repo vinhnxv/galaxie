@@ -56,7 +56,7 @@ def observe(*, output_key='changed', twice=False, failure=None, pause=None):
     from google.adk.tools import LongRunningFunctionTool
     tools = ([LongRunningFunctionTool(wait)] if pause == 'long-running' else [FunctionTool(wait)]) if pause else []
     inner = LlmAgent(name='inner', description='Answer one question.', model=Scripted(model='inner'),
-                     before_agent_callback=before, output_key=output_key, tools=tools)
+                     before_agent_callback=before, output_key=output_key, tools=list(tools))
     wrapper = AgentTool(inner)
     outer = LlmAgent(name='outer', model=Scripted(model='outer'), tools=[wrapper])
 
@@ -69,6 +69,7 @@ def observe(*, output_key='changed', twice=False, failure=None, pause=None):
                   new_message=types.Content(role='user', parts=[types.Part(text='go')]))]
         saved = await sessions.get_session(app_name='native', user_id='user', session_id='s')
         await runner.close()
+        assert saved is not None
         return events, saved
 
     events, saved = asyncio.run(run())
