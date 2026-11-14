@@ -925,7 +925,7 @@ answers. `indexeddb.test.ts` adds parity and close/reopen reload for both cases.
 
 Exact valid NodeInterrupt/raw GraphInterrupt requests publish once and fail on the
 first answer; recovery retains the accepted entry and retries that failure. A
-refused second call in one node restores with `executor_error`. Earlier answers
+refused second ID-less call in one node restores with `executor_error`. Earlier answers
 already folded into graph state are outside latest-pending-write registration;
 core registers accepted inbox payloads when recovery is configured. Second pauses
 inside body-invoked children, repeated child pauses, loop revisits, real models and
@@ -937,6 +937,50 @@ Run the focused evidence without updating existing goldens:
 ```sh
 pnpm exec vitest run --project node packages/adapter-langgraph/test/idless.test.ts tests/conformance/idless.node.test.ts tests/conformance/idless.test.ts tests/conformance/idless-recovery.test.ts
 pnpm exec vitest run --project 'browser (chromium)' tests/conformance/idless.test.ts tests/conformance/idless-recovery.test.ts tests/conformance/indexeddb.test.ts
+```
+
+## Several requests in one node
+
+The separate [`interrupt-twice` registry](cases/interrupt-twice.ts) leaves the
+original twelve cases, Python port and compatibility matrix unchanged.
+[`interrupt-twice.node.test.ts`](interrupt-twice.node.test.ts) owns the one new
+native golden: one node asks two distinct strict four-field questions, both pauses
+use the same raw engine ID, both answers reach final state and the node runs three
+times. [`interrupt-twice.test.ts`](interrupt-twice.test.ts) matches that transcript
+with zero differences on galaxie Node and Chromium. The harness independently
+checks host IDs against the known answer count, not adapter derivation code.
+
+[`repeated-requests.test.ts`](../../packages/adapter-langgraph/test/repeated-requests.test.ts)
+covers two and three requests, ten stable reads, reversed saver writes, raw-key
+resume payloads, missing hooks, registration before return, forged and answered
+IDs, abort identity, invalid values, stale writes and retained refusal guards.
+The former `twice` rejection in [`adapter.node.test.ts`](adapter.node.test.ts) now
+proves two identical requests complete; parallel and invalid shapes still fail.
+
+[`interrupt-twice-recovery.test.ts`](interrupt-twice-recovery.test.ts) covers both
+answers under `sync`, `async` and `exit` across unaccepted, accepted-before-resume,
+held mid-resume, held-abort, completed-before-inbox-consumption and complete
+windows. Fresh cloned memory savers return reversed writes. IDs stay stable,
+both answers commit once, stale and duplicate submissions fail through core,
+and registration precedes restored publication or replay. A blocked final
+checkpoint leaves stale completed-task writes in `sync`/`async`, which fail
+`unsupported`; `exit` has no final task writes yet and retains the second pause.
+No mode publishes a phantom `:2` question.
+
+[`indexeddb.test.ts`](indexeddb.test.ts) adds zero-difference parity plus Chromium
+close/reopen recovery at ordinals zero and one under all three durability modes.
+Both answers complete after reload, saved values register before the second
+pending read returns, inbox entries are consumed, and another reopen restores
+no pending interaction. These are saver-reopen tests, not real-model or device
+measurements. Parallel interrupts, repeated child pauses, later-ordinal surfaces
+and repeated ID-less requests remain refused. Loop revisits, real models and
+Python remain unmeasured; Firefox and WebKit use CI report gates. See
+[author guidance](../../packages/adapter-langgraph/README.md#several-requests-in-one-node).
+
+```sh
+pnpm exec vitest run --project node packages/adapter-langgraph tests/conformance/interrupt-twice.node.test.ts tests/conformance/interrupt-twice.test.ts tests/conformance/interrupt-twice-recovery.test.ts tests/conformance/adapter.node.test.ts tests/conformance/idless.node.test.ts tests/conformance/idless.test.ts tests/conformance/idless-recovery.test.ts
+pnpm exec vitest run --project 'browser (chromium)' tests/conformance/interrupt-twice.test.ts tests/conformance/interrupt-twice-recovery.test.ts tests/conformance/indexeddb.test.ts
+git diff --stat origin/main -- tests/conformance/golden tests/conformance/compatibility-matrix.json
 ```
 
 ## DSPy paused-session state binding spike

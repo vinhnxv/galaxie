@@ -306,11 +306,46 @@ after an await. The adapter reads this record from the checkpoint and core valid
 it against host-bound catalogs, regions, limits and URL/private-value policy before
 publication or restore. The resume value stays exactly `{ action, payload }`.
 
-One interrupt per node still applies. Advance a surface revision by resuming and
+One surface interrupt per node still applies. Advance a surface revision by resuming and
 reducing the next batch against the previous record in a later node, then interrupt
 with a new ID. Pending interrupts cannot be updated in place. `requestInteraction`
 and existing four-field checkpoints are unchanged.
 
+
+## Several requests in one node
+
+A top-level node can call `requestInteraction(request, config)` several times with
+strict four-field requests. The host sees one pending question at a time. The first
+interaction keeps its raw engine ID; later questions use `<raw>:1`, `<raw>:2`, and
+so on, counting only that task's committed resume values. Repeated reads and restore
+derive the same ID from the checkpoint. The adapter checks the submitted ID against
+the current pending question, then resumes LangGraph under the raw engine key.
+Forged or already-answered IDs fail with the fixed `unsupported` error before node
+execution. Hosts must answer `snapshot.run.pending`, not infer answerable IDs from
+raw stream updates, which retain their native IDs and payloads.
+
+Each resume re-executes the node from its start and replays earlier answers in call
+order. One node asking two questions executes its prefix three times. The separate
+two-branch experiment in [ADR-0030](../../docs/adr/0030-several-engine-pauses-published-one-at-a-time.md)
+counted five total prefix executions; parallel interrupts remain refused in this
+adapter, and those counts are not latency measurements. Keep effects after the
+interrupts or in a completed node. Keep question construction deterministic across
+re-execution and reload: no request-digest check binds a replayed answer to its
+question yet. Cancelling mid-sequence can leave earlier answers applied; it does
+not roll them back.
+
+Every committed resume value in the latest checkpoint's pending writes is passed
+to `registerRestoredData` before pending publication or replay. Reads with saved
+values fail `unsupported` without that hook. A completed task's stale interrupt is
+refused rather than published as another question. Earlier answers already folded
+into graph state remain outside this adapter's registration scope.
+
+Parallel interrupts, repeated child-graph pauses, surface records at ordinal one
+or later, and repeated ID-less requests remain refused with fixed `unsupported`.
+A surface record at ordinal zero retains its existing path. Loop revisits of a
+repeating node, real models and the Python driver remain unmeasured. See the
+[native Node, galaxie Node and Chromium evidence](../../tests/conformance/README.md#several-requests-in-one-node),
+including all three durability modes and reopened IndexedDB at both pauses.
 
 ## ID-less interrupts
 
@@ -331,7 +366,7 @@ once. A **compiled child** with a checkpoint namespace is refused before publica
 
 The fixed `unsupported` error also refuses multiple/mixed interrupts, unfinished
 fan-out siblings, malformed IDs (`null`, empty or non-string), non-request values,
-ID-less surface records, uncorroborated checkpoints and a second call in one node.
+ID-less surface records, uncorroborated checkpoints and a second ID-less call in one node.
 Forged `idless:` identities cannot reach graph execution. Core still checks stale
 identity, action, payload and duplicate submissions.
 
@@ -339,9 +374,10 @@ identity, action, payload and duplicate submissions.
 distinguished from the supported shape at pause time: it publishes once and ends
 `unsupported` on the first answer. String-valued `NodeInterrupt` is refused before
 publication. With recovery, the raw-request answer remains accepted; restore
-retries and fails again. After a second call in one node is refused, restore fails
+retries and fails again. After a second ID-less call in one node is refused, restore fails
 with `executor_error`, leaving the accepted entry intact. Replace these forms with
-`requestInteraction`; use one request per node. The [pause-time discriminator spike](../../spikes/langgraph-nodeinterrupt-pause-time/README.md) records **alternative**: P7/P8 break strict parsing or stream parity, P9/P10 lose restore signals, and P12 verifies the complete-config `requestInteraction` replacement; shipped behavior is unchanged.
+`requestInteraction` with complete node config; several top-level ID-bearing requests
+are supported as described above. The [pause-time discriminator spike](../../spikes/langgraph-nodeinterrupt-pause-time/README.md) records **alternative**: P7/P8 break strict parsing or stream parity, P9/P10 lose restore signals, and P12 verifies the complete-config `requestInteraction` replacement; its NodeInterrupt/raw GraphInterrupt outcome is unchanged.
 
 Every resume value in the latest checkpoint's pending writes is registered through
 `registerRestoredData` before an ID-less pending read returns or resume starts.

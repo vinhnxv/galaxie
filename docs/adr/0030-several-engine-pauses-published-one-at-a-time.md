@@ -74,3 +74,21 @@ The [spike result](../../spikes/parallel-interrupts/README.md), [native observat
 Native and integration probes cover all three durability modes. Core fake probes cover duplicate/stale dispatch, acceptance before commit, commit before publication, stable-order restore, the changed-order negative control, approval reuse, prefix counts and surface refusal. L5 isolates restored-value registration with and without the hook, without a recovery store or network access.
 
 The implementation follow-up must add Node and Chromium conformance cases with new goldens, preserve existing goldens and unrelated matrices/locks, repeat critical crash/reload tests with a reopened IndexedDB saver, update runtime validation and the adapter's documented limits, and pass `pnpm check`. Parallel implementation is not proposed while N5 is unresolved. The maintainer decision on Q1–Q3 is recorded above.
+
+### Shipped implementation evidence (2026-11-14)
+
+The adapter now implements the measured top-level four-field repeated-request
+mapping, without a core contract change. The earlier "implementation pending"
+statements describe the state at acceptance; the Decision and Recorded outcomes
+above retain that history. The [conformance evidence](../../tests/conformance/README.md#several-requests-in-one-node)
+adds one native golden, zero-difference galaxie Node and Chromium comparisons,
+recovery around both answers under `sync`, `async` and `exit`, and reopened
+Chromium IndexedDB at ordinals zero and one. Existing goldens, the compatibility
+matrix and other executors' locks are unchanged.
+
+Real checkpoint-write interruption tests refuse stale completed-task pauses under
+`sync` and `async`. Under `exit`, final task writes are not persisted before the
+final checkpoint; the original second pause remains. None publishes a phantom
+third interaction. Adapter tests also cover three requests, repeated reads, forged
+IDs, missing registration hooks, registration before publication, abort identity,
+invalid requests and the retained surface/parallel/child/ID-less refusals.
