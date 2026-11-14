@@ -2897,3 +2897,48 @@ GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=90000
 GALAXIE_BROWSER=chromium pnpm exec vitest run --project node --testTimeout=900000 --hookTimeout=900000 --silent=false --reporter=verbose examples/rag-browser/test/dspy-golden-engines.node.test.ts examples/rag-browser/test/dspy-engines.node.test.ts
 pnpm check
 ```
+
+### ADK Workflow and AgentTool measurements on adk-python and adk-go
+
+The [registered rules and final outcome](../../docs/adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
+record **REFUSED** for Python AgentTool, Python Workflow and Go AgentTool.
+Python's initial wrapper samples passed, but final review reproduces a shared
+V1/V2 T6 failure: an inner `transfer_to_agent` collides with ADK's injected tool,
+prepare accepts it, and run fails `invalid` before dispatch. The required static
+refusal is `unsupported` at prepare. The raw-wrapper refusal remains executable.
+Workflow fails completed graph restore on CPython and a fresh Node Worker;
+AL-W differs in exact requests despite matching final text and write counts,
+including retry. Go fails restored-ID uniqueness and wasm prepare-time admission.
+V1 was not built because per-tool confirmation metadata is private and the
+permitted tool-constructor seam stays unchanged. Go Workflow's absence walk
+passes again on Go 1.27.3 with `GOTOOLCHAIN=local`.
+
+| Evidence | Native CPython / Go | Node live | Fresh executor / Worker | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- | --- | --- | --- |
+| Python AgentTool V1/V2 | T6 FAIL: injected name | Initial sampled gates PASS; injected-name case UNMEASURED | Initial sampled gates PASS; injected-name case UNMEASURED | PASS: historical three cases, withdrawn | NOT RUN | NOT RUN |
+| Python Workflow Tier 1 | WG1/WG2 PASS; WG6 FAIL | WG1/WG2 PASS | WG6 FAIL | NOT RUN: no qualifying tier | NOT RUN | NOT RUN |
+| Workflow replacement AL-W | FAIL: request digests | FAIL: request digests, including retry | UNMEASURED: no separate restore lane | NOT RUN | NOT RUN | NOT RUN |
+| Go AgentTool V2 | T3 FAIL | T6 FAIL | T3/T6 FAIL | NOT RUN: no qualifying variant | NOT RUN | NOT RUN |
+| Go Workflow absence walk | PASS: source absence | NOT APPLICABLE | NOT APPLICABLE | NOT APPLICABLE | NOT APPLICABLE | NOT APPLICABLE |
+
+All candidate production source, optional inner markers, policy checks, new cases,
+goldens, harness registrations and dependent gate tests were removed by git
+reverts. The failures remain reproducible from the named historical commits;
+independent native facts, closed-list refusals, replacement divergence, Workflow
+restore-boundary evidence and ordinary Go restored-ID reuse remain executable.
+Existing production source, goldens, matrix entries, locks and assertions stay
+byte-identical. The matrices gain refusal facts only; the browser failure registry
+is unchanged and empty. No ADK browser golden diverged; the Python candidate's disqualifying failure is
+a CPython prepare gate.
+
+Run `node scripts/build-python-wheels.ts` before Worker tests and `pnpm check`.
+`node scripts/test-python.ts` covers retained CPython/native evidence. From
+`python/`, `uv run --locked --offline python -I ../scripts/record-adk-python-conformance.py --check`
+checks every existing golden. The retained Worker replacement lane is
+`pnpm exec vitest run --project node --testTimeout=900000 tests/conformance/adk-python-workflow-replacement.node.test.ts`;
+the existing Chromium lane is
+`pnpm exec vitest run --project node --testTimeout=900000 examples/rag-browser/test/adk-python-conformance.node.test.ts`.
+`pnpm run test:go` covers Go native facts and the ID counterexample. Use Go 1.27.3
+first on PATH with `GOTOOLCHAIN=local`, and a command timeout of at least
+1800000 ms for browser/full runs. All measurements use scripted models; real
+models, devices and unrun engines remain unmeasured.

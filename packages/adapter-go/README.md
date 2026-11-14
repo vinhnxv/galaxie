@@ -150,7 +150,7 @@ These shapes run: a single `LlmAgent` with capability tools, `SequentialAgent`, 
 `LoopAgent` trees up to 16 levels deep, transfer to a sub-agent, and a confirmation or long-running tool
 where the pause rule accepts it ("Interactions"). Branches of a `ParallelAgent` get branch-local effect
 scopes, so the order in which they reach the broker does not change what a write receives, and a restore after a later pause does not run them again;
-the order of their events does vary. These shapes fail `unsupported` before anything runs: `agenttool`,
+the order of their events does vary. These shapes fail `unsupported` before anything runs: raw `agenttool.New`,
 an agent, model, function tool or toolset built directly with ADK, and a tree outside the limits above.
 `subgraphs` stays false. Every shape is recorded with its native result in `tests/conformance` and
 `go/galaxie/shapes_test.go`; see the [limits](../../docs/unsupported.md#google-adk-go).
@@ -247,3 +247,12 @@ await adapter.prepare(
   with throwing stubs before the module starts, and discards Go standard output and error. Go code is
   trusted: the stubs catch accidental network use and are not an isolation boundary.
 - A Go exit, panic or Worker error marks the Worker dead. The next `prepare` builds a new Worker.
+
+The [independent AgentTool assessment](../../docs/adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
+keeps the capability-free wrapper **REFUSED** after completed-restore call-ID
+reuse and a wasm prepare/start refusal mismatch. V1 was not built because
+per-tool confirmation metadata is private and the permitted constructor seam
+stays unchanged. No wrapper, wire flag, adapter change or new golden ships.
+The retained ordinary-tree counterexample repeats IDs while effect scopes advance.
+Native Go and Node wasm provide the refusal evidence; no new wrapper browser
+case qualifies. Scripted models only; real models and devices remain unmeasured.

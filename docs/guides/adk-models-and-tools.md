@@ -300,6 +300,16 @@ The JavaScript `AgentTool` wrapper also stays **REFUSED** after the
 both admission variants failed copied temporary-state parity with native ADK.
 This guide offers no wrapper migration.
 
+The [independent Python and Go assessment](../adr/0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14)
+keeps both AgentTool wrappers **REFUSED**. Python's candidate misses a collision
+between an inner `transfer_to_agent` name and ADK's injected transfer tool; Go's
+candidate repeats completed-restore call IDs and defers wasm refusal until start.
+Python Workflow also stays **REFUSED**: completed graph restore fails, and the
+tree replacement differs in exact requests despite matching final text and write
+counts. No new helper, policy flag or migration ships. Historical Python
+candidate Chromium runs are recorded separately; Firefox, WebKit, real models
+and devices remain unmeasured for the assessment.
+
 ## Evidence and limits
 
 The JavaScript snippets run on Node and headless Chromium with scripted models.

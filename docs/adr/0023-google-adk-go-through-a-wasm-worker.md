@@ -79,3 +79,5 @@ IndexedDB/new Worker and the CSP compilation control. The reference module is
 existing golden, matrix entry or lock changes. Go page reload, the existing 23
 scripts on Firefox/WebKit, Linux CI engine evidence, real models and devices stay
 unmeasured; `subgraphs` remains false and this ADR stays Proposed.
+
+The [independent Workflow and AgentTool assessment](0020-google-adk-through-an-adapter.md#measured-outcome-2026-11-14) keeps Go AgentTool **REFUSED** after completed-restore ID reuse and a wasm prepare/start refusal mismatch. The read-capability variant was not built because the permitted metadata seam cannot identify per-tool confirmation; no wrapper, wire flag or adapter change ships. Native Go and Node wasm supply the refusal evidence; no new wrapper browser case qualifies. Go Workflow remains refused by the rerun source-absence walk. Scripted models only; real models and devices remain unmeasured.
