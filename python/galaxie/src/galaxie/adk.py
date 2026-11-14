@@ -30,7 +30,6 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.events._internal_metadata import RESTORED_EVENT_KEY
 from google.adk.plugins import ToolCallIntegrityPlugin
-from google.adk.workflow import Edge, JoinNode, Workflow, START
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools import AgentTool, FunctionTool, exit_loop
@@ -131,7 +130,6 @@ class _Registry:
 _models = _Registry()
 _tools = _Registry()
 _toolsets = _Registry()
-_workflows = _Registry()
 _roles: frozenset[str] = frozenset()
 
 
@@ -680,100 +678,6 @@ def _is_exit(tool: Any) -> bool:
     return type(tool) is FunctionTool and tool.func is exit_loop and tool in _tools
 
 
-def workflow(*, name: str, edges: list[Any]) -> Workflow:
-    """Construct a registered static Workflow; admission is checked at prepare."""
-    try:
-        root = Workflow(name=name, edges=edges)
-    except (ValueError, TypeError):
-        raise GalaxieError('unsupported') from None
-    _workflows.add(root)
-    return root
-
-
-def _validate_workflow(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str]]]:
-    if type(root) is not Workflow or root not in _workflows or root.graph is None:
-        raise GalaxieError('unsupported')
-    for field in (*_REFUSED_FIELDS, 'output_schema', 'max_concurrency'):
-        if field in Workflow.model_fields and getattr(root, field) != Workflow.model_fields[field].default:
-            raise GalaxieError('unsupported')
-    authored: dict[str, Any] = {}
-
-    def visit(value: Any) -> None:
-        if (isinstance(value, str) and value == 'START') or value is START:
-            return
-        if isinstance(value, (tuple, list)):
-            for item in value:
-                visit(item)
-            return
-        if type(value) is Edge:
-            if value.route is not None:
-                raise GalaxieError('unsupported')
-            visit(value.from_node)
-            visit(value.to_node)
-            return
-        if type(value) not in (LlmAgent, JoinNode):
-            raise GalaxieError('unsupported')
-        if value.name in authored and authored[value.name] is not value:
-            raise GalaxieError('unsupported')
-        authored[value.name] = value
-        if type(value) is LlmAgent:
-            pauses, _, _ = _validate(value)
-            if pauses or value.sub_agents or any(type(tool) is not _CapabilityTool for tool in value.tools):
-                raise GalaxieError('unsupported')
-        elif any(getattr(value, field) != JoinNode.model_fields[field].default
-                 for field in (*_REFUSED_FIELDS, 'output_schema') if field in JoinNode.model_fields):
-            raise GalaxieError('unsupported')
-
-    visit(root.edges)
-    graph = root.graph
-    nodes = graph.nodes
-    if not 1 < len(nodes) <= MAX_AGENTS or len({node.name for node in nodes}) != len(nodes):
-        raise GalaxieError('unsupported')
-    if root.name in {node.name for node in nodes}:
-        raise GalaxieError('unsupported')
-    known = {id(node): node for node in nodes}
-    if START not in nodes or {node.name for node in nodes if node is not START} != set(authored):
-        raise GalaxieError('unsupported')
-    assignments: list[tuple[LlmAgent, str]] = []
-    for node in nodes:
-        if node is START:
-            continue
-        if type(node) is LlmAgent:
-            if node.mode != 'single_turn' or node.include_contents != 'none' or node.rerun_on_resume is not True:
-                raise GalaxieError('unsupported')
-            plain = node.model_copy(update={'mode': None, 'rerun_on_resume': False})
-            pauses, _, pending = _validate(plain)
-            if pauses or node.sub_agents or any(type(tool) is not _CapabilityTool for tool in node.tools):
-                raise GalaxieError('unsupported')
-            assignments.extend((node, role) for _, role in pending)
-        elif type(node) is not JoinNode or any(
-            getattr(node, field) != JoinNode.model_fields[field].default
-            for field in (*_REFUSED_FIELDS, 'output_schema') if field in JoinNode.model_fields
-        ):
-            raise GalaxieError('unsupported')
-    targets: dict[int, list[int]] = {identity: [] for identity in known}
-    for edge in graph.edges:
-        if (type(edge) is not Edge or edge.route is not None
-            or id(edge.from_node) not in known or id(edge.to_node) not in known):
-            raise GalaxieError('unsupported')
-        targets[id(edge.from_node)].append(id(edge.to_node))
-    reached: set[int] = set()
-
-    def walk(identity: int, path: set[int]) -> None:
-        if identity in path or len(path) > MAX_DEPTH:
-            raise GalaxieError('unsupported')
-        if identity in reached:
-            return
-        for target in targets[identity]:
-            walk(target, {*path, identity})
-        reached.add(identity)
-
-    walk(id(START), set())
-    if reached != set(known):
-        raise GalaxieError('unsupported')
-    return frozenset(), False, assignments
-
-
 def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str]]]:
     """Fail closed unless every agent, model and tool in the tree is one galaxie can govern.
 
@@ -781,8 +685,6 @@ def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str
     Existing last-child sequences keep their original runner. Loops, transfer pauses,
     multiple pausing parallel branches and long-running parallel calls stay refused (ADR-0022).
     """
-    if isinstance(root, Workflow):
-        return _validate_workflow(root)
     visited = 0
     names: dict[str, int] = {}
     pausing: set[str] = set()
@@ -1370,7 +1272,7 @@ class Executor:
     """Run an ADK agent tree with explicit input and output projections."""
 
     def __init__(
-        self, agent: BaseAgent | Workflow, *,
+        self, agent: BaseAgent, *,
         interaction: Callable[[list[dict[str, Any]]], dict[str, Any]] | None = None,
         resume: Callable[[list[dict[str, Any]], str, Any], list[dict[str, Any]]] | None = None,
     ) -> None:
@@ -1421,7 +1323,7 @@ class Executor:
         runner = self._runners.get(session)
         if runner is None:
             plugin = ToolCallIntegrityPlugin(secret_key=self._keys.setdefault(session, secrets.token_bytes(32)))
-            runner = Runner(node=self.agent, app_name=APP_NAME, session_service=self._sessions, plugins=[plugin]) if isinstance(self.agent, Workflow) else Runner(
+            runner = Runner(
                 app=App(
                     name=APP_NAME, root_agent=self.agent, plugins=[plugin],
                     resumability_config=ResumabilityConfig(is_resumable=True) if self._resumable else None,
@@ -1605,10 +1507,6 @@ class Executor:
                             position += 1
                     if tracker.observe(event):
                         break
-                    if (isinstance(self.agent, Workflow) and event.output is not None
-                        and f'{self.agent.name}@1' in (event.node_info.output_for or [])):
-                        last = (None, '', {'workflow_output': event.output})
-                        continue
                     # A state-only final event (an after-agent callback) carries no answer.
                     if not event.is_final_response() or event.content is None:
                         continue
@@ -1676,12 +1574,7 @@ class Executor:
 
     def _output(self, last: tuple[str | None, str, Any]) -> Any:
         author, text, delta = last
-        if isinstance(self.agent, Workflow):
-            if isinstance(delta, dict) and 'workflow_output' in delta:
-                return delta['workflow_output']
-            agent = next((node for node in self.agent.graph.nodes if node.name == author), None) if self.agent.graph else None
-        else:
-            agent = self.agent.find_agent(author) if author else None
+        agent = self.agent.find_agent(author) if author else None
         key = agent.output_key if isinstance(agent, LlmAgent) else None
         if key and isinstance(delta, dict) and key in delta:
             return delta[key]
@@ -1692,6 +1585,6 @@ def prepare_executor(value: Any) -> Executor:
     """Accept the entry factory's agent tree or an explicit executor wrapper."""
     if isinstance(value, Executor):
         return value
-    if isinstance(value, (BaseAgent, Workflow)):
+    if isinstance(value, BaseAgent):
         return Executor(value)
     raise GalaxieError('unsupported')
