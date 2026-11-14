@@ -2,7 +2,11 @@
   "demonstration": true,
   "daemonSelection": "DOCKER_HOST=unix://$HOME/.colima/default/docker.sock",
   "checks": [
-    { "command": "pnpm install && pnpm build", "location": "repository root", "outcome": "passed" },
+    {
+      "command": "pnpm install && pnpm build",
+      "location": "repository root",
+      "outcome": "passed"
+    },
     {
       "command": "pnpm install --frozen-lockfile",
       "location": "isolated spike",
@@ -14,8 +18,15 @@
       "tests": 14,
       "liveTestsSkipped": 1
     },
-    { "command": "pnpm exec tsc --noEmit", "outcome": "passed" },
-    { "command": "pnpm run stack:up", "outcome": "passed", "services": 8 },
+    {
+      "command": "pnpm exec tsc --noEmit",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run stack:up",
+      "outcome": "passed",
+      "services": 8
+    },
     {
       "command": "pnpm run smoke",
       "outcome": "passed",
@@ -39,8 +50,14 @@
       "outcome": "passed",
       "note": "Existing repository warnings and informational diagnostics remain; no check was weakened."
     },
-    { "command": "pnpm run check:docs", "outcome": "passed" },
-    { "command": "git diff --check", "outcome": "passed" },
+    {
+      "command": "pnpm run check:docs",
+      "outcome": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "passed"
+    },
     {
       "command": "pnpm run stack:down",
       "outcome": "passed",
@@ -64,13 +81,18 @@
         "pnpm install",
         "pnpm build",
         "pnpm install --frozen-lockfile",
-        "pnpm exec vitest run test/single-copy.test.ts test/static.test.ts",
+        "pnpm exec vitest run test/single-copy.test.ts test/static.test.ts test/lifecycle.test.ts",
         "pnpm exec tsc --noEmit",
         "pnpm run stack:up",
         "pnpm run smoke",
+        "pnpm exec vitest run test/static.test.ts",
         "pnpm run stack:down"
       ],
-      "outcome": "passed"
+      "outcome": "passed",
+      "codeCommit": "82ed35d020ec2401c3979db89aa0e7e3f34cb5b5",
+      "freshCloneUnderSharedPath": true,
+      "offlineTests": 14,
+      "postSmokeStaticTests": 10
     },
     "correction": "Document the daemon-visible checkout requirement and use bind.create_host_path: false."
   },
@@ -84,9 +106,17 @@
       "expectedFailures": 2,
       "skippedTests": 165
     },
-    "python": { "passed": 1968, "skipped": 1 },
+    "python": {
+      "passed": 1968,
+      "skipped": 1
+    },
     "remainingGates": "Go tests, Python typecheck, builds, dependency boundaries, documentation and size gates passed."
   },
   "browserUiCheck": "Not applicable: no application routes changed. The repository gate separately runs its configured Chromium tests.",
-  "limits": "Hand-made spans only. No galaxie runs, browser export, real models, prompts, workflows, scores, evaluation, performance, capacity, failure recovery, retry delivery guarantees or vendor telemetry payload measurements."
+  "limits": "Hand-made spans only. No galaxie runs, browser export, real models, prompts, workflows, scores, evaluation, performance, capacity, failure recovery, retry delivery guarantees or vendor telemetry payload measurements.",
+  "review": {
+    "confirmedFindingsFixed": 3,
+    "remainingFindings": 0,
+    "proof": "CLI boundary tests failed before the fix and pass afterward. A synthetic canary proves the credential scan rejects inclusion; no real credential was written to results."
+  }
 }
