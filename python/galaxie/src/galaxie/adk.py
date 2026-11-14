@@ -129,6 +129,7 @@ class _Registry:
 
 _models = _Registry()
 _tools = _Registry()
+_agent_tools = _Registry()
 _toolsets = _Registry()
 _roles: frozenset[str] = frozenset()
 
@@ -535,6 +536,8 @@ class _CapabilityTool(BaseTool):
 
 
 class _AgentTool(AgentTool):
+    """An isolated inner runner sharing the outer run's router and fatal-failure slot."""
+
     async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
         run = _active.get()
         if run is None:
@@ -584,6 +587,7 @@ def agent_tool(agent: Any) -> BaseTool:
     if not isinstance(agent, BaseAgent):
         raise GalaxieError('invalid')
     wrapper = _AgentTool(agent)
+    _agent_tools.add(wrapper)
     _tools.add(wrapper)
     return wrapper
 
@@ -738,7 +742,7 @@ def _validate(root: Any) -> tuple[frozenset[str], bool, list[tuple[LlmAgent, str
             if any(isinstance(tool, _AgentTool) for tool in tools) and len({tool.name for tool in tools}) != len(tools):
                 raise GalaxieError('unsupported')
             for tool in tools:
-                if type(tool) is _AgentTool and tool in _tools:
+                if type(tool) is _AgentTool and tool in _agent_tools:
                     if inner or tool.name != tool.agent.name or tool.skip_summarization or not tool.include_plugins:
                         raise GalaxieError('unsupported')
                     walk(tool.agent, False, depth + 1, {*path, id(agent)}, (), True)
