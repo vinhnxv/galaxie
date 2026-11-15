@@ -16,6 +16,7 @@
     "smoke": "LLMOPS_STACK=1 vitest run test/stack.test.ts",
     "node-host": "LLMOPS_STACK=1 vitest run test/node.test.ts",
     "browser-host": "LLMOPS_STACK=1 vitest run test/browser.test.ts",
+    "feedback-node": "LLMOPS_STACK=1 vitest run test/feedback-node.test.ts",
     "python:sync": "uv sync --locked --project python",
     "python:lock-check": "uv lock --check --offline --project python"
   },

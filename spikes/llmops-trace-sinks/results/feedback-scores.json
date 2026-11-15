@@ -1,0 +1,69 @@
+{
+  "demonstration": true,
+  "scoreWindowMillis": 300000,
+  "reference": {
+    "source": "running Langfuse 4.80.0 /generated/api/openapi.yml",
+    "request": "array",
+    "documentedStatus": "generated response schema lists 200; description specifies 202 or 207",
+    "read": "/api/public/v3/scores?fields=subject"
+  },
+  "segments": [
+    {
+      "segment": 0,
+      "traceId": "trace-1",
+      "score": {
+        "status": "posted",
+        "id": "trace-1-segment-0",
+        "httpStatus": 202
+      },
+      "countAfterRepostAndLaterDateRetry": 1,
+      "originalTimestampRetained": true,
+      "otherSegmentCount": 0
+    },
+    {
+      "segment": 1,
+      "traceId": "trace-2",
+      "score": {
+        "status": "posted",
+        "id": "trace-2-segment-1",
+        "httpStatus": 202
+      },
+      "countAfterRepostAndLaterDateRetry": 1,
+      "originalTimestampRetained": true,
+      "otherSegmentCount": 0
+    }
+  ],
+  "freshTimestampControl": {
+    "status": "observed",
+    "scores": [
+      {
+        "id": "trace-1-fresh-timestamp-control",
+        "value": 1,
+        "timestamp": "<timestamp>",
+        "subject": {
+          "kind": "trace",
+          "id": "trace-1"
+        }
+      }
+    ],
+    "note": "Immediate read after second acceptance; asynchronous later visibility is not measured."
+  },
+  "beforeIngestion": {
+    "observationsBeforeFlush": 0,
+    "observationsAfterFlush": 3,
+    "scoreCount": 1,
+    "subjectMatchesOracle": true,
+    "scoreUnchanged": true
+  },
+  "unmapped": {
+    "unseenRun": {
+      "status": "unmapped",
+      "reason": "run-not-seen"
+    },
+    "unseenSegment": {
+      "status": "unmapped",
+      "reason": "segment-not-seen"
+    },
+    "postRequests": 0
+  }
+}
