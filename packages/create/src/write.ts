@@ -167,17 +167,13 @@ export async function writeProject(plan: WritePlan): Promise<void> {
       try {
         const stat = await lstat(created.path);
         if (stat.isFile() && same(stat, created.identity)) await unlink(created.path);
-      } catch {
-        /* Preserve anything no longer owned by this write. */
-      }
+      } catch {}
     }
     for (const created of createdDirectories.reverse()) {
       try {
         const stat = await lstat(created.path);
         if (stat.isDirectory() && same(stat, created.identity)) await rmdir(created.path);
-      } catch {
-        /* A concurrent file or changed directory is not ours to remove. */
-      }
+      } catch {}
     }
     if (error instanceof ProjectWriteError) throw error;
     throw new ProjectWriteError(

@@ -8,8 +8,8 @@ body:
     attributes:
       label: Which template or starting point did you use?
       options:
-        - templates/local-only
-        - templates/hybrid-gateway
+        - templates/kinds/browser-only
+        - templates/kinds/gateway
         - built an app from the package READMEs
         - other
     validations:

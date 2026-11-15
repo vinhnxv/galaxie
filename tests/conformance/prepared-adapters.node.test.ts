@@ -25,9 +25,9 @@ const prepared = ['adapter-pyodide', 'adapter-adk', 'adapter-go'].map((directory
   directory,
   manifest: readManifest(`packages/${directory}`),
 }));
-const templates = ['local-only', 'hybrid-gateway'].map((directory) => ({
+const templates = ['browser-only-langgraph-js', 'gateway-langgraph-js'].map((directory) => ({
   directory,
-  manifest: readManifest(`templates/${directory}`),
+  manifest: readManifest(`packages/create/.cache/composed/${directory}`),
 }));
 const createWorker = (): never => {
   throw new Error('Adapter version checks must not create a Worker.');

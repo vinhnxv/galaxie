@@ -68,7 +68,9 @@ This serves a local English-tutor host with a scripted mock model, so nothing is
 
 `pnpm check` runs the local validation suite, including the Go and Python lanes, so it also needs a Go toolchain and Python with `uv`. CI additionally runs Firefox and WebKit report gates. The [toolchain section](docs/system-design.md#10-toolchain) describes the TypeScript tooling.
 
-The [local-only starter template](templates/local-only/README.md) has its own tiny agent, uses available Built-in AI or an immediate mock, and loads WebLLM only after a size-disclosed opt-in. The [hybrid-gateway starter](templates/hybrid-gateway/README.md) runs the same agent through a same-origin Node gateway with server-held prompts and scoped HTTP capabilities.
+The [browser-only starter](templates/kinds/browser-only/files/README.md) has its own tiny agent, uses available Built-in AI or an immediate mock, and loads WebLLM only after a size-disclosed opt-in. The [gateway starter](templates/kinds/gateway/files/README.md) runs the same agent through a same-origin Node gateway with server-held prompts and scoped HTTP capabilities.
+
+Generate either starter from layers with the [private, unpublished create package](packages/create/README.md).
 
 ## Install in your own app
 
@@ -97,8 +99,8 @@ Known limit: the packages were tested with `@langchain/core` 1.2.x. The current 
 | [`@galaxie-ai/adapter-adk`](packages/adapter-adk/README.md) | Google ADK (JavaScript) adapter |
 | [`@galaxie-ai/adapter-go`](packages/adapter-go/README.md) | Google ADK (Go) through WebAssembly |
 | [`@galaxie-ai/eslint-plugin`](packages/eslint-plugin/README.md) | Lint rules that flag direct platform access in agent code |
-| [`templates/local-only`](templates/local-only/README.md) | Copyable local-only Vite + React starter with mock fallback and pending-question recovery |
-| [`templates/hybrid-gateway`](templates/hybrid-gateway/README.md) | Copyable browser agent with a Node model proxy, private prompts and scoped HTTP capabilities |
+| [`templates/kinds/browser-only`](templates/kinds/browser-only/files/README.md) | Browser-only Vite + React starter layers with mock fallback and pending-question recovery |
+| [`templates/kinds/gateway`](templates/kinds/gateway/files/README.md) | Gateway starter layers with a Node model proxy, private prompts and scoped HTTP capabilities |
 
 ## Documentation
 

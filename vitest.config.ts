@@ -192,7 +192,7 @@ const config: ViteUserConfig = defineConfig({
               'packages/*/test/**/*.test.ts',
               'tests/conformance/**/*.test.ts',
               'examples/*/test/**/*.test.ts',
-              'templates/*/test/**/*.node.test.ts',
+              'packages/create/.cache/composed/*/test/**/*.node.test.ts',
             ],
             [
               ...configDefaults.exclude,
@@ -258,7 +258,7 @@ const config: ViteUserConfig = defineConfig({
               '../../packages/adapter-go/test/**/*.test.ts',
               '../../packages/storage-indexeddb/test/**/*.test.ts',
               '../../examples/*/test/**/*.test.ts',
-              '../../templates/*/test/**/*.test.ts',
+              '../../packages/create/.cache/composed/*/test/**/*.test.ts',
             ],
             [
               ...configDefaults.exclude,
@@ -269,7 +269,7 @@ const config: ViteUserConfig = defineConfig({
               '../../packages/adapter-adk/test/**/*.node.test.ts',
               '../../packages/adapter-go/test/**/*.node.test.ts',
               '../../examples/*/test/**/*.node.test.ts',
-              '../../templates/*/test/**/*.node.test.ts',
+              '../../packages/create/.cache/composed/*/test/**/*.node.test.ts',
             ],
             '../../',
           ),

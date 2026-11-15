@@ -18,8 +18,8 @@
 - **`packages/storage-indexeddb`:** a LangGraph checkpoint saver and structural recovery port, with scoped keys, versioned envelopes and transaction-completion barriers. Host-local supplies both for reload reconciliation; Node/Chromium fault tests cover inbox and journal crash windows, including IndexedDB reopen in Chromium. Retention and app-wide fencing are implemented; logout remains slice 6 work (§8.2).
 - **`examples/host-remote`:** the unchanged English tutor wired from a bundled [configuration file](../examples/host-remote/galaxie.config.json), with named hooks in host code and parity tests against the former hand-built wiring; it uses a same-origin HttpOnly cookie-session model proxy, a fixed page placeholder, server-only key substitution into an in-process quiz upstream and end-session revocation, while HTTP capabilities retain renewable bearer tokens and host-rendered progress confirmation. Feedback stays in-browser; MemorySaver starts over after reload. Node and headless Chromium tests exercise request privacy, consent, confirmation, tokens and CSP. See [the host README](../examples/host-remote/README.md) for the stub and deployment limits.
 - **`examples/adk-recipes`:** a [separate scripted browser host](../examples/adk-recipes/README.md) for financial-advisor rewrites on ADK JavaScript and Go and auditor/loan rewrites on ADK Python, with one chosen executor per document, checked text, model destinations and scoped loan checkpoint/recovery storage; missing optional runtime assets disable their entries, and no real-model result is claimed.
-- **`templates/local-only`:** a [copyable Vite + React starter](../templates/local-only/README.md) with its own one-question LangGraph agent, available Built-in AI first, immediate scripted mock fallback, size-disclosed WebLLM opt-in, an exhaustive fixed-message model-state table and fenced IndexedDB checkpoint/recovery restore. Automated tests use injected probes and fake engine handles; real-device behavior for this template is unverified.
-- **`templates/hybrid-gateway`:** a [copyable browser and Node starter](../templates/hybrid-gateway/README.md) running the identical agent through one host-server model route, with server-rendered prompt IDs, scoped demo tokens, per-user call quotas, idempotent notes and private document search. MemorySaver starts over on reload. Stub-upstream Node and headless-Chromium loopback tests are supplied. Production authentication/storage and real upstream behavior remain unverified.
+- **`templates/kinds/browser-only`:** a [copyable Vite + React starter](../templates/kinds/browser-only/files/README.md) with its own one-question LangGraph agent, available Built-in AI first, immediate scripted mock fallback, size-disclosed WebLLM opt-in, an exhaustive fixed-message model-state table and fenced IndexedDB checkpoint/recovery restore. Automated tests use injected probes and fake engine handles; real-device behavior for this template is unverified.
+- **`templates/kinds/gateway`:** a [copyable browser and Node starter](../templates/kinds/gateway/files/README.md) running the identical agent through one host-server model route, with server-rendered prompt IDs, scoped demo tokens, per-user call quotas, idempotent notes and private document search. MemorySaver starts over on reload. Stub-upstream Node and headless-Chromium loopback tests are supplied. Production authentication/storage and real upstream behavior remain unverified.
 - **`tests/conformance`:** twelve graph cases compared across native Node, galaxie on Node and galaxie in headless Chromium, with native-owned goldens and an exact difference matrix, plus dual-lane policy, lifecycle, budget and tracing tests. The [conformance README](../tests/conformance/README.md) lists the explicit-config APIs.
 - **`spikes/`:** three throwaway spikes: B0 (a 1.7B model on WebGPU), the local English tutor (a LangGraph.js agent on that model in Chrome) and [Spike C](../spikes/c-ui-path/README.md) (typed interrupt UI and session-checkpoint reload). Each has its own pnpm workspace (brief §16.2).
 - **Everything else here is the target.** Each milestone builds its part (brief §16), and a folder appears only when work on it starts (brief §15).
@@ -95,9 +95,9 @@ Trust rules:
 ```mermaid
 flowchart TD
     Host["Host apps: examples/host-local, examples/host-remote"]
-    Starter["Template: templates/local-only, bundled one-question agent"]
+    Starter["Browser-only kind + LangGraph.js framework, bundled one-question agent"]
     Starter --> Adapter & Models & Storage & ReactPkg
-    HybridStarter["Template: templates/hybrid-gateway, same agent and Node gateway"]
+    HybridStarter["Gateway kind + LangGraph.js framework, same agent and Node gateway"]
     HybridStarter --> Adapter & Models & ReactPkg
     Tutor["Agent package: examples/english-tutor"]
     Host --> Tutor
@@ -223,8 +223,10 @@ galaxie/
 │   ├── check-license.ts       SPDX headers and package license fields (ADR-0024)
 │   └── check-dependencies.ts  source and built-package dependency boundaries
 ├── templates/
-│   ├── local-only/            browser-local starter with pending-question recovery
-│   └── hybrid-gateway/        same agent with a Node model and capability gateway
+│   ├── base/                  common project configuration and package fields
+│   ├── kinds/browser-only/    browser-local host and workspace tests
+│   ├── kinds/gateway/         Node gateway host and workspace tests
+│   └── frameworks/langgraph-js/ shared agent and framework dependencies
 ├── tests/conformance/         shared cases, native goldens and compatibility-matrix.json
 ├── spikes/                    throwaway spike code, outside the root workspace (brief §16.2)
 ├── biome.json  package.json  pnpm-workspace.yaml  tsconfig.base.json  vitest.config.ts
@@ -248,6 +250,31 @@ Target (brief §15), with the milestone that first needs each path:
 | `tests/injection-corpus/` | M4 |
 
 Spike code is throwaway. Keep it out of `packages/` and never promote it to package code (brief §16.2).
+
+### Starter composition
+
+The private, unpublished [`@galaxie-ai/create`](../packages/create/README.md) package
+loads repository layers from `templates/base`, `templates/kinds` and
+`templates/frameworks`. A layer has `layer.json`, verbatim `files/`, and optional
+repository-only `workspace/` files. `_gitignore` becomes `.gitignore`. Kind manifests
+declare supported frameworks; current kinds support only `langgraph-js` and keep
+their direct adapter imports until a second framework establishes another boundary.
+
+`compose` merges base, kind and framework in memory. Duplicate file paths fail;
+JSON objects merge recursively, equal scalars agree, and conflicting scalars fail
+with key paths and layer identities. Only compiler types and include arrays union.
+Paths are sorted, bytes use LF and output modes are fixed. Project names enter only
+the generated manifest. The writer checks conflicts and symlink components before
+exclusive creates, keeps existing `AGENTS.md` and `CLAUDE.md` case-insensitively, and
+rolls back only its own creations after a failure.
+
+`pnpm run compose:create` builds this tool and regenerates both workspace-test
+projects under the ignored `packages/create/.cache/composed`. Compiler and test
+commands invoke it explicitly; a cache-equality test rejects missing, changed or
+unexpected output. Generated projects omit workspace tests and mappings, and carry
+a `check` command that pins the emitted CSP and Trusted Types baseline. Layers stay
+in this checkout rather than the private package's `dist`; packaging and publishing
+them remain later work. ADR-0012 guarantees are unchanged.
 
 ## 6. Core runtime and contracts
 
