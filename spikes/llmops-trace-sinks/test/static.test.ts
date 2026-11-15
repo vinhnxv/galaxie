@@ -10,6 +10,82 @@ import { parse } from 'yaml';
 import { envPath, readEnv } from '../src/secrets.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+interface Gap {
+  name: string;
+  disposition: string;
+  evidence: { file: string; path: string }[];
+  proposedFix?: string;
+  beadsIssue?: string;
+}
+
+function auditGaps(gaps: Gap[], requireIds = false): void {
+  expect(new Set(gaps.map((gap) => gap.name)).size).toBe(gaps.length);
+  for (const name of [
+    'score-association',
+    'score-idempotency',
+    'score-before-ingestion',
+    'langfuse-sessions',
+    'mlflow-sessions',
+    'mlflow-root-io',
+    'browser-endpoint',
+  ])
+    expect(
+      gaps.some((gap) => gap.name === name),
+      `Missing workflow ${name}`,
+    ).toBe(true);
+  for (const gap of gaps) {
+    expect(['works', 'works-with-host-configuration', 'follow-up']).toContain(gap.disposition);
+    expect(gap.evidence.length).toBeGreaterThan(0);
+    for (const pointer of gap.evidence) {
+      expect(pointer.file).toMatch(/^[a-z0-9-]+\.json$/);
+      expect(pointer.path).toMatch(/^\//);
+      let value: unknown = JSON.parse(readFileSync(resolve(root, 'results', pointer.file), 'utf8'));
+      for (const key of pointer.path.slice(1).split('/')) {
+        expect(
+          value !== null && typeof value === 'object',
+          `${gap.name}: invalid evidence pointer`,
+        ).toBe(true);
+        value = Reflect.get(value as object, key.replaceAll('~1', '/').replaceAll('~0', '~'));
+      }
+      expect(value, `${gap.name}: unresolved evidence pointer`).not.toBeUndefined();
+    }
+    if (gap.disposition === 'follow-up') {
+      expect(gap.proposedFix?.length ?? 0).toBeGreaterThan(20);
+      expect(gap.beadsIssue).toMatch(
+        requireIds ? /^galaxie-d53\.\d+$/ : /^(PENDING-CLAUDE|galaxie-d53\.\d+)$/,
+      );
+    }
+  }
+}
+
+test('every feedback workflow has resolvable evidence and follow-up ownership', () => {
+  const gaps = JSON.parse(readFileSync(resolve(root, 'results/gaps.json'), 'utf8')) as Gap[];
+  auditGaps(gaps, process.env['LLMOPS_REQUIRE_GAP_IDS'] === '1');
+  const followUp = gaps.find((gap) => gap.disposition === 'follow-up');
+  expect(followUp).toBeDefined();
+  const pending = structuredClone(gaps);
+  const item = pending.find((gap) => gap.disposition === 'follow-up');
+  if (!item) throw new Error('Missing follow-up control');
+  item.beadsIssue = 'PENDING-CLAUDE';
+  expect(() => auditGaps(pending, true)).toThrow();
+  item.beadsIssue = 'galaxie-d53.7';
+  auditGaps(pending, true);
+  item.evidence = [{ file: 'sessions.json', path: '/missing-evidence' }];
+  expect(() => auditGaps(pending)).toThrow('unresolved evidence pointer');
+});
+
+test.each(['missing proposed fix', 'unknown disposition', 'malformed issue ID'])(
+  'gap register rejects %s',
+  (mutation) => {
+    const gaps = JSON.parse(readFileSync(resolve(root, 'results/gaps.json'), 'utf8')) as Gap[];
+    const item = gaps.find((gap) => gap.disposition === 'follow-up');
+    if (!item) throw new Error('Missing follow-up control');
+    if (mutation === 'missing proposed fix') delete item.proposedFix;
+    if (mutation === 'unknown disposition') item.disposition = 'unverified';
+    if (mutation === 'malformed issue ID') item.beadsIssue = 'not-an-issue';
+    expect(() => auditGaps(gaps)).toThrow();
+  },
+);
 interface Service {
   image: string;
   ports?: (string | { host_ip: string })[];
