@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { AssertionError } from 'node:assert/strict';
 import type { RunTrace, RunTraceMap } from './run-trace.js';
 
 export interface ScorePayload {
@@ -71,7 +72,9 @@ export function createScoreClient(options: {
         await response.body?.cancel();
         if (response.status === 202) return { status: 'posted', id, httpStatus: response.status };
         if (response.status < 500) return { status: 'rejected', httpStatus: response.status };
-      } catch {}
+      } catch (error) {
+        if (error instanceof AssertionError) throw error;
+      }
     }
     return { status: 'transport-error' };
   };

@@ -1,11 +1,29 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
+import { canary } from '../src/host.js';
 import { RunTraceMap } from '../src/run-trace.js';
 import { createScoreClient, scoreId } from '../src/scores.js';
 
 const entry = { traceId: 'a'.repeat(32), runId: 'run-fixture', segment: 0, sessionId: 'session' };
+test('a contaminated response cannot be hidden by a later clean retry', async () => {
+  let calls = 0;
+  const client = createScoreClient({
+    authorization: 'fixture',
+    fetch: async () => {
+      calls++;
+      const response = Response.json(calls === 1 ? { probe: canary } : {}, { status: 202 });
+      const body = await response.clone().json();
+      assert.ok(!JSON.stringify(body).includes(canary), 'Credential scan detected a leak');
+      return response;
+    },
+  });
+  await expect(client.post(entry, 'quality', 1)).rejects.toThrow('Credential scan detected a leak');
+  expect(calls).toBe(1);
+});
+
 test('score identity includes trace and name', () => {
   expect(scoreId(entry.traceId, 'quality')).toBe(`${entry.traceId}-quality`);
   expect(scoreId('b'.repeat(32), 'quality')).not.toBe(scoreId(entry.traceId, 'quality'));
