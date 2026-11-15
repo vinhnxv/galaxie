@@ -404,9 +404,139 @@ repository gates. The default offline suite skips all live tests and never
 launches a browser. The enabled browser command fails when the collector is
 unreachable. Teardown removes volumes as well as containers.
 
-Not measured: browser tool-call or model-failure scenarios, other executors,
+Not measured in that Chromium ingestion lane: browser tool-call or model-failure scenarios, other executors,
 Firefox, WebKit, real devices, real models or prompts, answer quality, feedback
 scores, session grouping, delivery guarantees, retries, capacity, latency,
 long-running ingestion, failure recovery, vendor telemetry payloads or container
 egress. Proxy authentication, request limits and origin policy beyond this local
 CSP/loopback fixture are not deployment measurements.
+
+## Host feedback, sessions and deterministic evaluation
+
+The feedback measurements extend the same local stack with host-only code. No
+galaxie package or collector mapping changes. Run them from this spike:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm run python:lock-check
+pnpm run python:sync
+export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
+pnpm run stack:up
+pnpm run feedback-node
+pnpm run feedback-browser
+shasum -a 256 results/* > /tmp/galaxie-feedback-before.sha256
+pnpm run feedback-node
+pnpm run feedback-browser
+shasum -a 256 results/* > /tmp/galaxie-feedback-after.sha256
+diff -u /tmp/galaxie-feedback-before.sha256 /tmp/galaxie-feedback-after.sha256
+pnpm run stack:down
+```
+
+Always run `stack:down`, including after a failed measurement; it removes volumes.
+The default offline tests need neither the stack, Chromium nor the Python
+environment. `LLMOPS_STACK=1` enables only the explicitly invoked live files.
+
+| Workflow | Measured outcome |
+| --- | --- |
+| Segment scores | Each interrupt/resume segment receives one score on its own oracle trace. Unknown runs and segments return `unmapped` and send no POST. |
+| Score retries | Stored payload retries (the client keeps the first payload and resends it unchanged) retain one score with its original value and timestamp. Resending the same ID with a payload dated on a later day left one visible row holding the new value; the original value was no longer returned. Whether a second physical row exists behind the read API is unmeasured. |
+| Score before ingestion | Zero observations before explicit flush, then all three observations; the single score is unchanged and names the oracle trace. |
+| Langfuse sessions | Root-only copy finds three roots per session but misses six child observations. The host processor groups all nine observations per session. |
+| MLflow sessions | Root-only copy suffices for `mlflow.trace.session`; two sessions each return exactly their three traces in every phase. |
+| MLflow evaluation | Six traces per text mode, six rows and six values per scorer. Usage is five per trace; chat text presence follows opt-in. Root request/response are absent in both modes. |
+| Browser feedback | Own reports return 200; wrong trace or segment 404; a confirmed association already owned by another user 403; missing cookie 401. Bundle, full requests, receiver wire requests and response bodies pass the credential scans and their positive controls. |
+
+[feedback-scores.json](results/feedback-scores.json),
+[sessions.json](results/sessions.json),
+[mlflow-evaluation.json](results/mlflow-evaluation.json) and
+[browser-feedback.json](results/browser-feedback.json) hold the normalized facts.
+[gaps.json](results/gaps.json) dispositions all seven workflows with resolvable
+evidence pointers. The root-I/O follow-up is filed as `galaxie-d53.7`; the
+delegating maintainer session replaced the placeholder before merge.
+`LLMOPS_REQUIRE_GAP_IDS=1 pnpm exec vitest run test/static.test.ts` enforces that
+handoff without contacting a tracker.
+
+`RunTraceMap` observes root `invoke_agent` spans at `onStart`, recording run ID,
+segment, session and trace ID. It changes no span. `SessionCopy` is optional:
+collector-only measurements run first, followed by the processor with text off
+and on. Sequential starts reuse each of two agent instances for three runs.
+Neither processor exposes a galaxie API. Maps and score payloads are in memory,
+without durable storage or eviction; restart-surviving feedback is unmeasured.
+
+The host score client sends an array to `/api/public/scores`, with an ID formed
+from trace ID and score name and an explicit timestamp. It stores the entire
+first payload and resends its bytes, including the original value, name and
+timestamp. Only transport errors and 5xx get bounded retries; 207 and 4xx do not.
+The running Langfuse reference's description specifies 202/207, while its
+generated response schema lists 200; live accepted posts return 202. Readback
+uses `/api/public/v3/scores?fields=subject` with a five-minute polling window.
+The fresh-date measurement first proves with a second score of another ID that
+duplicate rows are visible to this readback, then resends the same ID with a
+later-day payload, settles for 30 seconds and records the same-ID rows. Linking means the score's subject matches the
+oracle trace and its observations are found; UI linking is unmeasured.
+Credential-scan assertions escape the score client's transport retry loop. A
+regression supplies a contaminated first response followed by a clean response
+and requires the first scan to fail immediately, with no retry.
+
+The Node runner invokes `uv run --locked --offline python -I evaluate.py` in the
+spike's own Python project. The child receives only PATH, HOME, TMPDIR and three
+client telemetry/hint controls; macOS also supplies `__CF_USER_TEXT_ENCODING`.
+No Langfuse setting is passed. `MLFLOW_DISABLE_TELEMETRY=true`, `DO_NOT_TRACK=1`
+and `MLFLOW_DISABLE_AGENT_HINT=1` apply to this new client surface. Complete
+stdout and stderr are scanned before JSON parsing or error reporting. The script
+searches by session and calls `mlflow.genai.evaluate` with `chat_usage_total`,
+`chat_text_present` and `root_io_present`, using no model-based scorer or provider
+key. Evaluation writes runs and assessments to the local experiment. Its returned
+dataframe uses `trace_id`; an initial harness assumption of `request_id` failed
+after evaluation and was corrected without changing any scorer assertion.
+
+Empty root request/response is the sole framework follow-up. Chat-span text is
+present with opt-in, but `invoke_agent` has no input/output attributes. The proposed
+fix is a framework-neutral root-I/O contract under the existing text, label and
+destination rules, requiring a contract decision. It is not implemented here.
+Langfuse child-session grouping needs no framework change because the host
+processor recipe works. MLflow's experiment search currently emits a deprecation
+warning for `experiment_ids`; the pinned call still works.
+
+The browser uses the existing strict `connect-src 'self'` policy and exports
+through the same-origin collector proxy. Its `/feedback/scores` endpoint holds
+the Langfuse key on the server and accepts one score name, finite values from zero
+to one, an integer segment and bounded content-free IDs. A harness-issued
+HttpOnly, SameSite=Strict cookie selects the user. The endpoint confirms the
+reported trace's own run metadata and segment, then binds run/segment/trace to
+that user. A flush only hands spans to the collector: pages must retry
+`404 not-confirmed` after backend ingestion, and the live harness waits for roots
+before reporting. No user comes from the body.
+
+First-report-wins is only as strong as the secrecy of run and trace IDs: someone
+who learns them first can bind them. Host-side hardening would bind at run start
+through a host-issued grant. Browser telemetry is client-controlled; backend
+confirmation establishes consistency, not authenticity. Cookies and bindings are
+an in-memory fixture, not a real authentication design.
+
+This run used Node 24.15.0, pnpm 11.21.0, OpenTelemetry API 1.10.0, SDK 3.1.0,
+OTLP/HTTP exporter 0.301.0, Vite 8.3.4 and playwright-core 1.64.1 with headless
+Chromium 156.0.8078.4 (shell revision 1248). Backends were rechecked as Langfuse
+4.80.0, MLflow 3.18.0 and collector 0.154.0. Python is 3.14.6 and uv 0.11.23;
+`mlflow`, `mlflow-skinny` and `mlflow-tracing` lock to 3.18.0 with
+`requires-python = ">=3.14,<3.15"` and the absolute
+`exclude-newer = "2026-11-08T00:00:00Z"` cutoff. npm dependencies are unchanged.
+
+Langfuse and MLflow vendor telemetry stays at defaults by maintainer decision.
+Galaxie trace data and opted-in text go only to the local backends. The credential
+canary reaches only the local scripted provider and is absent from page traffic,
+score responses and stored trace readbacks. Backend vendor telemetry payloads and
+all container egress are unmeasured.
+
+[feedback-verification.json](results/feedback-verification.json) records commands,
+outcomes, hashes, the corrected harness failure and teardown. Existing Node
+results and browser span results remain byte-identical. The only older browser
+result change is five asset-name strings in `browser-evidence.json`, now written
+as `assets/index-<hash>.js` because the new passive map and page reporting API
+change the bundle.
+
+Not measured in this feedback cycle: other executors; real models, real prompts
+or answer quality; delivery guarantees, capacity or sustained operation; Langfuse
+and MLflow web UI session views; model-based evaluation; real user authentication
+or durable binding; score-read latency beyond the five-minute window; vendor
+telemetry payloads and all container egress. No production deployment is evaluated.

@@ -15,7 +15,11 @@
     "stack:down": "tsc -p tsconfig.scripts.json && node dist/stack.js down",
     "smoke": "LLMOPS_STACK=1 vitest run test/stack.test.ts",
     "node-host": "LLMOPS_STACK=1 vitest run test/node.test.ts",
-    "browser-host": "LLMOPS_STACK=1 vitest run test/browser.test.ts"
+    "browser-host": "LLMOPS_STACK=1 vitest run test/browser.test.ts",
+    "feedback-node": "LLMOPS_STACK=1 vitest run test/feedback-node.test.ts",
+    "feedback-browser": "LLMOPS_STACK=1 vitest run test/feedback-browser.test.ts",
+    "python:sync": "uv sync --locked --project python",
+    "python:lock-check": "uv lock --check --offline --project python"
   },
   "dependencies": {
     "@galaxie-ai/adapter-adk": "link:../../packages/adapter-adk",

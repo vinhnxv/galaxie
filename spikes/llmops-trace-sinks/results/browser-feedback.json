@@ -1,0 +1,389 @@
+{
+  "demonstration": true,
+  "browser": "156.0.8078.4",
+  "csp": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'",
+  "sharedPackageCopies": {
+    "@opentelemetry/api": 1,
+    "@langchain/core": 1,
+    "@langchain/langgraph": 1
+  },
+  "backendRootConfirmations": 3,
+  "waitedForBackendRootsBeforeReporting": true,
+  "reports": {
+    "unauthenticated": {
+      "status": 401,
+      "reason": "unauthenticated"
+    },
+    "aliceSegmentOne": {
+      "status": 200,
+      "reason": "posted"
+    },
+    "bobOwnTrace": {
+      "status": 200,
+      "reason": "posted"
+    },
+    "wrongSegment": {
+      "status": 404,
+      "reason": "not-confirmed"
+    },
+    "ownedRunOtherTrace": {
+      "status": 404,
+      "reason": "not-confirmed"
+    },
+    "confirmedOtherOwner": {
+      "status": 403,
+      "reason": "forbidden"
+    },
+    "repeat": {
+      "status": 200,
+      "reason": "posted"
+    }
+  },
+  "scores": {
+    "alice": [
+      {
+        "id": "trace-2-feedback",
+        "name": "feedback",
+        "value": 1,
+        "subject": {
+          "kind": "trace",
+          "id": "trace-2"
+        }
+      }
+    ],
+    "bob": [
+      {
+        "id": "trace-3-feedback",
+        "name": "feedback",
+        "value": 0.5,
+        "subject": {
+          "kind": "trace",
+          "id": "trace-3"
+        }
+      }
+    ],
+    "unchangedAfterRejectedReports": true
+  },
+  "scans": {
+    "bundleFiles": ["assets/index-<hash>.js", "index.html"],
+    "bundleHits": [],
+    "requestHits": [],
+    "wireHits": [],
+    "responseHits": [],
+    "bundlePositiveControlDetected": true,
+    "requestBodyPositiveControlDetected": true,
+    "responsePositiveControlDetected": true,
+    "requests": [
+      {
+        "count": 2,
+        "method": "GET",
+        "path": "/",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "cookie",
+          "host",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "sec-fetch-user",
+          "upgrade-insecure-requests",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "GET",
+        "path": "/",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "sec-fetch-user",
+          "upgrade-insecure-requests",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 2,
+        "method": "GET",
+        "path": "/assets/index-<hash>.js",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "cookie",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "GET",
+        "path": "/assets/index-<hash>.js",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 6,
+        "method": "POST",
+        "path": "/feedback/scores",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-length",
+          "content-type",
+          "cookie",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "POST",
+        "path": "/feedback/scores",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 2,
+        "method": "POST",
+        "path": "/otel/v1/traces",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-length",
+          "content-type",
+          "cookie",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      }
+    ],
+    "wireRequests": [
+      {
+        "count": 2,
+        "method": "GET",
+        "path": "/",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "cookie",
+          "host",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "sec-fetch-user",
+          "upgrade-insecure-requests",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "GET",
+        "path": "/",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "sec-fetch-user",
+          "upgrade-insecure-requests",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 2,
+        "method": "GET",
+        "path": "/assets/index-<hash>.js",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "cookie",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "GET",
+        "path": "/assets/index-<hash>.js",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 6,
+        "method": "POST",
+        "path": "/feedback/scores",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-length",
+          "content-type",
+          "cookie",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 1,
+        "method": "POST",
+        "path": "/feedback/scores",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      },
+      {
+        "count": 2,
+        "method": "POST",
+        "path": "/otel/v1/traces",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "connection",
+          "content-length",
+          "content-type",
+          "cookie",
+          "host",
+          "origin",
+          "referer",
+          "sec-ch-ua",
+          "sec-ch-ua-mobile",
+          "sec-ch-ua-platform",
+          "sec-fetch-dest",
+          "sec-fetch-mode",
+          "sec-fetch-site",
+          "user-agent"
+        ]
+      }
+    ],
+    "responseStatuses": [401, 200, 200, 404, 404, 403, 200]
+  },
+  "limitations": [
+    "Collector acceptance precedes backend visibility; the host page must retry a 404 not-confirmed report after ingestion.",
+    "First report wins: leaked run and trace IDs could be bound before their owner reports. Bind at run start through a host-issued grant for host-side hardening.",
+    "Browser telemetry is client-controlled; backend confirmation establishes association consistency, not authenticity.",
+    "Cookie sessions and bindings are in memory and are a local fixture, not real user authentication or durable authorization."
+  ],
+  "violations": []
+}

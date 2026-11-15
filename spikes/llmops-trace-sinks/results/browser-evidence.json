@@ -38,7 +38,7 @@
   ],
   "laneSpecificAttributes": [],
   "scans": {
-    "bundleFiles": ["assets/index-CWsBx5Of.js", "index.html"],
+    "bundleFiles": ["assets/index-<hash>.js", "index.html"],
     "bundleHits": [],
     "requestHits": [],
     "bundlePositiveControlDetected": true,
@@ -88,7 +88,7 @@
       {
         "count": 8,
         "method": "GET",
-        "path": "/assets/index-CWsBx5Of.js",
+        "path": "/assets/index-<hash>.js",
         "headerNames": [
           "accept",
           "accept-encoding",
@@ -110,7 +110,7 @@
       {
         "count": 1,
         "method": "GET",
-        "path": "/assets/index-CWsBx5Of.js",
+        "path": "/assets/index-<hash>.js",
         "headerNames": [
           "accept",
           "accept-encoding",
@@ -195,7 +195,7 @@
       {
         "count": 8,
         "method": "GET",
-        "path": "/assets/index-CWsBx5Of.js",
+        "path": "/assets/index-<hash>.js",
         "headerNames": [
           "accept",
           "accept-encoding",
@@ -217,7 +217,7 @@
       {
         "count": 1,
         "method": "GET",
-        "path": "/assets/index-CWsBx5Of.js",
+        "path": "/assets/index-<hash>.js",
         "headerNames": [
           "accept",
           "accept-encoding",

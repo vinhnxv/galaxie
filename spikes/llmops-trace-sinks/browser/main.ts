@@ -6,6 +6,7 @@ import { StackContextManager, type TracerProvider } from '@opentelemetry/sdk-tra
 import { collectorUrl, type HostOptions } from '../src/host.js';
 import { type SpanSnapshot, snapshotSpans } from '../src/oracle.js';
 import { runScenario, type ScenarioResult } from '../src/scenarios.js';
+import type { ScoreReport } from '../src/score-endpoint.js';
 
 export interface PageOptions {
   name: 'linear' | 'interrupt-resume';
@@ -28,6 +29,7 @@ declare global {
     llmops: {
       run(options: PageOptions): Promise<PageResult>;
       flush(): Promise<void>;
+      reportScore(report: ScoreReport): Promise<{ status: number; reason: string }>;
       violations: Violation[];
     };
   }
@@ -40,6 +42,16 @@ document.addEventListener('securitypolicyviolation', (event) => {
 let provider: TracerProvider | undefined;
 window.llmops = {
   violations,
+  async reportScore(report) {
+    const response = await fetch('/feedback/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(report),
+    });
+    const body = (await response.json()) as { reason: string };
+    return { status: response.status, reason: body.reason };
+  },
   async run({ name, exporter, ...options }) {
     const result = await runScenario(name, {
       ...options,

@@ -122,6 +122,19 @@ export function scanRequests(
   });
 }
 
+export function scanResponses(
+  bodies: readonly (string | Uint8Array)[],
+  env: Record<string, string>,
+  canary: string,
+): string[] {
+  return bodies.flatMap((body, index) => {
+    const value = text(body);
+    const hits = scanSecrets([value], env);
+    if (forms(canary).some((form) => value.includes(form))) hits.push('credential-canary');
+    return hits.map((hit) => `response[${index}]:${hit}`);
+  });
+}
+
 export async function captureRequest(
   request: Pick<Request, 'url' | 'method' | 'allHeaders' | 'postDataBuffer'>,
 ): Promise<CapturedRequest> {

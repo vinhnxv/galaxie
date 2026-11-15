@@ -132,6 +132,96 @@ export async function observationsQuery(
   return all;
 }
 
+export interface StoredScore {
+  id: string;
+  name: string;
+  value: number;
+  timestamp: string;
+  subject: { kind: string; id: string; traceId?: string };
+}
+
+export const scoreWindowMillis = 300_000;
+
+export interface SessionTrace {
+  trace_id: string;
+  trace_metadata?: Record<string, string>;
+}
+
+export async function mlflowSessionQuery(
+  sessionId: string,
+  inspect?: (response: unknown) => void,
+): Promise<SessionTrace[]> {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(sessionId)) throw new Error('Invalid session ID');
+  const env = readEnv();
+  const result = await json<{ traces?: SessionTrace[] }>(
+    `http://127.0.0.1:${env['MLFLOW_PORT']}/api/3.0/mlflow/traces/search`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locations: [
+          {
+            type: 'MLFLOW_EXPERIMENT',
+            mlflow_experiment: { experiment_id: env['MLFLOW_EXPERIMENT_ID'] },
+          },
+        ],
+        filter: `metadata.\`mlflow.trace.session\` = '${sessionId}'`,
+        max_results: 100,
+      }),
+    },
+  );
+  inspect?.(result);
+  return result.traces ?? [];
+}
+
+export async function scoresQuery(
+  query: Record<string, string>,
+  inspect?: (response: unknown) => void,
+): Promise<StoredScore[]> {
+  const all: StoredScore[] = [];
+  let cursor: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      ...query,
+      fields: 'subject',
+      limit: '100',
+      ...(cursor ? { cursor } : {}),
+    });
+    const page = await json<{ data: StoredScore[]; meta: { cursor?: string } }>(
+      `http://127.0.0.1:3000/api/public/v3/scores?${params}`,
+      { headers: { Authorization: readEnv()['LANGFUSE_AUTH_HEADER'] ?? '' } },
+    );
+    inspect?.(page);
+    all.push(...page.data);
+    cursor = page.meta.cursor;
+  } while (cursor);
+  return all;
+}
+
+export async function waitForScores(
+  query: Record<string, string>,
+  expectedCount: number,
+  inspect?: (response: unknown) => void,
+  ready: (scores: readonly StoredScore[]) => boolean = () => true,
+): Promise<StoredScore[]> {
+  const deadline = Date.now() + scoreWindowMillis;
+  let latest: StoredScore[] = [];
+  let transient: unknown;
+  do {
+    try {
+      latest = await scoresQuery(query, inspect);
+      if (latest.length >= expectedCount && ready(latest)) return latest;
+    } catch (error) {
+      if (error instanceof AssertionError) throw error;
+      transient = error;
+    }
+    await setTimeout(1000);
+  } while (Date.now() < deadline);
+  throw new Error(
+    `Score readback timed out after ${scoreWindowMillis}ms: ${latest.length}/${expectedCount}${transient instanceof Error ? ` (${transient.message})` : ''}`,
+  );
+}
+
 export async function waitForReadback(
   traceId: string,
   spanIds?: readonly string[],

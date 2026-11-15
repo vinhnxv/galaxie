@@ -1,0 +1,64 @@
+[
+  {
+    "name": "score-association",
+    "disposition": "works-with-host-configuration",
+    "finding": "A passive host span processor maps each run and segment to its own trace; the host posts trace scores without a galaxie API change.",
+    "evidence": [{ "file": "feedback-scores.json", "path": "/segments" }]
+  },
+  {
+    "name": "score-idempotency",
+    "disposition": "works-with-host-configuration",
+    "finding": "Resending the stored payload preserves one score, including a timestamp from two days earlier. A later-day payload with the same ID replaced the visible row's value and returned one row; a control with a distinct ID showed duplicates would be visible. Whether a second physical row exists behind the read API is not measured.",
+    "evidence": [
+      { "file": "feedback-scores.json", "path": "/segments" },
+      { "file": "feedback-scores.json", "path": "/freshTimestampControl" },
+      { "file": "feedback-scores.json", "path": "/unmapped" }
+    ]
+  },
+  {
+    "name": "score-before-ingestion",
+    "disposition": "works",
+    "finding": "Langfuse accepted a trace score before observations existed; after explicit flush the same single score and all three observations were found.",
+    "evidence": [{ "file": "feedback-scores.json", "path": "/beforeIngestion" }]
+  },
+  {
+    "name": "langfuse-sessions",
+    "disposition": "works-with-host-configuration",
+    "finding": "Root-only session IDs group the three roots per session, but omit six child observations. The host copier groups all nine observations per session without a collector change.",
+    "evidence": [
+      { "file": "sessions.json", "path": "/rootOnlySuffices/langfuse" },
+      { "file": "sessions.json", "path": "/fullyGroupedWithProcessor/langfuse" },
+      { "file": "sessions.json", "path": "/phases" }
+    ]
+  },
+  {
+    "name": "mlflow-sessions",
+    "disposition": "works-with-host-configuration",
+    "finding": "The existing collector's root session copy is sufficient for MLflow's trace metadata session filter. Both sessions return exactly their three traces, with no mixing.",
+    "evidence": [
+      { "file": "sessions.json", "path": "/rootOnlySuffices/mlflow" },
+      { "file": "sessions.json", "path": "/fullyGroupedWithProcessor/mlflow" }
+    ]
+  },
+  {
+    "name": "mlflow-root-io",
+    "disposition": "follow-up",
+    "finding": "Evaluation returns six rows and one non-null value per scorer per trace in each text mode. Root request and response remain empty even with chat text opt-in, because invoke_agent carries no input or output. Trace scorers still measure usage and chat text.",
+    "evidence": [
+      { "file": "mlflow-evaluation.json", "path": "/variants/0" },
+      { "file": "mlflow-evaluation.json", "path": "/variants/1" }
+    ],
+    "proposedFix": "Decide a framework-neutral root-span input/output contract under the existing development text opt-in, live data-label checks and final-destination policy. Keep text absent by default and keep backend-specific mapping in the host collector.",
+    "beadsIssue": "galaxie-d53.7"
+  },
+  {
+    "name": "browser-endpoint",
+    "disposition": "works-with-host-configuration",
+    "finding": "A same-origin host endpoint holds the Langfuse key, confirms run/segment/trace metadata, and binds the association to its cookie user. Wrong associations return 404, another owner returns 403 and no cookie returns 401. First-report binding and client-controlled telemetry remain fixture limits.",
+    "evidence": [
+      { "file": "browser-feedback.json", "path": "/reports" },
+      { "file": "browser-feedback.json", "path": "/scans" },
+      { "file": "browser-feedback.json", "path": "/limitations" }
+    ]
+  }
+]

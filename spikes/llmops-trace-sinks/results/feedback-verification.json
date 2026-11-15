@@ -1,0 +1,237 @@
+{
+  "demonstration": true,
+  "date": "2026-11-15",
+  "bead": "galaxie-d53.4",
+  "clientVersions": {
+    "node": "24.15.0",
+    "pnpm": "11.21.0",
+    "otelApi": "1.10.0",
+    "otelSdkTrace": "3.1.0",
+    "otlpHttpExporter": "0.301.0",
+    "vite": "8.3.4",
+    "playwrightCore": "1.64.1",
+    "chromium": "156.0.8078.4",
+    "chromiumShellRevision": 1248,
+    "uv": "0.11.23",
+    "python": "3.14.6"
+  },
+  "backendVersions": {
+    "langfuse": "4.80.0",
+    "mlflow": "3.18.0",
+    "collector": "0.154.0"
+  },
+  "pythonPins": {
+    "requiresPython": ">=3.14,<3.15",
+    "mlflow": "3.18.0",
+    "mlflow-skinny": "3.18.0",
+    "mlflow-tracing": "3.18.0",
+    "excludeNewer": "2026-11-08T00:00:00Z",
+    "lockedPackages": 92
+  },
+  "checks": [
+    {
+      "command": "pnpm install && pnpm build",
+      "location": "repository root",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "location": "spike",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run python:lock-check && pnpm run python:sync",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run stack:up",
+      "outcome": "passed",
+      "daemon": "colima",
+      "services": 8
+    },
+    {
+      "command": "pnpm run node-host",
+      "outcome": "passed",
+      "tests": 4,
+      "existingResultsUnchanged": true
+    },
+    {
+      "command": "pnpm run browser-host",
+      "outcome": "passed",
+      "tests": 1,
+      "onlyPriorResultChange": "Five asset strings in browser-evidence.json normalized to assets/index-<hash>.js"
+    },
+    {
+      "command": "pnpm run feedback-node",
+      "outcome": "passed twice after harness correction",
+      "tests": 6
+    },
+    {
+      "command": "pnpm run feedback-browser",
+      "outcome": "passed twice",
+      "tests": 1
+    },
+    {
+      "command": "pnpm run feedback-node && pnpm run feedback-browser (twice after review fix)",
+      "outcome": "passed",
+      "nodeTestsPerRun": 6,
+      "browserTestsPerRun": 1
+    },
+    {
+      "command": "shasum -a 256 results/* and diff across the reviewed live runs",
+      "outcome": "passed",
+      "allResultsFilesCompared": 20,
+      "byteIdentical": true,
+      "hashesExclude": ["feedback-verification.json", "gaps.json"],
+      "sha256": {
+        "browser-close.json": "20f3fdc95d68e164a03403502fd9fd119b9247d8b62dc97dd941e278676c8c11",
+        "browser-evidence.json": "2fd4ccfa2a59dfbfbe80a3b83764707beedd177baffdcfd2358a3db6ac7c5c57",
+        "browser-feedback.json": "3becb5ae1a8b6eab85aaba26ca8366632bb16111a2a3360de9277e4eca616793",
+        "browser-guide.json": "5ad537d99628543f43bdd93ab5d9beeb8b2aed8e77fc6183e37067c105ac7125",
+        "browser-interrupt-resume.json": "6246c152d5ea453686cccea9ea33d76641195ab424cb3be482871c1ba9647e95",
+        "browser-linear.json": "68edcad6cf84142f42e6c851719c8cab48a391509bfad379a7f0c80325d202a3",
+        "browser-verification.json": "57a406c3fc026e2a8cfd6044a1de3f786fde6ccd0c59d770663c328c05259b52",
+        "feedback-scores.json": "d301c4fb122e77c8d4db9951887ef9119925c0bfe40e8bc18611a17ea145c493",
+        "mlflow-evaluation.json": "a119889cbaa911199191efdb28a4a4aae2c8d119d16c99b043c5c01bb4b8f51b",
+        "node-interrupt-resume.json": "6246c152d5ea453686cccea9ea33d76641195ab424cb3be482871c1ba9647e95",
+        "node-linear.json": "68edcad6cf84142f42e6c851719c8cab48a391509bfad379a7f0c80325d202a3",
+        "node-model-failure.json": "ee5827b4c530000369e783e2f81a7ef0e14b2255e16508232566b76b0dd03fe6",
+        "node-tool-call.json": "5f591fcb8c61755f0f22fd7d99b196e7d505a1a6c9f4362e3e5392bc778c6812",
+        "node-verification.json": "3a9a955cc320ca826a2de0fc5b563091f06d8be9743f08bfc296ab2b1a56ffe3",
+        "sessions.json": "f9e230784efa49ac4402a89787d3582b1e21dbf5096186e0528a896522552cd3",
+        "smoke.json": "e78f0995778a137835f04f8f8295fe38a9ffb8fbad82537f2bf030adc079be40",
+        "verification.json": "4b61848e8d5c5475f9f8489bce750ef94a371e37a1ff3e62da8f53bce87e880d",
+        "versions.json": "29c63e43567856f155781ac69dca7078e8870f6e4479875cf3ba666cf3703a4d"
+      }
+    },
+    {
+      "command": "pnpm run stack:down; docker ps -a / docker volume ls / docker network ls with the project label",
+      "outcome": "passed",
+      "remainingProjectContainers": 0,
+      "remainingProjectVolumes": 0,
+      "remainingProjectNetworks": 0
+    },
+    {
+      "command": "pnpm exec vitest run (stack stopped, after review fix)",
+      "outcome": "passed",
+      "testsPassed": 118,
+      "liveTestsSkipped": 13,
+      "filesPassed": 13,
+      "liveFilesSkipped": 5
+    },
+    {
+      "command": "pnpm format",
+      "location": "repository root",
+      "outcome": "passed",
+      "warnings": 45,
+      "informationalDiagnostics": 1637
+    },
+    {
+      "command": "pnpm exec biome check spikes/llmops-trace-sinks",
+      "location": "repository root",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run typecheck && pnpm exec tsc -p tsconfig.scripts.json",
+      "location": "spike",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm run check:docs",
+      "location": "repository root",
+      "outcome": "passed"
+    },
+    {
+      "command": "pnpm check",
+      "location": "repository root",
+      "pathPrefix": "<Go-1.27.3-toolchain>/bin",
+      "outcome": "passed after review fix",
+      "nodeAndChromium": {
+        "filesPassed": 507,
+        "testsPassed": 7469,
+        "expectedFailures": 2,
+        "testsSkipped": 165
+      },
+      "python": {
+        "testsPassed": 1968,
+        "testsSkipped": 1
+      },
+      "otherGates": "Source and dependency licenses, Python wheels, Biome, both TypeScript compiler passes, Go, Python typecheck, builds, dependency boundaries, docs and size gates passed."
+    },
+    {
+      "command": "git diff --stat main...HEAD -- packages go python docs scripts .github",
+      "outcome": "empty; every changed path is under spikes/llmops-trace-sinks/"
+    }
+  ],
+  "correctedHarnessFailure": {
+    "command": "pnpm run feedback-node",
+    "exitCode": 1,
+    "reason": "KeyError: 'request_id'",
+    "output": "KeyError: 'request_id' raised at the row loop in python/evaluate.py after the evaluation completed; the full traceback is omitted because it holds machine-specific paths.",
+    "fix": "The pinned MLflow returned evaluation dataframe uses trace_id; the live assertion still compares every row with the oracle trace set. No assertion changed."
+  },
+  "ports": {
+    "publication": "127.0.0.1 only",
+    "publishedPorts": [3000, 5100, 4318],
+    "verifiedBy": [
+      "docker ps --filter label=com.docker.compose.project=galaxie-llmops-trace-sinks --format {{.Names}}\\t{{.Ports}}",
+      "lsof -nP -iTCP:3000 -iTCP:5100 -iTCP:4318 -sTCP:LISTEN"
+    ],
+    "envMode": "0600",
+    "dockerSocketMounted": false
+  },
+  "findingNames": [
+    "Score creation uses array/202; generated reference response schema lists 200",
+    "Resending a stored payload keeps one score; a later-day payload with the same ID replaced the visible row's value (no second row visible)",
+    "Scores can precede observations",
+    "Langfuse child grouping needs host copier; MLflow root session suffices",
+    "Root request and response absent; trace scorers work",
+    "Backend visibility can lag collector flush",
+    "First-report binding and client-controlled telemetry have stated limits",
+    "MLflow result dataframe uses trace_id; experiment_ids emits a deprecation warning",
+    "macOS supplies __CF_USER_TEXT_ENCODING to subprocess",
+    "Credential-scan assertions must escape transport retries; fixed in the spike with a first-contaminated/later-clean regression"
+  ],
+  "vendorTelemetry": "Langfuse and MLflow backend vendor telemetry remains at defaults by maintainer decision; new Python client telemetry disabled.",
+  "notMeasured": [
+    "Other executors",
+    "Real models, prompts and answer quality",
+    "Delivery guarantees, capacity and sustained operation",
+    "Langfuse and MLflow web UI session views",
+    "Model-based evaluation",
+    "Real authentication and durable bindings",
+    "Score-read latency beyond five-minute polling window",
+    "Vendor telemetry payloads and all container egress"
+  ],
+  "verifiedSourceCommit": "6f47562",
+  "review": {
+    "reviewedSourceCommit": "31b4d635b922bb2699c21fa7b81bcd30a312d2e0",
+    "lenses": [
+      "correctness",
+      "project-standards",
+      "testing",
+      "maintainability",
+      "security",
+      "reliability",
+      "adversarial"
+    ],
+    "externalPeer": "not run; explicitly prohibited",
+    "confirmedFindings": 1,
+    "appliedFindings": 1,
+    "remainingActionableFindings": 0,
+    "fixCommit": "6f47562",
+    "finding": "Credential-scan assertions could be swallowed as transport errors and hidden by a later clean response. They now escape the retry loop.",
+    "regression": "test/scores.test.ts: a contaminated response cannot be hidden by a later clean retry",
+    "redFailure": "AssertionError: promise resolved \"{ status: 'posted', …(2) }\" instead of rejecting",
+    "proof": "Observed red before the correction, then 30 focused tests, full offline suite, typecheck, Biome, two stable live runs and the final root suite passed."
+  },
+  "scope": {
+    "changedPaths": "spikes/llmops-trace-sinks/** only",
+    "collectorMappingChanged": false,
+    "productionCodeChanged": false,
+    "tracingGuideChanged": false,
+    "beadsCommandsRun": false,
+    "followUpOwner": "delegating Claude session",
+    "followUpIssue": "galaxie-d53.7"
+  }
+}

@@ -9,6 +9,7 @@ export function normalize(value: unknown, source: Smoke | readonly ReadableSpan[
   if (Array.isArray(source)) {
     const traces = new Map<string, string>();
     const identities = new Set<string>();
+    const counts = new Map<string, number>();
     for (const [index, span] of source.entries()) {
       const { traceId, spanId } = span.spanContext();
       if (!traces.has(traceId)) traces.set(traceId, `trace-${traces.size + 1}`);
@@ -24,7 +25,9 @@ export function normalize(value: unknown, source: Smoke | readonly ReadableSpan[
         const id = span.attributes[`galaxie.${kind}.id`];
         if (typeof id === 'string' && !identities.has(id)) {
           identities.add(id);
-          ids.push([id, `${kind}-1`]);
+          const count = (counts.get(kind) ?? 0) + 1;
+          counts.set(kind, count);
+          ids.push([id, `${kind}-${count}`]);
         }
       }
     }

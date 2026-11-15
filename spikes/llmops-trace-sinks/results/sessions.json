@@ -1,0 +1,230 @@
+{
+  "demonstration": true,
+  "phases": [
+    {
+      "phase": "collector-only",
+      "text": false,
+      "sessionCopy": false,
+      "sessions": [
+        {
+          "sessionId": "session-1",
+          "oracleTraces": ["trace-1", "trace-2", "trace-3"],
+          "oracleSpans": [
+            "span-1",
+            "span-2",
+            "span-3",
+            "span-4",
+            "span-5",
+            "span-6",
+            "span-7",
+            "span-8",
+            "span-9"
+          ],
+          "langfuse": {
+            "traceIds": ["trace-1", "trace-2", "trace-3"],
+            "spanIds": ["span-3", "span-6", "span-9"],
+            "missingSpanIds": ["span-1", "span-2", "span-4", "span-5", "span-7", "span-8"],
+            "allObservationsGrouped": false,
+            "tracesGroupedByRoot": true
+          },
+          "mlflow": {
+            "traceIds": ["trace-1", "trace-2", "trace-3"],
+            "tracesGroupedByRoot": true
+          }
+        },
+        {
+          "sessionId": "session-2",
+          "oracleTraces": ["trace-4", "trace-5", "trace-6"],
+          "oracleSpans": [
+            "span-10",
+            "span-11",
+            "span-12",
+            "span-13",
+            "span-14",
+            "span-15",
+            "span-16",
+            "span-17",
+            "span-18"
+          ],
+          "langfuse": {
+            "traceIds": ["trace-4", "trace-5", "trace-6"],
+            "spanIds": ["span-12", "span-15", "span-18"],
+            "missingSpanIds": ["span-10", "span-11", "span-13", "span-14", "span-16", "span-17"],
+            "allObservationsGrouped": false,
+            "tracesGroupedByRoot": true
+          },
+          "mlflow": {
+            "traceIds": ["trace-4", "trace-5", "trace-6"],
+            "tracesGroupedByRoot": true
+          }
+        }
+      ]
+    },
+    {
+      "phase": "processor",
+      "text": false,
+      "sessionCopy": true,
+      "sessions": [
+        {
+          "sessionId": "session-3",
+          "oracleTraces": ["trace-7", "trace-8", "trace-9"],
+          "oracleSpans": [
+            "span-19",
+            "span-20",
+            "span-21",
+            "span-22",
+            "span-23",
+            "span-24",
+            "span-25",
+            "span-26",
+            "span-27"
+          ],
+          "langfuse": {
+            "traceIds": ["trace-7", "trace-8", "trace-9"],
+            "spanIds": [
+              "span-19",
+              "span-20",
+              "span-21",
+              "span-22",
+              "span-23",
+              "span-24",
+              "span-25",
+              "span-26",
+              "span-27"
+            ],
+            "missingSpanIds": [],
+            "allObservationsGrouped": true,
+            "tracesGroupedByRoot": true
+          },
+          "mlflow": {
+            "traceIds": ["trace-7", "trace-8", "trace-9"],
+            "tracesGroupedByRoot": true
+          }
+        },
+        {
+          "sessionId": "session-4",
+          "oracleTraces": ["trace-10", "trace-11", "trace-12"],
+          "oracleSpans": [
+            "span-28",
+            "span-29",
+            "span-30",
+            "span-31",
+            "span-32",
+            "span-33",
+            "span-34",
+            "span-35",
+            "span-36"
+          ],
+          "langfuse": {
+            "traceIds": ["trace-10", "trace-11", "trace-12"],
+            "spanIds": [
+              "span-28",
+              "span-29",
+              "span-30",
+              "span-31",
+              "span-32",
+              "span-33",
+              "span-34",
+              "span-35",
+              "span-36"
+            ],
+            "missingSpanIds": [],
+            "allObservationsGrouped": true,
+            "tracesGroupedByRoot": true
+          },
+          "mlflow": {
+            "traceIds": ["trace-10", "trace-11", "trace-12"],
+            "tracesGroupedByRoot": true
+          }
+        }
+      ]
+    },
+    {
+      "phase": "processor-text",
+      "text": true,
+      "sessionCopy": true,
+      "sessions": [
+        {
+          "sessionId": "session-5",
+          "oracleTraces": ["trace-13", "trace-14", "trace-15"],
+          "oracleSpans": [
+            "span-37",
+            "span-38",
+            "span-39",
+            "span-40",
+            "span-41",
+            "span-42",
+            "span-43",
+            "span-44",
+            "span-45"
+          ],
+          "langfuse": {
+            "traceIds": ["trace-13", "trace-14", "trace-15"],
+            "spanIds": [
+              "span-37",
+              "span-38",
+              "span-39",
+              "span-40",
+              "span-41",
+              "span-42",
+              "span-43",
+              "span-44",
+              "span-45"
+            ],
+            "missingSpanIds": [],
+            "allObservationsGrouped": true,
+            "tracesGroupedByRoot": true
+          },
+          "mlflow": {
+            "traceIds": ["trace-13", "trace-14", "trace-15"],
+            "tracesGroupedByRoot": true
+          }
+        },
+        {
+          "sessionId": "session-6",
+          "oracleTraces": ["trace-16", "trace-17", "trace-18"],
+          "oracleSpans": [
+            "span-46",
+            "span-47",
+            "span-48",
+            "span-49",
+            "span-50",
+            "span-51",
+            "span-52",
+            "span-53",
+            "span-54"
+          ],
+          "langfuse": {
+            "traceIds": ["trace-16", "trace-17", "trace-18"],
+            "spanIds": [
+              "span-46",
+              "span-47",
+              "span-48",
+              "span-49",
+              "span-50",
+              "span-51",
+              "span-52",
+              "span-53",
+              "span-54"
+            ],
+            "missingSpanIds": [],
+            "allObservationsGrouped": true,
+            "tracesGroupedByRoot": true
+          },
+          "mlflow": {
+            "traceIds": ["trace-16", "trace-17", "trace-18"],
+            "tracesGroupedByRoot": true
+          }
+        }
+      ]
+    }
+  ],
+  "rootOnlySuffices": {
+    "langfuse": false,
+    "mlflow": true
+  },
+  "fullyGroupedWithProcessor": {
+    "langfuse": true,
+    "mlflow": true
+  }
+}
