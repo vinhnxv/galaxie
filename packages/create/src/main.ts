@@ -79,7 +79,7 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
       packageManager,
       ...(tarballs === undefined ? {} : { tarballs }),
     });
-    const plan = await planWrite(result.files, target);
+    const plan = await planWrite(result.files, target, io.cwd ?? process.cwd());
     await writeProject(plan);
     for (const path of plan.skipped) output.write(`Kept existing ${path}.\n`);
     output.write(

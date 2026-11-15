@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { expect, test } from 'vitest';
+import { chmodSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { expect, onTestFinished, test } from 'vitest';
 import {
   detectPackageManager,
   type InstallCommand,
@@ -60,3 +64,38 @@ test('Windows does not invoke a command shim and failures do not expose child di
   ).rejects.not.toThrow('document-value-canary');
   expect(calls).toBe(2);
 });
+
+test.skipIf(process.platform === 'win32')(
+  'the real spawn passes --ignore-scripts, keeps the working directory and reports a failed install',
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), 'galaxie-create-spawn-'));
+    onTestFinished(() => rm(root, { recursive: true, force: true }));
+    const bin = join(root, 'bin');
+    await mkdir(bin);
+    const record = join(root, 'record.txt');
+    const fake = join(bin, 'npm');
+    await writeFile(
+      fake,
+      '#!/bin/sh\nprintf "%s\\n" "$@" > "$GALAXIE_FAKE_RECORD"\npwd -P >> "$GALAXIE_FAKE_RECORD"\nprintf "%s\\n" "$npm_config_ignore_scripts" >> "$GALAXIE_FAKE_RECORD"\n',
+    );
+    chmodSync(fake, 0o755);
+    const project = join(root, 'proj $(touch pwned); `touch pwned2`');
+    await mkdir(project);
+    await install('npm', project, {
+      env: { PATH: bin, GALAXIE_FAKE_RECORD: record, npm_config_ignore_scripts: 'false' },
+      platform: 'linux',
+    });
+    const lines = (await readFile(record, 'utf8')).trim().split('\n');
+    // argv, then the working directory, then the inherited environment value.
+    expect(lines.slice(0, 2)).toEqual(['install', '--ignore-scripts']);
+    expect(lines[2]?.endsWith('proj $(touch pwned); `touch pwned2`')).toBe(true);
+    expect(lines[3]).toBe('false');
+    for (const name of ['pwned', 'pwned2'])
+      await expect(readFile(join(project, name))).rejects.toThrow();
+    // Negative control: a non-zero exit is reported as an InstallError with the manual command.
+    await writeFile(fake, '#!/bin/sh\nexit 3\n');
+    await expect(
+      install('npm', project, { env: { PATH: bin }, platform: 'linux' }),
+    ).rejects.toThrow(InstallError);
+  },
+);

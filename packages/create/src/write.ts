@@ -54,11 +54,28 @@ async function checkPath(plan: WritePlan, path: string): Promise<void> {
   }
 }
 
+// Every existing component between the trusted base (the working directory) and the target must be
+// a real directory entry; a symlink in the middle of the path would redirect the whole project.
+async function rejectLinkedComponents(base: string, absolute: string): Promise<void> {
+  const parts = relative(resolve(base), absolute).split(sep);
+  if (parts[0] === '..' || parts.some((part) => part === '')) return;
+  let current = resolve(base);
+  for (const part of parts) {
+    current = join(current, part);
+    const stat = await info(current);
+    if (stat === undefined) return;
+    if (stat.isSymbolicLink())
+      throw new ProjectWriteError('The target or its parent is a symlink.');
+  }
+}
+
 export async function planWrite(
   files: ReadonlyMap<string, ProjectFile>,
   target: string,
+  base: string = process.cwd(),
 ): Promise<WritePlan> {
   const absolute = validateTarget(target);
+  await rejectLinkedComponents(base, absolute);
   let ancestor = absolute;
   let existing = await info(ancestor);
   while (existing === undefined) {

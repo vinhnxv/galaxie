@@ -157,7 +157,13 @@ export async function loadLayers(templatesRoot: string): Promise<Layer[]> {
     const directory = join(templatesRoot, group);
     if ((await lstat(directory)).isSymbolicLink())
       throw new LayerManifestError('Layer symlinks are not supported.');
-    for (const id of (await readdir(directory)).sort()) await load(join(directory, id), id, type);
+    for (const entry of (await readdir(directory, { withFileTypes: true })).sort((left, right) =>
+      left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
+    )) {
+      // Editor and OS files such as .DS_Store are not layers.
+      if (entry.name.startsWith('.')) continue;
+      await load(join(directory, entry.name), entry.name, type);
+    }
   }
   return layers;
 }

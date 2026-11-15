@@ -119,3 +119,20 @@ test('a concurrent existing file is never replaced and failed writes remove only
   expect(await readFile(join(root, 'z.ts'), 'utf8')).toBe('concurrent');
   await expect(lstat(join(root, 'a.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
 });
+
+test('a symlink in the middle of an existing target path is refused (base-relative walk)', async () => {
+  const root = await scratch();
+  const outside = await scratch();
+  await mkdir(join(outside, 'sub'));
+  await symlink(outside, join(root, 'link'));
+  await expect(
+    planWrite(files({ 'a.ts': 'new' }), join(root, 'link', 'sub', 'proj'), root),
+  ).rejects.toThrow('symlink');
+  // Positive control: the same shape without the link is accepted and writes inside the base.
+  await mkdir(join(root, 'real', 'sub'), { recursive: true });
+  await writeProject(
+    await planWrite(files({ 'a.ts': 'new' }), join(root, 'real', 'sub', 'proj'), root),
+  );
+  expect(await readFile(join(root, 'real/sub/proj/a.ts'), 'utf8')).toBe('new');
+  await expect(lstat(join(outside, 'sub', 'proj'))).rejects.toThrow();
+});
