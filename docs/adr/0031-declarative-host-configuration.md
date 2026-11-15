@@ -5,7 +5,8 @@
 - **Related:** brief §0.2, §1.1, §5.2, §9.7, §13.2; ADR-0002, ADR-0006, ADR-0008, ADR-0011, ADR-0012, ADR-0017
 - **Revisions:**
   - 2026-11-15: initial proposal.
-  - 2026-11-15: core configuration subpath implemented and verified with mock unit/Node conformance tests, schema, pack, dependency and size gates; MCP builder and host-remote adoption remain planned. Status stays Proposed pending maintainer review.
+  - 2026-11-15: core configuration subpath implemented and verified with mock unit/Node conformance tests, schema, pack, dependency and size gates. Status stays Proposed pending maintainer review.
+  - 2026-11-15: tools-mcp builder implemented with mock failure tests and loopback fake-endpoint integration, parity and local lifecycle tests. Host-remote adoption and the guide remain planned; status stays Proposed.
 
 ## Context
 
@@ -17,7 +18,7 @@ The core host configuration document API now implements the validation and HTTP/
 
 ## Decision
 
-Propose a versioned plain-data host configuration document for one agent definition, with validation and building in `@galaxie-ai/core/config`. A planned builder in `@galaxie-ai/tools-mcp` would build MCP servers from the validated configuration. Core would not import models or tools-mcp; the host would compose them under the existing [dependency rules](../system-design.md#4-packages-and-dependency-rules). The core subpath now implements the document schema, pure validation and HTTP/routing/runtime-limit builders. The MCP builder and host-remote adoption remain planned. This ADR stays Proposed; ADR-0012 guarantees are unchanged.
+Propose a versioned plain-data host configuration document for one agent definition, with validation and building in `@galaxie-ai/core/config`. `buildMcpServers` in `@galaxie-ai/tools-mcp` now builds MCP servers and pinned bindings from the validated configuration. Core does not import models or tools-mcp; the host composes them under the existing [dependency rules](../system-design.md#4-packages-and-dependency-rules). The core subpath implements the document schema, pure validation and HTTP/routing/runtime-limit builders. Host-remote adoption and the guide remain planned. This ADR stays Proposed; ADR-0012 guarantees are unchanged.
 
 The proposed contract is:
 
@@ -36,7 +37,7 @@ ADR-0031 narrows ADR-0008's YAML rejection to agent definitions; it does not rev
 
 The proposed document would grant no power beyond existing host options. HTTP capabilities would still be built through [httpCapability](../../packages/core/src/http-capability.ts), with its destination checks and the [broker's descriptor checks](../../packages/core/src/capability-broker.ts) unchanged: placeholders must name declared input fields, and path placeholders cannot be free text. The existing `runtime.create` checks would remain in place after building.
 
-The planned configuration validator would apply equivalent checks for model endpoints and MCP servers, rather than claim to reuse every factory validator. The model validator is private to `@galaxie-ai/models`; [createMcpServer](../../packages/tools-mcp/src/server.ts) requires a token function and validates server IDs, URLs and destinations, while its bindings require 64-hex tool pins and confirmation for writes. Their construction-time checks would still run during building. MCP construction would belong only to the planned tools-mcp builder, preserving the dependency direction toward core. Duplicating rules can drift; the implementing work would need parity tests between validation and the existing constructors.
+The configuration validator applies equivalent checks for model endpoints and MCP servers, rather than reusing every factory validator. The model validator is private to `@galaxie-ai/models`; [createMcpServer](../../packages/tools-mcp/src/server.ts) requires a token function and validates server IDs, URLs and destinations, while its bindings require 64-hex tool pins and confirmation for writes. Their construction-time checks still run during building. MCP construction belongs only to the tools-mcp builder, preserving the dependency direction toward core. Duplicating rules can drift; parity tests compare validation and the existing constructors. Core currently accepts fractional tool timeouts that `bindings()` refuses; the builder retains that refusal with the tool's JSON Pointer.
 
 For MCP, the proposal fits ADR-0011 only if a host-authored document under the trust rule above counts as "configured in host code". It does not amend ADR-0011, and acceptance needs the maintainer to confirm that reading, possibly with a clarifying ADR-0011 change separately. Agents would gain no ability to add servers. Pins would be data, not credentials; a pin would be only as strong as write access to the document. ADR-0011's metadata-change detection would remain unchanged, including its inability to detect changed behavior behind unchanged metadata.
 
@@ -87,12 +88,21 @@ dependency boundaries and own-code size budgets; the main-entry budget is
 unchanged. `pnpm run check:docs` checks Markdown links and heading anchors, not
 ADR status. The [index](README.md#index) still lists Proposed.
 
-The remaining tools-mcp and host-remote work will extend verification to:
+`packages/tools-mcp/test/config.test.ts` compares document-built MCP names and
+policies against hand-built bindings and runtime calls against a loopback fake
+endpoint. It covers principal token routing, no build-time hook invocation or I/O,
+forged objects, own-property hooks, server/tool error paths and causes, rollback,
+text results, limits, trace propagation, events and host-owned local close.
+Mock failures exercise factory rejections that core validation normally prevents.
+The dependency conformance tests include an old-script negative control for the
+builder-only core/config import exception. Node and Chromium MCP conformance load
+the tools-mcp root export, including the configuration module.
 
-- A validated document building the same bindings, model routing, endpoints and runtime limits as equivalent hand-written options, with no side effects or server/model/runtime creation during validation.
-- Unknown versions, keys, hook names, undeclared capabilities/roles and derived MCP names failing with the offending entry's JSON Pointer and original error code, without document values in errors.
-- Origin-relative URLs resolved before factories, with `//` and `/\` prefixes rejected as not origin-relative; protocol and destination refusals; HTTP placeholder checks; finite budget and URL-allowlist validation; parity with the existing endpoint and MCP constructor checks, plus the proposed endpoint destination rule.
-- Runtime limits supplied by one document for a shared runtime, and MCP servers built only by tools-mcp from validated configuration, retaining token hooks, pins and confirmed writes.
-- A host-remote parity run and a check that no published galaxie package includes a YAML parser.
+Host-remote adoption, its parity run and the guide remain planned. `check:deps`
+continues to forbid YAML parsers in published packages.
 
-Unmeasured: real hosts, browser configuration integration, consumer-bundle size and real backends. The tools-mcp builder, host-remote adoption and guide remain unimplemented. The document's host-authorship and trust rule, intended-server identity, credential scope and backend authorization remain host obligations that galaxie cannot establish through document validation.
+Unmeasured: real hosts, browser configuration integration, consumer-bundle size
+with Zod in tools-mcp's module graph, real MCP servers and real backends. The
+document's host-authorship and trust rule, intended-server identity, credential
+scope and backend authorization remain host obligations that galaxie cannot
+establish through document validation.

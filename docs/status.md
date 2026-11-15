@@ -1,5 +1,16 @@
 # Project status
 
+On 2026-11-15, `buildMcpServers` in `@galaxie-ai/tools-mcp` builds pinned bindings
+and host-owned servers from core's validated host configuration. Mock unit tests
+cover construction failures, rollback, immutable snapshots and value-free errors;
+loopback fake-endpoint tests compare hand-built policies, principal tokens,
+runtime dispatch, trace propagation, text results, limits and local close behavior.
+Dependency tests restrict the core/config import to the builder and its emitted
+files. Real hosts, real MCP servers and consumer-bundle size with Zod behind the
+tools-mcp root export remain unmeasured. Host-remote adoption and the guide remain
+planned. [ADR-0031](adr/0031-declarative-host-configuration.md) stays Proposed;
+ADR-0012 guarantees are unchanged.
+
 On 2026-11-15, `@galaxie-ai/core/config` adds a strict host wiring document,
 pure definition-bound validation, HTTP bindings, model routing, endpoint options
 and separate runtime limits. Named hooks retain credentials and executable code
@@ -7,7 +18,7 @@ in the host; validation invokes none. Unit and Node conformance tests use mock
 executors and injected fetch to compare hand-wired tutor requests, approval,
 URL/descriptor refusals, immutable snapshots and fixed errors. Schema regeneration,
 dependency boundaries, package contents and own-code size budgets are checked by
-`pnpm check`; the main-entry budget is unchanged. Real hosts, the tools-mcp builder,
+`pnpm check`; the main-entry budget is unchanged. Real hosts,
 host-remote adoption and size in a real consumer bundle remain unmeasured.
 [ADR-0031](adr/0031-declarative-host-configuration.md) stays Proposed; its delivery
 and trust questions remain open, and ADR-0012 guarantees are unchanged.

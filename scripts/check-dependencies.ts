@@ -699,6 +699,12 @@ for (const area of ['src', 'dist']) {
         specifier.startsWith('./') ||
         specifier.startsWith('../') ||
         specifier === '@galaxie-ai/core' ||
+        (specifier === '@galaxie-ai/core/config' &&
+          [
+            'packages/tools-mcp/src/config.ts',
+            'packages/tools-mcp/dist/config.js',
+            'packages/tools-mcp/dist/config.d.ts',
+          ].includes(file)) ||
         specifier.startsWith('@modelcontextprotocol/sdk/client/') ||
         specifier === '@modelcontextprotocol/sdk/types.js'
       )

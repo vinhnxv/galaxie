@@ -4,6 +4,10 @@
 
 Host-configured MCP tools as galaxie capability bindings, over Streamable HTTP with SDK 1.32.1 and protocol 2025-11-25. Only servers or gateways the host controls are supported (ADR-0011).
 
+The package root exports `buildMcpServers`, `BuildMcpServersOptions` and
+`BuiltMcpServers` alongside `createMcpServer`, `toolPin` and their types. There are
+no public subpaths.
+
 ```ts
 import { createMcpServer, toolPin } from '@galaxie-ai/tools-mcp';
 
@@ -29,6 +33,44 @@ await server.closePrincipal(principalScope);
 // On host shutdown:
 await server.close();
 ```
+
+## Build from a host configuration
+
+```ts
+import { buildHostConfig, validateHostConfig } from '@galaxie-ai/core/config';
+import { buildMcpServers } from '@galaxie-ai/tools-mcp';
+
+const validated = validateHostConfig(document, definition, hooks, baseURL);
+const mcp = buildMcpServers(validated, { onEvent });
+const host = buildHostConfig(validated, mcp.bindings);
+// Pass host.bindings and host.modelRouting to runtime.create.
+// On sign-out:
+await Promise.all(Object.values(mcp.servers).map((server) => server.closePrincipal(principalScope)));
+// On host shutdown:
+await Promise.all(Object.values(mcp.servers).map((server) => server.close()));
+```
+
+The synchronous builder accepts only the original validated object, resolves named
+token and fetch hooks by own property and returns frozen `bindings` and `servers`
+maps. It invokes no hook and performs no I/O; pins are checked when calls connect.
+Every server and pinned tool still passes the existing factory checks. A failure
+closes all servers already created and throws `HostConfigError` with the server
+or tool JSON Pointer and original code. Its cause may be the factory's fixed-message
+`GalaxieError`, never an SDK, server or host callback error; no callback runs during
+building. Untyped failures become `invalid` without a cause. Paths contain document
+key names, so show them only to the configuration editor.
+
+The document has the same trust as host code. Its editor chooses URLs, pins,
+destinations and which token hook runs against each URL. Hosts must bind credentials
+to intended origins and authorize calls at the backend. Validation cannot establish
+intended-server identity or host control of a server. The host owns lifecycle;
+`closePrincipal` and `close` disconnect locally without terminating the remote
+session. The builder imports core/config, bringing Zod into the tools-mcp module
+graph; consumer-bundle size remains unmeasured. Host-remote adoption and the guide
+remain planned. [ADR-0031](../../docs/adr/0031-declarative-host-configuration.md)
+stays Proposed, and ADR-0012 guarantees are unchanged.
+
+## Server policies and limits
 
 `id` is a lowercase namespace segment (up to 32 characters). URLs must be absolute HTTPS or loopback HTTP, with no credentials, query or fragment. `user-device` requires loopback; `in-browser` is invalid. A destination describes the final recipient, including any forwarding by a gateway. The token callback runs before each new session and before each call. Use short-lived host-issued bearer tokens: page code can read them (ADR-0012). No token is stored in a capability, event or typed error.
 
@@ -69,6 +111,6 @@ Results are untrusted data. The default returns `structuredContent`; `result: 't
 
 Defaults are 262144 wire bytes per response (and per complete listing), 65536 canonical result bytes and a 30000 ms POST idle deadline. Override with finite positive integers in `limits: { messageBytes, resultBytes, idleMs }`. Wire reads stop before SDK parsing; stalled POST responses race a failure signal so the SDK's SSE error behavior cannot hold the call until its request timeout. Standalone GET notifications have no idle deadline. Limit failures return no result and emit `mcp_limit_exceeded`.
 
-`onEvent` receives only fixed codes plus the host server/tool identifiers or protocol method. Codes are `mcp_pin_mismatch`, `mcp_tool_missing`, `mcp_protocol_mismatch`, `mcp_session_reset`, `mcp_server_request_rejected`, `mcp_limit_exceeded`, `mcp_tool_error` and `mcp_unauthorized`. All binding rejections are fresh, fixed-message core `GalaxieError`s without causes. SDK and host callback errors are discarded; this package emits no logs, spans or core diagnostics. Core's host-only `DiagnosticEvent.error` can receive the sanitized binding error, never the original SDK/server/token callback error. Hosts must avoid logging tokens or untrusted metadata/results themselves.
+`onEvent` receives only fixed codes plus the host server/tool identifiers or protocol method. Codes are `mcp_pin_mismatch`, `mcp_tool_missing`, `mcp_protocol_mismatch`, `mcp_session_reset`, `mcp_server_request_rejected`, `mcp_limit_exceeded`, `mcp_tool_error` and `mcp_unauthorized`. Binding invocation rejections are fresh, fixed-message core `GalaxieError`s without causes; configuration building wraps the factory's fixed-message error as described above. SDK and host callback errors are discarded; this package emits no logs, spans or core diagnostics. Core's host-only `DiagnosticEvent.error` can receive the sanitized binding error, never the original SDK/server/token callback error. Hosts must avoid logging tokens or untrusted metadata/results themselves.
 
-No OAuth, resources, prompts, third-party servers, model-chosen tool wrappers, runtime pin approval, resumable streams or host integration are included. See [the reference server](../../examples/mcp-server/README.md) and [system design](../../docs/system-design.md#61-mcp-client).
+No OAuth, resources, prompts, third-party servers, model-chosen tool wrappers, runtime pin approval or resumable streams are included. See [the reference server](../../examples/mcp-server/README.md) and [system design](../../docs/system-design.md#61-mcp-client).
