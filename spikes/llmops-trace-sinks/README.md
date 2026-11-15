@@ -166,8 +166,8 @@ recommendation.
 lane. Run it after the root build and spike install above, while the stack is up:
 
 ```sh
-# Use the Go 1.27.3 toolchain directory on this machine.
-export GO_TOOLCHAIN_BIN="$(go env GOROOT)/bin"
+# Put the Go version pinned in go/wasm.lock first on PATH (offline).
+export GO_TOOLCHAIN_BIN="$(GOTOOLCHAIN=go1.27.3 GOPROXY=off go env GOROOT)/bin"
 export PATH="$GO_TOOLCHAIN_BIN:$PATH"
 pnpm run span-coverage
 shasum -a 256 results/* > /tmp/galaxie-coverage-before.sha256
@@ -183,7 +183,9 @@ put that directory on PATH before the root build or validation if the default Go
 version differs. Python needs the already populated `.cache/python-wheels/`
 cache, its `local-wheels.json`, all locked wheels and the installed Pyodide runtime.
 Neither family downloads assets. Missing prerequisites produce an `unmeasured`
-row with the exact reason and repo-relative probes. Runtime assertion failures
+row with the exact reason and repo-relative probes, but the matrix writer refuses to
+replace the committed matrix with an unmeasured Python or Go row (and so drop its
+derived gap) unless `LLMOPS_ALLOW_UNMEASURED=1` is set. Runtime assertion failures
 fail the lane and leave the previous matrix intact.
 
 | Family | Scripted model / capability calls | Emitted root / node / model / capability spans | Measurement |
@@ -197,8 +199,7 @@ Each scenario calls one capability after a model. ADK's tool-calling loops call
 the model again after the tool result. Fixture provenance and scripted counts are
 in each row. The Python model counter, Go's independent golden wire transcript,
 capability counters, exact successful outputs and captured root/capability spans
-are positive controls for the missing-span findings. Separate providers also
-check that these in-memory trees contain no ADK JavaScript spans.
+are positive controls for the missing-span findings.
 
 Both live families match the in-memory oracle by span ID and parent link in each
 backend. Langfuse types root/node/model/capability as
@@ -215,17 +216,21 @@ run, five spans form five separate traces, share no galaxie trace, and have empt
 attributes. They therefore classify as `other` in the coverage model; Langfuse
 stores all five as `SPAN`, while MLflow assigns no type. Their names include
 `call_llm` and `execute_tool math_double_1`, but names alone do not establish
-model or capability attributes or usage.
+model or capability attributes or usage, so the row's usage is recorded as
+`not determinable` rather than as having no model spans.
 
 The measured run sets `ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false`. An earlier
 in-memory control enables capture and a Node AsyncLocalStorage context manager
 because ADK writes attributes onto the active span after awaits. It detects all
-four prompt, reply, argument and result markers. The forwarding exporter gate
-stays closed during that control and is flushed before opening. The measured
-run removes the context manager, and scans emitted attributes and complete raw
-backend responses for every marker and the credential canary. This proves the
-scanner can see content; it does not isolate the flag's effect from the missing
-context manager. No control content is exported.
+four prompt, reply, argument and result markers. A second in-memory control runs
+the same context manager with capture off: its spans carry attributes and none
+contain a marker, so the flag's effect is isolated from the missing context
+manager. The forwarding exporter gate stays closed during both controls and is
+flushed before opening. The measured run has no context manager, records zero
+attribute keys on ADK's own spans, and scans emitted attributes and complete raw
+backend responses for every marker and the credential canary. Its empty
+attributes alone would not show the flag's effect. No control content is
+exported.
 
 The spike's devDependency links `@google/adk` to the adapter's already pinned
 2.3.0 copy; an offline real-path check verifies it is the same package. The link
@@ -236,14 +241,16 @@ Two gaps are derived from the measured rows:
 `pyodide-langgraph-python-span-coverage` and `adk-go-span-coverage`.
 Each proposes node and model instrumentation, including response usage, through
 the existing framework-neutral `RunTrace` contract at the adapter bridge. Vendor
-mapping stays in the host collector. Their issue IDs are `PENDING-CLAUDE` for the
-delegating session to replace; no tracker operation runs in this lane.
+mapping stays in the host collector. They are tracked as `galaxie-d53.8` and
+`galaxie-d53.9`. The matrix writer emits the placeholder `PENDING-CLAUDE` for each
+derived gap, so a regenerated matrix needs those IDs restored by hand; no tracker
+operation runs in this lane.
 
 The default `pnpm exec vitest run` remains offline, including schema mutations,
 marker detection, missing-cache and toolchain-mismatch controls. Only
 `LLMOPS_STACK=1` enables the new live file (`pnpm run span-coverage`).
 `LLMOPS_REQUIRE_GAP_IDS=1 pnpm exec vitest run test/coverage-static.test.ts`
-deliberately fails until the placeholders are replaced. The matrix writer
+fails whenever a placeholder remains in the committed matrix. The matrix writer
 audits all rows, derives the exact gap set, formats with Biome and renames one
 complete file atomically. Results contain no generated IDs, timestamps or local
 paths.

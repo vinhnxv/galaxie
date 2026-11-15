@@ -15,6 +15,15 @@ export const spanKinds = ['root', 'node', 'model', 'capability', 'other'] as con
 export type SpanKind = (typeof spanKinds)[number];
 const memoryOnly = 'not measured: maintainer decision' as const;
 const noModels = 'not applicable: no model spans' as const;
+const undetermined =
+  'not determinable: span attributes are empty without a context manager' as const;
+type NoUsage = typeof noModels | typeof undetermined;
+const expectedExecutors: Partial<Record<RowId, string>> = {
+  'langgraph-js': 'langgraph-js',
+  'adk-js': 'adk-js',
+  'pyodide-langgraph-python': 'langgraph-python',
+  'adk-go': 'adk-go',
+};
 
 export interface CoverageSpan {
   name: string;
@@ -77,7 +86,7 @@ export interface MeasuredRow extends RowDescription {
         langfuse: Usage[] | typeof memoryOnly;
         mlflow: Usage[] | typeof memoryOnly;
       }
-    | typeof noModels;
+    | NoUsage;
   tree: { name: string; kind: SpanKind; parentName: string | null }[];
   controls?: Record<string, string | number | boolean>;
   versions?: Record<string, string>;
@@ -218,7 +227,9 @@ export function buildRow(
           langfuse: backends ? stored('model', 'langfuse').map(storedUsage) : memoryOnly,
           mlflow: backends ? stored('model', 'mlflow').map(storedUsage) : memoryOnly,
         }
-      : noModels,
+      : options.id === 'adk-js-own-spans'
+        ? undetermined
+        : noModels,
     tree: spans
       .map((span) => ({
         name: span.name,
@@ -266,7 +277,7 @@ export function deriveGaps(rows: Partial<Record<RowId, CoverageRow>>): Gap[] {
           'Emit node and model spans at the adapter boundary where the host brokers model calls and receives step notifications. Use the existing RunTrace contract and attribute allowlist, include usage from each host-side model response, and keep vendor mapping in the host collector.',
         beadsIssue: 'PENDING-CLAUDE',
       });
-    if (row.usage !== noModels && row.usage.emitted.some((value) => !value.present))
+    if (typeof row.usage === 'object' && row.usage.emitted.some((value) => !value.present))
       gaps.push({
         name: `${id}-model-usage`,
         disposition: 'follow-up',
@@ -287,7 +298,10 @@ export function assertResultHygiene(serialized: string): void {
     'Generated UUID in result',
   );
   assert.ok(!/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(serialized), 'Timestamp in result');
-  assert.ok(!/\/(?:Users|home|private|tmp)\//.test(serialized), 'Machine-specific path in result');
+  assert.ok(
+    !/\/(?:Users|home|private|tmp|var|opt|usr|root|etc)\//.test(serialized),
+    'Machine-specific path in result',
+  );
 }
 
 function auditUsage(values: Usage[], expectedCount: number): void {
@@ -341,11 +355,27 @@ export function auditMatrix(matrix: CoverageMatrix, options: { requireIds?: bool
     assert.equal(row.measurement, 'measured', `${id}: unknown measurement`);
     const live = ['langgraph-js', 'adk-js', 'adk-js-own-spans'].includes(id);
     assert.equal(row.lane, live ? 'live' : 'in-memory', `${id}: incorrect measurement lane`);
-    if (id !== 'adk-js-own-spans')
-      assert.ok(
-        typeof row.executorId === 'string' && row.executorId.length > 0,
-        `${id}: missing root executor ID`,
+    if (id === 'adk-js-own-spans') assert.equal(row.executorId, null, `${id}: unexpected executor`);
+    else assert.equal(row.executorId, expectedExecutors[id], `${id}: unexpected root executor ID`);
+    if (!live) {
+      assert.equal(row.controls?.['outputCorrect'], true, `${id}: output control failed`);
+      assert.equal(
+        row.controls?.['modelCalls'],
+        row.scriptedCalls.model,
+        `${id}: model calls differ from the script`,
       );
+      assert.equal(
+        row.controls?.['capabilityCalls'],
+        row.scriptedCalls.capability,
+        `${id}: capability calls differ from the script`,
+      );
+      if (id === 'adk-go')
+        assert.equal(
+          row.controls?.['goldenTranscriptMatched'],
+          true,
+          `${id}: golden transcript control failed`,
+        );
+    }
     let count = 0;
     for (const kind of spanKinds) {
       const entry: KindCoverage = row.spans[kind];
@@ -365,12 +395,36 @@ export function auditMatrix(matrix: CoverageMatrix, options: { requireIds?: bool
           assert.equal(measured.count, entry.emitted.count, `${id}: ${backend} span count differs`);
           assert.equal(measured.names.length, measured.count);
           assert.equal(measured.types.length, measured.count);
+          if (id !== 'adk-js-own-spans' && kind !== 'other') {
+            const expectedNames =
+              kind === 'capability' && backend === 'langfuse'
+                ? entry.emitted.names.map((name) => name.replace(/^execute_tool /, ''))
+                : entry.emitted.names;
+            assert.deepEqual(
+              [...measured.names].sort(),
+              expectedNames,
+              `${id}: ${backend} ${kind} names differ from emitted names`,
+            );
+            if (kind !== 'node')
+              assert.ok(
+                measured.types.every((type) => typeof type === 'string' && type.length > 0),
+                `${id}: ${backend} ${kind} type missing`,
+              );
+          }
         }
       }
     }
     assert.ok(count > 0, `${id}: no emitted spans`);
     assert.equal(row.tree.length, count, `${id}: incomplete span tree`);
-    if (row.spans.model.emitted.count === 0) assert.equal(row.usage, noModels);
+    if (id !== 'adk-js-own-spans')
+      for (const entry of row.tree)
+        assert.equal(
+          entry.parentName === null,
+          entry.kind === 'root',
+          `${id}: ${entry.name} has an unexpected parent`,
+        );
+    if (row.spans.model.emitted.count === 0)
+      assert.equal(row.usage, id === 'adk-js-own-spans' ? undetermined : noModels);
     else {
       assert.ok(typeof row.usage === 'object', `${id}: missing usage measurements`);
       auditUsage(row.usage.emitted, row.spans.model.emitted.count);
@@ -378,6 +432,11 @@ export function auditMatrix(matrix: CoverageMatrix, options: { requireIds?: bool
         if (live) {
           assert.ok(Array.isArray(row.usage[backend]), `${id}: missing ${backend} usage`);
           auditUsage(row.usage[backend] as Usage[], row.spans.model.emitted.count);
+          assert.deepEqual(
+            (row.usage[backend] as Usage[]).map(({ name: _name, ...counts }) => counts),
+            row.usage.emitted.map(({ name: _name, ...counts }) => counts),
+            `${id}: ${backend} usage differs from emitted usage`,
+          );
         } else assert.equal(row.usage[backend], memoryOnly);
     }
   }

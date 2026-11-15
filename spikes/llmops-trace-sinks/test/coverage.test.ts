@@ -33,15 +33,38 @@ function emitted(records: StoredSpan[]): CoverageSpan[] {
   }));
 }
 
+const executors: Partial<Record<RowId, string>> = {
+  'langgraph-js': 'langgraph-js',
+  'adk-js': 'adk-js',
+  'pyodide-langgraph-python': 'langgraph-python',
+  'adk-go': 'adk-go',
+};
+
 function row(id: RowId = 'langgraph-js', spans = emitted(records.langfuse)): MeasuredRow {
+  const live = id === 'langgraph-js' || id === 'adk-js' || id === 'adk-js-own-spans';
+  const adapted = spans.map((span) =>
+    id === 'adk-js-own-spans'
+      ? { ...span, attributes: {} }
+      : span.attributes['gen_ai.operation.name'] === 'invoke_agent'
+        ? { ...span, attributes: { ...span.attributes, 'galaxie.executor.id': executors[id] } }
+        : span,
+  );
   return buildRow({
     id,
-    spans,
+    spans: adapted,
     fixture: ['results/node-tool-call.json'],
     scriptedCalls: { model: 1, capability: 1 },
-    ...(id === 'langgraph-js' || id === 'adk-js' || id === 'adk-js-own-spans'
-      ? { backends: records }
-      : {}),
+    ...(live ? { backends: records } : {}),
+    ...(live
+      ? {}
+      : {
+          controls: {
+            modelCalls: 1,
+            capabilityCalls: 1,
+            outputCorrect: true,
+            ...(id === 'adk-go' ? { goldenTranscriptMatched: true } : {}),
+          },
+        }),
   });
 }
 
@@ -133,7 +156,16 @@ test.each([
     gap.evidence = [{ file: 'coverage-matrix.json', path: '/missing' }];
   if (mutation === 'unknown disposition') Reflect.set(gap, 'disposition', 'unverified');
   if (mutation === 'bad issue') gap.beadsIssue = 'not-an-issue';
-  expect(() => auditMatrix(value)).toThrow();
+  expect(() => auditMatrix(value)).toThrow(
+    {
+      'remove gap': 'Gap set differs',
+      'invent gap': 'Gap set differs',
+      'missing proposed fix': 'missing proposed fix',
+      'bad pointer': 'evidence differs from gap',
+      'unknown disposition': 'unknown disposition',
+      'bad issue': 'invalid issue ID',
+    }[mutation],
+  );
 });
 
 test('strict issue audit rejects pending IDs and accepts a real issue ID', () => {
@@ -146,8 +178,8 @@ test('strict issue audit rejects pending IDs and accepts a real issue ID', () =>
   auditMatrix(value);
   auditMatrix(value, { requireIds: true });
   gap.beadsIssue = 'not-an-issue';
-  expect(() => auditMatrix(value)).toThrow();
-  expect(() => auditMatrix(value, { requireIds: true })).toThrow();
+  expect(() => auditMatrix(value)).toThrow('invalid issue ID');
+  expect(() => auditMatrix(value, { requireIds: true })).toThrow('invalid issue ID');
 });
 
 test.each([null, '', undefined])('in-memory backend columns reject %s', (replacement) => {
@@ -155,7 +187,7 @@ test.each([null, '', undefined])('in-memory backend columns reject %s', (replace
   const result = value.rows['pyodide-langgraph-python'];
   if (result.measurement !== 'measured') throw new Error('Missing memory positive control');
   Reflect.set(result.spans.root, 'langfuse', replacement);
-  expect(() => auditMatrix(value)).toThrow();
+  expect(() => auditMatrix(value)).toThrow('must say not measured: maintainer decision');
 });
 
 test('live backend column must be measured', () => {
@@ -163,7 +195,7 @@ test('live backend column must be measured', () => {
   const result = value.rows['langgraph-js'];
   if (result.measurement !== 'measured') throw new Error('Missing live positive control');
   Reflect.deleteProperty(result.spans.root, 'mlflow');
-  expect(() => auditMatrix(value)).toThrow();
+  expect(() => auditMatrix(value)).toThrow('missing live mlflow column');
 });
 
 test('unmeasured rows require both a reason and probes', () => {
@@ -177,7 +209,7 @@ test('unmeasured rows require both a reason and probes', () => {
   });
   auditMatrix(value);
   Reflect.deleteProperty(value.rows['adk-go'], 'reason');
-  expect(() => auditMatrix(value)).toThrow();
+  expect(() => auditMatrix(value)).toThrow('missing unmeasured reason');
 });
 
 test.each([
@@ -186,8 +218,12 @@ test.each([
   '/Users/example/private',
   '/home/example/cache',
   '/private/tmp/example',
+  '/opt/homebrew/Cellar/go',
+  '/usr/local/go/bin',
 ])('result hygiene rejects machine value %s', (value) => {
-  expect(() => assertResultHygiene(JSON.stringify({ value }))).toThrow();
+  expect(() => assertResultHygiene(JSON.stringify({ value }))).toThrow(
+    /Generated trace ID|Timestamp|Machine-specific/,
+  );
 });
 
 test('result hygiene permits repo-relative fixtures and fixed version strings', () => {

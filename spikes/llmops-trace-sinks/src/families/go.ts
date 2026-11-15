@@ -82,11 +82,11 @@ interface Script {
 
 function sanitizedFailure(error: unknown, directory?: string): string {
   const failure = error as { code?: string | number; stderr?: string; message?: string };
-  const message = failure.stderr?.trim() || failure.message || String(error);
+  const message = (failure.stderr?.trim() || failure.message || String(error)).split('\n')[0];
   return `exit ${failure.code ?? 'unknown'}: ${message}`
     .replaceAll(root, '<repository>/')
     .replaceAll(directory ?? '\0', '<temporary>')
-    .replace(/\/(?:Users|home|private|tmp|var)\/[^\s:'"]+/g, '<local-path>');
+    .replace(/\/(?:Users|home|private|tmp|var|opt|usr|root|etc)\/[^\s:'"]+/g, '<local-path>');
 }
 
 async function readLock(): Promise<GoLock> {

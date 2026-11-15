@@ -168,6 +168,23 @@ live(
       expect(JSON.stringify(controlAttributes)).toContain(marker);
       expect(() => scanMarkers(controlAttributes, [marker])).toThrow('Trace content marker');
     }
+    // Isolate the flag: the same context manager with capture off must leave no marker.
+    own.oracle.reset();
+    const isolation = new ControlContext().enable();
+    assert.ok(context.setGlobalContextManager(isolation));
+    try {
+      await runAdk(own, false);
+    } finally {
+      context.disable();
+    }
+    const isolated = own.oracle.getFinishedSpans();
+    expect(isolated.length).toBeGreaterThan(0);
+    // Positive control: with the context manager the spans carry attributes, so absence is not vacuous.
+    expect(isolated.some((span) => Object.keys(span.attributes).length > 0)).toBe(true);
+    scanMarkers(
+      isolated.map((span) => span.attributes),
+      adkMarkers,
+    );
     // Force-flush occurred while the forwarding gate was closed, then discard the control oracle.
     own.oracle.reset();
     own.setExportEnabled(true);
@@ -179,6 +196,11 @@ live(
     );
     const ownSpans = own.oracle.getFinishedSpans();
     expect(ownSpans.length).toBeGreaterThan(0);
+    const ownAttributeKeyCount = ownSpans.reduce(
+      (total, span) => total + Object.keys(span.attributes).length,
+      0,
+    );
+    expect(ownAttributeKeyCount).toBe(0);
     expect(ownSpans.every((span) => span.instrumentationScope.name === 'gcp.vertex.agent')).toBe(
       true,
     );
@@ -239,7 +261,11 @@ live(
         controlContextManager: 'Node AsyncLocalStorage; in-memory control only',
         measuredContextManager: 'none',
         controlMarkersDetected: adkMarkers.length,
+        flagFalseWithContextManagerMarkersAbsent: true,
         measuredContentAbsent: true,
+        measuredAttributeKeyCount: ownAttributeKeyCount,
+        caveat:
+          'The measured run has no context manager, so its empty attributes alone do not show the flag effect; the flag-false control with a context manager isolates it.',
         spanIdsAndParentsMatch: true,
         rawResponsesScanned: true,
         sharesGalaxieTrace: ownSpans.some((span) => span.spanContext().traceId === rootTrace),
@@ -256,10 +282,6 @@ live(
   async () => {
     const { runPyodide } = await import('../src/families/pyodide.js');
     const result = await runPyodide();
-    if (result.measurement === 'measured')
-      expect(
-        result.spans.some((span) => span.instrumentationScope.name === 'gcp.vertex.agent'),
-      ).toBe(false);
     const common = {
       id: 'pyodide-langgraph-python' as const,
       fixture: fixture['pyodide-langgraph-python'],
@@ -276,9 +298,6 @@ live(
               modelCalls: result.modelCalls,
               capabilityCalls: result.capabilityCalls,
               outputCorrect: result.outputCorrect,
-              noAdkOwnSpans: result.spans.every(
-                (span) => span.instrumentationScope.name !== 'gcp.vertex.agent',
-              ),
             },
           });
   },
@@ -290,10 +309,6 @@ live(
   async () => {
     const { runGo } = await import('../src/families/go.js');
     const result = await runGo();
-    if (result.measurement === 'measured')
-      expect(
-        result.spans.some((span) => span.instrumentationScope.name === 'gcp.vertex.agent'),
-      ).toBe(false);
     const common = {
       id: 'adk-go' as const,
       fixture: fixture['adk-go'],
@@ -311,9 +326,6 @@ live(
               capabilityCalls: result.capabilityCalls,
               outputCorrect: result.outputCorrect,
               goldenTranscriptMatched: result.goldenMatched,
-              noAdkOwnSpans: result.spans.every(
-                (span) => span.instrumentationScope.name !== 'gcp.vertex.agent',
-              ),
             },
           });
   },
@@ -322,6 +334,15 @@ live(
 
 live('assemble and atomically format a complete matrix only after all families ran', () => {
   for (const id of Object.keys(fixture)) assert.ok(rows[id as RowId], `Missing coverage row ${id}`);
+  // An unmeasured in-memory family would silently drop its derived gap, so refuse to replace a
+  // complete matrix unless the run explicitly accepts a missing toolchain or wheel cache.
+  if (process.env['LLMOPS_ALLOW_UNMEASURED'] !== '1')
+    for (const id of ['pyodide-langgraph-python', 'adk-go'] as const)
+      assert.equal(
+        rows[id]?.measurement,
+        'measured',
+        `${id} is unmeasured (${(rows[id] as { reason?: string } | undefined)?.reason ?? 'unknown'}); set LLMOPS_ALLOW_UNMEASURED=1 to accept it`,
+      );
   const matrix: CoverageMatrix = {
     scenario: {
       description:

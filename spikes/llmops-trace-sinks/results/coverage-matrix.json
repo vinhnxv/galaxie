@@ -454,7 +454,7 @@
           }
         }
       },
-      "usage": "not applicable: no model spans",
+      "usage": "not determinable: span attributes are empty without a context manager",
       "tree": [
         {
           "name": "call_llm",
@@ -487,7 +487,10 @@
         "controlContextManager": "Node AsyncLocalStorage; in-memory control only",
         "measuredContextManager": "none",
         "controlMarkersDetected": 4,
+        "flagFalseWithContextManagerMarkersAbsent": true,
         "measuredContentAbsent": true,
+        "measuredAttributeKeyCount": 0,
+        "caveat": "The measured run has no context manager, so its empty attributes alone do not show the flag effect; the flag-false control with a context manager isolates it.",
         "spanIdsAndParentsMatch": true,
         "rawResponsesScanned": true,
         "sharesGalaxieTrace": false,
@@ -565,8 +568,7 @@
       "controls": {
         "modelCalls": 1,
         "capabilityCalls": 1,
-        "outputCorrect": true,
-        "noAdkOwnSpans": true
+        "outputCorrect": true
       },
       "versions": {
         "pyodide": "314.0.7"
@@ -646,8 +648,7 @@
         "modelCalls": 2,
         "capabilityCalls": 1,
         "outputCorrect": true,
-        "goldenTranscriptMatched": true,
-        "noAdkOwnSpans": true
+        "goldenTranscriptMatched": true
       },
       "versions": {
         "go": "go1.27.3",
@@ -671,7 +672,7 @@
         }
       ],
       "proposedFix": "Emit node and model spans at the adapter boundary where the host brokers model calls and receives step notifications. Use the existing RunTrace contract and attribute allowlist, include usage from each host-side model response, and keep vendor mapping in the host collector.",
-      "beadsIssue": "PENDING-CLAUDE"
+      "beadsIssue": "galaxie-d53.8"
     },
     {
       "name": "adk-go-span-coverage",
@@ -688,7 +689,7 @@
         }
       ],
       "proposedFix": "Emit node and model spans at the adapter boundary where the host brokers model calls and receives step notifications. Use the existing RunTrace contract and attribute allowlist, include usage from each host-side model response, and keep vendor mapping in the host collector.",
-      "beadsIssue": "PENDING-CLAUDE"
+      "beadsIssue": "galaxie-d53.9"
     }
   ],
   "notMeasured": [
