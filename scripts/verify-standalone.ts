@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone-core.js';
 
 export interface Arguments {
-  template: 'local-only' | 'hybrid-gateway' | 'all';
+  kind: 'browser-only' | 'gateway' | 'all';
   nodes: NodeRequest[];
   mode: Mode | 'both';
   tarballs?: string;
@@ -17,7 +17,7 @@ export interface Arguments {
   help: boolean;
 }
 export const usage = `Usage: node scripts/verify-standalone.ts [options]
-  --template local-only|hybrid-gateway|all   (default all)
+  --kind browser-only|gateway|all             (default all)
   --node <major>[=/path/to/node]            (repeatable; default current)
   --mode registry|tarball|both              (default registry)
   --tarballs <directory>                   reuse seven packed launch packages
@@ -31,7 +31,7 @@ Chromium: pnpm exec playwright install chromium.`;
 
 export function parseArguments(args: readonly string[]): Arguments {
   const options: Arguments = {
-    template: 'all',
+    kind: 'all',
     nodes: [],
     mode: 'registry',
     keep: false,
@@ -53,9 +53,9 @@ export function parseArguments(args: readonly string[]): Arguments {
     const value = args[++index];
     if (value === undefined || value.startsWith('--')) invalid();
     switch (flag) {
-      case '--template':
-        if (value !== 'all' && value !== 'local-only' && value !== 'hybrid-gateway') invalid();
-        options.template = value;
+      case '--kind':
+        if (value !== 'all' && value !== 'browser-only' && value !== 'gateway') invalid();
+        options.kind = value;
         break;
       case '--mode':
         if (value !== 'registry' && value !== 'tarball' && value !== 'both') invalid();
@@ -91,10 +91,11 @@ const vite = 'node_modules/vite/bin/vite.js';
 const tsc = 'node_modules/typescript/bin/tsc';
 export const templateSpecs: readonly TemplateSpec[] = [
   {
-    name: 'local-only',
+    name: 'browser-only-langgraph-js',
+    kind: 'browser-only',
+    framework: 'langgraph-js',
     build: [vite, 'build'],
     preview: [vite, 'preview'],
-    typecheck: [tsc, '--noEmit'],
     steps: [
       { action: 'check', role: 'radio', name: '4' },
       { action: 'click', role: 'button', name: 'Submit answers' },
@@ -102,10 +103,11 @@ export const templateSpecs: readonly TemplateSpec[] = [
     ],
   },
   {
-    name: 'hybrid-gateway',
+    name: 'gateway-langgraph-js',
+    kind: 'gateway',
+    framework: 'langgraph-js',
     build: [vite, 'build'],
     preview: [vite, 'preview'],
-    typecheck: [tsc, '--noEmit'],
     probeSession: true,
     server: {
       compile: [tsc, '-p', 'server/tsconfig.json'],
@@ -273,13 +275,33 @@ if (import.meta.main) {
           nodes: options.nodes,
           modes: options.mode === 'both' ? ['registry', 'tarball'] : [options.mode],
           specs: templateSpecs.filter(
-            (spec) => options.template === 'all' || spec.name === options.template,
+            (spec) => options.kind === 'all' || spec.kind === options.kind,
           ),
           ...(options.tarballs === undefined ? {} : { tarballs: options.tarballs }),
           ...(options.exclude === undefined ? {} : { exclude: options.exclude }),
           keep: options.keep,
         },
         {
+          scaffold: async ({ spec, directory, tarballs, node, env, signal, runner }) => {
+            await runner.run({
+              executable: node,
+              args: [
+                fileURLToPath(new URL('../packages/create/dist/cli.js', import.meta.url)),
+                basename(directory),
+                '--kind',
+                spec.kind,
+                '--framework',
+                spec.framework,
+                '--no-install',
+              ],
+              cwd: dirname(directory),
+              env: {
+                ...env,
+                ...(tarballs === undefined ? {} : { GALAXIE_CREATE_PACKAGE_DIR: tarballs }),
+              },
+              signal,
+            });
+          },
           driver: { drive: driveChromium },
           retained: (path) => console.info(`Retained temporary root: ${path}`),
         },

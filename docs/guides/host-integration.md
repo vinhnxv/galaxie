@@ -26,23 +26,22 @@ deployment; the detailed topic sections below remain the integration reference.
 
 ## Layer 0: run an agent in the page
 
-Start from a copy of the [local-only template](../../templates/local-only/README.md),
-keeping its Vite + React setup. In the copy, use the two snippets below as
-`src/agent.ts` and `src/main.tsx`. The agent is verbatim from
-[`templates/local-only/src/agent.ts`](../../templates/local-only/src/agent.ts);
-the host wiring reduces
-[`templates/local-only/src/runtime.ts`](../../templates/local-only/src/runtime.ts)
-and its [entry point](../../templates/local-only/src/main.tsx) to a memory-only
+Generate a browser-only LangGraph.js project with the [private create package](../../packages/create/README.md),
+keeping its Vite + React setup. In the project, use the two snippets below as
+`src/agent.ts` and `src/main.tsx`. The agent is verbatim from the
+[shared framework layer](../../templates/frameworks/langgraph-js/files/src/agent.ts);
+the host wiring reduces the
+[browser-only runtime](../../templates/kinds/browser-only/files/src/runtime.ts)
+and its [entry point](../../templates/kinds/browser-only/files/src/main.tsx) to a memory-only
 host, so you can diff the snippets against those files.
 
-To try it inside this repository, copy the template to a new directory under
-`templates/`, give the copy's `package.json` a new name, replace the two files,
-and run the following from the repository root (use your copy's package name):
+After replacing the two files, run these commands from the generated project:
 
 ```sh
-pnpm install
-pnpm build
-pnpm --filter <your-package-name> dev
+npm install --ignore-scripts
+npm run check
+npm run build
+npm run dev
 ```
 
 These steps ran against the workspace packages; standalone registry installation
@@ -190,8 +189,8 @@ for await (const event of instance.events(runId)) {
 You gain a runnable question: choose **4**, submit, and see
 `Correct. Keep practicing one small step at a time.` The graph pauses before the
 model call; the surface dispatches the answer, and the router uses the scripted
-mock. The template's [runtime tests](../../templates/local-only/test/runtime.node.test.ts)
-and [app tests](../../templates/local-only/test/app.test.ts) cover mock completion
+mock. The template's [runtime tests](../../templates/kinds/browser-only/workspace/test/runtime.node.test.ts)
+and [app tests](../../templates/kinds/browser-only/workspace/test/app.test.ts) cover mock completion
 and the template's model states; they exercise the full template host.
 
 Nothing survives a reload. There is no tab ownership and no application policy
@@ -213,10 +212,10 @@ is lost.
 
 Follow [Storage persistence and recovery](#storage-persistence-and-recovery) and
 [Ownership and logout](#ownership-and-logout), with the template's
-[`src/runtime.ts`](../../templates/local-only/src/runtime.ts) and
-[`src/app.tsx`](../../templates/local-only/src/app.tsx) as the wiring reference.
-The [built-app reload test](../../templates/local-only/test/reload.node.test.ts),
-[reopened IndexedDB app test](../../templates/local-only/test/app.test.ts) and
+[`src/runtime.ts`](../../templates/kinds/browser-only/files/src/runtime.ts) and
+[`src/app.tsx`](../../templates/kinds/browser-only/files/src/app.tsx) as the wiring reference.
+The [built-app reload test](../../templates/kinds/browser-only/workspace/test/reload.node.test.ts),
+[reopened IndexedDB app test](../../templates/kinds/browser-only/workspace/test/app.test.ts) and
 [ownership tests](../../tests/conformance/ownership.test.ts) cover those paths.
 The host still owns trusted identity, session pointers, teardown and backend
 reconciliation of unknown effects, optionally through a binding's

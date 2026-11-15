@@ -1,10 +1,43 @@
-# Standalone template verification
+# Standalone project verification
 
-Measured on 2026-11-15 for `galaxie-wa5.1`. Results below describe the copied starters with no Built-in AI, WebGPU or upstream model.
+The current harness scaffolds projects through the private create CLI. The earlier
+2026-11-15 copied-starter characterization for `galaxie-wa5.1` is retained below.
+Both measurements use the mock or gateway-unavailable flow, without Built-in AI,
+WebGPU or an upstream model.
 
-## Characterization
+## Composed-project measurement (2026-11-16)
 
-Before any template fix, this command exited 1:
+The adapted harness ran once with a 25-minute wall-clock cap and exited 0:
+
+```sh
+node scripts/verify-standalone.ts --mode both --node 22 --node 24 --json /tmp/galaxie-create-u5-network.json
+```
+
+| Combination | Target Node | npm | Registry | Packed workspace |
+| --- | --- | --- | --- | --- |
+| browser-only / langgraph-js | 22.23.5 | 12.2.2 | PASS | PASS |
+| browser-only / langgraph-js | 24.15.0 | 12.2.2 | PASS | PASS |
+| gateway / langgraph-js | 22.23.5 | 12.2.2 | PASS | PASS |
+| gateway / langgraph-js | 24.15.0 | 12.2.2 | PASS | PASS |
+
+All eight results have empty failure arrays. Each passes CLI scaffolding,
+installation with lifecycle scripts disabled, production build, `npm run check`,
+both directive mutation controls and the preview browser drive. Tarball results
+also pass single-copy checks. Each gateway case additionally compiles and drives
+the static Node server and probes sessions on both servers. No lifecycle-script
+fallback or release-age exclusion was needed.
+
+The host was macOS arm64, using harness Node 24.15.0, pnpm 11.21.0 for workspace
+build/pack, Playwright 1.64.1 and headless Chromium 156.0.8078.4. Registry packages
+were the seven launch packages at 0.1.0; packed packages came from the current
+checkout. The workspace policy remained 10080 minutes, enforced as seven npm days.
+The measured tree includes the create commits through `93f4281` and the harness
+adaptation in this change. JSON and the command log remain outside the repository;
+the harness removed its temporary projects.
+
+## Previous copied-starter characterization
+
+Before the earlier template fixes, this command exited 1:
 
 ```sh
 node scripts/verify-standalone.ts --node 22 --node 24 --mode both --json /tmp/galaxie-standalone-characterization.json
@@ -47,11 +80,13 @@ provider credential or upstream is needed.
 ```sh
 pnpm install --frozen-lockfile
 pnpm exec playwright install chromium
+pnpm exec tsc -p packages/create/tsconfig.build.json
 node scripts/verify-standalone.ts --help
 node scripts/verify-standalone.ts --node 22 --node 24 --mode both --json /tmp/galaxie-standalone-final.json
 ```
 
-`--template local-only|hybrid-gateway|all` selects starters. `--node` is repeatable;
+`--kind browser-only|gateway|all` selects kinds; the framework is `langgraph-js`.
+The old `--template` flag is rejected. `--node` is repeatable;
 `--node 22=/absolute/path/to/node` overrides discovery. Otherwise the current
 runtime wins for its major, then the newest matching nvm installation.
 `--mode registry|tarball|both` selects installs. `--tarballs /path/to/dir` reuses
@@ -63,16 +98,21 @@ change to user configuration. No exclusion was used for this measurement.
 Tarball mode first runs `build:packages` in the workspace, writing its ordinary
 ignored build artifacts, then `pnpm pack` for the seven launch packages. It uses
 the harness Node 24 and pnpm for packing, independently of the target Node. Every
-copied project's install, build, preview and server compile/run uses the requested
+generated project's scaffold, install, build, check, preview and server compile/run uses the requested
 Node binary. npm's resolved `npm-cli.js` is invoked by that binary explicitly;
 Node 22's bundled npm is not used. All direct galaxie dependencies and all seven
 transitive overrides point to the owned tarballs. The lockfile check requires one
 file-resolved copy of each reachable galaxie package and rejects duplicates,
 registry resolutions, missing required packages and unexpected galaxie packages.
-Local-only reaches seven launch packages; hybrid reaches six (no storage package).
+Browser-only reaches seven launch packages; gateway reaches six (no storage package).
 
-Copies live outside the repository and exclude `node_modules`, `dist`, `.server`,
-`test` and `tsconfig.workspace.json`; symlinks are refused. Child environment names
+The scaffold hook runs the built CLI with a relative target, selected kind/framework
+and `--no-install`. In tarball mode it receives the owned tarball directory through
+`GALAXIE_CREATE_PACKAGE_DIR`; registry mode receives no tarball setting. Projects
+live outside the repository. `assertCopy` rejects workspace artifacts such as
+`node_modules`, `dist`, `.server`, `test`, `tsconfig.workspace.json`, `.npmrc`,
+`.git` and environment files before installation, and refuses symlinks.
+Child environment names
 are allowlisted, with empty owned npm user/global configuration and a fresh owned
 cache. Upstream variables, authentication variables and `NODE_OPTIONS` do not pass
 through. The public registry and seven-day release age are explicit; npm 12 and
@@ -91,7 +131,21 @@ gateway route, selects `4`, submits, requires the observed model HTTP 503 and
 also receive a separate `POST /api/session` probe expecting HTTP 200; its response
 body is cancelled without parsing, printing or recording it.
 
-## Environment and final matrix
+Every generated project must pass `npm run check` after the build. This includes
+client/check TypeScript compilation, exact Vite CSP and Trusted Types assertions,
+and the gateway's compiled static-handler header. The harness then separately adds
+`'unsafe-inline'` to `script-src` and empties `require-trusted-types-for`, reruns the
+check, and requires a rejection naming the changed directive. A check that passes
+or fails for an unrelated reason makes the negative-control phase fail. The CSP
+source is restored in `finally` after each mutation. Installs use
+`npm install --ignore-scripts --no-audit --no-fund`; no fallback to lifecycle
+scripts was needed in the measured matrix.
+
+Tarball mode supports npm only. pnpm and yarn are refused by the create CLI until
+follow-up work proves their installs and override locations. The private create
+package is never packed as a launch package, published or tagged by this harness.
+
+## Previous copied-starter environment and final matrix
 
 | Component | Measured version |
 | --- | --- |
@@ -107,7 +161,7 @@ body is cancelled without parsing, printing or recording it.
 | Workspace baseline | `29bdabf`, plus this PR's template changes |
 | Release age | 10080 workspace minutes → 7 npm days; no exclusion |
 
-After adding pinned TypeScript 7.0.2, Node types 24.19.2 and React/React DOM types
+In that measurement, after adding pinned TypeScript 7.0.2, Node types 24.19.2 and React/React DOM types
 19.3.0 to both templates, all characterization rows pass. Hybrid also gains
 `build:server`. No package source, manifest, export, peer range or dependency fix
 was necessary. The lockfile changes only the two template importers.
@@ -138,9 +192,10 @@ The JSON output is an array of results: `template`, verified `node` (or the requ
 major if version resolution fails), exact `npm` (or `unknown` before its probe),
 `mode`, `releaseAgeDays`, `exclude`, `browser` and `failures`. Each failure contains
 `phase`, `gating`, `source`, `suggested`, `summary` and `excerpt`; the parent result
-supplies the template/node/mode identity. Phases are node, pack, copy, install,
-build, typecheck, compile, serve, drive and probe. Only source type-check failures
-are advisory. Suggested sources are template, `package:<name>`, environment,
+supplies the combination/node/mode identity. Current phases are node, pack,
+scaffold, install, build, check, negative-control, compile, serve, drive and probe.
+All current failures are gating; the earlier advisory source check has been
+replaced by `npm run check`. Suggested sources are template, `package:<name>`, environment,
 harness or unclassified; triage must confirm them. Excerpts replace the temporary
 root, HOME, URLs and credential-like fields and are capped at 16 lines/4000
 characters. Any gating or unclassified failure causes exit 1; usage errors exit 2.
@@ -149,7 +204,8 @@ compares failures as pass, defect, release-gap or workspace-regression.
 
 `pnpm check` does not run the real network matrix. Its Node conformance lane runs
 [the offline tests](../tests/conformance/verify-standalone.node.test.ts): pure
-helper tables and rejection controls; release-age enforcement with a stub runner;
+helper tables and rejection controls; scaffold-hook arguments and artifact rejection;
+gating checks and negative-control/restoration cases; release-age enforcement with a stub runner;
 real npm `--offline` file-dependency installation, build and loopback subprocesses;
 cleanup and abort; and real Chromium pages served by in-process loopback fixtures.
 Expected package names, paths, statuses and UI text are fixed test oracles.
@@ -157,11 +213,11 @@ Additional real-process regressions cover an exited group leader, descendants wi
 No new test requires a prebuilt package `dist`.
 
 The reusable script API is [standalone-core.ts](../scripts/standalone-core.ts):
-`runStandalone` with injectable runner, driver, clock, ports, environment and roots,
-and pure helpers for release age, environment, Node discovery, manifest rewrite,
-lockfile copies, command/temp/copy checks, classification, redaction and mode
+`runStandalone` with a required scaffold hook and injectable runner, driver, clock,
+ports, environment and roots, plus helpers for release age, environment, Node
+discovery, lockfile copies, command/temp/scaffold checks, classification, redaction and mode
 comparison. [verify-standalone.ts](../scripts/verify-standalone.ts) exports argument
-parsing, template data, the lazy Chromium driver and result rendering. Importing
+parsing, combination data, the lazy Chromium driver and result rendering. Importing
 the core has no top-level I/O. No published package API or export was added;
 core's main entry and its runtime Zod boundary are unchanged.
 
@@ -177,7 +233,8 @@ core's main entry and its runtime Zod boundary are unchanged.
 ## Unmeasured
 
 Real Built-in AI, real WebGPU devices, WebLLM/model downloads, real upstream
-inference, other package managers, bundled npm 10 versus npm 12, Windows, answer
+inference, pnpm/yarn installs, the pnpm 11 override location, bundled npm 10 versus
+npm 12, Windows automatic install and operation, answer
 quality, latency and memory are not covered. No live service, real user data,
 backend authorization audit, broad packaging/API compatibility claim or ADR
 acceptance is implied. ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.

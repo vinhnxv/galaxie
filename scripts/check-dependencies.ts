@@ -576,6 +576,7 @@ function sourceFilesOutsideDependencies(directory: string, includeDist: boolean)
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
+      if (path === join('packages', 'create', '.cache')) return [];
       if (entry.name === 'node_modules' || (entry.name === 'dist' && !includeDist)) return [];
       return sourceFilesOutsideDependencies(path, includeDist);
     }

@@ -89,3 +89,28 @@ test('a correct untracked tree passes, including normalized text, shebangs and d
   }
   expect(run(files)).toEqual({ status: 0, output: '' });
 });
+
+test.each(['ts', 'js'])(
+  'a %s shebang permits only an immediate, complete SPDX header',
+  (extension) => {
+    expect(run({ [`main.${extension}`]: `#!/usr/bin/env node\n${lineHeader}` })).toEqual({
+      status: 0,
+      output: '',
+    });
+    for (const suffix of [
+      '',
+      `\n${lineHeader}`,
+      lineHeader.replace('Apache-2.0', 'AGPL-3.0-only'),
+    ]) {
+      const result = run({ [`main.${extension}`]: `#!/usr/bin/env node\n${suffix}` });
+      expect(result.status).toBe(1);
+      expect(result.output).toContain(`main.${extension}: does not start with the SPDX header`);
+    }
+  },
+);
+
+test('shebang tolerance does not extend to other source formats', () => {
+  const result = run({ 'main.go': `#!/usr/bin/env node\n${lineHeader}` });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('main.go: does not start with the SPDX header');
+});

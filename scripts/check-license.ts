@@ -40,7 +40,8 @@ for (const file of files) {
   const header = HEADERS[extension];
   if (header !== undefined) {
     let source = readFileSync(file, 'utf8').normalize('NFC');
-    if (extension === '.py') source = source.replace(/^#![^\n]*\n/, '');
+    if (extension === '.py' || extension === '.ts' || extension === '.js')
+      source = source.replace(/^#![^\n]*\n/, '');
     if (extension === '.html') source = source.replace(/^<!doctype html>\r?\n/i, '');
     if (!source.startsWith(header.normalize('NFC'))) {
       problems.push(`${file}: does not start with the SPDX header`);

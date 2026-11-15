@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "id": "gateway",
+  "type": "kind",
+  "package": {
+    "description": "A copyable browser agent with a same-origin Node model and capability gateway.",
+    "scripts": {
+      "check": "tsc --noEmit && tsc --noEmit -p check/tsconfig.json && tsc -p server/tsconfig.json && node --test check/baseline.check.ts",
+      "build:server": "tsc -p server/tsconfig.json"
+    },
+    "dependencies": {
+      "@langchain/openai": "1.6.3"
+    }
+  },
+  "frameworks": ["langgraph-js"],
+  "workspace": {
+    "paths": {
+      "@galaxie-ai/adapter-kit": ["packages/adapter-kit/src/index.ts"],
+      "@galaxie-ai/core": ["packages/core/src/index.ts"],
+      "@galaxie-ai/ui-protocol": ["packages/ui-protocol/src/index.ts"],
+      "@galaxie-ai/adapter-langgraph": ["packages/adapter-langgraph/src/index.ts"],
+      "@galaxie-ai/react": ["packages/react/src/index.ts"],
+      "react": ["packages/react/node_modules/@types/react/index.d.ts"],
+      "react/*": ["packages/react/node_modules/@types/react/*.d.ts"],
+      "react-dom/*": ["packages/react/node_modules/@types/react-dom/*.d.ts"],
+      "@galaxie-ai/models/openai": ["packages/models/src/openai/index.ts"]
+    },
+    "include": ["server"]
+  },
+  "json": {
+    "tsconfig.json": {
+      "compilerOptions": {
+        "types": ["node"]
+      }
+    }
+  }
+}
