@@ -473,6 +473,9 @@ uses `/api/public/v3/scores?fields=subject` with a five-minute polling window.
 The fresh-date control waits for the new value to become readable before
 recording the two dated rows. Linking means the score's subject matches the
 oracle trace and its observations are found; UI linking is unmeasured.
+Credential-scan assertions escape the score client's transport retry loop. A
+regression supplies a contaminated first response followed by a clean response
+and requires the first scan to fail immediately, with no retry.
 
 The Node runner invokes `uv run --locked --offline python -I evaluate.py` in the
 spike's own Python project. The child receives only PATH, HOME, TMPDIR and three
