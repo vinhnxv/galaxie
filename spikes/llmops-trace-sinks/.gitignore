@@ -6,3 +6,4 @@ volumes/
 .env.*.tmp
 python/.venv/
 python/.pytest_cache/
+results/*.tmp
