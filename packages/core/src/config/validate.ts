@@ -125,14 +125,21 @@ export function validateHostConfig<const Document, const Definition extends Agen
   hooks: HostConfigHooks,
   baseURL: string,
 ): ValidatedHostConfig<Definition, CapabilityNames<Document>> {
+  // One read of every property: accessors and proxies cannot answer differently per check.
+  let snapshot: unknown;
+  try {
+    snapshot = copyDocument(supplied);
+  } catch {
+    throw new HostConfigError('invalid', '');
+  }
   const version =
-    supplied !== null && typeof supplied === 'object' && Object.hasOwn(supplied, 'version')
-      ? (supplied as { version?: unknown }).version
+    snapshot !== null && typeof snapshot === 'object' && Object.hasOwn(snapshot, 'version')
+      ? (snapshot as { version?: unknown }).version
       : undefined;
   if (version !== '0.1')
     throw new HostConfigError(typeof version === 'string' ? 'unsupported' : 'invalid', '/version');
-  rejectPrototypeKeys(supplied);
-  const parsed = hostConfigSchema.safeParse(supplied);
+  rejectPrototypeKeys(snapshot);
+  const parsed = hostConfigSchema.safeParse(snapshot);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const parts =
@@ -193,7 +200,18 @@ export function validateHostConfig<const Document, const Definition extends Agen
   for (const [name, server] of Object.entries(data.mcp?.servers ?? {})) {
     const path = pointer(['mcp', 'servers', name]);
     Object.assign(server, { url: resolveUrl(server.url, base, path) });
-    if (!isHttpDestination(new URL(server.url))) throw new HostConfigError('invalid', path);
+    const url = new URL(server.url);
+    if (
+      !isHttpDestination(url) ||
+      /[?#]/.test(server.url) ||
+      server.destination === 'in-browser' ||
+      (server.destination === 'user-device' && !isLoopback(url.hostname)) ||
+      (server.propagateTraceContext === true && server.destination !== 'host-server') ||
+      !Object.values(server.limits ?? {}).every(
+        (limit) => limit !== undefined && Number.isSafeInteger(limit) && limit > 0,
+      )
+    )
+      throw new HostConfigError('invalid', path);
   }
   if (data.limits?.urlAllowlist !== undefined) {
     try {
@@ -207,7 +225,8 @@ export function validateHostConfig<const Document, const Definition extends Agen
     ...Object.entries(definition.capabilities?.optional ?? {}),
   ]);
   for (const name of Object.keys(data.capabilities ?? {}))
-    if (!requests.has(name)) throw new HostConfigError('invalid', pointer(['capabilities', name]));
+    if (!requests.has(name) || name.startsWith('mcp.'))
+      throw new HostConfigError('invalid', pointer(['capabilities', name]));
   for (const [role, route] of Object.entries(data.models?.roles ?? {})) {
     const path = pointer(['models', 'roles', role]);
     if (!Object.hasOwn(definition.models ?? {}, role)) throw new HostConfigError('invalid', path);

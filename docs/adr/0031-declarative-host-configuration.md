@@ -78,8 +78,9 @@ invocation, fixed error codes and JSON Pointers, HTTP policy parity, destination
 and URL checks, runtime limits and approval-gated tutor calls through injected
 fetch. A stricter definition rejects config-built descriptors at `runtime.create`.
 Node conformance also records the intended capability-userinfo and endpoint
-destination differences from today's factories, and the MCP query-string seam
-left to the later builder.
+destination differences from today's factories, and that validation refuses the
+MCP server shapes `createMcpServer` refuses (destination, query, fragment, userinfo,
+trace-propagation destination and limits).
 
 `pnpm check` verifies the generated draft 2020-12 JSON Schema, package exports,
 dependency boundaries and own-code size budgets; the main-entry budget is

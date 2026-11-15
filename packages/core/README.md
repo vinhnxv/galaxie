@@ -47,7 +47,7 @@ checks remain responsible for required bindings after composition.
 The document has the same trust as host code. Its editor chooses destinations,
 credential modes and hooks; credential hooks run against document-chosen URLs.
 Validation cannot establish intended-server identity or backend authorization.
-The host must bind credentials to intended origins. The MCP builder and host-remote
+A `HostConfigError` message is fixed, but its `path` can contain document key names, so show it only to the configuration editor. A base URL path is ignored; `/` URLs keep only the base origin. The host must bind credentials to intended origins. The MCP builder and host-remote
 adoption remain planned, and [ADR-0031](../../docs/adr/0031-declarative-host-configuration.md)
 stays Proposed. ADR-0012 guarantees are unchanged.
 

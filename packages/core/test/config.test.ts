@@ -1037,3 +1037,78 @@ test('validates an empty wiring document and emits the literal schema version', 
     properties: { version: { const: '0.1' } },
   });
 });
+
+const mcpServer = (override: Record<string, unknown>) => {
+  const input = document();
+  return {
+    ...input,
+    mcp: { servers: { school: { ...input.mcp.servers.school, ...override } } },
+  };
+};
+
+test.each([
+  ['in-browser destination', { destination: 'in-browser' }],
+  ['user-device destination on a non-loopback host', { destination: 'user-device' }],
+  [
+    'trace propagation to a third-party server',
+    { destination: 'third-party', propagateTraceContext: true },
+  ],
+  ['query on the URL', { url: '/mcp?marker=1' }],
+  ['fragment on the URL', { url: '/mcp#marker' }],
+  ['zero message limit', { limits: { messageBytes: 0 } }],
+  ['negative idle limit', { limits: { idleMs: -5 } }],
+  ['fractional result limit', { limits: { resultBytes: 1.5 } }],
+])('rejects an MCP server createMcpServer would refuse: %s', (_label, override) => {
+  rejected(() => validate(mcpServer(override)), '/mcp/servers/school');
+});
+
+test('accepts the MCP server shapes createMcpServer accepts', () => {
+  expect(() =>
+    validate(
+      mcpServer({
+        destination: 'user-device',
+        url: 'http://127.0.0.1:8080/mcp',
+        limits: { messageBytes: 1, resultBytes: 2, idleMs: 3 },
+      }),
+    ),
+  ).not.toThrow();
+  expect(() =>
+    validate(mcpServer({ destination: 'host-server', propagateTraceContext: true })),
+  ).not.toThrow();
+});
+
+test('rejects an HTTP capability that takes an MCP-derived name', () => {
+  const input = document();
+  const agent: AgentDefinition = {
+    ...configDefinition,
+    capabilities: {
+      optional: { ...configDefinition.capabilities?.optional, 'mcp.school.other@1': request },
+    },
+  };
+  rejected(
+    () =>
+      validate(
+        {
+          ...input,
+          capabilities: { 'mcp.school.other@1': input.capabilities['lessons.get@1'] },
+        },
+        agent,
+      ),
+    '/capabilities/mcp.school.other@1',
+  );
+});
+
+test('reads every document property once, so an accessor cannot answer differently per check', () => {
+  const input = document();
+  let reads = 0;
+  const trap = {
+    version: '0.1',
+    get capabilities(): unknown {
+      reads += 1;
+      return reads === 1 ? { ['__proto__']: {} } : input.capabilities;
+    },
+  };
+  Object.defineProperty(trap, '__proto__', { value: {}, enumerable: true });
+  expect(() => validate(trap)).toThrow(HostConfigError);
+  expect(reads).toBe(1);
+});

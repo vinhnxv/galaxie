@@ -388,7 +388,7 @@ test('endpoint construction retains URL restrictions and adds the documented des
   ).toThrow(expect.objectContaining({ code: 'invalid', path: '/models/providers/quiz' }));
 });
 
-test('capability userinfo is refused only by the document and MCP query validation remains a builder seam', () => {
+test('capability userinfo is refused only by the document; MCP query and userinfo are refused by both paths', () => {
   const capability = {
     kind: 'read',
     destination: 'host-server',
@@ -422,7 +422,7 @@ test('capability userinfo is refused only by the document and MCP query validati
       { token: { session: () => 'test-only-placeholder' } },
       'https://app.example',
     ),
-  ).not.toThrow();
+  ).toThrow(expect.objectContaining({ code: 'invalid', path: '/mcp/servers/school' }));
   expect(() =>
     createMcpServer({ ...server, id: 'school', token: () => 'test-only-placeholder' }),
   ).toThrow(expect.objectContaining({ code: 'invalid' }));
