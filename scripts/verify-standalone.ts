@@ -1,0 +1,315 @@
+// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+// SPDX-License-Identifier: Apache-2.0
+
+import { writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone-core.js';
+
+export interface Arguments {
+  template: 'local-only' | 'hybrid-gateway' | 'all';
+  nodes: NodeRequest[];
+  mode: Mode | 'both';
+  tarballs?: string;
+  json?: string;
+  exclude?: string;
+  keep: boolean;
+  help: boolean;
+}
+export const usage = `Usage: node scripts/verify-standalone.ts [options]
+  --template local-only|hybrid-gateway|all   (default all)
+  --node <major>[=/path/to/node]            (repeatable; default current)
+  --mode registry|tarball|both              (default registry)
+  --tarballs <directory>                   reuse seven packed launch packages
+  --json <file>                            write the result array
+  --min-release-age-exclude <pattern>       explicit, recorded npm exclusion
+  --keep                                  retain and print the temporary root
+  --help
+Node versions are never downloaded. Missing Node 22: nvm install 22.
+Packing needs pnpm on PATH and this workspace's installed build tooling.
+Chromium: pnpm exec playwright install chromium.`;
+
+export function parseArguments(args: readonly string[]): Arguments {
+  const options: Arguments = {
+    template: 'all',
+    nodes: [],
+    mode: 'registry',
+    keep: false,
+    help: false,
+  };
+  const invalid: () => never = () => {
+    throw new Error(usage);
+  };
+  for (let index = 0; index < args.length; index++) {
+    const flag = args[index];
+    if (flag === '--help') {
+      options.help = true;
+      continue;
+    }
+    if (flag === '--keep') {
+      options.keep = true;
+      continue;
+    }
+    const value = args[++index];
+    if (value === undefined || value.startsWith('--')) invalid();
+    switch (flag) {
+      case '--template':
+        if (value !== 'all' && value !== 'local-only' && value !== 'hybrid-gateway') invalid();
+        options.template = value;
+        break;
+      case '--mode':
+        if (value !== 'registry' && value !== 'tarball' && value !== 'both') invalid();
+        options.mode = value;
+        break;
+      case '--node': {
+        const match = /^(\d+)(?:=(.+))?$/.exec(value);
+        if (match === null || Number(match[1]) < 22) invalid();
+        const major = Number(match[1]);
+        if (options.nodes.some((node) => node.major === major)) invalid();
+        options.nodes.push(match[2] === undefined ? { major } : { major, path: match[2] });
+        break;
+      }
+      case '--tarballs':
+        options.tarballs = resolve(value);
+        break;
+      case '--json':
+        options.json = resolve(value);
+        break;
+      case '--min-release-age-exclude':
+        options.exclude = value;
+        break;
+      default:
+        invalid();
+    }
+  }
+  if (options.nodes.length === 0)
+    options.nodes.push({ major: Number(process.versions.node.split('.')[0]) });
+  return options;
+}
+
+const vite = 'node_modules/vite/bin/vite.js';
+const tsc = 'node_modules/typescript/bin/tsc';
+export const templateSpecs: readonly TemplateSpec[] = [
+  {
+    name: 'local-only',
+    build: [vite, 'build'],
+    preview: [vite, 'preview'],
+    typecheck: [tsc, '--noEmit'],
+    steps: [
+      { action: 'check', role: 'radio', name: '4' },
+      { action: 'click', role: 'button', name: 'Submit answers' },
+      { action: 'text', name: 'Correct. Keep practicing one small step at a time.' },
+    ],
+  },
+  {
+    name: 'hybrid-gateway',
+    build: [vite, 'build'],
+    preview: [vite, 'preview'],
+    typecheck: [tsc, '--noEmit'],
+    probeSession: true,
+    server: {
+      compile: [tsc, '-p', 'server/tsconfig.json'],
+      entry: '.server/server/serve.js',
+      port: 4173,
+    },
+    steps: [
+      { action: 'click', role: 'button', name: 'Start with gateway' },
+      { action: 'check', role: 'radio', name: '4' },
+      {
+        action: 'click',
+        role: 'button',
+        name: 'Submit answers',
+        unavailable: {
+          path: '/api/v1/chat/completions',
+          text: 'The gateway is unavailable. Retry later.',
+        },
+      },
+      { action: 'visible', role: 'button', name: 'Retry' },
+    ],
+  },
+];
+
+/** Browser code stays here; the reusable pipeline imports no Playwright or DOM types. */
+export async function driveChromium(
+  url: string,
+  spec: TemplateSpec,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { chromium } = await import('playwright');
+  let browser: Awaited<ReturnType<typeof chromium.launch>>;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--disable-gpu', '--disable-webgpu'],
+    });
+  } catch {
+    throw new Error('Chromium unavailable; run pnpm exec playwright install chromium.');
+  }
+  const abort = (): void => {
+    void browser.close();
+  };
+  signal?.addEventListener('abort', abort, { once: true });
+  try {
+    signal?.throwIfAborted();
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    await context.addInitScript(
+      "Object.defineProperty(globalThis, 'LanguageModel', { configurable: true, value: undefined }); Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined });",
+    );
+    let external = 0;
+    const errors: string[] = [];
+    let probes = 0;
+    let expected: Step['unavailable'];
+    const responses = new Set<string>();
+    const diagnostics: string[] = [];
+    const flush = async (): Promise<void> => {
+      await page.evaluate(
+        'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+      );
+    };
+    await context.route('**/*', async (route) => {
+      if (new URL(route.request().url()).origin !== new URL(url).origin) {
+        external++;
+        await route.abort('blockedbyclient');
+      } else await route.continue();
+    });
+    const page = await context.newPage();
+    page.setDefaultTimeout(15000);
+    page.on('pageerror', () => errors.push('Page error.'));
+    page.on('requestfailed', () => errors.push('Request failed.'));
+    page.on('response', (response) => {
+      if (response.status() < 400) return;
+      const target = new URL(response.url());
+      if (
+        expected !== undefined &&
+        response.status() === 503 &&
+        target.origin === new URL(url).origin &&
+        target.pathname === expected.path
+      )
+        responses.add(response.url());
+      else errors.push(`HTTP status ${response.status()}.`);
+    });
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return;
+      if (
+        (message.text() === "This document requires 'TrustedScript' assignment." ||
+          message.text() ===
+            "This document requires 'TrustedScript' assignment. The action has been blocked.") &&
+        probes++ === 0
+      )
+        return;
+      if (
+        expected !== undefined &&
+        /^Failed to load resource: the server responded with a status of 503(?: \(Service Unavailable\))?$/.test(
+          message.text(),
+        )
+      ) {
+        diagnostics.push(message.location().url);
+        return;
+      }
+      errors.push('Console error.');
+    });
+    const response = await page.goto(url);
+    if (response?.status() !== 200) throw new Error('Page did not return 200.');
+    for (const step of spec.steps) {
+      expected = step.unavailable;
+      if (step.action === 'text') await page.getByText(step.name, { exact: true }).waitFor();
+      else {
+        if (step.role === undefined) throw new Error('Missing step role.');
+        const locator = page.getByRole(step.role, { name: step.name, exact: true });
+        if (step.action === 'check') await locator.check();
+        else if (step.action === 'click') await locator.click();
+        else await locator.waitFor();
+      }
+      if (expected !== undefined) {
+        await page.getByText(expected.text, { exact: true }).waitFor();
+        await flush();
+        if (responses.size === 0) errors.push('Expected HTTP status 503 was not observed.');
+        for (const diagnostic of diagnostics)
+          if (!responses.has(diagnostic))
+            errors.push('Console error: uncorrelated HTTP status 503.');
+        responses.clear();
+        diagnostics.length = 0;
+      }
+      expected = undefined;
+    }
+    // Flush page tasks before inspecting asynchronous console and request callbacks.
+    await flush();
+    if (external > 0) throw new Error(`Cross-origin request attempts: ${external}.`);
+    if (errors.length > 0) throw new Error(errors.join('\n'));
+    return browser.version();
+  } finally {
+    signal?.removeEventListener('abort', abort);
+    await browser.close();
+  }
+}
+
+export function renderResults(results: readonly Result[]): string {
+  return results
+    .map(
+      (result) =>
+        `${result.template} | ${result.node} | npm ${result.npm} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
+    )
+    .join('\n');
+}
+
+if (import.meta.main) {
+  let options: Arguments | undefined;
+  try {
+    options = parseArguments(process.argv.slice(2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : usage);
+    process.exitCode = 2;
+  }
+  if (options?.help) console.info(usage);
+  else if (options !== undefined) {
+    try {
+      // Native Node strips TypeScript but does not remap emitted .js specifiers to source .ts.
+      const core = (await import(
+        new URL('./standalone-core.ts', import.meta.url).href
+      )) as typeof import('./standalone-core.js');
+      const results = await core.runStandalone(
+        {
+          repo: fileURLToPath(new URL('..', import.meta.url)),
+          nodes: options.nodes,
+          modes: options.mode === 'both' ? ['registry', 'tarball'] : [options.mode],
+          specs: templateSpecs.filter(
+            (spec) => options.template === 'all' || spec.name === options.template,
+          ),
+          ...(options.tarballs === undefined ? {} : { tarballs: options.tarballs }),
+          ...(options.exclude === undefined ? {} : { exclude: options.exclude }),
+          keep: options.keep,
+        },
+        {
+          driver: { drive: driveChromium },
+          retained: (path) => console.info(`Retained temporary root: ${path}`),
+        },
+      );
+      console.info(renderResults(results));
+      if (options.mode === 'both')
+        for (const spec of new Set(results.map((result) => result.template)))
+          for (const node of options.nodes) {
+            const matched = results.filter(
+              (result) =>
+                result.template === spec &&
+                Number(result.node.replace(/^v/, '').split('.')[0]) === node.major,
+            );
+            const failed = (mode: Mode): boolean =>
+              matched.some((result) => result.mode === mode && result.failures.length > 0);
+            console.info(
+              `${spec} | Node ${node.major} | ${core.compareModes(failed('registry'), failed('tarball'))}`,
+            );
+          }
+      if (options.json !== undefined)
+        await writeFile(options.json, `${JSON.stringify(results, null, 2)}\n`);
+      if (
+        results.some((result) =>
+          result.failures.some((failure) => failure.gating || failure.source === 'unclassified'),
+        )
+      )
+        process.exitCode = 1;
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : 'Standalone verification failed.');
+      process.exitCode = 1;
+    }
+  }
+}
