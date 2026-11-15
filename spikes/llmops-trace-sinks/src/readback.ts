@@ -202,6 +202,7 @@ export async function waitForScores(
   query: Record<string, string>,
   expectedCount: number,
   inspect?: (response: unknown) => void,
+  ready: (scores: readonly StoredScore[]) => boolean = () => true,
 ): Promise<StoredScore[]> {
   const deadline = Date.now() + scoreWindowMillis;
   let latest: StoredScore[] = [];
@@ -209,7 +210,7 @@ export async function waitForScores(
   do {
     try {
       latest = await scoresQuery(query, inspect);
-      if (latest.length >= expectedCount) return latest;
+      if (latest.length >= expectedCount && ready(latest)) return latest;
     } catch (error) {
       if (error instanceof AssertionError) throw error;
       transient = error;
