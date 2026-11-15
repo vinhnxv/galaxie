@@ -168,6 +168,11 @@ recorded. If any label allows only `in-browser`, text is omitted regardless of
 the declaration. Serialization failure also omits text silently. Do not widen
 the data policy merely to enable tracing.
 
+For collector fan-out, `developmentTraceText.destination` **must** be the
+least-trusted class among all exporters in the pipeline: use `third-party` if
+any exporter sends to a hosted service. Labels are checked against the one
+declared class, not separately for each exporter.
+
 These opted-in messages and arguments are verbatim: agent code can put tool
 results, URLs or error text inside them. They are not redacted. galaxie adds no
 separate capability-result, URL, header, credential or error-message attribute.
@@ -182,15 +187,22 @@ errors, events, snapshots or spans. It is not content-free telemetry. See the
 
 ## Register a browser exporter in the host
 
-This is a host-side example of the `WebTracerProvider` API, using host-selected
-compatible OpenTelemetry packages. The repository does not install these web
-SDK/exporter packages, compile this example or test a collector connection;
-its tracing tests use the installed `@opentelemetry/sdk-trace` in-memory exporter.
-This documentation adds no dependency.
+This host-side example follows the corrected SDK shape used by the isolated
+[Chromium spike](../../spikes/llmops-trace-sinks/README.md#chromium-page-measurements),
+outside root CI. The spike ran it against a local collector; repository tracing
+tests still use the in-memory exporter. This guide adds no dependency.
+The lane used `@opentelemetry/sdk-trace` and resources 3.1.0, OTLP/HTTP exporter
+0.301.0, API 1.10.0, Vite 8.3.4 and playwright-core 1.64.1 with headless Chromium
+156.0.8078.4. Evidence:
+[versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/browserLane`.
 
 ```ts
-import { WebTracerProvider } from '@opentelemetry/sdk-trace-web';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { context, trace } from '@opentelemetry/api';
+import {
+  BatchSpanProcessor,
+  StackContextManager,
+  TracerProvider,
+} from '@opentelemetry/sdk-trace';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { createRuntime } from '@galaxie-ai/core';
 import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
@@ -198,10 +210,11 @@ import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 const exporter = new OTLPTraceExporter({
   url: new URL('/otel/v1/traces', location.origin).href,
 });
-const provider = new WebTracerProvider({
-  spanProcessors: [new BatchSpanProcessor(exporter)],
+const provider = new TracerProvider({
+  spanProcessors: [new BatchSpanProcessor({ exporter })],
 });
-provider.register();
+trace.setGlobalTracerProvider(provider);
+context.setGlobalContextManager(new StackContextManager().enable());
 const runtime = createRuntime({
   appId: 'lesson-app',
   executors: [createLangGraphAdapter()],
@@ -213,17 +226,108 @@ const runtime = createRuntime({
 // await provider.shutdown();
 ```
 
-The host serves `/otel/v1/traces` as a proxy to its collector's OTLP/HTTP
-receiver, preserving the `/v1/traces` receiver path. This is a host endpoint,
-not an API galaxie provides. Configure its authentication, request limits and
-origin policy in the host. A different collector origin also requires explicit
-CORS and [CSP `connect-src`](host-integration.md#csp-and-trusted-types).
-The browser exporter contains no Langfuse secret or authorization header.
+Parenting still uses explicit contexts and forwarded graph config; the stack
+context manager does not supply async browser context propagation. The previous
+web/base SDK example also typechecked, built and exported one span to a scratch
+stub with SDK 2.12.0 / exporter 0.301.2 and SDK 2.12.1 / exporter 0.223.2. Both
+sets had unmet API peer warnings, and the `latest` web/base tags were deprecated.
+Those probes did not measure galaxie graphs or backend ingestion with those
+package sets. Evidence:
+[browser-guide.json](../../spikes/llmops-trace-sinks/results/browser-guide.json)
+`/sets` and `/findings`; the [recorded SDK differences](../../spikes/llmops-trace-sinks/README.md#guide-probe-and-differences).
+
+The host serves `/otel/v1/traces` as a proxy, rewriting to the collector's
+OTLP/HTTP `/v1/traces`. This is a host endpoint; configure its authentication,
+request limits and origin policy in the host. The measured page kept CSP
+`connect-src 'self'`. Direct export to the collector origin produced four
+violations and zero spans in either backend during a 15-second observation
+window after a successful proxied control. A different collector origin needs
+explicit CORS and [CSP `connect-src`](host-integration.md#csp-and-trusted-types).
+No Langfuse key, Basic value or MLflow experiment header appeared in the measured
+bundle or page requests. Evidence:
+[browser-evidence.json](../../spikes/llmops-trace-sinks/results/browser-evidence.json)
+`/proxy`, `/csp`, `/cspControl`, `/scans` and `/credentialPositiveControls`.
+
+For linear and interrupt/resume runs, with text off and on, Chromium produced
+the same normalized backend records as Node, with no lane-specific attributes.
+Browser tool-call and model-failure scenarios are unmeasured. Evidence:
+[browser-linear.json](../../spikes/llmops-trace-sinks/results/browser-linear.json)
+and [node-linear.json](../../spikes/llmops-trace-sinks/results/node-linear.json) `/variants`;
+[browser-interrupt-resume.json](../../spikes/llmops-trace-sinks/results/browser-interrupt-resume.json)
+and [node-interrupt-resume.json](../../spikes/llmops-trace-sinks/results/node-interrupt-resume.json) `/variants`;
+[browser-evidence.json](../../spikes/llmops-trace-sinks/results/browser-evidence.json) `/laneSpecificAttributes`.
+
+Page close can lose spans. With a 60-second batch delay and a 15-second backend
+observation window per case, these were the sampled results. No `pagehide` or
+`sendBeacon` mitigation was added; these counts make no delivery guarantee.
+Evidence: [browser-close.json](../../spikes/llmops-trace-sinks/results/browser-close.json)
+`/cases`; the spike's [page-close notes](../../spikes/llmops-trace-sinks/README.md#chromium-page-measurements).
+
+| Mechanism | Auto flush on hide | Langfuse / MLflow spans | Evidence |
+| --- | --- | --- | --- |
+| Close without explicit flush | Off | 0 / 0 of 3 | [browser-close.json](../../spikes/llmops-trace-sinks/results/browser-close.json) `/cases/0` |
+| Navigate away without explicit flush | SDK default | 3 / 3 of 3 | [browser-close.json](../../spikes/llmops-trace-sinks/results/browser-close.json) `/cases/1` |
+| Explicit `forceFlush()` and `shutdown()`, then close | SDK default | 3 / 3 of 3 | [browser-close.json](../../spikes/llmops-trace-sinks/results/browser-close.json) `/cases/2` |
+
+Page-reported run, trace and session IDs are client-supplied and forgeable.
+The host backend must authorize the whole user/run/segment/trace association
+before posting a score; IDs alone grant no authority. The measured endpoint
+holds the key on the server, takes the user from a harness-issued cookie,
+confirms the trace's own run-ID metadata and segment, binds on first report,
+and rejects an association already bound to another user. Collector acceptance
+precedes backend visibility, so the page must retry `404 not-confirmed` after
+ingestion. Evidence:
+[browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json)
+`/reports`, `/limitations` and `/scans`;
+[gaps.json](../../spikes/llmops-trace-sinks/results/gaps.json), `browser-endpoint`.
+
+| Feedback report | Measured status | Evidence |
+| --- | --- | --- |
+| Own confirmed association | 200 | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/aliceSegmentOne`, `/reports/bobOwnTrace` |
+| Wrong trace or segment | 404 | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/ownedRunOtherTrace`, `/reports/wrongSegment` |
+| Confirmed association owned by another user | 403, which also tells an authenticated caller that the association exists (`galaxie-jjk`) | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/confirmedOtherOwner` |
+| Missing cookie | 401 | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/unauthenticated` |
+
+First-report-wins is only as strong as the secrecy of the IDs: someone who
+learns them first can bind them. Backend confirmation establishes consistency,
+not authenticity. Bind at run start through a host-issued grant for host-side
+hardening (`galaxie-jjk`). The spike's cookie and binding store are an in-memory
+fixture, not an authentication design. Evidence:
+[browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/limitations`.
 
 ## Forward from the collector to Langfuse
 
-The host runs an OpenTelemetry Collector or equivalent proxy. A collector
-configuration can receive OTLP/HTTP behind the host proxy and forward it:
+galaxie works with most OpenTelemetry-based LLMOps and MLflow workflows through
+the host's OpenTelemetry integration. The measured subset is trace export from Node and
+Chromium, host-side Langfuse scores, session grouping, deterministic MLflow
+evaluation, and LangGraph JavaScript and ADK JavaScript span coverage. Root
+input/output does not work yet (`galaxie-d53.7`); Pyodide Python and ADK Go lack
+node and model spans (`galaxie-d53.8`, `galaxie-d53.9`). Evidence:
+[coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json)
+`/rows` and `/gaps`, [feedback-scores.json](../../spikes/llmops-trace-sinks/results/feedback-scores.json)
+`/segments`, [sessions.json](../../spikes/llmops-trace-sinks/results/sessions.json)
+`/phases`, [mlflow-evaluation.json](../../spikes/llmops-trace-sinks/results/mlflow-evaluation.json)
+`/variants`, and the [Chromium results above](#register-a-browser-exporter-in-the-host).
+
+These results are demonstrations on one Apple M5 Pro machine (Darwin arm64),
+not benchmarks, delivery guarantees or deployment recommendations
+([ADR-0016](../adr/0016-parity-demonstrations-and-otel-traces.md);
+[versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/machine`).
+The measured Langfuse is self-hosted v4; Langfuse Cloud and other majors are
+unmeasured.
+
+| Component | Measured version and image digest | Evidence |
+| --- | --- | --- |
+| Langfuse web | 4.80.0; `sha256:0814758db3db8e923f733be3884e7d7a9e3afd60568d874a610d78aae47476c5` | [versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/versions/langfuse`, `/images/1` |
+| Langfuse worker | 4.80.0; `sha256:da9f618dd784219aa6508ab6941c4a89c4ef6fb429fb1734c4163df3baa8f1ca` | [versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/images/0` |
+
+The host runs an OpenTelemetry Collector or equivalent proxy. This fan-out
+configuration matches the measured [collector.yaml](../../spikes/llmops-trace-sinks/collector.yaml)
+except for the receiver bind, adapted here for a **directly run** collector, and one added comment.
+That direct-run bind was not measured. `developmentTraceText.destination` must be
+the least-trusted class among all exporters in this pipeline: use `third-party`
+if either exporter goes to a hosted service. See the
+[least-trusted-destination rule](#default-filter-and-development-text).
 
 ```yaml
 receivers:
@@ -231,34 +335,256 @@ receivers:
     protocols:
       http:
         endpoint: 127.0.0.1:4318
+processors:
+  transform:
+    error_mode: propagate
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["session.id"], attributes["galaxie.session.id"]) where attributes["galaxie.session.id"] != nil
+          - set(attributes["langfuse.observation.metadata.galaxie.run.id"], attributes["galaxie.run.id"]) where attributes["galaxie.run.id"] != nil
 exporters:
   otlphttp/langfuse:
     endpoint: ${env:LANGFUSE_OTEL_ENDPOINT}
     headers:
       Authorization: ${env:LANGFUSE_AUTH_HEADER}
+      x-langfuse-ingestion-version: "4"
+  otlphttp/mlflow:
+    endpoint: ${env:MLFLOW_OTEL_ENDPOINT}
+    compression: none # no compression below MLflow 3.7 (vendor-stated; see the MLflow section)
+    headers:
+      x-mlflow-experiment-id: ${env:MLFLOW_EXPERIMENT_ID}
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [otlphttp/langfuse]
+      processors: [transform]
+      exporters: [otlphttp/langfuse, otlphttp/mlflow]
 ```
+
+The measured [collector.yaml](../../spikes/llmops-trace-sinks/collector.yaml) binds
+`0.0.0.0:4318` **inside a container**, with the port published as
+`127.0.0.1:4318:4318` in [compose.yaml](../../spikes/llmops-trace-sinks/compose.yaml).
+A wildcard host listener was not the measured shape: the smoke check rejects
+one. Evidence: [smoke.json](../../spikes/llmops-trace-sinks/results/smoke.json)
+`/ports` and the spike's [services and controls](../../spikes/llmops-trace-sinks/README.md#services-and-controls).
 
 On the collector only, set `LANGFUSE_OTEL_ENDPOINT` to the chosen Langfuse
 origin plus `/api/public/otel`. The OTLP/HTTP exporter appends `/v1/traces`.
 Set `LANGFUSE_AUTH_HEADER` to the server-generated Basic authorization value for
 the Langfuse public and secret key pair. Keep both environment values in the
 host deployment; never put the secret key in browser code, Vite variables or
-the bundle. Consult the linked
-[Langfuse integration reference](https://langfuse.com/integrations/native/opentelemetry)
-for the host's deployment. This slice records no live Langfuse result.
+the bundle. Every measured run sent `x-langfuse-ingestion-version: 4`; its
+necessity is unmeasured because no run omitted it. Evidence:
+[collector.yaml](../../spikes/llmops-trace-sinks/collector.yaml) `exporters.otlphttp/langfuse`
+and [smoke.json](../../spikes/llmops-trace-sinks/results/smoke.json) `/readback`.
+
+The transform copies `galaxie.session.id` to `session.id` and promotes
+`galaxie.run.id` to `langfuse.observation.metadata.galaxie.run.id` only on spans
+carrying those source attributes. In galaxie's tree that session copy reaches
+the root; it does not populate children. Evidence:
+[collector.yaml](../../spikes/llmops-trace-sinks/collector.yaml) `processors.transform.trace_statements`
+and [sessions.json](../../spikes/llmops-trace-sinks/results/sessions.json) `/phases/0`.
+
+For child grouping, the host's passive `RunTraceMap` observes root spans at
+`onStart` and records run, segment, session and trace IDs without changing spans.
+`SessionCopy` maintains its own trace-to-session map from roots and sets
+`session.id` on each span in that trace.
+These are host processors, with no galaxie API. The measured recipes keep their
+maps in memory without eviction (`SessionCopy` clears only on shutdown), so a
+long-lived host needs its own bounded or durable store. See the measured
+[run-trace.ts](../../spikes/llmops-trace-sinks/src/run-trace.ts) and
+[scores.ts](../../spikes/llmops-trace-sinks/src/scores.ts) recipes.
+Root-only copying grouped three roots per session but missed six children;
+the processor grouped all nine observations, with text off and on. MLflow needed
+only the root mapping. Evidence:
+[sessions.json](../../spikes/llmops-trace-sinks/results/sessions.json)
+`/rootOnlySuffices`, `/fullyGroupedWithProcessor` and `/phases`;
+[gaps.json](../../spikes/llmops-trace-sinks/results/gaps.json), `langfuse-sessions`
+and `mlflow-sessions` entries.
+
+Use the **v2 observations API** for Langfuse lookups. The smoke readback, on a
+hand-made two-span trace with no galaxie runtime, found two observations with
+parent links and typed attributes. For interrupt/resume,
+a `stringObject` metadata filter with column `metadata`, key `galaxie.run.id`
+and operator `=` returned both traces of the run, segments 0 and 1. Evidence:
+[smoke.json](../../spikes/llmops-trace-sinks/results/smoke.json) `/readback/observations`
+and [node-interrupt-resume.json](../../spikes/llmops-trace-sinks/results/node-interrupt-resume.json)
+`/variants/0/runQuery`.
+
+| Measured representation | Langfuse readback | Evidence |
+| --- | --- | --- |
+| Root / node / model / capability | `AGENT` / `SPAN` / `GENERATION` / `TOOL` | [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json) `/rows/langgraph-js/spans`, `/rows/adk-js/spans` |
+| Capability name | Emitted `execute_tool lookup@1` stored as `lookup@1` | [node-tool-call.json](../../spikes/llmops-trace-sinks/results/node-tool-call.json) `/variants/0/findings/0` |
+| LangGraph model usage | 2 input, 3 output, 5 total tokens | [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json) `/rows/langgraph-js/usage/langfuse` |
+| Text off / on, both backends | Default runs store no prompt, reply or tool text. With `developmentTraceText`, destination `host-server` and labels `public`, model input/output appears and Langfuse moves the tool-call arguments JSON onto the tool observation's input (capability results stay absent); root input/output remains absent in both modes. | [node-linear.json](../../spikes/llmops-trace-sinks/results/node-linear.json) `/variants`, [node-tool-call.json](../../spikes/llmops-trace-sinks/results/node-tool-call.json) `/variants`, [versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/nodeHostMeasurement` |
+| Model failure, both backends | Langfuse `ERROR` level and MLflow `STATUS_CODE_ERROR` on model, node and root; each has `error.type`, only the root has `galaxie.error.code`. No error-message text. | [node-model-failure.json](../../spikes/llmops-trace-sinks/results/node-model-failure.json) `/variants` |
+| Credential control | A canary passed through a provider declaring `credential: true` was absent from backend readbacks and page requests. | [node-linear.json](../../spikes/llmops-trace-sinks/results/node-linear.json) `/variants/0/credentialCanaryAbsent`, `/variants/1/credentialCanaryAbsent`; [browser-evidence.json](../../spikes/llmops-trace-sinks/results/browser-evidence.json) `/scans`, `/credentialPositiveControls` |
+
+For host feedback, map the run and segment to its own trace with `RunTraceMap`.
+Before accepting page-reported IDs, apply the
+[host authorization checks](#register-a-browser-exporter-in-the-host).
+The measured [scores.ts](../../spikes/llmops-trace-sinks/src/scores.ts) recipe
+posts an array to `/api/public/scores`, forms the score ID from trace ID and
+score name, supplies an explicit timestamp, and stores the entire first payload
+for unchanged retries. Accepted posts returned 202; readback used
+`/api/public/v3/scores?fields=subject`. Evidence:
+[feedback-scores.json](../../spikes/llmops-trace-sinks/results/feedback-scores.json)
+`/reference` and `/segments`.
+
+| Score case | Measured outcome | Evidence |
+| --- | --- | --- |
+| Stored-payload retry | One visible score per segment, retaining the original value and timestamp | [feedback-scores.json](../../spikes/llmops-trace-sinks/results/feedback-scores.json) `/segments`; [gaps.json](../../spikes/llmops-trace-sinks/results/gaps.json), `score-idempotency` |
+| Same ID, later-day payload | One visible row with the new value; whether a second physical row exists is unmeasured | [feedback-scores.json](../../spikes/llmops-trace-sinks/results/feedback-scores.json) `/freshTimestampControl`; [gaps.json](../../spikes/llmops-trace-sinks/results/gaps.json), `score-idempotency` |
+| Before trace ingestion | Score accepted before observations existed; after flush, all three observations and the unchanged score linked to the trace | [feedback-scores.json](../../spikes/llmops-trace-sinks/results/feedback-scores.json) `/beforeIngestion` |
+| Unknown run or segment | Explicit `unmapped`, no POST | [feedback-scores.json](../../spikes/llmops-trace-sinks/results/feedback-scores.json) `/unmapped` |
+
+## Forward from the collector to MLflow
+
+MLflow 3.18.0 was measured with Node and Chromium trace export, root-based
+session grouping, deterministic evaluation, and LangGraph JavaScript and ADK
+JavaScript span coverage. Root request/response is still absent with text on
+or off (`galaxie-d53.7`); Python and Go backend classification is unmeasured.
+Evidence: [versions.json](../../spikes/llmops-trace-sinks/results/versions.json)
+`/versions/mlflow`, [sessions.json](../../spikes/llmops-trace-sinks/results/sessions.json)
+`/phases`, [mlflow-evaluation.json](../../spikes/llmops-trace-sinks/results/mlflow-evaluation.json)
+`/variants`, [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json)
+`/rows`, and the [Chromium results above](#register-a-browser-exporter-in-the-host).
+
+The measured image is `ghcr.io/mlflow/mlflow:v3.18.0`, digest
+`sha256:257204c77980b0f3450a26eb6089e487603fcdd4509529eadaf88f90669f5c13`.
+Evidence: [versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/images/6`.
+MLflow's documentation states that OTLP trace ingestion needs 3.6 or later and
+that compressed payloads are accepted from 3.7 on, so use no compression below 3.7
+([MLflow OpenTelemetry ingestion](https://www.mlflow.org/docs/latest/genai/tracing/opentelemetry/ingest/)).
+These two points are **vendor-stated, not measured here**. Only 3.18.0 with `compression: none` was
+run; versions 3.6 through 3.17 and gzip are unmeasured. Evidence for the measured
+setting: [versions.json](../../spikes/llmops-trace-sinks/results/versions.json)
+`/collectorDecision/mlflowCompression` and
+[collector.yaml](../../spikes/llmops-trace-sinks/collector.yaml) `exporters.otlphttp/mlflow`.
+
+In the [fan-out example](#forward-from-the-collector-to-langfuse),
+`MLFLOW_OTEL_ENDPOINT` is the MLflow origin; the exporter appends `/v1/traces`.
+Create or look up the experiment on the host and provide its ID through
+`x-mlflow-experiment-id`, never browser code. The smoke readback found one trace
+with two spans. Evidence:
+[collector.yaml](../../spikes/llmops-trace-sinks/collector.yaml) `exporters.otlphttp/mlflow`,
+[smoke.json](../../spikes/llmops-trace-sinks/results/smoke.json) `/readback/traces`
+and `/readback/spans`; [browser-evidence.json](../../spikes/llmops-trace-sinks/results/browser-evidence.json)
+`/scans` records no experiment header in page traffic.
+
+| Emitted span | Measured MLflow type | Evidence |
+| --- | --- | --- |
+| Root | `AGENT` | [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json) `/rows/langgraph-js/spans/root/mlflow`, `/rows/adk-js/spans/root/mlflow` |
+| Node | No type | [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json) `/rows/langgraph-js/spans/node/mlflow`, `/rows/adk-js/spans/node/mlflow` |
+| Model | `CHAT_MODEL` | [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json) `/rows/langgraph-js/spans/model/mlflow`, `/rows/adk-js/spans/model/mlflow` |
+| Capability | `TOOL`; name retained as emitted (`execute_tool lookup@1`) | [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json) `/rows/langgraph-js/spans/capability/mlflow` |
+
+LangGraph model usage was 2 input, 3 output and 5 total tokens, matching the
+emitted values ([coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json)
+`/rows/langgraph-js/usage/mlflow`). MLflow parsed the opted-in
+`gen_ai.tool.call.arguments` JSON string into an object in the attribute and
+tool input: the value survived but the attribute type changed
+([node-tool-call.json](../../spikes/llmops-trace-sinks/results/node-tool-call.json)
+`/variants/1/findings` and `/variants/1/backends/mlflow`).
+
+Search sessions through `mlflow.trace.session`: two sessions returned exactly
+their three traces each in every phase, using only the root session mapping.
+No child processor was needed. Evidence:
+[sessions.json](../../spikes/llmops-trace-sinks/results/sessions.json)
+`/rootOnlySuffices/mlflow` and `/phases`.
+
+The measured host-side [Python evaluation recipe](../../spikes/llmops-trace-sinks/python/evaluate.py)
+uses this sequence, with deterministic code scorers and no model-based judge or
+provider key. Evidence:
+[mlflow-evaluation.json](../../spikes/llmops-trace-sinks/results/mlflow-evaluation.json)
+`/scorers` and `/variants`.
+
+```text
+mlflow.search_traces: filter metadata.`mlflow.trace.session` by session
+mlflow.genai.evaluate: pass the searched traces and these code scorers
+  chat_usage_total
+  chat_text_present
+  root_io_present
+```
+
+Each text mode produced six traces, six evaluation rows and six non-null values
+per scorer. Usage was 5 per trace; chat text presence followed opt-in.
+Root request/response and `root_io_present` stayed empty/false in both modes
+(`galaxie-d53.7`). Evidence:
+[mlflow-evaluation.json](../../spikes/llmops-trace-sinks/results/mlflow-evaluation.json)
+`/variants/0` and `/variants/1`; [gaps.json](../../spikes/llmops-trace-sinks/results/gaps.json),
+`mlflow-root-io`. The pinned recipe's `experiment_ids` search argument still
+worked but emitted a deprecation warning, as recorded in the spike's
+[evaluation notes](../../spikes/llmops-trace-sinks/README.md#host-feedback-sessions-and-deterministic-evaluation).
+
+## Use Langfuse and MLflow responsibly
+
+Use Langfuse and MLflow as developer debugging tools: for developers and users
+who want to inspect how their own app and agents work. Tell users clearly what
+is traced and where it is sent. Keep development trace text off unless needed,
+and check [labels and the final destination](#default-filter-and-development-text)
+before enabling it. Never use these tools to track users, and do not put user identifiers in
+`session.id` or run IDs.
+
+## Limits and unmeasured items
+
+- Results demonstrate sampled deliveries on one machine. Trace-export retries,
+  delivery guarantees, capacity, sustained operation, latency and failure recovery
+  are unmeasured. Score-payload retries above are a separate measured workflow.
+  Evidence for scope: [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json)
+  `/notMeasured` and the spike's [feedback limits](../../spikes/llmops-trace-sinks/README.md#host-feedback-sessions-and-deterministic-evaluation).
+- Langfuse Cloud, other Langfuse majors, MLflow versions 3.6 through 3.17, gzip,
+  ingestion-header necessity, physical score-row storage and Langfuse/MLflow web
+  UI views are unmeasured. The MLflow floor and compression rule are vendor-stated,
+  not measured here. See the evidence and qualifications in the
+  [Langfuse](#forward-from-the-collector-to-langfuse) and
+  [MLflow](#forward-from-the-collector-to-mlflow) sections.
+- Root input/output remains absent in both backends, even with opted-in model
+  text (`galaxie-d53.7`). Evidence:
+  [node-linear.json](../../spikes/llmops-trace-sinks/results/node-linear.json) `/variants`,
+  [mlflow-evaluation.json](../../spikes/llmops-trace-sinks/results/mlflow-evaluation.json)
+  `/variants`, [gaps.json](../../spikes/llmops-trace-sinks/results/gaps.json), `mlflow-root-io`.
+- LangGraph Python in Pyodide and ADK Go emitted root and capability spans but
+  no node or model spans; these were in-memory measurements, not backend runs
+  (`galaxie-d53.8`, `galaxie-d53.9`). ADK Python, DSPy and Pydantic AI drivers
+  are unmeasured here. Evidence:
+  [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json)
+  `/rows/pyodide-langgraph-python`, `/rows/adk-go`, `/gaps`, `/notMeasured`.
+- ADK's own instrumentation is outside galaxie's allowlist. The measured run set
+  `ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false`; its five ADK spans formed five
+  separate traces with empty attributes. They fall in the spike's `other` bucket
+(no galaxie span kind); Langfuse stores them as `SPAN` and MLflow assigns no type. In-memory
+  controls with a Node context manager detected prompt, reply, argument and result
+  text with capture on, and no markers with capture off. Empty measured attributes
+  alone do not prove the flag's effect. ADK nesting needs a host context manager;
+  nesting with one is unmeasured here. Evidence:
+  [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json)
+  `/rows/adk-js/controls/captureMessageContent`, `/rows/adk-js-own-spans`;
+  [control details](../../spikes/llmops-trace-sinks/README.md#span-coverage-per-executor-family).
+- Browser backend ingestion was measured only on Chromium, only for linear and
+  interrupt/resume scenarios. Tool-call and model-failure scenarios, Firefox,
+  WebKit, real devices, real models/prompts and answer quality are unmeasured in
+  this spike. Page-close loss is recorded [above](#register-a-browser-exporter-in-the-host).
+  Evidence: [browser-guide.json](../../spikes/llmops-trace-sinks/results/browser-guide.json)
+  `/notMeasured`, [browser-close.json](../../spikes/llmops-trace-sinks/results/browser-close.json)
+  `/cases`, and the spike's [Chromium scope](../../spikes/llmops-trace-sinks/README.md#repeat-and-limits).
+- Vendor telemetry stayed at defaults; its payloads and all container egress are
+  unmeasured. Real user authentication, durable run/trace bindings and durable
+  score-payload storage are unmeasured. Evidence:
+  [versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/telemetry`,
+  [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json)
+  `/limitations`, and the spike's [feedback limits](../../spikes/llmops-trace-sinks/README.md#host-feedback-sessions-and-deterministic-evaluation).
 
 ## Local proof
 
 Run `pnpm test tests/conformance/trace-context.test.ts` for injected-fetch HTTP
 parenting and MCP call/refresh headers on Node and Chromium. The baggage/global
 propagator case runs on Node and is skipped in the browser because it needs a
-global context manager at run start. These are local fixtures, with no live
-collector or backend exporter measurement.
+global context manager at run start. These repository tests use local fixtures;
+the separate live collector/backend measurements are recorded in the
+[spike README](../../spikes/llmops-trace-sinks/README.md) and its committed
+[results](../../spikes/llmops-trace-sinks/results).
 
 Run `pnpm test tests/conformance/tracing.test.ts` for mock-provider span trees,
 failure hygiene and live-label text omission on Node and headless Chromium.

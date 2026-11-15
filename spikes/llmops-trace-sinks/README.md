@@ -139,6 +139,36 @@ experiment ID are excluded from that credential scan.
 
 ## Measured result and limits
 
+These tables repeat [results/versions.json](results/versions.json), which remains authoritative.
+
+| Component | Version | Image digest |
+| --- | --- | --- |
+| Langfuse web | 4.80.0 | `sha256:0814758db3db8e923f733be3884e7d7a9e3afd60568d874a610d78aae47476c5` |
+| Langfuse worker | 4.80.0 | `sha256:da9f618dd784219aa6508ab6941c4a89c4ef6fb429fb1734c4163df3baa8f1ca` |
+| MLflow (`ghcr.io/mlflow/mlflow:v3.18.0`) | 3.18.0 | `sha256:257204c77980b0f3450a26eb6089e487603fcdd4509529eadaf88f90669f5c13` |
+| OpenTelemetry Collector contrib | 0.154.0 | `sha256:b3079f45e19bdb7326bf49cdddce6cf60dfd865138db39f2733ea48ab17bc4cb` |
+| Postgres | 17.12 | `sha256:846a7ddaa67a4b354ae1d21087b683901aa6113a4ed626d3787cfbf6c85e3e07` |
+| ClickHouse | 26.3.62.3 | `sha256:de3e47c64078aa196dae2349e048fc98ba81947f651f5c20e06e46baea8ae40a` |
+| Redis | 7.4.12 | `sha256:2e3eb11462c4e3759e6972678dd051d150ff54b1e60714b3c33b701260172a90` |
+| MinIO (`cgr.dev/chainguard/minio`, tag `latest`) | `minio version RELEASE.2026-11-12T01-15-23Z (commit-id=a60e2a7b026ab48e41a23a4230aad773c4eae2e0)` | `sha256:0f9fda72fbc6bd3560ea903aec2ceefa20f6ba82628d67656f37fb370c39ae9c` |
+| OTLP/HTTP exporter | 0.301.0 | n/a (npm) |
+| `@opentelemetry/sdk-trace` | 3.1.0 | n/a (npm) |
+
+| Machine field | Recorded value |
+| --- | --- |
+| OS | Darwin 27.2.0 |
+| Architecture | arm64 |
+| CPU | Apple M5 Pro |
+| Logical CPUs | 15 |
+| Memory | 24 GiB (25769803776 bytes) |
+| Node, Node lane | v26.13.0 |
+| Node, browser lane | v24.15.0 |
+| pnpm | 11.21.0 |
+| Docker server | 29.5.2 |
+| Compose | 5.7.0 |
+| Daemon | colima |
+| Daemon resources | 4 CPUs, 10405429248 bytes memory |
+
 [versions.json](results/versions.json) records the actual machine, runtime
 versions, pulled image digests and collector decision.
 [smoke.json](results/smoke.json) records normalized API readback and host publication.
@@ -437,7 +467,7 @@ or `sendBeacon` mitigation was added.
 ### Guide probe and differences
 
 [browser-guide.json](results/browser-guide.json) records two scratch installs
-outside the repository. The browser-exporter guide excerpt was tried verbatim,
+outside the repository. The earlier browser-exporter guide excerpt was tried verbatim,
 then a separate harness created one SDK span and flushed it to a same-origin
 loopback stub. Both package sets passed typechecking, Vite build and Chromium
 export:
@@ -449,13 +479,13 @@ export:
 
 Both sets emitted unmet API peer warnings; pnpm retained one API version rather
 than installing a second one, and each scratch bundle contained one API copy.
-The `latest` web/base SDK tags were deprecated. The guide's constructor and
+The `latest` web/base SDK tags were deprecated. The earlier guide's constructor and
 `register()` worked in both sets. These are initialization and one-span stub
 measurements, not galaxie graph or backend parity with the web SDK packages.
-The guide stays unchanged.
+The [guide's browser example](../../docs/guides/tracing.md#register-a-browser-exporter-in-the-host) was later updated to the live page's SDK shape.
 
 The live page instead keeps the Node lane's aligned SDK/exporter pair. Its code
-shape differs from the guide as follows:
+shape differed from the earlier guide example as follows (the guide now shows the live shape):
 
 - Import `TracerProvider`, `BatchSpanProcessor` and `StackContextManager` from
   `@opentelemetry/sdk-trace`, rather than the web/base SDK packages.
