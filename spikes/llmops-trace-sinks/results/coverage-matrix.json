@@ -1,0 +1,703 @@
+{
+  "scenario": {
+    "description": "One capability call preceded by model calls; tool-calling loops require a second model call after the result.",
+    "text": false,
+    "pythonAndGoBackends": "not measured: maintainer decision",
+    "vendorTelemetry": "Langfuse and MLflow defaults, by maintainer decision"
+  },
+  "rows": {
+    "langgraph-js": {
+      "id": "langgraph-js",
+      "measurement": "measured",
+      "lane": "live",
+      "fixture": ["src/scenarios.ts#tool-call", "tests/conformance/support/scripted-chat-model.ts"],
+      "scriptedCalls": {
+        "model": 1,
+        "capability": 1
+      },
+      "executorId": "langgraph-js",
+      "spans": {
+        "root": {
+          "emitted": {
+            "count": 1,
+            "names": ["invoke_agent spike/tool-call"]
+          },
+          "langfuse": {
+            "count": 1,
+            "names": ["invoke_agent spike/tool-call"],
+            "types": ["AGENT"]
+          },
+          "mlflow": {
+            "count": 1,
+            "names": ["invoke_agent spike/tool-call"],
+            "types": ["AGENT"]
+          }
+        },
+        "node": {
+          "emitted": {
+            "count": 2,
+            "names": ["galaxie.node lookup", "galaxie.node respond"]
+          },
+          "langfuse": {
+            "count": 2,
+            "names": ["galaxie.node lookup", "galaxie.node respond"],
+            "types": ["SPAN", "SPAN"]
+          },
+          "mlflow": {
+            "count": 2,
+            "names": ["galaxie.node lookup", "galaxie.node respond"],
+            "types": [null, null]
+          }
+        },
+        "model": {
+          "emitted": {
+            "count": 1,
+            "names": ["chat fixture-1"]
+          },
+          "langfuse": {
+            "count": 1,
+            "names": ["chat fixture-1"],
+            "types": ["GENERATION"]
+          },
+          "mlflow": {
+            "count": 1,
+            "names": ["chat fixture-1"],
+            "types": ["CHAT_MODEL"]
+          }
+        },
+        "capability": {
+          "emitted": {
+            "count": 1,
+            "names": ["execute_tool lookup@1"]
+          },
+          "langfuse": {
+            "count": 1,
+            "names": ["lookup@1"],
+            "types": ["TOOL"]
+          },
+          "mlflow": {
+            "count": 1,
+            "names": ["execute_tool lookup@1"],
+            "types": ["TOOL"]
+          }
+        },
+        "other": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": {
+            "count": 0,
+            "names": [],
+            "types": []
+          },
+          "mlflow": {
+            "count": 0,
+            "names": [],
+            "types": []
+          }
+        }
+      },
+      "usage": {
+        "emitted": [
+          {
+            "name": "chat fixture-1",
+            "present": true,
+            "input": 2,
+            "output": 3,
+            "total": 5
+          }
+        ],
+        "langfuse": [
+          {
+            "name": "chat fixture-1",
+            "present": true,
+            "input": 2,
+            "output": 3,
+            "total": 5
+          }
+        ],
+        "mlflow": [
+          {
+            "name": "chat fixture-1",
+            "present": true,
+            "input": 2,
+            "output": 3,
+            "total": 5
+          }
+        ]
+      },
+      "tree": [
+        {
+          "name": "chat fixture-1",
+          "kind": "model",
+          "parentName": "galaxie.node respond"
+        },
+        {
+          "name": "execute_tool lookup@1",
+          "kind": "capability",
+          "parentName": "galaxie.node lookup"
+        },
+        {
+          "name": "galaxie.node lookup",
+          "kind": "node",
+          "parentName": "invoke_agent spike/tool-call"
+        },
+        {
+          "name": "galaxie.node respond",
+          "kind": "node",
+          "parentName": "invoke_agent spike/tool-call"
+        },
+        {
+          "name": "invoke_agent spike/tool-call",
+          "kind": "root",
+          "parentName": null
+        }
+      ],
+      "controls": {
+        "credentialCalls": 1,
+        "spanIdsAndParentsMatch": true,
+        "rawResponsesScanned": true
+      }
+    },
+    "adk-js": {
+      "id": "adk-js",
+      "measurement": "measured",
+      "lane": "live",
+      "fixture": [
+        "tests/conformance/support/adk.ts#runAdkGalaxie",
+        "tests/conformance/cases-adk/fixtures.json#capability"
+      ],
+      "scriptedCalls": {
+        "model": 2,
+        "capability": 1
+      },
+      "executorId": "adk-js",
+      "spans": {
+        "root": {
+          "emitted": {
+            "count": 1,
+            "names": ["invoke_agent spike/adk-span-coverage"]
+          },
+          "langfuse": {
+            "count": 1,
+            "names": ["invoke_agent spike/adk-span-coverage"],
+            "types": ["AGENT"]
+          },
+          "mlflow": {
+            "count": 1,
+            "names": ["invoke_agent spike/adk-span-coverage"],
+            "types": ["AGENT"]
+          }
+        },
+        "node": {
+          "emitted": {
+            "count": 1,
+            "names": ["galaxie.node adk.run"]
+          },
+          "langfuse": {
+            "count": 1,
+            "names": ["galaxie.node adk.run"],
+            "types": ["SPAN"]
+          },
+          "mlflow": {
+            "count": 1,
+            "names": ["galaxie.node adk.run"],
+            "types": [null]
+          }
+        },
+        "model": {
+          "emitted": {
+            "count": 2,
+            "names": ["chat", "chat"]
+          },
+          "langfuse": {
+            "count": 2,
+            "names": ["chat", "chat"],
+            "types": ["GENERATION", "GENERATION"]
+          },
+          "mlflow": {
+            "count": 2,
+            "names": ["chat", "chat"],
+            "types": ["CHAT_MODEL", "CHAT_MODEL"]
+          }
+        },
+        "capability": {
+          "emitted": {
+            "count": 1,
+            "names": ["execute_tool math.double@1"]
+          },
+          "langfuse": {
+            "count": 1,
+            "names": ["math.double@1"],
+            "types": ["TOOL"]
+          },
+          "mlflow": {
+            "count": 1,
+            "names": ["execute_tool math.double@1"],
+            "types": ["TOOL"]
+          }
+        },
+        "other": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": {
+            "count": 0,
+            "names": [],
+            "types": []
+          },
+          "mlflow": {
+            "count": 0,
+            "names": [],
+            "types": []
+          }
+        }
+      },
+      "usage": {
+        "emitted": [
+          {
+            "name": "chat",
+            "present": true,
+            "input": 2,
+            "output": 2,
+            "total": 4
+          },
+          {
+            "name": "chat",
+            "present": true,
+            "input": 2,
+            "output": 2,
+            "total": 4
+          }
+        ],
+        "langfuse": [
+          {
+            "name": "chat",
+            "present": true,
+            "input": 2,
+            "output": 2,
+            "total": 4
+          },
+          {
+            "name": "chat",
+            "present": true,
+            "input": 2,
+            "output": 2,
+            "total": 4
+          }
+        ],
+        "mlflow": [
+          {
+            "name": "chat",
+            "present": true,
+            "input": 2,
+            "output": 2,
+            "total": 4
+          },
+          {
+            "name": "chat",
+            "present": true,
+            "input": 2,
+            "output": 2,
+            "total": 4
+          }
+        ]
+      },
+      "tree": [
+        {
+          "name": "chat",
+          "kind": "model",
+          "parentName": "galaxie.node adk.run"
+        },
+        {
+          "name": "chat",
+          "kind": "model",
+          "parentName": "galaxie.node adk.run"
+        },
+        {
+          "name": "execute_tool math.double@1",
+          "kind": "capability",
+          "parentName": "galaxie.node adk.run"
+        },
+        {
+          "name": "galaxie.node adk.run",
+          "kind": "node",
+          "parentName": "invoke_agent spike/adk-span-coverage"
+        },
+        {
+          "name": "invoke_agent spike/adk-span-coverage",
+          "kind": "root",
+          "parentName": null
+        }
+      ],
+      "controls": {
+        "modelCalls": 2,
+        "capabilityCalls": 1,
+        "outputCorrect": true,
+        "spanIdsAndParentsMatch": true,
+        "rawResponsesScanned": true,
+        "captureMessageContent": false
+      },
+      "versions": {
+        "adk": "2.3.0"
+      }
+    },
+    "adk-js-own-spans": {
+      "id": "adk-js-own-spans",
+      "measurement": "measured",
+      "lane": "live",
+      "fixture": ["tests/conformance/cases-adk/fixtures.json#capability"],
+      "scriptedCalls": {
+        "model": 2,
+        "capability": 1
+      },
+      "executorId": null,
+      "spans": {
+        "root": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": {
+            "count": 0,
+            "names": [],
+            "types": []
+          },
+          "mlflow": {
+            "count": 0,
+            "names": [],
+            "types": []
+          }
+        },
+        "node": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": {
+            "count": 0,
+            "names": [],
+            "types": []
+          },
+          "mlflow": {
+            "count": 0,
+            "names": [],
+            "types": []
+          }
+        },
+        "model": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": {
+            "count": 0,
+            "names": [],
+            "types": []
+          },
+          "mlflow": {
+            "count": 0,
+            "names": [],
+            "types": []
+          }
+        },
+        "capability": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": {
+            "count": 0,
+            "names": [],
+            "types": []
+          },
+          "mlflow": {
+            "count": 0,
+            "names": [],
+            "types": []
+          }
+        },
+        "other": {
+          "emitted": {
+            "count": 5,
+            "names": [
+              "call_llm",
+              "call_llm",
+              "execute_tool math_double_1",
+              "invocation",
+              "invoke_agent agent"
+            ]
+          },
+          "langfuse": {
+            "count": 5,
+            "names": [
+              "call_llm",
+              "call_llm",
+              "execute_tool math_double_1",
+              "invocation",
+              "invoke_agent agent"
+            ],
+            "types": ["SPAN", "SPAN", "SPAN", "SPAN", "SPAN"]
+          },
+          "mlflow": {
+            "count": 5,
+            "names": [
+              "call_llm",
+              "call_llm",
+              "execute_tool math_double_1",
+              "invocation",
+              "invoke_agent agent"
+            ],
+            "types": [null, null, null, null, null]
+          }
+        }
+      },
+      "usage": "not applicable: no model spans",
+      "tree": [
+        {
+          "name": "call_llm",
+          "kind": "other",
+          "parentName": null
+        },
+        {
+          "name": "call_llm",
+          "kind": "other",
+          "parentName": null
+        },
+        {
+          "name": "execute_tool math_double_1",
+          "kind": "other",
+          "parentName": null
+        },
+        {
+          "name": "invocation",
+          "kind": "other",
+          "parentName": null
+        },
+        {
+          "name": "invoke_agent agent",
+          "kind": "other",
+          "parentName": null
+        }
+      ],
+      "controls": {
+        "contentControlDetected": true,
+        "controlContextManager": "Node AsyncLocalStorage; in-memory control only",
+        "measuredContextManager": "none",
+        "controlMarkersDetected": 4,
+        "measuredContentAbsent": true,
+        "spanIdsAndParentsMatch": true,
+        "rawResponsesScanned": true,
+        "sharesGalaxieTrace": false,
+        "traceCount": 5
+      }
+    },
+    "pyodide-langgraph-python": {
+      "id": "pyodide-langgraph-python",
+      "measurement": "measured",
+      "lane": "in-memory",
+      "fixture": [
+        "examples/rag-browser/test/support/python.node.ts",
+        "tests/conformance/pyodide.node.test.ts"
+      ],
+      "scriptedCalls": {
+        "model": 1,
+        "capability": 1
+      },
+      "executorId": "langgraph-python",
+      "spans": {
+        "root": {
+          "emitted": {
+            "count": 1,
+            "names": ["invoke_agent coverage/python"]
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        },
+        "node": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        },
+        "model": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        },
+        "capability": {
+          "emitted": {
+            "count": 1,
+            "names": ["execute_tool lookup@1"]
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        },
+        "other": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        }
+      },
+      "usage": "not applicable: no model spans",
+      "tree": [
+        {
+          "name": "execute_tool lookup@1",
+          "kind": "capability",
+          "parentName": "invoke_agent coverage/python"
+        },
+        {
+          "name": "invoke_agent coverage/python",
+          "kind": "root",
+          "parentName": null
+        }
+      ],
+      "controls": {
+        "modelCalls": 1,
+        "capabilityCalls": 1,
+        "outputCorrect": true,
+        "noAdkOwnSpans": true
+      },
+      "versions": {
+        "pyodide": "314.0.7"
+      }
+    },
+    "adk-go": {
+      "id": "adk-go",
+      "measurement": "measured",
+      "lane": "in-memory",
+      "fixture": [
+        "examples/rag-browser/test/support/adk-go-ref/run.ts",
+        "examples/rag-browser/test/support/adk-go-reference.node.ts",
+        "tests/conformance/cases-adk-go/scripts.json#capability-tool",
+        "tests/conformance/golden-adk-go/capability-tool.json"
+      ],
+      "scriptedCalls": {
+        "model": 2,
+        "capability": 1
+      },
+      "executorId": "adk-go",
+      "spans": {
+        "root": {
+          "emitted": {
+            "count": 1,
+            "names": ["invoke_agent conformance/adk-go"]
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        },
+        "node": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        },
+        "model": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        },
+        "capability": {
+          "emitted": {
+            "count": 1,
+            "names": ["execute_tool math.double@1"]
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        },
+        "other": {
+          "emitted": {
+            "count": 0,
+            "names": []
+          },
+          "langfuse": "not measured: maintainer decision",
+          "mlflow": "not measured: maintainer decision"
+        }
+      },
+      "usage": "not applicable: no model spans",
+      "tree": [
+        {
+          "name": "execute_tool math.double@1",
+          "kind": "capability",
+          "parentName": "invoke_agent conformance/adk-go"
+        },
+        {
+          "name": "invoke_agent conformance/adk-go",
+          "kind": "root",
+          "parentName": null
+        }
+      ],
+      "controls": {
+        "modelCalls": 2,
+        "capabilityCalls": 1,
+        "outputCorrect": true,
+        "goldenTranscriptMatched": true,
+        "noAdkOwnSpans": true
+      },
+      "versions": {
+        "go": "go1.27.3",
+        "adk": "v1.9.0"
+      }
+    }
+  },
+  "gaps": [
+    {
+      "name": "pyodide-langgraph-python-span-coverage",
+      "disposition": "follow-up",
+      "finding": "pyodide-langgraph-python emits no node and model spans in the measured scenario, despite the scripted model and capability calls completing.",
+      "evidence": [
+        {
+          "file": "coverage-matrix.json",
+          "path": "/rows/pyodide-langgraph-python/spans/node"
+        },
+        {
+          "file": "coverage-matrix.json",
+          "path": "/rows/pyodide-langgraph-python/spans/model"
+        }
+      ],
+      "proposedFix": "Emit node and model spans at the adapter boundary where the host brokers model calls and receives step notifications. Use the existing RunTrace contract and attribute allowlist, include usage from each host-side model response, and keep vendor mapping in the host collector.",
+      "beadsIssue": "PENDING-CLAUDE"
+    },
+    {
+      "name": "adk-go-span-coverage",
+      "disposition": "follow-up",
+      "finding": "adk-go emits no node and model spans in the measured scenario, despite the scripted model and capability calls completing.",
+      "evidence": [
+        {
+          "file": "coverage-matrix.json",
+          "path": "/rows/adk-go/spans/node"
+        },
+        {
+          "file": "coverage-matrix.json",
+          "path": "/rows/adk-go/spans/model"
+        }
+      ],
+      "proposedFix": "Emit node and model spans at the adapter boundary where the host brokers model calls and receives step notifications. Use the existing RunTrace contract and attribute allowlist, include usage from each host-side model response, and keep vendor mapping in the host collector.",
+      "beadsIssue": "PENDING-CLAUDE"
+    }
+  ],
+  "notMeasured": [
+    "ADK Python, DSPy and Pydantic AI drivers",
+    "Browsers, engines and real devices",
+    "Real models and answer quality",
+    "ADK span nesting with a context manager",
+    "Langfuse and MLflow classification of Python and Go trees: maintainer decision",
+    "Delivery guarantees, retries, capacity and latency",
+    "Vendor telemetry payloads and all container egress"
+  ]
+}

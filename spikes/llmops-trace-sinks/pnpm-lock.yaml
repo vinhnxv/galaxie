@@ -54,6 +54,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@google/adk':
+        specifier: link:../../packages/adapter-adk/node_modules/@google/adk
+        version: link:../../packages/adapter-adk/node_modules/@google/adk
       '@opentelemetry/exporter-trace-otlp-http':
         specifier: 0.301.0
         version: 0.301.0(@opentelemetry/api@1.10.0)
