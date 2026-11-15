@@ -141,6 +141,7 @@ test('launch entries come from public manifests and include all default subpaths
       private: false,
       exports: {
         './worker': { types: './dist/worker.d.ts', default: './dist/worker.js' },
+        './schema.json': { default: './dist/schema.json' },
         '.': { types: './dist/index.d.ts', default: './dist/index.js' },
       },
     }),
@@ -161,6 +162,18 @@ test('launch entries come from public manifests and include all default subpaths
     file: join(directory, 'public/dist/index.js'),
   });
   expect(entries[2]?.file).toBe(join(directory, 'second/dist/worker.js'));
+});
+
+test('a JavaScript export outside dist is still rejected', () => {
+  const directory = fixture({
+    'public/package.json': JSON.stringify({
+      name: '@fixture/public',
+      exports: { '.': { default: './src/index.js' } },
+    }),
+  });
+  expect(() => discoverEntries(directory)).toThrow(
+    '@fixture/public/.: expected a default JavaScript export under dist/.',
+  );
 });
 
 test('a missing distribution file names the entry and asks for a build', async () => {

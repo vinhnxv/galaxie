@@ -100,6 +100,9 @@ const alias = {
   '@galaxie-ai/models/decision': fileURLToPath(
     new URL('./packages/models/src/decision/structured.ts', import.meta.url),
   ),
+  '@galaxie-ai/core/config': fileURLToPath(
+    new URL('./packages/core/src/config/index.ts', import.meta.url),
+  ),
   '@galaxie-ai/core/browser': fileURLToPath(
     new URL('./packages/core/src/browser.ts', import.meta.url),
   ),

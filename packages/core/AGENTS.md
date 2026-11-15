@@ -16,6 +16,10 @@ provenance for materialized pending surfaces. Legacy requests retain their old p
   with no unguarded browser globals.
 - `@galaxie-ai/core/browser` opts into ownership and invalidation helpers and their
   types from [src/browser.ts](src/browser.ts).
+- `@galaxie-ai/core/config` exports `validateHostConfig`, `buildHostConfig`,
+  `buildRuntimeLimits`, `hostConfigJsonSchema`, `HostConfigError` and document/hook
+  types. Only this entry imports Zod at runtime. The generated JSON Schema is
+  exported as `@galaxie-ai/core/host-config.schema.json`.
 - `createRuntime`, `defineAgentDefinition` and `createManifest` construct runtime,
   definition and build-time manifest data respectively.
 - `injectTraceContext(context, headers)` adds only W3C trace context for live
@@ -61,7 +65,9 @@ const runtime = createRuntime({
 - Never add generic fetch, SQL or shell capabilities, or use attribution as authorization.
 - Never place credentials in graph state, checkpoints, errors, events or traces.
 - Never assume direct model calls inherit router policy or output safety.
-- Never export raw host errors or set a cause on new typed errors.
+- Never export raw host errors or set a cause on new typed errors, except
+  `HostConfigError.cause` may retain the fixed-message `GalaxieError` from
+  `httpCapability` or its descriptor check. Never retain a `ZodError` as a cause.
 - Never render raw executor stream state as display data.
 
 ## Limits

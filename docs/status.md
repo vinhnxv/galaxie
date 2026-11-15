@@ -1,5 +1,17 @@
 # Project status
 
+On 2026-11-15, `@galaxie-ai/core/config` adds a strict host wiring document,
+pure definition-bound validation, HTTP bindings, model routing, endpoint options
+and separate runtime limits. Named hooks retain credentials and executable code
+in the host; validation invokes none. Unit and Node conformance tests use mock
+executors and injected fetch to compare hand-wired tutor requests, approval,
+URL/descriptor refusals, immutable snapshots and fixed errors. Schema regeneration,
+dependency boundaries, package contents and own-code size budgets are checked by
+`pnpm check`; the main-entry budget is unchanged. Real hosts, the tools-mcp builder,
+host-remote adoption and size in a real consumer bundle remain unmeasured.
+[ADR-0031](adr/0031-declarative-host-configuration.md) stays Proposed; its delivery
+and trust questions remain open, and ADR-0012 guarantees are unchanged.
+
 On 2026-11-15, the [tracing guide](guides/tracing.md#forward-from-the-collector-to-langfuse)
 records measured self-hosted Langfuse 4.80.0 and
 [MLflow 3.18.0](guides/tracing.md#forward-from-the-collector-to-mlflow) workflows
@@ -449,7 +461,7 @@ The [local-only starter](../templates/local-only/README.md) supplies a standalon
 
 The [hybrid-gateway starter](../templates/hybrid-gateway/README.md) supplies the identical one-question agent with a single host-server model route and a plain Node gateway. Server-side controls include five-minute scoped demo tokens, per-user call quotas, model allowlisting, validated prompt IDs and variables, bounded idempotency receipts and per-user fake document search. The page uses MemorySaver and fixed gateway statuses; reload starts over. Node and Chromium tests cover stub-upstream routing, validation, capability scoping, credential scans and a built-page flow over loopback in Node and headless Chromium. Span export is not exercised. Demo users and in-memory stores are not production authentication or storage; real upstream behavior, real-device results, latency and memory use are unverified and unmeasured. A standalone install of this starter from the npm registry has not been verified.
 
-Core now has two entry points: `@galaxie-ai/core` for runtime/contracts with no unguarded browser globals, and `@galaxie-ai/core/browser` for `acquireOwnership`, `watchInvalidation` and their public types. Moving those exports out of the main entry was a breaking change to the public API, made before the first release. Ownership and invalidation behavior and limits are unchanged. The dependency check enforces this split; `packages/core/test/main-entry.node.test.ts` exercises import and a fake-executor run with browser globals absent.
+Core now has three JavaScript entry points: `@galaxie-ai/core` for runtime/contracts with no unguarded browser globals, `@galaxie-ai/core/browser` for `acquireOwnership`, `watchInvalidation` and their public types, and `@galaxie-ai/core/config` for host wiring validation and building. Moving those exports out of the main entry was a breaking change to the public API, made before the first release. Ownership and invalidation behavior and limits are unchanged. The dependency check enforces this split; `packages/core/test/main-entry.node.test.ts` exercises import and a fake-executor run with browser globals absent.
 
 `examples/adk-recipes` runs scripted financial-advisor recipes on ADK JavaScript and Go and auditor/loan recipes on ADK Python through a React picker, checked streams, model destinations and scoped loan approval recovery, with optional lanes disabled when their local build prerequisites are absent and real-model runs recorded only as maintainer-device demonstrations (see the [record](adk-recipes-real-model-record.md) and the [example](../examples/adk-recipes/README.md)).
 

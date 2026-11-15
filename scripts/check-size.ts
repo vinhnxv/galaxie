@@ -51,6 +51,7 @@ export function discoverEntries(packagesDirectory: string): PackageEntry[] {
     for (const [subpath, conditions] of Object.entries(manifest.exports)) {
       const entry = `${manifest.name}/${subpath === '.' ? '.' : subpath.slice(2)}`;
       const target = conditions.default;
+      if (target?.endsWith('.json')) continue;
       if (!target?.startsWith('./dist/') || !/\.[cm]?js$/.test(target))
         throw new Error(`${entry}: expected a default JavaScript export under dist/.`);
       entries.push({ entry, directory, file: resolve(directory, target) });

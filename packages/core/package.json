@@ -25,6 +25,13 @@
     "./browser": {
       "types": "./dist/browser.d.ts",
       "default": "./dist/browser.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "default": "./dist/config/index.js"
+    },
+    "./host-config.schema.json": {
+      "default": "./dist/config/host-config.schema.json"
     }
   },
   "files": [
