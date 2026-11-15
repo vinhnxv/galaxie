@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentInstance, ModelConsentRequest } from '@galaxie-ai/core';
+import { type AgentInstance, GalaxieError, type ModelConsentRequest } from '@galaxie-ai/core';
 import { lessonFixture, type TutorInput } from '@galaxie-ai/example-english-tutor';
 import { AgentSurface, ConfirmationPrompt, ModelRoutes, useAgentSnapshot } from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
@@ -122,12 +122,19 @@ export function App(): ReactElement {
         { lessonId: lessonFixture.id },
         { grants: ['lessons.get@1', 'progress.save@1'] },
       );
-    } catch {
+    } catch (failure) {
       await host?.runtime.dispose();
       if (mounted.current) {
         setActive(undefined);
+        const configuration =
+          failure instanceof GalaxieError &&
+          (failure.code === 'invalid' || failure.code === 'unsupported');
         setError(
-          host ? 'The lesson could not start.' : 'This host needs Chrome Built-in AI for feedback.',
+          host
+            ? 'The lesson could not start.'
+            : configuration
+              ? 'The host configuration is invalid.'
+              : 'This host needs Chrome Built-in AI for feedback.',
         );
       }
     } finally {

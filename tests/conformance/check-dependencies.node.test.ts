@@ -114,6 +114,25 @@ test.each([
   expect(result.output).toContain(`${path}: forbidden MCP client import ${specifier}`);
 });
 
+test('host-remote src may import only its own configuration file as JSON', () => {
+  expect(run({ 'examples/host-remote/src/a.ts': adk('../galaxie.config.json') })).toEqual({
+    status: 0,
+    output: '',
+  });
+});
+
+test.each([
+  ['examples/host-remote/src/a.ts', '../other.json'],
+  ['examples/host-remote/src/a.ts', '../../host-local/galaxie.config.json'],
+  ['examples/host-remote/src/a.ts', '../galaxie.config.json.bak'],
+  ['examples/host-remote/server/a.ts', '../galaxie.config.json'],
+  ['examples/host-remote/test/a.ts', '../galaxie.config.json'],
+])('host-remote refuses %s importing %s', (path, specifier) => {
+  const result = run({ [path]: adk(specifier) });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${path}: forbidden remote host`);
+});
+
 test('an empty skeleton passes', () => {
   expect(run({})).toMatchObject({ status: 0, output: '' });
 });

@@ -87,7 +87,7 @@ export async function createRemoteHost(
     runtime,
     registry,
     confirmations,
-    createInstance: () => {
+    createInstance: async () => {
       const { bindings, modelRouting, endpoints } = buildHostConfig(validated);
       const endpoint = endpoints['quiz'];
       if (endpoint === undefined)

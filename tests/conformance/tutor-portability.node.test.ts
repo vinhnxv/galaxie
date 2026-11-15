@@ -108,6 +108,8 @@ function hostEvidence(host: string): {
       readFileSync(resolve(directory, 'galaxie.config.json'), 'utf8'),
     ) as { capabilities: Record<string, { destination: string }> };
     expect(imports).toContain('../galaxie.config.json');
+    expect(runtime.text).toContain('buildHostConfig(');
+    expect(runtime.text).not.toContain('httpCapability(');
     expect(Object.keys(configuration.capabilities)).toHaveLength(2);
     for (const name of Object.keys(configuration.capabilities)) expect(name).toMatch(/@1$/);
     bindingDestinations = Object.fromEntries(

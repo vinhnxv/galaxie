@@ -7,7 +7,6 @@
   - 2026-11-15: initial proposal.
   - 2026-11-15: core configuration subpath implemented and verified with mock unit/Node conformance tests, schema, pack, dependency and size gates. Status stays Proposed pending maintainer review.
   - 2026-11-15: tools-mcp builder implemented with mock failure tests and loopback fake-endpoint integration, parity and local lifecycle tests. Host-remote adoption and the guide remain planned; status stays Proposed.
-
   - 2026-11-15: host-remote now bundles its wiring document, with hand-built parity, proxy model-name and definition-validation tests plus the host configuration guide. Status stays Proposed; ADR-0012 guarantees are unchanged.
 
 ## Context
