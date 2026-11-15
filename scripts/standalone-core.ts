@@ -16,6 +16,7 @@ import {
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 export const launchPackages: readonly string[] = [
   'ui-protocol',
@@ -329,8 +330,18 @@ export function processRunner(allowed: readonly string[]): Runner {
     };
     child.stdout.on('data', collect);
     child.stderr.on('data', collect);
+    const groupAlive = (): boolean => {
+      if (child.pid === undefined) return false;
+      if (process.platform === 'win32') return child.exitCode === null && child.signalCode === null;
+      try {
+        process.kill(-child.pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
     const kill = (signal: NodeJS.Signals): void => {
-      if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return;
+      if (!groupAlive() || child.pid === undefined) return;
       try {
         if (process.platform === 'win32') child.kill(signal);
         else process.kill(-child.pid, signal);
@@ -338,8 +349,6 @@ export function processRunner(allowed: readonly string[]): Runner {
         /* The process group may already have exited. */
       }
     };
-    const abort = (): void => kill('SIGTERM');
-    command.signal.addEventListener('abort', abort, { once: true });
     const completion = new Promise<string>((fulfill, reject) => {
       child.once('error', reject);
       child.once('close', (code) => {
@@ -350,18 +359,32 @@ export function processRunner(allowed: readonly string[]): Runner {
     });
     // Servers are observed through readiness and output, so early exit must not be unhandled.
     void completion.catch(() => {});
-    return {
-      completion,
-      output: () => output,
-      stop: async () => {
+    let stopping: Promise<void> | undefined;
+    const stop = (): Promise<void> => {
+      stopping ??= (async () => {
         kill('SIGTERM');
-        const timer = setTimeout(() => kill('SIGKILL'), 2000);
+        const force = Promise.withResolvers<void>();
+        const timer = setTimeout(() => {
+          kill('SIGKILL');
+          force.resolve();
+        }, 2000);
         try {
           await completion.catch(() => {});
+          if (groupAlive()) await force.promise;
         } finally {
           clearTimeout(timer);
         }
-      },
+      })();
+      return stopping;
+    };
+    const abort = (): void => {
+      void stop();
+    };
+    command.signal.addEventListener('abort', abort, { once: true });
+    return {
+      completion,
+      output: () => output,
+      stop,
     };
   };
   return {
@@ -383,7 +406,7 @@ export function processRunner(allowed: readonly string[]): Runner {
 
 const systemClock: Clock = {
   now: Date.now,
-  sleep: (milliseconds) => new Promise((fulfill) => setTimeout(fulfill, milliseconds)),
+  sleep,
 };
 const loopbackPorts: PortFinder = {
   find: (preferred = 0) =>
@@ -492,7 +515,6 @@ export async function runStandalone(
         const destination = join(root, 'tarballs');
         await mkdir(destination);
         if (options.tarballs !== undefined) {
-          // Copy reused artifacts into our owned root; npm never operates on the caller's directory.
           await cp(await realpath(options.tarballs), destination, { recursive: true });
         } else {
           if (pnpm === undefined) throw new Error('Packing is impossible: pnpm unavailable.');
@@ -555,10 +577,12 @@ export async function runStandalone(
             const run = (args: readonly string[]): Promise<string> =>
               runner.run(command(binary, args, project, childEnv));
             const project = join(root, `${spec.name}-${request.major}-${mode}`);
-            // Version probes run in the owned root before the template is copied.
-            result.node = (await runner.run(command(binary, ['--version'], root, childEnv))).trim();
-            if (Number(result.node.replace(/^v/, '').split('.')[0]) !== request.major)
+            const observedNode = (
+              await runner.run(command(binary, ['--version'], root, childEnv))
+            ).trim();
+            if (Number(observedNode.replace(/^v/, '').split('.')[0]) !== request.major)
               throw new Error('Node version does not match requested major.');
+            result.node = observedNode;
             result.npm = (
               await runner.run(command(binary, [npmCli, '--version'], root, childEnv))
             ).trim();

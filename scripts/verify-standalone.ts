@@ -129,7 +129,6 @@ export const templateSpecs: readonly TemplateSpec[] = [
   },
 ];
 
-/** Browser code stays here; the reusable pipeline imports no Playwright or DOM types. */
 export async function driveChromium(
   url: string,
   spec: TemplateSpec,
@@ -140,6 +139,8 @@ export async function driveChromium(
   try {
     browser = await chromium.launch({
       headless: true,
+      handleSIGINT: false,
+      handleSIGTERM: false,
       args: ['--disable-gpu', '--disable-webgpu'],
     });
   } catch {
@@ -232,7 +233,6 @@ export async function driveChromium(
       }
       expected = undefined;
     }
-    // Flush page tasks before inspecting asynchronous console and request callbacks.
     await flush();
     if (external > 0) throw new Error(`Cross-origin request attempts: ${external}.`);
     if (errors.length > 0) throw new Error(errors.join('\n'));

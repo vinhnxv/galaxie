@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import type { Result } from '../../scripts/standalone-core.js';
 import {
   assertCommand,
@@ -19,6 +20,7 @@ import {
   isolatedEnvironment,
   launchPackages,
   nodeBinary,
+  processRunner,
   redact,
   releaseAgeDays,
   rewriteManifest,
@@ -459,7 +461,15 @@ it.each(['old-npm', 'ignored-policy', 'effective-policy'] as const)(
   },
 );
 
-it.each(['pass', 'probe', 'external', 'pageerror', 'console', 'probe-twice'] as const)(
+it.each([
+  'pass',
+  'probe',
+  'probe-short',
+  'external',
+  'pageerror',
+  'console',
+  'probe-twice',
+] as const)(
   'drives real Chromium offline and detects forbidden behavior (%s)',
   async (kind) => {
     const server = createServer((_request, response) => {
@@ -468,6 +478,7 @@ it.each(['pass', 'probe', 'external', 'pageerror', 'console', 'probe-twice'] as 
         pass: '',
         probe:
           'console.error("This document requires \'TrustedScript\' assignment. The action has been blocked.")',
+        'probe-short': 'console.error("This document requires \'TrustedScript\' assignment.")',
         external: "fetch('https://example.invalid/x').catch(()=>{})",
         pageerror: "setTimeout(()=>{throw Error('page-canary')},0)",
         console: "console.error('console-canary')",
@@ -492,7 +503,8 @@ it.each(['pass', 'probe', 'external', 'pageerror', 'console', 'probe-twice'] as 
           { action: 'text', name: 'Finished' },
         ],
       });
-      if (kind === 'pass' || kind === 'probe') expect(await drive).toMatch(/\d+\./);
+      if (kind === 'pass' || kind === 'probe' || kind === 'probe-short')
+        expect(await drive).toMatch(/\d+\./);
       else await expect(drive).rejects.toThrow(/Cross-origin|Page error|Console error/);
     } finally {
       server.closeAllConnections();
@@ -519,17 +531,18 @@ it.each([
           request.socket.destroy();
           return;
         }
-        response.writeHead(kind === '500' ? 500 : kind === 'uncorrelated' ? 200 : 503);
+        response.writeHead(kind === '500' ? 500 : 503);
         response.end('unavailable');
         return;
       }
       response.setHeader('content-type', 'text/html');
-      const action =
+      const diagnostic =
         kind === 'uncorrelated'
-          ? "console.error('Failed to load resource: the server responded with a status of 503 (Service Unavailable)'); document.querySelector('p').textContent='Unavailable'"
-          : `fetch('${kind === 'other-path' ? '/other' : path}').catch(()=>{}).finally(()=>{document.querySelector('p').textContent='Unavailable'})`;
+          ? "console.error('Failed to load resource: the server responded with a status of 503 (Service Unavailable)');"
+          : '';
+      const action = `document.querySelector('p').textContent='Waiting'; fetch('${kind === 'other-path' ? '/other' : path}').catch(()=>{}).finally(()=>{${diagnostic}document.querySelector('p').textContent='Unavailable'})`;
       response.end(
-        `<button onclick="${kind === 'outside-step' ? '' : action}">Submit answers</button><p>Waiting</p>${kind === 'outside-step' ? `<script>${action}</script>` : ''}`,
+        `<button onclick="${action}">Submit answers</button><p>Waiting</p>${kind === 'outside-step' ? `<script>${action}</script>` : ''}`,
       );
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -551,6 +564,12 @@ it.each([
         ],
       });
       if (kind === 'expected') expect(await drive).toMatch(/\d+\./);
+      else if (kind === 'uncorrelated')
+        await expect(drive).rejects.toThrow('Console error: uncorrelated HTTP status 503.');
+      else if (kind === '500') await expect(drive).rejects.toThrow('HTTP status 500.');
+      else if (kind === 'outside-step' || kind === 'other-path')
+        await expect(drive).rejects.toThrow('HTTP status 503.');
+      else if (kind === 'failed-request') await expect(drive).rejects.toThrow('Request failed.');
       else await expect(drive).rejects.toThrow(/Console error|HTTP status|Request failed/);
     } finally {
       server.closeAllConnections();
@@ -558,4 +577,161 @@ it.each([
     }
   },
   30000,
+);
+
+it('keeps a refused binary associated with the requested Node major', async () => {
+  const repo = await temporary();
+  const base = await temporary();
+  await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+  const results = await runStandalone(
+    {
+      repo,
+      tempBase: base,
+      nodes: [{ major: 22, path: process.execPath }],
+      modes: ['registry', 'tarball'],
+      tarballs: join(base, 'absent'),
+      specs: [{ name: 'fixture', build: [], preview: [], steps: [] }],
+    },
+    {
+      runner: {
+        run: async () => 'v24.15.0',
+        start: async () => {
+          throw new Error('unexpected server');
+        },
+      },
+      driver: { drive: async () => 'stub' },
+    },
+  );
+  expect(results.map(({ node }) => node)).toEqual(['22', '22']);
+  expect(results.map(({ failures }) => failures[0])).toMatchObject([
+    { phase: 'node', source: 'environment', gating: true },
+    { phase: 'node', source: 'environment', gating: true },
+  ]);
+  expect(renderResults(results)).toContain('fixture | 22 | npm unknown | registry | FAIL');
+});
+
+it
+  .skipIf(process.platform === 'win32')
+  .each(['traps-sigterm', 'leader-exited', 'closed-stdio'] as const)(
+  'aborts the owned process group even when its launcher %s',
+  async (kind) => {
+    const directory = await temporary();
+    const controller = new AbortController();
+    const script =
+      kind === 'traps-sigterm'
+        ? "process.on('SIGTERM',()=>{});require('node:fs').writeFileSync('ready.json',JSON.stringify({leader:process.pid}));setInterval(()=>{},1000)"
+        : `const child=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:${kind === 'closed-stdio' ? "'ignore'" : "['ignore',1,2]"}});require('node:fs').writeFileSync('ready.json',JSON.stringify({leader:process.pid,descendant:child.pid}));process.exit(0)`;
+    let leader: number | undefined;
+    let descendant: number | undefined;
+    let finished = false;
+    const completion = processRunner([process.execPath])
+      .run({
+        executable: process.execPath,
+        args: ['-e', script],
+        cwd: directory,
+        env: {},
+        signal: controller.signal,
+      })
+      .finally(() => {
+        finished = true;
+      });
+    void completion.catch(() => {});
+    try {
+      await vi.waitFor(() => expect(existsSync(join(directory, 'ready.json'))).toBe(true), {
+        timeout: 5000,
+      });
+      const ids = JSON.parse(await readFile(join(directory, 'ready.json'), 'utf8')) as {
+        leader: number;
+        descendant?: number;
+      };
+      leader = ids.leader;
+      descendant = ids.descendant;
+      if (kind === 'leader-exited')
+        await vi.waitFor(() => expect(() => process.kill(leader ?? 0, 0)).toThrow(), {
+          timeout: 5000,
+        });
+      controller.abort();
+      await vi.waitFor(() => expect(finished).toBe(true), { timeout: 5000 });
+      if (descendant !== undefined)
+        await vi.waitFor(() => expect(() => process.kill(descendant ?? 0, 0)).toThrow(), {
+          timeout: 5000,
+        });
+    } finally {
+      if (leader !== undefined) {
+        try {
+          process.kill(-leader, 'SIGKILL');
+        } catch {
+          /* Already stopped. */
+        }
+      }
+      await completion.catch(() => {});
+    }
+  },
+  15000,
+);
+
+it.skipIf(process.platform === 'win32')(
+  'cleans the temporary project on SIGINT during a real Chromium drive',
+  async () => {
+    const root = await temporary();
+    const repo = join(root, 'repo');
+    const runs = join(root, 'runs');
+    const fixture = join(repo, 'templates/fixture');
+    await mkdir(fixture, { recursive: true });
+    await mkdir(runs);
+    await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+    await writeFile(join(fixture, 'package.json'), '{"name":"fixture","private":true}');
+    await writeFile(join(fixture, 'build.cjs'), '');
+    await writeFile(
+      join(fixture, 'serve.cjs'),
+      "const fs=require('node:fs');let gets=0;fs.writeFileSync('server.pid',String(process.pid));require('node:http').createServer((q,s)=>{if(++gets===2)fs.writeFileSync('browser-ready','ready');s.end('<p>Ready</p>')}).listen(Number(process.argv[process.argv.indexOf('--port')+1]),'127.0.0.1')",
+    );
+    const script = `const {runStandalone}=await import(${JSON.stringify(new URL('../../scripts/standalone-core.ts', import.meta.url).href)});const {driveChromium}=await import(${JSON.stringify(new URL('../../scripts/verify-standalone.ts', import.meta.url).href)});await runStandalone(${JSON.stringify({ repo, tempBase: runs, nodes: [{ major: 24 }], modes: ['registry'], offline: true, verifyReleaseAge: false, specs: [{ name: 'fixture', build: ['build.cjs'], preview: ['serve.cjs'], steps: [{ action: 'text', name: 'Never rendered' }] }] })},{driver:{drive:driveChromium}});console.log('cleanup-complete');`;
+    const child = spawn(process.execPath, ['--input-type=module', '-e', script], {
+      cwd: repo,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '';
+    child.stdout.on('data', (bytes: Buffer) => {
+      output += bytes.toString();
+    });
+    child.stderr.on('data', (bytes: Buffer) => {
+      output += bytes.toString();
+    });
+    const completed = new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('exit', resolve);
+    });
+    let server: number | undefined;
+    try {
+      let project = '';
+      await vi.waitFor(
+        async () => {
+          const entry = (await readdir(runs)).find((name) =>
+            name.startsWith('galaxie-standalone-'),
+          );
+          project = join(runs, entry ?? '', 'fixture-24-registry');
+          expect(existsSync(join(project, 'browser-ready'))).toBe(true);
+        },
+        { timeout: 15000 },
+      );
+      server = Number(await readFile(join(project, 'server.pid'), 'utf8'));
+      child.kill('SIGINT');
+      expect(await completed).toBe(0);
+      expect(output).toContain('cleanup-complete');
+      expect(await readdir(runs)).toEqual([]);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      if (server !== undefined) {
+        try {
+          process.kill(-server, 'SIGKILL');
+        } catch {
+          /* Already stopped. */
+        }
+      }
+      await completed;
+    }
+  },
+  25000,
 );
