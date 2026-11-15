@@ -4,13 +4,12 @@
 import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentInstance,
-  type BindingsFor,
   createRuntime,
   GalaxieError,
-  httpCapability,
   type ModelRouting,
   type Runtime,
 } from '@galaxie-ai/core';
+import { buildHostConfig, buildRuntimeLimits } from '@galaxie-ai/core/config';
 import {
   createTutorAgent,
   ProgressInputSchema,
@@ -27,6 +26,7 @@ import {
   type Registry,
 } from '@galaxie-ai/react';
 import { MemorySaver } from '@langchain/langgraph/web';
+import { validateRemoteHost } from './host-config.js';
 import { createSession } from './session.js';
 
 const modelCredentialPlaceholder = 'host-remote-placeholder';
@@ -55,31 +55,14 @@ export async function createRemoteHost(
   const headers = async (): Promise<Record<string, string>> => ({
     authorization: `Bearer ${await token()}`,
   });
-  const policy = {
-    destination: 'host-server',
-    timeoutMs: 10_000,
-    concurrency: 1,
-    grantScope: 'run',
-    retry: 'none',
-    credentials: 'omit',
+  const validated = validateRemoteHost(origin, {
     headers,
-  } as const;
-  const bindings: BindingsFor<typeof tutorDefinition> = {
-    'lessons.get@1': httpCapability({
-      ...policy,
-      method: 'GET',
-      kind: 'read',
-      approval: 'none',
-      url: `${origin}/api/lessons/{lessonId}`,
-    }),
-    'progress.save@1': httpCapability({
-      ...policy,
-      method: 'POST',
-      kind: 'write',
-      approval: 'confirm',
-      url: `${origin}/api/progress`,
-    }),
-  };
+    consent,
+    getCredential: async () => {
+      await token();
+      return modelCredentialPlaceholder;
+    },
+  });
   const registry = createRegistry({ components: educationComponents });
   const confirmations = defineConfirmations({
     'progress.save@1': {
@@ -96,6 +79,7 @@ export async function createRemoteHost(
     },
   });
   const runtime = createRuntime({
+    ...buildRuntimeLimits(validated),
     appId: 'galaxie-host-remote',
     executors: [createLangGraphAdapter()],
   });
@@ -103,54 +87,29 @@ export async function createRemoteHost(
     runtime,
     registry,
     confirmations,
-    createInstance: () =>
-      runtime.create(tutorDefinition, {
+    createInstance: () => {
+      const { bindings, modelRouting, endpoints } = buildHostConfig(validated);
+      const endpoint = endpoints['quiz'];
+      if (endpoint === undefined)
+        throw new GalaxieError('invalid', 'The quiz endpoint is missing.');
+      return runtime.create(tutorDefinition, {
         principalScope: 'demo-learner',
         agent: createTutorAgent(),
         services: {
           checkpointer: new MemorySaver(),
           chatModels: {
-            quiz: openAICompatible({
-              baseURL: new URL('/api/v1', origin).href,
-              model: 'host-quiz',
-            }),
+            quiz: openAICompatible({ ...endpoint }),
             feedback,
           },
         },
-        models: {
-          providers: {
-            quiz: {
-              destination: 'host-server',
-              modality: 'text',
-              features: ['streaming', 'cancellation', 'structured-output'],
-              languages: ['en'],
-              pricing: { inputPerToken: 0, outputPerToken: 0 },
-              credential: true,
-            },
-            feedback: {
-              destination: 'in-browser',
-              modality: 'text',
-              features: ['streaming', 'cancellation', 'structured-output'],
-              languages: ['en'],
-              pricing: { inputPerToken: 0, outputPerToken: 0 },
-            },
-          },
-          roles: {
-            'quiz.generate': { providers: ['quiz'], allow: ['host-server'], maxTokens: 2000 },
-            'tutor.feedback': { providers: ['feedback'], allow: ['in-browser'], maxTokens: 1000 },
-          },
-          consent,
-          getCredential: async () => {
-            await token();
-            return modelCredentialPlaceholder;
-          },
-        },
+        models: modelRouting,
         bindings,
         ui: registry.bindings({ surfaces: ['lesson-main'] }),
         confirmations: {
           capabilities: confirmations.capabilities,
           policyRevision: () => 'host-remote-1',
         },
-      }),
+      });
+    },
   };
 }

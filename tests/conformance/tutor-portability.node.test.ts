@@ -102,31 +102,48 @@ function hostEvidence(host: string): {
   ]);
   expect(runtime.text).toContain('runtime.create(tutorDefinition,');
 
-  const policy = nodes(runtime).find(
-    (node): node is ts.VariableDeclaration =>
-      ts.isVariableDeclaration(node) && node.name.getText(runtime) === 'policy',
-  );
-  const destination = nodes(policy as ts.VariableDeclaration).find(
-    (node): node is ts.PropertyAssignment =>
-      ts.isPropertyAssignment(node) && node.name.getText(runtime) === 'destination',
-  );
-  if (destination === undefined || !ts.isStringLiteral(destination.initializer))
-    throw new Error('Missing binding destination.');
-  const destinationName = destination.initializer.text;
-  const bindingDeclaration = nodes(runtime).find(
-    (node): node is ts.VariableDeclaration =>
-      ts.isVariableDeclaration(node) && node.name.getText(runtime) === 'bindings',
-  );
-  const bindings = nodes(bindingDeclaration as ts.VariableDeclaration)
-    .filter(ts.isPropertyAssignment)
-    .filter((node) => ts.isStringLiteral(node.name) && node.name.text.endsWith('@1'));
-  expect(bindings).toHaveLength(2);
-  for (const binding of bindings) {
-    expect(binding.initializer.getText(runtime)).toContain('...policy');
-    expect(ts.isCallExpression(binding.initializer)).toBe(host === 'host-remote');
-    if (ts.isCallExpression(binding.initializer)) {
-      expect(binding.initializer.expression.getText(runtime)).toBe('httpCapability');
+  let bindingDestinations: Record<string, string>;
+  if (host === 'host-remote') {
+    const configuration = JSON.parse(
+      readFileSync(resolve(directory, 'galaxie.config.json'), 'utf8'),
+    ) as { capabilities: Record<string, { destination: string }> };
+    expect(imports).toContain('../galaxie.config.json');
+    expect(Object.keys(configuration.capabilities)).toHaveLength(2);
+    for (const name of Object.keys(configuration.capabilities)) expect(name).toMatch(/@1$/);
+    bindingDestinations = Object.fromEntries(
+      Object.entries(configuration.capabilities).map(([name, capability]) => [
+        name,
+        capability.destination,
+      ]),
+    );
+  } else {
+    const policy = nodes(runtime).find(
+      (node): node is ts.VariableDeclaration =>
+        ts.isVariableDeclaration(node) && node.name.getText(runtime) === 'policy',
+    );
+    const destination = nodes(policy as ts.VariableDeclaration).find(
+      (node): node is ts.PropertyAssignment =>
+        ts.isPropertyAssignment(node) && node.name.getText(runtime) === 'destination',
+    );
+    if (destination === undefined || !ts.isStringLiteral(destination.initializer))
+      throw new Error('Missing binding destination.');
+    const destinationName = destination.initializer.text;
+    const bindingDeclaration = nodes(runtime).find(
+      (node): node is ts.VariableDeclaration =>
+        ts.isVariableDeclaration(node) && node.name.getText(runtime) === 'bindings',
+    );
+    const bindings = nodes(bindingDeclaration as ts.VariableDeclaration)
+      .filter(ts.isPropertyAssignment)
+      .filter((node) => ts.isStringLiteral(node.name) && node.name.text.endsWith('@1'));
+    expect(bindings).toHaveLength(2);
+    for (const binding of bindings) {
+      expect(binding.initializer.getText(runtime)).toContain('...policy');
+      expect(ts.isCallExpression(binding.initializer)).toBe(false);
     }
+
+    bindingDestinations = Object.fromEntries(
+      bindings.map((node) => [(node.name as ts.StringLiteral).text, destinationName]),
+    );
   }
 
   // Vite bundles source, whereas the release manifest inventories dist. Hash the source
@@ -146,9 +163,7 @@ function hostEvidence(host: string): {
       ),
       lockfile: digest(resolve(root, 'pnpm-lock.yaml')),
     },
-    bindings: Object.fromEntries(
-      bindings.map((node) => [(node.name as ts.StringLiteral).text, destinationName]),
-    ),
+    bindings: bindingDestinations,
   };
 }
 

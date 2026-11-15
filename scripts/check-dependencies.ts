@@ -924,6 +924,8 @@ for (const area of ['src', 'server', 'test']) {
       if (relative) {
         const target = resolve(dirname(file), specifier);
         const allowed = area === 'test' ? ['src', 'server', 'test'] : [area];
+        if (area === 'src' && target === resolve('examples/host-remote/galaxie.config.json'))
+          continue;
         if (allowed.some((part) => target.startsWith(`${resolve('examples/host-remote', part)}/`)))
           continue;
       } else if (area === 'server') {

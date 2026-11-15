@@ -1,0 +1,74 @@
+{
+  "version": "0.1",
+  "capabilities": {
+    "lessons.get@1": {
+      "destination": "host-server",
+      "timeoutMs": 10000,
+      "concurrency": 1,
+      "grantScope": "run",
+      "retry": "none",
+      "credentials": "omit",
+      "headers": "session",
+      "method": "GET",
+      "kind": "read",
+      "approval": "none",
+      "url": "/api/lessons/{lessonId}"
+    },
+    "progress.save@1": {
+      "destination": "host-server",
+      "timeoutMs": 10000,
+      "concurrency": 1,
+      "grantScope": "run",
+      "retry": "none",
+      "credentials": "omit",
+      "headers": "session",
+      "method": "POST",
+      "kind": "write",
+      "approval": "confirm",
+      "url": "/api/progress"
+    }
+  },
+  "models": {
+    "consent": "quiz-consent",
+    "getCredential": "model-proxy",
+    "providers": {
+      "quiz": {
+        "destination": "host-server",
+        "modality": "text",
+        "features": ["streaming", "cancellation", "structured-output"],
+        "languages": ["en"],
+        "pricing": {
+          "inputPerToken": 0,
+          "outputPerToken": 0
+        },
+        "credential": true,
+        "endpoint": {
+          "baseURL": "/api/v1",
+          "model": "host-quiz"
+        }
+      },
+      "feedback": {
+        "destination": "in-browser",
+        "modality": "text",
+        "features": ["streaming", "cancellation", "structured-output"],
+        "languages": ["en"],
+        "pricing": {
+          "inputPerToken": 0,
+          "outputPerToken": 0
+        }
+      }
+    },
+    "roles": {
+      "quiz.generate": {
+        "providers": ["quiz"],
+        "allow": ["host-server"],
+        "maxTokens": 2000
+      },
+      "tutor.feedback": {
+        "providers": ["feedback"],
+        "allow": ["in-browser"],
+        "maxTokens": 1000
+      }
+    }
+  }
+}
