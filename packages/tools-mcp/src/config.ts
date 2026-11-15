@@ -26,6 +26,13 @@ export function buildMcpServers(
 ): BuiltMcpServers {
   // This core builder asserts the private validation brand before reading the document.
   buildRuntimeLimits(config);
+  // Options errors are host code errors, not document entries: report them at the document root.
+  if (
+    options === null ||
+    typeof options !== 'object' ||
+    (options.onEvent !== undefined && typeof options.onEvent !== 'function')
+  )
+    throw new HostConfigError('invalid', '');
   const bindings = Object.create(null) as Record<CapabilityName, CapabilityBinding>;
   const servers = Object.create(null) as Record<string, McpServer>;
   let path = '';

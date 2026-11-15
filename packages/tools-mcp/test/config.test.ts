@@ -977,6 +977,28 @@ test.each([{ version: '0.1' }, { version: '0.1', mcp: { servers: {} } }])(
   },
 );
 
+test.each([
+  ['non-function onEvent with servers', 5, true],
+  ['non-function onEvent without servers', 5, false],
+  ['null options', null, true],
+])(
+  'T-options: %s is refused at the document root, not a server entry',
+  async (_label, bad, withServer) => {
+    const fixture = await endpoint();
+    const config = withServer
+      ? validateHostConfig(
+          document(fixture.server.url, fixture.pins),
+          definition,
+          fixture.hooks,
+          origin,
+        )
+      : validateHostConfig({ version: '0.1' }, definition, {}, origin);
+    const options = bad === null ? null : { onEvent: bad };
+    rejected(() => buildMcpServers(config, options as never), '');
+    expect(build(config, { onEvent: () => {} })).toBeDefined();
+  },
+);
+
 test('T-immutable: detached frozen configuration and hooks keep their original behavior', async () => {
   const fixture = await endpoint();
   const data = document(fixture.server.url, fixture.pins);
