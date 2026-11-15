@@ -4,3 +4,5 @@ dist/
 volumes/
 *.tsbuildinfo
 .env.*.tmp
+python/.venv/
+python/.pytest_cache/

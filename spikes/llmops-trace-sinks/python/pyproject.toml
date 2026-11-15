@@ -1,0 +1,10 @@
+[project]
+name = "galaxie-spike-llmops-mlflow-eval"
+version = "0.0.0"
+license = "Apache-2.0"
+requires-python = ">=3.14,<3.15"
+dependencies = ["mlflow==3.18.0"]
+
+[tool.uv]
+package = false
+exclude-newer = "2026-11-08T00:00:00Z"

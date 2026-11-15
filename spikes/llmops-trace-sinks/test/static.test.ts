@@ -204,3 +204,48 @@ test('credential scan rejects an injected synthetic canary', () => {
     }),
   ).toThrow('Generated POSTGRES_PASSWORD appears in synthetic-result');
 });
+
+function auditPython(project: string, lock: string, script: string): void {
+  const evidence = JSON.parse(readFileSync(resolve(root, 'results/versions.json'), 'utf8')) as {
+    versions: { mlflow: string };
+  };
+  const version = evidence.versions.mlflow.match(/\b\d+\.\d+\.\d+\b/)?.[0];
+  expect(version).toBeDefined();
+  expect(project).toContain(`"mlflow==${version}"`);
+  expect(project).toContain('requires-python = ">=3.14,<3.15"');
+  expect(project).toContain('license = "Apache-2.0"');
+  expect(project).toContain('exclude-newer = "2026-11-08T00:00:00Z"');
+  expect(project).toContain('package = false');
+  expect(lock).toContain(`name = "mlflow"\nversion = "${version}"`);
+  expect(script).toMatch(
+    /^# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh\n# SPDX-License-Identifier: Apache-2\.0\n/,
+  );
+  expect(script).not.toMatch(/openai|litellm|anthropic|judge|(?:api|provider)[_-]?key/i);
+}
+
+test('Python evaluation pins the backend release and contains only deterministic scorers', () => {
+  auditPython(
+    readFileSync(resolve(root, 'python/pyproject.toml'), 'utf8'),
+    readFileSync(resolve(root, 'python/uv.lock'), 'utf8'),
+    readFileSync(resolve(root, 'python/evaluate.py'), 'utf8'),
+  );
+});
+
+test.each(['project version', 'lock version', 'header', 'provider import'])(
+  'Python evaluation static guard rejects %s',
+  (mutation) => {
+    let project = readFileSync(resolve(root, 'python/pyproject.toml'), 'utf8');
+    let lock = readFileSync(resolve(root, 'python/uv.lock'), 'utf8');
+    let script = readFileSync(resolve(root, 'python/evaluate.py'), 'utf8');
+    if (mutation === 'project version')
+      project = project.replace('mlflow==3.18.0', 'mlflow==0.0.0');
+    if (mutation === 'lock version')
+      lock = lock.replace(
+        'name = "mlflow"\nversion = "3.18.0"',
+        'name = "mlflow"\nversion = "0.0.0"',
+      );
+    if (mutation === 'header') script = script.replace('# SPDX-License-Identifier: Apache-2.0', '');
+    if (mutation === 'provider import') script += '\nimport openai\n';
+    expect(() => auditPython(project, lock, script)).toThrow();
+  },
+);
