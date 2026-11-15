@@ -60,7 +60,16 @@ public. These are maintainer-only steps.
    it through a pull request, and check out the merged commit. That commit is the
    release commit: everything below publishes and tags it, with no uncommitted edits.
 3. Run `pnpm install --frozen-lockfile`, then `pnpm check`.
-4. Run `pnpm run build`.
+4. Run `pnpm run build`. Before publishing, verify copied starters against packed
+   workspace packages with Node 22 and 24 installed locally, using npm 12 on PATH:
+
+   ```sh
+   node scripts/verify-standalone.ts --node 22 --node 24 --mode tarball --json /tmp/galaxie-standalone-tarball.json
+   ```
+
+   Review the matrix and advisory findings as described in the
+   [standalone verification record](standalone-verification.md). The harness never
+   publishes; tarballs and copied projects are temporary.
 5. Run `pnpm pack` in each launch package directory and inspect each tarball. It
    must contain `dist`, `LICENSE`, `NOTICE`, `README.md` and `package.json`, with no
    `src`, tests or internal files. No `workspace:` reference may remain in the
@@ -75,8 +84,19 @@ public. These are maintainer-only steps.
    pnpm rewrites each `workspace:` reference to the exact dependency version when
    it packs and does not check the registry, so a package published before its
    dependencies installs only once those are published. That is why the order matters.
-7. Tag the release commit `v<version>` and push the tag.
-8. Write release notes in English, including any breaking public API changes.
+7. After all seven packages are published, run the public-registry check:
+
+   ```sh
+   node scripts/verify-standalone.ts --node 22 --node 24 --mode registry --json /tmp/galaxie-standalone-registry.json
+   ```
+
+   The seven-day release-age policy normally requires waiting for a new release
+   to age. If deliberately verifying it sooner, explicitly pass
+   `--min-release-age-exclude '@galaxie-ai/*'` and retain that recorded exclusion
+   with the release evidence. Do not change user npm configuration. Record any
+   remaining failure before tagging; see the verification record for limits.
+8. Tag the release commit `v<version>` and push the tag.
+9. Write release notes in English, including any breaking public API changes.
 
 Manual publishing from a laptop has no provenance attestations.
 

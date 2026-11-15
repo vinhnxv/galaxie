@@ -35,6 +35,7 @@ it('declares exactly four launch packages, registry ranges and the existing thir
     license: string;
     dependencies: Record<string, string>;
     devDependencies: Record<string, string>;
+    scripts: Record<string, string>;
   };
   expect(manifest).toMatchObject({
     name: 'hybrid-gateway-template',
@@ -58,7 +59,12 @@ it('declares exactly four launch packages, registry ranges and the existing thir
     zod: '4.6.7',
     vite: '8.3.4',
     playwright: '1.64.1',
+    typescript: '7.0.2',
+    '@types/node': '24.19.2',
+    '@types/react': '19.3.0',
+    '@types/react-dom': '19.3.0',
   };
+  expect(manifest.scripts['build:server']).toBe('tsc -p server/tsconfig.json');
   expect(
     Object.fromEntries(
       Object.entries(dependencies).filter(([name]) => !name.startsWith('@galaxie-ai/')),
