@@ -97,6 +97,10 @@ it('declares only launch packages with registry-compatible ranges and the pinned
       '@mlc-ai/web-llm',
       'vite',
       'playwright',
+      'typescript',
+      '@types/node',
+      '@types/react',
+      '@types/react-dom',
     ].sort(),
   );
   for (const version of Object.values(dependencies)) expect(version).not.toContain('workspace:');

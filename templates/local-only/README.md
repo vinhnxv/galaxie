@@ -16,7 +16,15 @@ pnpm --filter local-only-template dev
 
 The root build produces the local packages' distribution files. The template's Vite config uses package exports, with no aliases into this checkout. `linkWorkspacePackages: true` in the root workspace configuration links its `^0.1.0` ranges to matching local packages. Both TypeScript compiler chains use `tsconfig.workspace.json` and `test/tsconfig.json` to resolve workspace source before a build; `tsconfig.json` is standalone and keeps the repository's strict compiler options.
 
-Copy this entire directory for a new app. Outside this repository the five `@galaxie-ai/*` dependencies come from the npm registry at 0.1.0. **A standalone registry install of this template has not been verified**: the repository's checks link the local workspace packages. In the copy, use `pnpm install` and `pnpm dev`. The repository-only source mappings and test tooling are for galaxie's checks; they are not needed to serve a copied app.
+Copy this directory for a new app. Outside this repository the five `@galaxie-ai/*` dependencies resolve from the public npm registry. Standalone npm installs, production builds and Chromium mock completion pass on Node 22.23.5 and 24.15.0, with Built-in AI and WebGPU disabled; see the [verification record](../../docs/standalone-verification.md) for versions, controls and limits. The declared Node floor is 22.22.2; only those two patch versions were tested. In the copy, use npm 12 or later with the seven-day release-age policy:
+
+```sh
+npm install --min-release-age=7 --registry=https://registry.npmjs.org/
+npm run build
+npm run preview -- --host 127.0.0.1
+```
+
+The template declares its own TypeScript and Node/React types. The repository-only source mappings and tests are unnecessary for a copied app; the verification harness strips `test/` and `tsconfig.workspace.json`. Other package managers and real-device model behavior remain unmeasured.
 
 ## Route order and consent
 

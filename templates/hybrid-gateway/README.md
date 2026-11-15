@@ -24,13 +24,22 @@ To serve a built page and gateway with Node, after the root package build:
 ```sh
 cd templates/hybrid-gateway
 pnpm build
-pnpm exec tsc -p server/tsconfig.json
+pnpm build:server
 node .server/server/serve.js
 ```
 
-Open `http://127.0.0.1:4173`. This command compiles only the gateway, static server and CSP module into `.server/`. The repository root supplies TypeScript and Node types. A copied project must supply its own TypeScript, Node and React type tooling to run type checks or compile the server. The static server serves only `dist/`, sends the CSP response header and never falls through from an API route to a file.
+Open `http://127.0.0.1:4173`. This command compiles only the gateway, static server and CSP module into `.server/`. The template declares its own pinned TypeScript, Node and React type tooling, so a copied project can type-check its sources and compile the server without repository-root tools. The static server serves only `dist/`, sends the CSP response header and never falls through from an API route to a file.
 
-Copy this directory for a new app. The four launch dependencies use exactly `^0.1.0`, linked locally by this repository's workspace settings. Outside this repository they resolve from the npm registry. **A standalone registry install of this template has not been verified.** The repository-only `tsconfig.workspace.json` maps package sources for checks, without affecting the standalone Vite build. No executable source imports another template, example or package by relative path. The repository-only agent-equality test skips when the local-only source is absent; a copied agent may diverge.
+Copy this directory for a new app. The four launch dependencies use exactly `^0.1.0`, linked locally by this repository's workspace settings. Outside this repository they resolve from the public npm registry. Standalone npm installs, production builds, source checks, preview and compiled-server Chromium unavailable flows pass on Node 22.23.5 and 24.15.0 without an upstream; see the [verification record](../../docs/standalone-verification.md) for controls and limits. The declared Node floor is 22.22.2; only those two patch versions were tested. In the copy, use npm 12 or later:
+
+```sh
+npm install --min-release-age=7 --registry=https://registry.npmjs.org/
+npm run build
+npm run build:server
+node .server/server/serve.js
+```
+
+Real upstream behavior and other package managers remain unmeasured. The repository-only `tsconfig.workspace.json` maps package sources for checks, without affecting the standalone Vite build. No executable source imports another template, example or package by relative path. The repository-only agent-equality test skips when the local-only source is absent; a copied agent may diverge.
 
 ## Routing, prompts and credentials
 

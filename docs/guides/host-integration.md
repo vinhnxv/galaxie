@@ -45,8 +45,10 @@ pnpm build
 pnpm --filter <your-package-name> dev
 ```
 
-These steps ran against the workspace packages; a standalone install of the same
-snippets from the npm registry has not been verified. The mock needs no GPU, model download, provider key or agent backend. The
+These steps ran against the workspace packages; standalone registry installation
+of these modified snippets remains unmeasured. The unchanged starter's copied
+installation has a separate [verification record](../standalone-verification.md).
+The mock needs no GPU, model download, provider key or agent backend. The
 snippets were built and run in Chromium on the mock during review of this guide;
 that is a check of this page's code, not a result for any real model or device.
 
