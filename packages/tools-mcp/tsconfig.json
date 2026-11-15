@@ -4,6 +4,7 @@
     "noEmit": true,
     "paths": {
       "@galaxie-ai/core/browser": ["../core/src/browser.ts"],
+      "@galaxie-ai/core/config": ["../core/src/config/index.ts"],
       "@galaxie-ai/core": ["../core/src/index.ts"],
       "@galaxie-ai/ui-protocol": ["../ui-protocol/src/index.ts"]
     }

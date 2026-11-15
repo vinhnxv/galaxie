@@ -93,6 +93,27 @@ const adk = (specifier: string, kind = 'import'): string =>
     ? `import type { X } from '${specifier}';\n`
     : `import { X } from '${specifier}';\nexport { X };\n`;
 
+test.each([
+  'packages/tools-mcp/src/config.ts',
+  'packages/tools-mcp/dist/config.js',
+  'packages/tools-mcp/dist/config.d.ts',
+])('the MCP configuration builder may import core/config in %s', (path) => {
+  expect(run({ [path]: adk('@galaxie-ai/core/config') })).toEqual({ status: 0, output: '' });
+});
+
+test.each([
+  ['packages/tools-mcp/src/server.ts', '@galaxie-ai/core/config'],
+  ['packages/tools-mcp/src/session.ts', '@galaxie-ai/core/config'],
+  ['packages/tools-mcp/dist/server.js', '@galaxie-ai/core/config'],
+  ['packages/tools-mcp/dist/server.d.ts', '@galaxie-ai/core/config'],
+  ['packages/tools-mcp/src/config.ts', '@galaxie-ai/core/browser'],
+  ['packages/tools-mcp/src/config.ts', 'zod'],
+])('the MCP configuration exception refuses %s importing %s', (path, specifier) => {
+  const result = run({ [path]: adk(specifier) });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${path}: forbidden MCP client import ${specifier}`);
+});
+
 test('an empty skeleton passes', () => {
   expect(run({})).toMatchObject({ status: 0, output: '' });
 });
