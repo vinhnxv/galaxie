@@ -65,7 +65,7 @@ def evaluate(args: argparse.Namespace) -> dict:
                 elif hasattr(value, "item"):
                     value = value.item()
                 scores[name] = value
-            rows.append({"traceId": row["request_id"], "scores": scores})
+            rows.append({"traceId": row["trace_id"], "scores": scores})
     return {
         "mlflowVersion": mlflow.__version__,
         "expectedTraces": args.expected_traces,

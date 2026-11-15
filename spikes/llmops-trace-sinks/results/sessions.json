@@ -224,5 +224,13 @@
         }
       ]
     }
-  ]
+  ],
+  "rootOnlySuffices": {
+    "langfuse": false,
+    "mlflow": true
+  },
+  "fullyGroupedWithProcessor": {
+    "langfuse": true,
+    "mlflow": true
+  }
 }

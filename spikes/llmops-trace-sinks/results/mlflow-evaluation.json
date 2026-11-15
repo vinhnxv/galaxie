@@ -1,0 +1,210 @@
+{
+  "demonstration": true,
+  "scorers": "deterministic code only",
+  "variants": [
+    {
+      "text": false,
+      "mlflowVersion": "3.18.0",
+      "expectedTraces": 6,
+      "traceIds": [
+        "mlflow-trace-1",
+        "mlflow-trace-2",
+        "mlflow-trace-3",
+        "mlflow-trace-4",
+        "mlflow-trace-5",
+        "mlflow-trace-6"
+      ],
+      "rootIO": [
+        {
+          "traceId": "mlflow-trace-1",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-2",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-3",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-4",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-5",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-6",
+          "requestPresent": false,
+          "responsePresent": false
+        }
+      ],
+      "evaluateRows": 6,
+      "rows": [
+        {
+          "traceId": "mlflow-trace-1",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": false,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-2",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": false,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-3",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": false,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-4",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": false,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-5",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": false,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-6",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": false,
+            "root_io_present": false
+          }
+        }
+      ],
+      "nonNullCounts": {
+        "chat_usage_total": 6,
+        "chat_text_present": 6,
+        "root_io_present": 6
+      },
+      "rootIOObservation": "Root request and response are empty because invoke_agent spans carry no input or output; chat_usage_total and chat_text_present still return one value per trace."
+    },
+    {
+      "text": true,
+      "mlflowVersion": "3.18.0",
+      "expectedTraces": 6,
+      "traceIds": [
+        "mlflow-trace-7",
+        "mlflow-trace-8",
+        "mlflow-trace-9",
+        "mlflow-trace-10",
+        "mlflow-trace-11",
+        "mlflow-trace-12"
+      ],
+      "rootIO": [
+        {
+          "traceId": "mlflow-trace-7",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-8",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-9",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-10",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-11",
+          "requestPresent": false,
+          "responsePresent": false
+        },
+        {
+          "traceId": "mlflow-trace-12",
+          "requestPresent": false,
+          "responsePresent": false
+        }
+      ],
+      "evaluateRows": 6,
+      "rows": [
+        {
+          "traceId": "mlflow-trace-7",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": true,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-8",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": true,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-9",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": true,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-10",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": true,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-11",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": true,
+            "root_io_present": false
+          }
+        },
+        {
+          "traceId": "mlflow-trace-12",
+          "scores": {
+            "chat_usage_total": 5,
+            "chat_text_present": true,
+            "root_io_present": false
+          }
+        }
+      ],
+      "nonNullCounts": {
+        "chat_usage_total": 6,
+        "chat_text_present": 6,
+        "root_io_present": 6
+      },
+      "rootIOObservation": "Root request and response are empty because invoke_agent spans carry no input or output; chat_usage_total and chat_text_present still return one value per trace."
+    }
+  ]
+}

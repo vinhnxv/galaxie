@@ -3,6 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { evaluateSessions } from '../src/evaluate.js';
 import type { Host } from '../src/host.js';
 import { normalize } from '../src/normalize.js';
 import {
@@ -18,10 +19,10 @@ import {
   type ScenarioResult,
   type SessionsResult,
 } from '../src/scenarios.js';
-import { sessionReadback } from '../src/session-readback.js';
 import { inspectFeedback, writeFeedback } from '../src/score-readback.js';
 import { createScoreClient } from '../src/scores.js';
 import { readEnv } from '../src/secrets.js';
+import { sessionReadback } from '../src/session-readback.js';
 
 const enabled = process.env['LLMOPS_STACK'] === '1';
 let result: ScenarioResult;
@@ -58,6 +59,102 @@ test.skipIf(!enabled)(
         ),
       );
     }
+    const grouped = (
+      phase: Awaited<ReturnType<typeof sessionReadback>> | undefined,
+      backend: 'langfuse' | 'mlflow',
+    ): boolean =>
+      phase?.sessions.every(
+        (session) =>
+          session[backend].allObservationsGrouped && session[backend].tracesGroupedByRoot,
+      ) ?? false;
+    writeFeedback(
+      'sessions.json',
+      normalize(
+        {
+          demonstration: true,
+          phases,
+          rootOnlySuffices: {
+            langfuse: grouped(phases[0], 'langfuse'),
+            mlflow: grouped(phases[0], 'mlflow'),
+          },
+          fullyGroupedWithProcessor: {
+            langfuse: grouped(phases[1], 'langfuse'),
+            mlflow: grouped(phases[1], 'mlflow'),
+          },
+        },
+        sessionRuns.flatMap((item) => item.spans),
+      ),
+    );
+  },
+);
+
+test.skipIf(!enabled)(
+  'MLflow evaluates every stored trace with deterministic code scorers in both text modes',
+  async () => {
+    const variants = [];
+    for (const result of sessionRuns.slice(1)) {
+      const expected = result.runTrace.map((entry) => `tr-${entry.traceId}`);
+      expect(expected).toHaveLength(6);
+      const evaluation = await evaluateSessions(
+        [...new Set(result.runTrace.map((entry) => entry.sessionId))],
+        expected.length,
+      );
+      expect(evaluation.mlflowVersion).toBe('3.18.0');
+      expect([...evaluation.traceIds].sort()).toEqual([...expected].sort());
+      expect(evaluation.evaluateRows).toBe(6);
+      expect(evaluation.rows).toHaveLength(6);
+      expect(evaluation.nonNullCounts).toEqual({
+        chat_usage_total: 6,
+        chat_text_present: 6,
+        root_io_present: 6,
+      });
+      expect(evaluation.rows.map((row) => row.traceId).sort()).toEqual([...expected].sort());
+      expect(evaluation.rootIO.map((row) => row.traceId).sort()).toEqual([...expected].sort());
+      for (const row of evaluation.rows) {
+        const traceId = row.traceId.replace(/^tr-/, '');
+        const usage = result.spans
+          .filter(
+            (span) =>
+              span.spanContext().traceId === traceId &&
+              span.attributes['gen_ai.operation.name'] === 'chat',
+          )
+          .reduce(
+            (sum, span) =>
+              sum +
+              Number(span.attributes['gen_ai.usage.input_tokens'] ?? 0) +
+              Number(span.attributes['gen_ai.usage.output_tokens'] ?? 0),
+            0,
+          );
+        expect(usage).toBe(5);
+        expect(row.scores.chat_usage_total).toBe(usage);
+        expect(row.scores.chat_text_present).toBe(result.text);
+        const root = evaluation.rootIO.find((root) => root.traceId === row.traceId);
+        assert.ok(root);
+        expect(row.scores.root_io_present).toBe(root.requestPresent && root.responsePresent);
+      }
+      const byOracle = <T extends { traceId: string }>(rows: T[]): T[] =>
+        [...rows].sort((a, b) => expected.indexOf(a.traceId) - expected.indexOf(b.traceId));
+      variants.push({
+        text: result.text,
+        ...evaluation,
+        traceIds: expected,
+        rootIO: byOracle(evaluation.rootIO),
+        rows: byOracle(evaluation.rows),
+        rootIOObservation: evaluation.rootIO.every(
+          (row) => !row.requestPresent && !row.responsePresent,
+        )
+          ? 'Root request and response are empty because invoke_agent spans carry no input or output; chat_usage_total and chat_text_present still return one value per trace.'
+          : 'Root I/O presence recorded per trace.',
+      });
+    }
+    expect(variants).toHaveLength(2);
+    writeFeedback(
+      'mlflow-evaluation.json',
+      normalize(
+        { demonstration: true, scorers: 'deterministic code only', variants },
+        sessionRuns.slice(1).flatMap((result) => result.spans),
+      ),
+    );
   },
 );
 
@@ -166,17 +263,31 @@ test.skipIf(!enabled)(
       { traceId: entry.traceId, name: 'fresh-timestamp-control' },
       1,
       inspectFeedback,
+      (scores) => scores.some((score) => score.value === 0),
     );
     evidence['freshTimestampControl'] = {
       status: 'observed',
-      scores: scores.map(({ id, value, timestamp, subject }) => ({
-        id,
-        value,
-        timestamp,
-        subject,
-      })),
-      note: 'Immediate read after second acceptance; asynchronous later visibility is not measured.',
+      scores: [...scores]
+        .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+        .map(({ id, value, timestamp, subject }) => ({
+          id,
+          value,
+          timestamp,
+          subject,
+        })),
+      note: 'Readback waited for the fresh payload value to become visible; duplicate count is an observed backend behavior.',
     };
+    for (const segment of result.runTrace) {
+      const retained = await scoresQuery(
+        { traceId: segment.traceId, name: `segment-${segment.segment}` },
+        inspectFeedback,
+      );
+      expect(retained).toHaveLength(1);
+      expect(retained[0]?.value).toBe(1);
+      expect(retained[0]?.timestamp.slice(0, 10)).toBe(
+        new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10),
+      );
+    }
   },
   scoreWindowMillis * 2 + 30_000,
 );

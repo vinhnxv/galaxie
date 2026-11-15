@@ -38,7 +38,7 @@
     "scores": [
       {
         "id": "trace-1-fresh-timestamp-control",
-        "value": 1,
+        "value": 0,
         "timestamp": "<timestamp>",
         "subject": {
           "kind": "trace",
@@ -46,7 +46,7 @@
         }
       }
     ],
-    "note": "Immediate read after second acceptance; asynchronous later visibility is not measured."
+    "note": "Readback waited for the fresh payload value to become visible; duplicate count is an observed backend behavior."
   },
   "beforeIngestion": {
     "observationsBeforeFlush": 0,
