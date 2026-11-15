@@ -12,6 +12,7 @@ import {
   ScriptedChatModel,
 } from '../../../tests/conformance/support/scripted-chat-model.js';
 import { createHost, type Host, type HostOptions } from './host.js';
+import type { RunTrace } from './run-trace.js';
 
 export const scenarios = ['linear', 'tool-call', 'interrupt-resume', 'model-failure'] as const;
 export type Scenario = (typeof scenarios)[number];
@@ -25,6 +26,7 @@ export interface ScenarioResult {
   spans: ReadableSpan[];
   traceIds: string[];
   runId: string;
+  runTrace: RunTrace[];
   credentialCalls: number;
   exportErrors: Host['exportErrors'];
 }
@@ -158,6 +160,7 @@ export async function runScenario(
       spans,
       traceIds: [...new Set(spans.map((span) => span.spanContext().traceId))],
       runId,
+      runTrace: host.runTrace.entries(),
       credentialCalls: host.credentialCalls(),
       exportErrors: host.exportErrors,
     };

@@ -11,6 +11,7 @@ import {
   SimpleSpanProcessor,
   TracerProvider,
 } from '@opentelemetry/sdk-trace';
+import { RunTraceMap, SessionCopy } from './run-trace.js';
 
 export const canary = 'llmops-synthetic-credential-canary';
 export const collectorUrl = 'http://127.0.0.1:4318/v1/traces';
@@ -22,12 +23,14 @@ export interface HostOptions {
   flush?: 'complete' | 'none' | 'tolerate';
   autoFlushOnHide?: boolean;
   scheduledDelayMillis?: number;
+  sessionCopy?: boolean;
 }
 
 export interface Host {
   runtime: Runtime;
   provider: TracerProvider;
   oracle: InMemorySpanExporter;
+  runTrace: RunTraceMap;
   routing: ModelRouting;
   modelFactory(options: { credential: string }): BaseChatModel;
   credentialCalls(): number;
@@ -38,8 +41,11 @@ export interface Host {
 
 export function createHost(model: BaseChatModel, options: HostOptions & { key: string }): Host {
   const oracle = new InMemorySpanExporter();
+  const runTrace = new RunTraceMap();
   const provider = new TracerProvider({
     spanProcessors: [
+      runTrace,
+      ...(options.sessionCopy ? [new SessionCopy()] : []),
       new SimpleSpanProcessor({ exporter: oracle }),
       ...(options.live
         ? [
@@ -74,6 +80,7 @@ export function createHost(model: BaseChatModel, options: HostOptions & { key: s
   return {
     provider,
     oracle,
+    runTrace,
     runtime: createRuntime({
       appId: `llmops-${options.key}`,
       executors: [createLangGraphAdapter()],
