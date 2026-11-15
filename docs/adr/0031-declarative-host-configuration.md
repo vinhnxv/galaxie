@@ -8,9 +8,11 @@
   - 2026-11-15: core configuration subpath implemented and verified with mock unit/Node conformance tests, schema, pack, dependency and size gates. Status stays Proposed pending maintainer review.
   - 2026-11-15: tools-mcp builder implemented with mock failure tests and loopback fake-endpoint integration, parity and local lifecycle tests. Host-remote adoption and the guide remain planned; status stays Proposed.
 
+  - 2026-11-15: host-remote now bundles its wiring document, with hand-built parity, proxy model-name and definition-validation tests plus the host configuration guide. Status stays Proposed; ADR-0012 guarantees are unchanged.
+
 ## Context
 
-The host currently wires agents in TypeScript. [host-remote](../../examples/host-remote/src/runtime.ts) constructs one GET and one POST `httpCapability` with a shared policy, two model providers and two role routes, and an `openAICompatible` quiz endpoint at `/api/v1`. Its headers, credential callback and consent hook are host code. Changing this wiring requires a code edit.
+Before adopting the document, the host wired agents in TypeScript. [host-remote](../../examples/host-remote/src/runtime.ts) constructed one GET and one POST `httpCapability` with a shared policy, two model providers and two role routes, and an `openAICompatible` quiz endpoint at `/api/v1`. Its headers, credential callback and consent hook stayed in host code. Changing that wiring required a code edit.
 
 The core host configuration document API now implements the validation and HTTP/routing half of this proposal. A console or deployment pipeline would need a plain-data representation of wiring without duplicating the agent definition or carrying executable code. The [brief](../galaxie-project-brief.md) leaves the console's scope open (§20, question 5); this proposal does not settle it.
 
@@ -18,7 +20,7 @@ The core host configuration document API now implements the validation and HTTP/
 
 ## Decision
 
-Propose a versioned plain-data host configuration document for one agent definition, with validation and building in `@galaxie-ai/core/config`. `buildMcpServers` in `@galaxie-ai/tools-mcp` now builds MCP servers and pinned bindings from the validated configuration. Core does not import models or tools-mcp; the host composes them under the existing [dependency rules](../system-design.md#4-packages-and-dependency-rules). The core subpath implements the document schema, pure validation and HTTP/routing/runtime-limit builders. Host-remote adoption and the guide remain planned. This ADR stays Proposed; ADR-0012 guarantees are unchanged.
+Propose a versioned plain-data host configuration document for one agent definition, with validation and building in `@galaxie-ai/core/config`. `buildMcpServers` in `@galaxie-ai/tools-mcp` now builds MCP servers and pinned bindings from the validated configuration. Core does not import models or tools-mcp; the host composes them under the existing [dependency rules](../system-design.md#4-packages-and-dependency-rules). The core subpath implements the document schema, pure validation and HTTP/routing/runtime-limit builders. [Host-remote](../../examples/host-remote/README.md) now bundles its wiring document, and the [host configuration guide](../guides/host-configuration.md) describes its use. This ADR stays Proposed; ADR-0012 guarantees are unchanged.
 
 The proposed contract is:
 
@@ -46,7 +48,7 @@ For MCP, the proposal fits ADR-0011 only if a host-authored document under the t
 - **YAML agent definitions.** Rejected for the reasons in ADR-0008's Context and Consequences: duplicated definitions drift and lose compiler checking, and closures belong in `create(host)`. ADR-0017 also keeps agent authoring with existing frameworks rather than adding a graph DSL. This proposal covers wiring only.
 - **galaxie-side YAML parsing.** Rejected: it would add a parser dependency and its supply-chain surface to published configuration code and invite format-specific behavior. Existing factories accept JavaScript options, so the host can parse JSON or YAML before validation; the dependency direction in system design §4 gives core no role in document delivery.
 - **Inline secrets.** Rejected: ADR-0012 A4 and B3 and brief §9.7 keep credentials out of agent data and provider keys out of bundles. The document could be bundled and inspected. Credentials would stay behind host hooks, following the existing [host credential pattern](../guides/host-integration.md#credentials-for-apis-mcp-and-remote-models).
-- **Config by URL as a galaxie API.** Rejected: it would couple wiring to network delivery and CSP instead of pure validation. ADR-0002 forbids runtime code loading; this proposal would also leave data-document delivery with the host, without treating that ADR as an existing ban on fetching data. The planned example would bundle the document by default; whether to allow a host runtime-fetch pattern remains open for review.
+- **Config by URL as a galaxie API.** Rejected: it would couple wiring to network delivery and CSP instead of pure validation. ADR-0002 forbids runtime code loading; this proposal would also leave data-document delivery with the host, without treating that ADR as an existing ban on fetching data. The host-remote example bundles the document by default; whether to allow a host runtime-fetch pattern remains open for review.
 
 ## Consequences
 
@@ -98,10 +100,10 @@ The dependency conformance tests include an old-script negative control for the
 builder-only core/config import exception. Node and Chromium MCP conformance load
 the tools-mcp root export, including the configuration module.
 
-Host-remote adoption, its parity run and the guide remain planned. `check:deps`
+The [host-remote parity test](../../examples/host-remote/test/config-parity.node.test.ts) validates the bundled document against the tutor definition with stub hooks, compares capability policies, HTTP requests, model routing and endpoint options against hand-built wiring, and checks fixed error paths for undeclared capabilities and unknown hooks. A loopback proxy records the shipped model name and a JSON-only replacement. Existing Node and headless Chromium host tests pass unchanged on random ports; AT-05 reads the remote bindings from the imported file. The [guide](../guides/host-configuration.md) documents the format and trust rule. `check:deps`
 continues to forbid YAML parsers in published packages.
 
-Unmeasured: real hosts, browser configuration integration, consumer-bundle size
+Unmeasured: real hosts, consumer-bundle size
 with Zod in tools-mcp's module graph, real MCP servers and real backends. The
 document's host-authorship and trust rule, intended-server identity, credential
 scope and backend authorization remain host obligations that galaxie cannot

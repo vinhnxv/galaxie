@@ -11,6 +11,8 @@ alongside these integration steps. The seven launch packages (`@galaxie-ai/ui-pr
 to npm.
 The other packages remain private workspace packages.
 
+For host-authored wiring in a data file, see the [host configuration guide](host-configuration.md) and its worked host-remote example.
+
 ## Layer map
 
 | Layer | What you gain | What you still own |

@@ -50,8 +50,7 @@ Validation cannot establish intended-server identity or backend authorization.
 A `HostConfigError` message is fixed, but its `path` can contain document key names, so show it only to the configuration editor. A base URL path is ignored; `/` URLs keep only the base origin. The host must bind credentials to intended origins. `buildMcpServers` in
 [`@galaxie-ai/tools-mcp`](../tools-mcp/README.md#build-from-a-host-configuration)
 builds the MCP section and supplies its bindings to `buildHostConfig` as code
-bindings. Host-remote adoption remains planned, and [ADR-0031](../../docs/adr/0031-declarative-host-configuration.md)
-stays Proposed. ADR-0012 guarantees are unchanged.
+bindings. The [host-remote example](../../examples/host-remote/README.md) adopts the format described in the [host configuration guide](../../docs/guides/host-configuration.md), and [ADR-0031](../../docs/adr/0031-declarative-host-configuration.md) stays Proposed. ADR-0012 guarantees are unchanged.
 
 Moving these functions and types out of the main entry was a breaking change to
 the public API, made before the first release. Update host imports:

@@ -66,8 +66,7 @@ to intended origins and authorize calls at the backend. Validation cannot establ
 intended-server identity or host control of a server. The host owns lifecycle;
 `closePrincipal` and `close` disconnect locally without terminating the remote
 session. The builder imports core/config, bringing Zod into the tools-mcp module
-graph; consumer-bundle size remains unmeasured. Host-remote adoption and the guide
-remain planned. [ADR-0031](../../docs/adr/0031-declarative-host-configuration.md)
+graph; consumer-bundle size remains unmeasured. The [host-remote example](../../examples/host-remote/README.md) adopts HTTP/model configuration, and the [host configuration guide](../../docs/guides/host-configuration.md) also describes MCP composition. [ADR-0031](../../docs/adr/0031-declarative-host-configuration.md)
 stays Proposed, and ADR-0012 guarantees are unchanged.
 
 ## Server policies and limits

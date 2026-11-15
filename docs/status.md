@@ -1,5 +1,21 @@
 # Project status
 
+On 2026-11-15, [host-remote](../examples/host-remote/README.md) adopts a bundled
+[host configuration document](../examples/host-remote/galaxie.config.json) for HTTP
+capabilities, model descriptors, role routes and its quiz endpoint. Host code
+retains headers, session renewal, the placeholder credential, consent and browser
+feedback. Node parity tests compare hand-built policies, requests and routing,
+validate the shipped file against the tutor definition with stub hooks, and check
+fixed error codes and paths for renamed capabilities and unknown hooks. A real
+loopback proxy records a model-name change made only in a cloned document. The
+unchanged host tests exercise the browser loop on random ports under the existing
+CSP; AT-05 reads the remote bindings from the imported file. The new
+[guide](guides/host-configuration.md) covers trust, hooks, builders and editor
+validation. Real-host integration and consumer-bundle measurements remain
+unmeasured; the example build size is a local demonstration, not a size gate.
+[ADR-0031](adr/0031-declarative-host-configuration.md) stays Proposed, runtime
+fetching remains an open review question, and ADR-0012 guarantees are unchanged.
+
 On 2026-11-15, `buildMcpServers` in `@galaxie-ai/tools-mcp` builds pinned bindings
 and host-owned servers from core's validated host configuration. Mock unit tests
 cover construction failures, rollback, immutable snapshots and value-free errors;
