@@ -427,6 +427,62 @@ test.each([
   );
 });
 
+test.each([1.5, 0.5, 0, -1, 2 ** 53, 1e300, Infinity, NaN])(
+  'rejects an MCP tool timeout that is not a positive safe integer: %s',
+  (timeoutMs) => {
+    const input = document();
+    input.mcp.servers.school.tools.lookup.timeoutMs = timeoutMs;
+    const error = rejected(() => validate(input), '/mcp/servers/school/tools/lookup/timeoutMs');
+    expect(error.message).toBe('The request is invalid.');
+    input.mcp.servers.school.tools.lookup.timeoutMs = 1000;
+    expect(() => validate(input)).not.toThrow();
+  },
+);
+
+test.each([1000, Number.MAX_SAFE_INTEGER])(
+  'accepts a positive safe MCP tool timeout: %s',
+  (timeoutMs) => {
+    const input = document();
+    input.mcp.servers.school.tools.lookup.timeoutMs = timeoutMs;
+    expect(validate(input).document.mcp?.servers['school']?.tools['lookup']?.timeoutMs).toBe(
+      timeoutMs,
+    );
+  },
+);
+
+test('preserves fractional HTTP capability timeouts', () => {
+  // HTTP accepts positive numbers; only MCP tools require positive safe integers.
+  const input = document();
+  const validated = validate({
+    ...input,
+    capabilities: {
+      ...input.capabilities,
+      'lessons.get@1': { ...input.capabilities['lessons.get@1'], timeoutMs: 1.5 },
+    },
+  });
+  expect(validated.document.capabilities?.['lessons.get@1']?.timeoutMs).toBe(1.5);
+});
+
+test('generates distinct MCP tool and HTTP timeout rules in draft 2020-12', () => {
+  const schema = hostConfigJsonSchema();
+  expect(schema['$schema']).toBe('https://json-schema.org/draft/2020-12/schema');
+  expect(schema).toHaveProperty(
+    'properties.mcp.properties.servers.additionalProperties.properties.tools.additionalProperties.properties.timeoutMs',
+    expect.objectContaining({
+      type: 'integer',
+      exclusiveMinimum: 0,
+      maximum: Number.MAX_SAFE_INTEGER,
+    }),
+  );
+  expect(schema).toHaveProperty(
+    'properties.capabilities.additionalProperties.properties.timeoutMs',
+    expect.objectContaining({ type: 'number', exclusiveMinimum: 0 }),
+  );
+  expect(schema).not.toHaveProperty(
+    'properties.capabilities.additionalProperties.properties.timeoutMs.maximum',
+  );
+});
+
 test.each([
   ['capabilities', '/capabilities'],
   ['providers', '/models/providers'],
