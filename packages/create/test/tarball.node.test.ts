@@ -1,0 +1,135 @@
+// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+// SPDX-License-Identifier: Apache-2.0
+
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { PassThrough } from 'node:stream';
+import { fileURLToPath } from 'node:url';
+import { expect, onTestFinished, test } from 'vitest';
+import { run } from '../src/main.js';
+import { resolveTarballs } from '../src/packages.js';
+
+const names = [
+  'ui-protocol',
+  'core',
+  'adapter-kit',
+  'adapter-langgraph',
+  'models',
+  'storage-indexeddb',
+  'react',
+] as const;
+const templatesRoot = fileURLToPath(new URL('../../../templates', import.meta.url));
+
+async function fixture(): Promise<{ root: string; packed: string }> {
+  const root = await mkdtemp(join(tmpdir(), 'galaxie-tarballs-'));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const packed = join(root, 'packed');
+  await mkdir(packed);
+  for (const name of names)
+    await writeFile(join(packed, `galaxie-ai-${name}-0.1.0.tgz`), 'fixture');
+  return { root, packed };
+}
+
+test('the npm CLI emits fixed file dependency specs and all seven overrides', async () => {
+  const { root, packed } = await fixture();
+  const resolved = await resolveTarballs(packed);
+  expect(Object.fromEntries(resolved)).toEqual(
+    Object.fromEntries(
+      names.map((name) => [`@galaxie-ai/${name}`, join(packed, `galaxie-ai-${name}-0.1.0.tgz`)]),
+    ),
+  );
+  expect(
+    await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+      cwd: root,
+      templatesRoot,
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: 'npm/12' },
+    }),
+  ).toBe(0);
+  const manifest = JSON.parse(await readFile(join(root, 'my-app/package.json'), 'utf8'));
+  expect(manifest.overrides).toEqual({
+    '@galaxie-ai/ui-protocol': `file:${packed}/galaxie-ai-ui-protocol-0.1.0.tgz`,
+    '@galaxie-ai/core': `file:${packed}/galaxie-ai-core-0.1.0.tgz`,
+    '@galaxie-ai/adapter-kit': `file:${packed}/galaxie-ai-adapter-kit-0.1.0.tgz`,
+    '@galaxie-ai/adapter-langgraph': `file:${packed}/galaxie-ai-adapter-langgraph-0.1.0.tgz`,
+    '@galaxie-ai/models': `file:${packed}/galaxie-ai-models-0.1.0.tgz`,
+    '@galaxie-ai/storage-indexeddb': `file:${packed}/galaxie-ai-storage-indexeddb-0.1.0.tgz`,
+    '@galaxie-ai/react': `file:${packed}/galaxie-ai-react-0.1.0.tgz`,
+  });
+  expect(
+    Object.fromEntries(
+      Object.entries(manifest.dependencies).filter(([name]) => name.startsWith('@galaxie-ai/')),
+    ),
+  ).toEqual({
+    '@galaxie-ai/adapter-langgraph': `file:${packed}/galaxie-ai-adapter-langgraph-0.1.0.tgz`,
+    '@galaxie-ai/core': `file:${packed}/galaxie-ai-core-0.1.0.tgz`,
+    '@galaxie-ai/models': `file:${packed}/galaxie-ai-models-0.1.0.tgz`,
+    '@galaxie-ai/react': `file:${packed}/galaxie-ai-react-0.1.0.tgz`,
+    '@galaxie-ai/storage-indexeddb': `file:${packed}/galaxie-ai-storage-indexeddb-0.1.0.tgz`,
+  });
+  expect(manifest.dependencies.react).toBe('19.3.1');
+});
+
+test.each(['empty', 'relative', 'absent', 'missing', 'duplicate', 'symlink'] as const)(
+  'tarball directory %s fails before any project write, with a valid-directory control',
+  async (kind) => {
+    const { root, packed } = await fixture();
+    expect((await resolveTarballs(packed)).size).toBe(7);
+    let directory = packed;
+    if (kind === 'empty') directory = '';
+    if (kind === 'relative') directory = 'packed';
+    if (kind === 'absent') directory = join(root, 'absent');
+    if (kind === 'missing') await rm(join(packed, 'galaxie-ai-core-0.1.0.tgz'));
+    if (kind === 'duplicate') await writeFile(join(packed, 'galaxie-ai-core-0.1.1.tgz'), 'fixture');
+    if (kind === 'symlink') {
+      await rm(join(packed, 'galaxie-ai-core-0.1.0.tgz'));
+      await symlink(
+        join(packed, 'galaxie-ai-react-0.1.0.tgz'),
+        join(packed, 'galaxie-ai-core-0.1.0.tgz'),
+      );
+    }
+    const stderr = new PassThrough();
+    let errors = '';
+    stderr.on('data', (bytes: Buffer) => {
+      errors += bytes.toString();
+    });
+    expect(
+      await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+        cwd: root,
+        templatesRoot,
+        stdout: new PassThrough(),
+        stderr,
+        env: { GALAXIE_CREATE_PACKAGE_DIR: directory },
+      }),
+    ).toBe(1);
+    expect(existsSync(join(root, 'my-app'))).toBe(false);
+    expect(errors).toContain('tarball');
+    expect(await readdir(root)).toEqual(['packed']);
+  },
+);
+
+test.each(['pnpm', 'yarn'])(
+  'tarball mode refuses unproven %s installs before writing',
+  async (manager) => {
+    const { root, packed } = await fixture();
+    const stderr = new PassThrough();
+    let errors = '';
+    stderr.on('data', (bytes: Buffer) => {
+      errors += bytes.toString();
+    });
+    expect(
+      await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+        cwd: root,
+        templatesRoot,
+        stdout: new PassThrough(),
+        stderr,
+        env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: `${manager}/1` },
+      }),
+    ).toBe(1);
+    expect(errors).toContain('Tarball mode supports npm only');
+    expect(existsSync(join(root, 'my-app'))).toBe(false);
+  },
+);
