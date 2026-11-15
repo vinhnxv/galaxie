@@ -32,10 +32,14 @@ if (process.env['LLMOPS_STACK'] !== '1')
 
 const folder = new URL('../results/', import.meta.url);
 function writeResult(name: string, value: unknown): void {
+  const serialized = JSON.stringify(value, null, 2);
   const formatted = execFileSync(
     fileURLToPath(new URL('../../../node_modules/.bin/biome', import.meta.url)),
     ['format', '--stdin-file-path', `results/${name}`],
-    { input: `${JSON.stringify(value, null, 2)}\n`, encoding: 'utf8' },
+    {
+      input: `${name === 'browser-evidence.json' ? serialized.replace(/assets\/index-[A-Za-z0-9_-]+\.js/g, 'assets/index-<hash>.js') : serialized}\n`,
+      encoding: 'utf8',
+    },
   );
   writeFileSync(new URL(name, folder), formatted);
 }

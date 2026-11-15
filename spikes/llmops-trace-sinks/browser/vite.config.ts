@@ -4,6 +4,7 @@
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { build, type InlineConfig, type PreviewServer, preview } from 'vite';
+import type { ScoreEndpoint } from '../src/score-endpoint.js';
 import { shared, singleCopy } from '../src/single-copy.js';
 
 export const csp =
@@ -48,7 +49,7 @@ export async function buildPage(): Promise<Record<string, number>> {
   return Object.fromEntries(Object.entries(copies).map(([name, paths]) => [name, paths.size]));
 }
 
-export async function startPreview(): Promise<PreviewServer> {
+export async function startPreview(endpoint?: ScoreEndpoint): Promise<PreviewServer> {
   const port = await new Promise<number>((resolve, reject) => {
     const server = createServer();
     server.once('error', reject);
@@ -62,7 +63,29 @@ export async function startPreview(): Promise<PreviewServer> {
       server.close((error) => (error ? reject(error) : resolve(address.port)));
     });
   });
-  return preview({ ...pageConfig, preview: { ...pageConfig.preview, port } });
+  return preview({
+    ...pageConfig,
+    plugins: [
+      ...(pageConfig.plugins ?? []),
+      ...(endpoint
+        ? [
+            {
+              name: 'host-feedback-scores',
+              configurePreviewServer(server: PreviewServer) {
+                server.middlewares.use((request, response, next) => {
+                  if (request.url?.split('?')[0] !== '/feedback/scores') {
+                    next();
+                    return;
+                  }
+                  void endpoint.handle(request, response);
+                });
+              },
+            },
+          ]
+        : []),
+    ],
+    preview: { ...pageConfig.preview, port },
+  });
 }
 
 export default pageConfig;

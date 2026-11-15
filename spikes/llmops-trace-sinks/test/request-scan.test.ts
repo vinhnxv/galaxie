@@ -7,6 +7,7 @@ import {
   captureRequest,
   scanBundle,
   scanRequests,
+  scanResponses,
   summarizeRequests,
 } from '../src/request-scan.js';
 
@@ -189,4 +190,13 @@ test('a malformed percent escape in a path is reported, not thrown', () => {
   expect(
     scanRequests([request({ url: 'http://127.0.0.1:4318/a/%E0%A4%A/x' })], env, canary),
   ).toContain('request[0]:experiment-id');
+});
+
+test('score response scan sees Basic values, generated secrets and canaries without exposing them', () => {
+  expect(scanResponses(['{"reason":"posted"}'], env, canary)).toEqual([]);
+  for (const value of [auth, secret, canary]) {
+    const hits = scanResponses([JSON.stringify({ unexpected: value })], env, canary);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(JSON.stringify(hits)).not.toContain(value);
+  }
 });
