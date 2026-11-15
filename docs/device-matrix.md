@@ -112,8 +112,11 @@ recorded slice, rather than overriding the current
   storage size after a lesson. Fault-injection and synthetic-event coverage is
   automated evidence only. The external developer trial remains open.
 - Real remote-provider, user-endpoint/LNA and MCP deployments are not established
-  by these exit records or the mock/injected/loopback CI tests. This slice also
-  records no live tracing-exporter or Langfuse connection.
+  by these exit records or the mock/injected/loopback CI tests. The separate
+  [trace-sink spike](../spikes/llmops-trace-sinks/README.md#measured-result-and-limits)
+  records local Langfuse and MLflow connections from Node and headless Chromium
+  on one maintainer machine, outside the automated lanes; see the
+  [tracing guide](guides/tracing.md#limits-and-unmeasured-items) for scope and limits.
 
 Use `pnpm check` for the full local gates and `CI=true pnpm test` for Node and
 headless Chromium tests without updating missing goldens. The

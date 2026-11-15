@@ -1,5 +1,20 @@
 # Project status
 
+On 2026-11-15, the [tracing guide](guides/tracing.md#forward-from-the-collector-to-langfuse)
+records measured self-hosted Langfuse 4.80.0 and
+[MLflow 3.18.0](guides/tracing.md#forward-from-the-collector-to-mlflow) workflows
+through a fan-out collector: Node and Chromium export, host feedback scores,
+sessions, deterministic evaluation and JavaScript executor span coverage. The
+[spike results and version tables](../spikes/llmops-trace-sinks/README.md#measured-result-and-limits)
+are demonstrations on one maintainer machine, outside root CI; this documentation
+cycle ran no new measurement. Root input/output remains absent (`galaxie-d53.7`);
+Pyodide Python and ADK Go lack node/model spans in the in-memory coverage lane
+(`galaxie-d53.8`, `galaxie-d53.9`). Cloud and other Langfuse majors, other MLflow
+versions, delivery guarantees, capacity, UI views, real models/devices, other
+executors and Firefox/WebKit trace ingestion remain unmeasured. The guide records
+[browser teardown and authorization limits](guides/tracing.md#register-a-browser-exporter-in-the-host)
+and [responsible use](guides/tracing.md#use-langfuse-and-mlflow-responsibly).
+
 On 2026-11-14, several strict four-field interaction requests in one top-level
 LangGraph node gained checkpoint-derived ordinal IDs: the first raw ID is
 preserved, later questions use `<raw>:1`, `<raw>:2`, and resumes route to the raw
