@@ -907,3 +907,15 @@ test.each(['@galaxie-ai/ui-protocol/internal', '../../ui-protocol/src/index.js',
     );
   },
 );
+
+test('only the create package composed cache is exempt from the ADK scan', () => {
+  expect(run({ 'packages/create/.cache/composed/a.ts': adk('@google/adk') })).toEqual({
+    status: 0,
+    output: '',
+  });
+  const result = run({ 'packages/other/.cache/a.ts': adk('@google/adk') });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(
+    'packages/other/.cache/a.ts: ADK imports belong only in packages/adapter-adk',
+  );
+});
