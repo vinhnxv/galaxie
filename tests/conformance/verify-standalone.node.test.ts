@@ -3,7 +3,7 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -735,3 +735,82 @@ it.skipIf(process.platform === 'win32')(
   },
   25000,
 );
+
+it('refuses template symlinks and strips project-level npm and environment files', async () => {
+  const root = await temporary();
+  const source = join(root, 'repo/template');
+  await mkdir(source, { recursive: true });
+  await writeFile(join(source, 'package.json'), '{}');
+  await writeFile(join(source, '.npmrc'), 'registry=https://example.invalid/');
+  await writeFile(join(source, '.env.local'), 'TEST_PLACEHOLDER=1');
+  await mkdir(join(source, '.git'));
+  await writeFile(join(source, '.git/config'), '');
+  const destination = join(root, 'copy');
+  await copyProject(source, destination);
+  for (const name of ['.npmrc', '.env.local', '.git'])
+    expect(existsSync(join(destination, name))).toBe(false);
+  expect(existsSync(join(destination, 'package.json'))).toBe(true);
+  await symlink(join(source, 'package.json'), join(source, 'linked.json'));
+  await expect(copyProject(source, join(root, 'copy-with-link'))).rejects.toThrow(
+    'Template symlinks are not supported.',
+  );
+});
+
+it('gives build and preview children only the allowlisted environment', async () => {
+  const root = await temporary();
+  const repo = join(root, 'repo');
+  const project = join(repo, 'templates/fixture');
+  await mkdir(project, { recursive: true });
+  await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+  await writeFile(
+    join(project, 'package.json'),
+    JSON.stringify({ name: 'fixture', private: true }),
+  );
+  const dump =
+    "require('node:fs').writeFileSync(process.argv[1], JSON.stringify(Object.keys(process.env)));";
+  await writeFile(join(project, 'build.cjs'), dump.replace('process.argv[1]', "'env-build.json'"));
+  await writeFile(
+    join(project, 'serve.cjs'),
+    `${dump.replace('process.argv[1]', "'env-serve.json'")} require('node:http').createServer((q,s)=>s.end('ready')).listen(Number(process.argv[process.argv.indexOf('--port')+1]), '127.0.0.1')`,
+  );
+  const keys: string[][] = [];
+  const results = await runStandalone(
+    {
+      repo,
+      tempBase: root,
+      nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
+      modes: ['registry'],
+      specs: [{ name: 'fixture', build: ['build.cjs'], preview: ['serve.cjs'], steps: [] }],
+      offline: true,
+      verifyReleaseAge: false,
+    },
+    {
+      environment: {
+        PATH: process.env['PATH'],
+        HOME: process.env['HOME'],
+        NPM_TOKEN: 'canary',
+        NODE_AUTH_TOKEN: 'canary',
+        UPSTREAM_API_KEY: 'canary',
+        NODE_OPTIONS: '--no-warnings',
+        npm_config_registry: 'https://example.invalid/',
+      },
+      driver: {
+        drive: async () => {
+          const entries = await readdir(root);
+          const run = entries.find((entry) => entry.startsWith('galaxie-standalone-')) ?? '';
+          const copy = join(root, run, `fixture-${process.versions.node.split('.')[0]}-registry`);
+          for (const file of ['env-build.json', 'env-serve.json'])
+            keys.push(JSON.parse(await readFile(join(copy, file), 'utf8')) as string[]);
+          return 'stub';
+        },
+      },
+    },
+  );
+  expect(results[0]?.failures).toEqual([]);
+  expect(keys).toHaveLength(2);
+  for (const names of keys) {
+    expect(names).toContain('PATH');
+    for (const forbidden of ['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'UPSTREAM_API_KEY', 'NODE_OPTIONS'])
+      expect(names).not.toContain(forbidden);
+  }
+}, 30000);

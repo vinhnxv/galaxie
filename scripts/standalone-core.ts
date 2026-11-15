@@ -225,12 +225,21 @@ export function assertSingleCopies(
     if (counts.get(name) !== 1) throw new Error(`Single-copy tarball check failed for ${name}.`);
 }
 
-const stripped = new Set(['node_modules', 'dist', '.server', 'test', 'tsconfig.workspace.json']);
+const stripped = new Set([
+  'node_modules',
+  'dist',
+  '.server',
+  'test',
+  'tsconfig.workspace.json',
+  '.npmrc',
+  '.git',
+]);
+const strippedPrefix = '.env';
 export async function copyProject(source: string, destination: string): Promise<void> {
   await cp(source, destination, {
     recursive: true,
     filter: async (path) => {
-      if (stripped.has(basename(path))) return false;
+      if (stripped.has(basename(path)) || basename(path).startsWith(strippedPrefix)) return false;
       if ((await lstat(path)).isSymbolicLink())
         throw new Error('Template symlinks are not supported.');
       return true;
@@ -240,7 +249,8 @@ export async function copyProject(source: string, destination: string): Promise<
 }
 export async function assertCopy(directory: string): Promise<void> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (stripped.has(entry.name)) throw new Error('Workspace artifact survived the copy.');
+    if (stripped.has(entry.name) || entry.name.startsWith(strippedPrefix))
+      throw new Error('Workspace artifact survived the copy.');
     if (entry.isDirectory()) await assertCopy(join(directory, entry.name));
   }
 }
@@ -670,6 +680,7 @@ export async function runStandalone(
                 children.delete(child);
               }
             };
+            phase = 'serve';
             const previewPort = await ports.find();
             await serve(
               [

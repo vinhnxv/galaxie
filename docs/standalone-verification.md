@@ -124,7 +124,7 @@ also pass the single-copy assertion. There are no remaining advisory errors or
 release-gap findings in this matrix. JSON and raw local command logs were kept
 outside the repository; temporary projects were removed.
 
-The oldest passing **major is 22**. Both manifests declare `engines.node` as
+The oldest **tested** major is 22, and it passes. Both manifests declare `engines.node` as
 `>=22.22.2`, using npm 12's lower 22.x bound; the measured patch is 22.23.5, not
 every admitted patch. npm 12.2.2 itself supports `^22.22.2 || ^24.15.0 || >=26`;
 use one of those ranges when running this harness. `@langchain/openai@1.6.3`
