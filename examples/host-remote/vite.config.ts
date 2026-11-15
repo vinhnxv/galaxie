@@ -32,6 +32,9 @@ const config: UserConfigExport = defineConfig({
       '@galaxie-ai/core/browser': fileURLToPath(
         new URL('../../packages/core/src/browser.ts', import.meta.url),
       ),
+      '@galaxie-ai/core/config': fileURLToPath(
+        new URL('../../packages/core/src/config/index.ts', import.meta.url),
+      ),
       '@galaxie-ai/core': fileURLToPath(
         new URL('../../packages/core/src/index.ts', import.meta.url),
       ),

@@ -2,11 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    "resolveJsonModule": true,
     "jsx": "react-jsx",
     "types": ["node", "vite/client"],
     "paths": {
       "@galaxie-ai/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
       "@galaxie-ai/core/browser": ["../../packages/core/src/browser.ts"],
+      "@galaxie-ai/core/config": ["../../packages/core/src/config/index.ts"],
       "@galaxie-ai/core": ["../../packages/core/src/index.ts"],
       "@galaxie-ai/ui-protocol": ["../../packages/ui-protocol/src/index.ts"],
       "@galaxie-ai/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
