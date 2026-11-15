@@ -129,7 +129,7 @@ live(
           );
       }
     }
-    rows['langgraph-js'] = buildRow({
+    const row = buildRow({
       id: 'langgraph-js',
       spans: result.spans,
       fixture: fixture['langgraph-js'],
@@ -141,7 +141,8 @@ live(
         rawResponsesScanned: true,
       },
     });
-    expect(rows['langgraph-js'].executorId).toBe('langgraph-js');
+    expect(row.executorId).toBe('langgraph-js');
+    rows['langgraph-js'] = row;
   },
   180_000,
 );
@@ -178,6 +179,9 @@ live(
     );
     const ownSpans = own.oracle.getFinishedSpans();
     expect(ownSpans.length).toBeGreaterThan(0);
+    expect(ownSpans.every((span) => span.instrumentationScope.name === 'gcp.vertex.agent')).toBe(
+      true,
+    );
     scanMarkers(
       [...result.spans, ...ownSpans].map((span) => span.attributes),
       [canary, ...adkMarkers],
