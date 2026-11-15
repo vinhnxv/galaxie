@@ -3,13 +3,14 @@
 
 import {
   type AgentDefinition,
-  type CapabilityBinding,
+  type BindingsFor,
   createRuntime,
   httpCapability,
 } from '@galaxie-ai/core';
 import {
   buildHostConfig,
   type HostConfigDocument,
+  type ValidatedHostConfig,
   validateHostConfig,
 } from '@galaxie-ai/core/config';
 import { tutorDefinition } from '@galaxie-ai/example-english-tutor';
@@ -19,7 +20,7 @@ import { expect, onTestFinished, test, vi } from 'vitest';
 import { z } from 'zod';
 import { collect, FakeExecutor } from '../../packages/core/test/fake-executor.js';
 
-const definition: AgentDefinition = { ...tutorDefinition, executor: 'fake' };
+const definition = { ...tutorDefinition, executor: 'fake' } as const;
 const lesson = {
   id: 'lesson-1',
   title: 'Lesson',
@@ -32,7 +33,7 @@ const consent = (): boolean => true;
 const getCredential = (): string => 'test-only-placeholder';
 const modelHooks = { consent: { notice: consent }, getCredential: { model: getCredential } };
 
-function document(): HostConfigDocument {
+function document() {
   return {
     version: '0.1',
     capabilities: {
@@ -91,7 +92,7 @@ function document(): HostConfigDocument {
         'tutor.feedback': { providers: ['feedback'], allow: ['in-browser'], maxTokens: 1000 },
       },
     },
-  };
+  } satisfies HostConfigDocument;
 }
 
 function transport(): ReturnType<typeof vi.fn<typeof globalThis.fetch>> {
@@ -101,7 +102,7 @@ function transport(): ReturnType<typeof vi.fn<typeof globalThis.fetch>> {
 }
 
 async function runCalls(
-  bindings: Readonly<Record<string, CapabilityBinding<never>>>,
+  bindings: BindingsFor<typeof definition>,
   fetch: ReturnType<typeof transport>,
 ): Promise<unknown[]> {
   const results: unknown[] = [];
@@ -225,6 +226,80 @@ test('config-built tutor calls match independent hand-wired requests and wait fo
   expect(manual).toEqual(expected);
 });
 
+test('retains concrete definition types through partial document and code composition', async () => {
+  const fetch = transport();
+  const input = document();
+  const partial = validateHostConfig(
+    {
+      ...input,
+      capabilities: { 'lessons.get@1': input.capabilities['lessons.get@1'] },
+    },
+    definition,
+    { ...modelHooks, headers: { session: headers }, fetch: { transport: fetch } },
+    'https://app.example',
+  );
+  const incomplete = buildHostConfig(partial);
+  // @ts-expect-error Partial wiring does not prove that the required write binding exists.
+  const missing: BindingsFor<typeof definition> = incomplete.bindings;
+  void missing;
+  const save: BindingsFor<typeof definition>['progress.save@1'] = httpCapability({
+    kind: 'write',
+    destination: 'host-server',
+    timeoutMs: 10000,
+    concurrency: 1,
+    grantScope: 'run',
+    retry: 'none',
+    approval: 'confirm',
+    credentials: 'omit',
+    method: 'POST',
+    url: 'https://app.example/api/progress',
+    headers,
+    fetch,
+  });
+  const complete: BindingsFor<typeof definition> = buildHostConfig(partial, {
+    'progress.save@1': save,
+  }).bindings;
+  await runCalls(complete, fetch);
+});
+
+test('keeps optional, union and unknown documents conservative at the type boundary', () => {
+  const input = document();
+  const hooks = { ...modelHooks, headers: { session: headers }, fetch: { transport: transport() } };
+  type Capabilities = typeof input.capabilities;
+  type CompleteConfig = ValidatedHostConfig<typeof definition, keyof Capabilities>;
+  const optional: Partial<Capabilities> = {};
+  const empty = validateHostConfig(
+    { ...input, capabilities: optional },
+    definition,
+    hooks,
+    'https://app.example',
+  );
+  const emptyBindings = buildHostConfig(empty).bindings;
+  expect(Object.keys(emptyBindings)).toEqual([]);
+  // @ts-expect-error Optional document keys do not establish required bindings.
+  const missingOptional: BindingsFor<typeof definition> = emptyBindings;
+  // @ts-expect-error A type annotation cannot promote unproven names to guaranteed names.
+  const promoted: CompleteConfig = empty;
+  function variant(
+    capabilities: Pick<Capabilities, 'lessons.get@1'> | Pick<Capabilities, 'progress.save@1'>,
+  ) {
+    return buildHostConfig(
+      validateHostConfig({ ...input, capabilities }, definition, hooks, 'https://app.example'),
+    );
+  }
+  const one = variant({ 'lessons.get@1': input.capabilities['lessons.get@1'] });
+  expect(Object.keys(one.bindings)).toEqual(['lessons.get@1']);
+  // @ts-expect-error A document union guarantees only names present in every member.
+  const missingUnion: BindingsFor<typeof definition> = one.bindings;
+  const unknownDocument: unknown = input;
+  const dynamic = validateHostConfig(unknownDocument, definition, hooks, 'https://app.example');
+  // @ts-expect-error Unknown input does not prove concrete capability names.
+  const missingUnknown: BindingsFor<typeof definition> = buildHostConfig(dynamic).bindings;
+  // @ts-expect-error Unknown input cannot gain guaranteed names through annotation.
+  const promotedUnknown: CompleteConfig = dynamic;
+  void [missingOptional, promoted, missingUnion, missingUnknown, promotedUnknown];
+});
+
 test('endpoint construction retains URL restrictions and adds the documented destination check', () => {
   const built = buildHostConfig(
     validateHostConfig(
@@ -263,6 +338,29 @@ test('endpoint construction retains URL restrictions and adds the documented des
     );
   }
   const baseURL = 'https://app.example/v1';
+  for (const model of ['', ' \t\n']) {
+    const invalid = {
+      version: '0.1',
+      models: {
+        providers: {
+          quiz: {
+            destination: 'host-server',
+            modality: 'text',
+            features: [],
+            pricing: 'unknown',
+            endpoint: { baseURL, model },
+          },
+        },
+        roles: {},
+      },
+    };
+    expect(() => validateHostConfig(invalid, definition, {}, baseURL)).toThrow(
+      expect.objectContaining({ code: 'invalid', path: '/models/providers/quiz/endpoint/model' }),
+    );
+    expect(() => openAICompatible({ baseURL, model })).toThrow(
+      expect.objectContaining({ code: 'invalid' }),
+    );
+  }
   expect(() =>
     openAICompatible({ baseURL, model: 'host-quiz', destination: 'user-device' }),
   ).not.toThrow();
@@ -335,6 +433,29 @@ test('capability userinfo is refused only by the document and MCP query validati
     token: () => 'test-only-placeholder',
   });
   onTestFinished(() => control.close());
+  const url = 'https://user:pass@app.example/mcp';
+  expect(() =>
+    validateHostConfig(
+      { version: '0.1', mcp: { servers: { school: { ...server, url } } } },
+      definition,
+      { token: { session: () => 'test-only-placeholder' } },
+      'https://app.example',
+    ),
+  ).toThrow(expect.objectContaining({ code: 'invalid', path: '/mcp/servers/school' }));
+  expect(() =>
+    createMcpServer({ ...server, id: 'school', url, token: () => 'test-only-placeholder' }),
+  ).toThrow(expect.objectContaining({ code: 'invalid' }));
+  expect(() =>
+    validateHostConfig(
+      {
+        version: '0.1',
+        mcp: { servers: { school: { ...server, url: 'https://app.example/mcp' } } },
+      },
+      definition,
+      { token: { session: () => 'test-only-placeholder' } },
+      'https://app.example',
+    ),
+  ).not.toThrow();
 });
 
 test('the runtime broker finds config descriptors and rejects a weaker placeholder schema', async () => {

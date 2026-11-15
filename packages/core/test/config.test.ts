@@ -16,12 +16,85 @@ import {
 import { getHttpCapability } from '../src/http-capability.js';
 import {
   type AgentDefinition,
+  type CapabilityContext,
   createRuntime,
   GalaxieError,
   httpCapability,
   toErrorInfo,
 } from '../src/index.js';
 import { binding, collect, definition, FakeExecutor } from './fake-executor.js';
+
+test('preserves accepted own non-enumerable hooks in snapshots and requests', async () => {
+  const hooks = hostHooks();
+  const transport = hooks.fetch.transport;
+  for (const group of Object.getOwnPropertyNames(hooks)) {
+    const record = hooks[group as keyof typeof hooks];
+    for (const name of Object.getOwnPropertyNames(record))
+      Object.defineProperty(record, name, { enumerable: false });
+    Object.defineProperty(hooks, group, { enumerable: false });
+  }
+  const validated = validate(document(), configDefinition, hooks);
+  for (const group of Object.getOwnPropertyNames(hooks)) {
+    const snapshot = validated.hooks[group as keyof HostConfigHooks];
+    const original = hooks[group as keyof typeof hooks];
+    expect(snapshot).toBeDefined();
+    for (const name of Object.getOwnPropertyNames(original))
+      expect(snapshot?.[name]).toBe(original[name as keyof typeof original]);
+  }
+  expect(validated.hooks.fetch?.['transport']).toBe(transport);
+  const built = buildHostConfig(validated);
+  expect(built.modelRouting.consent).toBe(hooks.consent.notice);
+  const binding = built.bindings['lessons.get@1'];
+  if (binding === undefined) throw new Error('Missing HTTP binding.');
+  await binding.invoke(
+    { lessonId: 'lesson-1' } as never,
+    {
+      signal: new AbortController().signal,
+      effectId: 'test-effect',
+      runId: 'test-run',
+      principalScope: 'learner',
+      agent: { id: 'tests/agent', version: '1.0.0', hash: '' },
+    } as CapabilityContext,
+  );
+  expect(transport).toHaveBeenCalledExactlyOnceWith(
+    'https://app.example/api/lessons/lesson-1',
+    expect.objectContaining({ redirect: 'error', credentials: 'omit' }),
+  );
+});
+
+test.each(['invalid', 'unsupported'] as const)(
+  'omits host annotation errors from the %s cause chain',
+  (code) => {
+    let fail = true;
+    const input = new Proxy(idSchema, {
+      get(target, property, receiver) {
+        if (fail && property === '~standard') throw new GalaxieError(code, 'schema-secret-marker');
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const agent: AgentDefinition = {
+      ...configDefinition,
+      capabilities: {
+        optional: {
+          ...configDefinition.capabilities?.optional,
+          'lessons.get@1': { ...request, input },
+        },
+      },
+    };
+    const error = rejected(() => validate(document(), agent), '/capabilities/lessons.get@1', code);
+    expect(error.cause).toBeUndefined();
+    fail = false;
+    expect(() => validate(document(), agent)).not.toThrow();
+  },
+);
+
+test.each(['', ' \t\n'])('rejects a blank endpoint model before construction: %j', (model) => {
+  const input = document();
+  input.models.providers.quiz.endpoint.model = model;
+  rejected(() => validate(input), '/models/providers/quiz/endpoint/model');
+  input.models.providers.quiz.endpoint.model = 'host-quiz';
+  expect(() => validate(input)).not.toThrow();
+});
 
 const policy = {
   destination: 'host-server',

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { CapabilityBinding, HttpCapabilityOptions } from '../capabilities.js';
+import type { AgentDefinition, BindingsFor } from '../definition.js';
 import { httpCapability } from '../http-capability.js';
 import type { ModelDescriptor, ModelRouting } from '../models.js';
 import type { RuntimeOptions } from '../runtime.js';
@@ -17,13 +18,36 @@ interface Endpoint {
   readonly temperature?: number;
 }
 
-interface BuiltHostConfig {
-  readonly bindings: Readonly<Record<string, CapabilityBinding<never, unknown>>>;
+type ConfigBindings<Definition extends AgentDefinition, Names extends string> = {
+  readonly [Name in Names]: Name extends keyof BindingsFor<Definition>
+    ? NonNullable<BindingsFor<Definition>[Name]>
+    : CapabilityBinding<never, unknown>;
+};
+
+interface BuiltHostConfig<
+  Definition extends AgentDefinition = AgentDefinition,
+  Names extends string = never,
+  CodeBindings = Readonly<Record<string, CapabilityBinding<never, unknown>>>,
+> {
+  readonly bindings: Readonly<Record<string, CapabilityBinding<never, unknown>>> &
+    ConfigBindings<Definition, Names> &
+    CodeBindings;
   readonly modelRouting: ModelRouting;
   readonly endpoints: Readonly<Record<string, Endpoint>>;
 }
 
 /** Builds fresh runtime instance options without constructing providers or invoking hooks. */
+export function buildHostConfig<Definition extends AgentDefinition, Names extends string>(
+  config: ValidatedHostConfig<Definition, Names>,
+): BuiltHostConfig<Definition, Names, Record<never, never>>;
+export function buildHostConfig<
+  Definition extends AgentDefinition,
+  Names extends string,
+  CodeBindings extends Readonly<Record<string, CapabilityBinding<never, unknown>>>,
+>(
+  config: ValidatedHostConfig<Definition, Names>,
+  codeBindings: CodeBindings,
+): BuiltHostConfig<Definition, Names, CodeBindings>;
 export function buildHostConfig(
   config: ValidatedHostConfig,
   codeBindings: Readonly<Record<string, CapabilityBinding<never, unknown>>> = {},
@@ -51,7 +75,7 @@ export function buildHostConfig(
   );
   const providers = Object.fromEntries(
     Object.entries(data.models?.providers ?? {}).map(
-      ([id, { endpoint: _endpoint, ...descriptor }]) => [id, copyDocument(descriptor)],
+      ([id, { endpoint: _endpoint, ...descriptor }]) => [id, descriptor],
     ),
   );
   const endpoints = Object.fromEntries(
@@ -75,7 +99,7 @@ export function buildHostConfig(
     bindings: { ...codeBindings, ...bindings },
     modelRouting: copyDocument({
       providers,
-      roles: copyDocument(models?.roles ?? {}),
+      roles: models?.roles ?? {},
       ...(models?.consent === undefined ? {} : { consent: hooks.consent?.[models.consent] }),
       ...(models?.getCredential === undefined
         ? {}

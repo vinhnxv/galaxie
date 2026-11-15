@@ -38,6 +38,12 @@ options. Runtime limits are built separately for `createRuntime`. Validation
 invokes no hooks, performs no I/O and returns a detached, frozen snapshot.
 Errors carry a JSON Pointer and fixed message without document values.
 
+For code-authored documents, `satisfies HostConfigDocument` preserves known
+capability names through validation and building, along with the definition's
+binding types. Code bindings can complete a partial document. Parsed documents
+of unknown shape retain a dynamic binding map; the existing `runtime.create`
+checks remain responsible for required bindings after composition.
+
 The document has the same trust as host code. Its editor chooses destinations,
 credential modes and hooks; credential hooks run against document-chosen URLs.
 Validation cannot establish intended-server identity or backend authorization.

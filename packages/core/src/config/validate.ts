@@ -30,19 +30,32 @@ export interface HostConfigHooks {
   readonly download?: Readonly<Record<string, NonNullable<ModelRouting['download']>>>;
 }
 
+declare const configurationType: unique symbol;
+
+type RequiredNames<Value> = keyof {
+  [Name in keyof Value as Record<never, never> extends Pick<Value, Name> ? never : Name]: unknown;
+};
+
+type CapabilityNames<Document> = [Document] extends [{ readonly capabilities: infer Capabilities }]
+  ? Extract<RequiredNames<Capabilities>, string>
+  : never;
+
 /** Only values returned by validateHostConfig can be passed to the builders. */
-export interface ValidatedHostConfig {
+export interface ValidatedHostConfig<
+  Definition extends AgentDefinition = AgentDefinition,
+  Names extends string = never,
+> {
   readonly document: HostConfigDocument;
   readonly hooks: HostConfigHooks;
+  readonly [configurationType]?: readonly [Definition, (name: Names) => void];
 }
 
 const validated = new WeakSet<object>();
 
-export function assertValidatedHostConfig(value: ValidatedHostConfig): void {
+export function assertValidatedHostConfig(value: object): void {
   if (!validated.has(value)) throw new HostConfigError('invalid', '');
 }
 
-/** Removes optional undefined values while copying the validated plain-data tree. */
 export function copyDocument<Value>(value: Value): Value {
   if (Array.isArray(value)) return value.map(copyDocument) as Value;
   if (value !== null && typeof value === 'object')
@@ -92,21 +105,26 @@ function resolveUrl(value: string, base: URL, path: string): string {
 function snapshotHooks(hooks: HostConfigHooks): HostConfigHooks {
   return freeze(
     Object.fromEntries(
-      Object.entries(hooks).map(([group, functions]) => [
-        group,
-        Object.fromEntries(Object.entries(functions ?? {})),
-      ]),
+      Object.getOwnPropertyNames(hooks).map((group) => {
+        const functions = hooks[group as keyof HostConfigHooks];
+        return [
+          group,
+          Object.fromEntries(
+            Object.getOwnPropertyNames(functions ?? {}).map((name) => [name, functions?.[name]]),
+          ),
+        ];
+      }),
     ),
   );
 }
 
 /** Pure validation against a definition and host-owned hook names, before any runtime exists. */
-export function validateHostConfig(
-  supplied: unknown,
-  definition: AgentDefinition,
+export function validateHostConfig<const Document, const Definition extends AgentDefinition>(
+  supplied: Document,
+  definition: Definition,
   hooks: HostConfigHooks,
   baseURL: string,
-): ValidatedHostConfig {
+): ValidatedHostConfig<Definition, CapabilityNames<Document>> {
   const version =
     supplied !== null && typeof supplied === 'object' && Object.hasOwn(supplied, 'version')
       ? (supplied as { version?: unknown }).version
@@ -212,9 +230,17 @@ export function validateHostConfig(
       const { headers: _headers, fetch: _fetch, ...options } = capability;
       const binding = httpCapability(copyDocument(options) as HttpCapabilityOptions);
       const request = requests.get(name);
-      if (request !== undefined)
-        getHttpCapability(binding)?.validate(readAnnotations(request.input), binding);
+      if (request !== undefined) {
+        let annotations: ReturnType<typeof readAnnotations>;
+        try {
+          annotations = readAnnotations(request.input);
+        } catch (error) {
+          throw new HostConfigError(error instanceof GalaxieError ? error.code : 'invalid', path);
+        }
+        getHttpCapability(binding)?.validate(annotations, binding);
+      }
     } catch (error) {
+      if (error instanceof HostConfigError) throw error;
       if (error instanceof GalaxieError) throw new HostConfigError(error.code, path, error);
       throw new HostConfigError('invalid', path);
     }

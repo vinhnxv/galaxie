@@ -151,7 +151,7 @@ export const hostConfigSchema: z.ZodType<HostConfigDocument> = z.strictObject({
           endpoint: z
             .strictObject({
               baseURL: z.string(),
-              model: z.string(),
+              model: z.string().regex(/\S/),
               maxTokens: z.number().int().positive().optional(),
               temperature: z.number().optional(),
               fetch: z.string().optional(),
