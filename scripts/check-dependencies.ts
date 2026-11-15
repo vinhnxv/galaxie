@@ -246,10 +246,20 @@ if (
   );
 
 for (const file of files('packages/core/src', /\.[cm]?tsx?$/)) {
+  const configDirectory = resolve('packages/core/src/config');
+  const inConfig = resolve(file).startsWith(`${configDirectory}/`);
   const mainEntry = !browserModules.has(resolve(file).replace(/\.ts$/, '.js'));
   if (mainEntry) checkCoreGlobals(file);
   for (const reference of imports(file)) {
     const { specifier, typeOnly } = reference;
+    const target = resolve(dirname(file), specifier);
+    if (
+      !inConfig &&
+      ((specifier.startsWith('.') &&
+        (target === configDirectory || target.startsWith(`${configDirectory}/`))) ||
+        specifier === '@galaxie-ai/core/config')
+    )
+      problems.push(`${file}: core modules outside config must not import config`);
     if (mainEntry && browserModules.has(resolve(dirname(file), specifier).replace(/\.ts$/, '.js')))
       problems.push(`${file}: main-entry modules must not import or re-export ${specifier}`);
     if (
@@ -257,6 +267,7 @@ for (const file of files('packages/core/src', /\.[cm]?tsx?$/)) {
       specifier.startsWith('../') ||
       specifier === '@opentelemetry/api' ||
       specifier === '@galaxie-ai/ui-protocol' ||
+      (inConfig && specifier === 'zod') ||
       (specifier === 'zod/v4/core' && typeOnly)
     )
       continue;

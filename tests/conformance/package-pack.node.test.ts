@@ -54,6 +54,11 @@ beforeAll(() => {
       timeout: 300_000,
     });
   }
+  execFileSync(process.execPath, ['scripts/build-host-config-schema.ts'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 300_000,
+  });
   for (const pkg of packages) {
     const destination = join(temporaryDirectory, pkg.directory);
     mkdirSync(destination);

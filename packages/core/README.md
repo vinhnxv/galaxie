@@ -26,6 +26,25 @@ storage persistence and development page warnings keep their feature guards.
 `InvalidationOptions` and `InvalidationWatcher`. Ownership requires Web Locks and
 BroadcastChannel; invalidation requires BroadcastChannel and also works in a Worker.
 
+`@galaxie-ai/core/config` exports `validateHostConfig`, `buildHostConfig`,
+`buildRuntimeLimits`, `hostConfigJsonSchema`, `HostConfigError` and the types
+`HostConfigDocument`, `HostConfigHooks`, `ValidatedHostConfig`. The generated
+`@galaxie-ai/core/host-config.schema.json` is a draft 2020-12 editor schema.
+Only the config entry imports Zod at runtime; main and browser stay separate.
+
+The host parses its document and validates it against one agent definition and
+named host hooks before building HTTP bindings, model routing and endpoint
+options. Runtime limits are built separately for `createRuntime`. Validation
+invokes no hooks, performs no I/O and returns a detached, frozen snapshot.
+Errors carry a JSON Pointer and fixed message without document values.
+
+The document has the same trust as host code. Its editor chooses destinations,
+credential modes and hooks; credential hooks run against document-chosen URLs.
+Validation cannot establish intended-server identity or backend authorization.
+The host must bind credentials to intended origins. The MCP builder and host-remote
+adoption remain planned, and [ADR-0031](../../docs/adr/0031-declarative-host-configuration.md)
+stays Proposed. ADR-0012 guarantees are unchanged.
+
 Moving these functions and types out of the main entry was a breaking change to
 the public API, made before the first release. Update host imports:
 

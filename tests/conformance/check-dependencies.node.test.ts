@@ -97,6 +97,44 @@ test('an empty skeleton passes', () => {
   expect(run({})).toMatchObject({ status: 0, output: '' });
 });
 
+test('only the config subpath may import runtime Zod', () => {
+  expect(run({ 'packages/core/src/config/schema.ts': "import * as z from 'zod';" })).toMatchObject({
+    status: 0,
+    output: '',
+  });
+  for (const file of ['packages/core/src/index.ts', 'packages/core/src/browser.ts']) {
+    const result = run({ [file]: "import * as z from 'zod';" });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain(`${file}: forbidden core import zod`);
+  }
+  const other = run({ 'packages/core/src/config/schema.ts': "import 'other-library';" });
+  expect(other.status).toBe(1);
+  expect(other.output).toContain('forbidden core import other-library');
+}, 30000);
+
+test.each(['index', 'browser', 'helper'])(
+  'other core modules cannot reach config from %s',
+  (name) => {
+    for (const source of [
+      "import './config/index.js';",
+      "export * from './config/index.js';",
+      "export const load = () => import('./config/index.js');",
+    ]) {
+      const file = `packages/core/src/${name}.ts`;
+      const result = run({ [file]: source });
+      expect(result.status).toBe(1);
+      expect(result.output).toContain(
+        `${file}: core modules outside config must not import config`,
+      );
+    }
+    expect(run({ 'packages/core/src/config/build.ts': "import './schema.js';" })).toMatchObject({
+      status: 0,
+      output: '',
+    });
+  },
+  30000,
+);
+
 test.each([
   'export const page = navigator;',
   'export const page = globalThis.navigator;',

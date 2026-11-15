@@ -5,18 +5,19 @@
 - **Related:** brief §0.2, §1.1, §5.2, §9.7, §13.2; ADR-0002, ADR-0006, ADR-0008, ADR-0011, ADR-0012, ADR-0017
 - **Revisions:**
   - 2026-11-15: initial proposal.
+  - 2026-11-15: core configuration subpath implemented and verified with mock unit/Node conformance tests, schema, pack, dependency and size gates; MCP builder and host-remote adoption remain planned. Status stays Proposed pending maintainer review.
 
 ## Context
 
 The host currently wires agents in TypeScript. [host-remote](../../examples/host-remote/src/runtime.ts) constructs one GET and one POST `httpCapability` with a shared policy, two model providers and two role routes, and an `openAICompatible` quiz endpoint at `/api/v1`. Its headers, credential callback and consent hook are host code. Changing this wiring requires a code edit.
 
-There is no host configuration document API yet. A console or deployment pipeline would need a plain-data representation of wiring without duplicating the agent definition or carrying executable code. The [brief](../galaxie-project-brief.md) leaves the console's scope open (§20, question 5); this proposal does not settle it.
+The core host configuration document API now implements the validation and HTTP/routing half of this proposal. A console or deployment pipeline would need a plain-data representation of wiring without duplicating the agent definition or carrying executable code. The [brief](../galaxie-project-brief.md) leaves the console's scope open (§20, question 5); this proposal does not settle it.
 
 [ADR-0008](0008-code-first-agent-definition.md) rejects YAML agent definitions because two hand-maintained descriptions drift and lose type checking. [ADR-0011](0011-mcp-via-controlled-servers.md) requires MCP servers configured in host code, and [ADR-0012](0012-security-baseline.md) sets the mandatory controls and host obligations. A data format for wiring needs an explicit boundary against those decisions before implementation.
 
 ## Decision
 
-Propose a versioned plain-data host configuration document for one agent definition, with validation and building in a planned `@galaxie-ai/core/config` subpath. A planned builder in `@galaxie-ai/tools-mcp` would build MCP servers from the validated configuration. Core would not import models or tools-mcp; the host would compose them under the existing [dependency rules](../system-design.md#4-packages-and-dependency-rules). Nothing in this ADR is implemented, and this proposal changes no shipped contract or behavior.
+Propose a versioned plain-data host configuration document for one agent definition, with validation and building in `@galaxie-ai/core/config`. A planned builder in `@galaxie-ai/tools-mcp` would build MCP servers from the validated configuration. Core would not import models or tools-mcp; the host would compose them under the existing [dependency rules](../system-design.md#4-packages-and-dependency-rules). The core subpath now implements the document schema, pure validation and HTTP/routing/runtime-limit builders. The MCP builder and host-remote adoption remain planned. This ADR stays Proposed; ADR-0012 guarantees are unchanged.
 
 The proposed contract is:
 
@@ -71,9 +72,21 @@ Status stays Proposed until the maintainer reviews it.
 
 ## Verification
 
-This change records the proposal and documentation pointers only. `pnpm run check:docs` checks Markdown links and heading anchors, but not the ADR index or status; read back the title and Proposed status in [the index](README.md#index) separately. The linked source files above establish the existing constructor checks, runtime option ownership and hand-written host-remote wiring, not implementation of this format.
+The core implementation is covered by `packages/core/test/config.test.ts` and
+`tests/conformance/host-config.node.test.ts`: immutable validation without hook
+invocation, fixed error codes and JSON Pointers, HTTP policy parity, destination
+and URL checks, runtime limits and approval-gated tutor calls through injected
+fetch. A stricter definition rejects config-built descriptors at `runtime.create`.
+Node conformance also records the intended capability-userinfo and endpoint
+destination differences from today's factories, and the MCP query-string seam
+left to the later builder.
 
-Planned verification for the implementing work would cover:
+`pnpm check` verifies the generated draft 2020-12 JSON Schema, package exports,
+dependency boundaries and own-code size budgets; the main-entry budget is
+unchanged. `pnpm run check:docs` checks Markdown links and heading anchors, not
+ADR status. The [index](README.md#index) still lists Proposed.
+
+The remaining tools-mcp and host-remote work will extend verification to:
 
 - A validated document building the same bindings, model routing, endpoints and runtime limits as equivalent hand-written options, with no side effects or server/model/runtime creation during validation.
 - Unknown versions, keys, hook names, undeclared capabilities/roles and derived MCP names failing with the offending entry's JSON Pointer and original error code, without document values in errors.
@@ -81,4 +94,4 @@ Planned verification for the implementing work would cover:
 - Runtime limits supplied by one document for a shared runtime, and MCP servers built only by tools-mcp from validated configuration, retaining token hooks, pins and confirmed writes.
 - A host-remote parity run and a check that no published galaxie package includes a YAML parser.
 
-Unmeasured: no configuration code, example or guide is implemented by this change; no browser run or real-backend result verifies this proposal. The document's host-authorship and trust rule, intended-server identity, credential scope and backend authorization remain host obligations that galaxie cannot establish through document validation.
+Unmeasured: real hosts, browser configuration integration, consumer-bundle size and real backends. The tools-mcp builder, host-remote adoption and guide remain unimplemented. The document's host-authorship and trust rule, intended-server identity, credential scope and backend authorization remain host obligations that galaxie cannot establish through document validation.
