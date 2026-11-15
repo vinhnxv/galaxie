@@ -87,6 +87,7 @@ Trust rules:
 | UI | Hooks, surfaces, typed registry, headless reference components | `react` | [ADR-0007](adr/0007-typed-ui-registry-for-mvp.md) |
 | Agent linting | Implemented: five ESTree rules for direct network, storage, DOM/HTML sinks, eval and model-provider access; scope-aware, without type information or runtime enforcement | `eslint-plugin` | [ADR-0002](adr/0002-trusted-first-execution.md), [ADR-0012](adr/0012-security-baseline.md), [ADR-0013](adr/0013-typescript-first-implementation.md) |
 | Agent definitions | Code-first definitions; a build script generates the manifest | `core` (types) | [ADR-0008](adr/0008-code-first-agent-definition.md) |
+| Host configuration | Proposed, not implemented: a plain-data wiring document for one agent definition, validated against it and built into existing runtime options; no credentials, header values or functions | `@galaxie-ai/core/config` subpath and `@galaxie-ai/tools-mcp` builder (planned) | [ADR-0031](adr/0031-declarative-host-configuration.md), [§6.4](#64-host-configuration-documents) |
 | Tracing | OpenTelemetry spans for runs, nodes, model calls and capability calls; every value galaxie records is filtered, and span content follows the data labels; no exporter | `core` | [ADR-0016](adr/0016-parity-demonstrations-and-otel-traces.md), brief §14.4 |
 
 ## 4. Packages and dependency rules
@@ -416,6 +417,16 @@ Recovery submissions retain only action and domain payload, with no component ID
 Replay accepts when at least one registered action on a surface component validates
 that payload; it cannot recover the originating component. Render outcomes continue
 to use interaction ID and view token, so each new revision has a new outcome key.
+
+### 6.4. Host configuration documents
+
+[ADR-0031](adr/0031-declarative-host-configuration.md) proposes a versioned plain-data document for one agent definition's wiring. It is not implemented. The planned `@galaxie-ai/core/config` subpath would cover HTTP capabilities, model providers and role routes, OpenAI-compatible endpoints and runtime limits; a planned `@galaxie-ai/tools-mcp` builder would cover MCP servers with pinned tools. Agent definitions, graphs, workflows, prompts and context would stay in code.
+
+In the proposed flow, the host would parse JSON or YAML, then validate the object against the definition and host-supplied named hooks without invoking them. Pure validation would create no server, model or runtime, though it could construct and discard HTTP bindings for descriptor checks. Building would follow validation and produce bindings, model routing and endpoint options. Runtime limits would be built separately, supplied by exactly one document per runtime. The tools-mcp builder would construct MCP servers from the validated configuration: tools-mcp imports core, never the reverse (§4). The host would pass the resulting options to the existing `createRuntime` and `runtime.create` APIs.
+
+The proposed validation would reject unknown versions as `unsupported` and unknown keys as `invalid`; undeclared capability, role and derived MCP names and unknown hook names would fail too. It would resolve capability, endpoint and MCP URLs that begin with a single `/` against a host base URL before factories see them, keeping the base origin (`//` and `/\` prefixes fail). Model endpoints would follow the HTTP destination rule: no `in-browser`, `user-device` only on loopback, and HTTPS except HTTP on loopback. This endpoint destination check is proposed; the model constructor does not currently enforce it. Errors would name an entry by JSON Pointer, retain the original error code and omit document values. Existing `runtime.create` checks would remain unchanged.
+
+Under the proposed trust rule, the document would be authored and served by the host with the same trust as host code, never from end users, model output or tool results. Credentials, header values and functions would stay in host code behind string-named hooks. An editor of the document could change wiring and runtime limits within validation; credential hooks would then run against document-chosen URLs. Validation could not establish intended-server identity, server authorization or host control of an MCP server. Bundling is the proposed default; host runtime fetching and the reading of ADR-0011's "configured in host code" remain maintainer review questions in the ADR. No ADR-0012 obligation would be relaxed.
 
 ## 7. Runtime topology
 
