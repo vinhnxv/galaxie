@@ -142,6 +142,38 @@ export interface StoredScore {
 
 export const scoreWindowMillis = 300_000;
 
+export interface SessionTrace {
+  trace_id: string;
+  trace_metadata?: Record<string, string>;
+}
+
+export async function mlflowSessionQuery(
+  sessionId: string,
+  inspect?: (response: unknown) => void,
+): Promise<SessionTrace[]> {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(sessionId)) throw new Error('Invalid session ID');
+  const env = readEnv();
+  const result = await json<{ traces?: SessionTrace[] }>(
+    `http://127.0.0.1:${env['MLFLOW_PORT']}/api/3.0/mlflow/traces/search`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locations: [
+          {
+            type: 'MLFLOW_EXPERIMENT',
+            mlflow_experiment: { experiment_id: env['MLFLOW_EXPERIMENT_ID'] },
+          },
+        ],
+        filter: `metadata.\`mlflow.trace.session\` = '${sessionId}'`,
+        max_results: 100,
+      }),
+    },
+  );
+  inspect?.(result);
+  return result.traces ?? [];
+}
+
 export async function scoresQuery(
   query: Record<string, string>,
   inspect?: (response: unknown) => void,

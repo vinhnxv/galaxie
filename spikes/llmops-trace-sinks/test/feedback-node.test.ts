@@ -12,7 +12,13 @@ import {
   waitForReadback,
   waitForScores,
 } from '../src/readback.js';
-import { runScenario, type ScenarioResult } from '../src/scenarios.js';
+import {
+  runScenario,
+  runSessions,
+  type ScenarioResult,
+  type SessionsResult,
+} from '../src/scenarios.js';
+import { sessionReadback } from '../src/session-readback.js';
 import { inspectFeedback, writeFeedback } from '../src/score-readback.js';
 import { createScoreClient } from '../src/scores.js';
 import { readEnv } from '../src/secrets.js';
@@ -24,6 +30,36 @@ let posts = 0;
 let now = new Date();
 let client: ReturnType<typeof createScoreClient>;
 const evidence: Record<string, unknown> = { demonstration: true, scoreWindowMillis };
+const sessionRuns: SessionsResult[] = [];
+
+test.skipIf(!enabled)(
+  'session filters measure root-only and copied attributes in both backends',
+  async () => {
+    const phases = [];
+    for (const [sessionCopy, text] of [
+      [false, false],
+      [true, false],
+      [true, true],
+    ] as const) {
+      const result = await runSessions({ live: true, sessionCopy, text });
+      sessionRuns.push(result);
+      const measured = await sessionReadback(result);
+      phases.push({
+        phase: !sessionCopy ? 'collector-only' : text ? 'processor-text' : 'processor',
+        text,
+        sessionCopy,
+        ...measured,
+      });
+      writeFeedback(
+        'sessions.json',
+        normalize(
+          { demonstration: true, phases },
+          sessionRuns.flatMap((item) => item.spans),
+        ),
+      );
+    }
+  },
+);
 
 beforeAll(async () => {
   if (!enabled) return;
