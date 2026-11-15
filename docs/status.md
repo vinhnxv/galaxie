@@ -4,8 +4,8 @@ On 2026-11-16, `@galaxie-ai/adapter-pyodide`, `@galaxie-ai/adapter-adk` and
 `@galaxie-ai/adapter-go` gain metadata and root license files, with offline and
 tarball tests covering package contents, exports, versions and private status.
 They remain private and unpublished at `0.0.0`, outside launch lists and size
-budgets; nothing is published and the registry still carries only the seven
-launch packages. Python's `@galaxie-ai/adapter-pyodide/runtime-files` subpath
+budgets; this change publishes nothing and leaves the seven-package
+launch list unchanged. Python's `@galaxie-ai/adapter-pyodide/runtime-files` subpath
 exposes the Worker's unchanged runtime and wheel inventories. Its vendored
 `cryptography` wheel URL remains repo-relative and needs a delivery decision
 before publication. The three adapters inherit the starters' `>=22.22.2` Node

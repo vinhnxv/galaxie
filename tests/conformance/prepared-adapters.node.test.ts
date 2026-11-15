@@ -119,3 +119,17 @@ test('prepared adapters remain private and outside standalone launch and size bu
     ).toEqual(['size-budget']);
   }
 });
+
+test('prepared adapters stay out of the dependency-license launch list', () => {
+  const source = readFileSync(
+    new URL('../../scripts/check-dependency-licenses.ts', import.meta.url),
+    'utf8',
+  );
+  const listed = /const launchPackages = \[([^\]]*)\]/.exec(source)?.[1];
+  expect(listed).toBeDefined();
+  const directories = [...(listed ?? '').matchAll(/'packages\/([^']+)'/g)].map((match) => match[1]);
+  // Positive control: the parser sees the real list before absence is claimed.
+  expect(directories).toContain('core');
+  expect(directories).toHaveLength(7);
+  for (const { directory } of prepared) expect(directories).not.toContain(directory);
+});
