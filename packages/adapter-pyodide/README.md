@@ -497,6 +497,16 @@ the bundled WebLLM and Built-in AI descriptors lack it, so only mock mode curren
 offers that choice. See the [mock command and review steps](../../examples/rag-browser/README.md#passage-review-with-mock-models).
 A mock-only hands-on Chrome check of pydantic-ai in the RAG example (2026-10-31) covered review, reload restore, resume and Start over. A mock-only hands-on Chrome check of DSPy (2026-10-31) covered a cited answer, review with two kept passages, reload restore of the executor and pending review, resume and Start over. Real models remain unmeasured.
 
+## Runtime and wheel inventories
+
+`@galaxie-ai/adapter-pyodide/runtime-files` exports `runtimeFiles` (runtime file
+names and byte lengths) and `lockedWheels` (the pinned third-party wheel inventory
+used by the Worker). Hosts serving the runtime and wheels can use this subpath
+without importing the Worker. The package remains private and unpublished.
+The `cryptography` wheel's inventory URL is repo-relative; registry consumers'
+wheel delivery must be resolved before publication. See the
+[promotion checklist](../../docs/releasing.md#prepared-adapters).
+
 ## DSPy programs
 
 Select `framework: 'dspy'` and executor `dspy-python`, pinned to DSPy 3.4.1.

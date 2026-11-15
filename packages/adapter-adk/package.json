@@ -4,6 +4,21 @@
   "private": true,
   "description": "Google ADK (JavaScript) executor adapter for galaxie.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinhnxv/galaxie.git",
+    "directory": "packages/adapter-adk"
+  },
+  "homepage": "https://github.com/vinhnxv/galaxie/tree/main/packages/adapter-adk#readme",
+  "bugs": {
+    "url": "https://github.com/vinhnxv/galaxie/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -13,7 +28,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "dependencies": {
     "@galaxie-ai/core": "workspace:*",
