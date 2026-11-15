@@ -4,6 +4,21 @@
   "private": true,
   "description": "Worker-based LangGraph Python executor for galaxie.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinhnxv/galaxie.git",
+    "directory": "packages/adapter-pyodide"
+  },
+  "homepage": "https://github.com/vinhnxv/galaxie/tree/main/packages/adapter-pyodide#readme",
+  "bugs": {
+    "url": "https://github.com/vinhnxv/galaxie/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  },
   "type": "module",
   "sideEffects": [
     "./src/worker.ts",
@@ -17,10 +32,16 @@
     "./worker": {
       "types": "./dist/worker.d.ts",
       "default": "./dist/worker.js"
+    },
+    "./runtime-files": {
+      "types": "./dist/runtime-files.d.ts",
+      "default": "./dist/runtime-files.js"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "dependencies": {
     "@galaxie-ai/core": "workspace:*",

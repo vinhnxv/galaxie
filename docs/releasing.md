@@ -21,6 +21,24 @@ exact release version after packing. The A2UI renderer is a breaking change to t
 launch React package's public surface API and must land in a 0.x minor release.
 Publish order remains protocol first, then core, then the dependent packages.
 
+## Prepared adapters
+
+`@galaxie-ai/adapter-pyodide`, `@galaxie-ai/adapter-adk` and `@galaxie-ai/adapter-go`
+have package metadata, root license files and pack conformance coverage, but stay
+`private: true` at `0.0.0`, outside the seven launch packages and size budgets.
+The Python adapter also exposes `./runtime-files` for its runtime and wheel inventories.
+Their declared Node floor, `>=22.22.2`, matches the starters; these adapters have
+not been measured at that floor.
+
+Promotion requires a lockstep version bump of manifests and adapter constants,
+removal of `private`, membership in the pack, standalone and dependency-license
+launch lists, size budgets for every export (including Python's `./runtime-files`
+and `./worker`), updated release package lists and publish order, README install
+instructions and removal of the experimental/unpublished banners. Before
+publication, decide how consumers obtain the vendored `cryptography` wheel:
+its inventory URL is repo-relative (`../python/wheels/...`) and does not resolve
+from an installed registry package. This preparation leaves that inventory unchanged.
+
 ## Size budgets
 
 CI and `pnpm check` measure every default JavaScript export of each public package

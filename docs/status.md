@@ -1,5 +1,18 @@
 # Project status
 
+On 2026-11-16, `@galaxie-ai/adapter-pyodide`, `@galaxie-ai/adapter-adk` and
+`@galaxie-ai/adapter-go` gain metadata and root license files, with offline and
+tarball tests covering package contents, exports, versions and private status.
+They remain private and unpublished at `0.0.0`, outside launch lists and size
+budgets; nothing is published and the registry still carries only the seven
+launch packages. Python's `@galaxie-ai/adapter-pyodide/runtime-files` subpath
+exposes the Worker's unchanged runtime and wheel inventories. Its vendored
+`cryptography` wheel URL remains repo-relative and needs a delivery decision
+before publication. The three adapters inherit the starters' `>=22.22.2` Node
+floor as a consistent declaration, not a measurement of these adapters. See
+[release promotion work](releasing.md#prepared-adapters).
+ADR-0031 stays Proposed; runtime behavior and ADR-0012 guarantees are unchanged.
+
 On 2026-11-15, the [standalone verification harness](standalone-verification.md)
 installs both starters outside this workspace from the public npm registry and
 packed workspace tarballs on Node 22.23.5 and 24.15.0. All eight cases pass builds,

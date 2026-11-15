@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import * as runtimeInventory from '../../packages/adapter-pyodide/src/runtime-files.js';
+import { discoverEntries } from '../../scripts/check-size.js';
 
 interface Manifest {
   readonly version: string;
@@ -16,9 +18,15 @@ interface Manifest {
   readonly exports: Readonly<Record<string, Readonly<Record<string, string>>>>;
   readonly dependencies?: Readonly<Record<string, string>>;
   readonly publishConfig?: { readonly access?: string };
-  readonly repository?: { readonly url?: string };
+  readonly repository?: {
+    readonly type?: string;
+    readonly url?: string;
+    readonly directory?: string;
+  };
   readonly homepage?: string;
   readonly bugs?: { readonly url?: string };
+  readonly files?: readonly string[];
+  readonly engines?: { readonly node?: string };
 }
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -31,17 +39,20 @@ const launchPackages = [
   'storage-indexeddb',
   'react',
 ];
+const preparedPackages = ['adapter-pyodide', 'adapter-adk', 'adapter-go'];
 
 function readManifest(directory: string): Manifest {
   return JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) as Manifest;
 }
 
 const coreVersion = readManifest(join(root, 'packages/core')).version;
-const packages = launchPackages.map((directory) => ({
+const packages = [...launchPackages, ...preparedPackages].map((directory) => ({
   directory,
+  group: launchPackages.includes(directory) ? 'launch' : 'prepared',
   source: readManifest(join(root, 'packages', directory)),
   entries: [] as string[],
   packedJson: '',
+  tarball: '',
 }));
 let temporaryDirectory: string | undefined;
 
@@ -70,6 +81,7 @@ beforeAll(() => {
     const [filename] = readdirSync(destination).filter((name) => name.endsWith('.tgz'));
     if (filename === undefined) throw new Error(`No tarball produced for ${pkg.directory}.`);
     const tarball = join(destination, filename);
+    pkg.tarball = tarball;
     pkg.entries = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8' })
       .trim()
       .split(/\r?\n/);
@@ -84,15 +96,18 @@ afterAll(() => {
     rmSync(temporaryDirectory, { recursive: true, force: true });
 });
 
+function missingExportTargets(manifest: Manifest, entries: readonly string[]): string[] {
+  return Object.values(manifest.exports)
+    .flatMap((targets) => Object.values(targets))
+    .filter((target) => !entries.includes(`package/${target.replace(/^\.\//, '')}`));
+}
+
 test.each(packages)('$directory packs only distribution files and includes every export', (pkg) => {
   for (const name of ['package.json', 'README.md', 'LICENSE', 'NOTICE'])
     expect(pkg.entries).toContain(`package/${name}`);
   expect(pkg.entries.some((entry) => entry.startsWith('package/dist/'))).toBe(true);
   const manifest = JSON.parse(pkg.packedJson) as Manifest;
-  for (const targets of Object.values(manifest.exports)) {
-    for (const target of Object.values(targets))
-      expect(pkg.entries).toContain(`package/${target.replace(/^\.\//, '')}`);
-  }
+  expect(missingExportTargets(manifest, pkg.entries)).toEqual([]);
   for (const entry of pkg.entries) {
     expect(entry).toMatch(/^package\/(?:dist\/|LICENSE$|NOTICE$|README\.md$|package\.json$)/);
     expect(entry).not.toMatch(/^package\/(?:src|test)\//);
@@ -122,18 +137,141 @@ test('React packs its protocol dependency at the shared release version', () => 
 
 test.each(packages)('$directory has public metadata and the root license files', (pkg) => {
   const packed = JSON.parse(pkg.packedJson) as Manifest;
-  expect(pkg.source).not.toHaveProperty('private');
-  expect(packed).not.toHaveProperty('private');
-  expect(packed.version).toBe(coreVersion);
+  if (pkg.group === 'launch') {
+    expect(pkg.source).not.toHaveProperty('private');
+    expect(packed).not.toHaveProperty('private');
+    expect(packed.version).toBe(coreVersion);
+  } else {
+    for (const manifest of [pkg.source, packed]) {
+      expect(manifest.private).toBe(true);
+      expect(manifest.engines?.node).toBeTypeOf('string');
+      expect(manifest.engines?.node?.trim()).not.toBe('');
+      expect(manifest.repository).toEqual({
+        type: 'git',
+        url: 'git+https://github.com/vinhnxv/galaxie.git',
+        directory: `packages/${pkg.directory}`,
+      });
+      expect(manifest.homepage).toBe(
+        `https://github.com/vinhnxv/galaxie/tree/main/packages/${pkg.directory}#readme`,
+      );
+      expect(manifest.bugs?.url).toBe('https://github.com/vinhnxv/galaxie/issues');
+      expect(manifest.publishConfig?.access).toBe('public');
+      expect(manifest.files).toEqual(['dist', 'LICENSE', 'NOTICE']);
+    }
+    expect(packed.version).toBe(pkg.source.version);
+  }
   expect(packed.version).toMatch(/^0\.\d+\.\d+$/);
   expect(packed.publishConfig?.access).toBe('public');
   expect(packed.repository?.url).toBeTruthy();
   expect(packed.homepage).toBeTruthy();
   expect(packed.bugs?.url).toBeTruthy();
-  for (const name of ['LICENSE', 'NOTICE'])
+  for (const name of ['LICENSE', 'NOTICE']) {
     expect(readFileSync(join(root, 'packages', pkg.directory, name))).toEqual(
       readFileSync(join(root, name)),
     );
+    expect(execFileSync('tar', ['-xzOf', pkg.tarball, `package/${name}`])).toEqual(
+      readFileSync(join(root, name)),
+    );
+  }
+});
+
+test.each(packages.filter((pkg) => pkg.group === 'prepared'))(
+  '$directory detects a missing packed export target',
+  (pkg) => {
+    const manifest = JSON.parse(pkg.packedJson) as Manifest;
+    expect(missingExportTargets(manifest, pkg.entries)).toEqual([]);
+    expect(
+      missingExportTargets(
+        manifest,
+        pkg.entries.filter((entry) => entry !== 'package/dist/index.js'),
+      ),
+    ).toEqual(['./dist/index.js']);
+  },
+);
+
+test.each(packages.filter((pkg) => pkg.group === 'prepared'))(
+  '$directory maps every export to dist JavaScript and declarations',
+  (pkg) => {
+    for (const manifest of [pkg.source, JSON.parse(pkg.packedJson) as Manifest]) {
+      for (const targets of Object.values(manifest.exports)) {
+        expect(targets['types']).toMatch(/^\.\/dist\/.+\.d\.ts$/);
+        expect(targets['default']).toMatch(/^\.\/dist\/.+\.(?:js|mjs)$/);
+      }
+    }
+    if (pkg.directory !== 'adapter-adk') {
+      expect(pkg.entries).toContain('package/dist/worker.js');
+      expect(pkg.entries).toContain('package/dist/worker.d.ts');
+    }
+  },
+);
+
+test('prepared packages stay outside launch and size discovery', () => {
+  const entries = discoverEntries(join(root, 'packages'));
+  expect(entries.length).toBeGreaterThan(0);
+  for (const directory of preparedPackages) {
+    expect(launchPackages).not.toContain(directory);
+    expect(entries.filter(({ entry }) => entry.startsWith(`@galaxie-ai/${directory}/`))).toEqual(
+      [],
+    );
+  }
+});
+
+test('size discovery detects prepared packages when a copy loses private status', () => {
+  if (temporaryDirectory === undefined) throw new Error('Missing temporary directory.');
+  const directory = join(temporaryDirectory, 'size-discovery');
+  mkdirSync(directory);
+  for (const pkg of packages.filter((entry) => entry.group === 'prepared')) {
+    const destination = join(directory, pkg.directory);
+    mkdirSync(destination);
+    writeFileSync(
+      join(destination, 'package.json'),
+      JSON.stringify({ ...pkg.source, private: false }),
+    );
+  }
+  expect(discoverEntries(directory).map(({ entry }) => entry)).toEqual([
+    '@galaxie-ai/adapter-adk/.',
+    '@galaxie-ai/adapter-go/.',
+    '@galaxie-ai/adapter-go/worker',
+    '@galaxie-ai/adapter-pyodide/.',
+    '@galaxie-ai/adapter-pyodide/runtime-files',
+    '@galaxie-ai/adapter-pyodide/worker',
+  ]);
+});
+
+test('the packed runtime-files module exposes the worker inventories', () => {
+  const pkg = packages.find((entry) => entry.directory === 'adapter-pyodide');
+  if (pkg === undefined || temporaryDirectory === undefined)
+    throw new Error('Missing packed adapter.');
+  const manifest = JSON.parse(pkg.packedJson) as Manifest;
+  expect(manifest.exports['./runtime-files']).toEqual({
+    types: './dist/runtime-files.d.ts',
+    default: './dist/runtime-files.js',
+  });
+  expect(pkg.entries).toContain('package/dist/runtime-files.d.ts');
+  expect(missingExportTargets(manifest, pkg.entries)).toEqual([]);
+  expect(
+    missingExportTargets(
+      manifest,
+      pkg.entries.filter((entry) => entry !== 'package/dist/runtime-files.js'),
+    ),
+  ).toEqual(['./dist/runtime-files.js']);
+  const file = join(temporaryDirectory, 'runtime-files.mjs');
+  writeFileSync(file, execFileSync('tar', ['-xzOf', pkg.tarball, 'package/dist/runtime-files.js']));
+  const packed = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        'const inventory = await import(process.argv[1]); process.stdout.write(JSON.stringify(inventory));',
+        pathToFileURL(file).href,
+      ],
+      { encoding: 'utf8' },
+    ),
+  ) as typeof runtimeInventory;
+  expect(Object.keys(packed).sort()).toEqual(['lockedWheels', 'runtimeFiles']);
+  expect(packed.lockedWheels).toEqual(runtimeInventory.lockedWheels);
+  expect(packed.runtimeFiles).toEqual(runtimeInventory.runtimeFiles);
 });
 
 test('release size measurements include the kit and its LangGraph consumer bundle', async () => {
