@@ -467,7 +467,7 @@ or `sendBeacon` mitigation was added.
 ### Guide probe and differences
 
 [browser-guide.json](results/browser-guide.json) records two scratch installs
-outside the repository. The browser-exporter guide excerpt was tried verbatim,
+outside the repository. The earlier browser-exporter guide excerpt was tried verbatim,
 then a separate harness created one SDK span and flushed it to a same-origin
 loopback stub. Both package sets passed typechecking, Vite build and Chromium
 export:
@@ -479,13 +479,13 @@ export:
 
 Both sets emitted unmet API peer warnings; pnpm retained one API version rather
 than installing a second one, and each scratch bundle contained one API copy.
-The `latest` web/base SDK tags were deprecated. The guide's constructor and
+The `latest` web/base SDK tags were deprecated. The earlier guide's constructor and
 `register()` worked in both sets. These are initialization and one-span stub
 measurements, not galaxie graph or backend parity with the web SDK packages.
 The [guide's browser example](../../docs/guides/tracing.md#register-a-browser-exporter-in-the-host) was later updated to the live page's SDK shape.
 
 The live page instead keeps the Node lane's aligned SDK/exporter pair. Its code
-shape differs from the guide as follows:
+shape differed from the earlier guide example as follows (the guide now shows the live shape):
 
 - Import `TracerProvider`, `BatchSpanProcessor` and `StackContextManager` from
   `@opentelemetry/sdk-trace`, rather than the web/base SDK packages.

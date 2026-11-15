@@ -285,7 +285,7 @@ ingestion. Evidence:
 | --- | --- | --- |
 | Own confirmed association | 200 | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/aliceSegmentOne`, `/reports/bobOwnTrace` |
 | Wrong trace or segment | 404 | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/ownedRunOtherTrace`, `/reports/wrongSegment` |
-| Confirmed association owned by another user | 403 | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/confirmedOtherOwner` |
+| Confirmed association owned by another user | 403, which also tells an authenticated caller that the association exists (`galaxie-jjk`) | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/confirmedOtherOwner` |
 | Missing cookie | 401 | [browser-feedback.json](../../spikes/llmops-trace-sinks/results/browser-feedback.json) `/reports/unauthenticated` |
 
 First-report-wins is only as strong as the secrecy of the IDs: someone who
@@ -297,8 +297,8 @@ fixture, not an authentication design. Evidence:
 
 ## Forward from the collector to Langfuse
 
-galaxie works with most LLMOps and MLflow workflows through the host's
-OpenTelemetry integration. The measured subset is trace export from Node and
+galaxie works with most OpenTelemetry-based LLMOps and MLflow workflows through
+the host's OpenTelemetry integration. The measured subset is trace export from Node and
 Chromium, host-side Langfuse scores, session grouping, deterministic MLflow
 evaluation, and LangGraph JavaScript and ADK JavaScript span coverage. Root
 input/output does not work yet (`galaxie-d53.7`); Pyodide Python and ADK Go lack
@@ -323,9 +323,11 @@ unmeasured.
 
 The host runs an OpenTelemetry Collector or equivalent proxy. This fan-out
 configuration matches the measured [collector.yaml](../../spikes/llmops-trace-sinks/collector.yaml)
-except for the receiver bind, adapted here for a **directly run** collector.
-That direct-run bind was not measured. Apply the
-[least-trusted-destination rule](#default-filter-and-development-text) to both exporters.
+except for the receiver bind, adapted here for a **directly run** collector, and one added comment.
+That direct-run bind was not measured. `developmentTraceText.destination` must be
+the least-trusted class among all exporters in this pipeline: use `third-party`
+if either exporter goes to a hosted service. See the
+[least-trusted-destination rule](#default-filter-and-development-text).
 
 ```yaml
 receivers:
@@ -349,7 +351,7 @@ exporters:
       x-langfuse-ingestion-version: "4"
   otlphttp/mlflow:
     endpoint: ${env:MLFLOW_OTEL_ENDPOINT}
-    compression: none
+    compression: none # no compression below MLflow 3.7 (vendor-stated; see the MLflow section)
     headers:
       x-mlflow-experiment-id: ${env:MLFLOW_EXPERIMENT_ID}
 service:
@@ -388,7 +390,9 @@ For child grouping, the host's passive `RunTraceMap` observes root spans at
 `onStart` and records run, segment, session and trace IDs without changing spans.
 `SessionCopy` maintains its own trace-to-session map from roots and sets
 `session.id` on each span in that trace.
-These are host processors, with no galaxie API: see the measured
+These are host processors, with no galaxie API. The measured recipes keep their
+maps in memory without eviction (`SessionCopy` clears only on shutdown), so a
+long-lived host needs its own bounded or durable store. See the measured
 [run-trace.ts](../../spikes/llmops-trace-sinks/src/run-trace.ts) and
 [scores.ts](../../spikes/llmops-trace-sinks/src/scores.ts) recipes.
 Root-only copying grouped three roots per session but missed six children;
@@ -399,8 +403,9 @@ only the root mapping. Evidence:
 [gaps.json](../../spikes/llmops-trace-sinks/results/gaps.json), `langfuse-sessions`
 and `mlflow-sessions` entries.
 
-Use the **v2 observations API** for Langfuse lookups. The smoke readback found
-two observations with parent links and typed attributes. For interrupt/resume,
+Use the **v2 observations API** for Langfuse lookups. The smoke readback, on a
+hand-made two-span trace with no galaxie runtime, found two observations with
+parent links and typed attributes. For interrupt/resume,
 a `stringObject` metadata filter with column `metadata`, key `galaxie.run.id`
 and operator `=` returned both traces of the run, segments 0 and 1. Evidence:
 [smoke.json](../../spikes/llmops-trace-sinks/results/smoke.json) `/readback/observations`
@@ -412,7 +417,7 @@ and [node-interrupt-resume.json](../../spikes/llmops-trace-sinks/results/node-in
 | Root / node / model / capability | `AGENT` / `SPAN` / `GENERATION` / `TOOL` | [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json) `/rows/langgraph-js/spans`, `/rows/adk-js/spans` |
 | Capability name | Emitted `execute_tool lookup@1` stored as `lookup@1` | [node-tool-call.json](../../spikes/llmops-trace-sinks/results/node-tool-call.json) `/variants/0/findings/0` |
 | LangGraph model usage | 2 input, 3 output, 5 total tokens | [coverage-matrix.json](../../spikes/llmops-trace-sinks/results/coverage-matrix.json) `/rows/langgraph-js/usage/langfuse` |
-| Text off / on, both backends | Default runs store no prompt, reply or tool text. With `developmentTraceText`, destination `host-server` and labels `public`, model input/output appears; root input/output remains absent in both modes. | [node-linear.json](../../spikes/llmops-trace-sinks/results/node-linear.json) `/variants`, [node-tool-call.json](../../spikes/llmops-trace-sinks/results/node-tool-call.json) `/variants`, [versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/nodeHostMeasurement` |
+| Text off / on, both backends | Default runs store no prompt, reply or tool text. With `developmentTraceText`, destination `host-server` and labels `public`, model input/output appears and Langfuse moves the tool-call arguments JSON onto the tool observation's input (capability results stay absent); root input/output remains absent in both modes. | [node-linear.json](../../spikes/llmops-trace-sinks/results/node-linear.json) `/variants`, [node-tool-call.json](../../spikes/llmops-trace-sinks/results/node-tool-call.json) `/variants`, [versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/nodeHostMeasurement` |
 | Model failure, both backends | Langfuse `ERROR` level and MLflow `STATUS_CODE_ERROR` on model, node and root; each has `error.type`, only the root has `galaxie.error.code`. No error-message text. | [node-model-failure.json](../../spikes/llmops-trace-sinks/results/node-model-failure.json) `/variants` |
 | Credential control | A canary passed through a provider declaring `credential: true` was absent from backend readbacks and page requests. | [node-linear.json](../../spikes/llmops-trace-sinks/results/node-linear.json) `/variants/0/credentialCanaryAbsent`, `/variants/1/credentialCanaryAbsent`; [browser-evidence.json](../../spikes/llmops-trace-sinks/results/browser-evidence.json) `/scans`, `/credentialPositiveControls` |
 
@@ -449,8 +454,10 @@ Evidence: [versions.json](../../spikes/llmops-trace-sinks/results/versions.json)
 The measured image is `ghcr.io/mlflow/mlflow:v3.18.0`, digest
 `sha256:257204c77980b0f3450a26eb6089e487603fcdd4509529eadaf88f90669f5c13`.
 Evidence: [versions.json](../../spikes/llmops-trace-sinks/results/versions.json) `/images/6`.
-The MLflow version floor of 3.6 and the rule to use no compression below 3.7 are
-**vendor-stated, not measured here**. Only 3.18.0 with `compression: none` was
+MLflow's documentation states that OTLP trace ingestion needs 3.6 or later and
+that compressed payloads are accepted from 3.7 on, so use no compression below 3.7
+([MLflow OpenTelemetry ingestion](https://www.mlflow.org/docs/latest/genai/tracing/opentelemetry/ingest/)).
+These two points are **vendor-stated, not measured here**. Only 3.18.0 with `compression: none` was
 run; versions 3.6 through 3.17 and gzip are unmeasured. Evidence for the measured
 setting: [versions.json](../../spikes/llmops-trace-sinks/results/versions.json)
 `/collectorDecision/mlflowCompression` and
@@ -517,7 +524,8 @@ Use Langfuse and MLflow as developer debugging tools: for developers and users
 who want to inspect how their own app and agents work. Tell users clearly what
 is traced and where it is sent. Keep development trace text off unless needed,
 and check [labels and the final destination](#default-filter-and-development-text)
-before enabling it. Never use these tools to track users.
+before enabling it. Never use these tools to track users, and do not put user identifiers in
+`session.id` or run IDs.
 
 ## Limits and unmeasured items
 
@@ -545,7 +553,8 @@ before enabling it. Never use these tools to track users.
   `/rows/pyodide-langgraph-python`, `/rows/adk-go`, `/gaps`, `/notMeasured`.
 - ADK's own instrumentation is outside galaxie's allowlist. The measured run set
   `ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false`; its five ADK spans formed five
-  separate traces with empty attributes and classified as `other`. In-memory
+  separate traces with empty attributes. They fall in the spike's `other` bucket
+(no galaxie span kind); Langfuse stores them as `SPAN` and MLflow assigns no type. In-memory
   controls with a Node context manager detected prompt, reply, argument and result
   text with capture on, and no markers with capture off. Empty measured attributes
   alone do not prove the flag's effect. ADK nesting needs a host context manager;
