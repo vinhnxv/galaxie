@@ -15,7 +15,7 @@ import {
 } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 export const launchPackages: readonly string[] = [
@@ -31,10 +31,11 @@ export type Mode = 'registry' | 'tarball';
 export type Phase =
   | 'node'
   | 'pack'
-  | 'copy'
+  | 'scaffold'
   | 'install'
   | 'build'
-  | 'typecheck'
+  | 'check'
+  | 'negative-control'
   | 'compile'
   | 'serve'
   | 'drive'
@@ -65,10 +66,11 @@ export interface Step {
 }
 export interface TemplateSpec {
   readonly name: string;
+  readonly kind: string;
+  readonly framework: string;
   readonly build: readonly string[];
   readonly preview: readonly string[];
   readonly steps: readonly Step[];
-  readonly typecheck?: readonly string[];
   readonly probeSession?: boolean;
   readonly server?: {
     readonly compile: readonly string[];
@@ -118,7 +120,18 @@ export interface Options {
   readonly offline?: boolean;
   readonly verifyReleaseAge?: boolean;
 }
+export interface ScaffoldRequest {
+  readonly spec: TemplateSpec;
+  readonly mode: Mode;
+  readonly directory: string;
+  readonly tarballs?: string;
+  readonly node: string;
+  readonly env: Readonly<Record<string, string>>;
+  readonly signal: AbortSignal;
+  readonly runner: Runner;
+}
 export interface Dependencies {
+  readonly scaffold: (request: ScaffoldRequest) => Promise<void>;
   readonly driver: Driver;
   readonly runner?: Runner;
   readonly clock?: Clock;
@@ -181,32 +194,6 @@ export async function nodeBinary(
 
 interface Manifest {
   readonly dependencies?: Record<string, string>;
-  readonly devDependencies?: Record<string, string>;
-  readonly overrides?: Record<string, string>;
-  readonly [key: string]: unknown;
-}
-export function rewriteManifest(
-  manifest: Manifest,
-  tarballs?: Readonly<Record<string, string>>,
-): Manifest {
-  if (tarballs === undefined) return structuredClone(manifest);
-  const result = structuredClone(manifest);
-  for (const section of ['dependencies', 'devDependencies'] as const) {
-    for (const name of Object.keys(result[section] ?? {})) {
-      if (!name.startsWith('@galaxie-ai/')) continue;
-      const path = tarballs[name];
-      if (path === undefined) throw new Error(`Missing tarball for ${name}.`);
-      const entries = result[section];
-      if (entries !== undefined) entries[name] = `file:${path}`;
-    }
-  }
-  return {
-    ...result,
-    overrides: {
-      ...result.overrides,
-      ...Object.fromEntries(Object.entries(tarballs).map(([name, path]) => [name, `file:${path}`])),
-    },
-  };
 }
 
 export function assertSingleCopies(
@@ -235,22 +222,13 @@ const stripped = new Set([
   '.git',
 ]);
 const strippedPrefix = '.env';
-export async function copyProject(source: string, destination: string): Promise<void> {
-  await cp(source, destination, {
-    recursive: true,
-    filter: async (path) => {
-      if (stripped.has(basename(path)) || basename(path).startsWith(strippedPrefix)) return false;
-      if ((await lstat(path)).isSymbolicLink())
-        throw new Error('Template symlinks are not supported.');
-      return true;
-    },
-  });
-  await assertCopy(destination);
-}
 export async function assertCopy(directory: string): Promise<void> {
+  if ((await lstat(directory)).isSymbolicLink())
+    throw new Error('Scaffold symlinks are not supported.');
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     if (stripped.has(entry.name) || entry.name.startsWith(strippedPrefix))
-      throw new Error('Workspace artifact survived the copy.');
+      throw new Error('Workspace artifact survived the scaffold.');
+    if (entry.isSymbolicLink()) throw new Error('Scaffold symlinks are not supported.');
     if (entry.isDirectory()) await assertCopy(join(directory, entry.name));
   }
 }
@@ -279,12 +257,16 @@ export function classify(message: string): string {
   )
     return 'environment';
   if (
-    /(?:^|[\s/])(?:src\/|server\/|vite\.config\.ts)|Cannot find (?:package|module)|typescript\/bin\/tsc/i.test(
+    /(?:^|[\s/])(?:src\/|server\/|check\/|vite\.config\.ts)|Cannot find (?:package|module)|typescript\/bin\/tsc/i.test(
       message,
     )
   )
     return 'template';
-  if (/Single-copy|Workspace artifact|Command is not allowed|Temporary projects/.test(message))
+  if (
+    /Single-copy|Workspace artifact|Scaffold symlinks|Negative control|Command is not allowed|Temporary projects/.test(
+      message,
+    )
+  )
     return 'harness';
   return 'unclassified';
 }
@@ -453,6 +435,49 @@ async function ready(url: string, signal: AbortSignal, clock: Clock, child: Chil
   throw new Error(`Server readiness timed out.\n${child.output()}`);
 }
 
+async function assertBaselineRejections(
+  project: string,
+  check: () => Promise<string>,
+  signal: AbortSignal,
+): Promise<void> {
+  const path = join(project, 'src/csp.ts');
+  const original = await readFile(path, 'utf8');
+  const mutations = [
+    {
+      directive: 'script-src',
+      pattern: /('script-src':\s*\[)/,
+      replacement: '$1"\'unsafe-inline\'", ',
+    },
+    {
+      directive: 'require-trusted-types-for',
+      pattern: /('require-trusted-types-for':\s*)\[[^\]]*\]/,
+      replacement: '$1[]',
+    },
+  ];
+  for (const { directive, pattern, replacement } of mutations) {
+    signal.throwIfAborted();
+    const changed = original.replace(pattern, replacement);
+    if (changed === original) throw new Error(`Negative control could not mutate ${directive}.`);
+    try {
+      await writeFile(path, changed);
+      let rejected = false;
+      try {
+        await check();
+      } catch (error) {
+        signal.throwIfAborted();
+        if (!(error instanceof Error) || !error.message.includes(`${directive} changed`))
+          throw new Error(
+            `Negative control did not report ${directive} changed.\n${error instanceof Error ? error.message : 'Unknown check failure.'}`,
+          );
+        rejected = true;
+      }
+      if (!rejected) throw new Error(`Negative control unexpectedly passed for ${directive}.`);
+    } finally {
+      await writeFile(path, original);
+    }
+  }
+}
+
 /** One owned temporary root, one pipeline for registry and packed installations. */
 export async function runStandalone(
   options: Options,
@@ -518,7 +543,7 @@ export async function runStandalone(
       cwd: string,
       childEnv = env,
     ): Command => ({ executable, args, cwd, env: childEnv, signal });
-    let tarballs: Record<string, string> | undefined;
+    let tarballs: string | undefined;
     let packError: unknown;
     if (options.modes.includes('tarball')) {
       try {
@@ -538,7 +563,6 @@ export async function runStandalone(
               ),
             );
         }
-        tarballs = {};
         const filenames = await readdir(destination);
         for (const name of launchPackages) {
           const matches = filenames.filter(
@@ -546,8 +570,8 @@ export async function runStandalone(
           );
           if (matches.length !== 1)
             throw new Error(`Packing is impossible: expected one tarball for ${name}.`);
-          tarballs[name] = join(destination, matches[0] ?? '');
         }
+        tarballs = destination;
       } catch (error) {
         packError = error;
       }
@@ -571,7 +595,7 @@ export async function runStandalone(
             const message = error instanceof Error ? error.message : 'Unknown failure.';
             result.failures.push({
               phase,
-              gating: phase !== 'typecheck',
+              gating: true,
               source: classify(message),
               suggested: true,
               summary: `${phase} failed.`,
@@ -602,15 +626,21 @@ export async function runStandalone(
               phase = 'pack';
               if (packError !== undefined) throw packError;
             }
-            phase = 'copy';
-            await copyProject(join(repo, 'templates', spec.name), project);
-            const manifestFile = join(project, 'package.json');
-            const original = JSON.parse(await readFile(manifestFile, 'utf8')) as Manifest;
-            if (mode === 'tarball')
-              await writeFile(
-                manifestFile,
-                `${JSON.stringify(rewriteManifest(original, tarballs), null, 2)}\n`,
-              );
+            phase = 'scaffold';
+            await dependencies.scaffold({
+              spec,
+              mode,
+              directory: project,
+              node: binary,
+              env: childEnv,
+              signal,
+              runner,
+              ...(mode === 'tarball' && tarballs !== undefined ? { tarballs } : {}),
+            });
+            await assertCopy(project);
+            const manifest = JSON.parse(
+              await readFile(join(project, 'package.json'), 'utf8'),
+            ) as Manifest;
             phase = 'install';
             if (options.verifyReleaseAge !== false) {
               const effective = (await run([npmCli, 'config', 'get', 'min-release-age'])).trim();
@@ -620,6 +650,7 @@ export async function runStandalone(
             await run([
               npmCli,
               'install',
+              '--ignore-scripts',
               '--no-audit',
               '--no-fund',
               ...(options.offline ? ['--offline'] : []),
@@ -630,7 +661,7 @@ export async function runStandalone(
                   '@galaxie-ai/core',
                   '@galaxie-ai/ui-protocol',
                   '@galaxie-ai/adapter-kit',
-                  ...Object.keys(original.dependencies ?? {}).filter((name) =>
+                  ...Object.keys(manifest.dependencies ?? {}).filter((name) =>
                     name.startsWith('@galaxie-ai/'),
                   ),
                 ]),
@@ -644,14 +675,10 @@ export async function runStandalone(
             }
             phase = 'build';
             await run(spec.build);
-            if (spec.typecheck !== undefined) {
-              phase = 'typecheck';
-              try {
-                await run(spec.typecheck);
-              } catch (error) {
-                record(error);
-              }
-            }
+            phase = 'check';
+            await run([npmCli, 'run', 'check']);
+            phase = 'negative-control';
+            await assertBaselineRejections(project, () => run([npmCli, 'run', 'check']), signal);
             const serve = async (args: readonly string[], port: number): Promise<void> => {
               phase = 'serve';
               const child = await runner.start(command(binary, args, project, childEnv));

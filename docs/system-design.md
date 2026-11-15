@@ -274,7 +274,22 @@ commands invoke it explicitly; a cache-equality test rejects missing, changed or
 unexpected output. Generated projects omit workspace tests and mappings, and carry
 a `check` command that pins the emitted CSP and Trusted Types baseline. Layers stay
 in this checkout rather than the private package's `dist`; packaging and publishing
-them remain later work. ADR-0012 guarantees are unchanged.
+them remain later work.
+
+The CLI accepts a relative directory, kind and framework, with native terminal
+prompts for missing choices. It detects npm, pnpm or yarn and installs with
+`--ignore-scripts` without a shell unless installation is skipped; Windows prints
+the manual command. An absolute `GALAXIE_CREATE_PACKAGE_DIR` selects all seven
+launch tarballs and npm overrides. Tarball mode refuses pnpm and yarn until their
+installs and override locations are proven.
+
+The [standalone harness](standalone-verification.md) scaffolds with this built CLI
+outside the checkout, installs without lifecycle scripts, builds and gates on
+`npm run check`. Two mutation controls require that check to reject loosened
+`script-src` and `require-trusted-types-for`, restoring the original source after
+each. It retains isolated npm configuration/environment, single-copy tarball
+checks, loopback browser drives and owned-process cleanup. The real network matrix
+stays outside `pnpm check`. ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.
 
 ## 6. Core runtime and contracts
 

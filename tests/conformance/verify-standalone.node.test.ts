@@ -3,12 +3,12 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { Result } from '../../scripts/standalone-core.js';
+import type { Result, ScaffoldRequest, TemplateSpec } from '../../scripts/standalone-core.js';
 import {
   assertCommand,
   assertCopy,
@@ -16,14 +16,12 @@ import {
   assertSingleCopies,
   classify,
   compareModes,
-  copyProject,
   isolatedEnvironment,
   launchPackages,
   nodeBinary,
   processRunner,
   redact,
   releaseAgeDays,
-  rewriteManifest,
   runStandalone,
 } from '../../scripts/standalone-core.js';
 import {
@@ -34,6 +32,39 @@ import {
 } from '../../scripts/verify-standalone.js';
 
 const directories: string[] = [];
+const fixtureSpec: TemplateSpec = {
+  name: 'fixture',
+  kind: 'browser-only',
+  framework: 'langgraph-js',
+  build: [],
+  preview: [],
+  steps: [],
+};
+const fixtureCsp = `'script-src': ["'self'"],\n'require-trusted-types-for': ["'script'"],\n`;
+async function writeBaseline(directory: string): Promise<void> {
+  await mkdir(join(directory, 'src'), { recursive: true });
+  await writeFile(join(directory, 'src/csp.ts'), fixtureCsp);
+  const required = `'require-trusted-types-for': ["'script'"]`;
+  await writeFile(
+    join(directory, 'check.cjs'),
+    `const source=require('node:fs').readFileSync('src/csp.ts','utf8');if(source.includes('unsafe-inline'))throw new Error('script-src changed');if(!source.includes(${JSON.stringify(required)}))throw new Error('require-trusted-types-for changed');`,
+  );
+  const path = join(directory, 'package.json');
+  const manifest = JSON.parse(await readFile(path, 'utf8'));
+  await writeFile(
+    path,
+    JSON.stringify({ ...manifest, scripts: { ...manifest.scripts, check: 'node check.cjs' } }),
+  );
+}
+function scaffoldFixture(source: string): (request: ScaffoldRequest) => Promise<void> {
+  return async ({ directory }) => {
+    await cp(source, directory, { recursive: true });
+  };
+}
+async function unexpectedScaffold(): Promise<void> {
+  throw new Error('Unexpected scaffold.');
+}
+
 const expectedLaunch = [
   '@galaxie-ai/ui-protocol',
   '@galaxie-ai/core',
@@ -120,24 +151,8 @@ it('resolves explicit, current and newest nvm Nodes in that order with an action
   ).rejects.toThrow('nvm install 26');
 });
 
-it('rewrites all launch overrides while preserving third parties and the registry manifest', () => {
-  expect(launchPackages).toEqual(expectedLaunch);
-  const manifest = { dependencies: { '@galaxie-ai/core': '^0.1.0', react: '19.3.1' } };
-  const tarballs = Object.fromEntries(
-    expectedLaunch.map((name) => [name, `/tmp/${name.split('/')[1]}.tgz`]),
-  );
-  expect(rewriteManifest(manifest)).toEqual(manifest);
-  expect(rewriteManifest(manifest, tarballs)).toEqual({
-    dependencies: { '@galaxie-ai/core': 'file:/tmp/core.tgz', react: '19.3.1' },
-    overrides: Object.fromEntries(
-      expectedLaunch.map((name) => [name, `file:/tmp/${name.split('/')[1]}.tgz`]),
-    ),
-  });
-  expect(manifest.dependencies['@galaxie-ai/core']).toBe('^0.1.0');
-  expect(() => rewriteManifest({ dependencies: { '@galaxie-ai/missing': '1' } }, tarballs)).toThrow(
-    'Missing tarball',
-  );
-});
+it('keeps the seven launch package inventory unchanged', () =>
+  expect(launchPackages).toEqual(expectedLaunch));
 
 it('detects nested duplicates, registry resolutions, absent dependencies and unrecognized galaxie packages', () => {
   const packages = Object.fromEntries(
@@ -183,21 +198,30 @@ it('detects nested duplicates, registry resolutions, absent dependencies and unr
   ).toThrow('Single-copy');
 });
 
-it('copies outside the repository, strips workspace artifacts and detects surviving ones', async () => {
+it.each([
+  'test',
+  'tsconfig.workspace.json',
+  'node_modules',
+  'dist',
+  '.server',
+  '.npmrc',
+  '.git',
+  '.env',
+  '.env.local',
+])(
+  'refuses a surviving workspace artifact (%s), with a clean scaffold control',
+  async (artifact) => {
+    const root = await temporary();
+    const destination = join(root, 'project');
+    await mkdir(destination);
+    await writeFile(join(destination, 'package.json'), '{}');
+    await assertCopy(destination);
+    await writeFile(join(destination, artifact), 'canary');
+    await expect(assertCopy(destination)).rejects.toThrow('Workspace artifact');
+  },
+);
+it('requires temporary projects outside the repository', async () => {
   const root = await temporary();
-  const source = join(root, 'repo/template');
-  await mkdir(join(source, 'test'), { recursive: true });
-  await writeFile(join(source, 'package.json'), '{}');
-  await writeFile(join(source, 'test/test.ts'), '');
-  await writeFile(join(source, 'tsconfig.workspace.json'), '{}');
-  const destination = join(root, 'copy');
-  await copyProject(source, destination);
-  expect(await readFile(join(destination, 'package.json'), 'utf8')).toBe('{}');
-  expect(existsSync(join(destination, 'test'))).toBe(false);
-  expect(existsSync(join(destination, 'tsconfig.workspace.json'))).toBe(false);
-  await assertCopy(destination);
-  await writeFile(join(destination, 'tsconfig.workspace.json'), '{}');
-  await expect(assertCopy(destination)).rejects.toThrow('Workspace artifact');
   expect(() => assertOutside(join(root, 'repo'), join(root, 'repo/tmp'))).toThrow('outside');
   expect(() => assertOutside(join(root, 'repo'), join(root, 'repo'))).toThrow('outside');
   expect(() => assertOutside(join(root, 'repo'), join(root, 'repository'))).not.toThrow();
@@ -241,17 +265,37 @@ it('compares matched failures across modes without treating advisory failures as
 
 it('parses the documented CLI forms and refuses malformed or unknown arguments', () => {
   expect(
-    parseArguments(['--node', '22=/p', '--node', '24', '--mode', 'both', '--keep']),
-  ).toMatchObject({ nodes: [{ major: 22, path: '/p' }, { major: 24 }], mode: 'both', keep: true });
+    parseArguments([
+      '--node',
+      '22=/p',
+      '--node',
+      '24',
+      '--mode',
+      'both',
+      '--kind',
+      'gateway',
+      '--keep',
+    ]),
+  ).toMatchObject({
+    nodes: [{ major: 22, path: '/p' }, { major: 24 }],
+    mode: 'both',
+    kind: 'gateway',
+    keep: true,
+  });
   expect(parseArguments(['--help']).help).toBe(true);
   for (const args of [
     ['--wat'],
     ['--node'],
     ['--node', '22='],
-    ['--template', 'missing'],
+    ['--kind', 'missing'],
+    ['--template', 'local-only'],
     ['--mode', 'missing'],
   ])
     expect(() => parseArguments(args)).toThrow('Usage');
+  expect(templateSpecs.map(({ name, kind, framework }) => ({ name, kind, framework }))).toEqual([
+    { name: 'browser-only-langgraph-js', kind: 'browser-only', framework: 'langgraph-js' },
+    { name: 'gateway-langgraph-js', kind: 'gateway', framework: 'langgraph-js' },
+  ]);
   expect(templateSpecs[0]?.steps).toEqual([
     { action: 'check', role: 'radio', name: '4' },
     { action: 'click', role: 'button', name: 'Submit answers' },
@@ -322,6 +366,7 @@ it('runs a real offline npm file install, build and loopback server, then remove
     join(project, 'serve.cjs'),
     "require('node:fs').writeFileSync('args.json', JSON.stringify(process.argv.slice(2))); require('node:http').createServer((q,s)=>s.end('ready')).listen(Number(process.argv[process.argv.indexOf('--port')+1]), '127.0.0.1')",
   );
+  await writeBaseline(project);
   let copy = '';
   const results = await runStandalone(
     {
@@ -329,11 +374,12 @@ it('runs a real offline npm file install, build and loopback server, then remove
       tempBase: root,
       nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
       modes: ['registry'],
-      specs: [{ name: 'fixture', build: ['build.cjs'], preview: ['serve.cjs'], steps: [] }],
+      specs: [{ ...fixtureSpec, build: ['build.cjs'], preview: ['serve.cjs'] }],
       offline: true,
       verifyReleaseAge: false,
     },
     {
+      scaffold: scaffoldFixture(project),
       driver: {
         drive: async (url) => {
           expect(new URL(url).hostname).toBe('127.0.0.1');
@@ -375,10 +421,11 @@ it.each(['throw', 'abort'] as const)(
         tempBase: root,
         nodes: [{ major: 24 }],
         modes: ['registry'],
-        specs: [{ name: 'fixture', build: [], preview: [], steps: [] }],
+        specs: [fixtureSpec],
         signal: controller.signal,
       },
       {
+        scaffold: unexpectedScaffold,
         runner: {
           run: async () => {
             if (kind === 'abort') controller.abort();
@@ -404,7 +451,7 @@ it('rejects an in-repository temp root before creating a project', async () => {
   await expect(
     runStandalone(
       { repo, tempBase: repo, nodes: [], specs: [], modes: [] },
-      { driver: { drive: async () => 'stub' } },
+      { scaffold: unexpectedScaffold, driver: { drive: async () => 'stub' } },
     ),
   ).rejects.toThrow('outside');
 });
@@ -424,9 +471,10 @@ it.each(['old-npm', 'ignored-policy', 'effective-policy'] as const)(
         tempBase: root,
         nodes: [{ major: 24 }],
         modes: ['registry'],
-        specs: [{ name: 'fixture', build: ['build.js'], preview: [], steps: [] }],
+        specs: [{ ...fixtureSpec, build: ['build.js'] }],
       },
       {
+        scaffold: scaffoldFixture(join(repo, 'templates/fixture')),
         driver: { drive: async () => 'stub' },
         runner: {
           run: async (command) => {
@@ -494,7 +542,7 @@ it.each([
     if (address === null || typeof address === 'string') throw new Error('No port');
     try {
       const drive = driveChromium(`http://127.0.0.1:${address.port}`, {
-        name: 'fixture',
+        ...fixtureSpec,
         build: [],
         preview: [],
         steps: [
@@ -550,7 +598,7 @@ it.each([
     if (address === null || typeof address === 'string') throw new Error('No port');
     try {
       const drive = driveChromium(`http://127.0.0.1:${address.port}`, {
-        name: 'hybrid-gateway',
+        ...fixtureSpec,
         build: [],
         preview: [],
         steps: [
@@ -590,9 +638,10 @@ it('keeps a refused binary associated with the requested Node major', async () =
       nodes: [{ major: 22, path: process.execPath }],
       modes: ['registry', 'tarball'],
       tarballs: join(base, 'absent'),
-      specs: [{ name: 'fixture', build: [], preview: [], steps: [] }],
+      specs: [fixtureSpec],
     },
     {
+      scaffold: unexpectedScaffold,
       runner: {
         run: async () => 'v24.15.0',
         start: async () => {
@@ -682,11 +731,12 @@ it.skipIf(process.platform === 'win32')(
     await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
     await writeFile(join(fixture, 'package.json'), '{"name":"fixture","private":true}');
     await writeFile(join(fixture, 'build.cjs'), '');
+    await writeBaseline(fixture);
     await writeFile(
       join(fixture, 'serve.cjs'),
       "const fs=require('node:fs');let gets=0;fs.writeFileSync('server.pid',String(process.pid));require('node:http').createServer((q,s)=>{if(++gets===2)fs.writeFileSync('browser-ready','ready');s.end('<p>Ready</p>')}).listen(Number(process.argv[process.argv.indexOf('--port')+1]),'127.0.0.1')",
     );
-    const script = `const {runStandalone}=await import(${JSON.stringify(new URL('../../scripts/standalone-core.ts', import.meta.url).href)});const {driveChromium}=await import(${JSON.stringify(new URL('../../scripts/verify-standalone.ts', import.meta.url).href)});await runStandalone(${JSON.stringify({ repo, tempBase: runs, nodes: [{ major: 24 }], modes: ['registry'], offline: true, verifyReleaseAge: false, specs: [{ name: 'fixture', build: ['build.cjs'], preview: ['serve.cjs'], steps: [{ action: 'text', name: 'Never rendered' }] }] })},{driver:{drive:driveChromium}});console.log('cleanup-complete');`;
+    const script = `const {runStandalone}=await import(${JSON.stringify(new URL('../../scripts/standalone-core.ts', import.meta.url).href)});const {driveChromium}=await import(${JSON.stringify(new URL('../../scripts/verify-standalone.ts', import.meta.url).href)});await runStandalone(${JSON.stringify({ repo, tempBase: runs, nodes: [{ major: 24 }], modes: ['registry'], offline: true, verifyReleaseAge: false, specs: [{ ...fixtureSpec, build: ['build.cjs'], preview: ['serve.cjs'], steps: [{ action: 'text', name: 'Never rendered' }] }] })},{scaffold:async({directory})=>{await(await import('node:fs/promises')).cp(${JSON.stringify(fixture)},directory,{recursive:true})},driver:{drive:driveChromium}});console.log('cleanup-complete');`;
     const child = spawn(process.execPath, ['--input-type=module', '-e', script], {
       cwd: repo,
       env: process.env,
@@ -736,25 +786,28 @@ it.skipIf(process.platform === 'win32')(
   25000,
 );
 
-it('refuses template symlinks and strips project-level npm and environment files', async () => {
-  const root = await temporary();
-  const source = join(root, 'repo/template');
-  await mkdir(source, { recursive: true });
-  await writeFile(join(source, 'package.json'), '{}');
-  await writeFile(join(source, '.npmrc'), 'registry=https://example.invalid/');
-  await writeFile(join(source, '.env.local'), 'TEST_PLACEHOLDER=1');
-  await mkdir(join(source, '.git'));
-  await writeFile(join(source, '.git/config'), '');
-  const destination = join(root, 'copy');
-  await copyProject(source, destination);
-  for (const name of ['.npmrc', '.env.local', '.git'])
-    expect(existsSync(join(destination, name))).toBe(false);
-  expect(existsSync(join(destination, 'package.json'))).toBe(true);
-  await symlink(join(source, 'package.json'), join(source, 'linked.json'));
-  await expect(copyProject(source, join(root, 'copy-with-link'))).rejects.toThrow(
-    'Template symlinks are not supported.',
-  );
-});
+it.each(['root', 'file', 'directory'] as const)(
+  'refuses scaffold symlinks (%s), with a real-directory control',
+  async (kind) => {
+    const root = await temporary();
+    const project = join(root, 'project');
+    await mkdir(project);
+    await writeFile(join(project, 'package.json'), '{}');
+    await assertCopy(project);
+    if (kind === 'root') {
+      const link = join(root, 'linked');
+      await symlink(project, link);
+      await expect(assertCopy(link)).rejects.toThrow('symlink');
+    } else {
+      await mkdir(join(project, 'nested'));
+      await symlink(
+        kind === 'file' ? join(project, 'package.json') : project,
+        join(project, 'nested/linked'),
+      );
+      await expect(assertCopy(project)).rejects.toThrow('symlink');
+    }
+  },
+);
 
 it('gives build and preview children only the allowlisted environment', async () => {
   const root = await temporary();
@@ -773,6 +826,7 @@ it('gives build and preview children only the allowlisted environment', async ()
     join(project, 'serve.cjs'),
     `${dump.replace('process.argv[1]', "'env-serve.json'")} require('node:http').createServer((q,s)=>s.end('ready')).listen(Number(process.argv[process.argv.indexOf('--port')+1]), '127.0.0.1')`,
   );
+  await writeBaseline(project);
   const keys: string[][] = [];
   const results = await runStandalone(
     {
@@ -780,11 +834,12 @@ it('gives build and preview children only the allowlisted environment', async ()
       tempBase: root,
       nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
       modes: ['registry'],
-      specs: [{ name: 'fixture', build: ['build.cjs'], preview: ['serve.cjs'], steps: [] }],
+      specs: [{ ...fixtureSpec, build: ['build.cjs'], preview: ['serve.cjs'] }],
       offline: true,
       verifyReleaseAge: false,
     },
     {
+      scaffold: scaffoldFixture(project),
       environment: {
         PATH: process.env['PATH'],
         HOME: process.env['HOME'],
@@ -814,3 +869,177 @@ it('gives build and preview children only the allowlisted environment', async ()
       expect(names).not.toContain(forbidden);
   }
 }, 30000);
+
+it.each([
+  'pass',
+  'both',
+  'test-artifact',
+  'workspace-artifact',
+  'check-failure',
+  'negative-pass',
+  'negative-wrong',
+  'negative-abort',
+  'mutation-missing',
+] as const)('gates scaffold/check/mutation phases and restores the source (%s)', async (kind) => {
+  const root = await temporary();
+  const repo = join(root, 'repo');
+  await mkdir(repo);
+  await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+  const packed = join(root, 'packed');
+  await mkdir(packed);
+  for (const name of expectedLaunch)
+    await writeFile(join(packed, `galaxie-ai-${name.split('/')[1]}-0.1.0.tgz`), 'fixture');
+  const requests: ScaffoldRequest[] = [];
+  const controller = new AbortController();
+  let checks = 0;
+  let installs = 0;
+  const server = createServer((_request, response) => response.end('ready'));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('No fixture port.');
+  try {
+    const results = await runStandalone(
+      {
+        repo,
+        tempBase: root,
+        nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
+        modes: kind === 'both' ? ['registry', 'tarball'] : ['registry'],
+        tarballs: packed,
+        specs: [{ ...fixtureSpec, name: 'browser-only-langgraph-js' }],
+        keep: true,
+        signal: controller.signal,
+      },
+      {
+        scaffold: async (request) => {
+          requests.push(request);
+          await mkdir(join(request.directory, 'src'), { recursive: true });
+          await writeFile(
+            join(request.directory, 'package.json'),
+            JSON.stringify({ dependencies: { '@galaxie-ai/core': '^0.1.0' } }),
+          );
+          await writeFile(
+            join(request.directory, 'src/csp.ts'),
+            kind === 'mutation-missing' ? 'not a CSP fixture' : fixtureCsp,
+          );
+          if (kind === 'test-artifact') await mkdir(join(request.directory, 'test'));
+          if (kind === 'workspace-artifact')
+            await writeFile(join(request.directory, 'tsconfig.workspace.json'), '{}');
+        },
+        runner: {
+          run: async (command) => {
+            if (command.args[0] === '--version') return process.version;
+            if (command.args.includes('--version')) return '12.2.2';
+            if (command.args.includes('config')) return '7';
+            if (command.args.includes('install')) {
+              installs++;
+              expect(command.args.slice(1)).toEqual([
+                'install',
+                '--ignore-scripts',
+                '--no-audit',
+                '--no-fund',
+              ]);
+              await writeFile(
+                join(command.cwd, 'package-lock.json'),
+                JSON.stringify({
+                  packages: Object.fromEntries(
+                    expectedLaunch.map((name) => [
+                      `node_modules/${name}`,
+                      { resolved: `file:/fixture/${name.split('/')[1]}.tgz` },
+                    ]),
+                  ),
+                }),
+              );
+              return '';
+            }
+            if (command.args.includes('check')) {
+              checks++;
+              const source = await readFile(join(command.cwd, 'src/csp.ts'), 'utf8');
+              if (kind === 'check-failure') throw new Error('src/csp.ts fixture check failed.');
+              if (source === fixtureCsp || kind === 'mutation-missing') return '';
+              if (kind === 'negative-pass') return '';
+              if (kind === 'negative-wrong') throw new Error('Unrelated compiler failure.');
+              if (kind === 'negative-abort') {
+                controller.abort();
+                throw new Error('Interrupted check.');
+              }
+              throw new Error(
+                source.includes('unsafe-inline')
+                  ? 'script-src changed'
+                  : 'require-trusted-types-for changed',
+              );
+            }
+            return '';
+          },
+          start: async () => ({ stop: async () => {}, output: () => '' }),
+        },
+        ports: { find: async () => address.port },
+        driver: { drive: async () => 'fixture-browser' },
+      },
+    );
+    expect(requests).toHaveLength(kind === 'both' ? 2 : 1);
+    expect(
+      requests.map(({ spec, mode, directory, tarballs }) => ({
+        name: spec.name,
+        kind: spec.kind,
+        framework: spec.framework,
+        mode,
+        directory: basename(directory),
+        tarballs: tarballs === undefined ? undefined : basename(tarballs),
+      })),
+    ).toEqual([
+      {
+        name: 'browser-only-langgraph-js',
+        kind: 'browser-only',
+        framework: 'langgraph-js',
+        mode: 'registry',
+        directory: `browser-only-langgraph-js-${process.versions.node.split('.')[0]}-registry`,
+        tarballs: undefined,
+      },
+      ...(kind === 'both'
+        ? [
+            {
+              name: 'browser-only-langgraph-js',
+              kind: 'browser-only',
+              framework: 'langgraph-js',
+              mode: 'tarball',
+              directory: `browser-only-langgraph-js-${process.versions.node.split('.')[0]}-tarball`,
+              tarballs: 'tarballs',
+            },
+          ]
+        : []),
+    ]);
+    for (const request of requests) {
+      expect(request.node).toBe(process.execPath);
+      expect(await readFile(join(request.directory, 'src/csp.ts'), 'utf8')).toBe(
+        kind === 'mutation-missing' ? 'not a CSP fixture' : fixtureCsp,
+      );
+    }
+    if (kind === 'pass' || kind === 'both') {
+      expect(results.every(({ failures }) => failures.length === 0)).toBe(true);
+      expect(checks).toBe(kind === 'both' ? 6 : 3);
+      expect(installs).toBe(kind === 'both' ? 2 : 1);
+    } else {
+      const phase = kind.endsWith('artifact')
+        ? 'scaffold'
+        : kind === 'check-failure'
+          ? 'check'
+          : 'negative-control';
+      expect(results[0]?.failures).toMatchObject([{ phase, gating: true }]);
+      if (kind.endsWith('artifact')) expect(results[0]?.failures[0]?.source).toBe('harness');
+      if (kind === 'check-failure') expect(results[0]?.failures[0]?.source).toBe('template');
+      if (kind === 'negative-pass' || kind === 'negative-wrong' || kind === 'mutation-missing')
+        expect(results[0]?.failures[0]?.source).toBe('harness');
+      if (kind === 'negative-pass')
+        expect(results[0]?.failures[0]?.excerpt).toContain(
+          'Negative control unexpectedly passed for script-src.',
+        );
+      if (kind === 'negative-wrong')
+        expect(results[0]?.failures[0]?.excerpt).toContain(
+          'Negative control did not report script-src changed.',
+        );
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

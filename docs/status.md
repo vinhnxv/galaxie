@@ -1,5 +1,23 @@
 # Project status
 
+On 2026-11-16, the private, unpublished
+[`@galaxie-ai/create`](../packages/create/README.md) composes browser-only and gateway
+LangGraph.js starters from base, kind and framework layers. Offline tests cover
+deterministic merging, path and collision rejection, instruction-file preservation,
+exclusive writes, CLI choices, install policy and npm tarball specifications.
+Root compiler/test commands regenerate ignored composed projects; the ported Node
+and Chromium tests pass against them, and CSP source hashes match the old starters.
+Generated `check` commands pin emitted CSP and Trusted Types, with mutation controls
+for loosened directives and removed header emission. The standalone harness now
+scaffolds through the CLI and gates on those checks. All eight registry/tarball
+cases on Node 22.23.5 and 24.15.0 pass with npm 12.2.2, including single-copy
+tarball checks, mutation rejections and mock/unavailable Chromium drives; see
+the [verification record](standalone-verification.md). pnpm/yarn tarball installs
+are refused, Windows automatic installation is skipped, and the pnpm 11 override
+location and real model/device behavior remain unmeasured. Layers stay in this
+checkout; publication and project-mode CI remain follow-up work.
+ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.
+
 On 2026-11-16, `@galaxie-ai/adapter-pyodide`, `@galaxie-ai/adapter-adk` and
 `@galaxie-ai/adapter-go` gain metadata and root license files, with offline and
 tarball tests covering package contents, exports, versions and private status.
