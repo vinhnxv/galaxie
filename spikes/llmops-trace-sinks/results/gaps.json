@@ -8,7 +8,7 @@
   {
     "name": "score-idempotency",
     "disposition": "works-with-host-configuration",
-    "finding": "Resending the stored payload preserves one score, including a timestamp from two days earlier. A fresh timestamp date produced two scores with the same ID.",
+    "finding": "Resending the stored payload preserves one score, including a timestamp from two days earlier. A later-day payload with the same ID replaced the visible row's value and returned one row; a control with a distinct ID showed duplicates would be visible. Whether a second physical row exists behind the read API is not measured.",
     "evidence": [
       { "file": "feedback-scores.json", "path": "/segments" },
       { "file": "feedback-scores.json", "path": "/freshTimestampControl" },
@@ -49,7 +49,7 @@
       { "file": "mlflow-evaluation.json", "path": "/variants/1" }
     ],
     "proposedFix": "Decide a framework-neutral root-span input/output contract under the existing development text opt-in, live data-label checks and final-destination policy. Keep text absent by default and keep backend-specific mapping in the host collector.",
-    "beadsIssue": "PENDING-CLAUDE"
+    "beadsIssue": "galaxie-d53.7"
   },
   {
     "name": "browser-endpoint",

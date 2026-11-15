@@ -439,7 +439,7 @@ environment. `LLMOPS_STACK=1` enables only the explicitly invoked live files.
 | Workflow | Measured outcome |
 | --- | --- |
 | Segment scores | Each interrupt/resume segment receives one score on its own oracle trace. Unknown runs and segments return `unmapped` and send no POST. |
-| Score retries | Stored payload retries retain one score across dates. Retrying the same ID with a fresh timestamp date produces two scores. |
+| Score retries | Stored payload retries (the client keeps the first payload and resends it unchanged) retain one score with its original value and timestamp. Resending the same ID with a payload dated on a later day left one visible row holding the new value; the original value was no longer returned. Whether a second physical row exists behind the read API is unmeasured. |
 | Score before ingestion | Zero observations before explicit flush, then all three observations; the single score is unchanged and names the oracle trace. |
 | Langfuse sessions | Root-only copy finds three roots per session but misses six child observations. The host processor groups all nine observations per session. |
 | MLflow sessions | Root-only copy suffices for `mlflow.trace.session`; two sessions each return exactly their three traces in every phase. |
@@ -451,8 +451,8 @@ environment. `LLMOPS_STACK=1` enables only the explicitly invoked live files.
 [mlflow-evaluation.json](results/mlflow-evaluation.json) and
 [browser-feedback.json](results/browser-feedback.json) hold the normalized facts.
 [gaps.json](results/gaps.json) dispositions all seven workflows with resolvable
-evidence pointers. The root-I/O follow-up is `PENDING-CLAUDE`: the delegating
-maintainer session files its issue and replaces that placeholder before merge.
+evidence pointers. The root-I/O follow-up is filed as `galaxie-d53.7`; the
+delegating maintainer session replaced the placeholder before merge.
 `LLMOPS_REQUIRE_GAP_IDS=1 pnpm exec vitest run test/static.test.ts` enforces that
 handoff without contacting a tracker.
 
@@ -470,8 +470,9 @@ timestamp. Only transport errors and 5xx get bounded retries; 207 and 4xx do not
 The running Langfuse reference's description specifies 202/207, while its
 generated response schema lists 200; live accepted posts return 202. Readback
 uses `/api/public/v3/scores?fields=subject` with a five-minute polling window.
-The fresh-date control waits for the new value to become readable before
-recording the two dated rows. Linking means the score's subject matches the
+The fresh-date measurement first proves with a second score of another ID that
+duplicate rows are visible to this readback, then resends the same ID with a
+later-day payload, settles for 30 seconds and records the same-ID rows. Linking means the score's subject matches the
 oracle trace and its observations are found; UI linking is unmeasured.
 Credential-scan assertions escape the score client's transport retry loop. A
 regression supplies a contaminated first response followed by a clean response

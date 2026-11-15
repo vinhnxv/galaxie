@@ -91,14 +91,14 @@
         "browser-interrupt-resume.json": "6246c152d5ea453686cccea9ea33d76641195ab424cb3be482871c1ba9647e95",
         "browser-linear.json": "68edcad6cf84142f42e6c851719c8cab48a391509bfad379a7f0c80325d202a3",
         "browser-verification.json": "57a406c3fc026e2a8cfd6044a1de3f786fde6ccd0c59d770663c328c05259b52",
-        "feedback-scores.json": "cb44505fb6f40efd9359ee1da332b97c3da56c69a5e228d8673d05023f70bd68",
-        "mlflow-evaluation.json": "2904c8e8db9343c1535a4b39b462e19ac1c9661529557610a0735472b7bf5280",
+        "feedback-scores.json": "d301c4fb122e77c8d4db9951887ef9119925c0bfe40e8bc18611a17ea145c493",
+        "mlflow-evaluation.json": "a119889cbaa911199191efdb28a4a4aae2c8d119d16c99b043c5c01bb4b8f51b",
         "node-interrupt-resume.json": "6246c152d5ea453686cccea9ea33d76641195ab424cb3be482871c1ba9647e95",
         "node-linear.json": "68edcad6cf84142f42e6c851719c8cab48a391509bfad379a7f0c80325d202a3",
         "node-model-failure.json": "ee5827b4c530000369e783e2f81a7ef0e14b2255e16508232566b76b0dd03fe6",
         "node-tool-call.json": "5f591fcb8c61755f0f22fd7d99b196e7d505a1a6c9f4362e3e5392bc778c6812",
         "node-verification.json": "3a9a955cc320ca826a2de0fc5b563091f06d8be9743f08bfc296ab2b1a56ffe3",
-        "sessions.json": "78db3a7643a0590dd560fca43c1d47d4e3eb5a1695e71b1584f600faea50d599",
+        "sessions.json": "f9e230784efa49ac4402a89787d3582b1e21dbf5096186e0528a896522552cd3",
         "smoke.json": "e78f0995778a137835f04f8f8295fe38a9ffb8fbad82537f2bf030adc079be40",
         "verification.json": "4b61848e8d5c5475f9f8489bce750ef94a371e37a1ff3e62da8f53bce87e880d",
         "versions.json": "29c63e43567856f155781ac69dca7078e8870f6e4479875cf3ba666cf3703a4d"
@@ -167,7 +167,7 @@
     "command": "pnpm run feedback-node",
     "exitCode": 1,
     "reason": "KeyError: 'request_id'",
-    "output": "Traceback (most recent call last):\n  File \"/Users/vinhnxv/Desktop/repos/galaxie/spikes/llmops-trace-sinks/python/.venv/lib/python3.14/site-packages/pandas/core/indexes/base.py\", line 3816, in get_loc\n    return self._engine.get_loc(casted_key)\n           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"pandas/_libs/index.pyx\", line 172, in pandas._libs.index.IndexEngine.get_loc\n  File \"pandas/_libs/index.pyx\", line 201, in pandas._libs.index.IndexEngine.get_loc\n  File \"pandas/_libs/hashtable_class_helper.pxi\", line 7726, in pandas._libs.hashtable.PyObjectHashTable.get_item\n  File \"pandas/_libs/hashtable_class_helper.pxi\", line 7734, in pandas._libs.hashtable.PyObjectHashTable.get_item\nKeyError: 'request_id'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/Users/vinhnxv/Desktop/repos/galaxie/spikes/llmops-trace-sinks/python/evaluate.py\", line 103, in <module>\n    main()\n    ~~~~^^\n  File \"/Users/vinhnxv/Desktop/repos/galaxie/spikes/llmops-trace-sinks/python/evaluate.py\", line 98, in main\n    result = evaluate(args)\n  File \"/Users/vinhnxv/Desktop/repos/galaxie/spikes/llmops-trace-sinks/python/evaluate.py\", line 68, in evaluate\n    rows.append({\"traceId\": row[\"request_id\"], \"scores\": scores})\n                            ~~~^^^^^^^^^^^^^^\n  File \"/Users/vinhnxv/Desktop/repos/galaxie/spikes/llmops-trace-sinks/python/.venv/lib/python3.14/site-packages/pandas/core/series.py\", line 1102, in __getitem__\n    return self._get_value(key)\n           ~~~~~~~~~~~~~~~^^^^^\n  File \"/Users/vinhnxv/Desktop/repos/galaxie/spikes/llmops-trace-sinks/python/.venv/lib/python3.14/site-packages/pandas/core/series.py\", line 1189, in _get_value\n    loc = self.index.get_loc(label)\n  File \"/Users/vinhnxv/Desktop/repos/galaxie/spikes/llmops-trace-sinks/python/.venv/lib/python3.14/site-packages/pandas/core/indexes/base.py\", line 3823, in get_loc\n    raise KeyError(key) from err\nKeyError: 'request_id'\n",
+    "output": "KeyError: 'request_id' raised at the row loop in python/evaluate.py after the evaluation completed; the full traceback is omitted because it holds machine-specific paths.",
     "fix": "The pinned MLflow returned evaluation dataframe uses trace_id; the live assertion still compares every row with the oracle trace set. No assertion changed."
   },
   "ports": {
@@ -182,7 +182,7 @@
   },
   "findingNames": [
     "Score creation uses array/202; generated reference response schema lists 200",
-    "Stored payload date is required for idempotency; fresh date yielded two rows",
+    "Resending a stored payload keeps one score; a later-day payload with the same ID replaced the visible row's value (no second row visible)",
     "Scores can precede observations",
     "Langfuse child grouping needs host copier; MLflow root session suffices",
     "Root request and response absent; trace scorers work",
@@ -232,6 +232,6 @@
     "tracingGuideChanged": false,
     "beadsCommandsRun": false,
     "followUpOwner": "delegating Claude session",
-    "followUpPlaceholder": "PENDING-CLAUDE"
+    "followUpIssue": "galaxie-d53.7"
   }
 }

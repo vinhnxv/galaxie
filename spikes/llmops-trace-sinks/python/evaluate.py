@@ -48,6 +48,10 @@ def evaluate(args: argparse.Namespace) -> dict:
         for session in args.session
     ]
     traces = pd.concat(frames, ignore_index=True)
+    if len(traces) != args.expected_traces:
+        raise SystemExit(
+            f"expected {args.expected_traces} traces, searched {len(traces)}"
+        )
     result = mlflow.genai.evaluate(
         data=traces,
         scorers=[chat_usage_total, chat_text_present, root_io_present],

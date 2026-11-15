@@ -29,7 +29,6 @@
           },
           "mlflow": {
             "traceIds": ["trace-1", "trace-2", "trace-3"],
-            "allObservationsGrouped": true,
             "tracesGroupedByRoot": true
           }
         },
@@ -56,7 +55,6 @@
           },
           "mlflow": {
             "traceIds": ["trace-4", "trace-5", "trace-6"],
-            "allObservationsGrouped": true,
             "tracesGroupedByRoot": true
           }
         }
@@ -100,7 +98,6 @@
           },
           "mlflow": {
             "traceIds": ["trace-7", "trace-8", "trace-9"],
-            "allObservationsGrouped": true,
             "tracesGroupedByRoot": true
           }
         },
@@ -137,7 +134,6 @@
           },
           "mlflow": {
             "traceIds": ["trace-10", "trace-11", "trace-12"],
-            "allObservationsGrouped": true,
             "tracesGroupedByRoot": true
           }
         }
@@ -181,7 +177,6 @@
           },
           "mlflow": {
             "traceIds": ["trace-13", "trace-14", "trace-15"],
-            "allObservationsGrouped": true,
             "tracesGroupedByRoot": true
           }
         },
@@ -218,7 +213,6 @@
           },
           "mlflow": {
             "traceIds": ["trace-16", "trace-17", "trace-18"],
-            "allObservationsGrouped": true,
             "tracesGroupedByRoot": true
           }
         }

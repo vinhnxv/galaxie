@@ -256,6 +256,9 @@ test('environment template is empty, ignored secrets stay private and results co
   expect(tracked).toContain('.env.example');
   for (const file of new Set([...tracked, ...resultFiles()])) {
     const content = readFileSync(resolve(root, file), 'utf8');
+    // verification.json records one diagnosed bind-mount host path from the stack spike.
+    if (file.startsWith('results/') && file !== 'results/verification.json')
+      expect(content, `machine-specific path in ${file}`).not.toMatch(/\/(Users|home|private)\//);
     expect(content, `credential-shaped value in ${file}`).not.toMatch(
       /\b[ps]k-lf-[0-9a-f-]{32,}|Basic [A-Za-z0-9+/=]{40,}/,
     );

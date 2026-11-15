@@ -16,7 +16,7 @@
         "id": "trace-1-segment-0",
         "httpStatus": 202
       },
-      "countAfterRepostAndLaterDateRetry": 1,
+      "countAfterStoredPayloadRepost": 1,
       "originalTimestampRetained": true,
       "otherSegmentCount": 0
     },
@@ -28,25 +28,19 @@
         "id": "trace-2-segment-1",
         "httpStatus": 202
       },
-      "countAfterRepostAndLaterDateRetry": 1,
+      "countAfterStoredPayloadRepost": 1,
       "originalTimestampRetained": true,
       "otherSegmentCount": 0
     }
   ],
   "freshTimestampControl": {
     "status": "observed",
-    "scores": [
-      {
-        "id": "trace-1-fresh-timestamp-control",
-        "value": 0,
-        "timestamp": "<timestamp>",
-        "subject": {
-          "kind": "trace",
-          "id": "trace-1"
-        }
-      }
-    ],
-    "note": "Readback waited for the fresh payload value to become visible; duplicate count is an observed backend behavior."
+    "duplicateVisibilityControl": {
+      "rowsVisibleWithDistinctId": 2
+    },
+    "sameIdRowsAfterFreshDateResend": 1,
+    "sameIdValues": [0],
+    "note": "Rows are read after a 30 second settle. The control shows distinct IDs are visible as separate rows; the same-ID count is the observed backend behavior for a resend dated on a later day."
   },
   "beforeIngestion": {
     "observationsBeforeFlush": 0,

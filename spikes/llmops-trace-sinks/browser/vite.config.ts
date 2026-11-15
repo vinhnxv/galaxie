@@ -77,7 +77,10 @@ export async function startPreview(endpoint?: ScoreEndpoint): Promise<PreviewSer
                     next();
                     return;
                   }
-                  void endpoint.handle(request, response);
+                  endpoint.handle(request, response).catch(() => {
+                    if (!response.headersSent) response.writeHead(500);
+                    response.end();
+                  });
                 });
               },
             },

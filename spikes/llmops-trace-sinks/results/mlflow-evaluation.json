@@ -102,7 +102,7 @@
         "chat_text_present": 6,
         "root_io_present": 6
       },
-      "rootIOObservation": "Root request and response are empty because invoke_agent spans carry no input or output; chat_usage_total and chat_text_present still return one value per trace."
+      "rootIOObservation": "Root request and response are empty because invoke_agent spans carry no input or output attributes (asserted on the in-memory span oracle); chat_usage_total and chat_text_present still return one value per trace."
     },
     {
       "text": true,
@@ -204,7 +204,7 @@
         "chat_text_present": 6,
         "root_io_present": 6
       },
-      "rootIOObservation": "Root request and response are empty because invoke_agent spans carry no input or output; chat_usage_total and chat_text_present still return one value per trace."
+      "rootIOObservation": "Root request and response are empty because invoke_agent spans carry no input or output attributes (asserted on the in-memory span oracle); chat_usage_total and chat_text_present still return one value per trace."
     }
   ]
 }

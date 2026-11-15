@@ -20,7 +20,7 @@ import {
   type SessionsResult,
 } from '../src/scenarios.js';
 import { inspectFeedback, writeFeedback } from '../src/score-readback.js';
-import { createScoreClient } from '../src/scores.js';
+import { createScoreClient, scoreId } from '../src/scores.js';
 import { readEnv } from '../src/secrets.js';
 import { sessionReadback } from '../src/session-readback.js';
 
@@ -28,7 +28,8 @@ const enabled = process.env['LLMOPS_STACK'] === '1';
 let result: ScenarioResult;
 let host: Host;
 let posts = 0;
-let now = new Date();
+// Captured once so a run that crosses UTC midnight compares against the same day.
+const backdatedDate = new Date(Date.now() - 2 * 86_400_000);
 let client: ReturnType<typeof createScoreClient>;
 const evidence: Record<string, unknown> = { demonstration: true, scoreWindowMillis };
 const sessionRuns: SessionsResult[] = [];
@@ -59,13 +60,29 @@ test.skipIf(!enabled)(
         ),
       );
     }
+    // Positive controls and pinned outcomes: every phase must return rows for both
+    // sessions (so an empty readback cannot pass), and the recorded findings are asserted.
+    for (const phase of phases) {
+      expect(phase.sessions).toHaveLength(2);
+      for (const session of phase.sessions) {
+        expect(session.oracleTraces).toHaveLength(3);
+        expect(session.oracleSpans).toHaveLength(9);
+        expect(session.langfuse.traceIds).toHaveLength(3);
+        expect(session.langfuse.tracesGroupedByRoot).toBe(true);
+        expect(session.mlflow.tracesGroupedByRoot).toBe(true);
+        // Langfuse groups all nine observations only when child spans carry the attribute.
+        expect(session.langfuse.allObservationsGrouped).toBe(phase.sessionCopy);
+        expect(session.langfuse.missingSpanIds).toHaveLength(phase.sessionCopy ? 0 : 6);
+      }
+    }
     const grouped = (
       phase: Awaited<ReturnType<typeof sessionReadback>> | undefined,
       backend: 'langfuse' | 'mlflow',
     ): boolean =>
-      phase?.sessions.every(
-        (session) =>
-          session[backend].allObservationsGrouped && session[backend].tracesGroupedByRoot,
+      phase?.sessions.every((session) =>
+        backend === 'langfuse'
+          ? session.langfuse.allObservationsGrouped && session.langfuse.tracesGroupedByRoot
+          : session.mlflow.tracesGroupedByRoot,
       ) ?? false;
     writeFeedback(
       'sessions.json',
@@ -110,6 +127,10 @@ test.skipIf(!enabled)(
       });
       expect(evaluation.rows.map((row) => row.traceId).sort()).toEqual([...expected].sort());
       expect(evaluation.rootIO.map((row) => row.traceId).sort()).toEqual([...expected].sort());
+      for (const row of evaluation.rootIO) {
+        expect(row.requestPresent).toBe(false);
+        expect(row.responsePresent).toBe(false);
+      }
       for (const row of evaluation.rows) {
         const traceId = row.traceId.replace(/^tr-/, '');
         const usage = result.spans
@@ -132,6 +153,16 @@ test.skipIf(!enabled)(
         assert.ok(root);
         expect(row.scores.root_io_present).toBe(root.requestPresent && root.responsePresent);
       }
+      // Oracle check: the premise of the root-I/O finding is that the instrumented root spans
+      // themselves carry no input or output attributes, independent of what MLflow shows.
+      const roots = result.spans.filter((span) => span.name.startsWith('invoke_agent '));
+      expect(roots).toHaveLength(6);
+      for (const root of roots)
+        expect(
+          Object.keys(root.attributes).filter((key) =>
+            /(^|\.)(input|output)(\.|$)|messages/.test(key),
+          ),
+        ).toEqual([]);
       const byOracle = <T extends { traceId: string }>(rows: T[]): T[] =>
         [...rows].sort((a, b) => expected.indexOf(a.traceId) - expected.indexOf(b.traceId));
       variants.push({
@@ -140,11 +171,8 @@ test.skipIf(!enabled)(
         traceIds: expected,
         rootIO: byOracle(evaluation.rootIO),
         rows: byOracle(evaluation.rows),
-        rootIOObservation: evaluation.rootIO.every(
-          (row) => !row.requestPresent && !row.responsePresent,
-        )
-          ? 'Root request and response are empty because invoke_agent spans carry no input or output; chat_usage_total and chat_text_present still return one value per trace.'
-          : 'Root I/O presence recorded per trace.',
+        rootIOObservation:
+          'Root request and response are empty because invoke_agent spans carry no input or output attributes (asserted on the in-memory span oracle); chat_usage_total and chat_text_present still return one value per trace.',
       });
     }
     expect(variants).toHaveLength(2);
@@ -189,10 +217,9 @@ beforeAll(async () => {
         .map((span) => span.spanContext().spanId),
       inspectFeedback,
     );
-  now = new Date(Date.now() - 2 * 86_400_000);
   client = createScoreClient({
     authorization: readEnv()['LANGFUSE_AUTH_HEADER'] ?? '',
-    clock: () => now,
+    clock: () => backdatedDate,
     fetch: async (url, options) => {
       posts++;
       const response = await fetch(url, options);
@@ -203,7 +230,7 @@ beforeAll(async () => {
 });
 
 test.skipIf(!enabled)(
-  'segment feedback associates and reposts without duplicates across dates',
+  'segment feedback associates, and a stored-payload repost keeps one score',
   async () => {
     const records = [];
     for (const entry of result.runTrace) {
@@ -216,7 +243,8 @@ test.skipIf(!enabled)(
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 1),
       ).toMatchObject({ status: 'posted' });
-      now = new Date();
+      // The client retains the first payload; later calls resend it unchanged whatever the
+      // clock or the new value say. The test pins that behaviour, not Langfuse's date handling.
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 0),
       ).toMatchObject({ status: 'posted' });
@@ -231,11 +259,10 @@ test.skipIf(!enabled)(
         segment: entry.segment,
         traceId: entry.traceId,
         score: first,
-        countAfterRepostAndLaterDateRetry: repeated.length,
+        countAfterStoredPayloadRepost: repeated.length,
         originalTimestampRetained: true,
         otherSegmentCount: 0,
       });
-      now = new Date(Date.now() - 2 * 86_400_000);
     }
     evidence['segments'] = records;
   },
@@ -243,39 +270,57 @@ test.skipIf(!enabled)(
 );
 
 test.skipIf(!enabled)(
-  'fresh timestamp retry is recorded as a control',
+  'fresh timestamp retry is measured against a duplicate-visibility control',
   async () => {
     const entry = result.runTrace[0];
     assert.ok(entry);
+    const name = 'fresh-timestamp-control';
+    const authorization = readEnv()['LANGFUSE_AUTH_HEADER'] ?? '';
     const backdated = createScoreClient({
-      authorization: readEnv()['LANGFUSE_AUTH_HEADER'] ?? '',
-      clock: () => new Date(Date.now() - 2 * 86_400_000),
+      authorization,
+      clock: () => backdatedDate,
     });
-    expect((await backdated.post(entry, 'fresh-timestamp-control', 1)).status).toBe('posted');
-    await waitForScores(
-      { traceId: entry.traceId, name: 'fresh-timestamp-control' },
-      1,
-      inspectFeedback,
+    expect((await backdated.post(entry, name, 1)).status).toBe('posted');
+    await waitForScores({ traceId: entry.traceId, name }, 1, inspectFeedback);
+    // Positive control: a second row with the same trace and name but another ID must be
+    // visible to this readback as a separate row, so a hidden duplicate cannot go unnoticed.
+    const extra = await fetch('http://127.0.0.1:3000/api/public/scores', {
+      method: 'POST',
+      headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        {
+          id: `${entry.traceId}-${name}-extra`,
+          traceId: entry.traceId,
+          name,
+          value: 2,
+          dataType: 'NUMERIC',
+          timestamp: backdatedDate.toISOString(),
+        },
+      ]),
+      signal: AbortSignal.timeout(5000),
+      redirect: 'error',
+    });
+    await extra.body?.cancel();
+    expect(extra.status).toBe(202);
+    const control = await waitForScores({ traceId: entry.traceId, name }, 2, inspectFeedback);
+    expect(control.map((score) => score.value).sort()).toEqual([1, 2]);
+    // Measurement: resend the same ID with a payload dated today.
+    const fresh = createScoreClient({ authorization });
+    expect((await fresh.post(entry, name, 0)).status).toBe('posted');
+    await waitForScores({ traceId: entry.traceId, name }, 1, inspectFeedback, (scores) =>
+      scores.some((score) => score.value === 0),
     );
-    const fresh = createScoreClient({ authorization: readEnv()['LANGFUSE_AUTH_HEADER'] ?? '' });
-    expect((await fresh.post(entry, 'fresh-timestamp-control', 0)).status).toBe('posted');
-    const scores = await waitForScores(
-      { traceId: entry.traceId, name: 'fresh-timestamp-control' },
-      1,
-      inspectFeedback,
-      (scores) => scores.some((score) => score.value === 0),
-    );
+    await new Promise((resolve) => setTimeout(resolve, 30_000));
+    const settled = await scoresQuery({ traceId: entry.traceId, name }, inspectFeedback);
+    const sameId = settled.filter((score) => score.id === scoreId(entry.traceId, name));
+    expect(sameId.length).toBeGreaterThan(0);
+    expect(sameId.some((score) => score.value === 0)).toBe(true);
     evidence['freshTimestampControl'] = {
       status: 'observed',
-      scores: [...scores]
-        .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-        .map(({ id, value, timestamp, subject }) => ({
-          id,
-          value,
-          timestamp,
-          subject,
-        })),
-      note: 'Readback waited for the fresh payload value to become visible; duplicate count is an observed backend behavior.',
+      duplicateVisibilityControl: { rowsVisibleWithDistinctId: control.length },
+      sameIdRowsAfterFreshDateResend: sameId.length,
+      sameIdValues: sameId.map((score) => score.value).sort(),
+      note: 'Rows are read after a 30 second settle. The control shows distinct IDs are visible as separate rows; the same-ID count is the observed backend behavior for a resend dated on a later day.',
     };
     for (const segment of result.runTrace) {
       const retained = await scoresQuery(
@@ -284,12 +329,10 @@ test.skipIf(!enabled)(
       );
       expect(retained).toHaveLength(1);
       expect(retained[0]?.value).toBe(1);
-      expect(retained[0]?.timestamp.slice(0, 10)).toBe(
-        new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10),
-      );
+      expect(retained[0]?.timestamp.slice(0, 10)).toBe(backdatedDate.toISOString().slice(0, 10));
     }
   },
-  scoreWindowMillis * 2 + 30_000,
+  scoreWindowMillis * 4 + 60_000,
 );
 
 test.skipIf(!enabled)(

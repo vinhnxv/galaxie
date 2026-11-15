@@ -18,7 +18,7 @@ export async function sessionReadback(result: SessionsResult): Promise<{
       allObservationsGrouped: boolean;
       tracesGroupedByRoot: boolean;
     };
-    mlflow: { traceIds: string[]; allObservationsGrouped: boolean; tracesGroupedByRoot: boolean };
+    mlflow: { traceIds: string[]; tracesGroupedByRoot: boolean };
   }[];
 }> {
   assert.equal(result.runTrace.length, 6);
@@ -72,15 +72,17 @@ export async function sessionReadback(result: SessionsResult): Promise<{
         traceIds: oracleTraces.filter((id) => observations.some((item) => item.traceId === id)),
         spanIds: lfIds,
         missingSpanIds: oracleSpans.filter((id) => !lfIds.includes(id)),
-        allObservationsGrouped: observations.length === 9,
+        allObservationsGrouped:
+          observations.length === ownSpans.length && oracleSpans.every((id) => lfIds.includes(id)),
         tracesGroupedByRoot: roots.every((root) => lfIds.includes(root.spanContext().spanId)),
       },
       mlflow: {
         traceIds: oracleTraces.filter((id) =>
           traces.some((trace) => trace.trace_id === `tr-${id}`),
         ),
-        allObservationsGrouped: traces.length === 3,
-        tracesGroupedByRoot: traces.length === 3,
+        tracesGroupedByRoot:
+          traces.length === oracleTraces.length &&
+          oracleTraces.every((id) => traces.some((trace) => trace.trace_id === `tr-${id}`)),
       },
     });
   }

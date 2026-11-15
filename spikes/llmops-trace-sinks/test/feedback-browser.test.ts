@@ -44,9 +44,11 @@ test.skipIf(!enabled)(
     await health.body?.cancel();
     expect(health.status).toBe(405);
     const env = readEnv();
+    let upstreamPosts = 0;
     const scoreClient = createScoreClient({
       authorization: env['LANGFUSE_AUTH_HEADER'] ?? '',
       fetch: async (url, init) => {
+        if (init?.method === 'POST') upstreamPosts++;
         const response = await fetch(url, init);
         inspectFeedback(await response.clone().json());
         return response;
@@ -163,6 +165,7 @@ test.skipIf(!enabled)(
       expect(unauthenticated).toEqual({ status: 401, reason: 'unauthenticated' });
       const alicePosted = await report(alice, a);
       const bobPosted = await report(bob, b, 0.5);
+      expect(upstreamPosts).toBe(2);
       expect(alicePosted).toEqual({ status: 200, reason: 'posted' });
       expect(bobPosted).toEqual({ status: 200, reason: 'posted' });
       const aliceScores = await waitForScores(
@@ -185,6 +188,8 @@ test.skipIf(!enabled)(
       expect(wrongSegment).toEqual({ status: 404, reason: 'not-confirmed' });
       expect(ownedRunOtherTrace).toEqual({ status: 404, reason: 'not-confirmed' });
       expect(confirmedOtherOwner).toEqual({ status: 403, reason: 'forbidden' });
+      // Deterministic: the 401, 404 and 403 reports never reached Langfuse.
+      expect(upstreamPosts).toBe(2);
       expect(await scoresQuery({ traceId: a.traceId, name: 'feedback' }, inspectFeedback)).toEqual(
         aliceScores,
       );
@@ -193,6 +198,7 @@ test.skipIf(!enabled)(
       );
       const repeat = await report(alice, a, 0);
       expect(repeat).toEqual({ status: 200, reason: 'posted' });
+      expect(upstreamPosts).toBe(3);
       expect(await scoresQuery({ traceId: a.traceId, name: 'feedback' }, inspectFeedback)).toEqual(
         aliceScores,
       );
