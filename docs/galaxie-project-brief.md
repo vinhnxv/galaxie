@@ -53,6 +53,7 @@ API and package names in examples are **sketches**, not real APIs or registered 
 12. **The verdict is parity.** Code written with LangChain and LangGraph runs in galaxie the way it runs natively, for example in Node inside a Docker container. A conformance suite runs the same graphs with a deterministic fake chat model on Node and in Chrome, and compares stream events, state, checkpoints, interrupts and resume. A difference is fixed, or listed in the compatibility matrix with its reason. Accuracy and system metrics are demonstrations, never pass/fail gates: they depend on the model, the tools and the pipeline the agent builder chooses. [ADR-0016]
 13. **Traces are OpenTelemetry spans.** galaxie filters every value it records in them, and data labels apply to span content as they do to any outbound call. galaxie never exports spans itself: the host registers the exporter, for example to Langfuse during development. [ADR-0016]
 14. **The contracts are a framework-neutral standard.** LangGraph.js is the first framework behind them, not the only one. They reuse open protocols (MCP, OpenTelemetry, JSON Schema, the OpenAI-compatible wire format) and specify only what no protocol covers. [ADR-0017]
+15. **Agent definitions stay code.** Host wiring stays in code today; a plain-data host configuration document is proposed in [ADR-0031](adr/0031-declarative-host-configuration.md), with secrets and functions staying in host code. This narrows ADR-0008's YAML rejection to agent definitions without reversing it.
 
 ## 1. Vision and product hypotheses
 
@@ -68,7 +69,7 @@ API and package names in examples are **sketches**, not real APIs or registered 
 - **One environment for models and tools.** Agents use a local LLM through WebGPU, a model built into the browser, a model server on the user's machine or a remote API, and they reach MCP servers and HTTP APIs, all under one policy. Calling agents that run elsewhere may come later (§16.8).
 - Agents use data within the permissions the host app and backend grant. This is like a frontend calling an API, plus agent-specific policy.
 - **Agents work with the app's UI.** An agent drives an assigned UI region with the app's own components and LLM-generated data, provides data to the app, and gives directives such as navigating to a page, through capabilities the host defines (§11.2).
-- **Configuration and context through the web.** Agent settings, model choices, prompts and context are managed in the web app, not in a daemon or a file on the user's machine. In the MVP the host sets them in code; a web console is not scheduled until its scope is settled (§20, question 5).
+- **Configuration and context through the web.** Agent settings, model choices, prompts and context are managed in the web app, not in a daemon or a file on the user's machine. Prompts and context stay in code; agent wiring and model choices are in code today and could also use a host configuration document under [ADR-0031](adr/0031-declarative-host-configuration.md) (proposed, not implemented). A web console is not scheduled until its scope is settled (§20, question 5).
 - **Development tracing.** During development, galaxie exposes run data as traces, so a tool such as Langfuse shows the order of steps and where the time went (§14.4).
 - **A standard for browser agents.** galaxie defines how browser agents communicate, the protocols they use, the security rules and the layers. The standard is framework-neutral, so LangChain, LangGraph and other frameworks can implement it (§7.6).
 - Agents, skills, plugins and integrations can be shared, reinstalled, configured and reused.
@@ -308,7 +309,7 @@ See ADR-0010 for the cuts and the reasons, and §16 for when each item comes bac
 - Building A2UI, AG-UI and a third UI DSL at the same time.
 - Distributed multi-agent coordination, calls to agents that run elsewhere (§16.8), cross-device resume and always-on scheduling.
 - Local model training or LoRA fine-tuning. The MVP configures prompts, skills, bindings and model selection only.
-- A web console for agent settings, model choices, prompts and context. The host sets them in code; the console's scope is open (§20).
+- A web console for agent settings, model choices, prompts and context. Prompts and context stay in code; wiring and model choices are in code today and could also use a host configuration document under [ADR-0031](adr/0031-declarative-host-configuration.md) (proposed, not implemented). The console's scope is open (§20).
 - Full-duplex voice, authoritative pronunciation scoring and every kind of multimodal input.
 - Support for every browser, mobile device or GPU. Choose reference configurations and measure first.
 - Third-party MCP servers with OAuth 2.1, and importing OpenAPI operations as capabilities.

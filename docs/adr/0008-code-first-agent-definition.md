@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** brief §4.3, §13.2, §14.2
+- **Related:** brief §4.3, §13.2, §14.2; ADR-0031
 
 ## Context
 
