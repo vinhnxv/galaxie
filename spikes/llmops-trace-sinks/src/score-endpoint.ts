@@ -124,7 +124,6 @@ export function createScoreEndpoint(options: {
           reply(404, 'not-confirmed');
           return;
         }
-        // Check and bind synchronously after the lookup: overlapping first reports cannot both win.
         const owner = runOwners.get(body.runId);
         const boundTrace = traces.get(body.traceId);
         const boundSegment = runs.get(body.runId)?.get(body.segment);
