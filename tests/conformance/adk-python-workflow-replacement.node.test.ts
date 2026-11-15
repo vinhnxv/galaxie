@@ -182,9 +182,21 @@ class StageModel extends BaseChatModel {
 class ReceiptedRecoveryStore extends MemoryRecoveryStore {
   readonly receipts = Promise.withResolvers<void>();
 
+  readonly #deadline: ReturnType<typeof setTimeout>;
+
   constructor() {
     super();
     void this.receipts.promise.catch(() => {});
+    // Failure path only: a write that is never dispatched must fail fast, not wait for the test timeout.
+    this.#deadline = setTimeout(
+      () =>
+        this.receipts.reject(new Error('Receipt barrier timed out: both writes never arrived.')),
+      60000,
+    );
+  }
+
+  clear(): void {
+    clearTimeout(this.#deadline);
   }
 
   override async recordEffect(
@@ -284,11 +296,9 @@ async function runWorkflowReplacement({
             retry: 'none',
             async invoke(input: { value: number }) {
               invoked.push(input.value);
-              if (holdWrite) {
-                if (input.value === 2) {
-                  writeStarted.resolve();
-                  await heldWrite.promise;
-                }
+              if (holdWrite && input.value === 2) {
+                writeStarted.resolve();
+                await heldWrite.promise;
               }
               return input;
             },
@@ -374,6 +384,7 @@ async function runWorkflowReplacement({
     expect(hostedB.tools).toEqual(nativeB.tools);
     expect(fixture.workerErrors).toEqual([]);
   } finally {
+    recovery.clear();
     heldWrite.resolve();
     stop();
     await runtime.dispose();
