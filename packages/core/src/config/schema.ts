@@ -196,6 +196,7 @@ export const hostConfigSchema: z.ZodType<HostConfigDocument> = z.strictObject({
             z.string().regex(/^[A-Za-z0-9_.-]{1,128}$/),
             z.strictObject({
               ...policy,
+              timeoutMs: z.number().int().positive(),
               kind: z.enum(['read', 'write']),
               version: z.number().int().positive(),
               pin: z.string().regex(/^[a-f0-9]{64}$/),

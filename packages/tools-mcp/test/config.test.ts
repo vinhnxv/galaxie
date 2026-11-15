@@ -407,22 +407,52 @@ test('T-integration: merges code bindings and routes principal tokens through th
   expect(fixture.transport.mock.calls.length).toBeGreaterThan(sentBefore);
 });
 
-test('characterizes the known fractional timeout divergence before building', async () => {
+test.each([
+  ['timeoutMs', 1.5],
+  ['timeoutMs', 0],
+  ['timeoutMs', -1],
+  ['timeoutMs', 2 ** 53],
+  ['timeoutMs', 1e300],
+  ['concurrency', 1.5],
+  ['concurrency', 0],
+  ['concurrency', -1],
+  ['concurrency', 2 ** 53],
+  ['version', 1.5],
+  ['version', 0],
+  ['version', -1],
+  ['version', 2 ** 53],
+] as const)('T-parity: core and the factory reject tool %s = %s', async (field, value) => {
   const fixture = await endpoint();
   const data = document(fixture.server.url, fixture.pins);
-  data.mcp.servers.lessons.tools['lesson.lookup'].timeoutMs = 1.5;
+  const tool = data.mcp.servers.lessons.tools['lesson.lookup'];
+  tool[field] = value;
+  rejected(
+    () => validateHostConfig(data, definition, fixture.hooks, origin),
+    `/mcp/servers/lessons/tools/lesson.lookup/${field}`,
+  );
+  const hand = handBuilt(fixture);
+  expect(() => hand.server.bindings({ 'lesson.lookup': { ...tool } })).toThrow(
+    'The request is invalid.',
+  );
+  tool[field] = 1;
+  expect(() => validateHostConfig(data, definition, fixture.hooks, origin)).not.toThrow();
+  expect(() => hand.server.bindings({ 'lesson.lookup': { ...tool } })).not.toThrow();
+});
+
+test.each([
+  ['timeoutMs', 1],
+  ['timeoutMs', Number.MAX_SAFE_INTEGER],
+  ['concurrency', 1],
+  ['concurrency', Number.MAX_SAFE_INTEGER],
+  ['version', 1],
+] as const)('T-parity: core and the factory accept tool %s = %s', async (field, value) => {
+  const fixture = await endpoint();
+  const data = document(fixture.server.url, fixture.pins);
+  const tool = data.mcp.servers.lessons.tools['lesson.lookup'];
+  tool[field] = value;
   expect(() => validateHostConfig(data, definition, fixture.hooks, origin)).not.toThrow();
   const hand = handBuilt(fixture);
-  expect(() =>
-    hand.server.bindings({
-      'lesson.lookup': { ...data.mcp.servers.lessons.tools['lesson.lookup'] },
-    }),
-  ).toThrow('The request is invalid.');
-  expect(() =>
-    hand.server.bindings({
-      'lesson.lookup': { ...data.mcp.servers.lessons.tools['lesson.lookup'], timeoutMs: 2 },
-    }),
-  ).not.toThrow();
+  expect(() => hand.server.bindings({ 'lesson.lookup': { ...tool } })).not.toThrow();
 });
 
 test.each([true, false])(
@@ -695,10 +725,9 @@ test('T-server-reject: retains the real factory error and server path', async ()
   expect(Object.keys(build(config).servers)).toEqual(['first', 'second']);
 });
 
-test('T-tool-reject: wraps the known fractional timeout divergence at the tool path', async () => {
+test('T-tool-reject: wraps a real factory rejection at the tool path', async () => {
   const fixture = await endpoint();
   const data = document(fixture.server.url, fixture.pins);
-  data.mcp.servers.lessons.tools['lesson.lookup'].timeoutMs = 1.5;
   const config = validateHostConfig(data, definition, fixture.hooks, origin);
   let original: unknown;
   factory.mockImplementation((options) => {
@@ -708,7 +737,14 @@ test('T-tool-reject: wraps the known fractional timeout divergence at the tool p
       ...server,
       bindings: (tools) => {
         try {
-          return server.bindings(tools);
+          return server.bindings(
+            Object.fromEntries(
+              Object.entries(tools).map(([name, tool]) => [
+                name,
+                name === 'lesson.lookup' ? { ...tool, timeoutMs: 1.5 } : tool,
+              ]),
+            ),
+          );
         } catch (error) {
           original = error;
           throw error;
@@ -720,8 +756,8 @@ test('T-tool-reject: wraps the known fractional timeout divergence at the tool p
     original,
   );
   expect(original).toBeInstanceOf(GalaxieError);
-  data.mcp.servers.lessons.tools['lesson.lookup'].timeoutMs = 2;
-  build(validateHostConfig(data, definition, fixture.hooks, origin));
+  factory.mockImplementation(realCreateMcpServer);
+  expect(() => build(config)).not.toThrow();
 });
 
 test.each([
@@ -748,7 +784,6 @@ test.each(['factory', 'tool'] as const)(
     const fixture = await endpoint();
     const data = document(fixture.server.url, fixture.pins);
     const server = data.mcp.servers.lessons;
-    if (failure === 'tool') server.tools['progress.record'].timeoutMs = 1.5;
     const config = validateHostConfig(
       {
         ...data,
@@ -773,6 +808,19 @@ test.each(['factory', 'tool'] as const)(
       });
       expect(() => client.bindings({})).not.toThrow();
       created.push(client);
+      if (failure === 'tool' && options.id === 'lessons')
+        return {
+          ...client,
+          bindings: (tools) =>
+            client.bindings(
+              Object.fromEntries(
+                Object.entries(tools).map(([name, tool]) => [
+                  name,
+                  name === 'progress.record' ? { ...tool, timeoutMs: 1.5 } : tool,
+                ]),
+              ),
+            ),
+        };
       return client;
     });
     let result: BuiltMcpServers | undefined;

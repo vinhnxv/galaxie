@@ -102,8 +102,9 @@ the endpoint's actual recipient.
 | `mcp.servers` | Map of server IDs to `url`, `destination`, named `token` hook and `tools`; optional named `fetch`, boolean `propagateTraceContext` and `limits` (`messageBytes`, `resultBytes`, `idleMs`). Tool entries require positive integer `version`, 64-character lowercase hex `pin`, `kind` (`read` or `write`) and the common policy fields; optional `result` is `structured` or `text`. |
 | `limits` | Optional `budgets`, `dataPolicy` and `urlAllowlist`, built separately for the runtime. See [runtime limits](#runtime-limits). |
 
-HTTP `method` is `GET`, `DELETE`, `POST`, `PUT` or `PATCH`. Common policies use
-positive `timeoutMs`, positive integer `concurrency`, `grantScope` of `app`,
+HTTP `method` is `GET`, `DELETE`, `POST`, `PUT` or `PATCH`. HTTP `timeoutMs` is a
+positive number; MCP tool `timeoutMs` must be a positive safe integer. Common
+policies use positive integer `concurrency`, `grantScope` of `app`,
 `principal`, `instance` or `run`, `approval` of `none` or `confirm`, and `retry`
 of `none`, `idempotent` or `idempotency-key`. HTTP `kind` can be `read`, `write`,
 `device` or `ui`; MCP restricts it to `read` or `write`. MCP writes require
