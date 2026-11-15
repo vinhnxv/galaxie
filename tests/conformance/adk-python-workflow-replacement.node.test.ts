@@ -4,7 +4,12 @@
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { createRuntime, defineAgentDefinition, type RunEvent } from '@galaxie-ai/core';
+import {
+  createRuntime,
+  type DiagnosticEvent,
+  defineAgentDefinition,
+  type RunEvent,
+} from '@galaxie-ai/core';
 import { BaseChatModel, type BindToolsInput } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
@@ -124,6 +129,7 @@ function messagesOf(messages: BaseMessage[]): Message[] {
 interface Script {
   parallel: boolean;
   fail: boolean;
+  beforeFailure: Promise<void>;
   requests: Request[];
 }
 
@@ -150,6 +156,7 @@ class StageModel extends BaseChatModel {
     const afterTool = mapped.at(-1)?.role === 'tool';
     if (name === 'b' && afterTool && this.script.fail) {
       this.script.fail = false;
+      await this.script.beforeFailure;
       throw new Error('Scripted failure after one write.');
     }
     const writers: Record<string, number> = this.script.parallel ? { b: 1, c: 2 } : { a: 1, b: 2 };
@@ -172,134 +179,235 @@ class StageModel extends BaseChatModel {
   }
 }
 
+class ReceiptedRecoveryStore extends MemoryRecoveryStore {
+  readonly receipts = Promise.withResolvers<void>();
+
+  readonly #deadline: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    super();
+    void this.receipts.promise.catch(() => {});
+    // Failure path only: a write that is never dispatched must fail fast, not wait for the test timeout.
+    this.#deadline = setTimeout(
+      () =>
+        this.receipts.reject(new Error('Receipt barrier timed out: both writes never arrived.')),
+      60000,
+    );
+  }
+
+  clear(): void {
+    clearTimeout(this.#deadline);
+  }
+
+  override async recordEffect(
+    ...args: Parameters<MemoryRecoveryStore['recordEffect']>
+  ): Promise<void> {
+    await super.recordEffect(...args);
+    const statuses = [...this.journal.values()].map((record) => record.status);
+    if (statuses.some((status) => status === 'failed' || status === 'outcome_unknown')) {
+      this.receipts.reject(new Error(`Receipt barrier failed: ${JSON.stringify(statuses)}`));
+    } else if (statuses.length === 2 && statuses.every((status) => status === 'succeeded')) {
+      this.receipts.resolve();
+    }
+  }
+}
+
+async function runWorkflowReplacement({
+  parallel,
+  retry,
+  holdWrite = false,
+}: {
+  parallel: boolean;
+  retry: boolean;
+  holdWrite?: boolean;
+}): Promise<void> {
+  const oracle = native[`${parallel ? 'True' : 'False'}-${retry ? 'True' : 'False'}`];
+  if (!oracle) throw new Error('The native Workflow observation is missing.');
+  const fixture = await createPythonFixture({
+    framework: 'adk',
+    module: 'replacement',
+    sources: { 'replacement.py': source },
+  });
+  const recovery = new ReceiptedRecoveryStore();
+  const heldWrite = Promise.withResolvers<void>();
+  const writeStarted = Promise.withResolvers<void>();
+  const script: Script = {
+    parallel,
+    fail: retry,
+    requests: [],
+    // The control waits for dispatch only; oracle retries wait for both receipts.
+    beforeFailure: holdWrite ? writeStarted.promise : recovery.receipts.promise,
+  };
+  const model = new StageModel(script);
+  const invoked: number[] = [];
+  const checkpoints = new MemoryByteCheckpoints();
+  const diagnostics: DiagnosticEvent[] = [];
+  const timeline: { attempt: number; events: unknown[]; invoked: number[]; statuses: string[] }[] =
+    [];
+  const runtime = createRuntime({
+    diagnostics: (event) => diagnostics.push(event),
+    appId: 'workflow-replacement',
+    executors: [createPyodideAdapter({ ...fixture.options, framework: 'adk' })],
+    budgets: { steps: 20, toolCalls: 10, tokens: 5000 },
+    outputSafety: () => 'allow',
+  });
+  let stop = (): void => {};
+  try {
+    const schema = z.object({ value: z.number().int() });
+    const instance = await runtime.create(
+      defineAgentDefinition({
+        id: 'tests/workflow-replacement',
+        version: '1.0.0',
+        executor: 'adk-python',
+        input: z.object({ prompt: z.string() }),
+        models: {
+          answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' },
+        },
+        capabilities: {
+          required: { 'notes.write@1': { kind: 'write', input: schema, output: schema } },
+        },
+      }),
+      {
+        principalScope: 'fixture',
+        agent: { ...fixture.agent, entry: parallel ? 'fanout' : 'chain' },
+        confirmations: confirmationsFor(['notes.write@1'], 'workflow-replacement-v1'),
+        recovery,
+        services: { checkpoints, chatModels: { mock: model } },
+        models: {
+          providers: {
+            mock: {
+              destination: 'in-browser',
+              modality: 'text',
+              languages: ['en'],
+              features: ['tool-calling', 'streaming'],
+              pricing: { inputPerToken: 0, outputPerToken: 0 },
+            },
+          },
+          roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
+        },
+        bindings: {
+          'notes.write@1': {
+            kind: 'write',
+            destination: 'in-browser',
+            timeoutMs: holdWrite ? 60000 : 1000,
+            concurrency: 2,
+            grantScope: 'instance',
+            approval: 'confirm',
+            retry: 'none',
+            async invoke(input: { value: number }) {
+              invoked.push(input.value);
+              if (holdWrite && input.value === 2) {
+                writeStarted.resolve();
+                await heldWrite.promise;
+              }
+              return input;
+            },
+          },
+        },
+      },
+    );
+    await instance.prepare();
+    stop = autoApprove(instance);
+    const outputs: unknown[] = [],
+      errors: string[] = [];
+    for (let attempt = 0; attempt < (retry ? 2 : 1); attempt++) {
+      const { runId } = await instance.start({ prompt: 'run the stages' });
+      const events: RunEvent[] = [];
+      for await (const event of instance.events(runId)) events.push(event);
+      for (const event of events) {
+        if (event.type === 'output') outputs.push(event.output);
+        if (event.type === 'error') errors.push(event.error.code);
+      }
+      timeline.push({
+        attempt,
+        events: events.map((event) =>
+          event.type === 'error'
+            ? { type: event.type, code: event.error.code }
+            : { type: event.type },
+        ),
+        invoked: [...invoked],
+        statuses: [...recovery.journal.values()].map((record) => record.status),
+      });
+      if (holdWrite && attempt === 0) heldWrite.resolve();
+      if (retry && attempt === 0) {
+        expect(checkpoints.rows.size).toBe(0);
+        if (!holdWrite) {
+          const message = `Receipt barrier requires both write receipts: ${JSON.stringify(timeline)}`;
+          expect([...invoked].sort(), message).toEqual([1, 2]);
+          expect(
+            [...recovery.journal.values()].map((record) => record.status),
+            message,
+          ).toEqual(['succeeded', 'succeeded']);
+        }
+      }
+    }
+    const message = JSON.stringify(
+      { timeline, diagnostics, workerErrors: fixture.workerErrors },
+      (_key, value: unknown) =>
+        value instanceof Error ? { name: value.name, message: value.message } : value,
+    );
+    if (holdWrite) {
+      expect(errors, message).toEqual(['unavailable', 'outcome_unknown']);
+      expect([...invoked].sort()).toEqual([1, 2]);
+      expect(fixture.workerErrors).toEqual([]);
+      return;
+    }
+    expect(errors, message).toEqual(oracle.errors);
+    expect(outputs).toEqual(oracle.outputs);
+    expect(invoked.sort()).toEqual(oracle.invoked);
+    expect(invoked).toEqual([1, 2]);
+    expect(recovery.journal.size).toBe(2);
+    renumberPerAgent(script.requests);
+    expect(requestDigests(script.requests)).not.toEqual(requestDigests(oracle.requests));
+    const first = (requests: Request[]): Request => {
+      const candidates = requests.filter((request) => request.agent === 'b');
+      const picked = candidates.sort(
+        (left, right) => left.messages.length - right.messages.length,
+      )[0];
+      if (!picked) throw new Error('The downstream stage was not requested.');
+      return picked;
+    };
+    const nativeB = first(oracle.requests),
+      hostedB = first(script.requests);
+    expect(nativeB.messages).toEqual([
+      { role: 'system', content: 'Answer as b.' },
+      { role: 'user', content: 'a done' },
+    ]);
+    expect(hostedB.messages[0]).toEqual({
+      role: 'system',
+      content: 'Answer as b.\n\nYou are an agent. Your internal name is "b".',
+    });
+    expect(hostedB.messages[1]).toEqual({ role: 'user', content: 'run the stages' });
+    expect(hostedB.messages).toHaveLength(parallel ? 3 : 5);
+    expect(hostedB.messages.slice(2).every((message) => message.role === 'user')).toBe(true);
+    expect(hostedB.messages.at(-1)?.content).toMatch(/a done\n<<<END_QUOTED_AGENT_CONTENT>>>$/);
+    expect(hostedB.tools).toEqual(nativeB.tools);
+    expect(fixture.workerErrors).toEqual([]);
+  } finally {
+    recovery.clear();
+    heldWrite.resolve();
+    stop();
+    await runtime.dispose();
+    await fixture.cleanup();
+  }
+}
+
 for (const parallel of [false, true]) {
   for (const retry of [false, true]) {
     test.skipIf(!pythonWheelsAvailable)(
       `Workflow replacement measures request divergence and write replay (${parallel ? 'fanout' : 'chain'}, ${retry ? 'retry' : 'normal'})`,
       async () => {
-        const oracle = native[`${parallel ? 'True' : 'False'}-${retry ? 'True' : 'False'}`];
-        if (!oracle) throw new Error('The native Workflow observation is missing.');
-        const fixture = await createPythonFixture({
-          framework: 'adk',
-          module: 'replacement',
-          sources: { 'replacement.py': source },
-        });
-        const script: Script = { parallel, fail: retry, requests: [] };
-        const model = new StageModel(script);
-        const invoked: number[] = [];
-        const checkpoints = new MemoryByteCheckpoints();
-        const recovery = new MemoryRecoveryStore();
-        const runtime = createRuntime({
-          appId: 'workflow-replacement',
-          executors: [createPyodideAdapter({ ...fixture.options, framework: 'adk' })],
-          budgets: { steps: 20, toolCalls: 10, tokens: 5000 },
-          outputSafety: () => 'allow',
-        });
-        let stop = (): void => {};
-        try {
-          const schema = z.object({ value: z.number().int() });
-          const instance = await runtime.create(
-            defineAgentDefinition({
-              id: 'tests/workflow-replacement',
-              version: '1.0.0',
-              executor: 'adk-python',
-              input: z.object({ prompt: z.string() }),
-              models: {
-                answer: { modality: 'text', languages: ['en'], defaultPolicy: 'local-only' },
-              },
-              capabilities: {
-                required: { 'notes.write@1': { kind: 'write', input: schema, output: schema } },
-              },
-            }),
-            {
-              principalScope: 'fixture',
-              agent: { ...fixture.agent, entry: parallel ? 'fanout' : 'chain' },
-              confirmations: confirmationsFor(['notes.write@1'], 'workflow-replacement-v1'),
-              recovery,
-              services: { checkpoints, chatModels: { mock: model } },
-              models: {
-                providers: {
-                  mock: {
-                    destination: 'in-browser',
-                    modality: 'text',
-                    languages: ['en'],
-                    features: ['tool-calling', 'streaming'],
-                    pricing: { inputPerToken: 0, outputPerToken: 0 },
-                  },
-                },
-                roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
-              },
-              bindings: {
-                'notes.write@1': {
-                  kind: 'write',
-                  destination: 'in-browser',
-                  timeoutMs: 1000,
-                  concurrency: 2,
-                  grantScope: 'instance',
-                  approval: 'confirm',
-                  retry: 'none',
-                  async invoke(input: { value: number }) {
-                    invoked.push(input.value);
-                    return input;
-                  },
-                },
-              },
-            },
-          );
-          await instance.prepare();
-          stop = autoApprove(instance);
-          const outputs: unknown[] = [],
-            errors: string[] = [];
-          for (let attempt = 0; attempt < (retry ? 2 : 1); attempt++) {
-            const { runId } = await instance.start({ prompt: 'run the stages' });
-            const events: RunEvent[] = [];
-            for await (const event of instance.events(runId)) events.push(event);
-            for (const event of events) {
-              if (event.type === 'output') outputs.push(event.output);
-              if (event.type === 'error') errors.push(event.error.code);
-            }
-            if (retry && attempt === 0) expect(checkpoints.rows.size).toBe(0);
-          }
-          expect(errors).toEqual(oracle.errors);
-          expect(outputs).toEqual(oracle.outputs);
-          expect(invoked.sort()).toEqual(oracle.invoked);
-          expect(invoked).toEqual([1, 2]);
-          expect(recovery.journal.size).toBe(2);
-          renumberPerAgent(script.requests);
-          expect(requestDigests(script.requests)).not.toEqual(requestDigests(oracle.requests));
-          const first = (requests: Request[]): Request => {
-            const candidates = requests.filter((request) => request.agent === 'b');
-            const picked = candidates.sort(
-              (left, right) => left.messages.length - right.messages.length,
-            )[0];
-            if (!picked) throw new Error('The downstream stage was not requested.');
-            return picked;
-          };
-          const nativeB = first(oracle.requests),
-            hostedB = first(script.requests);
-          expect(nativeB.messages).toEqual([
-            { role: 'system', content: 'Answer as b.' },
-            { role: 'user', content: 'a done' },
-          ]);
-          expect(hostedB.messages[0]).toEqual({
-            role: 'system',
-            content: 'Answer as b.\n\nYou are an agent. Your internal name is "b".',
-          });
-          expect(hostedB.messages[1]).toEqual({ role: 'user', content: 'run the stages' });
-          expect(hostedB.messages).toHaveLength(parallel ? 3 : 5);
-          expect(hostedB.messages.slice(2).every((message) => message.role === 'user')).toBe(true);
-          expect(hostedB.messages.at(-1)?.content).toMatch(
-            /a done\n<<<END_QUOTED_AGENT_CONTENT>>>$/,
-          );
-          expect(hostedB.tools).toEqual(nativeB.tools);
-          expect(fixture.workerErrors).toEqual([]);
-        } finally {
-          stop();
-          await runtime.dispose();
-          await fixture.cleanup();
-        }
+        await runWorkflowReplacement({ parallel, retry });
       },
       900000,
     );
   }
 }
+
+test.skipIf(!pythonWheelsAvailable)(
+  'Workflow replacement retry race control reports an in-flight write as outcome_unknown',
+  async () => {
+    await runWorkflowReplacement({ parallel: true, retry: true, holdWrite: true });
+  },
+  900000,
+);
