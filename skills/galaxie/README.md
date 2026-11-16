@@ -57,8 +57,13 @@ partial installation; fix the cause and rerun with `--replace-skill`.
 Node scratch-app tests compare instruction bytes before and after installation,
 verify both copies against the source and cover mismatch, replacement and symlink
 refusals without a network. The skill's version is checked against core in tests.
+The [Next.js App Router guide](../../docs/guides/nextjs.md) and
+[reference](references/nextjs.md) cover the workspace mock example in Chromium on
+Next 16.4.6, with webpack production enforcement and report-only development.
+The reference is copied with all common references; read it only for a Next host.
 No agent has been measured consuming this skill. Release-tag installation, Windows,
-Node below 22.18 and Next.js integration are unmeasured. Package-manager installs
+Node below 22.18, installation into a Next app and real-agent use there remain
+unmeasured. Package-manager installs
 are irrelevant to this file-copy installer.
 
 Maintainers refresh citations only after reviewing the changed rules:

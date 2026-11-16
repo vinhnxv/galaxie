@@ -1,0 +1,37 @@
+{
+  "name": "@galaxie-ai/example-nextjs-app-router",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Client-only mock agents in the Next.js App Router.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "build": "NEXT_TELEMETRY_DISABLED=1 next build --webpack",
+    "start": "NEXT_TELEMETRY_DISABLED=1 next start",
+    "pretest": "pnpm --workspace-root run build:packages && pnpm --workspace-root exec tsc -p packages/adapter-adk/tsconfig.build.json",
+    "test": "NEXT_TELEMETRY_DISABLED=1 vitest run"
+  },
+  "dependencies": {
+    "@galaxie-ai/adapter-adk": "workspace:*",
+    "@galaxie-ai/adapter-langgraph": "workspace:*",
+    "@galaxie-ai/core": "workspace:*",
+    "@galaxie-ai/models": "workspace:*",
+    "@galaxie-ai/react": "workspace:*",
+    "@google/adk": "2.3.0",
+    "@langchain/core": "1.2.20",
+    "@langchain/langgraph": "1.5.1",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@typescript/typescript6": "6.0.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "playwright": "1.64.1",
+    "vitest": "5.0.5"
+  }
+}

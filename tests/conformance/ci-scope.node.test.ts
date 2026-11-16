@@ -20,6 +20,7 @@ test('a change confined to documents, Go and unrelated packages skips the Python
       'tests/conformance/golden-adk-go/parallel.json',
       'tests/conformance/adk-go-restore.node.test.ts',
       'examples/host-local/src/main.ts',
+      'examples/nextjs-app-router/src/host.tsx',
       'llms.txt',
     ]),
   ).toBe(false);

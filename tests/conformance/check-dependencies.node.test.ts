@@ -969,3 +969,14 @@ test.each([
   expect(result.status).toBe(1);
   expect(result.output).toContain('adapters must not import starter-python');
 });
+
+test.each([
+  ['examples/nextjs-app-router/src/adk-js/agent.ts', '@google/adk', 0],
+  ['examples/nextjs-app-router/next.config.ts', '@google/adk', 1],
+  ['examples/nextjs-app-router/src/host.tsx', '@google/adk', 1],
+  ['examples/nextjs-app-router/src/adk-js/agent.ts', '@google/adk/tools/mcp', 1],
+  ['examples/nextjs-app-router-other/src/adk-js/agent.ts', '@google/adk', 1],
+  ['examples/nextjs-app-router/.next-test/a/chunk.js', '@google/adk', 0],
+])('scopes the Next example ADK scan allowance to %s (%s)', (path, specifier, status) => {
+  expect(run({ [path]: adk(specifier) }).status).toBe(status);
+});

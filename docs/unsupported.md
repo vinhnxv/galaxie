@@ -134,6 +134,10 @@ One recipe and executor are active per page load. Switching aborts and disposes 
 
 The loan's displayed decision comes only from its pending confirmation or finalize receipt; a text-only completion is undecided. Approval is followed by a separate broker finalization prompt. Scoped IndexedDB checkpoints and recovery restore a paused loan, and Start over deletes that session. Visible answer text and the other recipes do not restore. Fixture decision records remain host-memory data; this supplies no lending backend or cross-device resume. Reconciliation limits are listed under [storage and recovery](#storage-and-recovery).
 
+## Next.js example
+
+The [Next.js App Router example](../examples/nextjs-app-router/README.md) and [guide](guides/nextjs.md) are checked on the mock in Chromium with Next 16.4.6 only. A Turbopack production build does not meet the Trusted Types obligation until [vercel/next.js#101261](https://github.com/vercel/next.js/issues/101261) is fixed, so `next build --webpack` is the only documented production build. Go and Python agents in Next are described through a `public/` asset copy and are unverified. Other Next versions, Firefox and WebKit, real models and devices, and hosted deployment platforms are unmeasured. A statically prerendered page cannot receive the per-request nonce, so every page that hosts galaxie, including the 404 page, must render dynamically.
+
 ## Platforms and evidence
 
 - Mobile devices, other GPUs and other OS/device combinations have no real-device evidence in the published matrix ([untested configurations](device-matrix.md#untested-or-unmeasured)). Firefox and Safari have mock-model runs and one short real-model probe each on the maintainer's Mac, but the Financial advisor (ADK JavaScript) recipe did not complete on either, and neither has a tool-call or WASM-backend run ([matrix](device-matrix.md#real-device-demonstrations)); Firefox and WebKit pass every mock-model CI case apart from four skipped ones ([results](device-matrix.md#mock-model-runs-on-firefox-and-webkit)).

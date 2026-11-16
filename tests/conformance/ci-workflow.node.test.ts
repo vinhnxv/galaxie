@@ -105,7 +105,25 @@ test('scope exposes create and both early exits conservatively enable both job g
   expect(block).toContain('node scripts/ci-scope.ts | tee -a "$GITHUB_OUTPUT"');
 });
 
-test('the final ci gate depends on every other job, including create-clean', () => {
+test('nextjs runs the example unconditionally with Chromium and pinned external actions', () => {
+  const block = job('nextjs');
+  expect(block).toContain('runs-on: ubuntu-24.04');
+  expect(block).toContain('timeout-minutes: 45');
+  expect(block).not.toMatch(/^ {4}(?:if|needs):/m);
+  expect(block).toContain('persist-credentials: false');
+  const actions = [...block.matchAll(/^\s+(?:- )?uses: (.+)$/gm)].map((match) => match[1]);
+  expect(actions.length).toBeGreaterThan(0);
+  for (const action of actions) {
+    if (action?.startsWith('./')) continue;
+    expect(action).toMatch(/^[\w./-]+@[a-f0-9]{40} # v\S+$/);
+  }
+  expect(block).toContain('uses: ./.github/actions/setup');
+  expect(block).toContain('browser: "true"');
+  expect(block).not.toMatch(/^\s+(?:go|python):/m);
+  expect(block).toContain('run: pnpm --filter @galaxie-ai/example-nextjs-app-router test');
+});
+
+test('the final ci gate depends on every other job, including create-clean and nextjs', () => {
   const needs = /^ {4}needs:\s*\[([^\]]+)\]/m.exec(job('ci'))?.[1];
   expect(needs).toBeDefined();
   const dependencies =
@@ -114,5 +132,6 @@ test('the final ci gate depends on every other job, including create-clean', () 
       .map((name) => name.trim())
       .filter(Boolean) ?? [];
   expect(dependencies).toContain('create-clean');
+  expect(dependencies).toContain('nextjs');
   expect(dependencies.sort()).toEqual([...jobs.keys()].filter((name) => name !== 'ci').sort());
 });

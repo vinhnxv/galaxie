@@ -578,7 +578,13 @@ function sourceFilesOutsideDependencies(directory: string, includeDist: boolean)
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
       if (path === join('packages', 'create', '.cache')) return [];
-      if (entry.name === 'node_modules' || (entry.name === 'dist' && !includeDist)) return [];
+      if (
+        entry.name === 'node_modules' ||
+        (entry.name.startsWith('.next') &&
+          path.startsWith(join('examples', 'nextjs-app-router'))) ||
+        (entry.name === 'dist' && !includeDist)
+      )
+        return [];
       return sourceFilesOutsideDependencies(path, includeDist);
     }
     return entry.isFile() && /\.[cm]?[jt]sx?$/.test(entry.name) ? [path] : [];
@@ -597,6 +603,8 @@ for (const root of ['examples', 'templates', 'tests', 'scripts', 'packages']) {
         (file.startsWith('templates/frameworks/adk-js/') ||
           file.startsWith('packages/create/dist/templates/frameworks/adk-js/'))
       )
+        continue;
+      if (match[1] === '@google/adk' && file.startsWith('examples/nextjs-app-router/src/adk-js/'))
         continue;
       if (match[1] === '@google/adk' && file.startsWith('examples/adk-recipes/src/recipes/'))
         continue;

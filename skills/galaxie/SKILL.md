@@ -13,6 +13,7 @@ Read the references present in this skill's `references/` directory for the
 project's kind and framework. An existing app may have several; follow only the
 ones matching its actual host and executor. Read
 [host integration](references/host-integration.md) when changing host wiring.
+For a Next.js App Router host, also read [Next.js](references/nextjs.md).
 
 ## Baseline to preserve
 

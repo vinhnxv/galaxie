@@ -125,8 +125,10 @@ Generated manifests retain `license: Apache-2.0` and the starter SPDX headers.
 All eight kind/framework combinations add `AGENTS.md` with one versioned managed
 block under 8192 bytes, `CLAUDE.md` containing exactly `@AGENTS.md` and a newline,
 and matching real-file skill copies in `.agents/skills/galaxie` and
-`.claude/skills/galaxie`. Each copy contains `SKILL.md`, common host guidance and
-only the selected kind and framework references. The block includes the baseline
+`.claude/skills/galaxie`. Each copy contains `SKILL.md`, all common references
+(including host integration and the host-scoped Next.js reference), and only the
+selected kind and framework references. Follow only references matching the
+actual host and executor; these starters remain Vite apps. The block includes the baseline
 do-and-never rules, supported shapes and verification commands. No existing
 project source, CSP or Trusted Types output changes.
 

@@ -243,6 +243,7 @@ const config: ViteUserConfig = defineConfig({
             ],
             [
               ...configDefaults.exclude,
+              'examples/nextjs-app-router/**',
               'packages/storage-indexeddb/test/schema.test.ts',
               'packages/storage-indexeddb/test/saver.test.ts',
               'tests/conformance/indexeddb.test.ts',
@@ -353,6 +354,7 @@ const config: ViteUserConfig = defineConfig({
                 ...(pythonStarter
                   ? []
                   : ['../../packages/create/.cache/composed/*-langgraph-python/test/**/*.test.ts']),
+                '../../examples/nextjs-app-router/**',
                 '**/*.node.test.ts',
                 '../../packages/adapter-kit/test/**/*.node.test.ts',
                 '../../packages/ui-protocol/test/**/*.node.test.ts',

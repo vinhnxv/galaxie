@@ -17,7 +17,7 @@ const independent: readonly RegExp[] = [
   /^packages\/starter-go\//,
   /^packages\/tools-mcp\//,
   /^packages\/eslint-plugin\//,
-  /^examples\/(?:host-local|host-remote|mcp-server|english-tutor)\//,
+  /^examples\/(?:host-local|host-remote|mcp-server|english-tutor|nextjs-app-router)\//,
   /^tests\/conformance\/.*adk-go/,
 ];
 

@@ -130,6 +130,37 @@ test('passes on the tracked repository documentation', () => {
   });
 });
 
+test('the Next.js reference absolute repository links resolve, including heading anchors', () => {
+  const repo = fileURLToPath(new URL('../..', import.meta.url));
+  const prefix = 'https://github.com/vinhnxv/galaxie/blob/main/';
+  const source = readFileSync(join(repo, 'skills/galaxie/references/nextjs.md'), 'utf8');
+  const targets = [...source.matchAll(/\]\((https:\/\/[^\s)]+)\)/g)].map((match) => {
+    const url = match[1]!;
+    expect(url).toMatch(/^https:\/\/github\.com\/vinhnxv\/galaxie\/blob\/main\//);
+    return url.slice(prefix.length);
+  });
+  expect(targets.length).toBeGreaterThan(0);
+  expect(targets.some((target) => target.startsWith('docs/guides/nextjs.md#'))).toBe(true);
+  const linksOnly = source.replaceAll(prefix, '').replace(/^<!-- galaxie:cite .+ -->$/gm, '');
+  const root = fixture({ 'reference.md': linksOnly });
+  for (const target of targets) {
+    const path = target.split('#')[0]!;
+    const destination = join(root, path);
+    mkdirSync(dirname(destination), { recursive: true });
+    // Untracked targets are read for anchors, without scanning their outgoing links.
+    writeFileSync(destination, readFileSync(join(repo, path)));
+  }
+  expect(run(root)).toEqual({ status: 0, output: '' });
+  const anchored = targets.find((target) => target.includes('#'))!;
+  writeFileSync(
+    join(root, 'reference.md'),
+    linksOnly.replace(anchored, `${anchored}-missing-heading`),
+  );
+  const broken = run(root);
+  expect(broken.status).toBe(1);
+  expect(broken.output).toContain(`missing heading: ${anchored}-missing-heading`);
+});
+
 test.each([
   '[API [v1]](absent.md)',
   '[API](\nabsent.md\n)',
