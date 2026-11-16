@@ -30,7 +30,7 @@ After preparing nine npm tarballs, this real-network run exits 0 with a PATH
 containing only Node, npm and `sh` (no `python`, `python3` or `uv`):
 
 ```sh
-node scripts/verify-standalone.ts --framework langgraph-python --mode tarball --tarballs <tarballs> --json /tmp/galaxie-python-stage3b-network.json
+node scripts/verify-standalone.ts --framework langgraph-python --mode tarball --tarballs <tarballs> --json <result-file>
 ```
 
 | Kind / framework | Target Node | npm | Mode | Chromium | Result |

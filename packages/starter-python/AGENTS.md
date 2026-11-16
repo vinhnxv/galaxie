@@ -17,7 +17,7 @@ Preserve full wheel license texts and the certifi/orjson MPL-2.0 review flags.
 The limited same-name ormsgpack stand-in is not upstream: its license is to be
 confirmed by the maintainer. Never silently treat its serializer as compatible.
 Build test distributions only in owned temporary directories. Source hashing and
-framework overlays belong to the next implementation stage.
+the framework overlay live in `templates/frameworks/langgraph-python`.
 
 ## Never
 

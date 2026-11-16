@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -25,6 +27,14 @@ describe.skipIf(!hasStarterPython())('the composed LangGraph Python gateway star
     const fixture = await starterProject('gateway');
     const built = await buildProject(fixture, 'built');
     expect(built.status, built.output).toBe(0);
+    // The client drops the system role before the gateway sees it, so the request alone cannot show
+    // that a system prompt is set. Assert the agent sets one, then that the answer still arrives.
+    const graph = await readFile(
+      join(fixture.directory, 'python/agent/starter_agent/graph.py'),
+      'utf8',
+    );
+    expect(graph).toMatch(/SystemMessage\(\s*content="[^"]+"/);
+    expect(graph).toMatch(/model\.ainvoke\(\[\s*SystemMessage\(/);
     const previous = {
       PATH: process.env['PATH'],
       UPSTREAM_BASE_URL: process.env['UPSTREAM_BASE_URL'],

@@ -28,7 +28,7 @@ export function pythonFramework(projectDirectory: string): UserConfig {
       // Resolve lazily so the generated baseline check needs no private artifacts installed.
       const require = createRequire(join(projectDirectory, 'package.json'));
       const entry = require.resolve('@galaxie-ai/starter-python/build');
-      const { readManifest, verifyArtifact, invalidWheel } = (await import(
+      const { readManifest, invalidWheel } = (await import(
         pathToFileURL(entry).href
       )) as typeof import('@galaxie-ai/starter-python/build');
       const { lockedWheels, runtimeFiles } = (await import(
@@ -41,9 +41,17 @@ export function pythonFramework(projectDirectory: string): UserConfig {
         fileName: string,
         path: string,
         expected: { readonly bytes: number; readonly sha256: string },
+        failure: string = `The Python starter file could not be verified: ${fileName}.`,
       ): Promise<void> => {
-        await verifyArtifact(path, expected);
-        assets.push({ fileName, source: await readFile(path) });
+        // Hash the exact bytes that are emitted, so a file cannot change after verification.
+        const source = await readFile(path).catch(() => undefined);
+        if (
+          source === undefined ||
+          source.byteLength !== expected.bytes ||
+          createHash('sha256').update(source).digest('hex') !== expected.sha256
+        )
+          throw new Error(failure);
+        assets.push({ fileName, source });
       };
       const required = lockedWheels.filter(
         (wheel) => wheel.frameworks === undefined || wheel.frameworks.includes('langgraph'),
@@ -71,7 +79,12 @@ export function pythonFramework(projectDirectory: string): UserConfig {
       )
         throw new Error('The Python starter wheel inventory is invalid.');
       for (const wheel of manifest.wheels)
-        await add(`python/wheels/${wheel.file}`, join(dist, 'wheels', wheel.file), wheel);
+        await add(
+          `python/wheels/${wheel.file}`,
+          join(dist, 'wheels', wheel.file),
+          wheel,
+          invalidWheel(wheel.file),
+        );
       const pyodideVersion = '314.0.7';
       const runtime = dirname(require.resolve('pyodide/package.json'));
       const pkg = JSON.parse(await readFile(join(runtime, 'package.json'), 'utf8')) as {

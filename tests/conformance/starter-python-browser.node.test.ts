@@ -217,6 +217,41 @@ describe.skipIf(!available)('the composed LangGraph Python browser starter', () 
   );
 });
 
+describe.skipIf(!available)('runtime and notice verification', () => {
+  test.each(['notice', 'runtime-manifest-hash'])(
+    'a tampered %s fails the build by file name before any output',
+    async (kind) => {
+      const fixture = await starterProject();
+      const { manifest } = await buildStarterDistOnce();
+      const manifestPath = join(fixture.artifacts, 'dist/manifest.json');
+      let name: string;
+      if (kind === 'notice') {
+        name = 'NOTICE.txt';
+        const path = join(fixture.artifacts, 'dist/NOTICE.txt');
+        const bytes = await readFile(path);
+        bytes[0] = (bytes[0] ?? 0) ^ 1;
+        await writeFile(path, bytes);
+      } else {
+        const runtime = manifest.runtimeFiles[0];
+        if (runtime === undefined) throw new Error('The runtime inventory is empty.');
+        name = runtime.file;
+        const changed = {
+          ...manifest,
+          runtimeFiles: manifest.runtimeFiles.map((item) =>
+            item.file === runtime.file ? { ...item, sha256: 'f'.repeat(64) } : item,
+          ),
+        };
+        await writeFile(manifestPath, JSON.stringify(changed));
+      }
+      const built = await buildProject(fixture, 'refused');
+      expect(built.status).not.toBe(0);
+      expect(built.output).toContain(name);
+      expect(existsSync(built.directory)).toBe(false);
+    },
+    120_000,
+  );
+});
+
 async function sourceHash(directory: string): Promise<string> {
   const hash = createHash('sha256');
   const root = join(directory, 'python/agent');

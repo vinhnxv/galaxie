@@ -111,3 +111,41 @@ test('Python shards partition the Node inventory and keep composed browser files
   ).toBe(true);
   for (const file of starter) expect(file).not.toMatch(/\/app\.test\.ts$/);
 }, 60_000);
+
+test('the Python starter browser project runs in the Python groups only and never repeats a main browser file', () => {
+  const list = (group?: string): string[] => {
+    const env = { ...process.env };
+    if (group === undefined) delete env['GALAXIE_TEST_GROUP'];
+    else env['GALAXIE_TEST_GROUP'] = group;
+    const result = spawnSync(
+      process.execPath,
+      [
+        'node_modules/vitest/vitest.mjs',
+        'list',
+        '--project',
+        'python-starter-browser',
+        '--project',
+        'browser',
+        '--filesOnly',
+        '--json',
+      ],
+      { encoding: 'utf8', env },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    return (JSON.parse(result.stdout) as { file: string }[]).map(({ file }) =>
+      file.replaceAll('\\', '/'),
+    );
+  };
+  const starterFiles = (files: string[]): string[] =>
+    files.filter(
+      (file) => file.includes('-langgraph-python/test/') && file.endsWith('app.test.ts'),
+    );
+  const everything = list();
+  expect(starterFiles(everything)).toHaveLength(2);
+  expect(everything.length).toBe(new Set(everything).size);
+  const rest = list('python-rest');
+  expect(starterFiles(rest)).toHaveLength(2);
+  expect(rest.length).toBe(new Set(rest).size);
+  for (const group of ['general', 'python-dspy', 'python-pydantic', 'python-adk'])
+    expect(starterFiles(list(group)), group).toEqual([]);
+}, 120_000);

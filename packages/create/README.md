@@ -100,8 +100,9 @@ Prepare the wheel cache and run starter-python's complete prepack first, as its
 tarballs. The generated [Python workflow](../../templates/frameworks/langgraph-python/files/PYTHON.md)
 explains raw source edits, wheel/runtime verification and license limits. Building
 and previewing a generated project needs neither Python nor uv; its `dev` command
-builds and previews without HMR. Registry installs remain unsupported. Gateway
-acceptance and the standalone harness are tracked in the final implementation stage.
+builds and previews without HMR. Registry installs remain unsupported. Both kinds
+are covered by Chromium acceptance, and the standalone harness measurement is
+recorded in the standalone verification record.
 
 ## Layers and writes
 

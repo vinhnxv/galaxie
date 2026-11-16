@@ -183,6 +183,22 @@ const forGroup = (
 };
 
 /**
+ * The Python starter browser project holds only the composed Python starters' app tests. They boot
+ * Pyodide, so they run with the Python groups and never in `general` or a named shard, and its
+ * files never depend on the group's name terms: those would re-select the main browser project's
+ * Pyodide tests a second time.
+ */
+const forPythonStarterGroup = (
+  include: string[],
+  exclusions: string[],
+  prefix: string,
+): { include: string[]; exclude: string[] } => ({
+  include:
+    groupName === undefined || groupName === 'python' || groupName === 'python-rest' ? include : [],
+  exclude: [...exclusions, `${prefix}packages/create/.cache/composed/.*/**`],
+});
+
+/**
  * The browser project drives Chromium unless `GALAXIE_BROWSER` names another engine. The Firefox
  * and WebKit runs reuse the same cases to collect mock-model evidence; the Chromium run stays the
  * one that gates every change.
@@ -309,7 +325,7 @@ const config: ViteUserConfig = defineConfig({
             ...(pythonStarter ? { testTimeout: 120_000 } : {}),
             api: { host: '127.0.0.1', port: pythonStarter ? 63316 : 63315, strictPort: true },
             globalSetup: ['support/mcp-global.node.ts'],
-            ...forGroup(
+            ...(pythonStarter ? forPythonStarterGroup : forGroup)(
               pythonStarter
                 ? ['../../packages/create/.cache/composed/*-langgraph-python/test/**/*.test.ts']
                 : [
