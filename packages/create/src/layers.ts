@@ -18,6 +18,7 @@ export interface LayerManifest {
   json?: Record<string, JsonObject>;
   frameworks?: string[];
   workspace?: WorkspaceFragment;
+  pnpm?: { allowBuilds: Record<string, boolean> };
 }
 export interface Layer {
   manifest: LayerManifest;
@@ -28,7 +29,7 @@ export class LayerManifestError extends Error {}
 
 function invalid(reason: string): never {
   throw new LayerManifestError(
-    `Invalid layer manifest: ${reason}. Valid schema: 1; valid types: base, kind, framework; valid keys: schema, id, type, package, json, frameworks, workspace.`,
+    `Invalid layer manifest: ${reason}. Valid schema: 1; valid types: base, kind, framework; valid keys: schema, id, type, package, json, frameworks, workspace, pnpm.`,
   );
 }
 function strings(value: unknown): value is string[] {
@@ -36,7 +37,7 @@ function strings(value: unknown): value is string[] {
 }
 function validateManifest(value: unknown, id: string, type: LayerManifest['type']): LayerManifest {
   if (!isObject(value) || !isJson(value)) invalid('expected a JSON object');
-  const allowed = ['schema', 'id', 'type', 'package', 'json', 'frameworks', 'workspace'];
+  const allowed = ['schema', 'id', 'type', 'package', 'json', 'frameworks', 'workspace', 'pnpm'];
   if (Object.keys(value).some((key) => !allowed.includes(key))) invalid('unknown key');
   if (value['schema'] !== 1) invalid('unsupported schema');
   if (value['id'] !== id || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id))
@@ -66,6 +67,21 @@ function validateManifest(value: unknown, id: string, type: LayerManifest['type'
       if (!path.endsWith('.json') || path === 'package.json' || !isObject(patch))
         invalid('json targets must be JSON objects outside package.json');
     }
+  }
+  const pnpm = value['pnpm'];
+  if (pnpm !== undefined) {
+    if (
+      !isObject(pnpm) ||
+      Object.keys(pnpm).some((key) => key !== 'allowBuilds') ||
+      !isObject(pnpm['allowBuilds'])
+    )
+      invalid('pnpm requires an allowBuilds object');
+    for (const [name, allowed] of Object.entries(pnpm['allowBuilds']))
+      if (
+        !/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(name) ||
+        typeof allowed !== 'boolean'
+      )
+        invalid('pnpm allowBuilds requires package names and boolean decisions');
   }
   const workspace = value['workspace'];
   if (workspace !== undefined) {

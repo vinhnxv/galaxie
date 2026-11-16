@@ -291,3 +291,37 @@ test('npm tarball composition rewrites direct dependencies and overrides, and ot
       'Tarball mode supports npm only',
     );
 });
+
+test('pnpm build decisions merge deterministically and only pnpm emits their file', () => {
+  const layers = basic();
+  layers[0]!.manifest.pnpm = { allowBuilds: { protobufjs: false } };
+  layers[2]!.manifest.pnpm = { allowBuilds: { '@google/genai': false, protobufjs: false } };
+  const output = compose(layers, { ...options, packageManager: 'pnpm' });
+  expect(Buffer.from(output.files.get('pnpm-workspace.yaml')!.bytes).toString()).toBe(
+    "allowBuilds:\n  '@google/genai': false\n  protobufjs: false\n",
+  );
+  for (const packageManager of ['npm', 'yarn'] as const)
+    expect(compose(layers, { ...options, packageManager }).files.has('pnpm-workspace.yaml')).toBe(
+      false,
+    );
+  expect(
+    compose(basic(), { ...options, packageManager: 'pnpm' }).files.has('pnpm-workspace.yaml'),
+  ).toBe(false);
+  layers[2]!.manifest.pnpm.allowBuilds['protobufjs'] = true;
+  expect(() => compose(layers, { ...options, packageManager: 'pnpm' })).toThrow('protobufjs');
+});
+
+test.each([
+  { allowBuilds: { '../bad': false } },
+  { allowBuilds: { '@scope/name': 'false' } },
+  { allowBuilds: [] },
+  { unexpected: true },
+  { allowBuilds: { 'bad:name': false } },
+])('invalid pnpm build decisions are rejected: %j', async (pnpm) => {
+  const root = await fixture();
+  await writeFile(
+    join(root, 'base/layer.json'),
+    JSON.stringify({ schema: 1, id: 'base', type: 'base', package: {}, pnpm }),
+  );
+  await expect(loadLayers(root)).rejects.toBeInstanceOf(LayerManifestError);
+});

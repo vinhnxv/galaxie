@@ -84,3 +84,12 @@ after composing the cache, and `pnpm check` for repository validation.
 ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+
+Framework layers may declare `pnpm.allowBuilds`, a map of package names to boolean
+build-script decisions. Composition merges matching decisions and rejects conflicts.
+Only pnpm projects with decisions receive a sorted `pnpm-workspace.yaml`; other
+managers and the LangGraph layer emit no additional file. The ADK layer refuses
+scripts for `@google/genai`, `cpu-features`, `protobufjs` and `ssh2`, including the
+additional packages found by the plain-install probe. Automatic installs still use
+`--ignore-scripts`.

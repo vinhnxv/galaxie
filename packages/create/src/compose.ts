@@ -191,6 +191,21 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
       'package.json.overrides',
     );
   }
+  const allowBuilds = mergeFragments(
+    selected.map((layer) => ({
+      layer: layer.manifest.id,
+      value: layer.manifest.pnpm?.allowBuilds ?? {},
+    })),
+    'pnpm.allowBuilds',
+  );
+  if (options.packageManager === 'pnpm' && Object.keys(allowBuilds).length > 0) {
+    const rows = Object.keys(allowBuilds)
+      .sort()
+      .map(
+        (name) => `  ${name.startsWith('@') ? `'${name}'` : name}: ${String(allowBuilds[name])}`,
+      );
+    add('pnpm-workspace.yaml', Buffer.from(`allowBuilds:\n${rows.join('\n')}\n`), 'composer');
+  }
   add('package.json', jsonBytes(orderedPackage(manifest)), 'composer');
   if (options.mode === 'workspace-test') {
     if (options.workspaceRoot === undefined || !isAbsolute(options.workspaceRoot))

@@ -15,6 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
+import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
 import type { InstallCommand } from '../src/install.js';
 import { run } from '../src/main.js';
@@ -343,3 +344,25 @@ test('a dot target uses the current directory name and help performs no write', 
   ).toBe(0);
   expect(JSON.parse(await readFile(join(cwd, 'package.json'), 'utf8')).name).toBe('current-app');
 });
+
+test.each(['pnpm', 'npm', 'yarn', 'bun'])(
+  'the %s ADK CLI emits build decisions only for pnpm',
+  async (manager) => {
+    const { root } = await fixture();
+    const streams = output();
+    expect(
+      await run(['adk-app', 'browser-only', 'adk-js', '--no-install'], {
+        cwd: root,
+        templatesRoot: fileURLToPath(new URL('../../../templates', import.meta.url)),
+        ...streams,
+        env: { npm_config_user_agent: `${manager}/11` },
+      }),
+    ).toBe(0);
+    const yaml = join(root, 'adk-app/pnpm-workspace.yaml');
+    expect(existsSync(yaml)).toBe(manager === 'pnpm');
+    if (manager === 'pnpm')
+      expect(await readFile(yaml, 'utf8')).toBe(
+        "allowBuilds:\n  '@google/genai': false\n  cpu-features: false\n  protobufjs: false\n  ssh2: false\n",
+      );
+  },
+);
