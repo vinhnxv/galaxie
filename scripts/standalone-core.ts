@@ -200,12 +200,17 @@ interface Manifest {
 export function assertSingleCopies(
   lock: { packages?: Record<string, { resolved?: string }> },
   required: readonly string[],
+  framework = 'langgraph-js',
 ): void {
   const counts = new Map<string, number>();
   for (const [path, entry] of Object.entries(lock.packages ?? {})) {
     const name = /(?:^|\/)node_modules\/(@galaxie-ai\/[^/]+)$/.exec(path)?.[1];
     if (name === undefined) continue;
-    if (!launchPackages.includes(name) || !entry.resolved?.startsWith('file:'))
+    if (
+      (!launchPackages.includes(name) &&
+        !(framework === 'adk-js' && name === '@galaxie-ai/adapter-adk')) ||
+      !entry.resolved?.startsWith('file:')
+    )
       throw new Error(`Single-copy tarball check failed for ${name}.`);
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
@@ -544,6 +549,10 @@ export async function runStandalone(
       cwd: string,
       childEnv = env,
     ): Command => ({ executable, args, cwd, env: childEnv, signal });
+    const needsAdk = options.specs.some((spec) => spec.framework === 'adk-js');
+    const packedPackages = needsAdk
+      ? [...launchPackages, '@galaxie-ai/adapter-adk']
+      : launchPackages;
     let tarballs: string | undefined;
     let packError: unknown;
     if (options.modes.includes('tarball')) {
@@ -555,7 +564,15 @@ export async function runStandalone(
         } else {
           if (pnpm === undefined) throw new Error('Packing is impossible: pnpm unavailable.');
           await runner.run(command(pnpm, ['run', 'build:packages'], repo));
-          for (const name of launchPackages)
+          if (needsAdk)
+            await runner.run(
+              command(
+                pnpm,
+                ['exec', 'tsc', '-p', 'packages/adapter-adk/tsconfig.build.json'],
+                repo,
+              ),
+            );
+          for (const name of packedPackages)
             await runner.run(
               command(
                 pnpm,
@@ -565,7 +582,7 @@ export async function runStandalone(
             );
         }
         const filenames = await readdir(destination);
-        for (const name of launchPackages) {
+        for (const name of packedPackages) {
           const matches = filenames.filter(
             (file) => file.startsWith(`galaxie-ai-${name.split('/')[1]}-`) && file.endsWith('.tgz'),
           );
@@ -672,6 +689,7 @@ export async function runStandalone(
                   await readFile(join(project, 'package-lock.json'), 'utf8'),
                 ) as Parameters<typeof assertSingleCopies>[0],
                 required,
+                spec.framework,
               );
             }
             phase = 'build';

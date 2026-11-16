@@ -4,7 +4,7 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { Layer } from './layers.js';
 import { isObject, type JsonObject, mergeFragments } from './merge.js';
-import { knownPackages, type PackageManager, TarballError, type Tarballs } from './packages.js';
+import { type PackageManager, requiredPackages, TarballError, type Tarballs } from './packages.js';
 import { validateOutputPath, validateProjectName } from './paths.js';
 
 export interface ProjectFile {
@@ -162,7 +162,7 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
         'Tarball mode supports npm only; pnpm and yarn tarball installs are not proven.',
       );
     const overrides: JsonObject = {};
-    for (const name of knownPackages) {
+    for (const name of requiredPackages(options.framework)) {
       const path = options.tarballs.get(name);
       if (path === undefined || !isAbsolute(path))
         throw new TarballError(`Expected an absolute tarball path for ${name}.`);
@@ -190,6 +190,22 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
       ],
       'package.json.overrides',
     );
+  }
+  const allowBuilds = mergeFragments(
+    selected.map((layer) => ({
+      layer: layer.manifest.id,
+      value: layer.manifest.pnpm?.allowBuilds ?? {},
+    })),
+    'pnpm.allowBuilds',
+  );
+  if (options.packageManager === 'pnpm' && Object.keys(allowBuilds).length > 0) {
+    const rows = Object.keys(allowBuilds)
+      .sort()
+      .map(
+        (name) =>
+          `  ${/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name) && !/^(?:null|true|false|yes|no|on|off|y|n)$/i.test(name) ? name : `'${name.replaceAll("'", "''")}'`}: ${String(allowBuilds[name])}`,
+      );
+    add('pnpm-workspace.yaml', Buffer.from(`allowBuilds:\n${rows.join('\n')}\n`), 'composer');
   }
   add('package.json', jsonBytes(orderedPackage(manifest)), 'composer');
   if (options.mode === 'workspace-test') {

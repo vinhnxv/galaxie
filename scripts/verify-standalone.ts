@@ -8,6 +8,7 @@ import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone
 
 export interface Arguments {
   kind: 'browser-only' | 'gateway' | 'all';
+  framework: 'langgraph-js' | 'adk-js';
   nodes: NodeRequest[];
   mode: Mode | 'both';
   tarballs?: string;
@@ -18,6 +19,7 @@ export interface Arguments {
 }
 export const usage = `Usage: node scripts/verify-standalone.ts [options]
   --kind browser-only|gateway|all             (default all)
+  --framework langgraph-js|adk-js          (default langgraph-js; ADK is tarball-only)
   --node <major>[=/path/to/node]            (repeatable; default current)
   --mode registry|tarball|both              (default registry)
   --tarballs <directory>                   reuse seven packed launch packages
@@ -32,6 +34,7 @@ Chromium: pnpm exec playwright install chromium.`;
 export function parseArguments(args: readonly string[]): Arguments {
   const options: Arguments = {
     kind: 'all',
+    framework: 'langgraph-js',
     nodes: [],
     mode: 'registry',
     keep: false,
@@ -56,6 +59,10 @@ export function parseArguments(args: readonly string[]): Arguments {
       case '--kind':
         if (value !== 'all' && value !== 'browser-only' && value !== 'gateway') invalid();
         options.kind = value;
+        break;
+      case '--framework':
+        if (value !== 'langgraph-js' && value !== 'adk-js') invalid();
+        options.framework = value;
         break;
       case '--mode':
         if (value !== 'registry' && value !== 'tarball' && value !== 'both') invalid();
@@ -82,6 +89,7 @@ export function parseArguments(args: readonly string[]): Arguments {
         invalid();
     }
   }
+  if (!options.help && options.framework === 'adk-js' && options.mode !== 'tarball') invalid();
   if (options.nodes.length === 0)
     options.nodes.push({ major: Number(process.versions.node.split('.')[0]) });
   return options;
@@ -89,7 +97,7 @@ export function parseArguments(args: readonly string[]): Arguments {
 
 const vite = 'node_modules/vite/bin/vite.js';
 const tsc = 'node_modules/typescript/bin/tsc';
-export const templateSpecs: readonly TemplateSpec[] = [
+const langGraphSpecs: readonly TemplateSpec[] = [
   {
     name: 'browser-only-langgraph-js',
     kind: 'browser-only',
@@ -136,6 +144,22 @@ export const templateSpecs: readonly TemplateSpec[] = [
       { action: 'text', name: 'Replies are fixed sample text from a mock upstream.' },
     ],
   },
+];
+
+export const templateSpecs: readonly TemplateSpec[] = [
+  ...langGraphSpecs,
+  ...langGraphSpecs.map(
+    (spec): TemplateSpec => ({
+      ...spec,
+      name: `${spec.kind}-adk-js`,
+      framework: 'adk-js',
+      steps: spec.steps.map((step) =>
+        step.action === 'text' && step.name.startsWith('Correct. ')
+          ? { ...step, name: step.name.slice('Correct. '.length) }
+          : step,
+      ),
+    }),
+  ),
 ];
 
 export async function driveChromium(
@@ -282,7 +306,9 @@ if (import.meta.main) {
           nodes: options.nodes,
           modes: options.mode === 'both' ? ['registry', 'tarball'] : [options.mode],
           specs: templateSpecs.filter(
-            (spec) => options.kind === 'all' || spec.kind === options.kind,
+            (spec) =>
+              spec.framework === options.framework &&
+              (options.kind === 'all' || spec.kind === options.kind),
           ),
           ...(options.tarballs === undefined ? {} : { tarballs: options.tarballs }),
           ...(options.exclude === undefined ? {} : { exclude: options.exclude }),

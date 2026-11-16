@@ -324,6 +324,8 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
   expect(templateSpecs.map(({ name, kind, framework }) => ({ name, kind, framework }))).toEqual([
     { name: 'browser-only-langgraph-js', kind: 'browser-only', framework: 'langgraph-js' },
     { name: 'gateway-langgraph-js', kind: 'gateway', framework: 'langgraph-js' },
+    { name: 'browser-only-adk-js', kind: 'browser-only', framework: 'adk-js' },
+    { name: 'gateway-adk-js', kind: 'gateway', framework: 'adk-js' },
   ]);
   expect(templateSpecs[0]?.steps).toEqual([
     { action: 'check', role: 'radio', name: '4' },
@@ -1153,3 +1155,60 @@ it.each([true, false])(
     }
   },
 );
+
+it('selects the ADK tarball matrix and refuses registry or unknown frameworks', () => {
+  expect(parseArguments(['--framework', 'adk-js', '--mode', 'tarball'])).toMatchObject({
+    framework: 'adk-js',
+    mode: 'tarball',
+  });
+  expect(parseArguments([]).framework).toBe('langgraph-js');
+  for (const mode of ['registry', 'both'])
+    expect(() => parseArguments(['--framework', 'adk-js', '--mode', mode])).toThrow('Usage');
+  expect(() => parseArguments(['--framework', 'unknown'])).toThrow('Usage');
+});
+
+it('pins the ADK drive strings to each composed framework export', async () => {
+  for (const kind of ['browser-only', 'gateway']) {
+    const executor = await import(
+      new URL(
+        `../../packages/create/.cache/composed/${kind}-adk-js/src/executor.ts`,
+        import.meta.url,
+      ).href
+    );
+    const spec = templateSpecs.find((spec) => spec.kind === kind && spec.framework === 'adk-js');
+    const original = templateSpecs.find(
+      (spec) => spec.kind === kind && spec.framework === 'langgraph-js',
+    );
+    const reply = kind === 'browser-only' ? executor.mockReply : executor.gatewayReply;
+    expect(spec?.steps).toEqual(
+      original?.steps.map((step) =>
+        step.action === 'text' && step.name.startsWith('Correct. ')
+          ? { ...step, name: executor.expectedResult(reply) }
+          : step,
+      ),
+    );
+    expect(spec?.server).toEqual(original?.server);
+  }
+});
+
+it('allows only the ADK extra package in ADK single-copy checks', () => {
+  const packages = { 'node_modules/@galaxie-ai/adapter-adk': { resolved: 'file:/tmp/adk.tgz' } };
+  expect(() =>
+    assertSingleCopies({ packages }, ['@galaxie-ai/adapter-adk'], 'adk-js'),
+  ).not.toThrow();
+  expect(() => assertSingleCopies({ packages }, ['@galaxie-ai/adapter-adk'])).toThrow(
+    'Single-copy',
+  );
+  expect(() =>
+    assertSingleCopies(
+      {
+        packages: {
+          ...packages,
+          'node_modules/@galaxie-ai/adapter-go': { resolved: 'file:/tmp/go.tgz' },
+        },
+      },
+      ['@galaxie-ai/adapter-adk'],
+      'adk-js',
+    ),
+  ).toThrow('Single-copy');
+});

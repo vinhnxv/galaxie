@@ -51,10 +51,14 @@ async function assertCache(
   }
 }
 
-test.each(['browser-only', 'gateway'])(
-  '%s composed cache exactly matches the current layers',
-  async (kind) => {
-    const directory = join(cache, 'composed', kind + '-langgraph-js');
+test.each(
+  ['browser-only', 'gateway'].flatMap((kind) =>
+    ['langgraph-js', 'adk-js'].map((framework) => ({ kind, framework })),
+  ),
+)(
+  '$kind-$framework composed cache exactly matches the current layers',
+  async ({ kind, framework }) => {
+    const directory = join(cache, 'composed', kind + '-' + framework);
     try {
       await lstat(directory);
     } catch {
@@ -63,8 +67,8 @@ test.each(['browser-only', 'gateway'])(
     const layers = await loadLayers(join(repo, 'templates'));
     const { files } = compose(layers, {
       kind,
-      framework: 'langgraph-js',
-      name: kind + '-langgraph-js',
+      framework,
+      name: kind + '-' + framework,
       mode: 'workspace-test',
       packageManager: 'npm',
       workspaceRoot: repo,

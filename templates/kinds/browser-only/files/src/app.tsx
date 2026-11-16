@@ -4,6 +4,7 @@
 import type { SessionId } from '@galaxie-ai/core';
 import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useState, useSyncExternalStore } from 'react';
+import { readResult, starterInput } from './executor.js';
 import { controlLabels, type ModelState, modelStates } from './model-state.js';
 import { sessionKey, type TemplateHost, type TemplateInstance } from './runtime.js';
 
@@ -54,9 +55,8 @@ function Question({
       void (async () => {
         for await (const event of instance.events(runId)) {
           if (!active) break;
-          if (event.type !== 'output' || typeof event.output !== 'object' || event.output === null)
-            continue;
-          const value = (event.output as Record<string, unknown>)['result'];
+          if (event.type !== 'output') continue;
+          const value = readResult(event.output);
           if (typeof value === 'string') setResult(value);
         }
       })();
@@ -104,14 +104,15 @@ export function App({ host }: { readonly host: TemplateHost }): ReactElement {
           else if (current.getSnapshot().run?.status === 'succeeded')
             sessionStorage.removeItem(sessionKey);
         });
-        const started = stored === null ? await current.start({}) : await current.restore();
+        const started =
+          stored === null ? await current.start(starterInput) : await current.restore();
         if (!active) {
           await current.dispose();
           return;
         }
         if (started === undefined) {
           sessionStorage.removeItem(sessionKey);
-          await current.start({});
+          await current.start(starterInput);
         }
         setInstance(current);
       } catch {

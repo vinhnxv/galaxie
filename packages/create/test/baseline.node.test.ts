@@ -96,13 +96,17 @@ function mutations(kind: string): readonly Mutation[] {
   ];
 }
 
-async function project(kind: string, mutation?: Mutation): Promise<string> {
+async function project(
+  kind: string,
+  mutation?: Mutation,
+  framework = 'langgraph-js',
+): Promise<string> {
   await mkdir(scratch, { recursive: true });
   const directory = await mkdtemp(join(scratch, `${kind}-`));
   try {
     const result = compose(await layers, {
       kind,
-      framework: 'langgraph-js',
+      framework,
       name: `${kind}-baseline`,
       mode: 'project',
       packageManager: 'npm',
@@ -133,25 +137,10 @@ async function project(kind: string, mutation?: Mutation): Promise<string> {
   }
 }
 
-for (const kind of ['browser-only', 'gateway']) {
-  it(`${kind} generated baseline accepts an unmodified project`, async () => {
-    const directory = await project(kind);
-    try {
-      const result = spawnSync(process.execPath, ['--test', 'check/baseline.check.ts'], {
-        cwd: directory,
-        encoding: 'utf8',
-        timeout: 30_000,
-      });
-      expect(result.error).toBeUndefined();
-      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
-  }, 60_000);
-
-  for (const mutation of mutations(kind)) {
-    it(`${kind} generated baseline rejects ${mutation.name}`, async () => {
-      const directory = await project(kind, mutation);
+for (const framework of ['langgraph-js', 'adk-js']) {
+  for (const kind of ['browser-only', 'gateway']) {
+    it(`${kind}-${framework} generated baseline accepts an unmodified project`, async () => {
+      const directory = await project(kind, undefined, framework);
       try {
         const result = spawnSync(process.execPath, ['--test', 'check/baseline.check.ts'], {
           cwd: directory,
@@ -159,11 +148,28 @@ for (const kind of ['browser-only', 'gateway']) {
           timeout: 30_000,
         });
         expect(result.error).toBeUndefined();
-        expect(result.status).not.toBe(0);
-        expect(`${result.stdout}\n${result.stderr}`).toContain(mutation.directive);
+        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       } finally {
         await rm(directory, { recursive: true, force: true });
       }
     }, 60_000);
+
+    for (const mutation of mutations(kind)) {
+      it(`${kind}-${framework} generated baseline rejects ${mutation.name}`, async () => {
+        const directory = await project(kind, mutation, framework);
+        try {
+          const result = spawnSync(process.execPath, ['--test', 'check/baseline.check.ts'], {
+            cwd: directory,
+            encoding: 'utf8',
+            timeout: 30_000,
+          });
+          expect(result.error).toBeUndefined();
+          expect(result.status).not.toBe(0);
+          expect(`${result.stdout}\n${result.stderr}`).toContain(mutation.directive);
+        } finally {
+          await rm(directory, { recursive: true, force: true });
+        }
+      }, 60_000);
+    }
   }
 }

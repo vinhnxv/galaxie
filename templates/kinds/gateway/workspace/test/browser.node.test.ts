@@ -12,6 +12,7 @@ import { devGatewayOptions } from '../server/dev.js';
 import { gatewayPlugin } from '../server/plugin.js';
 import { createAppHandler } from '../server/serve.js';
 import { cspHeader } from '../src/csp.js';
+import { expectedResult, gatewayReply } from '../src/executor.js';
 import { completion, harness, listen, post, token } from './support.node.js';
 
 const template = fileURLToPath(new URL('..', import.meta.url));
@@ -96,7 +97,7 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
     await page.getByRole('button', { name: 'Start with gateway', exact: true }).click();
     await page.getByRole('radio', { name: '4', exact: true }).check();
     await page.getByRole('button', { name: 'Submit answers', exact: true }).click();
-    await page.getByText('Correct. Keep practicing.', { exact: true }).waitFor();
+    await page.getByText(expectedResult('Keep practicing.'), { exact: true }).waitFor();
     expect(await page.getByRole('list', { name: 'Model destinations' }).textContent()).toContain(
       'Comment: Gateway (Host server)',
     );
@@ -150,9 +151,7 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
       await page.getByRole('button', { name: 'Start with gateway', exact: true }).click();
       await page.getByRole('radio', { name: '4', exact: true }).check();
       await page.getByRole('button', { name: 'Submit answers', exact: true }).click();
-      await page
-        .getByText('Correct. This is a fixed reply from the mock upstream.', { exact: true })
-        .waitFor();
+      await page.getByText(expectedResult(gatewayReply), { exact: true }).waitFor();
       await page
         .getByText('Replies are fixed sample text from a mock upstream.', { exact: true })
         .waitFor();

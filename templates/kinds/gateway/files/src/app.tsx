@@ -3,6 +3,7 @@
 
 import { AgentSurface, ModelRoutes, useAgentSnapshot } from '@galaxie-ai/react';
 import { type ReactElement, useEffect, useState, useSyncExternalStore } from 'react';
+import { readResult, starterInput } from './executor.js';
 import { type GatewayState, gatewayStates } from './gateway-state.js';
 import type { HybridHost, HybridInstance } from './runtime.js';
 
@@ -42,9 +43,8 @@ function Question({
       void (async () => {
         for await (const event of instance.events(runId)) {
           if (!active) break;
-          if (event.type !== 'output' || typeof event.output !== 'object' || event.output === null)
-            continue;
-          const value = (event.output as Record<string, unknown>)['result'];
+          if (event.type !== 'output') continue;
+          const value = readResult(event.output);
           if (typeof value === 'string') setResult(value);
         }
       })();
@@ -80,7 +80,7 @@ export function App({ host }: { readonly host: HybridHost }): ReactElement {
       try {
         next = await host.createInstance();
         await next.prepare();
-        await next.start({});
+        await next.start(starterInput);
         if (active) setInstance(next);
         else await next.dispose();
       } catch {

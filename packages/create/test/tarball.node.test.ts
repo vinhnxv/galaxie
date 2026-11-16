@@ -133,3 +133,62 @@ test.each(['pnpm', 'yarn'])(
     expect(existsSync(join(root, 'my-app'))).toBe(false);
   },
 );
+
+test('ADK tarballs add one adapter without changing the seven launch inventory', async () => {
+  const { root, packed } = await fixture();
+  await writeFile(join(packed, 'galaxie-ai-adapter-adk-0.0.0.tgz'), 'fixture');
+  expect((await resolveTarballs(packed)).size).toBe(7);
+  expect((await resolveTarballs(packed, 'adk-js')).size).toBe(8);
+  expect(
+    await run(['adk-app', 'browser-only', 'adk-js', '--no-install'], {
+      cwd: root,
+      templatesRoot,
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: 'npm/12' },
+    }),
+  ).toBe(0);
+  const manifest = JSON.parse(await readFile(join(root, 'adk-app/package.json'), 'utf8'));
+  expect(manifest.overrides).toEqual(
+    Object.fromEntries(
+      [...names, 'adapter-adk'].map((name) => [
+        '@galaxie-ai/' + name,
+        `file:${packed}/galaxie-ai-${name}-${name === 'adapter-adk' ? '0.0.0' : '0.1.0'}.tgz`,
+      ]),
+    ),
+  );
+  expect(
+    Object.fromEntries(
+      Object.entries(manifest.dependencies).filter(([name]) => name.startsWith('@galaxie-ai/')),
+    ),
+  ).toEqual({
+    '@galaxie-ai/adapter-adk': `file:${packed}/galaxie-ai-adapter-adk-0.0.0.tgz`,
+    '@galaxie-ai/core': `file:${packed}/galaxie-ai-core-0.1.0.tgz`,
+    '@galaxie-ai/models': `file:${packed}/galaxie-ai-models-0.1.0.tgz`,
+    '@galaxie-ai/react': `file:${packed}/galaxie-ai-react-0.1.0.tgz`,
+    '@galaxie-ai/storage-indexeddb': `file:${packed}/galaxie-ai-storage-indexeddb-0.1.0.tgz`,
+  });
+});
+
+test.each(['missing', 'duplicate'])(
+  'an %s ADK tarball fails before writing only for ADK',
+  async (problem) => {
+    const { root, packed } = await fixture();
+    if (problem === 'duplicate') {
+      await writeFile(join(packed, 'galaxie-ai-adapter-adk-0.0.0.tgz'), 'fixture');
+      await writeFile(join(packed, 'galaxie-ai-adapter-adk-0.0.1.tgz'), 'fixture');
+    }
+    expect((await resolveTarballs(packed)).size).toBe(7);
+    await expect(resolveTarballs(packed, 'adk-js')).rejects.toThrow('@galaxie-ai/adapter-adk');
+    expect(
+      await run(['adk-app', 'gateway', 'adk-js', '--no-install'], {
+        cwd: root,
+        templatesRoot,
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: 'npm/12' },
+      }),
+    ).toBe(1);
+    expect(existsSync(join(root, 'adk-app'))).toBe(false);
+  },
+);

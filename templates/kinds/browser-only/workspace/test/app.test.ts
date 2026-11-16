@@ -8,6 +8,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { App } from '../src/app.js';
+import { expectedResult, mockReply } from '../src/executor.js';
 import { modelStates } from '../src/model-state.js';
 import {
   createTemplateHost,
@@ -115,11 +116,7 @@ async function completeQuestion(): Promise<void> {
   await act(async () => button('Submit answers').click());
   await waitForRunStatus('succeeded');
   await act(async () => {});
-  await shown(
-    () =>
-      container?.textContent?.includes('Correct. Keep practicing one small step at a time.') ===
-      true,
-  );
+  await shown(() => container?.textContent?.includes(expectedResult(mockReply)) === true);
   expect(container?.textContent).toContain('Comment: Mock (In browser)');
 }
 
@@ -222,7 +219,7 @@ it('selects WebLLM only after a successful opted-in load and removes the control
   await waitForRunStatus('succeeded');
   await act(async () => {});
   await shown(
-    () => container?.textContent?.includes('Correct. A local encouraging comment.') === true,
+    () => container?.textContent?.includes(expectedResult('A local encouraging comment.')) === true,
   );
   expect(container?.textContent).toContain('Comment: WebLLM (In browser)');
 });

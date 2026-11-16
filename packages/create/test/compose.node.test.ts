@@ -291,3 +291,59 @@ test('npm tarball composition rewrites direct dependencies and overrides, and ot
       'Tarball mode supports npm only',
     );
 });
+
+test('pnpm build decision keys that YAML would read as non-strings are quoted', () => {
+  const layers = basic();
+  layers[0]!.manifest.pnpm = {
+    allowBuilds: { yes: false, null: false, '1.x': false, plain: false },
+  };
+  const output = compose(layers, { ...options, packageManager: 'pnpm' });
+  expect(Buffer.from(output.files.get('pnpm-workspace.yaml')!.bytes).toString()).toBe(
+    "allowBuilds:\n  '1.x': false\n  'null': false\n  plain: false\n  'yes': false\n",
+  );
+});
+
+test('pnpm build decisions merge deterministically and only pnpm emits their file', () => {
+  const layers = basic();
+  layers[0]!.manifest.pnpm = { allowBuilds: { protobufjs: false } };
+  layers[2]!.manifest.pnpm = { allowBuilds: { '@google/genai': false, protobufjs: false } };
+  const output = compose(layers, { ...options, packageManager: 'pnpm' });
+  expect(Buffer.from(output.files.get('pnpm-workspace.yaml')!.bytes).toString()).toBe(
+    "allowBuilds:\n  '@google/genai': false\n  protobufjs: false\n",
+  );
+  for (const packageManager of ['npm', 'yarn'] as const)
+    expect(compose(layers, { ...options, packageManager }).files.has('pnpm-workspace.yaml')).toBe(
+      false,
+    );
+  expect(
+    compose(basic(), { ...options, packageManager: 'pnpm' }).files.has('pnpm-workspace.yaml'),
+  ).toBe(false);
+  layers[2]!.manifest.pnpm.allowBuilds['protobufjs'] = true;
+  expect(() => compose(layers, { ...options, packageManager: 'pnpm' })).toThrow('protobufjs');
+});
+
+test.each([
+  { allowBuilds: { '../bad': false } },
+  { allowBuilds: { '@scope/name': 'false' } },
+  { allowBuilds: [] },
+  { unexpected: true },
+  { allowBuilds: { 'bad:name': false } },
+])('invalid pnpm build decisions are rejected: %j', async (pnpm) => {
+  const root = await fixture();
+  await writeFile(
+    join(root, 'base/layer.json'),
+    JSON.stringify({ schema: 1, id: 'base', type: 'base', package: {}, pnpm }),
+  );
+  await expect(loadLayers(root)).rejects.toBeInstanceOf(LayerManifestError);
+});
+
+test('pnpm build decisions preserve numeric-looking package-name keys', () => {
+  const layers = basic();
+  layers[2]!.manifest.pnpm = { allowBuilds: { '1.0': false, '1e3': true, '0xff': false } };
+  const yaml = compose(layers, { ...options, packageManager: 'pnpm' }).files.get(
+    'pnpm-workspace.yaml',
+  );
+  expect(Buffer.from(yaml!.bytes).toString()).toBe(
+    "allowBuilds:\n  '0xff': false\n  '1.0': false\n  '1e3': true\n",
+  );
+});

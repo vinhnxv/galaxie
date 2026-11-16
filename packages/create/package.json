@@ -24,6 +24,7 @@
     "dist"
   ],
   "devDependencies": {
+    "@google/adk": "2.3.0",
     "@langchain/core": "1.2.20",
     "@langchain/langgraph": "1.5.1",
     "@langchain/openai": "1.6.3",

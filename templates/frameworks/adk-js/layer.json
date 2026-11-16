@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "adk-js",
+  "type": "framework",
+  "package": {
+    "dependencies": {
+      "@galaxie-ai/adapter-adk": "^0.1.0",
+      "@google/adk": "2.3.0",
+      "@langchain/core": "1.2.20",
+      "zod": "4.6.7"
+    }
+  },
+  "pnpm": {
+    "allowBuilds": {
+      "@google/genai": false,
+      "cpu-features": false,
+      "protobufjs": false,
+      "ssh2": false
+    }
+  }
+}

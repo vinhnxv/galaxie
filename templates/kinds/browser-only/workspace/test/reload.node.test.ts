@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { type Browser, chromium } from 'playwright';
 import { build, type PreviewServer, preview } from 'vite';
 import { afterAll, beforeAll, expect, it } from 'vitest';
+import { expectedResult, mockReply } from '../src/executor.js';
 
 const template = fileURLToPath(new URL('..', import.meta.url));
 const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
@@ -107,9 +108,7 @@ it('reloads the built app under CSP with the same pending question and no model 
     ).toBe(saved);
     await page.getByRole('radio', { name: '4', exact: true }).check();
     await page.getByRole('button', { name: 'Submit answers' }).click();
-    await page
-      .getByText('Correct. Keep practicing one small step at a time.', { exact: true })
-      .waitFor();
+    await page.getByText(expectedResult(mockReply), { exact: true }).waitFor();
     expect(requests.length).toBeGreaterThan(0);
     expect(requests.every((url) => new URL(url).origin === origin)).toBe(true);
     expect(requests.some((url) => /webllm|\.wasm|huggingface|\.hf\.co/.test(url))).toBe(false);

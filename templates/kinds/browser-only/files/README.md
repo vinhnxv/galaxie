@@ -1,6 +1,6 @@
 # Local-only starter
 
-A copyable Vite + React app with its own tiny LangGraph agent: answer one multiple-choice question, then receive a short model comment. It has no agent backend, remote model endpoint, provider key or tracing exporter. Inference stays in the browser. Model assets require a network connection only after an explicit WebLLM download opt-in.
+A copyable Vite + React app with its own tiny agent: answer one multiple-choice question, then receive a short model comment. It has no agent backend, remote model endpoint, provider key or tracing exporter. Inference stays in the browser. Model assets require a network connection only after an explicit WebLLM download opt-in.
 
 ## Requirements and running
 

@@ -591,6 +591,12 @@ for (const root of ['examples', 'templates', 'tests', 'scripts', 'packages']) {
       /['"`](@google\/adk(?:\/[^'"`]*)?)['"`]/g,
     )) {
       if (isNativeReferenceRun(file, match[1])) continue;
+      if (
+        match[1] === '@google/adk' &&
+        (file.startsWith('templates/frameworks/adk-js/') ||
+          file.startsWith('packages/create/dist/templates/frameworks/adk-js/'))
+      )
+        continue;
       if (match[1] === '@google/adk' && file.startsWith('examples/adk-recipes/src/recipes/'))
         continue;
       problems.push(`${file}: ADK imports belong only in packages/adapter-adk (${match[1]})`);

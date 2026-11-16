@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter, type LangGraphServices } from '@galaxie-ai/adapter-langgraph';
 import {
   type AgentInstance,
   createRuntime,
@@ -16,11 +15,20 @@ import {
   ModelError,
   type ModelUnavailableReason,
 } from '@galaxie-ai/models/builtin-ai';
-import { MockChatModel } from '@galaxie-ai/models/mock';
 import type { WebLLMEngineHandle, WebLLMProgress } from '@galaxie-ai/models/webllm';
 import { createRegistry, Quiz, type Registry } from '@galaxie-ai/react';
 import { IndexedDBSaver } from '@galaxie-ai/storage-indexeddb';
-import { commentPrompt, createTemplateAgent, templateDefinition } from './agent.js';
+import {
+  type ChatModels,
+  createExecutor,
+  createMockModel,
+  createServices,
+  createTemplateAgent,
+  providerDescriptor,
+  type StarterInput,
+  starterBindings,
+  templateDefinition,
+} from './executor.js';
 import type { WebLLMPhase } from './model-state.js';
 
 export const appId = 'local-only-template';
@@ -45,7 +53,7 @@ export interface TemplateModelSnapshot {
   readonly progress: number;
 }
 
-export type TemplateInstance = AgentInstance<Record<string, never>, unknown>;
+export type TemplateInstance = AgentInstance<StarterInput, unknown>;
 
 export interface TemplateHost {
   readonly registry: Registry;
@@ -105,16 +113,14 @@ export async function createTemplateHost(options: TemplateHostOptions = {}): Pro
     snapshot = { ...snapshot, ...patch };
     for (const listener of listeners) listener();
   };
-  const mock = new MockChatModel({
-    [commentPrompt]: { id: 'practice-comment', text: 'Keep practicing one small step at a time.' },
-  });
-  const chatModels: Record<string, LangGraphServices['chatModels'][string]> = {
+  const mock = createMockModel();
+  const chatModels: ChatModels = {
     builtin: new BuiltInAIChatModel(languages),
     mock,
     webllm: mock,
   };
   const registry = createRegistry({ components: [Quiz] });
-  const runtime = createRuntime({ appId, executors: [createLangGraphAdapter()] });
+  const runtime = createRuntime({ appId, executors: [createExecutor()] });
   let saver: Promise<IndexedDBSaver> | undefined;
   let ownership: Ownership | undefined;
   let controller: AbortController | undefined;
@@ -169,9 +175,13 @@ export async function createTemplateHost(options: TemplateHostOptions = {}): Pro
         ...(sessionId === undefined ? {} : { sessionId }),
         ...(checkpointer === undefined ? {} : { recovery: checkpointer.recovery }),
         agent: createTemplateAgent(),
-        services: { chatModels, ...(checkpointer === undefined ? {} : { checkpointer }) },
+        services: createServices(chatModels, checkpointer),
         models: {
-          providers: { builtin: descriptor, webllm: descriptor, mock: descriptor },
+          providers: {
+            builtin: providerDescriptor(descriptor),
+            webllm: providerDescriptor(descriptor),
+            mock: providerDescriptor(descriptor),
+          },
           roles: {
             comment: {
               providers: ['builtin', 'webllm', 'mock'],
@@ -183,7 +193,7 @@ export async function createTemplateHost(options: TemplateHostOptions = {}): Pro
             status: providerId === snapshot.route ? 'available' : 'unavailable',
           }),
         },
-        bindings: {},
+        bindings: starterBindings,
         ui: registry.bindings({ surfaces: ['question'] }),
       });
     },
