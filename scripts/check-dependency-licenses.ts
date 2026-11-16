@@ -13,6 +13,12 @@ const launchPackages = [
   'packages/models',
   'packages/storage-indexeddb',
   'packages/react',
+  'packages/adapter-pyodide',
+  'packages/adapter-adk',
+  'packages/adapter-go',
+  'packages/starter-go',
+  'packages/starter-python',
+  'packages/create',
 ];
 
 interface Dependency {

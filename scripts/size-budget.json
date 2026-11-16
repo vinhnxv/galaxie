@@ -1,25 +1,53 @@
 {
   "marginPercent": 10,
   "entries": {
+    "@galaxie-ai/adapter-adk/.": {
+      "minified": 51400,
+      "gzip": 14500
+    },
+    "@galaxie-ai/adapter-go/.": {
+      "minified": 32000,
+      "gzip": 9600
+    },
+    "@galaxie-ai/adapter-go/worker": {
+      "minified": 7300,
+      "gzip": 2900
+    },
     "@galaxie-ai/adapter-kit/.": {
-      "minified": 6700,
-      "gzip": 2300
+      "minified": 7000,
+      "gzip": 2500
     },
     "@galaxie-ai/adapter-langgraph/.": {
-      "minified": 32100,
-      "gzip": 9300
+      "minified": 35300,
+      "gzip": 10100
+    },
+    "@galaxie-ai/adapter-pyodide/.": {
+      "minified": 34900,
+      "gzip": 10000
+    },
+    "@galaxie-ai/adapter-pyodide/runtime-files": {
+      "minified": 26300,
+      "gzip": 7600
+    },
+    "@galaxie-ai/adapter-pyodide/worker": {
+      "minified": 69000,
+      "gzip": 18400
     },
     "@galaxie-ai/core/.": {
-      "minified": 116700,
-      "gzip": 31300
+      "minified": 120700,
+      "gzip": 32300
     },
     "@galaxie-ai/core/browser": {
       "minified": 6700,
       "gzip": 2500
     },
     "@galaxie-ai/core/config": {
-      "minified": 27800,
-      "gzip": 8800
+      "minified": 28300,
+      "gzip": 8900
+    },
+    "@galaxie-ai/create/.": {
+      "minified": 23800,
+      "gzip": 7600
     },
     "@galaxie-ai/models/builtin-ai": {
       "minified": 8400,
@@ -42,8 +70,8 @@
       "gzip": 9100
     },
     "@galaxie-ai/models/transformers/worker": {
-      "minified": 21300,
-      "gzip": 7100
+      "minified": 22200,
+      "gzip": 7400
     },
     "@galaxie-ai/models/webllm": {
       "minified": 15900,
@@ -57,9 +85,25 @@
       "minified": 30500,
       "gzip": 8800
     },
+    "@galaxie-ai/starter-go/.": {
+      "minified": 1300,
+      "gzip": 700
+    },
+    "@galaxie-ai/starter-go/build": {
+      "minified": 7900,
+      "gzip": 3300
+    },
+    "@galaxie-ai/starter-python/.": {
+      "minified": 1800,
+      "gzip": 800
+    },
+    "@galaxie-ai/starter-python/build": {
+      "minified": 3000,
+      "gzip": 1200
+    },
     "@galaxie-ai/storage-indexeddb/.": {
-      "minified": 42100,
-      "gzip": 11100
+      "minified": 42600,
+      "gzip": 11200
     },
     "@galaxie-ai/ui-protocol/.": {
       "minified": 23700,

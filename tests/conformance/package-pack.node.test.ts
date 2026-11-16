@@ -31,10 +31,17 @@ import {
 } from './support/starter-python.node.js';
 
 interface Manifest {
+  readonly name: string;
   readonly version: string;
+  readonly description?: string;
+  readonly license?: string;
+  readonly bin?: Readonly<Record<string, string>>;
   readonly private?: boolean;
   readonly exports: Readonly<Record<string, Readonly<Record<string, string>>>>;
   readonly dependencies?: Readonly<Record<string, string>>;
+  readonly optionalDependencies?: Readonly<Record<string, string>>;
+  readonly peerDependencies?: Readonly<Record<string, string>>;
+  readonly devDependencies?: Readonly<Record<string, string>>;
   readonly publishConfig?: { readonly access?: string };
   readonly repository?: {
     readonly type?: string;
@@ -48,7 +55,7 @@ interface Manifest {
 }
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const launchPackages = [
+const publicPackages = [
   'ui-protocol',
   'core',
   'adapter-kit',
@@ -56,14 +63,14 @@ const launchPackages = [
   'models',
   'storage-indexeddb',
   'react',
-];
-const preparedPackages = [
   'adapter-pyodide',
   'adapter-adk',
   'adapter-go',
   'starter-go',
   'starter-python',
+  'create',
 ];
+const promotedPackages = publicPackages.slice(7);
 const starterAvailable = hasStarterGo();
 const pythonStarterAvailable = hasStarterPython();
 
@@ -72,12 +79,11 @@ function readManifest(directory: string): Manifest {
 }
 
 const coreVersion = readManifest(join(root, 'packages/core')).version;
-const packages = [...launchPackages, ...preparedPackages]
+const packages = publicPackages
   .filter((directory) => directory !== 'starter-go' || starterAvailable)
   .filter((directory) => directory !== 'starter-python' || pythonStarterAvailable)
   .map((directory) => ({
     directory,
-    group: launchPackages.includes(directory) ? 'launch' : 'prepared',
     source: readManifest(join(root, 'packages', directory)),
     entries: [] as string[],
     packedJson: '',
@@ -172,14 +178,19 @@ test.each(packages)('$directory packs only distribution files and includes every
 test.each(packages)('$directory packs resolved workspace dependencies', (pkg) => {
   expect(pkg.packedJson).not.toContain('workspace:');
   const manifest = JSON.parse(pkg.packedJson) as Manifest;
-  for (const dependency of [
-    '@galaxie-ai/core',
-    '@galaxie-ai/adapter-kit',
-    '@galaxie-ai/ui-protocol',
-  ]) {
-    if (pkg.source.dependencies?.[dependency] !== undefined)
-      expect(manifest.dependencies?.[dependency]).toBe(coreVersion);
-  }
+  for (const section of [
+    'dependencies',
+    'optionalDependencies',
+    'peerDependencies',
+    'devDependencies',
+  ] as const)
+    for (const name of new Set([
+      ...Object.keys(pkg.source[section] ?? {}),
+      ...Object.keys(manifest[section] ?? {}),
+    ])) {
+      if (!name.startsWith('@galaxie-ai/')) continue;
+      expect(manifest[section]?.[name], `${pkg.directory}.${section}.${name}`).toBe(coreVersion);
+    }
 });
 
 test('React packs its protocol dependency at the shared release version', () => {
@@ -191,28 +202,27 @@ test('React packs its protocol dependency at the shared release version', () => 
 
 test.each(packages)('$directory has public metadata and the root license files', (pkg) => {
   const packed = JSON.parse(pkg.packedJson) as Manifest;
-  if (pkg.group === 'launch') {
-    expect(pkg.source).not.toHaveProperty('private');
-    expect(packed).not.toHaveProperty('private');
-    expect(packed.version).toBe(coreVersion);
-  } else {
-    for (const manifest of [pkg.source, packed]) {
-      expect(manifest.private).toBe(true);
-      expect(manifest.engines?.node).toBeTypeOf('string');
-      expect(manifest.engines?.node?.trim()).not.toBe('');
-      expect(manifest.repository).toEqual({
-        type: 'git',
-        url: 'git+https://github.com/vinhnxv/galaxie.git',
-        directory: `packages/${pkg.directory}`,
-      });
-      expect(manifest.homepage).toBe(
-        `https://github.com/vinhnxv/galaxie/tree/main/packages/${pkg.directory}#readme`,
+  for (const manifest of [pkg.source, packed]) {
+    expect(manifest).not.toHaveProperty('private');
+    expect(manifest.version).toBe(coreVersion);
+    expect(manifest.license).toBe('Apache-2.0');
+    expect(manifest.description?.trim()).toBeTruthy();
+    expect(manifest.description).not.toMatch(/private/i);
+    expect(manifest.engines?.node?.trim()).toBeTruthy();
+    expect(manifest.repository).toEqual({
+      type: 'git',
+      url: 'git+https://github.com/vinhnxv/galaxie.git',
+      directory: `packages/${pkg.directory}`,
+    });
+    expect(manifest.homepage).toBe(
+      `https://github.com/vinhnxv/galaxie/tree/main/packages/${pkg.directory}#readme`,
+    );
+    expect(manifest.bugs?.url).toBe('https://github.com/vinhnxv/galaxie/issues');
+    expect(manifest.publishConfig?.access).toBe('public');
+    if (promotedPackages.includes(pkg.directory))
+      expect(manifest.files).toEqual(
+        pkg.directory === 'create' ? ['dist', 'NOTICE'] : ['dist', 'LICENSE', 'NOTICE'],
       );
-      expect(manifest.bugs?.url).toBe('https://github.com/vinhnxv/galaxie/issues');
-      expect(manifest.publishConfig?.access).toBe('public');
-      expect(manifest.files).toEqual(['dist', 'LICENSE', 'NOTICE']);
-    }
-    expect(packed.version).toBe(pkg.source.version);
   }
   expect(packed.version).toMatch(/^0\.\d+\.\d+$/);
   expect(packed.publishConfig?.access).toBe('public');
@@ -240,7 +250,7 @@ test.each(packages)('$directory has public metadata and the root license files',
   }
 });
 
-test.each(packages.filter((pkg) => pkg.group === 'prepared'))(
+test.each(packages.filter((pkg) => promotedPackages.includes(pkg.directory)))(
   '$directory detects a missing packed export target',
   (pkg) => {
     const manifest = JSON.parse(pkg.packedJson) as Manifest;
@@ -254,7 +264,7 @@ test.each(packages.filter((pkg) => pkg.group === 'prepared'))(
   },
 );
 
-test.each(packages.filter((pkg) => pkg.group === 'prepared'))(
+test.each(packages.filter((pkg) => promotedPackages.includes(pkg.directory)))(
   '$directory maps every export to dist JavaScript and declarations',
   (pkg) => {
     for (const manifest of [pkg.source, JSON.parse(pkg.packedJson) as Manifest]) {
@@ -285,37 +295,43 @@ test.each(packages.filter((pkg) => pkg.group === 'prepared'))(
           (entry) => entry.startsWith('package/dist/wheels/') && entry.endsWith('.whl'),
         ),
       ).toBe(true);
-    } else if (pkg.directory !== 'adapter-adk') {
+    } else if (['adapter-go', 'adapter-pyodide'].includes(pkg.directory)) {
       expect(pkg.entries).toContain('package/dist/worker.js');
       expect(pkg.entries).toContain('package/dist/worker.d.ts');
     }
   },
 );
 
-test('prepared packages stay outside launch and size discovery', () => {
-  const entries = discoverEntries(join(root, 'packages'));
-  expect(entries.length).toBeGreaterThan(0);
-  for (const directory of preparedPackages) {
-    expect(launchPackages).not.toContain(directory);
-    expect(entries.filter(({ entry }) => entry.startsWith(`@galaxie-ai/${directory}/`))).toEqual(
-      [],
-    );
-  }
+test('all thirteen public packages are packed in CI', () => {
+  expect(publicPackages).toHaveLength(13);
+  expect(packages.map(({ directory }) => directory)).toEqual(
+    publicPackages.filter(
+      (directory) =>
+        (directory !== 'starter-go' || starterAvailable) &&
+        (directory !== 'starter-python' || pythonStarterAvailable),
+    ),
+  );
+  if (process.env['CI']) expect(packages).toHaveLength(13);
+  for (const pkg of packages) expect(pkg.tarball, pkg.directory).not.toBe('');
 });
 
-test('size discovery detects prepared packages when a copy loses private status', () => {
+test('every public package joins size discovery', () => {
+  const entries = discoverEntries(join(root, 'packages'));
+  expect([...new Set(entries.map(({ directory }) => directory.split('/').at(-1)))].sort()).toEqual(
+    [...publicPackages].sort(),
+  );
+});
+
+test('size discovery includes all eleven promoted exports and excludes private copies', () => {
   if (temporaryDirectory === undefined) throw new Error('Missing temporary directory.');
   const directory = join(temporaryDirectory, 'size-discovery');
   mkdirSync(directory);
-  for (const pkg of preparedPackages.map((directory) => ({
-    directory,
-    source: readManifest(join(root, 'packages', directory)),
-  }))) {
-    const destination = join(directory, pkg.directory);
+  for (const name of promotedPackages) {
+    const destination = join(directory, name);
     mkdirSync(destination);
     writeFileSync(
       join(destination, 'package.json'),
-      JSON.stringify({ ...pkg.source, private: false }),
+      JSON.stringify(readManifest(join(root, 'packages', name))),
     );
   }
   expect(discoverEntries(directory).map(({ entry }) => entry)).toEqual([
@@ -325,11 +341,30 @@ test('size discovery detects prepared packages when a copy loses private status'
     '@galaxie-ai/adapter-pyodide/.',
     '@galaxie-ai/adapter-pyodide/runtime-files',
     '@galaxie-ai/adapter-pyodide/worker',
+    '@galaxie-ai/create/.',
     '@galaxie-ai/starter-go/.',
     '@galaxie-ai/starter-go/build',
     '@galaxie-ai/starter-python/.',
     '@galaxie-ai/starter-python/build',
   ]);
+  for (const name of promotedPackages) {
+    const path = join(directory, name, 'package.json');
+    const manifest = readManifest(join(directory, name));
+    writeFileSync(path, JSON.stringify({ ...manifest, private: true }));
+  }
+  expect(discoverEntries(directory)).toEqual([]);
+});
+
+test('create packs its CLI bin and public composer export', () => {
+  const pkg = packages.find(({ directory }) => directory === 'create');
+  expect(pkg).toBeDefined();
+  const manifest = JSON.parse(pkg?.packedJson ?? '{}') as Manifest;
+  expect(manifest.bin).toEqual({ create: 'dist/cli.js' });
+  expect(manifest.exports['.']).toEqual({
+    types: './dist/index.d.ts',
+    default: './dist/index.js',
+  });
+  expect(pkg?.entries).toContain('package/dist/cli.js');
 });
 
 test('the packed runtime-files module exposes the worker inventories', () => {
@@ -407,9 +442,12 @@ test('release size measurements include the kit and its LangGraph consumer bundl
   }
 }, 120_000);
 
-test('all other packages remain private', () => {
-  for (const entry of readdirSync(join(root, 'packages'), { withFileTypes: true })) {
-    if (entry.isDirectory() && !launchPackages.includes(entry.name))
-      expect(readManifest(join(root, 'packages', entry.name)).private, entry.name).toBe(true);
-  }
+test('only eslint-plugin and tools-mcp remain private', () => {
+  const privatePackages = readdirSync(join(root, 'packages'), { withFileTypes: true })
+    .filter(
+      (entry) => entry.isDirectory() && readManifest(join(root, 'packages', entry.name)).private,
+    )
+    .map((entry) => entry.name)
+    .sort();
+  expect(privatePackages).toEqual(['eslint-plugin', 'tools-mcp']);
 });

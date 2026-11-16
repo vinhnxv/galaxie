@@ -77,13 +77,13 @@ test('layer third-party pins equal create tooling and share React with the rende
   for (const name of ['react', '@types/react']) expect(pins[name], name).toBe(rendererPins[name]);
   expect(create).toMatchObject({
     name: '@galaxie-ai/create',
-    private: true,
     version: coreVersion,
     type: 'module',
     license: 'Apache-2.0',
     engines: { node: '>=22.22.2' },
     bin: { create: 'dist/cli.js' },
   });
+  expect(create).not.toHaveProperty('private');
   expect(create['dependencies']).toBeUndefined();
 });
 
@@ -380,7 +380,7 @@ test.each([
 });
 
 test.each(['browser-only', 'gateway'])(
-  'the %s Go overlay pins both private packages and keeps build plus preview',
+  'the %s Go overlay pins both release packages and keeps build plus preview',
   async (kind) => {
     const layers = await loadLayers(templates);
     const framework = layers.find((layer) => layer.manifest.id === 'adk-go');
@@ -459,7 +459,7 @@ test('all existing outputs retain main bytes except the baseline binding and two
   }
 });
 test.each(['browser-only', 'gateway'])(
-  'the %s Python overlay pins its private artifacts and raw sources',
+  'the %s Python overlay pins its release artifacts and raw sources',
   async (kind) => {
     const layers = await loadLayers(templates);
     const { files } = compose(layers, { ...options, kind, framework: 'langgraph-python' });
