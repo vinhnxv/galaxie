@@ -23,6 +23,7 @@ function readManifest(directory: string): Manifest {
   ) as Manifest;
 }
 
+const coreVersion = readManifest('packages/core').version;
 const prepared = [
   'adapter-pyodide',
   'adapter-adk',
@@ -93,7 +94,7 @@ function publicationProblems(
 test.each(prepared)(
   '$directory advertises its manifest version for every framework',
   ({ directory, manifest }) => {
-    expect(manifest.version).toBe('0.0.0');
+    expect(manifest.version).toBe(coreVersion);
     const advertised = versions[directory] ?? [];
     expect(versionProblems(manifest, advertised)).toEqual([]);
     expect(versionProblems({ ...manifest, version: '0.0.1' }, advertised)).toEqual(['version']);

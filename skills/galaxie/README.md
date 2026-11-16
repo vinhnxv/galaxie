@@ -24,7 +24,7 @@ refused. For a hoisted monorepo whose app has no local core installation, supply
 the verified installed version explicitly:
 
 ```sh
-node scripts/install-skill.ts /path/to/app --core-version 0.1.0
+node scripts/install-skill.ts /path/to/app --core-version 0.2.0
 ```
 
 An installed local version takes precedence over the override. An exact dependency

@@ -1,6 +1,6 @@
 {
   "name": "@galaxie-ai/create",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Private repository CLI for composing galaxie starter layers.",
   "license": "Apache-2.0",

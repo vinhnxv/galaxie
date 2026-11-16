@@ -8,7 +8,7 @@
       "check": "tsc --noEmit && tsc --noEmit -p check/tsconfig.json && node --test check/baseline.check.ts"
     },
     "dependencies": {
-      "@galaxie-ai/storage-indexeddb": "^0.1.0",
+      "@galaxie-ai/storage-indexeddb": "^0.2.0",
       "@mlc-ai/web-llm": "0.2.86"
     }
   },

@@ -23,6 +23,24 @@ async function manifest(path: string): Promise<JsonObject> {
   ) as JsonObject;
 }
 
+const coreVersion = (await manifest('packages/core'))['version'] as string;
+
+test('every galaxie layer pin matches its package manifest caret range', async () => {
+  const layers = await loadLayers(templates);
+  const pins: string[] = [];
+  for (const layer of layers)
+    for (const section of ['dependencies', 'devDependencies'])
+      for (const [name, range] of Object.entries(
+        (layer.manifest.package[section] ?? {}) as JsonObject,
+      )) {
+        if (!name.startsWith('@galaxie-ai/')) continue;
+        const pkg = await manifest(`packages/${name.slice('@galaxie-ai/'.length)}`);
+        expect(range, `${layer.manifest.id}.${section}.${name}`).toBe(`^${pkg['version']}`);
+        pins.push(name);
+      }
+  expect(pins).toHaveLength(10);
+});
+
 function mismatchedPins(layers: readonly Layer[], pins: JsonObject): string[] {
   const problems: string[] = [];
   for (const layer of layers)
@@ -60,7 +78,7 @@ test('layer third-party pins equal create tooling and share React with the rende
   expect(create).toMatchObject({
     name: '@galaxie-ai/create',
     private: true,
-    version: '0.0.0',
+    version: coreVersion,
     type: 'module',
     license: 'Apache-2.0',
     engines: { node: '>=22.22.2' },
@@ -227,7 +245,7 @@ test('the ADK overlay preserves inventories, pins, initialization and kind neutr
   const layers = await loadLayers(templates);
   const framework = layers.find((layer) => layer.manifest.id === 'adk-js');
   expect(framework?.manifest.package['dependencies']).toEqual({
-    '@galaxie-ai/adapter-adk': '^0.1.0',
+    '@galaxie-ai/adapter-adk': `^${coreVersion}`,
     '@google/adk': '2.3.0',
     '@langchain/core': '1.2.20',
     zod: '4.6.7',
@@ -367,8 +385,8 @@ test.each(['browser-only', 'gateway'])(
     const layers = await loadLayers(templates);
     const framework = layers.find((layer) => layer.manifest.id === 'adk-go');
     expect(framework?.manifest.package['dependencies']).toEqual({
-      '@galaxie-ai/adapter-go': '^0.1.0',
-      '@galaxie-ai/starter-go': '^0.1.0',
+      '@galaxie-ai/adapter-go': `^${coreVersion}`,
+      '@galaxie-ai/starter-go': `^${coreVersion}`,
       '@langchain/core': '1.2.20',
       zod: '4.6.7',
     });
@@ -419,7 +437,10 @@ test('all existing outputs retain main bytes except the baseline binding and two
     const hash = createHash('sha256');
     for (const [path, file] of files) {
       if (path === 'check/baseline.check.ts') continue;
+      // Keep the captured hashes sensitive to every change except the lockstep range.
       let bytes = file.bytes;
+      if (path === 'package.json' || path === 'README.md')
+        bytes = Buffer.from(Buffer.from(bytes).toString().replaceAll(`^${coreVersion}`, '^0.1.0'));
       if (path === 'server/serve.ts') {
         let source = Buffer.from(bytes).toString();
         for (const line of [
@@ -443,8 +464,8 @@ test.each(['browser-only', 'gateway'])(
     const layers = await loadLayers(templates);
     const { files } = compose(layers, { ...options, kind, framework: 'langgraph-python' });
     const manifest = JSON.parse(Buffer.from(files.get('package.json')!.bytes).toString());
-    expect(manifest.dependencies['@galaxie-ai/adapter-pyodide']).toBe('^0.1.0');
-    expect(manifest.dependencies['@galaxie-ai/starter-python']).toBe('^0.1.0');
+    expect(manifest.dependencies['@galaxie-ai/adapter-pyodide']).toBe(`^${coreVersion}`);
+    expect(manifest.dependencies['@galaxie-ai/starter-python']).toBe(`^${coreVersion}`);
     expect(manifest.dependencies.pyodide).toBe('314.0.7');
     expect(manifest.scripts.dev).toBe(
       'vite build && vite preview --host 127.0.0.1 --port 4173 --strictPort',

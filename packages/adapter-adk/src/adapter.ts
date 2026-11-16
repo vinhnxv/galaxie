@@ -150,7 +150,7 @@ async function digestOf(value: unknown): Promise<string> {
 export function createAdkAdapter(): ExecutorAdapter<AdkAgent, AdkServices> {
   return {
     id: 'adk-js',
-    version: '0.0.0',
+    version: '0.2.0',
     features: {
       interrupts: true,
       resume: true,

@@ -1,7 +1,7 @@
 ---
 name: galaxie
 description: Build or change browser agents in apps using galaxie. Preserve host-owned routing, capability policy, confirmations and UI while following the installed framework's supported shapes and refusals.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Build with galaxie

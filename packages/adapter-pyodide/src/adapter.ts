@@ -302,7 +302,7 @@ export function createPyodideAdapter(
   const langgraph = framework === 'langgraph';
   return {
     id: executorId,
-    version: '0.0.0',
+    version: '0.2.0',
     features: {
       interrupts: true,
       resume: true,
