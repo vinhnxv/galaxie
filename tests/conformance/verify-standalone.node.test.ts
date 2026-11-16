@@ -905,6 +905,8 @@ it('gives build and preview children only the allowlisted environment', async ()
 
 it.each([
   'pass',
+  'conditional-true',
+  'conditional-false',
   'both',
   'test-artifact',
   'workspace-artifact',
@@ -914,6 +916,12 @@ it.each([
   'negative-abort',
   'mutation-missing',
 ] as const)('gates scaffold/check/mutation phases and restores the source (%s)', async (kind) => {
+  const baseline = kind.startsWith('conditional-')
+    ? fixtureCsp.replace(
+        "'script-src': [\"'self'\"]",
+        "'script-src': frameworkProfile.workers ? [\"'self'\", \"'wasm-unsafe-eval'\"] : [\"'self'\"]",
+      )
+    : fixtureCsp;
   const root = await temporary();
   const repo = join(root, 'repo');
   await mkdir(repo);
@@ -952,7 +960,7 @@ it.each([
           );
           await writeFile(
             join(request.directory, 'src/csp.ts'),
-            kind === 'mutation-missing' ? 'not a CSP fixture' : fixtureCsp,
+            kind === 'mutation-missing' ? 'not a CSP fixture' : baseline,
           );
           if (kind === 'test-artifact') await mkdir(join(request.directory, 'test'));
           if (kind === 'workspace-artifact')
@@ -988,7 +996,14 @@ it.each([
               checks++;
               const source = await readFile(join(command.cwd, 'src/csp.ts'), 'utf8');
               if (kind === 'check-failure') throw new Error('src/csp.ts fixture check failed.');
-              if (source === fixtureCsp || kind === 'mutation-missing') return '';
+              if (source === baseline || kind === 'mutation-missing') return '';
+              if (kind.startsWith('conditional-') && source.includes('unsafe-inline')) {
+                const expression = /'script-src': (.*),/.exec(source)?.[1];
+                const active = new Function('frameworkProfile', `return (${expression});`)({
+                  workers: kind === 'conditional-true',
+                });
+                expect(active).toContain("'unsafe-inline'");
+              }
               if (kind === 'negative-pass') return '';
               if (kind === 'negative-wrong') throw new Error('Unrelated compiler failure.');
               if (kind === 'negative-abort') {
@@ -1044,10 +1059,10 @@ it.each([
     for (const request of requests) {
       expect(request.node).toBe(process.execPath);
       expect(await readFile(join(request.directory, 'src/csp.ts'), 'utf8')).toBe(
-        kind === 'mutation-missing' ? 'not a CSP fixture' : fixtureCsp,
+        kind === 'mutation-missing' ? 'not a CSP fixture' : baseline,
       );
     }
-    if (kind === 'pass' || kind === 'both') {
+    if (kind === 'pass' || kind === 'both' || kind.startsWith('conditional-')) {
       expect(results.every(({ failures }) => failures.length === 0)).toBe(true);
       expect(checks).toBe(kind === 'both' ? 6 : 3);
       expect(installs).toBe(kind === 'both' ? 2 : 1);

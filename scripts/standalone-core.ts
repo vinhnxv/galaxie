@@ -455,18 +455,22 @@ async function assertBaselineRejections(
   const mutations = [
     {
       directive: 'script-src',
-      pattern: /('script-src':\s*\[)/,
-      replacement: '$1"\'unsafe-inline\'", ',
+      change: (source: string): string =>
+        source.replace(
+          /('script-src':\s*)([^\n]+)/,
+          (_match, prefix: string, value: string) =>
+            prefix + value.replaceAll('[', '["\'unsafe-inline\'", '),
+        ),
     },
     {
       directive: 'require-trusted-types-for',
-      pattern: /('require-trusted-types-for':\s*)\[[^\]]*\]/,
-      replacement: '$1[]',
+      change: (source: string): string =>
+        source.replace(/('require-trusted-types-for':\s*)\[[^\]]*\]/, '$1[]'),
     },
   ];
-  for (const { directive, pattern, replacement } of mutations) {
+  for (const { directive, change } of mutations) {
     signal.throwIfAborted();
-    const changed = original.replace(pattern, replacement);
+    const changed = change(original);
     if (changed === original) throw new Error(`Negative control could not mutate ${directive}.`);
     try {
       await writeFile(path, changed);

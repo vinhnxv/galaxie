@@ -32,18 +32,33 @@ with Go 1.27.3. Then, with a PATH containing Node and system tools but no Go,
 this real-network command exited 0:
 
 ```sh
-node scripts/verify-standalone.ts --framework adk-go --mode tarball --tarballs <tarballs> --json /tmp/galaxie-adk-go-network-stage3.json
+node scripts/verify-standalone.ts --framework adk-go --mode tarball --tarballs <tarballs> --json /tmp/galaxie-adk-go-network-final.json
 ```
 
 | Kind / framework | Target Node | npm | Mode | Chromium | Result |
 | --- | --- | --- | --- | --- | --- |
 | browser-only / adk-go | 24.15.0 | 12.2.2 | Tarball | 156.0.8078.4 | PASS |
+| gateway / adk-go | 24.15.0 | 12.2.2 | Tarball | 156.0.8078.4 | PASS |
 
-The result has an empty failure array. Installation, single-copy checks,
+Each result has an empty failure array. Installation, single-copy checks,
 production build, generated checks, directive mutation controls and the mock
 browser drive pass with a seven-day release age, no exclusion and no lifecycle
 script fallback. The harness removed its temporary projects; JSON and logs stay
-outside the checkout. Nothing was published.
+outside the checkout. Gateway also passes its compiled production-server 503
+flow and session probes. Nothing was published.
+
+The first additional gateway run exited 1 after install/build/check passed:
+
+```text
+negative-control [harness]: negative-control failed.
+Negative control could not mutate script-src.
+```
+
+The harness's direct-array mutation did not match the framework-aware conditional
+in the gateway CSP source. Its mutation now inserts the forbidden directive in
+both branches; offline controls exercise each branch, still require the exact
+rejection and verify restoration. The rerun and the final two-kind run exit 0.
+No header or server assertion was loosened.
 
 Firefox/WebKit for the Go starter, real models, pnpm/yarn installs end to end,
 a cold Go module cache, Node 22 and CI cold-start time remain unmeasured. The
