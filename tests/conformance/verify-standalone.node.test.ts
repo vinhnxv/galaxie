@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { Result, ScaffoldRequest, TemplateSpec } from '../../scripts/standalone-core.js';
+import type { Result, ScaffoldRequest, Step, TemplateSpec } from '../../scripts/standalone-core.js';
 import {
   assertCommand,
   assertCopy,
@@ -41,6 +41,35 @@ const fixtureSpec: TemplateSpec = {
   steps: [],
 };
 const fixtureCsp = `'script-src': ["'self'"],\n'require-trusted-types-for': ["'script'"],\n`;
+it('pins preview mock text to the gateway layer and keeps production unavailable', async () => {
+  const gateway = templateSpecs[1];
+  expect(gateway?.steps).toEqual([
+    { action: 'click', role: 'button', name: 'Start with gateway' },
+    { action: 'check', role: 'radio', name: '4' },
+    { action: 'click', role: 'button', name: 'Submit answers' },
+    { action: 'text', name: 'Correct. This is a fixed reply from the mock upstream.' },
+    { action: 'text', name: 'Replies are fixed sample text from a mock upstream.' },
+  ]);
+  expect(gateway?.steps.some((step) => step.unavailable !== undefined)).toBe(false);
+  expect(gateway?.server?.steps?.filter((step) => step.unavailable !== undefined)).toEqual([
+    {
+      action: 'click',
+      role: 'button',
+      name: 'Submit answers',
+      unavailable: {
+        path: '/api/v1/chat/completions',
+        text: 'The gateway is unavailable. Retry later.',
+      },
+    },
+  ]);
+  const root = new URL('../../templates/kinds/gateway/files/', import.meta.url);
+  expect(await readFile(new URL('server/mock-upstream.ts', root), 'utf8')).toContain(
+    'This is a fixed reply from the mock upstream.',
+  );
+  expect(await readFile(new URL('src/gateway-state.ts', root), 'utf8')).toContain(
+    'Replies are fixed sample text from a mock upstream.',
+  );
+});
 async function writeBaseline(directory: string): Promise<void> {
   await mkdir(join(directory, 'src'), { recursive: true });
   await writeFile(join(directory, 'src/csp.ts'), fixtureCsp);
@@ -1043,3 +1072,84 @@ it.each([
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+it.each([true, false])(
+  'selects per-server drive steps with a preview fallback (%s)',
+  async (override) => {
+    const root = await temporary();
+    const repo = join(root, 'repo');
+    await mkdir(repo);
+    await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+    const server = createServer((_request, response) => response.end('ready'));
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('No fixture port.');
+    const previewSteps = [{ action: 'text', name: 'Preview mock reply' }] as const;
+    const productionSteps = [{ action: 'text', name: 'Production unavailable' }] as const;
+    const driven: (readonly Step[])[] = [];
+    const specs: TemplateSpec[] = [
+      { ...fixtureSpec, name: 'browser-fixture', steps: previewSteps },
+      {
+        ...fixtureSpec,
+        name: 'gateway-fixture',
+        kind: 'gateway',
+        steps: previewSteps,
+        server: {
+          compile: [],
+          entry: 'production.js',
+          port: address.port,
+          ...(override ? { steps: productionSteps } : {}),
+        },
+      },
+    ];
+    try {
+      const results = await runStandalone(
+        {
+          repo,
+          tempBase: root,
+          nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
+          modes: ['registry'],
+          specs,
+          offline: true,
+          verifyReleaseAge: false,
+        },
+        {
+          scaffold: async ({ directory }) => {
+            await mkdir(directory, { recursive: true });
+            await writeFile(join(directory, 'package.json'), '{}');
+            await writeBaseline(directory);
+          },
+          runner: {
+            run: async (command) => {
+              if (command.args[0] === '--version') return process.version;
+              if (command.args.includes('--version')) return '12.2.2';
+              if (command.args.includes('check')) {
+                const source = await readFile(join(command.cwd, 'src/csp.ts'), 'utf8');
+                if (source.includes('unsafe-inline')) throw new Error('script-src changed');
+                if (source !== fixtureCsp) throw new Error('require-trusted-types-for changed');
+              }
+              return '';
+            },
+            start: async () => ({ stop: async () => {}, output: () => '' }),
+          },
+          ports: { find: async () => address.port },
+          driver: {
+            drive: async (_url, spec) => {
+              driven.push(spec.steps);
+              return 'fixture-browser';
+            },
+          },
+        },
+      );
+      expect(results.map(({ failures }) => failures)).toEqual([[], []]);
+      expect(driven).toEqual([
+        previewSteps,
+        previewSteps,
+        override ? productionSteps : previewSteps,
+      ]);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  },
+);

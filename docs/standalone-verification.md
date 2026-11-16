@@ -2,10 +2,46 @@
 
 The current harness scaffolds projects through the private create CLI. The earlier
 2026-11-15 copied-starter characterization for `galaxie-wa5.1` is retained below.
-Both measurements use the mock or gateway-unavailable flow, without Built-in AI,
-WebGPU or an upstream model.
+The current gateway preview drive answers through an in-process mock; the compiled
+production server still follows the correlated 503 unavailable flow. These checks
+use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
+gateway mock.
 
-## Composed-project measurement (2026-11-16)
+## Gateway mock measurement (2026-11-16)
+
+The gateway-only matrix ran three times with the same command:
+
+```sh
+node scripts/verify-standalone.ts --kind gateway --node 22 --node 24 --mode both --json /tmp/galaxie-wa5-4-network.json
+```
+
+1. The first run, before the transport correction below, exited 1: all four rows
+   (Node 22.23.5 and 24.15.0, registry and packed workspace, npm 12.2.2) passed
+   installation, build, generated checks and directive mutation controls, and each
+   recorded one gating drive failure with the exact excerpt `Request failed.`
+2. After the correction, the matrix was rerun on the corrected tree and exited 0.
+3. After the review follow-ups to the gateway server and its tests, the matrix was
+   rerun on the final code and exited 0.
+
+| Target Node | npm | Registry | Packed workspace |
+| --- | --- | --- | --- |
+| 22.23.5 | 12.2.2 | PASS | PASS |
+| 24.15.0 | 12.2.2 | PASS | PASS |
+
+Each passing row covers installation, the production Vite build, the generated
+checks and mutation controls, the preview drive through the mock and the
+compiled-server 503 drive, with the release-age policy at 7 days and no
+exclusion or lifecycle-script fallback. JSON and command logs remain outside the
+repository; temporary projects were removed.
+
+A loopback reproduction of the first failure showed that the page received the mock
+result and status, then Chromium reported `net::ERR_ABORTED` as the SDK cancelled
+its SSE reader. The host wrapper now drains a clone of successful mock responses
+before giving the original response to the SDK. Real-upstream responses keep their
+existing path, and the harness driver stays strict. Real-provider behavior remains
+unmeasured.
+
+## Earlier composed-project measurement (2026-11-16, before the gateway mock)
 
 The adapted harness ran once with a 25-minute wall-clock cap and exited 0:
 
@@ -125,15 +161,20 @@ bounded readiness polling; hybrid's compiled server requires port 4173 to be fre
 The browser removes `LanguageModel` and `navigator.gpu`, aborts cross-origin
 requests, and checks page errors, failed requests, HTTP errors and console errors
 under the narrow exceptions above. Local-only selects radio `4`, submits and
-expects `Correct. Keep practicing one small step at a time.` Hybrid starts the
-gateway route, selects `4`, submits, requires the observed model HTTP 503 and
-`The gateway is unavailable. Retry later.`, then checks Retry. Both hybrid servers
+expects `Correct. Keep practicing one small step at a time.` Gateway preview starts the
+gateway route, selects `4`, submits and requires both
+`Correct. This is a fixed reply from the mock upstream.` and
+`Replies are fixed sample text from a mock upstream.` The compiled server follows
+the same question flow but requires the observed model HTTP 503 and
+`The gateway is unavailable. Retry later.`, then checks Retry. Both gateway servers
 also receive a separate `POST /api/session` probe expecting HTTP 200; its response
 body is cancelled without parsing, printing or recording it.
 
 Every generated project must pass `npm run check` after the build. This includes
 client/check TypeScript compilation, exact Vite CSP and Trusted Types assertions,
-and the gateway's compiled static-handler header. The harness then separately adds
+and the gateway's compiled static-handler header, transitive production import
+boundary, absence of compiled dev/mock files and imports, and authenticated
+production 503 without an upstream. The harness then separately adds
 `'unsafe-inline'` to `script-src` and empties `require-trusted-types-for`, reruns the
 check, and requires a rejection naming the changed directive. A check that passes
 or fails for an unrelated reason makes the negative-control phase fail. The CSP

@@ -24,6 +24,7 @@ export interface GatewayPrompt {
 }
 
 export interface GatewayOptions {
+  readonly mockUpstream?: (request: Request) => Response | Promise<Response>;
   readonly upstream?: { readonly baseURL: string; readonly apiKey: string };
   readonly users?: Readonly<Record<string, GatewayUser>>;
   readonly quota?: { readonly calls: number; readonly windowMs: number };
@@ -223,7 +224,8 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
       // Reserve before awaiting the upstream, so concurrent requests cannot bypass the quota.
       usage.count++;
       calls.set(principal, usage);
-      if (!options.upstream) {
+      const dispatch = options.upstream ? fetch : options.mockUpstream;
+      if (dispatch === undefined) {
         json(response, 503, { error: 'unavailable' });
         return;
       }
@@ -232,13 +234,15 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
       response.once('close', abort);
       const timeout = setTimeout(abort, 30_000);
       try {
-        const upstream = await fetch(
-          `${options.upstream.baseURL.replace(/\/$/, '')}/chat/completions`,
+        const upstreamRequest = new Request(
+          options.upstream
+            ? `${options.upstream.baseURL.replace(/\/$/, '')}/chat/completions`
+            : 'http://127.0.0.1/mock',
           {
             method: 'POST',
             headers: {
               'content-type': 'application/json',
-              authorization: `Bearer ${options.upstream.apiKey}`,
+              ...(options.upstream ? { authorization: `Bearer ${options.upstream.apiKey}` } : {}),
             },
             redirect: 'error',
             signal: controller.signal,
@@ -258,6 +262,7 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
             }),
           },
         );
+        const upstream = await dispatch(upstreamRequest);
         if (!upstream.ok) {
           await upstream.body?.cancel();
           const status =
@@ -273,6 +278,7 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         }
         response.writeHead(upstream.status, {
           'content-type': input['stream'] === true ? 'text/event-stream' : 'application/json',
+          ...(!options.upstream ? { 'x-galaxie-upstream': 'mock' } : {}),
           'cache-control': 'no-store',
         });
         if (upstream.body) {

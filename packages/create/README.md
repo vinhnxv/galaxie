@@ -28,7 +28,7 @@ Runtime and install failures exit with code 1; success exits with code 0.
 The current kinds are `browser-only` and `gateway`; both support `langgraph-js`.
 The generated README explains the selected project's mock and gateway behavior.
 Run its `check` command to typecheck and assert the pinned emitted CSP and Trusted
-Types baseline. The gateway check also compiles and probes its static handler.
+Types baseline. The gateway check also compiles and probes its static handler, rejects production imports or compiled files that reach the dev/preview mock, and proves production completions return 503 without an upstream.
 
 ## Installation
 

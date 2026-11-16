@@ -113,20 +113,27 @@ export const templateSpecs: readonly TemplateSpec[] = [
       compile: [tsc, '-p', 'server/tsconfig.json'],
       entry: '.server/server/serve.js',
       port: 4173,
+      steps: [
+        { action: 'click', role: 'button', name: 'Start with gateway' },
+        { action: 'check', role: 'radio', name: '4' },
+        {
+          action: 'click',
+          role: 'button',
+          name: 'Submit answers',
+          unavailable: {
+            path: '/api/v1/chat/completions',
+            text: 'The gateway is unavailable. Retry later.',
+          },
+        },
+        { action: 'visible', role: 'button', name: 'Retry' },
+      ],
     },
     steps: [
       { action: 'click', role: 'button', name: 'Start with gateway' },
       { action: 'check', role: 'radio', name: '4' },
-      {
-        action: 'click',
-        role: 'button',
-        name: 'Submit answers',
-        unavailable: {
-          path: '/api/v1/chat/completions',
-          text: 'The gateway is unavailable. Retry later.',
-        },
-      },
-      { action: 'visible', role: 'button', name: 'Retry' },
+      { action: 'click', role: 'button', name: 'Submit answers' },
+      { action: 'text', name: 'Correct. This is a fixed reply from the mock upstream.' },
+      { action: 'text', name: 'Replies are fixed sample text from a mock upstream.' },
     ],
   },
 ];

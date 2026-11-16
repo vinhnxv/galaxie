@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-export type GatewayState = 'ready' | 'denied' | 'quota_exceeded' | 'unavailable';
+export type GatewayState = 'ready' | 'mock' | 'denied' | 'quota_exceeded' | 'unavailable';
 
 export interface GatewayStateEntry {
   readonly message: string;
@@ -10,6 +10,7 @@ export interface GatewayStateEntry {
 
 export const gatewayStates: Readonly<Record<GatewayState, GatewayStateEntry>> = {
   ready: { message: 'Gateway route: host server.', control: null },
+  mock: { message: 'Replies are fixed sample text from a mock upstream.', control: null },
   denied: {
     message: 'Gateway access was denied. Retry to request a new demo session.',
     control: 'retry',
