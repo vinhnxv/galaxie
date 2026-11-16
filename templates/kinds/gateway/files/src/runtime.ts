@@ -7,7 +7,8 @@ import { openAICompatible } from '@galaxie-ai/models/openai';
 import { createRegistry, Quiz, type Registry } from '@galaxie-ai/react';
 import { MemorySaver } from '@langchain/langgraph/web';
 import { createTemplateAgent, templateDefinition } from './agent.js';
-import { type GatewayState, gatewayStateForStatus } from './gateway-state.js';
+import type { GatewayState } from './gateway-state.js';
+import { createModelFetch } from './model-fetch.js';
 import { createSession } from './session.js';
 
 export interface HybridHostOptions {
@@ -37,30 +38,7 @@ export function createHybridHost(options: HybridHostOptions = {}): HybridHost {
     for (const listener of listeners) listener();
   };
   const session = createSession(baseURL, fetcher, publish);
-  // The provider exposes fetch injection, not arbitrary body options. Add only host-owned metadata.
-  const modelFetch: typeof globalThis.fetch = async (input, init) => {
-    try {
-      const request = new Request(input, init);
-      const payload = (await request.json()) as Record<string, unknown>;
-      const response = await fetcher(request.url, {
-        method: request.method,
-        headers: request.headers,
-        signal: request.signal,
-        credentials: 'omit',
-        redirect: 'error',
-        cache: 'no-store',
-        body: JSON.stringify({
-          ...payload,
-          metadata: { promptId: 'practice-comment', variables: { tone: 'encouraging' } },
-        }),
-      });
-      publish(gatewayStateForStatus(response.status));
-      return response;
-    } catch {
-      publish('unavailable');
-      throw new Error('The gateway is unavailable.');
-    }
-  };
+  const modelFetch = createModelFetch(fetcher, publish);
   const registry = createRegistry({ components: [Quiz] });
   const runtime = createRuntime({
     appId: 'hybrid-gateway-template',

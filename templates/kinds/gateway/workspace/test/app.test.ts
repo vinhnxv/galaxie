@@ -159,3 +159,14 @@ it.each([401, 429, 503])(
     expect(host.getGatewayState()).toBe('ready');
   },
 );
+
+it('renders the fixed mock upstream status without a retry control', async () => {
+  mount();
+  await act(async () =>
+    root?.render(createElement(GatewayStatus, { state: 'mock', retry: () => {} })),
+  );
+  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
+    'Replies are fixed sample text from a mock upstream.',
+  );
+  expect(container?.querySelectorAll('button')).toHaveLength(0);
+});

@@ -104,6 +104,7 @@ it('keeps executable imports within the copied template or launch packages', asy
 it('keeps fixed states and a same-origin CSP with required Trusted Types', () => {
   expect(Object.keys(gatewayStates).sort()).toEqual([
     'denied',
+    'mock',
     'quota_exceeded',
     'ready',
     'unavailable',

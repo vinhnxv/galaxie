@@ -8,10 +8,13 @@ import {
   httpCapability,
   type RunId,
 } from '@galaxie-ai/core';
+import { openAICompatible } from '@galaxie-ai/models/openai';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { expect, it } from 'vitest';
 import { devGatewayOptions } from '../server/dev.js';
 import { createGateway } from '../server/gateway.js';
 import { createMockUpstream, mockReply } from '../server/mock-upstream.js';
+import { createModelFetch } from '../src/model-fetch.js';
 import { createHybridHost } from '../src/runtime.js';
 import { createSession } from '../src/session.js';
 import { answer, client, completion, harness, listen, post, token } from './support.node.js';
@@ -592,3 +595,122 @@ it('selects the dev mock only for empty upstream configuration and prefers a con
     }
   }
 });
+
+it('drops agent system and developer roles while preserving conversational messages and host metadata', async () => {
+  const seen: unknown[] = [];
+  const states: string[] = [];
+  const mock = createMockUpstream();
+  const gateway = createGateway({
+    mockUpstream: async (request) => {
+      seen.push(await request.clone().json());
+      return mock(request);
+    },
+  });
+  const origin = await listen(
+    createServer((request, response) => {
+      void gateway.handle(request, response);
+    }),
+  );
+  const credential = await token(origin);
+  const modelFetch = createModelFetch(fetch, (state) => states.push(state));
+  const messages = [
+    { role: 'system', content: 'Agent system' },
+    { role: 'user', content: 'Question' },
+    { role: 'developer', content: 'Agent developer' },
+    { role: 'assistant', content: 'Answer' },
+  ];
+  const response = await modelFetch(`${origin}/api/v1/chat/completions`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${credential}`, 'content-type': 'application/json' },
+    body: JSON.stringify(completion({ messages, metadata: { promptId: 'forged' } })),
+  });
+  expect(response.status).toBe(200);
+  expect(seen).toEqual([
+    expect.objectContaining({
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a practice coach. Give one short encouraging sentence. Keep it under 20 words.',
+        },
+        messages[1],
+        messages[3],
+      ],
+    }),
+  ]);
+  expect(states).toEqual(['mock']);
+  const direct = await post(
+    origin,
+    '/api/v1/chat/completions',
+    credential,
+    completion({ messages }),
+  );
+  expect(direct.status).toBe(400);
+  expect(await direct.json()).toEqual({ error: 'invalid_messages' });
+  const missing = await modelFetch(`${origin}/api/v1/chat/completions`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${credential}` },
+    body: JSON.stringify({ model: 'gateway-comment' }),
+  });
+  expect(missing.status).toBe(400);
+  expect(await missing.json()).toEqual({ error: 'invalid_messages' });
+});
+
+it('answers SystemMessage requests through the real OpenAI-compatible client in JSON and SSE', async () => {
+  const gateway = createGateway({ mockUpstream: createMockUpstream() });
+  const origin = await listen(
+    createServer((request, response) => {
+      void gateway.handle(request, response);
+    }),
+  );
+  const model = openAICompatible({
+    baseURL: `${origin}/api/v1`,
+    model: 'gateway-comment',
+    destination: 'host-server',
+    fetch: createModelFetch(fetch, () => {}),
+  })({ credential: await token(origin) });
+  const messages = [new SystemMessage('Agent-authored prompt'), new HumanMessage('Practice.')];
+  expect((await model.invoke(messages)).text).toBe('This is a fixed reply from the mock upstream.');
+  let text = '';
+  for await (const chunk of await model.stream(messages)) text += chunk.text;
+  expect(text).toBe('This is a fixed reply from the mock upstream.');
+  const host = createHybridHost({ baseURL: origin });
+  try {
+    const events = await answer(await host.createInstance());
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'output',
+        output: { result: 'Correct. This is a fixed reply from the mock upstream.' },
+      }),
+    );
+    expect(host.getGatewayState()).toBe('mock');
+  } finally {
+    await host.dispose();
+  }
+});
+
+it.each([200, 401, 429, 503])(
+  'uses the mock label only on successful responses (%s)',
+  async (status) => {
+    const states: string[] = [];
+    const fetcher = createModelFetch(
+      async (_input, init) => {
+        expect(init).toMatchObject({ credentials: 'omit', redirect: 'error', cache: 'no-store' });
+        const payload = JSON.parse(String(init?.body));
+        expect(payload).not.toHaveProperty('messages');
+        return Response.json({}, { status, headers: { 'x-galaxie-upstream': 'mock' } });
+      },
+      (state) => states.push(state),
+    );
+    await fetcher('http://127.0.0.1/api/v1/chat/completions', { method: 'POST', body: '{}' });
+    expect(states).toEqual([
+      status === 200
+        ? 'mock'
+        : status === 401
+          ? 'denied'
+          : status === 429
+            ? 'quota_exceeded'
+            : 'unavailable',
+    ]);
+  },
+);
