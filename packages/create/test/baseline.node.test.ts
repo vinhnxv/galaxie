@@ -78,6 +78,13 @@ function mutations(kind: string): readonly Mutation[] {
             after: 'void cspHeader;',
             directive: 'Content-Security-Policy',
           },
+          {
+            name: 'a production import of the mock upstream',
+            path: 'server/serve.ts',
+            before: "import { cspHeader } from '../src/csp.js';",
+            after: "import { cspHeader } from '../src/csp.js';\nimport './mock-upstream.js';",
+            directive: 'mock-upstream',
+          },
         ]),
   ];
 }
@@ -94,6 +101,7 @@ async function project(kind: string, mutation?: Mutation): Promise<string> {
       packageManager: 'npm',
     });
     await writeProject(await planWrite(result.files, directory));
+    if (kind === 'gateway') expect(result.files.has('server/mock-upstream.ts')).toBe(true);
     if (mutation !== undefined) {
       const path = join(directory, mutation.path);
       const original = await readFile(path, 'utf8');
