@@ -61,6 +61,25 @@ groups. Keep the request-time model trust check and existing pause-position rule
 Native author-defined and dynamic toolsets, provider tools, planners and executors
 remain refused. ADR-0012 and stored formats are unchanged.
 
+## Agent shapes
+
+- Use `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent` trees with
+  host-routed models and capability tools. `LlmAgent` sub-agents may transfer;
+  `subgraphs` stays false. Give every agent a distinct name.
+- A pause is supported in the first child at every `SequentialAgent` step or in
+  a transfer-linked chain of `LlmAgent`s. Pauses in a tree containing a
+  `ParallelAgent`, inside a `LoopAgent`, in later sequence children or under an
+  `LlmAgent` inside a workflow agent remain refused: resume can repeat siblings.
+- `AgentTool`, `Workflow`, foreign models, provider-native tools, planners and code
+  executors remain refused. Use fresh factory-built `host.adk.llm(role)` models,
+  or exact declared-role strings with `defineAdkEntry({ agent, roleStrings: true })`.
+  Fixed same-host capability groups use `adkToolset(host, tools)`; dynamic and
+  foreign toolsets remain refused.
+
+These are summaries of the [supported shapes](README.md#supported-agent-shapes),
+[model and toolset rules](README.md#porting-models-and-static-toolsets) and
+[documented refusals](../../docs/unsupported.md#google-adk-javascript).
+
 ## Tests
 
 Run `pnpm exec vitest run packages/adapter-adk tests/conformance/adk.test.ts
