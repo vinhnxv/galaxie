@@ -130,6 +130,43 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
     expect(errors.filter((message) => message.startsWith(evalProbe)).length).toBeLessThanOrEqual(1);
     expect(server.records).toHaveLength(1);
     await context.close();
+    delete process.env['UPSTREAM_BASE_URL'];
+    delete process.env['UPSTREAM_API_KEY'];
+    const mockPreview = await preview({
+      configFile: fileURLToPath(new URL('../vite.config.ts', import.meta.url)),
+      logLevel: 'silent',
+      build: { outDir: directory },
+      preview: { host: '127.0.0.1', port: 0, strictPort: true },
+    });
+    try {
+      const address = mockPreview.httpServer.address();
+      if (address === null || typeof address === 'string') throw new Error('Missing Vite port.');
+      const origin = `http://127.0.0.1:${address.port}`;
+      const context = await browser.newContext({ serviceWorkers: 'block' });
+      const page = await context.newPage();
+      const failed: string[] = [];
+      page.on('requestfailed', (request) => failed.push(request.failure()?.errorText ?? 'failed'));
+      await page.goto(origin);
+      await page.getByRole('button', { name: 'Start with gateway', exact: true }).click();
+      await page.getByRole('radio', { name: '4', exact: true }).check();
+      await page.getByRole('button', { name: 'Submit answers', exact: true }).click();
+      await page
+        .getByText('Correct. This is a fixed reply from the mock upstream.', { exact: true })
+        .waitFor();
+      await page
+        .getByText('Replies are fixed sample text from a mock upstream.', { exact: true })
+        .waitFor();
+      await page.evaluate(
+        'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+      );
+      expect(failed).toEqual([]);
+      await context.close();
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        mockPreview.httpServer.close((error) => (error ? reject(error) : resolve()));
+        mockPreview.httpServer.closeAllConnections();
+      });
+    }
   } finally {
     await browser?.close();
     await rm(directory, { recursive: true, force: true });

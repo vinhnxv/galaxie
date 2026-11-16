@@ -33,11 +33,10 @@ export function createModelFetch(
           metadata: { promptId: 'practice-comment', variables: { tone: 'encouraging' } },
         }),
       });
-      publish(
-        response.ok && response.headers.get('x-galaxie-upstream') === 'mock'
-          ? 'mock'
-          : gatewayStateForStatus(response.status),
-      );
+      const mock = response.ok && response.headers.get('x-galaxie-upstream') === 'mock';
+      // Finish the fixed mock body before the SDK cancels its reader after the SSE [DONE] frame.
+      if (mock) await response.clone().arrayBuffer();
+      publish(mock ? 'mock' : gatewayStateForStatus(response.status));
       return response;
     } catch {
       publish('unavailable');
