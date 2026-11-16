@@ -21,6 +21,7 @@ interface Asset {
 
 export function pythonFramework(projectDirectory: string): UserConfig {
   let resolved: Promise<{ build: PythonBuild; assets: readonly Asset[] }> | undefined;
+  let building = false;
   async function resolveBuild(): Promise<{ build: PythonBuild; assets: readonly Asset[] }> {
     if (resolved !== undefined) return resolved;
     resolved = (async () => {
@@ -141,7 +142,11 @@ export function pythonFramework(projectDirectory: string): UserConfig {
   }
   const assets: Plugin = {
     name: 'galaxie-python-assets',
+    configResolved(config) {
+      building = config.command === 'build';
+    },
     async buildStart() {
+      if (!building) return;
       resolved = undefined;
       const result = await resolveBuild();
       for (const asset of result.assets) this.emitFile({ type: 'asset', ...asset });

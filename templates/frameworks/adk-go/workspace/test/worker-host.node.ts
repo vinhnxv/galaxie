@@ -12,7 +12,9 @@ import {
 } from '../../../../../../examples/rag-browser/test/support/adk-go-reference.node.js';
 
 /** Exercise the shipped Go Worker in Node, adapting only browser messaging and location. */
-export async function createWorkerHost(): Promise<NodeHost> {
+export async function createWorkerHost(): Promise<
+  NodeHost & { readonly location: string; readonly workerScript: RegExp }
+> {
   const project = fileURLToPath(new URL('../', import.meta.url));
   const dist = join(project, 'node_modules/@galaxie-ai/starter-go/dist');
   const manifest = JSON.parse(await readFile(join(dist, 'manifest.json'), 'utf8')) as {
@@ -69,6 +71,8 @@ await import('./worker.mjs');
     });
     return {
       ...host,
+      location: host.wasm.url,
+      workerScript: /go-worker\.ts$/,
       async close() {
         await host.close();
         await rm(directory, { recursive: true, force: true });

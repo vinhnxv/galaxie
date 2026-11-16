@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 import { goFramework } from './templates/frameworks/adk-go/files/vite.framework.js';
+import { pythonFramework } from './templates/frameworks/langgraph-python/files/vite.framework.js';
 
 import {
   mcpAdminCommand,
@@ -28,6 +29,12 @@ const alias = {
   ),
   '@galaxie-ai/adapter-adk': fileURLToPath(
     new URL('./packages/adapter-adk/src/index.ts', import.meta.url),
+  ),
+  '@galaxie-ai/adapter-pyodide/worker': fileURLToPath(
+    new URL('./packages/adapter-pyodide/src/worker.ts', import.meta.url),
+  ),
+  '@galaxie-ai/adapter-pyodide/runtime-files': fileURLToPath(
+    new URL('./packages/adapter-pyodide/src/runtime-files.ts', import.meta.url),
   ),
   '@galaxie-ai/adapter-pyodide': fileURLToPath(
     new URL('./packages/adapter-pyodide/src/index.ts', import.meta.url),
@@ -186,13 +193,20 @@ const starterGo = goFramework(
   fileURLToPath(new URL('./packages/create/.cache/composed/browser-only-adk-go/', import.meta.url)),
 );
 
+const starterPython = pythonFramework(
+  fileURLToPath(
+    new URL('./packages/create/.cache/composed/browser-only-langgraph-python/', import.meta.url),
+  ),
+);
+const starterFrameworks = { ...starterGo, plugins: [starterGo.plugins, starterPython.plugins] };
+
 const config: ViteUserConfig = defineConfig({
   server: { host: '127.0.0.1' },
   test: {
     api: { host: '127.0.0.1' },
     projects: [
       {
-        ...starterGo,
+        ...starterFrameworks,
         resolve: { alias },
         test: {
           name: 'node',
@@ -216,11 +230,11 @@ const config: ViteUserConfig = defineConfig({
         },
       },
       {
-        ...starterGo,
+        ...starterFrameworks,
         root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
         resolve: { alias },
         plugins: [
-          starterGo.plugins,
+          starterFrameworks.plugins,
           {
             name: 'starter-go-test-wasm',
             configureServer(server) {

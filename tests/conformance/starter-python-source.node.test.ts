@@ -91,3 +91,17 @@ test('symlinks are refused rather than followed', async () => {
   );
   await expect(compile(directory)).rejects.toThrow('link.py');
 });
+
+test('hidden inputs affect source identity, while only the documented cache paths are ignored', async () => {
+  const directory = await project();
+  const initial = await compile(directory);
+  const root = join(directory, 'python/agent');
+  for (const name of ['.git', 'node_modules', '__pycache__']) {
+    await mkdir(join(root, name));
+    await writeFile(join(root, name, 'ignored.py'), '# Ignored cache input.\n');
+  }
+  await writeFile(join(root, '.DS_Store'), 'ignored');
+  expect(await compile(directory)).toBe(initial);
+  await writeFile(join(root, '.metadata'), 'authored input');
+  expect(await compile(directory)).not.toBe(initial);
+});
