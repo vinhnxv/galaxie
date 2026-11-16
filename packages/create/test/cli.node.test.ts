@@ -392,7 +392,13 @@ test.each([[], ['agents.md'], ['claude.md'], ['agents.md', 'claude.md']])(
         .split('\n')
         .filter((line) => line.startsWith('Hint:')),
     ).toEqual(
-      existing.length === 1 ? ['Hint: CLAUDE.md should import AGENTS.md with @AGENTS.md.'] : [],
+      existing.length !== 1
+        ? []
+        : existing[0] === 'claude.md'
+          ? ['Hint: CLAUDE.md should import AGENTS.md with @AGENTS.md.']
+          : [
+              'Hint: AGENTS.md was kept; point it at .agents/skills/galaxie/SKILL.md so agents find the skill.',
+            ],
     );
     expect(await readFile(join(root, 'my-app/.agents/skills/galaxie/SKILL.md'))).toEqual(
       await readFile(join(guidanceRoot, 'SKILL.md')),

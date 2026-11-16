@@ -178,3 +178,13 @@ test('written guidance consists of real files with fixed modes', async () => {
     expect(await readFile(actual)).toEqual(Buffer.from(bytes));
   }
 });
+
+test('only plain reference pages are copied into a project', async () => {
+  const input = new Map(await source);
+  input.set('references/.DS_Store', Buffer.from('noise'));
+  input.set('references/Notes.md', Buffer.from('# Notes\n'));
+  input.set('references/nested/extra.md', Buffer.from('# Extra\n'));
+  const files = renderGuidance(input, selection);
+  expect([...files.keys()].filter((path) => /DS_Store|Notes|nested/.test(path))).toEqual([]);
+  expect(files).toEqual(renderGuidance(await source, selection));
+});

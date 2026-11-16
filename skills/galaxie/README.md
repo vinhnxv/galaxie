@@ -27,7 +27,8 @@ the verified installed version explicitly:
 node scripts/install-skill.ts /path/to/app --core-version 0.1.0
 ```
 
-An installed local version takes precedence over the override. A mismatch or
+An installed local version takes precedence over the override. An exact dependency
+with no installed core is trusted as written; the installer cannot verify it. A mismatch or
 unresolved version fails before any writes. The installer needs no dependencies,
 package manager, network or provider credentials; cloning the future tag is a
 separate network step.

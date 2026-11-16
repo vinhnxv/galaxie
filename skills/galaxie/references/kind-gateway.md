@@ -13,9 +13,8 @@ The demo session endpoint and in-memory stores are not production authentication
 or storage. Supply authenticated sessions, backend authorization, durable
 transactional receipts, retention, cross-process quotas and provider billing
 limits. Call quotas and token caps do not establish a spending limit. Preserve
-Host/Origin checks and CSP/Trusted Types. Dev/preview mocks prove wiring only;
-production remains unavailable without an upstream. Keep production imports free
-of dev/mock code and retain the generated check's assertions.
+CSP/Trusted Types. Dev/preview mocks prove wiring only; production remains
+unavailable without an upstream. Retain the generated check's assertions.
 
 Read the generated README and framework reference for build prerequisites. See
 the [gateway starter](https://github.com/vinhnxv/galaxie/blob/main/templates/kinds/gateway/files/README.md).

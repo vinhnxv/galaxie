@@ -2,7 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from 'node:child_process';
-import { lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -199,4 +209,15 @@ test('skill version follows core, instructs comparison and documents the absent 
   const readme = await readFile(join(source, 'README.md'), 'utf8');
   expect(readme).toContain('No release tag exists yet');
   expect(readme).toContain('22.18');
+});
+
+test('a failed write leaves no half skill and no staging directory', async () => {
+  const directory = await app();
+  await mkdir(join(directory, '.claude'), { recursive: true });
+  await chmod(join(directory, '.claude'), 0o555);
+  onTestFinished(() => chmod(join(directory, '.claude'), 0o755));
+  if (process.getuid?.() === 0) return;
+  expect(() => install(directory)).toThrow();
+  await expect(lstat(join(directory, '.agents/skills/galaxie'))).rejects.toThrow();
+  expect(await readdir(join(directory, '.agents/skills'))).toEqual([]);
 });

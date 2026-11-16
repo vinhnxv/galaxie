@@ -280,6 +280,34 @@ test('rejects a malformed citation rather than silently skipping it', () => {
   expect(result.output).toContain(`${citationFile}:3: invalid citation`);
 });
 
+test.each([
+  ['an extra space', citation.replace('<!-- ', '<!--  ')],
+  ['no space', citation.replace('<!-- ', '<!--')],
+])('rejects a citation comment with %s rather than skipping it', (_name, comment) => {
+  const result = run(citationFixture(citedSource, comment));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${citationFile}:3: invalid citation`);
+});
+
+test('rejects a citation of an empty section', () => {
+  const root = citationFixture('# Rules\n\n## Never\n\n## Other\n\nNot cited.\n');
+  const result = run(root);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${citationFile}:3: empty citation section: rules.md#Never`);
+});
+
+test('an unpaired backtick does not hide later paragraphs from the claim and citation checks', () => {
+  const stale = citation.replace(sectionHash, '0'.repeat(64));
+  const root = fixture({
+    'rules.md': citedSource,
+    [citationFile]: `# Guidance\n\nStray tick \`\n\nThis app is secure.\n\n${stale}\nRule.\n\nAnother tick \`\n`,
+  });
+  const result = run(root);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${citationFile}:5: banned claim: secure`);
+  expect(result.output).toContain(`${citationFile}:7: citation hash mismatch`);
+});
+
 test('ignores citation examples in fences and inline code', () => {
   const root = fixture({
     [citationFile]:

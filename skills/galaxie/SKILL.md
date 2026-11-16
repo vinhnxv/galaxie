@@ -16,6 +16,7 @@ ones matching its actual host and executor. Read
 
 ## Baseline to preserve
 
+<!-- galaxie:cite path="docs/adr/0012-security-baseline.md" heading="Context" sha256="dad0387b30336c60f2e27ba8b8942480dab69ba8c315afd57d4c667a83ee9861" -->
 <!-- galaxie:cite path="docs/adr/0012-security-baseline.md" heading="Decision" sha256="a92d75c3ffb3f5b696b8b7637d3e0ccb093e274a892bbcf241cc63c26b1cbdc2" -->
 <!-- galaxie:summary:start -->
 - Run reviewed, bundled agent code. Same-origin code is trusted; client controls

@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -98,10 +99,9 @@ export function install(
     throw new Error('Skill references must be a directory.');
   const expected = new Map([
     ['SKILL.md', skill],
-    ...[...files(references)].map(([path, bytes]): [string, Buffer] => [
-      `references/${path}`,
-      bytes,
-    ]),
+    ...[...files(references)]
+      .filter(([path]) => /^[a-z0-9-]+\.md$/.test(path))
+      .map(([path, bytes]): [string, Buffer] => [`references/${path}`, bytes]),
   ]);
   const targets = ['.agents/skills/galaxie', '.claude/skills/galaxie'].map((path) => {
     const target = destination(root, path);
@@ -117,14 +117,26 @@ export function install(
       );
     return { target, exists, equal };
   });
-  for (const { target, exists, equal } of targets) {
-    if (equal) continue;
-    if (exists) rmSync(target, { recursive: true });
-    for (const [path, bytes] of expected) {
-      const output = join(target, path);
-      mkdirSync(dirname(output), { recursive: true });
-      writeFileSync(output, bytes, { flag: 'wx', mode: 0o644 });
+  // Stage every changed copy beside its target first, so a failed write leaves no half skill.
+  const pending = targets.filter(({ equal }) => !equal);
+  const staged: string[] = [];
+  try {
+    for (const { target } of pending) {
+      const stage = `${target}.staging-${process.pid}`;
+      staged.push(stage);
+      for (const [path, bytes] of expected) {
+        const output = join(stage, path);
+        mkdirSync(dirname(output), { recursive: true });
+        writeFileSync(output, bytes, { flag: 'wx', mode: 0o644 });
+      }
     }
+  } catch (error) {
+    for (const stage of staged) rmSync(stage, { recursive: true, force: true });
+    throw error;
+  }
+  for (const [index, { target, exists }] of pending.entries()) {
+    if (exists) rmSync(target, { recursive: true });
+    renameSync(staged[index] ?? '', target);
   }
 }
 

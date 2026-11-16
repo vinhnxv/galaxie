@@ -56,8 +56,15 @@ function mask(content: string): string {
   return content.replace(/[^\n]/g, ' ');
 }
 
+// A Markdown code span cannot cross a blank line, so an unpaired backtick must not
+// hide later paragraphs from the claim and citation checks.
 function withoutCode(content: string): string {
-  return content.replace(/(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/g, mask);
+  return content
+    .split(/(\n[ \t]*\n)/)
+    .map((part, index) =>
+      index % 2 === 1 ? part : part.replace(/(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/g, mask),
+    )
+    .join('');
 }
 
 interface Heading {
@@ -130,6 +137,10 @@ function citationHash(
     .map((value) => value.trimEnd())
     .join('\n')
     .replace(/^\n+|\n+$/g, '');
+  if (body === '') {
+    problem(file, line, `empty citation section: ${target}#${title}`);
+    return;
+  }
   return createHash('sha256').update(body, 'utf8').digest('hex');
 }
 
@@ -137,7 +148,7 @@ function checkCitations(file: string, source: string, content: string): void {
   const updates = new Map<number, string>();
   const raw = source.split(/\r?\n/);
   for (const [index, line] of content.split('\n').entries()) {
-    if (!line.includes('<!-- galaxie:cite')) continue;
+    if (!/<!--\s*galaxie:cite/i.test(line)) continue;
     const match =
       /^\s*<!-- galaxie:cite path="([^"]+)" heading="([^"]+)" sha256="([a-f\d]{64})" -->\s*$/.exec(
         raw[index] ?? '',

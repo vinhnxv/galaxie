@@ -111,7 +111,7 @@ Keep the generated CSP and Trusted Types assertions. Exercise changed flows with
     'SKILL.md',
     ...[...source.keys()].filter(
       (path) =>
-        path.startsWith('references/') &&
+        /^references\/[a-z0-9-]+\.md$/.test(path) &&
         (!/^references\/(?:kind|framework)-/.test(path) || path === kind || path === framework),
     ),
   ];

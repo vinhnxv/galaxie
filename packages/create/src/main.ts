@@ -104,8 +104,14 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
     const plan = await planWrite(result.files, target, io.cwd ?? process.cwd());
     await writeProject(plan);
     for (const path of plan.skipped) output.write(`Kept existing ${path}.\n`);
-    if (plan.skipped.length === 1)
-      output.write('Hint: CLAUDE.md should import AGENTS.md with @AGENTS.md.\n');
+    if (plan.skipped.length === 1) {
+      const kept = plan.skipped[0]?.toLowerCase() === 'claude.md';
+      output.write(
+        kept
+          ? 'Hint: CLAUDE.md should import AGENTS.md with @AGENTS.md.\n'
+          : 'Hint: AGENTS.md was kept; point it at .agents/skills/galaxie/SKILL.md so agents find the skill.\n',
+      );
+    }
     output.write(
       `Created ${plan.files.size} files in ${plan.target}.\nLayers: ${result.report.layers.join(', ')}.\n`,
     );
