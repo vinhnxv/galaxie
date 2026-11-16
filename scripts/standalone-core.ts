@@ -76,6 +76,7 @@ export interface TemplateSpec {
     readonly compile: readonly string[];
     readonly entry: string;
     readonly port: number;
+    readonly steps?: readonly Step[];
   };
 }
 export interface Driver {
@@ -679,7 +680,11 @@ export async function runStandalone(
             await run([npmCli, 'run', 'check']);
             phase = 'negative-control';
             await assertBaselineRejections(project, () => run([npmCli, 'run', 'check']), signal);
-            const serve = async (args: readonly string[], port: number): Promise<void> => {
+            const serve = async (
+              args: readonly string[],
+              port: number,
+              steps: readonly Step[] = spec.steps,
+            ): Promise<void> => {
               phase = 'serve';
               const child = await runner.start(command(binary, args, project, childEnv));
               children.add(child);
@@ -699,7 +704,7 @@ export async function runStandalone(
                   if (response.status !== 200) throw new Error('Session probe did not return 200.');
                 }
                 phase = 'drive';
-                result.browser = await dependencies.driver.drive(url, spec, signal);
+                result.browser = await dependencies.driver.drive(url, { ...spec, steps }, signal);
               } catch (error) {
                 record(error);
               } finally {
@@ -725,7 +730,7 @@ export async function runStandalone(
               await run(spec.server.compile);
               phase = 'serve';
               await ports.find(spec.server.port);
-              await serve([spec.server.entry], spec.server.port);
+              await serve([spec.server.entry], spec.server.port, spec.server.steps ?? spec.steps);
             }
           } catch (error) {
             record(error);
