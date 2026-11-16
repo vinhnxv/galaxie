@@ -146,15 +146,19 @@ test('the temporary starter passes native go vet', async (context) => {
     filter: (p) => !p.endsWith('_test.go'),
   });
   for (const file of ['go.mod', 'go.sum']) await cp(join('go', file), join(module, file));
-  const result = spawnSync('go', ['vet', '.'], {
+  const nativeOptions = {
     cwd: resolve(dir, 'go'),
     env: {
       ...buildEnvironment(),
       GOOS: process.platform === 'darwin' ? 'darwin' : 'linux',
       GOARCH: process.arch === 'arm64' ? 'arm64' : 'amd64',
     },
-    encoding: 'utf8',
-  });
+    encoding: 'utf8' as const,
+  };
+  // Keep cold-cache download progress separate from vet diagnostics.
+  const download = spawnSync('go', ['mod', 'download'], nativeOptions);
+  expect(download.status, download.stderr).toBe(0);
+  const result = spawnSync('go', ['vet', '.'], nativeOptions);
   expect(result.stderr).toBe('');
   expect(result.status).toBe(0);
 }, 120_000);
