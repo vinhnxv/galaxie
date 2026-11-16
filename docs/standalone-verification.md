@@ -9,32 +9,37 @@ gateway mock.
 
 ## Gateway mock measurement (2026-11-16)
 
-The gateway-only matrix ran once and exited 1:
+The gateway-only matrix ran three times with the same command:
 
 ```sh
 node scripts/verify-standalone.ts --kind gateway --node 22 --node 24 --mode both --json /tmp/galaxie-wa5-4-network.json
 ```
 
+1. The first run, before the transport correction below, exited 1: all four rows
+   (Node 22.23.5 and 24.15.0, registry and packed workspace, npm 12.2.2) passed
+   installation, build, generated checks and directive mutation controls, and each
+   recorded one gating drive failure with the exact excerpt `Request failed.`
+2. After the correction, the matrix was rerun on the corrected tree and exited 0.
+3. After the review follow-ups to the gateway server and its tests, the matrix was
+   rerun on the final code and exited 0.
+
 | Target Node | npm | Registry | Packed workspace |
 | --- | --- | --- | --- |
-| 22.23.5 | 12.2.2 | FAIL: preview request aborted | FAIL: preview request aborted |
-| 24.15.0 | 12.2.2 | FAIL: preview request aborted | FAIL: preview request aborted |
+| 22.23.5 | 12.2.2 | PASS | PASS |
+| 24.15.0 | 12.2.2 | PASS | PASS |
 
-All four rows passed installation, build, generated checks and directive mutation
-controls. Each recorded one gating drive failure, with the exact excerpt
-`Request failed.` The compiled-server 503 drive completed on Chromium
-156.0.8078.4. No release-age exclusion or lifecycle-script fallback was used.
-JSON and command logs remain outside the repository; temporary projects were
-removed.
+Each passing row covers installation, the production Vite build, the generated
+checks and mutation controls, the preview drive through the mock and the
+compiled-server 503 drive, with the release-age policy at 7 days and no
+exclusion or lifecycle-script fallback. JSON and command logs remain outside the
+repository; temporary projects were removed.
 
-A loopback reproduction showed that the page received the mock result and status,
-then Chromium reported `net::ERR_ABORTED` as the SDK cancelled its SSE reader.
-The host wrapper now drains a clone of successful mock responses before giving
-the original response to the SDK. Real-upstream responses keep their existing
-path. A browser regression failed before this correction and passes afterward;
-the unchanged strict harness driver also passes the corrected mock preview over
-loopback. The network matrix was not rerun after this correction, so these four
-rows remain failed measurements. Real-provider behavior remains unmeasured.
+A loopback reproduction of the first failure showed that the page received the mock
+result and status, then Chromium reported `net::ERR_ABORTED` as the SDK cancelled
+its SSE reader. The host wrapper now drains a clone of successful mock responses
+before giving the original response to the SDK. Real-upstream responses keep their
+existing path, and the harness driver stays strict. Real-provider behavior remains
+unmeasured.
 
 ## Earlier composed-project measurement (2026-11-16, before the gateway mock)
 

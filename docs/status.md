@@ -6,10 +6,9 @@ configuration and the compiled production entry retain 503 without an upstream.
 The host drops agent-authored system/developer messages while direct gateway
 requests with those roles remain refused. Offline tests cover JSON/SSE, quotas,
 real-client message projection and the source/compiled production boundary. The
-four-row Node 22/24 registry/tarball measurement passed installs, builds and
-generated checks but found a preview request-abort diagnostic. A correction passes
-the browser regression and strict preview driver over loopback; the network
-matrix was not rerun. See the [record](standalone-verification.md#gateway-mock-measurement-2026-11-16).
+four-row Node 22/24 registry/tarball measurement first found a preview
+request-abort diagnostic; after the transport correction and the review
+follow-ups it passes in all four rows. See the [record](standalone-verification.md#gateway-mock-measurement-2026-11-16).
 Real-provider behavior, devices, latency and memory use remain unmeasured.
 ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.
 
