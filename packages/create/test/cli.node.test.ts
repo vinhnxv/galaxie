@@ -20,7 +20,7 @@ import { expect, onTestFinished, test } from 'vitest';
 import type { InstallCommand } from '../src/install.js';
 import { run } from '../src/main.js';
 
-async function fixture(): Promise<{ root: string; templatesRoot: string }> {
+async function fixture(): Promise<{ root: string; templatesRoot: string; guidanceRoot: string }> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'galaxie-cli-')));
   onTestFinished(() => rm(root, { recursive: true, force: true }));
   const templatesRoot = join(root, 'layers');
@@ -30,7 +30,7 @@ async function fixture(): Promise<{ root: string; templatesRoot: string }> {
       'base',
       'base',
       { version: '0.0.0', private: true, license: 'Apache-2.0' },
-      { _gitignore: 'node_modules/\n', 'AGENTS.md': 'generated instructions\n' },
+      { _gitignore: 'node_modules/\n' },
     ],
     [
       'kinds/browser-only',
@@ -61,7 +61,19 @@ async function fixture(): Promise<{ root: string; templatesRoot: string }> {
     for (const [name, bytes] of Object.entries(files))
       await writeFile(join(templatesRoot, path, 'files', name), bytes);
   }
-  return { root, templatesRoot };
+  const guidanceRoot = join(root, 'guidance');
+  await mkdir(join(guidanceRoot, 'references'), { recursive: true });
+  for (const [path, content] of Object.entries({
+    'SKILL.md':
+      '---\nname: galaxie\ndescription: Fixture guidance.\nversion: 0.1.0\n---\n<!-- galaxie:summary:start -->\nFixture rules.\n<!-- galaxie:summary:end -->\n',
+    'references/kind-browser-only.md':
+      '<!-- galaxie:summary:start -->\nBrowser fixture.\n<!-- galaxie:summary:end -->\n',
+    'references/framework-langgraph-js.md':
+      '<!-- galaxie:summary:start -->\nFramework fixture.\n<!-- galaxie:summary:end -->\n',
+    'references/host-integration.md': 'Host fixture.\n',
+  }))
+    await writeFile(join(guidanceRoot, path), content);
+  return { root, templatesRoot, guidanceRoot };
 }
 
 function output(): {
@@ -87,13 +99,14 @@ test.each([
   ['my-app', 'browser-only', 'langgraph-js', '--no-install'],
   ['--kind', 'browser-only', '--framework', 'langgraph-js', '--no-install', 'my-app'],
 ])('writes the fixed project oracle for either argument form: %j', async (...argv) => {
-  const { root, templatesRoot } = await fixture();
+  const { root, templatesRoot, guidanceRoot } = await fixture();
   const streams = output();
   let installs = 0;
   expect(
     await run(argv, {
       cwd: root,
       templatesRoot,
+      guidanceRoot,
       ...streams,
       env: {},
       runner: async () => {
@@ -103,8 +116,11 @@ test.each([
   ).toBe(0);
   expect(installs).toBe(0);
   expect((await readdir(join(root, 'my-app'))).sort()).toEqual([
+    '.agents',
+    '.claude',
     '.gitignore',
     'AGENTS.md',
+    'CLAUDE.md',
     'agent.txt',
     'main.txt',
     'package.json',
@@ -112,7 +128,33 @@ test.each([
   expect(await readFile(join(root, 'my-app/main.txt'), 'utf8')).toBe('main\n');
   expect(await readFile(join(root, 'my-app/agent.txt'), 'utf8')).toBe('agent\n');
   expect(await readFile(join(root, 'my-app/.gitignore'), 'utf8')).toBe('node_modules/\n');
-  expect(await readFile(join(root, 'my-app/AGENTS.md'), 'utf8')).toBe('generated instructions\n');
+  expect(await readFile(join(root, 'my-app/AGENTS.md'), 'utf8')).toBe(`<!-- galaxie:begin guidance=1 skill=0.1.0 -->
+# Coding with galaxie
+
+Read [the galaxie skill](.agents/skills/galaxie/SKILL.md) and the references present
+before editing. The same skill is available in .claude/skills/galaxie.
+Compare its version with the installed @galaxie-ai/core; stop on a mismatch.
+
+## Rules to preserve
+
+Fixture rules.
+
+## Project kind: browser-only
+
+Browser fixture.
+
+## Framework: langgraph-js
+
+Framework fixture.
+
+## Verify changes
+
+Use the package manager in package.json. Run npm run check and npm run build
+(or the equivalent for that manager); gateway projects also have npm run build:server.
+Keep the generated CSP and Trusted Types assertions. Exercise changed flows with mocks.
+<!-- galaxie:end -->
+`);
+  expect(await readFile(join(root, 'my-app/CLAUDE.md'), 'utf8')).toBe('@AGENTS.md\n');
   expect(JSON.parse(await readFile(join(root, 'my-app/package.json'), 'utf8'))).toEqual({
     name: 'my-app',
     version: '0.0.0',
@@ -120,7 +162,7 @@ test.each([
     license: 'Apache-2.0',
     dependencies: { '@galaxie-ai/core': '^0.1.0', zod: '4.6.7' },
   });
-  expect(streams.text()).toContain('Created 5 files');
+  expect(streams.text()).toContain('Created 14 files');
   expect(streams.text()).toContain('npm install --ignore-scripts');
   expect(streams.errors()).toBe('');
 });
@@ -133,22 +175,36 @@ test.each([
   ['my-app', 'browser-only', 'wrong'],
   ['--unknown'],
 ])('non-TTY missing or invalid choices exit 2 before writing: %j', async (...argv) => {
-  const { root, templatesRoot } = await fixture();
+  const { root, templatesRoot, guidanceRoot } = await fixture();
   const streams = output();
   expect(
-    await run(argv, { cwd: root, templatesRoot, ...streams, env: {}, stdin: new PassThrough() }),
+    await run(argv, {
+      cwd: root,
+      templatesRoot,
+      guidanceRoot,
+      ...streams,
+      env: {},
+      stdin: new PassThrough(),
+    }),
   ).toBe(2);
   expect(streams.errors()).toContain('Valid kinds: browser-only');
   expect(streams.errors()).toContain('Valid frameworks: langgraph-js');
-  expect(await readdir(root)).toEqual(['layers']);
+  expect(await readdir(root)).toEqual(['guidance', 'layers']);
 });
 
 test('TTY prompts accept numeric choices, names and Enter for a singleton', async () => {
-  const { root, templatesRoot } = await fixture();
+  const { root, templatesRoot, guidanceRoot } = await fixture();
   const streams = output();
   const stdin = Object.assign(new PassThrough(), { isTTY: true });
   Object.assign(streams.stdout, { isTTY: true });
-  const task = run(['--no-install'], { cwd: root, templatesRoot, stdin, ...streams, env: {} });
+  const task = run(['--no-install'], {
+    cwd: root,
+    templatesRoot,
+    guidanceRoot,
+    stdin,
+    ...streams,
+    env: {},
+  });
   setImmediate(() => {
     stdin.end('my-app\n1\nlanggraph-js\n');
   });
@@ -160,6 +216,7 @@ test('TTY prompts accept numeric choices, names and Enter for a singleton', asyn
   const second = run(['another-app', 'browser-only', '--no-install'], {
     cwd: root,
     templatesRoot,
+    guidanceRoot,
     stdin: secondInput,
     ...streams,
     env: {},
@@ -171,13 +228,14 @@ test('TTY prompts accept numeric choices, names and Enter for a singleton', asyn
 });
 
 test.each(['eof', 'invalid'] as const)('TTY %s exits 2 and writes nothing', async (kind) => {
-  const { root, templatesRoot } = await fixture();
+  const { root, templatesRoot, guidanceRoot } = await fixture();
   const streams = output();
   const stdin = Object.assign(new PassThrough(), { isTTY: true });
   Object.assign(streams.stdout, { isTTY: true });
   const task = run(['my-app', '--no-install'], {
     cwd: root,
     templatesRoot,
+    guidanceRoot,
     stdin,
     ...streams,
     env: {},
@@ -192,7 +250,7 @@ test.each(['eof', 'invalid'] as const)('TTY %s exits 2 and writes nothing', asyn
 test.each(['npm', 'pnpm', 'yarn', 'bun'] as const)(
   'the CLI installs with the detected manager (%s)',
   async (manager) => {
-    const { root, templatesRoot } = await fixture();
+    const { root, templatesRoot, guidanceRoot } = await fixture();
     const streams = output();
     const commands: InstallCommand[] = [];
     const env = { npm_config_user_agent: `${manager}/1.0` };
@@ -200,6 +258,7 @@ test.each(['npm', 'pnpm', 'yarn', 'bun'] as const)(
       await run(['my-app', 'browser-only', 'langgraph-js'], {
         cwd: root,
         templatesRoot,
+        guidanceRoot,
         ...streams,
         env,
         platform: 'darwin',
@@ -223,7 +282,7 @@ test.each(['npm', 'pnpm', 'yarn', 'bun'] as const)(
 );
 
 test('Windows prints its install command; a failed install retains the project and returns 1', async () => {
-  const { root, templatesRoot } = await fixture();
+  const { root, templatesRoot, guidanceRoot } = await fixture();
   const streams = output();
   let calls = 0;
   const runner = async (): Promise<void> => {
@@ -234,6 +293,7 @@ test('Windows prints its install command; a failed install retains the project a
     await run(['my-app', 'browser-only', 'langgraph-js'], {
       cwd: root,
       templatesRoot,
+      guidanceRoot,
       ...streams,
       env: {},
       platform: 'win32',
@@ -246,6 +306,7 @@ test('Windows prints its install command; a failed install retains the project a
     await run(['failed-app', 'browser-only', 'langgraph-js'], {
       cwd: root,
       templatesRoot,
+      guidanceRoot,
       ...streams,
       env: {},
       platform: 'darwin',
@@ -258,7 +319,7 @@ test('Windows prints its install command; a failed install retains the project a
 });
 
 test('existing instruction files are kept and an ordinary collision aborts every write', async () => {
-  const { root, templatesRoot } = await fixture();
+  const { root, templatesRoot, guidanceRoot } = await fixture();
   const streams = output();
   await mkdir(join(root, 'my-app'));
   await writeFile(join(root, 'my-app/agents.md'), 'host instructions\n');
@@ -266,6 +327,7 @@ test('existing instruction files are kept and an ordinary collision aborts every
     await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
       cwd: root,
       templatesRoot,
+      guidanceRoot,
       ...streams,
       env: {},
     }),
@@ -278,6 +340,7 @@ test('existing instruction files are kept and an ordinary collision aborts every
     await run(['blocked-app', 'browser-only', 'langgraph-js', '--no-install'], {
       cwd: root,
       templatesRoot,
+      guidanceRoot,
       ...streams,
       env: {},
     }),
@@ -289,22 +352,23 @@ test('existing instruction files are kept and an ordinary collision aborts every
 test.each(['../escape', '/absolute-app', 'bad\0name', 'Uppercase', '.hidden', 'has spaces'])(
   'invalid project targets fail before writes: %j',
   async (directory) => {
-    const { root, templatesRoot } = await fixture();
+    const { root, templatesRoot, guidanceRoot } = await fixture();
     const streams = output();
     expect(
       await run([directory, 'browser-only', 'langgraph-js', '--no-install'], {
         cwd: root,
         templatesRoot,
+        guidanceRoot,
         ...streams,
         env: {},
       }),
     ).toBe(2);
-    expect(await readdir(root)).toEqual(['layers']);
+    expect(await readdir(root)).toEqual(['guidance', 'layers']);
   },
 );
 
 test('a symlink target is refused after a real target succeeds', async () => {
-  const { root, templatesRoot } = await fixture();
+  const { root, templatesRoot, guidanceRoot } = await fixture();
   const streams = output();
   await mkdir(join(root, 'actual-app'));
   await symlink(join(root, 'actual-app'), join(root, 'linked-app'));
@@ -312,6 +376,7 @@ test('a symlink target is refused after a real target succeeds', async () => {
     await run(['linked-app', 'browser-only', 'langgraph-js', '--no-install'], {
       cwd: root,
       templatesRoot,
+      guidanceRoot,
       ...streams,
       env: {},
     }),
@@ -321,6 +386,7 @@ test('a symlink target is refused after a real target succeeds', async () => {
     await run(['actual-app', 'browser-only', 'langgraph-js', '--no-install'], {
       cwd: root,
       templatesRoot,
+      guidanceRoot,
       ...streams,
       env: {},
     }),
@@ -328,16 +394,19 @@ test('a symlink target is refused after a real target succeeds', async () => {
 });
 
 test('a dot target uses the current directory name and help performs no write', async () => {
-  const { root, templatesRoot } = await fixture();
+  const { root, templatesRoot, guidanceRoot } = await fixture();
   const streams = output();
-  expect(await run(['--help'], { cwd: root, templatesRoot, ...streams, env: {} })).toBe(0);
-  expect(await readdir(root)).toEqual(['layers']);
+  expect(
+    await run(['--help'], { cwd: root, templatesRoot, guidanceRoot, ...streams, env: {} }),
+  ).toBe(0);
+  expect(await readdir(root)).toEqual(['guidance', 'layers']);
   const cwd = join(root, 'current-app');
   await mkdir(cwd);
   expect(
     await run(['.', 'browser-only', 'langgraph-js', '--no-install'], {
       cwd,
       templatesRoot,
+      guidanceRoot,
       ...streams,
       env: {},
     }),

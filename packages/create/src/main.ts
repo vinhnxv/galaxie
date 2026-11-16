@@ -6,6 +6,7 @@ import type { Readable, Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { type Choices, parseArguments, UsageError, usage } from './args.js';
 import { compose, LayerCollisionError, SelectionError } from './compose.js';
+import { GuidanceError, loadGuidanceSource, renderGuidance } from './guidance.js';
 import { detectPackageManager, InstallError, type InstallRunner, install } from './install.js';
 import { LayerManifestError, loadLayers } from './layers.js';
 import { MergeConflictError } from './merge.js';
@@ -17,6 +18,7 @@ import { ProjectWriteError, planWrite, writeProject } from './write.js';
 export interface IO {
   readonly cwd?: string;
   readonly templatesRoot?: string;
+  readonly guidanceRoot?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly platform?: NodeJS.Platform;
   readonly stdin?: Readable & { readonly isTTY?: boolean };
@@ -91,11 +93,19 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
       name,
       mode: 'project',
       packageManager,
+      guidance: renderGuidance(
+        await loadGuidanceSource(
+          io.guidanceRoot ?? fileURLToPath(new URL('../../../skills/galaxie', import.meta.url)),
+        ),
+        { kind: request.kind as string, framework: request.framework as string },
+      ),
       ...(tarballs === undefined ? {} : { tarballs }),
     });
     const plan = await planWrite(result.files, target, io.cwd ?? process.cwd());
     await writeProject(plan);
     for (const path of plan.skipped) output.write(`Kept existing ${path}.\n`);
+    if (plan.skipped.length === 1)
+      output.write('Hint: CLAUDE.md should import AGENTS.md with @AGENTS.md.\n');
     output.write(
       `Created ${plan.files.size} files in ${plan.target}.\nLayers: ${result.report.layers.join(', ')}.\n`,
     );
@@ -121,6 +131,7 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
       error instanceof ProjectPathError ||
       error instanceof SelectionError ||
       error instanceof LayerManifestError ||
+      error instanceof GuidanceError ||
       error instanceof LayerCollisionError ||
       error instanceof MergeConflictError ||
       error instanceof TarballError ||

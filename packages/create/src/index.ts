@@ -3,6 +3,7 @@
 
 export type { ComposeOptions, ComposeReport, Composition, ProjectFile } from './compose.js';
 export { compose, LayerCollisionError, SelectionError } from './compose.js';
+export { GuidanceError, loadGuidanceSource, renderGuidance } from './guidance.js';
 export type { Layer, LayerManifest, WorkspaceFragment } from './layers.js';
 export { LayerManifestError, loadLayers } from './layers.js';
 export type { Fragment, JsonObject, JsonValue } from './merge.js';
