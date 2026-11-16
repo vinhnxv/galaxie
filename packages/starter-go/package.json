@@ -34,5 +34,8 @@
     "dist",
     "LICENSE",
     "NOTICE"
-  ]
+  ],
+  "scripts": {
+    "prepack": "pnpm exec tsc -p tsconfig.build.json && node ../../scripts/build-starter-go.ts"
+  }
 }

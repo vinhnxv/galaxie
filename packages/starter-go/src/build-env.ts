@@ -56,7 +56,12 @@ export function checkBuildSettings(lock: {
     lock.build.goarch !== buildSettings.goarch ||
     lock.build.cgo !== buildSettings.cgo ||
     lock.build.ldflags !== buildSettings.ldflags ||
-    JSON.stringify(lock.build.flags) !== JSON.stringify(['-trimpath'])
+    JSON.stringify(lock.build.flags) !==
+      JSON.stringify(
+        buildSettings.flags.filter(
+          (flag) => flag !== '-mod=readonly' && flag !== '-buildvcs=false',
+        ),
+      )
   )
     throw new Error('The starter build settings drift from go/wasm.lock.');
 }
