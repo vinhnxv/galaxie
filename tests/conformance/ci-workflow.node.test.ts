@@ -25,6 +25,7 @@ test('create-clean is scoped, bounded and uses pinned external actions', () => {
   expect(block).toContain("if: needs.scope.outputs.create == 'true'");
   expect(block).toContain('runs-on: ubuntu-24.04');
   expect(block).toContain('timeout-minutes: 45');
+  expect(block).toContain('persist-credentials: false');
   const actions = [...block.matchAll(/^\s+(?:- )?uses: (.+)$/gm)].map((match) => match[1]);
   expect(actions.length).toBeGreaterThan(0);
   for (const action of actions) {

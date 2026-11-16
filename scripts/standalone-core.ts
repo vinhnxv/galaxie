@@ -540,7 +540,8 @@ async function assertGoSourceRejection(
 ): Promise<void> {
   const path = join(project, 'go/agent.go');
   const original = await readFile(path);
-  const expected = 'The agent source in go/ was edited and Go 1.27.3 was not found on PATH';
+  const expected =
+    'The agent source in go/ was edited and Go 1.27.3 was not found on PATH. Install Go 1.27.3, or restore the original go/ source to use the prebuilt agent.';
   signal.throwIfAborted();
   try {
     await writeFile(

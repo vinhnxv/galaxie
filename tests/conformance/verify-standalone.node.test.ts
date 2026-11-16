@@ -494,7 +494,7 @@ it('runs a real offline npm file install, build and loopback server, then remove
   expect(existsSync(copy)).toBe(false);
 }, 30000);
 
-it.each(['within', 'over', 'failed'] as const)(
+it.each(['within', 'exact', 'over', 'failed'] as const)(
   'measures each project independently and gates its budget (%s)',
   async (kind) => {
     const root = await realpath(await temporary());
@@ -503,7 +503,7 @@ it.each(['within', 'over', 'failed'] as const)(
     await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
     const commands: Command[] = [];
     let offset = 0;
-    const elapsed = kind === 'within' ? 30_000 : 60_001;
+    const elapsed = kind === 'within' ? 30_000 : kind === 'exact' ? 60_000 : 60_001;
     const server = createServer((_request, response) => response.end('ready'));
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
@@ -592,7 +592,7 @@ it.each(['within', 'over', 'failed'] as const)(
       for (const result of results) {
         expect(result.durationMs).toBe(elapsed);
         expect(JSON.parse(JSON.stringify(result)).durationMs).toBe(elapsed);
-        if (kind === 'within') expect(result.failures).toEqual([]);
+        if (kind === 'within' || kind === 'exact') expect(result.failures).toEqual([]);
         else
           expect(result.failures.filter(({ phase }) => phase === 'budget')).toEqual([
             {
@@ -690,7 +690,8 @@ it.each([
     await mkdir(repo);
     await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
     const original = Buffer.from('package main\r\n\r\nfunc main() {}\r\n');
-    const missingGo = 'The agent source in go/ was edited and Go 1.27.3 was not found on PATH';
+    const missingGo =
+      'The agent source in go/ was edited and Go 1.27.3 was not found on PATH. Install Go 1.27.3, or restore the original go/ source to use the prebuilt agent.';
     const builds: Buffer[] = [];
     let sourcePath = '';
     let offset = 0;

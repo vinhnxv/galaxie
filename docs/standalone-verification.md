@@ -55,10 +55,20 @@ mock answer within the budget:
 | browser-only / langgraph-js | 13,277 ms | PASS |
 | browser-only / adk-go | 13,108 ms | PASS |
 
-**Linux CI timings pending:** the delegating session will fill this placeholder
-from the first PR run's JSON logs or job summaries, recording both kinds for
-each of the four Node 24 frameworks and both LangGraph JavaScript kinds on
-Node 22. These local measurements do not establish Linux CI results.
+Linux CI (ubuntu-24.04, first run on PR #277, tarball mode, clean PATH asserted, 10-minute budget)
+reached the mock answer for every project. Scaffold to mock answer, from the job logs:
+
+| Framework | Node | browser-only | gateway |
+| --- | --- | ---: | ---: |
+| langgraph-js | 24.22.2 | 17,034 ms | 12,268 ms |
+| langgraph-js | 22.23.4 | 17,780 ms | 12,142 ms |
+| adk-js | 24.22.2 | 19,782 ms | 10,266 ms |
+| adk-go | 24.22.2 | 14,960 ms | 8,336 ms |
+| langgraph-python | 24.22.2 | 17,456 ms | 14,817 ms |
+
+These are one cold run each on GitHub-hosted runners. They exclude packing and starter
+artifact preparation, and for the gateway kind they stop at the preview mock answer,
+before the compiled server leg. They are a single observation, not a distribution.
 
 Unmeasured by this clean-environment matrix: pnpm and yarn installs, registry
 mode and the scheduled registry run, Windows, macOS CI, Node versions other than
