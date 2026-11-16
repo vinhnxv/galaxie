@@ -4,6 +4,7 @@
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
 import { compose, LayerCollisionError, SelectionError } from '../src/compose.js';
 import { type Layer, LayerManifestError, loadLayers } from '../src/layers.js';
@@ -345,5 +346,36 @@ test('pnpm build decisions preserve numeric-looking package-name keys', () => {
   );
   expect(Buffer.from(yaml!.bytes).toString()).toBe(
     "allowBuilds:\n  '0xff': false\n  '1.0': false\n  '1e3': true\n",
+  );
+});
+
+test('ADK Go composes identical Go source in both modes and owns its build-preview dev script', async () => {
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const layers = await loadLayers(join(root, 'templates'));
+  const project = compose(layers, { ...options, framework: 'adk-go' });
+  const workspace = compose(layers, {
+    ...options,
+    framework: 'adk-go',
+    mode: 'workspace-test',
+    workspaceRoot: root,
+  });
+  const goFiles = [...project.files.keys()].filter((path) => path.startsWith('go/'));
+  expect(goFiles).toEqual(['go/agent.go', 'go/go.mod', 'go/go.sum', 'go/main.go']);
+  for (const path of goFiles) {
+    expect(project.files.get(path)).toEqual(workspace.files.get(path));
+    expect(Buffer.from(project.files.get(path)!.bytes)).toEqual(
+      await readFile(join(root, 'templates/frameworks/adk-go/files', path)),
+    );
+  }
+  const manifest = JSON.parse(Buffer.from(project.files.get('package.json')!.bytes).toString());
+  expect(manifest.scripts.dev).toBe(
+    'vite build && vite preview --host 127.0.0.1 --port 4173 --strictPort',
+  );
+  expect(manifest.dependencies['@galaxie-ai/adapter-go']).toBe('^0.1.0');
+  expect(manifest.dependencies['@galaxie-ai/starter-go']).toBe('^0.1.0');
+  expect(manifest.dependencies['@langchain/core']).toBe('1.2.20');
+  expect(manifest.dependencies.zod).toBe('4.6.7');
+  expect(() => compose(layers, { ...options, kind: 'gateway', framework: 'adk-go' })).toThrow(
+    SelectionError,
   );
 });

@@ -3,10 +3,27 @@
 
 import { ModelError, type ModelUnavailableReason } from '@galaxie-ai/models/builtin-ai';
 import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { expectedOutput, mockReply, starterInput } from '../src/executor.js';
+import { frameworkProfile } from '../src/framework-profile.js';
 import { createTemplateHost, type TemplateInstance } from '../src/runtime.js';
 
+interface WorkerHost {
+  readonly wasm: { readonly url: string };
+  createWorker(): object;
+  close(): Promise<void>;
+}
+let goHost: WorkerHost | undefined;
+beforeAll(async () => {
+  if (frameworkProfile.workers) {
+    const workerHostModule = './worker-host.node.js';
+    const { createWorkerHost } = (await import(workerHostModule)) as {
+      createWorkerHost(): Promise<WorkerHost>;
+    };
+    goHost = await createWorkerHost();
+  }
+}, 60_000);
+afterAll(async () => goHost?.close());
 afterEach(() => vi.unstubAllGlobals());
 
 async function answer(instance: TemplateInstance): Promise<unknown> {
@@ -31,14 +48,28 @@ async function answer(instance: TemplateInstance): Promise<unknown> {
   return output;
 }
 
-it('finishes on the scripted model without a network request, worker, or WebLLM load', async () => {
+it('finishes on the scripted model with only the framework worker and no network or WebLLM load', async () => {
   const network = vi.fn(() => {
     throw new Error('No network is allowed.');
   });
   vi.stubGlobal('fetch', network);
   vi.stubGlobal('WebSocket', network);
   vi.stubGlobal('XMLHttpRequest', network);
-  vi.stubGlobal('Worker', network);
+  const worker = vi.fn(
+    class GoWorker {
+      constructor(url: URL, options: WorkerOptions) {
+        expect(url.pathname).toMatch(/go-worker\.ts$/);
+        expect(options).toEqual({ type: 'module' });
+        if (goHost === undefined) throw new Error('The Go Worker host is missing.');
+        Object.assign(this, goHost.createWorker());
+      }
+    },
+  );
+  if (frameworkProfile.workers) {
+    if (goHost === undefined) throw new Error('The Go Worker host is missing.');
+    vi.stubGlobal('location', new URL(goHost.wasm.url));
+    vi.stubGlobal('Worker', worker);
+  } else vi.stubGlobal('Worker', network);
   const loader = vi.fn(async () => {
     throw new Error('No WebLLM load is allowed.');
   });
@@ -55,6 +86,7 @@ it('finishes on the scripted model without a network request, worker, or WebLLM 
     });
     expect(await answer(await host.createInstance())).toEqual(expectedOutput(mockReply));
     expect(network).not.toHaveBeenCalled();
+    if (frameworkProfile.workers) expect(worker).toHaveBeenCalledOnce();
     expect(loader).not.toHaveBeenCalled();
   } finally {
     await host.dispose();

@@ -31,6 +31,7 @@ The current kinds are `browser-only` and `gateway`:
 | --- | --- | --- |
 | `langgraph-js` | Yes | Registry or npm tarballs |
 | `adk-js` | Yes | npm tarballs; adapter private and unpublished |
+| `adk-go` | Browser-only | npm tarballs; adapter and starter artifacts private and unpublished |
 
 ADK asks the same scripted quiz through a long-running `question.ask@1` capability,
 then validates the answer and requests a text-only closing comment. Native
@@ -84,6 +85,14 @@ absolute `file:` specifications. LangGraph resolution still uses seven tarballs
 and ignores an extra ADK adapter tarball. Registry-mode ADK installs are unsupported.
 Tarball mode continues to refuse pnpm and yarn before any project write.
 
+For `adk-go`, pack `adapter-go` and `starter-go` in addition to the seven launch
+packages with Go 1.27.3 on PATH. All nine npm overrides point to those tarballs.
+The generated [Go workflow](../../templates/frameworks/adk-go/files/GO.md) explains
+the source hash, verified cache/prebuilt/local precedence, exact toolchain,
+module layout and upgrade limits. A fresh project uses the prebuilt without Go;
+editing needs Go 1.27.3. Its `dev` command builds and previews under the strict CSP,
+with no HMR client. Gateway support and real-network Go harness measurement are pending.
+
 ## Layers and writes
 
 The composer combines `templates/base`, the selected `templates/kinds` layer and
@@ -101,7 +110,10 @@ These checks do not isolate the target from concurrent processes with write acce
 Generated manifests retain `license: Apache-2.0` and the starter SPDX headers.
 
 Repository-only tests and source mappings are composed under the ignored
-`packages/create/.cache/composed` by `pnpm run compose:create`. Root compiler and
+`packages/create/.cache/composed` by `pnpm run compose:create`. Build the complete starter-go distribution before testing the Go composition:
+`pnpm --filter @galaxie-ai/starter-go run prepack` with Go 1.27.3 on PATH.
+The Go cache has a repository-only symlink to that package; its `go/` bytes match
+project-mode output. Root compiler and
 test commands regenerate it, and a conformance test rejects missing, changed or
 unexpected cache output. Project-mode output omits those workspace artifacts.
 

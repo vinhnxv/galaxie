@@ -49,6 +49,7 @@ test('layer third-party pins equal create tooling and share React with the rende
   const pins = create['devDependencies'] as JsonObject;
   expect(mismatchedPins(layers, pins)).toEqual([]);
   expect(mismatchedPins(layers, { ...pins, zod: '0.0.0' })).toEqual([
+    'adk-go.dependencies.zod',
     'adk-js.dependencies.zod',
     'langgraph-js.dependencies.zod',
   ]);
@@ -67,7 +68,7 @@ test('layer third-party pins equal create tooling and share React with the rende
   expect(create['dependencies']).toBeUndefined();
 });
 
-test('both kinds share agent bytes and preserve the original CSP source hashes', async () => {
+test('both kinds share agent bytes and pin the framework-aware CSP source hashes', async () => {
   const layers = await loadLayers(templates);
   const browser = compose(layers, { ...options, kind: 'browser-only' });
   const gateway = compose(layers, { ...options, kind: 'gateway' });
@@ -75,8 +76,8 @@ test('both kinds share agent bytes and preserve the original CSP source hashes',
     gateway.files.get('src/agent.ts')?.bytes,
   );
   for (const [project, expected] of [
-    [browser, '05dbd8eee1c3a95ea1a4b223eb17fd99a7148a9bdebc560f4f670cd5133ebf79'],
-    [gateway, '6ca810a0c86df49ee16df1e6d7e3f958e441f123affa72cd6b31377bd75e827f'],
+    [browser, '2b01b35320287590ece2b2c94d3bb3d1084977da174f3c2306367322b8dc90b1'],
+    [gateway, '227f70a6698827e541f0d634667aa223617104eba67c8bee020ff8e213ed5477'],
   ] as const) {
     const source = project.files.get('src/csp.ts');
     expect(source).toBeDefined();
@@ -119,8 +120,10 @@ test('both kinds share agent bytes and preserve the original CSP source hashes',
     'src/app.tsx',
     'src/csp.ts',
     'src/executor.ts',
+    'src/framework-profile.ts',
     'src/main.tsx',
     'src/runtime.ts',
+    'src/worker-policy.ts',
     'tsconfig.json',
     'vite.config.ts',
     'vite.framework.ts',

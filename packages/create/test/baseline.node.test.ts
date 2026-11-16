@@ -6,7 +6,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadConfigFromFile } from 'vite';
 import { expect, it } from 'vitest';
+import { cspHeader as goRecipeCsp } from '../../../examples/adk-recipes/src/host/csp.js';
 import { compose } from '../src/compose.js';
 import { loadLayers } from '../src/layers.js';
 import { planWrite, writeProject } from '../src/write.js';
@@ -143,9 +145,9 @@ async function project(
   }
 }
 
-for (const framework of ['langgraph-js', 'adk-js']) {
-  for (const kind of ['browser-only', 'gateway']) {
-    for (const workers of [false, true]) {
+for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
+  for (const kind of framework === 'adk-go' ? ['browser-only'] : ['browser-only', 'gateway']) {
+    for (const workers of framework === 'adk-go' ? [true] : [false, true]) {
       it(`${kind}-${framework} workers=${workers} generated baseline accepts an unmodified project`, async () => {
         const directory = await project(kind, undefined, framework, workers);
         try {
@@ -181,3 +183,20 @@ for (const framework of ['langgraph-js', 'adk-js']) {
     }
   }
 }
+
+it('the ADK Go mock header equals the existing Go recipe header without an installed starter package', async () => {
+  const directory = await project('browser-only', undefined, 'adk-go', true);
+  try {
+    const declared = await loadConfigFromFile(
+      { command: 'serve', mode: 'mock' },
+      join(directory, 'vite.config.ts'),
+      undefined,
+      'silent',
+    );
+    expect(declared?.config.preview?.headers?.['Content-Security-Policy']).toBe(
+      goRecipeCsp('mock'),
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
