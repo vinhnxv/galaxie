@@ -22,7 +22,7 @@ pnpm --filter @galaxie-ai/example-nextjs-app-router test
 The app consumes built workspace `dist` exports, as an installed consumer would.
 The separate `tsconfig.check.json` resolves sources for build-independent checking.
 Server pages render a shell and a client wrapper; only the wrapper's
-`dynamic(..., { ssr: false })` imports load the runtime. Agent pages use
+`dynamic(..., { ssr: false })` imports load the runtime. Pages use
 `connection()` to opt into request-time rendering.
 
 ## Response policy
