@@ -1,6 +1,6 @@
 # Hybrid gateway starter
 
-A copyable Vite + React page and plain `node:http` gateway. The browser runs the same one-question LangGraph agent as the [local-only starter](https://github.com/vinhnxv/galaxie/blob/main/templates/kinds/browser-only/files/README.md); its `comment` role has exactly one provider, `gateway`, with destination `host-server`. Private system prompts and backend documents stay on the gateway. The upstream model receives the rendered system prompt and the practice request. The browser holds a short-lived demo bearer in memory, never the upstream provider key.
+A copyable Vite + React page and plain `node:http` gateway. The browser runs the same one-question agent as the [local-only starter](https://github.com/vinhnxv/galaxie/blob/main/templates/kinds/browser-only/files/README.md); its `comment` role has exactly one provider, `gateway`, with destination `host-server`. Private system prompts and backend documents stay on the gateway. The upstream model receives the rendered system prompt and the practice request. The browser holds a short-lived demo bearer in memory, never the upstream provider key.
 
 ## Requirements and running
 

@@ -1,12 +1,17 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { createLangGraphAdapter } from '@galaxie-ai/adapter-langgraph';
 import { type AgentInstance, createRuntime } from '@galaxie-ai/core';
 import { openAICompatible } from '@galaxie-ai/models/openai';
 import { createRegistry, Quiz, type Registry } from '@galaxie-ai/react';
-import { MemorySaver } from '@langchain/langgraph/web';
-import { createTemplateAgent, templateDefinition } from './agent.js';
+import {
+  createExecutor,
+  createGatewayServices,
+  createTemplateAgent,
+  providerDescriptor,
+  type StarterInput,
+  templateDefinition,
+} from './executor.js';
 import type { GatewayState } from './gateway-state.js';
 import { createModelFetch } from './model-fetch.js';
 import { createSession } from './session.js';
@@ -16,7 +21,7 @@ export interface HybridHostOptions {
   readonly baseURL?: string;
 }
 
-export type HybridInstance = AgentInstance<Record<string, never>, unknown>;
+export type HybridInstance = AgentInstance<StarterInput, unknown>;
 
 export interface HybridHost {
   readonly registry: Registry;
@@ -42,7 +47,7 @@ export function createHybridHost(options: HybridHostOptions = {}): HybridHost {
   const registry = createRegistry({ components: [Quiz] });
   const runtime = createRuntime({
     appId: 'hybrid-gateway-template',
-    executors: [createLangGraphAdapter()],
+    executors: [createExecutor()],
   });
   return {
     registry,
@@ -55,27 +60,24 @@ export function createHybridHost(options: HybridHostOptions = {}): HybridHost {
       runtime.create(templateDefinition, {
         principalScope: 'demo-ada',
         agent: createTemplateAgent(),
-        services: {
-          checkpointer: new MemorySaver(),
-          chatModels: {
-            gateway: openAICompatible({
-              baseURL: new URL('/api/v1', baseURL).href,
-              model: 'gateway-comment',
-              destination: 'host-server',
-              fetch: modelFetch,
-            }),
-          },
-        },
+        services: createGatewayServices({
+          gateway: openAICompatible({
+            baseURL: new URL('/api/v1', baseURL).href,
+            model: 'gateway-comment',
+            destination: 'host-server',
+            fetch: modelFetch,
+          }),
+        }),
         models: {
           providers: {
-            gateway: {
+            gateway: providerDescriptor({
               destination: 'host-server',
               modality: 'text',
               languages: ['en'],
               features: ['streaming', 'cancellation'],
               pricing: { inputPerToken: 0, outputPerToken: 0 },
               credential: true,
-            },
+            }),
           },
           roles: { comment: { providers: ['gateway'], allow: ['host-server'], maxTokens: 48 } },
           // Choosing "Start with gateway" is the user's consent for the host-server route.

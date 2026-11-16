@@ -6,6 +6,7 @@ import { createServer, type Server } from 'node:http';
 import { type OpenAICompatibleChatModel, openAICompatible } from '@galaxie-ai/models/openai';
 import { afterEach, expect } from 'vitest';
 import { createGateway, type Gateway, type GatewayOptions } from '../server/gateway.js';
+import { starterInput } from '../src/executor.js';
 import type { HybridInstance } from '../src/runtime.js';
 
 const servers: Server[] = [];
@@ -204,7 +205,7 @@ export function client(
 
 export async function answer(instance: HybridInstance, terminal = 'succeeded'): Promise<unknown[]> {
   await instance.prepare();
-  const { runId } = await instance.start({});
+  const { runId } = await instance.start(starterInput);
   await expect.poll(() => instance.getSnapshot().run?.status).toBe('waiting_input');
   const pending = instance.getSnapshot().run?.pending;
   if (pending === undefined) throw new Error('The question did not pause.');

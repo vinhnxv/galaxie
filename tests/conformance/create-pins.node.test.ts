@@ -117,10 +117,12 @@ test('both kinds share agent bytes and preserve the original CSP source hashes',
     'src/agent.ts',
     'src/app.tsx',
     'src/csp.ts',
+    'src/executor.ts',
     'src/main.tsx',
     'src/runtime.ts',
     'tsconfig.json',
     'vite.config.ts',
+    'vite.framework.ts',
   ];
   expect([...browser.files.keys()]).toEqual(
     [...common, 'src/model-state.ts', 'src/webllm.ts', 'src/webllm-worker.ts'].sort(),

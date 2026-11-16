@@ -4,13 +4,14 @@
 import { ModelError, type ModelUnavailableReason } from '@galaxie-ai/models/builtin-ai';
 import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
 import { afterEach, expect, it, vi } from 'vitest';
+import { expectedResult, mockReply, starterInput } from '../src/executor.js';
 import { createTemplateHost, type TemplateInstance } from '../src/runtime.js';
 
 afterEach(() => vi.unstubAllGlobals());
 
 async function answer(instance: TemplateInstance): Promise<unknown> {
   await instance.prepare();
-  const { runId } = await instance.start({});
+  const { runId } = await instance.start(starterInput);
   await expect.poll(() => instance.getSnapshot().run?.status).toBe('waiting_input');
   const pending = instance.getSnapshot().run?.pending;
   if (pending === undefined) throw new Error('The question did not pause.');
@@ -53,7 +54,7 @@ it('finishes on the scripted model without a network request, worker, or WebLLM 
       webllm: 'no_webgpu',
     });
     expect(await answer(await host.createInstance())).toEqual({
-      result: 'Correct. Keep practicing one small step at a time.',
+      result: expectedResult(mockReply),
     });
     expect(network).not.toHaveBeenCalled();
     expect(loader).not.toHaveBeenCalled();
