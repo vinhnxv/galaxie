@@ -445,7 +445,8 @@ test('release size measurements include the kit and its LangGraph consumer bundl
 test('only eslint-plugin and tools-mcp remain private', () => {
   const privatePackages = readdirSync(join(root, 'packages'), { withFileTypes: true })
     .filter(
-      (entry) => entry.isDirectory() && readManifest(join(root, 'packages', entry.name)).private,
+      (entry) =>
+        entry.isDirectory() && readManifest(join(root, 'packages', entry.name)).private === true,
     )
     .map((entry) => entry.name)
     .sort();
