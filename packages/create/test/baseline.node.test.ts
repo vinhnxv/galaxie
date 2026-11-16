@@ -35,10 +35,10 @@ function mutations(kind: string): readonly Mutation[] {
       path: 'src/csp.ts',
       before: browser
         ? "'script-src': [\"'self'\", \"'wasm-unsafe-eval'\"]"
-        : "'script-src': [\"'self'\"]",
+        : "'script-src': frameworkProfile.workers ? [\"'self'\", \"'wasm-unsafe-eval'\"] : [\"'self'\"]",
       after: browser
         ? "'script-src': [\"'self'\", \"'wasm-unsafe-eval'\", \"'unsafe-inline'\"]"
-        : "'script-src': [\"'self'\", \"'unsafe-inline'\"]",
+        : "'script-src': frameworkProfile.workers ? [\"'self'\", \"'wasm-unsafe-eval'\", \"'unsafe-inline'\"] : [\"'self'\", \"'unsafe-inline'\"]",
       directive: 'script-src',
     },
     {
@@ -52,18 +52,16 @@ function mutations(kind: string): readonly Mutation[] {
       name: 'a widened Trusted Types policy list',
       path: 'src/csp.ts',
       before: browser
-        ? "'trusted-types': mode === 'mock' ? [\"'none'\"] : ['default']"
-        : "'trusted-types': [\"'none'\"]",
-      after: browser
-        ? "'trusted-types': mode === 'mock' ? [\"'none'\"] : ['default', '*']"
-        : "'trusted-types': ['*']",
+        ? "'trusted-types': mode === 'mock' && !workers ? [\"'none'\"] : ['default']"
+        : "'trusted-types': frameworkProfile.workers ? ['default'] : [\"'none'\"]",
+      after: "'trusted-types': ['*']",
       directive: 'trusted-types',
     },
     ...(['server', 'preview'] as const).map((target) => ({
       name: `removed Vite ${target} headers`,
       path: 'vite.config.ts',
       before: browser
-        ? `${target}: { headers: { 'Content-Security-Policy': cspHeader(mode) } }`
+        ? `${target}: { headers: { 'Content-Security-Policy': cspHeader(mode, frameworkProfile.workers) } }`
         : `${target}: { host: '127.0.0.1', headers: { 'Content-Security-Policy': cspHeader() } }`,
       after: browser ? `${target}: {}` : `${target}: { host: '127.0.0.1' }`,
       directive: 'Content-Security-Policy',
@@ -100,6 +98,7 @@ async function project(
   kind: string,
   mutation?: Mutation,
   framework = 'langgraph-js',
+  workers = false,
 ): Promise<string> {
   await mkdir(scratch, { recursive: true });
   const directory = await mkdtemp(join(scratch, `${kind}-`));
@@ -112,6 +111,13 @@ async function project(
       packageManager: 'npm',
     });
     await writeProject(await planWrite(result.files, directory));
+    if (workers) {
+      const profile = join(directory, 'src/framework-profile.ts');
+      await writeFile(
+        profile,
+        (await readFile(profile, 'utf8')).replace('workers: false', 'workers: true'),
+      );
+    }
     if (kind === 'gateway') expect(result.files.has('server/mock-upstream.ts')).toBe(true);
     if (mutation !== undefined) {
       const path = join(directory, mutation.path);
@@ -139,24 +145,9 @@ async function project(
 
 for (const framework of ['langgraph-js', 'adk-js']) {
   for (const kind of ['browser-only', 'gateway']) {
-    it(`${kind}-${framework} generated baseline accepts an unmodified project`, async () => {
-      const directory = await project(kind, undefined, framework);
-      try {
-        const result = spawnSync(process.execPath, ['--test', 'check/baseline.check.ts'], {
-          cwd: directory,
-          encoding: 'utf8',
-          timeout: 30_000,
-        });
-        expect(result.error).toBeUndefined();
-        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-      } finally {
-        await rm(directory, { recursive: true, force: true });
-      }
-    }, 60_000);
-
-    for (const mutation of mutations(kind)) {
-      it(`${kind}-${framework} generated baseline rejects ${mutation.name}`, async () => {
-        const directory = await project(kind, mutation, framework);
+    for (const workers of [false, true]) {
+      it(`${kind}-${framework} workers=${workers} generated baseline accepts an unmodified project`, async () => {
+        const directory = await project(kind, undefined, framework, workers);
         try {
           const result = spawnSync(process.execPath, ['--test', 'check/baseline.check.ts'], {
             cwd: directory,
@@ -164,12 +155,29 @@ for (const framework of ['langgraph-js', 'adk-js']) {
             timeout: 30_000,
           });
           expect(result.error).toBeUndefined();
-          expect(result.status).not.toBe(0);
-          expect(`${result.stdout}\n${result.stderr}`).toContain(mutation.directive);
+          expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
         } finally {
           await rm(directory, { recursive: true, force: true });
         }
       }, 60_000);
+
+      for (const mutation of mutations(kind)) {
+        it(`${kind}-${framework} workers=${workers} generated baseline rejects ${mutation.name}`, async () => {
+          const directory = await project(kind, mutation, framework, workers);
+          try {
+            const result = spawnSync(process.execPath, ['--test', 'check/baseline.check.ts'], {
+              cwd: directory,
+              encoding: 'utf8',
+              timeout: 30_000,
+            });
+            expect(result.error).toBeUndefined();
+            expect(result.status).not.toBe(0);
+            expect(`${result.stdout}\n${result.stderr}`).toContain(mutation.directive);
+          } finally {
+            await rm(directory, { recursive: true, force: true });
+          }
+        }, 60_000);
+      }
     }
   }
 }

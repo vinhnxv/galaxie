@@ -10,8 +10,13 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadConfigFromFile, resolveConfig } from 'vite';
 
-const header =
-  "default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types 'none'";
+const { frameworkProfile } = (await import(
+  new URL('../src/framework-profile.ts', import.meta.url).href
+)) as { frameworkProfile: { readonly workers: boolean } };
+
+const header = frameworkProfile.workers
+  ? "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types default"
+  : "default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types 'none'";
 
 function assertHeader(actual: unknown, location: string): void {
   assert.ok(typeof actual === 'string', `${location}: Content-Security-Policy header is missing`);
@@ -26,7 +31,11 @@ function assertHeader(actual: unknown, location: string): void {
     "'script'",
     `${location}: require-trusted-types-for changed`,
   );
-  assert.equal(directives.get('trusted-types'), "'none'", `${location}: trusted-types changed`);
+  assert.equal(
+    directives.get('trusted-types'),
+    frameworkProfile.workers ? 'default' : "'none'",
+    `${location}: trusted-types changed`,
+  );
   for (const entry of header.split('; ')) {
     const [name, ...sources] = entry.split(' ');
     assert.equal(directives.get(name), sources.join(' '), `${location}: ${name} changed`);

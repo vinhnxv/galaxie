@@ -4,6 +4,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig, mergeConfig, type UserConfigExport } from 'vite';
 import { cspHeader } from './src/csp.js';
+import { frameworkProfile } from './src/framework-profile.js';
 import framework from './vite.framework.js';
 
 const config: UserConfigExport = defineConfig(({ mode }) =>
@@ -11,8 +12,8 @@ const config: UserConfigExport = defineConfig(({ mode }) =>
     root: fileURLToPath(new URL('.', import.meta.url)),
     worker: { format: 'es' },
     oxc: { jsx: { runtime: 'automatic' } },
-    server: { headers: { 'Content-Security-Policy': cspHeader(mode) } },
-    preview: { headers: { 'Content-Security-Policy': cspHeader(mode) } },
+    server: { headers: { 'Content-Security-Policy': cspHeader(mode, frameworkProfile.workers) } },
+    preview: { headers: { 'Content-Security-Policy': cspHeader(mode, frameworkProfile.workers) } },
   }),
 );
 

@@ -73,7 +73,7 @@ test.each(
       packageManager: 'npm',
       workspaceRoot: repo,
     });
-    expect([...files.keys()].filter((path) => /\.test\.ts$/.test(path))).toHaveLength(4);
+    expect([...files.keys()].filter((path) => /\.test\.ts$/.test(path))).toHaveLength(5);
     await assertCache(directory, files);
   },
 );

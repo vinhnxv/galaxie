@@ -8,6 +8,9 @@
       "@langchain/core": "1.2.20",
       "@langchain/langgraph": "1.5.1",
       "zod": "4.6.7"
+    },
+    "scripts": {
+      "dev": "vite"
     }
   }
 }
