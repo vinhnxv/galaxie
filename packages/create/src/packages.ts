@@ -18,6 +18,8 @@ export type PackageManager = 'npm' | 'pnpm' | 'yarn';
 export class TarballError extends Error {}
 
 export function requiredPackages(framework: string): readonly string[] {
+  if (framework === 'langgraph-python')
+    return [...knownPackages, '@galaxie-ai/adapter-pyodide', '@galaxie-ai/starter-python'];
   if (framework === 'adk-go')
     return [...knownPackages, '@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'];
   return framework === 'adk-js' ? [...knownPackages, '@galaxie-ai/adapter-adk'] : knownPackages;

@@ -52,6 +52,7 @@ test('layer third-party pins equal create tooling and share React with the rende
     'adk-go.dependencies.zod',
     'adk-js.dependencies.zod',
     'langgraph-js.dependencies.zod',
+    'langgraph-python.dependencies.zod',
   ]);
   expect(mismatchedPins(layers, { ...pins, react: '*' })).toEqual(['base.dependencies.react']);
   const rendererPins = renderer['devDependencies'] as JsonObject;
@@ -378,5 +379,69 @@ test.each(['browser-only', 'gateway'])(
     );
     expect(project.files.has('GO.md')).toBe(true);
     expect(project.files.has('go/go.mod')).toBe(true);
+  },
+);
+
+// Captured by composing main (061d1cd), before Python overlay registration.
+const existingOutputHashes: Readonly<Record<string, string>> = {
+  'browser-only/langgraph-js/npm':
+    '67fb47269b9196c3d06b3822bc1c7acecf0eb57473337fe56addf722f03b5fe6',
+  'browser-only/langgraph-js/pnpm':
+    '67fb47269b9196c3d06b3822bc1c7acecf0eb57473337fe56addf722f03b5fe6',
+  'browser-only/langgraph-js/yarn':
+    '67fb47269b9196c3d06b3822bc1c7acecf0eb57473337fe56addf722f03b5fe6',
+  'browser-only/adk-js/npm': 'd4dc1d8a5e2bba4da29b5ad1093b9f9bee2d3affa959522110e6b8399749b6c7',
+  'browser-only/adk-js/pnpm': '6a193369c2aa74f4f208841f496c6d0db58fabbf543726c60687145f470f1768',
+  'browser-only/adk-js/yarn': 'd4dc1d8a5e2bba4da29b5ad1093b9f9bee2d3affa959522110e6b8399749b6c7',
+  'browser-only/adk-go/npm': '15c7d3aa10baa9cbe248fce76d26aec3a8d82eaa566347ac7c0aa04976bde01e',
+  'browser-only/adk-go/pnpm': '15c7d3aa10baa9cbe248fce76d26aec3a8d82eaa566347ac7c0aa04976bde01e',
+  'browser-only/adk-go/yarn': '15c7d3aa10baa9cbe248fce76d26aec3a8d82eaa566347ac7c0aa04976bde01e',
+  'gateway/langgraph-js/npm': '619e451463f43b8c1160e71703843e81b81cddd8f1918633807830f51026a623',
+  'gateway/langgraph-js/pnpm': '619e451463f43b8c1160e71703843e81b81cddd8f1918633807830f51026a623',
+  'gateway/langgraph-js/yarn': '619e451463f43b8c1160e71703843e81b81cddd8f1918633807830f51026a623',
+  'gateway/adk-js/npm': 'c3c8677fe55d33034ca4f01b1028c7fc4dec2b5c929443530223da17f8d1ed7d',
+  'gateway/adk-js/pnpm': '2d48b455454558cccce6cddd754fd8530cc00650333d16ebf89097f931d0ee0d',
+  'gateway/adk-js/yarn': 'c3c8677fe55d33034ca4f01b1028c7fc4dec2b5c929443530223da17f8d1ed7d',
+  'gateway/adk-go/npm': '9f978e8aca2b38418fbaa0597e2d21167441d704164f6269a79f93eafbc1dbc6',
+  'gateway/adk-go/pnpm': '9f978e8aca2b38418fbaa0597e2d21167441d704164f6269a79f93eafbc1dbc6',
+  'gateway/adk-go/yarn': '9f978e8aca2b38418fbaa0597e2d21167441d704164f6269a79f93eafbc1dbc6',
+};
+test('all existing kind/framework/manager outputs retain main bytes except the baseline binding', async () => {
+  const layers = await loadLayers(templates);
+  for (const [combination, expected] of Object.entries(existingOutputHashes)) {
+    const [kind, framework, packageManager] = combination.split('/');
+    const { files } = compose(layers, {
+      ...options,
+      kind: kind as string,
+      framework: framework as string,
+      packageManager: packageManager as 'npm' | 'pnpm' | 'yarn',
+    });
+    const hash = createHash('sha256');
+    for (const [path, file] of files) {
+      if (path === 'check/baseline.check.ts') continue;
+      hash.update(JSON.stringify([path, file.mode, file.bytes.length]));
+      hash.update(file.bytes);
+    }
+    expect(hash.digest('hex'), combination).toBe(expected);
+  }
+});
+test.each(['browser-only', 'gateway'])(
+  'the %s Python overlay pins its private artifacts and raw sources',
+  async (kind) => {
+    const layers = await loadLayers(templates);
+    const { files } = compose(layers, { ...options, kind, framework: 'langgraph-python' });
+    const manifest = JSON.parse(Buffer.from(files.get('package.json')!.bytes).toString());
+    expect(manifest.dependencies['@galaxie-ai/adapter-pyodide']).toBe('^0.1.0');
+    expect(manifest.dependencies['@galaxie-ai/starter-python']).toBe('^0.1.0');
+    expect(manifest.dependencies.pyodide).toBe('314.0.7');
+    expect(manifest.scripts.dev).toBe(
+      'vite build && vite preview --host 127.0.0.1 --port 4173 --strictPort',
+    );
+    expect([...files.keys()].filter((path) => path.startsWith('python/'))).toEqual([
+      'python/agent/starter_agent/__init__.py',
+      'python/agent/starter_agent/graph.py',
+    ]);
+    for (const path of ['src/pyodide-worker.ts', 'src/python-build.d.ts', 'PYTHON.md'])
+      expect(files.has(path)).toBe(true);
   },
 );

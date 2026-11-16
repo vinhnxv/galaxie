@@ -4,10 +4,14 @@
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { build } from 'vite';
+import { build, type UserConfig } from 'vite';
 import { afterEach, expect, test } from 'vitest';
 import { validSourcePath } from '../../packages/adapter-pyodide/src/bridge.js';
-import { pythonFramework } from '../../templates/frameworks/langgraph-python/files/vite.framework.js';
+
+const { pythonFramework } = (await import(
+  new URL('../../templates/frameworks/langgraph-python/files/vite.framework.ts', import.meta.url)
+    .href
+)) as { pythonFramework(directory: string): UserConfig };
 
 const temporary: string[] = [];
 afterEach(async () => {

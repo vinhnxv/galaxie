@@ -19,7 +19,8 @@ test('the framework profile matches the installed framework', () => {
   // The profile is editable source, so it must be bound to the dependency that needs workers.
   assert.equal(
     frameworkProfile.workers,
-    manifest.dependencies?.['@galaxie-ai/starter-go'] !== undefined,
+    manifest.dependencies?.['@galaxie-ai/starter-go'] !== undefined ||
+      manifest.dependencies?.['@galaxie-ai/starter-python'] !== undefined,
     'framework profile changed',
   );
 });

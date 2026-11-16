@@ -7,8 +7,12 @@ byte and SHA-256 refusals, runtime hashes, notices and distribution tampering.
 Notices flag certifi/orjson MPL-2.0 and the limited same-name ormsgpack stand-in,
 whose license is to be confirmed by the maintainer and whose serializer compatibility
 is unverified. Local-wheel reproducibility and bridge-version binding are not
-established. Generated Python projects and browser/standalone acceptance remain
-separate work. The package stays unpublished and outside the launch inventory and
+established. Both create kinds now compose the LangGraph Python overlay with
+raw agent sources, pinned Pyodide runtime assets and independently adapter-bound
+wheel checks. CLI, tarball, source-path and CSP/profile mutation tests cover the
+registration; existing generated outputs match main except the shared baseline
+dependency binding. Browser and standalone acceptance remain separate work.
+The package stays unpublished and outside the launch inventory and
 size budgets; ADR-0012 guarantees are unchanged. See the [package limits](../packages/starter-python/README.md).
 
 On 2026-11-16, the private `@galaxie-ai/starter-go` artifact package and the

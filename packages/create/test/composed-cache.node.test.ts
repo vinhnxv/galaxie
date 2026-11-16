@@ -62,7 +62,7 @@ async function assertCache(
 
 test.each(
   ['browser-only', 'gateway'].flatMap((kind) =>
-    ['langgraph-js', 'adk-js', 'adk-go'].map((framework) => ({
+    ['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python'].map((framework) => ({
       kind,
       framework,
     })),
@@ -87,6 +87,17 @@ test.each(
     });
     expect([...files.keys()].filter((path) => /\.test\.ts$/.test(path))).toHaveLength(5);
     await assertCache(directory, files);
+    if (framework === 'langgraph-python') {
+      for (const [name, target] of [
+        ['@galaxie-ai/starter-python', 'packages/starter-python'],
+        ['@galaxie-ai/adapter-pyodide', 'packages/adapter-pyodide'],
+        ['pyodide', 'packages/adapter-pyodide/node_modules/pyodide'],
+      ]) {
+        const installed = join(directory, 'node_modules', name as string);
+        expect((await lstat(installed)).isSymbolicLink()).toBe(true);
+        expect(await realpath(installed)).toBe(await realpath(join(repo, target as string)));
+      }
+    }
     if (framework === 'adk-go') {
       const installed = join(directory, 'node_modules/@galaxie-ai/starter-go');
       expect((await lstat(installed)).isSymbolicLink()).toBe(true);

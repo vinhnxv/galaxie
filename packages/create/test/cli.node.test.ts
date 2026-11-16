@@ -405,3 +405,26 @@ test.each(['browser-only', 'gateway'])(
     ]);
   },
 );
+
+test.each(['browser-only', 'gateway'])(
+  'the %s LangGraph Python CLI warns about both unpublished packages and emits the Python source',
+  async (kind) => {
+    const { root } = await fixture();
+    const streams = output();
+    expect(
+      await run(['python-app', kind, 'langgraph-python', '--no-install'], {
+        cwd: root,
+        templatesRoot: fileURLToPath(new URL('../../../templates', import.meta.url)),
+        ...streams,
+        env: {},
+      }),
+    ).toBe(0);
+    expect(streams.text()).toContain(
+      '@galaxie-ai/adapter-pyodide and @galaxie-ai/starter-python are not published yet',
+    );
+    expect(await readdir(join(root, 'python-app/python/agent/starter_agent'))).toEqual([
+      '__init__.py',
+      'graph.py',
+    ]);
+  },
+);
