@@ -224,7 +224,8 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
       // Reserve before awaiting the upstream, so concurrent requests cannot bypass the quota.
       usage.count++;
       calls.set(principal, usage);
-      if (!options.upstream && !options.mockUpstream) {
+      const dispatch = options.upstream ? fetch : options.mockUpstream;
+      if (dispatch === undefined) {
         json(response, 503, { error: 'unavailable' });
         return;
       }
@@ -261,9 +262,7 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
             }),
           },
         );
-        const upstream = options.upstream
-          ? await fetch(upstreamRequest)
-          : await options.mockUpstream!(upstreamRequest);
+        const upstream = await dispatch(upstreamRequest);
         if (!upstream.ok) {
           await upstream.body?.cancel();
           const status =

@@ -85,6 +85,13 @@ function mutations(kind: string): readonly Mutation[] {
             after: "import { cspHeader } from '../src/csp.js';\nimport './mock-upstream.js';",
             directive: 'mock-upstream',
           },
+          {
+            name: 'a compiled server program that includes the mock upstream',
+            path: 'server/tsconfig.json',
+            before: '"include": ["gateway.ts", "serve.ts", "../src/csp.ts"]',
+            after: '"include": ["gateway.ts", "serve.ts", "mock-upstream.ts", "../src/csp.ts"]',
+            directive: 'mock-upstream',
+          },
         ]),
   ];
 }

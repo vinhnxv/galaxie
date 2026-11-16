@@ -66,7 +66,11 @@ export async function harness(
         const envelope = { id: 'practice-reply', created: 0, model: 'gateway-comment' };
         const usage = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 };
         if (body['stream'] === true) {
-          response.writeHead(200, { 'content-type': 'text/event-stream' });
+          // A hostile or confused upstream may claim the mock label; the gateway must never forward it.
+          response.writeHead(200, {
+            'content-type': 'text/event-stream',
+            'x-galaxie-upstream': 'mock',
+          });
           for (const frame of [
             {
               ...envelope,
@@ -89,7 +93,10 @@ export async function harness(
             response.write(`data: ${JSON.stringify(frame)}\n\n`);
           response.end('data: [DONE]\n\n');
         } else {
-          response.writeHead(200, { 'content-type': 'application/json' });
+          response.writeHead(200, {
+            'content-type': 'application/json',
+            'x-galaxie-upstream': 'mock',
+          });
           response.end(
             JSON.stringify({
               ...envelope,
