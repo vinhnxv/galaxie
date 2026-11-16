@@ -16,7 +16,7 @@ ones matching its actual host and executor. Read
 
 ## Baseline to preserve
 
-<!-- galaxie:cite path="docs/adr/0012-security-baseline.md" heading="Decision" sha256="0000000000000000000000000000000000000000000000000000000000000000" -->
+<!-- galaxie:cite path="docs/adr/0012-security-baseline.md" heading="Decision" sha256="a92d75c3ffb3f5b696b8b7637d3e0ccb093e274a892bbcf241cc63c26b1cbdc2" -->
 <!-- galaxie:summary:start -->
 - Run reviewed, bundled agent code. Same-origin code is trusted; client controls
   apply only on SDK-controlled paths and do not replace backend authorization.

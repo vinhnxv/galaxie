@@ -1,10 +1,10 @@
 # ADK JavaScript
 
-<!-- galaxie:cite path="packages/adapter-adk/AGENTS.md" heading="Never" sha256="0000000000000000000000000000000000000000000000000000000000000000" -->
+<!-- galaxie:cite path="packages/adapter-adk/AGENTS.md" heading="Never" sha256="c88ccf45b95a99709711503d694b71ab668dbffcbadfa647556be74e6488b7ab" -->
 Do not import ADK subpaths or another executor adapter. Preserve CSP and Trusted
 Types; do not add `unsafe-eval` or direct network access from a run.
 
-<!-- galaxie:cite path="packages/adapter-adk/AGENTS.md" heading="Agent shapes" sha256="0000000000000000000000000000000000000000000000000000000000000000" -->
+<!-- galaxie:cite path="packages/adapter-adk/AGENTS.md" heading="Agent shapes" sha256="469f5ca4e071a625c72325c63c9249aaafe855e6c8fed58b1d48f1487d0aaf6c" -->
 <!-- galaxie:summary:start -->
 Use host-routed `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent`
 trees with distinct names; `subgraphs` is false. Pause only in the first child

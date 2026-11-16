@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,8 +34,8 @@ function fixture(extra: Record<string, string> = {}): string {
   return root;
 }
 
-function run(root: string): { status: number | null; output: string } {
-  const result = spawnSync(process.execPath, [script], { cwd: root, encoding: 'utf8' });
+function run(root: string, ...args: string[]): { status: number | null; output: string } {
+  const result = spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: 'utf8' });
   return { status: result.status, output: result.stdout + result.stderr };
 }
 
@@ -169,4 +170,202 @@ test.each([
   expect(result.status).toBe(status);
   if (status === 1) expect(result.output).toContain('guide.md:3: missing target: absent.md');
   else expect(result.output).toBe('');
+});
+
+const citationFile = 'skills/galaxie/references/rules.md';
+const sectionBody = '- Keep checks.\n\n### Detail\n\nKeep this too.';
+const sectionHash = createHash('sha256').update(sectionBody).digest('hex');
+const citedSource = `---\nlabel: fixture\n---\n\n# Rules\n\n## Never\n\n${sectionBody}\n\n## Other\n\nNot cited.\n`;
+const citation = `<!-- galaxie:cite path="rules.md" heading="Never" sha256="${sectionHash}" -->`;
+
+function citationFixture(source = citedSource, comment = citation): string {
+  return fixture({
+    'rules.md': source,
+    [citationFile]: `# Guidance\n\n${comment}\nKeep checks.\n`,
+  });
+}
+
+test('accepts a section citation and never writes during a normal check', () => {
+  const root = citationFixture();
+  const before = readFileSync(join(root, citationFile));
+  expect(run(root)).toEqual({ status: 0, output: '' });
+  expect(readFileSync(join(root, citationFile))).toEqual(before);
+});
+
+test.each([
+  ['removed', citedSource.replace('## Never', '## Renamed'), 'missing heading: rules.md#Never'],
+  [
+    'duplicated',
+    `${citedSource}\n## Never\n\nAnother rule.\n`,
+    'ambiguous heading: rules.md#Never',
+  ],
+])('rejects a %s cited heading', (_name, source, message) => {
+  const result = run(citationFixture(source));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${citationFile}:3: ${message}`);
+});
+
+test('rejects a missing citation file', () => {
+  const root = citationFixture();
+  rmSync(join(root, 'rules.md'));
+  const result = run(root);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${citationFile}:3: missing citation file: rules.md`);
+});
+
+test('detects an added rule, refreshes only hashes and passes on the next check', () => {
+  const root = citationFixture(citedSource.replace('## Other', '- Another rule.\n\n## Other'));
+  const before = readFileSync(join(root, citationFile), 'utf8');
+  const failed = run(root);
+  expect(failed.status).toBe(1);
+  expect(failed.output).toContain(`${citationFile}:3: citation hash mismatch: rules.md#Never`);
+  expect(failed.output).toContain('node scripts/check-docs.ts --refresh-citations');
+  expect(readFileSync(join(root, citationFile), 'utf8')).toBe(before);
+  expect(run(root, '--refresh-citations')).toEqual({ status: 0, output: '' });
+  const refreshed = readFileSync(join(root, citationFile), 'utf8');
+  const expected = createHash('sha256').update(`${sectionBody}\n\n- Another rule.`).digest('hex');
+  expect(refreshed).toBe(before.replace(sectionHash, expected));
+  expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+test('normalizes CRLF, trailing whitespace and surrounding blank lines, not internal blanks', () => {
+  const source = citedSource
+    .replace(sectionBody, `\n${sectionBody}\n\n`)
+    .split('\n')
+    .map((line) => `${line} \t`)
+    .join('\r\n');
+  const root = citationFixture(source);
+  expect(run(root)).toEqual({ status: 0, output: '' });
+  writeFileSync(join(root, 'rules.md'), source.replace('### Detail', '\r\n### Detail'));
+  expect(run(root).output).toContain('citation hash mismatch');
+});
+
+test('hashes raw fenced samples and ignores fenced headings and setext underlines for extents', () => {
+  const body = '- Keep checks.\n\n```md\n## Never\nFake title\n---\n```\n\nLast rule.';
+  const hash = createHash('sha256').update(body).digest('hex');
+  const source = `---\nNever\n---\n\n# Rules\n\n## Never\n\n${body}\n\n## Other\nEnd.\n`;
+  const root = citationFixture(source, citation.replace(sectionHash, hash));
+  expect(run(root)).toEqual({ status: 0, output: '' });
+  writeFileSync(join(root, 'rules.md'), source.replace('Fake title', 'Changed sample'));
+  expect(run(root).output).toContain('citation hash mismatch');
+});
+
+test('a setext heading ends a cited section before the title line', () => {
+  const root = citationFixture(citedSource.replace('## Other', 'Other\n-----'));
+  expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+test('a stray setext underline changes the extent instead of becoming an ordinary rule', () => {
+  const root = citationFixture(citedSource.replace('Keep this too.', 'Keep this too.\n---'));
+  expect(run(root).output).toContain('citation hash mismatch');
+});
+
+test('can cite a setext heading without hashing its underline', () => {
+  expect(run(citationFixture(citedSource.replace('## Never', 'Never\n-----')))).toEqual({
+    status: 0,
+    output: '',
+  });
+});
+
+test('refresh refuses invalid targets without rewriting any citations', () => {
+  const root = citationFixture(citedSource.replace('## Never', '## Renamed'));
+  const before = readFileSync(join(root, citationFile));
+  expect(run(root, '--refresh-citations').status).toBe(1);
+  expect(readFileSync(join(root, citationFile))).toEqual(before);
+});
+
+test('rejects a malformed citation rather than silently skipping it', () => {
+  const result = run(citationFixture(citedSource, citation.replace(sectionHash, 'not-a-hash')));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${citationFile}:3: invalid citation`);
+});
+
+test('ignores citation examples in fences and inline code', () => {
+  const root = fixture({
+    [citationFile]:
+      '# Examples\n\n`<!-- galaxie:cite invalid -->`\n\n```md\n<!-- galaxie:cite invalid -->\n```\n',
+  });
+  expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+test.each([
+  'skills/galaxie/SKILL.md',
+  'skills/galaxie/references/nested/guide.md',
+  'templates/base/files/README.md',
+  'templates/kinds/demo/files/README.md',
+  'templates/frameworks/demo/files/guide.md',
+])('checks banned claims throughout %s', (file) => {
+  const result = run(fixture({ [file]: '# Guide\n\nA secure app.\n' }));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${file}:3: banned claim: secure`);
+});
+
+test.each(['secure', 'secured', 'compliant', 'certified', 'SECURE', 'Certified'])(
+  'rejects the banned prose claim %s',
+  (word) => {
+    const result = run(fixture({ [citationFile]: `# Guide\n\nAn app is ${word}.\n` }));
+    expect(result.status).toBe(1);
+    expect(result.output).toContain(`${citationFile}:3: banned claim: ${word}`);
+  },
+);
+
+test('masks inline and fenced code for claims, and allows security and compliance nouns', () => {
+  const root = fixture({
+    [citationFile]: [
+      '---',
+      'name: galaxie',
+      'description: security guidance',
+      'version: 0.1.0',
+      '---',
+      '# Guide',
+      'Security and compliance are nouns.',
+      '`secure` and ``compliant ` example`` and `certified` and `secured`.',
+      '```md',
+      'secure secured compliant certified',
+      '```',
+      '~~~md',
+      'SECURE',
+      '~~~',
+      '`multiline',
+      'secure',
+      '`',
+    ].join('\n'),
+  });
+  expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+test('keeps banned-claim scope to guidance and template Markdown', () => {
+  expect(run(fixture({ 'guide.md': 'The word secure outside guidance.\n' }))).toEqual({
+    status: 0,
+    output: '',
+  });
+});
+
+test('checks prose claims in skill frontmatter descriptions', () => {
+  const result = run(
+    fixture({
+      'skills/galaxie/SKILL.md':
+        '---\nname: galaxie\ndescription: A secure app.\nversion: 0.1.0\n---\n# Guide\n',
+    }),
+  );
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('skills/galaxie/SKILL.md:3: banned claim: secure');
+});
+
+test('preserves citation source CRLF and all non-hash bytes on refresh', () => {
+  const root = citationFixture();
+  const source = `# Guidance\r\n\r\n${citation.replace(sectionHash, '0'.repeat(64))}\r\nKeep checks.\r\n`;
+  writeFileSync(join(root, citationFile), source);
+  expect(run(root, '--refresh-citations')).toEqual({ status: 0, output: '' });
+  expect(readFileSync(join(root, citationFile), 'utf8')).toBe(
+    source.replace('0'.repeat(64), sectionHash),
+  );
+});
+
+test('accepts a heading containing inline code in the citation attribute', () => {
+  const root = citationFixture(
+    citedSource.replace('## Never', '## Never `eval`'),
+    citation.replace('heading="Never"', 'heading="Never `eval`"'),
+  );
+  expect(run(root)).toEqual({ status: 0, output: '' });
 });

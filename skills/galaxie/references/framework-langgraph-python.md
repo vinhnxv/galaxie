@@ -1,12 +1,12 @@
 # LangGraph Python
 
-<!-- galaxie:cite path="packages/adapter-pyodide/AGENTS.md" heading="Never" sha256="0000000000000000000000000000000000000000000000000000000000000000" -->
+<!-- galaxie:cite path="packages/adapter-pyodide/AGENTS.md" heading="Never" sha256="1f040593263e577ae8cbdc1bff6ea3ea0d5e3e177ea6d8c82b32e018ea5643e9" -->
 Keep credentials, providers and policy in JavaScript. Do not expose credentials
 to the Worker, import the JavaScript LangGraph adapter, relax CSP or copy spike
 code. Keep byte checkpoints on the scoped host port; Python never accesses
 IndexedDB directly.
 
-<!-- galaxie:cite path="packages/adapter-pyodide/AGENTS.md" heading="Agent shapes" sha256="0000000000000000000000000000000000000000000000000000000000000000" -->
+<!-- galaxie:cite path="packages/adapter-pyodide/AGENTS.md" heading="Agent shapes" sha256="75d6011bcee9ee24953bebc940b76147d7d97dcb1862aa20981c88b3311a0d12" -->
 <!-- galaxie:summary:start -->
 Return a graph compiled with `galaxie.langgraph.checkpointer()`. Async text
 models, checked streams, subgraphs and child-interrupt restore are supported.
