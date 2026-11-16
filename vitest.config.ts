@@ -145,6 +145,7 @@ const pythonTerms = ['python', 'pyodide', 'dspy', 'pydantic'];
 const pythonDirectories = [
   'examples/rag-browser/test/**/!(*adk-go*|*go-gate*)',
   'packages/adapter-pyodide/test/**/*',
+  'packages/create/.cache/composed/*-langgraph-python/test/**/*',
 ];
 const groups = ['general', 'python', 'python-rest', ...Object.keys(pythonShards)];
 if (groupName !== undefined && !groups.includes(groupName))
@@ -232,7 +233,17 @@ const config: ViteUserConfig = defineConfig({
       {
         ...starterFrameworks,
         root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
-        resolve: { alias },
+        resolve: {
+          alias: {
+            ...alias,
+            pyodide: fileURLToPath(
+              new URL(
+                './packages/adapter-pyodide/node_modules/pyodide/pyodide.mjs',
+                import.meta.url,
+              ),
+            ),
+          },
+        },
         plugins: [
           starterFrameworks.plugins,
           {
@@ -258,6 +269,7 @@ const config: ViteUserConfig = defineConfig({
             'onnxruntime-web',
           ],
           include: [
+            'pyodide',
             'react',
             'react-dom/client',
             'react/jsx-runtime',

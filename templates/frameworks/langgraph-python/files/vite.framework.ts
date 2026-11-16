@@ -145,6 +145,34 @@ export function pythonFramework(projectDirectory: string): UserConfig {
     configResolved(config) {
       building = config.command === 'build';
     },
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const path = new URL(request.url ?? '/', 'http://localhost').pathname;
+        const prefix = `${server.config.base}python/`;
+        if (!path.startsWith(prefix)) return next();
+        void resolveBuild()
+          .then(({ assets }) => {
+            const fileName = `python/${path.slice(prefix.length)}`;
+            const asset = assets.find((item) => item.fileName === fileName);
+            if (asset === undefined) return next();
+            response.setHeader('Cache-Control', 'no-store');
+            response.setHeader(
+              'Content-Type',
+              fileName.endsWith('.mjs')
+                ? 'text/javascript'
+                : fileName.endsWith('.wasm')
+                  ? 'application/wasm'
+                  : fileName.endsWith('.json')
+                    ? 'application/json'
+                    : fileName.endsWith('.whl')
+                      ? 'application/octet-stream'
+                      : 'text/plain; charset=utf-8',
+            );
+            response.end(asset.source);
+          })
+          .catch(next);
+      });
+    },
     async buildStart() {
       if (!building) return;
       resolved = undefined;

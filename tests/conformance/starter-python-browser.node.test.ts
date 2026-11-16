@@ -5,7 +5,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -33,7 +33,13 @@ async function project(): Promise<Project> {
   fixtures.push(directory);
   await cp(composed, directory, {
     recursive: true,
-    filter: (path) => !path.includes('node_modules'),
+    filter: (path) => {
+      const top = relative(composed, path).split(sep)[0] ?? '';
+      return (
+        !['node_modules', 'dist', '.server'].includes(top) &&
+        !/^\.(?:reload|browser)-check-/.test(top)
+      );
+    },
   });
   const artifacts = join(directory, '.artifacts/starter-python');
   const dist = await buildStarterDistOnce();
