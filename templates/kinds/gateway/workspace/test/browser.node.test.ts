@@ -164,7 +164,8 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
     } finally {
       await new Promise<void>((resolve, reject) => {
         mockPreview.httpServer.close((error) => (error ? reject(error) : resolve()));
-        mockPreview.httpServer.closeAllConnections();
+        if ('closeAllConnections' in mockPreview.httpServer)
+          mockPreview.httpServer.closeAllConnections();
       });
     }
   } finally {
