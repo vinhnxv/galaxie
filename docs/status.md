@@ -1,5 +1,18 @@
 # Project status
 
+On 2026-11-16, the gateway starter gains an in-process dev/preview mock when both
+upstream variables are empty. Successful mock replies show a fixed status; partial
+configuration and the compiled production entry retain 503 without an upstream.
+The host drops agent-authored system/developer messages while direct gateway
+requests with those roles remain refused. Offline tests cover JSON/SSE, quotas,
+real-client message projection and the source/compiled production boundary. The
+four-row Node 22/24 registry/tarball measurement passed installs, builds and
+generated checks but found a preview request-abort diagnostic. A correction passes
+the browser regression and strict preview driver over loopback; the network
+matrix was not rerun. See the [record](standalone-verification.md#gateway-mock-measurement-2026-11-16).
+Real-provider behavior, devices, latency and memory use remain unmeasured.
+ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.
+
 On 2026-11-16, the private, unpublished
 [`@galaxie-ai/create`](../packages/create/README.md) composes browser-only and gateway
 LangGraph.js starters from base, kind and framework layers. Offline tests cover
@@ -9,7 +22,7 @@ Root compiler/test commands regenerate ignored composed projects; the ported Nod
 and Chromium tests pass against them, and CSP source hashes match the old starters.
 Generated `check` commands pin emitted CSP and Trusted Types, with mutation controls
 for loosened directives and removed header emission. The standalone harness now
-scaffolds through the CLI and gates on those checks. All eight registry/tarball
+scaffolds through the CLI and gates on those checks. Before the gateway mock, all eight registry/tarball
 cases on Node 22.23.5 and 24.15.0 pass with npm 12.2.2, including single-copy
 tarball checks, mutation rejections and mock/unavailable Chromium drives; see
 the [verification record](standalone-verification.md). pnpm/yarn tarball installs
@@ -35,9 +48,11 @@ On 2026-11-15, the [standalone verification harness](standalone-verification.md)
 installs both starters outside this workspace from the public npm registry and
 packed workspace tarballs on Node 22.23.5 and 24.15.0. All eight cases pass builds,
 source checks and Chromium drives; hybrid also compiles and drives its Node server.
-Both starters now declare their own compiler/type tooling and Node floor. Tests
-use the local mock or fixed gateway-unavailable state, with no real model or
-upstream. The network matrix stays a manual release check; `pnpm check` runs
+Both starters now declare their own compiler/type tooling and Node floor. Those
+recorded tests
+used the local mock or fixed gateway-unavailable state, with no real model or
+upstream; the gateway preview now uses the dev/preview mock described above. The
+network matrix stays a manual release check; `pnpm check` runs
 offline harness controls. ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.
 
 On 2026-11-15, [host-remote](../examples/host-remote/README.md) adopts a bundled
@@ -526,7 +541,7 @@ Core accepts a surface-bearing interaction whose engine interrupt carries the re
 
 The [local-only starter](../templates/kinds/browser-only/files/README.md) supplies a standalone one-question LangGraph agent, an immediate deterministic mock when Built-in AI is unavailable, fixed model states and explicit size-disclosed WebLLM loading. It uses scoped IndexedDB checkpoints plus recovery and app ownership to restore a pending question. Node and Chromium tests are supplied for dependency/import boundaries, mock completion, unavailable/declined/failed/cancelled loading and restore, including a built-app reload test; they now pass locally alongside the standalone verification matrix. No real-device behavior, first download, latency or memory use is measured for this template. Standalone npm registry and packed-tarball installs pass on Node 22.23.5 and 24.15.0 for the scoped flows in the [verification record](standalone-verification.md).
 
-The [hybrid-gateway starter](../templates/kinds/gateway/files/README.md) supplies the identical one-question agent with a single host-server model route and a plain Node gateway. Server-side controls include five-minute scoped demo tokens, per-user call quotas, model allowlisting, validated prompt IDs and variables, bounded idempotency receipts and per-user fake document search. The page uses MemorySaver and fixed gateway statuses; reload starts over. Node and Chromium tests cover stub-upstream routing, validation, capability scoping, credential scans and a built-page flow over loopback in Node and headless Chromium. Span export is not exercised. Demo users and in-memory stores are not production authentication or storage; real upstream behavior, real-device results, latency and memory use are unverified and unmeasured. Standalone npm registry and packed-tarball installs pass on Node 22.23.5 and 24.15.0 for the scoped flows in the [verification record](standalone-verification.md).
+The [hybrid-gateway starter](../templates/kinds/gateway/files/README.md) supplies the identical one-question agent with a single host-server model route and a plain Node gateway. Server-side controls include five-minute scoped demo tokens, per-user call quotas, model allowlisting, validated prompt IDs and variables, bounded idempotency receipts and per-user fake document search. Dev and preview use a credential-free in-process mock only when both upstream variables are empty, and label successful mock responses with a fixed page status. Partial configuration and the compiled production entry retain 503 without an upstream. The host fetch wrapper drops agent-authored system/developer messages; direct gateway requests with those roles remain refused. The page uses MemorySaver and fixed gateway statuses; reload starts over. Node and Chromium tests cover stub-upstream routing, validation, capability scoping, credential scans and a built-page flow over loopback in Node and headless Chromium. Span export is not exercised. Demo users and in-memory stores are not production authentication or storage; real upstream behavior, real-device results, latency and memory use are unverified and unmeasured. Standalone npm registry and packed-tarball installs pass on Node 22.23.5 and 24.15.0 for the scoped flows in the [verification record](standalone-verification.md).
 
 Core now has three JavaScript entry points: `@galaxie-ai/core` for runtime/contracts with no unguarded browser globals, `@galaxie-ai/core/browser` for `acquireOwnership`, `watchInvalidation` and their public types, and `@galaxie-ai/core/config` for host wiring validation and building. Moving those exports out of the main entry was a breaking change to the public API, made before the first release. Ownership and invalidation behavior and limits are unchanged. The dependency check enforces this split; `packages/core/test/main-entry.node.test.ts` exercises import and a fake-executor run with browser globals absent.
 
