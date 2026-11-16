@@ -112,6 +112,18 @@ jobs:
       - run: pnpm run check:deps
       - run: pnpm run check:docs
 
+  nextjs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          browser: "true"
+      - run: pnpm --filter @galaxie-ai/example-nextjs-app-router test
+
   test-general:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -358,6 +370,7 @@ jobs:
         dependency-licenses,
         size,
         build,
+        nextjs,
         test-general,
         test-browser-engines,
         test-python,
