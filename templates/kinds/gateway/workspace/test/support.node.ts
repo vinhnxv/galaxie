@@ -11,37 +11,51 @@ import { frameworkProfile } from '../src/framework-profile.js';
 import type { HybridInstance } from '../src/runtime.js';
 
 interface WorkerHost {
-  readonly wasm: { readonly url: string };
+  readonly location: string;
+  readonly workerScript: RegExp;
+  readonly sources?: { readonly paths: readonly string[]; fetch: typeof fetch };
   createWorker(): object;
   close(): Promise<void>;
 }
-let goHost: WorkerHost | undefined;
+let workerHost: WorkerHost | undefined;
 beforeAll(async () => {
   if (frameworkProfile.workers) {
     const workerHostModule = './worker-host.node.js';
     const { createWorkerHost } = (await import(workerHostModule)) as {
       createWorkerHost(): Promise<WorkerHost>;
     };
-    goHost = await createWorkerHost();
+    workerHost = await createWorkerHost();
   }
 }, 60_000);
 beforeEach(() => {
   if (!frameworkProfile.workers) return;
-  if (goHost === undefined) throw new Error('The Go Worker host is missing.');
-  vi.stubGlobal('location', new URL(goHost.wasm.url));
+  if (workerHost === undefined) throw new Error('The framework Worker host is missing.');
+  vi.stubGlobal('location', new URL(workerHost.location));
+  if (workerHost.sources !== undefined) {
+    const sources = workerHost.sources;
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const url = new URL(
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+      );
+      return sources.paths.includes(url.pathname)
+        ? sources.fetch(input, init)
+        : originalFetch(input, init);
+    });
+  }
   vi.stubGlobal(
     'Worker',
-    class GoWorker {
+    class FrameworkWorker {
       constructor(url: URL, options: WorkerOptions) {
-        expect(url.pathname).toMatch(/go-worker\.ts$/);
+        if (workerHost === undefined) throw new Error('The framework Worker host is missing.');
+        expect(url.pathname).toMatch(workerHost.workerScript);
         expect(options).toEqual({ type: 'module' });
-        if (goHost === undefined) throw new Error('The Go Worker host is missing.');
-        Object.assign(this, goHost.createWorker());
+        Object.assign(this, workerHost.createWorker());
       }
     },
   );
 });
-afterAll(async () => goHost?.close());
+afterAll(async () => workerHost?.close());
 
 const servers: Server[] = [];
 afterEach(async () => {

@@ -1,114 +1,24 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { cspHeader } from '../../examples/adk-recipes/src/host/csp.js';
 import {
+  buildProject,
   buildStarterDistOnce,
   cleanStarterDist,
   hasStarterPython,
+  starterProject,
 } from './support/starter-python.node.js';
 
 const available = hasStarterPython();
-const repo = resolve('.');
-const composed = join(repo, 'packages/create/.cache/composed/browser-only-langgraph-python');
-const fixtures: string[] = [];
-
-interface Project {
-  readonly directory: string;
-  readonly artifacts: string;
-  readonly noPython: string;
-  readonly buildScript: string;
-}
-
-async function project(): Promise<Project> {
-  const directory = await mkdtemp(join(composed, '../.starter-python-browser-'));
-  fixtures.push(directory);
-  await cp(composed, directory, {
-    recursive: true,
-    filter: (path) => {
-      const top = relative(composed, path).split(sep)[0] ?? '';
-      return (
-        !['node_modules', 'dist', '.server'].includes(top) &&
-        !/^\.(?:reload|browser)-check-/.test(top)
-      );
-    },
-  });
-  const artifacts = join(directory, '.artifacts/starter-python');
-  const dist = await buildStarterDistOnce();
-  await cp(dist.directory, artifacts, { recursive: true });
-  const scope = join(directory, 'node_modules/@galaxie-ai');
-  await mkdir(scope, { recursive: true });
-  await symlink(artifacts, join(scope, 'starter-python'), 'dir');
-  const noPython = join(directory, '.no-python');
-  await mkdir(noPython);
-  for (const command of ['python', 'python3', 'uv'])
-    expect(spawnSync(command, ['--version'], { env: { PATH: noPython } }).error).toMatchObject({
-      code: 'ENOENT',
-    });
-  await symlink(join(repo, 'packages/adapter-pyodide'), join(scope, 'adapter-pyodide'), 'dir');
-  await symlink(
-    join(repo, 'packages/adapter-pyodide/node_modules/pyodide'),
-    join(directory, 'node_modules/pyodide'),
-    'dir',
-  );
-  const workspace = JSON.parse(
-    await readFile(join(composed, 'tsconfig.workspace.json'), 'utf8'),
-  ) as {
-    compilerOptions: { paths: Record<string, string[]> };
-  };
-  const alias = Object.entries(workspace.compilerOptions.paths)
-    .filter(([name]) => name.startsWith('@galaxie-ai/'))
-    .sort(([a], [b]) => b.length - a.length)
-    .map(([find, paths]) => ({ find, replacement: resolve(composed, paths[0] as string) }));
-  const buildScript = join(directory, '.build.mjs');
-  await writeFile(
-    buildScript,
-    `import { build } from ${JSON.stringify(import.meta.resolve('vite'))};
-await build({ configFile: ${JSON.stringify(join(directory, 'vite.config.ts'))}, mode: 'mock', logLevel: 'silent', resolve: { alias: ${JSON.stringify(alias)} }, build: { outDir: process.argv[2], emptyOutDir: true } });
-`,
-  );
-  return { directory, artifacts, noPython, buildScript };
-}
-
-async function buildProject(
-  fixture: Project,
-  name: string,
-): Promise<{
-  directory: string;
-  status: number | null;
-  output: string;
-}> {
-  const directory = join(fixture.directory, name);
-  const child = spawn(process.execPath, [fixture.buildScript, directory], {
-    cwd: fixture.directory,
-    env: {
-      ...process.env,
-      NODE_ENV: 'production',
-      PATH: fixture.noPython,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let output = '';
-  child.stdout.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
-  });
-  child.stderr.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
-  });
-  const status = await new Promise<number | null>((done, reject) => {
-    child.once('error', reject);
-    child.once('exit', done);
-  });
-  return { directory, status, output };
-}
 
 async function answer(
   directory: string,
@@ -236,7 +146,6 @@ async function driveAnswer(
 }
 
 afterAll(async () => {
-  await Promise.all(fixtures.map((directory) => rm(directory, { recursive: true, force: true })));
   await cleanStarterDist();
 });
 
@@ -246,7 +155,7 @@ describe.skipIf(!available)('the composed LangGraph Python browser starter', () 
   }, 120_000);
 
   test('answers without Python and refuses compilation without wasm-unsafe-eval', async () => {
-    const fixture = await project();
+    const fixture = await starterProject();
     const built = await buildProject(fixture, 'initial');
     expect(built.status, built.output).toBe(0);
     const digest = await sourceHash(fixture.directory);
@@ -255,7 +164,7 @@ describe.skipIf(!available)('the composed LangGraph Python browser starter', () 
   }, 180_000);
 
   test('editing a Python agent changes its answer after rebuilding without Python', async () => {
-    const fixture = await project();
+    const fixture = await starterProject();
     const before = await sourceHash(fixture.directory);
     const path = join(fixture.directory, 'python/agent/starter_agent/graph.py');
     await writeFile(path, (await readFile(path, 'utf8')).replace('"Correct."', '"Well done."'));
@@ -274,7 +183,7 @@ describe.skipIf(!available)('the composed LangGraph Python browser starter', () 
   test.each(['missing', 'corrupt', 'changed-manifest'])(
     'a %s wheel fails by filename before any output',
     async (kind) => {
-      const fixture = await project();
+      const fixture = await starterProject();
       const { manifest } = await buildStarterDistOnce();
       const wheel = manifest.wheels[0];
       if (wheel === undefined) throw new Error('The wheel inventory is empty.');

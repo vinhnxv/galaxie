@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { cp, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
+import { expect } from 'vitest';
 import { lockedWheels } from '../../../packages/adapter-pyodide/src/runtime-files.js';
 import type { StarterManifest } from '../../../packages/starter-python/src/manifest.js';
 import { buildStarterDist } from '../../../scripts/build-starter-python.js';
@@ -83,9 +84,107 @@ export function buildStarterDistOnce(): Promise<StarterDist> {
 }
 
 export async function cleanStarterDist(): Promise<void> {
+  await Promise.all(
+    fixtures.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
   if (built) {
     const result = await built.catch(() => undefined);
     if (result) await rm(result.directory, { recursive: true, force: true });
     built = undefined;
   }
+}
+
+const repo = resolve('.');
+const fixtures: string[] = [];
+
+interface Project {
+  readonly directory: string;
+  readonly artifacts: string;
+  readonly noPython: string;
+  readonly buildScript: string;
+}
+
+export async function starterProject(
+  kind: 'browser-only' | 'gateway' = 'browser-only',
+): Promise<Project> {
+  const composed = join(repo, `packages/create/.cache/composed/${kind}-langgraph-python`);
+  const directory = await mkdtemp(join(composed, '../.starter-python-browser-'));
+  fixtures.push(directory);
+  await cp(composed, directory, {
+    recursive: true,
+    filter: (path) => {
+      const top = relative(composed, path).split(sep)[0] ?? '';
+      return (
+        !['node_modules', 'dist', '.server'].includes(top) &&
+        !/^\.(?:reload|browser)-check-/.test(top)
+      );
+    },
+  });
+  const artifacts = join(directory, '.artifacts/starter-python');
+  const dist = await buildStarterDistOnce();
+  await cp(dist.directory, artifacts, { recursive: true });
+  const scope = join(directory, 'node_modules/@galaxie-ai');
+  await mkdir(scope, { recursive: true });
+  await symlink(artifacts, join(scope, 'starter-python'), 'dir');
+  const noPython = join(directory, '.no-python');
+  await mkdir(noPython);
+  for (const command of ['python', 'python3', 'uv'])
+    expect(spawnSync(command, ['--version'], { env: { PATH: noPython } }).error).toMatchObject({
+      code: 'ENOENT',
+    });
+  await symlink(join(repo, 'packages/adapter-pyodide'), join(scope, 'adapter-pyodide'), 'dir');
+  await symlink(
+    join(repo, 'packages/adapter-pyodide/node_modules/pyodide'),
+    join(directory, 'node_modules/pyodide'),
+    'dir',
+  );
+  const workspace = JSON.parse(
+    await readFile(join(composed, 'tsconfig.workspace.json'), 'utf8'),
+  ) as {
+    compilerOptions: { paths: Record<string, string[]> };
+  };
+  const alias = Object.entries(workspace.compilerOptions.paths)
+    .filter(([name]) => name.startsWith('@galaxie-ai/'))
+    .sort(([a], [b]) => b.length - a.length)
+    .map(([find, paths]) => ({ find, replacement: resolve(composed, paths[0] as string) }));
+  const buildScript = join(directory, '.build.mjs');
+  await writeFile(
+    buildScript,
+    `import { build } from ${JSON.stringify(import.meta.resolve('vite'))};
+await build({ configFile: ${JSON.stringify(join(directory, 'vite.config.ts'))}, mode: 'mock', logLevel: 'silent', resolve: { alias: ${JSON.stringify(alias)} }, build: { outDir: process.argv[2], emptyOutDir: true } });
+`,
+  );
+  return { directory, artifacts, noPython, buildScript };
+}
+
+export async function buildProject(
+  fixture: Project,
+  name: string,
+): Promise<{
+  directory: string;
+  status: number | null;
+  output: string;
+}> {
+  const directory = join(fixture.directory, name);
+  const child = spawn(process.execPath, [fixture.buildScript, directory], {
+    cwd: fixture.directory,
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      PATH: fixture.noPython,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  child.stdout.on('data', (chunk: Buffer) => {
+    output += chunk.toString();
+  });
+  child.stderr.on('data', (chunk: Buffer) => {
+    output += chunk.toString();
+  });
+  const status = await new Promise<number | null>((done, reject) => {
+    child.once('error', reject);
+    child.once('exit', done);
+  });
+  return { directory, status, output };
 }

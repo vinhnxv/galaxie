@@ -406,7 +406,7 @@ const existingOutputHashes: Readonly<Record<string, string>> = {
   'gateway/adk-go/pnpm': '9f978e8aca2b38418fbaa0597e2d21167441d704164f6269a79f93eafbc1dbc6',
   'gateway/adk-go/yarn': '9f978e8aca2b38418fbaa0597e2d21167441d704164f6269a79f93eafbc1dbc6',
 };
-test('all existing kind/framework/manager outputs retain main bytes except the baseline binding', async () => {
+test('all existing outputs retain main bytes except the baseline binding and two MIME entries', async () => {
   const layers = await loadLayers(templates);
   for (const [combination, expected] of Object.entries(existingOutputHashes)) {
     const [kind, framework, packageManager] = combination.split('/');
@@ -419,8 +419,20 @@ test('all existing kind/framework/manager outputs retain main bytes except the b
     const hash = createHash('sha256');
     for (const [path, file] of files) {
       if (path === 'check/baseline.check.ts') continue;
-      hash.update(JSON.stringify([path, file.mode, file.bytes.length]));
-      hash.update(file.bytes);
+      let bytes = file.bytes;
+      if (path === 'server/serve.ts') {
+        let source = Buffer.from(bytes).toString();
+        for (const line of [
+          "    '.mjs': 'text/javascript; charset=utf-8',\n",
+          "    '.wasm': 'application/wasm',\n",
+        ]) {
+          expect(source.split(line), combination).toHaveLength(2);
+          source = source.replace(line, '');
+        }
+        bytes = Buffer.from(source);
+      }
+      hash.update(JSON.stringify([path, file.mode, bytes.length]));
+      hash.update(bytes);
     }
     expect(hash.digest('hex'), combination).toBe(expected);
   }

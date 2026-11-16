@@ -104,7 +104,13 @@ it('keeps executable imports within the copied template or launch packages', asy
       if (specifier.startsWith('.')) {
         const path = relative(root, resolve(dirname(file), specifier));
         expect(path.startsWith('..') || isAbsolute(path)).toBe(false);
-        if (frameworkProfile.workers && specifier === './go-worker.ts?worker&url')
+        if (
+          frameworkProfile.workers &&
+          specifier ===
+            (templateDefinition.executor === 'langgraph-python'
+              ? './pyodide-worker.ts?worker&url'
+              : './go-worker.ts?worker&url')
+        )
           expect(file).toBe(resolve(root, 'src/executor.ts'));
         else expect(specifier).toMatch(/\.js$/);
       }
