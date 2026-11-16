@@ -14,7 +14,7 @@ import { expect, it } from 'vitest';
 import { devGatewayOptions } from '../server/dev.js';
 import { createGateway } from '../server/gateway.js';
 import { createMockUpstream, mockReply } from '../server/mock-upstream.js';
-import { expectedResult, gatewayReply } from '../src/executor.js';
+import { expectedOutput, gatewayReply } from '../src/executor.js';
 import { createModelFetch } from '../src/model-fetch.js';
 import { createHybridHost } from '../src/runtime.js';
 import { createSession } from '../src/session.js';
@@ -415,7 +415,7 @@ it('runs the identical agent through the gateway and keeps credential canaries o
     expect(events).toContainEqual(
       expect.objectContaining({
         type: 'output',
-        output: { result: expectedResult('Keep practicing.') },
+        output: expectedOutput('Keep practicing.'),
       }),
     );
     expect(instance.getSnapshot().routes?.['comment']).toMatchObject({
@@ -684,7 +684,7 @@ it('answers SystemMessage requests through the real OpenAI-compatible client in 
     expect(events).toContainEqual(
       expect.objectContaining({
         type: 'output',
-        output: { result: expectedResult(gatewayReply) },
+        output: expectedOutput(gatewayReply),
       }),
     );
     expect(host.getGatewayState()).toBe('mock');

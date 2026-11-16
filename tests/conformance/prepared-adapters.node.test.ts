@@ -25,7 +25,12 @@ const prepared = ['adapter-pyodide', 'adapter-adk', 'adapter-go'].map((directory
   directory,
   manifest: readManifest(`packages/${directory}`),
 }));
-const templates = ['browser-only-langgraph-js', 'gateway-langgraph-js'].map((directory) => ({
+const templates = [
+  'browser-only-langgraph-js',
+  'gateway-langgraph-js',
+  'browser-only-adk-js',
+  'gateway-adk-js',
+].map((directory) => ({
   directory,
   manifest: readManifest(`packages/create/.cache/composed/${directory}`),
 }));

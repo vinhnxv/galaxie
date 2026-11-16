@@ -22,16 +22,18 @@ for (const part of ['.cache', 'composed']) {
 }
 const layers = await loadLayers(join(repo, 'templates'));
 for (const kind of ['browser-only', 'gateway']) {
-  const name = `${kind}-langgraph-js`;
-  const { files } = compose(layers, {
-    kind,
-    framework: 'langgraph-js',
-    name,
-    mode: 'workspace-test',
-    packageManager: 'npm',
-    workspaceRoot: repo,
-  });
-  const directory = join(cache, name);
-  await rm(directory, { recursive: true, force: true });
-  await writeProject(await planWrite(files, directory));
+  for (const framework of ['langgraph-js', 'adk-js']) {
+    const name = `${kind}-${framework}`;
+    const { files } = compose(layers, {
+      kind,
+      framework,
+      name,
+      mode: 'workspace-test',
+      packageManager: 'npm',
+      workspaceRoot: repo,
+    });
+    const directory = join(cache, name);
+    await rm(directory, { recursive: true, force: true });
+    await writeProject(await planWrite(files, directory));
+  }
 }

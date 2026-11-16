@@ -26,6 +26,7 @@ import {
   createTemplateAgent,
   providerDescriptor,
   type StarterInput,
+  starterBindings,
   templateDefinition,
 } from './executor.js';
 import type { WebLLMPhase } from './model-state.js';
@@ -192,7 +193,7 @@ export async function createTemplateHost(options: TemplateHostOptions = {}): Pro
             status: providerId === snapshot.route ? 'available' : 'unavailable',
           }),
         },
-        bindings: {},
+        bindings: starterBindings,
         ui: registry.bindings({ surfaces: ['question'] }),
       });
     },

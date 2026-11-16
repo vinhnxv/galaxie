@@ -6,6 +6,7 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaultWebLLMModel } from '@galaxie-ai/models/webllm';
 import { expect, it } from 'vitest';
+import { templateDefinition } from '../src/executor.js';
 import {
   controlLabels,
   modelStates,
@@ -14,9 +15,16 @@ import {
 } from '../src/model-state.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const framework = JSON.parse(
+  await readFile(
+    resolve(root, '../../../../../templates/frameworks', templateDefinition.executor, 'layer.json'),
+    'utf8',
+  ),
+) as { package: { dependencies: Record<string, string> } };
+const frameworkDependencies = framework.package.dependencies;
 const launch = [
   '@galaxie-ai/core',
-  '@galaxie-ai/adapter-langgraph',
+  ...Object.keys(frameworkDependencies).filter((name) => name.startsWith('@galaxie-ai/')),
   '@galaxie-ai/models',
   '@galaxie-ai/storage-indexeddb',
   '@galaxie-ai/react',
@@ -72,7 +80,7 @@ it('declares only launch packages with registry-compatible ranges and the pinned
     devDependencies: Record<string, string>;
   };
   expect(manifest).toMatchObject({
-    name: 'browser-only-langgraph-js',
+    name: `browser-only-${templateDefinition.executor}`,
     private: true,
     license: 'Apache-2.0',
   });
@@ -88,11 +96,11 @@ it('declares only launch packages with registry-compatible ranges and the pinned
       Object.entries(dependencies).filter(([name]) => !name.startsWith('@galaxie-ai/')),
     ),
   ).toEqual({
+    ...Object.fromEntries(
+      Object.entries(frameworkDependencies).filter(([name]) => !name.startsWith('@galaxie-ai/')),
+    ),
     react: '19.3.1',
     'react-dom': '19.3.1',
-    '@langchain/core': '1.2.20',
-    '@langchain/langgraph': '1.5.1',
-    zod: '4.6.7',
     '@mlc-ai/web-llm': '0.2.86',
     vite: '8.3.4',
     playwright: '1.64.1',

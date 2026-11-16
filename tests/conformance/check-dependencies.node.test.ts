@@ -919,3 +919,14 @@ test('only the create package composed cache is exempt from the ADK scan', () =>
     'packages/other/.cache/a.ts: ADK imports belong only in packages/adapter-adk',
   );
 });
+
+test.each([
+  ['templates/frameworks/adk-js/files/src/agent.ts', 0],
+  ['packages/create/dist/templates/frameworks/adk-js/files/src/agent.ts', 0],
+  ['templates/kinds/gateway/files/src/x.ts', 1],
+  ['templates/frameworks/langgraph-js/files/src/x.ts', 1],
+  ['templates/frameworks/adk-js-other/files/src/x.ts', 1],
+  ['packages/create/dist/templates/kinds/gateway/files/src/x.ts', 1],
+])('scopes the ADK overlay allowance to %s', (path, status) => {
+  expect(run({ [path]: adk('@google/adk') }).status).toBe(status);
+});

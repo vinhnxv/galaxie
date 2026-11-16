@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createLangGraphAdapter, type LangGraphServices } from '@galaxie-ai/adapter-langgraph';
-import type { ModelDescriptor } from '@galaxie-ai/core';
+import type { CapabilityBinding, ModelDescriptor } from '@galaxie-ai/core';
 import { MockChatModel } from '@galaxie-ai/models/mock';
 import { MemorySaver } from '@langchain/langgraph/web';
 import { commentPrompt } from './agent.js';
@@ -42,4 +42,10 @@ export function createServices(
 
 export function createGatewayServices(chatModels: ChatModels): LangGraphServices {
   return { chatModels, checkpointer: new MemorySaver() };
+}
+
+export const starterBindings: Readonly<Record<string, CapabilityBinding>> = {};
+
+export function expectedOutput(reply: string): unknown {
+  return { result: expectedResult(reply) };
 }

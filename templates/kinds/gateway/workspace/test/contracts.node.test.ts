@@ -6,12 +6,20 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 import { cspDirectives } from '../src/csp.js';
+import { templateDefinition } from '../src/executor.js';
 import { gatewayStateForStatus, gatewayStates } from '../src/gateway-state.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const framework = JSON.parse(
+  await readFile(
+    resolve(root, '../../../../../templates/frameworks', templateDefinition.executor, 'layer.json'),
+    'utf8',
+  ),
+) as { package: { dependencies: Record<string, string> } };
+const frameworkDependencies = framework.package.dependencies;
 const launch = [
   '@galaxie-ai/core',
-  '@galaxie-ai/adapter-langgraph',
+  ...Object.keys(frameworkDependencies).filter((name) => name.startsWith('@galaxie-ai/')),
   '@galaxie-ai/models',
   '@galaxie-ai/react',
 ];
@@ -27,7 +35,7 @@ it('declares exactly four launch packages, registry ranges and the existing thir
     scripts: Record<string, string>;
   };
   expect(manifest).toMatchObject({
-    name: 'gateway-langgraph-js',
+    name: `gateway-${templateDefinition.executor}`,
     version: '0.0.0',
     private: true,
     license: 'Apache-2.0',
@@ -40,12 +48,12 @@ it('declares exactly four launch packages, registry ranges and the existing thir
   ).toEqual([...launch].sort());
   for (const name of launch) expect(dependencies[name]).toBe('^0.1.0');
   const thirdParties = {
+    ...Object.fromEntries(
+      Object.entries(frameworkDependencies).filter(([name]) => !name.startsWith('@galaxie-ai/')),
+    ),
     react: '19.3.1',
     'react-dom': '19.3.1',
-    '@langchain/core': '1.2.20',
-    '@langchain/langgraph': '1.5.1',
     '@langchain/openai': '1.6.3',
-    zod: '4.6.7',
     vite: '8.3.4',
     playwright: '1.64.1',
     typescript: '7.0.2',

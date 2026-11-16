@@ -10,6 +10,7 @@ import {
   createTemplateAgent,
   providerDescriptor,
   type StarterInput,
+  starterBindings,
   templateDefinition,
 } from './executor.js';
 import type { GatewayState } from './gateway-state.js';
@@ -84,7 +85,7 @@ export function createHybridHost(options: HybridHostOptions = {}): HybridHost {
           consent: () => true,
           getCredential: () => session.token(),
         },
-        bindings: {},
+        bindings: starterBindings,
         ui: registry.bindings({ surfaces: ['question'] }),
       }),
     resetSession() {

@@ -4,7 +4,7 @@
 import { ModelError, type ModelUnavailableReason } from '@galaxie-ai/models/builtin-ai';
 import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
 import { afterEach, expect, it, vi } from 'vitest';
-import { expectedResult, mockReply, starterInput } from '../src/executor.js';
+import { expectedOutput, mockReply, starterInput } from '../src/executor.js';
 import { createTemplateHost, type TemplateInstance } from '../src/runtime.js';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -53,9 +53,7 @@ it('finishes on the scripted model without a network request, worker, or WebLLM 
       builtinReason: 'no_api',
       webllm: 'no_webgpu',
     });
-    expect(await answer(await host.createInstance())).toEqual({
-      result: expectedResult(mockReply),
-    });
+    expect(await answer(await host.createInstance())).toEqual(expectedOutput(mockReply));
     expect(network).not.toHaveBeenCalled();
     expect(loader).not.toHaveBeenCalled();
   } finally {
