@@ -13,6 +13,12 @@ The other packages remain private workspace packages.
 
 For host-authored wiring in a data file, see the [host configuration guide](host-configuration.md) and its worked host-remote example.
 
+## With a coding agent
+
+Generated projects include versioned galaxie guidance for coding agents. For an
+existing app, see the [standalone skill and installer](../../skills/galaxie/README.md);
+match its version to the app's `@galaxie-ai/core` before editing.
+
 ## Layer map
 
 | Layer | What you gain | What you still own |

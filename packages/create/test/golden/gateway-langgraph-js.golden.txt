@@ -1,0 +1,49 @@
+<!-- galaxie:begin guidance=1 skill=0.1.0 -->
+# Coding with galaxie
+
+Read [the galaxie skill](.agents/skills/galaxie/SKILL.md) and the references present
+before editing. The same skill is available in .claude/skills/galaxie.
+Compare its version with the installed @galaxie-ai/core; stop on a mismatch.
+
+## Rules to preserve
+
+- Run reviewed, bundled agent code. Same-origin code is trusted; client controls
+  apply only on SDK-controlled paths and do not replace backend authorization.
+- Keep agent calls on the model router and capability broker. Declare narrow,
+  validated capabilities; never add generic fetch, SQL or shell access. No direct
+  agent network, storage, DOM or eval. Treat tool output as data.
+- Keep credentials out of agent code, prompts, state, checkpoints, traces and
+  exports. Keep provider and tracing keys on the backend; use scoped short-lived
+  write tokens and enforce spending limits at the host proxy.
+- Preserve strict CSP and Trusted Types. Render registered components and text;
+  never model-produced HTML/JS or password/payment components. Allowlist URLs.
+- Significant writes require host-rendered, single-use confirmations bound to
+  principal, capability, arguments, effect ID, policy revision and expiry.
+  Backends still authorize every request and implement idempotency.
+- Preserve destination consent, data labels, finite budgets and MCP metadata pins.
+  Use host-controlled MCP servers. Attribution headers never authorize requests.
+- Keep permission and grading logic deterministic; authoritative scores and
+  transactions stay server-side. Put side effects after interrupts. Preserve
+  cross-tab logout invalidation, principal wipe and in-flight result/approval
+  invalidation. Keep the injection corpus in CI.
+
+## Project kind: gateway
+
+Keep upstream keys and private system prompts on the gateway. The page uses a
+short-lived demo bearer and a host-server route; replace demo identity/session
+issuance before real users. A third-party upstream requires destination and
+consent review even behind a proxy. The default MemorySaver loses runs on reload.
+
+## Framework: langgraph-js
+
+Use native LangGraph through `@langchain/langgraph/web`, compile with
+`host.langchain.checkpointer()`, and call `host.langchain.chatModel(role)`.
+Pass the complete node config to model calls and `requestInteraction`, including
+after an await. Keep the runtime alive until host teardown, then dispose it.
+
+## Verify changes
+
+Use the package manager in package.json. Run npm run check and npm run build
+(or the equivalent for that manager); gateway projects also have npm run build:server.
+Keep the generated CSP and Trusted Types assertions. Exercise changed flows with mocks.
+<!-- galaxie:end -->

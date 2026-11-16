@@ -19,6 +19,7 @@ export interface ComposeOptions {
   readonly packageManager: PackageManager;
   readonly tarballs?: Tarballs;
   readonly workspaceRoot?: string;
+  readonly guidance?: ReadonlyMap<string, Uint8Array>;
 }
 export interface ComposeReport {
   readonly layers: readonly string[];
@@ -243,6 +244,7 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
       'composer',
     );
   }
+  for (const [path, bytes] of options.guidance ?? []) add(path, bytes, 'guidance');
   for (const paths of Object.values(filesByLayer)) paths.sort();
   return {
     files: new Map(

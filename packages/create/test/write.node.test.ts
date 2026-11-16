@@ -15,8 +15,10 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
 import type { ProjectFile } from '../src/compose.js';
+import { loadGuidanceSource, renderGuidance } from '../src/guidance.js';
 import { ProjectWriteError, planWrite, writeProject } from '../src/write.js';
 
 const files = (values: Record<string, string>): Map<string, ProjectFile> =>
@@ -36,13 +38,18 @@ test('exclusive creation uses fixed modes and preserves case-insensitive instruc
   const root = await scratch();
   await writeFile(join(root, 'AGENTS.md'), 'host-owned\n');
   await writeFile(join(root, 'claude.md'), 'also-host-owned\n');
+  const guidance = renderGuidance(
+    await loadGuidanceSource(fileURLToPath(new URL('../../../skills/galaxie', import.meta.url))),
+    { kind: 'browser-only', framework: 'langgraph-js' },
+  );
   const plan = await planWrite(
-    files({
-      'AGENTS.md': 'replace',
-      'CLAUDE.md': 'replace',
-      'package.json': '{}\n',
-      'src/main.ts': 'main\n',
-    }),
+    new Map([
+      ...[...guidance].map(([path, bytes]) => [path, { bytes, mode: 0o644 }] as const),
+      ...files({
+        'package.json': '{}\n',
+        'src/main.ts': 'main\n',
+      }),
+    ]),
     root,
   );
   expect(plan.conflicts).toEqual([]);
@@ -53,6 +60,11 @@ test('exclusive creation uses fixed modes and preserves case-insensitive instruc
   expect(await readFile(join(root, 'src/main.ts'), 'utf8')).toBe('main\n');
   expect((await stat(join(root, 'src/main.ts'))).mode & 0o777).toBe(0o644);
   expect((await stat(join(root, 'src'))).mode & 0o777).toBe(0o755);
+  for (const [path, bytes] of guidance) {
+    if (path === 'AGENTS.md' || path === 'CLAUDE.md') continue;
+    expect(await readFile(join(root, path))).toEqual(Buffer.from(bytes));
+    expect((await lstat(join(root, path))).isSymbolicLink()).toBe(false);
+  }
 });
 
 test('all ordinary existing paths are listed and no output is written', async () => {

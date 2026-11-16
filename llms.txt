@@ -8,6 +8,7 @@
 - [Project status](docs/status.md): implemented behavior, mock-only verification and unmeasured paths.
 - [System design](docs/system-design.md): implemented contracts and limits.
 - [Root coding guidance](AGENTS.md): repository rules.
+- [galaxie coding-agent skill](skills/galaxie/README.md): generated-project guidance and a version-gated installer for existing apps; no installer release tag exists yet.
 - [License](LICENSE): Apache-2.0, with a [NOTICE](NOTICE) file.
 - [Framework overview](docs/framework-overview.md): audiences and direction; distinguish targets from implemented contracts.
 - [Architecture decisions](docs/adr/README.md): statuses and decision index; follow Accepted decisions.

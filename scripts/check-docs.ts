@@ -2,8 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, resolve } from 'node:path';
+
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== '--refresh-citations')) {
+  console.error('Usage: node scripts/check-docs.ts [--refresh-citations]');
+  process.exit(2);
+}
+const refreshCitations = args[0] === '--refresh-citations';
+const citationUpdates = new Map<string, string>();
 
 const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
   .split('\0')
@@ -47,22 +56,146 @@ function mask(content: string): string {
   return content.replace(/[^\n]/g, ' ');
 }
 
+// A Markdown code span cannot cross a blank line, so an unpaired backtick must not
+// hide later paragraphs from the claim and citation checks.
 function withoutCode(content: string): string {
-  return content.replace(/(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/g, mask);
+  return content
+    .split(/(\n[ \t]*\n)/)
+    .map((part, index) =>
+      index % 2 === 1 ? part : part.replace(/(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/g, mask),
+    )
+    .join('');
 }
 
-function headings(lines: readonly string[]): { level: number; text: string }[] {
-  const result: { level: number; text: string }[] = [];
+interface Heading {
+  level: number;
+  text: string;
+  line: number;
+}
+
+function headings(lines: readonly string[]): Heading[] {
+  const result: Heading[] = [];
+  const frontmatterEnd =
+    lines[0]?.trimEnd() === '---'
+      ? lines.findIndex((line, index) => index > 0 && /^---\s*$/.test(line))
+      : -1;
   for (const [index, line] of lines.entries()) {
+    if (frontmatterEnd > 0 && index <= frontmatterEnd) continue;
     const heading = /^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
     if (heading?.[1] && heading[2]) {
-      result.push({ level: heading[1].length, text: heading[2] });
+      result.push({ level: heading[1].length, text: heading[2], line: index });
     } else if (index > 0 && /^ {0,3}(?:=+|-+)\s*$/.test(line)) {
       const previous = lines[index - 1]?.trim();
-      if (previous) result.push({ level: line.trim().startsWith('=') ? 1 : 2, text: previous });
+      if (previous)
+        result.push({
+          level: line.trim().startsWith('=') ? 1 : 2,
+          text: previous,
+          line: index - 1,
+        });
     }
   }
   return result;
+}
+
+function sectionExtent(
+  lines: readonly string[],
+  titles: readonly Heading[],
+  heading: Heading,
+): { start: number; end: number } {
+  const start = heading.line + (/^ {0,3}#{1,6}\s/.test(lines[heading.line] ?? '') ? 1 : 2);
+  const next = titles.find((item) => item.line > heading.line && item.level <= heading.level);
+  return { start, end: next?.line ?? lines.length };
+}
+
+function citationHash(
+  file: string,
+  line: number,
+  target: string,
+  title: string,
+): string | undefined {
+  if (!tracked.has(target) || !existsSync(target) || !statSync(target).isFile()) {
+    problem(file, line, `missing citation file: ${target}`);
+    return;
+  }
+  const raw = readFileSync(target, 'utf8').split(/\r?\n/);
+  const masked = prose(raw.join('\n'));
+  const titles = headings(masked);
+  const matches = titles.filter((item) => item.text === title);
+  if (matches.length !== 1) {
+    problem(
+      file,
+      line,
+      `${matches.length === 0 ? 'missing' : 'ambiguous'} heading: ${target}#${title}`,
+    );
+    return;
+  }
+  const heading = matches[0];
+  if (heading === undefined) return;
+  const { start, end } = sectionExtent(masked, titles, heading);
+  const body = raw
+    .slice(start, end)
+    .map((value) => value.trimEnd())
+    .join('\n')
+    .replace(/^\n+|\n+$/g, '');
+  if (body === '') {
+    problem(file, line, `empty citation section: ${target}#${title}`);
+    return;
+  }
+  return createHash('sha256').update(body, 'utf8').digest('hex');
+}
+
+function checkCitations(file: string, source: string, content: string): void {
+  const updates = new Map<number, string>();
+  const raw = source.split(/\r?\n/);
+  for (const [index, line] of content.split('\n').entries()) {
+    if (!/<!--\s*galaxie:cite/i.test(line)) continue;
+    const match =
+      /^\s*<!-- galaxie:cite path="([^"]+)" heading="([^"]+)" sha256="([a-f\d]{64})" -->\s*$/.exec(
+        raw[index] ?? '',
+      );
+    if (match === null) {
+      problem(
+        file,
+        index + 1,
+        'invalid citation: expected path, heading and a 64-character sha256',
+      );
+      continue;
+    }
+    const [, target, title, expected] = match;
+    if (target === undefined || title === undefined || expected === undefined) continue;
+    const actual = citationHash(file, index + 1, target, title);
+    if (actual === undefined || actual === expected) continue;
+    if (refreshCitations) updates.set(index, actual);
+    else
+      problem(
+        file,
+        index + 1,
+        `citation hash mismatch: ${target}#${title}; review the guidance, then run node scripts/check-docs.ts --refresh-citations`,
+      );
+  }
+  if (updates.size > 0) {
+    let index = 0;
+    citationUpdates.set(
+      file,
+      source.replace(/[^\n]*(?:\n|$)/g, (line) => {
+        const hash = updates.get(index++);
+        return hash === undefined ? line : line.replace(/sha256="[a-f\d]{64}"/, `sha256="${hash}"`);
+      }),
+    );
+  }
+}
+
+function checkClaims(file: string, content: string): void {
+  if (!/^(?:skills\/galaxie\/|templates\/).*\.md$/i.test(file)) return;
+  for (const [index, line] of content.split('\n').entries()) {
+    for (const match of line.matchAll(/\b(?:secure|secured|compliant|certified)\b/gi)) {
+      problem(
+        file,
+        index + 1,
+        `banned claim: ${match[0]}; describe controls and documented limits`,
+      );
+    }
+  }
 }
 
 function slugs(lines: readonly string[]): Set<string> {
@@ -140,9 +273,13 @@ for (const file of files.filter((file) => /\.md$/i.test(file) || file === 'llms.
     problem(file, 1, 'missing required file');
     continue;
   }
-  const lines = prose(readFileSync(file, 'utf8'));
+  const source = readFileSync(file, 'utf8');
+  const lines = prose(source);
+  const text = withoutCode(lines.join('\n'));
+  checkCitations(file, source, text);
+  checkClaims(file, text);
   const refs = new Map<string, string>();
-  const content = withoutCode(lines.join('\n')).replace(
+  const content = text.replace(
     /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:\n[ \t]*)?(.+)$/gm,
     (definition: string, label: string, target: string) => {
       const key = reference(label);
@@ -199,4 +336,6 @@ required('llms.txt');
 if (problems.length > 0) {
   console.error([...new Set(problems)].join('\n'));
   process.exitCode = 1;
+} else if (refreshCitations) {
+  for (const [file, content] of citationUpdates) writeFileSync(file, content);
 }

@@ -86,6 +86,32 @@ Each prepare owns a fresh interpreter; this trusted declaration is not isolation
 duplicate checks and flattened pause scanning. Native, dynamic and foreign
 toolsets, built-ins, planners and code executors remain refused.
 
+## Agent shapes
+
+- LangGraph Python entries return a graph compiled with
+  `galaxie.langgraph.checkpointer()`. Asynchronous text models, checked streams,
+  subgraphs, child interrupts and durable restore are supported. Parallel or
+  ID-less interrupts and static breakpoints remain refused; native tool-call
+  parts, `bind_tools` and default structured output remain refused. Use the
+  documented author-validated text protocol for model-chosen calls.
+- ADK Python accepts `LlmAgent`, `SequentialAgent`, `ParallelAgent` and `LoopAgent`
+  trees with `galaxie.adk` models and capability tools; `subgraphs` stays false.
+  Names must be distinct. A leaf can pause at any sequential child position;
+  one pausing agent beneath each Parallel ancestor can ask for confirmation.
+  Loop pauses and long-running Parallel tools remain refused. Resumable apps
+  also refuse `temp:` output keys and `LlmAgent` transfer children.
+- ADK `AgentTool` and `Workflow`, foreign models, dynamic toolsets, provider-native
+  tools, code executors and planners remain refused. Exact declared-role strings
+  and fixed same-boot capability toolsets are supported.
+- pydantic-ai entries return an `Agent` or `Executor`; DSPy entries return a
+  `dspy.Module` or `galaxie.dspy.Executor`. Their separate executors keep
+  `subgraphs` false; do not infer LangGraph or ADK support from those faces.
+
+See the [LangGraph entry contract](README.md),
+[ADK shapes](README.md#authoring-surface-and-supported-shapes),
+[ADK model/toolset rules](README.md#porting-adk-models-and-static-toolsets) and
+[unsupported list](../../docs/unsupported.md#execution-and-langgraph).
+
 ## Tests
 
 Run the focused bridge and adapter tests with Vitest on Node and Chromium. Real

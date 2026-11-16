@@ -114,11 +114,38 @@ the project name is injected only into `package.json`.
 
 Composition and target inspection finish before writes. Ordinary existing output
 paths abort the run. Existing `AGENTS.md` and `CLAUDE.md` are preserved
-case-insensitively if a layer emits those names; current layers emit neither.
+case-insensitively when guidance emits those names.
 Traversal, absolute output paths and symlink components are rejected. Writes use
 exclusive creates and roll back only files and directories they created.
 These checks do not isolate the target from concurrent processes with write access.
 Generated manifests retain `license: Apache-2.0` and the starter SPDX headers.
+
+## Coding-agent guidance
+
+All eight kind/framework combinations add `AGENTS.md` with one versioned managed
+block under 8192 bytes, `CLAUDE.md` containing exactly `@AGENTS.md` and a newline,
+and matching real-file skill copies in `.agents/skills/galaxie` and
+`.claude/skills/galaxie`. Each copy contains `SKILL.md`, common host guidance and
+only the selected kind and framework references. The block includes the baseline
+do-and-never rules, supported shapes and verification commands. No existing
+project source, CSP or Trusted Types output changes.
+
+The single source is [skills/galaxie](../../skills/galaxie/README.md), loaded by the
+CLI and rendered by [src/guidance.ts](src/guidance.ts), outside the template layers.
+The composer accepts its optional file map through the usual collision and path
+checks; compositions without guidance remain unchanged. The repository-only
+composed test cache intentionally remains guidance-free. Eight `AGENTS.md` golden
+files and source-byte comparisons cover rendering. Deliberately refresh goldens
+with `pnpm exec vitest run --project node packages/create/test/guidance.node.test.ts --update`.
+Citation hashes and unsupported-claim checks run in `pnpm run check:docs`.
+
+Existing instruction files keep their bytes while new skill files are written.
+When only one instruction file exists, the CLI prints an import hint; it does not
+rewrite the existing file. Existing conflicting skill files abort ordinary create
+writes. For an existing app, use the separate version-gated
+[skill installer](../../skills/galaxie/README.md#install-into-an-existing-app).
+No agent has been measured consuming the skill, and no installer release tag
+exists yet. Guidance adds files only; ADR-0012 guarantees are unchanged.
 
 Repository-only tests and source mappings are composed under the ignored
 `packages/create/.cache/composed` by `pnpm run compose:create`. Build the complete starter-go distribution before testing the Go composition:
