@@ -7,6 +7,51 @@ production server still follows the correlated 503 unavailable flow. These check
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
 
+## ADK Go measurement (2026-11-16)
+
+The private, unpublished `@galaxie-ai/starter-go` package supplies the browser-only
+ADK Go starter's prebuilt agent, verified glue, Go module source, manifest and
+notices. With Go 1.27.3 on PATH, its prepack produced 29,897,761 wasm bytes with
+SHA-256 `bff0abbb35389b1fbc3e2757f98574abcebfd758b843852da96cf1f5731c2c30`.
+Artifact conformance compares four clean/git/symlink-shaped builds, pack/plugin
+source identities, glue tampering and a broken module replacement.
+
+`tests/conformance/starter-go-browser.node.test.ts` passes all four Chromium
+cases: unedited prebuilt without Go; edited-source refusal with the exact documented
+message and no output; an edited local build followed by a no-Go cache hit; and an
+unedited version-only artifact upgrade without Go. Each successful browser drive
+answers the quiz from the mock and checks the logged origin and wasm digest,
+same-origin requests, zero CSP/Trusted Types violations and zero errors. The
+negative control without `wasm-unsafe-eval` cannot open the question or compile
+an empty wasm module. The Go overlay initializes Zod in jitless mode before page
+dependencies create schemas, preventing its caught eval probe without changing
+any CSP directive.
+
+The seven launch packages plus `adapter-go` and `starter-go` were packed locally
+with Go 1.27.3. Then, with a PATH containing Node and system tools but no Go,
+this real-network command exited 0:
+
+```sh
+node scripts/verify-standalone.ts --framework adk-go --mode tarball --tarballs <tarballs> --json /tmp/galaxie-adk-go-network-stage3.json
+```
+
+| Kind / framework | Target Node | npm | Mode | Chromium | Result |
+| --- | --- | --- | --- | --- | --- |
+| browser-only / adk-go | 24.15.0 | 12.2.2 | Tarball | 156.0.8078.4 | PASS |
+
+The result has an empty failure array. Installation, single-copy checks,
+production build, generated checks, directive mutation controls and the mock
+browser drive pass with a seven-day release age, no exclusion and no lifecycle
+script fallback. The harness removed its temporary projects; JSON and logs stay
+outside the checkout. Nothing was published.
+
+Firefox/WebKit for the Go starter, real models, pnpm/yarn installs end to end,
+a cold Go module cache, Node 22 and CI cold-start time remain unmeasured. The
+pnpm symlink shape has build-level evidence only. Hidden or underscore-prefixed
+embedded inputs remain outside the source-cache contract; the starter has no
+embeds. A release changing the template Go tree requires Go for older projects.
+ADR-0012 guarantees are unchanged.
+
 ## ADK overlay measurement (2026-11-16)
 
 Both starter kinds now support `--framework adk-js --mode tarball`. The adapter

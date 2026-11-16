@@ -68,10 +68,19 @@ export function goFramework(projectDirectory: string): UserConfig {
           source: await readFile(join(dirname(built.glue.file), 'NOTICE.txt')),
         });
       },
+      transform(code, id) {
+        if (id === join(projectDirectory, 'src/main.tsx'))
+          return `import 'virtual:galaxie-go-env';\n${code}`;
+        return undefined;
+      },
       resolveId(id) {
+        if (id === 'virtual:galaxie-go-env') return '\0galaxie-go-env';
         return id === 'virtual:galaxie-go' ? '\0galaxie-go' : undefined;
       },
       async load(id) {
+        // Initialize Zod before page dependencies create schemas and probe eval support.
+        if (id === '\0galaxie-go-env')
+          return "import { z } from 'zod'; z.config({ jitless: true });";
         if (id !== '\0galaxie-go') return undefined;
         const { origin, sourceSha256, wasm } = await resolveBuild();
         return `export const goBuild = { ...${JSON.stringify({ origin, sourceSha256, wasm })}, wasm: { ...${JSON.stringify(wasm)}, url: import.meta.env.BASE_URL + 'go/agent.wasm' } };`;
