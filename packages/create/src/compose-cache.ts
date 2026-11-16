@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compose } from './compose.js';
 import { loadLayers } from './layers.js';
+import { assetRoot } from './paths.js';
 import { planWrite, writeProject } from './write.js';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
@@ -20,7 +21,7 @@ for (const part of ['.cache', 'composed']) {
     throw new Error('The composed cache must use real directories.');
   if (info === undefined) await mkdir(cache, { mode: 0o755 });
 }
-const layers = await loadLayers(join(repo, 'templates'));
+const layers = await loadLayers(assetRoot('templates'));
 for (const kind of ['browser-only', 'gateway']) {
   for (const framework of ['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python']) {
     const name = `${kind}-${framework}`;

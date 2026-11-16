@@ -3,7 +3,6 @@
 
 import { isAbsolute, resolve } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
-import { fileURLToPath } from 'node:url';
 import { type Choices, parseArguments, UsageError, usage } from './args.js';
 import { compose, LayerCollisionError, SelectionError } from './compose.js';
 import { GuidanceError, loadGuidanceSource, renderGuidance } from './guidance.js';
@@ -11,7 +10,7 @@ import { detectPackageManager, InstallError, type InstallRunner, install } from 
 import { LayerManifestError, loadLayers } from './layers.js';
 import { MergeConflictError } from './merge.js';
 import { resolveTarballs, TarballError } from './packages.js';
-import { ProjectPathError, projectName, validateTarget } from './paths.js';
+import { assetRoot, ProjectPathError, projectName, validateTarget } from './paths.js';
 import { prompt } from './prompt.js';
 import { ProjectWriteError, planWrite, writeProject } from './write.js';
 
@@ -33,9 +32,7 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
   const errorOutput = io.stderr ?? process.stderr;
   const env = io.env ?? process.env;
   try {
-    const layers = await loadLayers(
-      io.templatesRoot ?? fileURLToPath(new URL('../../../templates', import.meta.url)),
-    );
+    const layers = await loadLayers(io.templatesRoot ?? assetRoot('templates'));
     const choices: Choices = {
       kinds: layers
         .filter((layer) => layer.manifest.type === 'kind')
@@ -77,15 +74,15 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
         : await resolveTarballs(tarballDirectory, request.framework as string);
     if (request.framework === 'adk-js' && tarballDirectory === undefined)
       output.write(
-        'Note: @galaxie-ai/adapter-adk is not published yet, so installing from the registry fails. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
+        'Note: Registry installation requires @galaxie-ai/adapter-adk at the generated dependency ranges. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
       );
     if (request.framework === 'adk-go' && tarballDirectory === undefined)
       output.write(
-        'Note: @galaxie-ai/adapter-go and @galaxie-ai/starter-go are not published yet, so installing from the registry fails. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
+        'Note: Registry installation requires @galaxie-ai/adapter-go and @galaxie-ai/starter-go at the generated dependency ranges. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
       );
     if (request.framework === 'langgraph-python' && tarballDirectory === undefined)
       output.write(
-        'Note: @galaxie-ai/adapter-pyodide and @galaxie-ai/starter-python are not published yet, so installing from the registry fails. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
+        'Note: Registry installation requires @galaxie-ai/adapter-pyodide and @galaxie-ai/starter-python at the generated dependency ranges. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
       );
     const result = compose(layers, {
       kind: request.kind as string,
@@ -94,9 +91,7 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
       mode: 'project',
       packageManager,
       guidance: renderGuidance(
-        await loadGuidanceSource(
-          io.guidanceRoot ?? fileURLToPath(new URL('../../../skills/galaxie', import.meta.url)),
-        ),
+        await loadGuidanceSource(io.guidanceRoot ?? assetRoot('skills/galaxie')),
         { kind: request.kind as string, framework: request.framework as string },
       ),
       ...(tarballs === undefined ? {} : { tarballs }),

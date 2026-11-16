@@ -19,6 +19,7 @@ import { build } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import * as runtimeInventory from '../../packages/adapter-pyodide/src/runtime-files.js';
 import { discoverEntries } from '../../scripts/check-size.js';
+import { packPackage } from './support/package-pack.node.js';
 import {
   buildStarterDistOnce as buildStarterGoDistOnce,
   cleanStarterDist as cleanStarterGoDist,
@@ -122,23 +123,11 @@ beforeAll(async () => {
           join(root, 'packages', pkg.directory, name),
           join(starterDist.directory, name),
         );
-    execFileSync(
-      'pnpm',
-      [
-        'pack',
-        ...(starterDist ? ['--config.ignore-scripts=true'] : []),
-        '--pack-destination',
-        destination,
-      ],
-      {
-        cwd: starterDist?.directory ?? join(root, 'packages', pkg.directory),
-        encoding: 'utf8',
-        timeout: 300_000,
-      },
+    const tarball = packPackage(
+      starterDist?.directory ?? join(root, 'packages', pkg.directory),
+      destination,
+      starterDist !== undefined,
     );
-    const [filename] = readdirSync(destination).filter((name) => name.endsWith('.tgz'));
-    if (filename === undefined) throw new Error(`No tarball produced for ${pkg.directory}.`);
-    const tarball = join(destination, filename);
     pkg.tarball = tarball;
     pkg.entries = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8' })
       .trim()
@@ -169,8 +158,12 @@ test.each(packages)('$directory packs only distribution files and includes every
   const manifest = JSON.parse(pkg.packedJson) as Manifest;
   expect(missingExportTargets(manifest, pkg.entries)).toEqual([]);
   for (const entry of pkg.entries) {
-    expect(entry).toMatch(/^package\/(?:dist\/|LICENSE$|NOTICE$|README\.md$|package\.json$)/);
-    expect(entry).not.toMatch(/^package\/(?:src|test)\//);
+    expect(entry).toMatch(
+      pkg.directory === 'create'
+        ? /^package\/(?:dist\/|templates\/|skills\/galaxie\/|LICENSE$|NOTICE$|README\.md$|package\.json$)/
+        : /^package\/(?:dist\/|LICENSE$|NOTICE$|README\.md$|package\.json$)/,
+    );
+    expect(entry).not.toMatch(/^package\/(?:src|tests?)\//);
     expect(entry.split('/')).not.toContain('internal');
   }
 });
@@ -221,7 +214,9 @@ test.each(packages)('$directory has public metadata and the root license files',
     expect(manifest.publishConfig?.access).toBe('public');
     if (promotedPackages.includes(pkg.directory))
       expect(manifest.files).toEqual(
-        pkg.directory === 'create' ? ['dist', 'NOTICE'] : ['dist', 'LICENSE', 'NOTICE'],
+        pkg.directory === 'create'
+          ? ['dist', 'templates', 'skills', 'LICENSE', 'NOTICE']
+          : ['dist', 'LICENSE', 'NOTICE'],
       );
   }
   expect(packed.version).toMatch(/^0\.\d+\.\d+$/);
@@ -365,6 +360,8 @@ test('create packs its CLI bin and public composer export', () => {
     default: './dist/index.js',
   });
   expect(pkg?.entries).toContain('package/dist/cli.js');
+  expect(pkg?.entries).toContain('package/templates/base/layer.json');
+  expect(pkg?.entries).toContain('package/skills/galaxie/SKILL.md');
 });
 
 test('the packed runtime-files module exposes the worker inventories', () => {

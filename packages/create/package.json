@@ -30,8 +30,16 @@
   },
   "files": [
     "dist",
+    "templates",
+    "skills",
+    "LICENSE",
     "NOTICE"
   ],
+  "scripts": {
+    "prepack": "pnpm exec tsc -p tsconfig.build.json && node ../../scripts/prepare-create.ts",
+    "postpack": "node ../../scripts/prepare-create.ts --clean",
+    "clean:pack": "node ../../scripts/prepare-create.ts --clean"
+  },
   "devDependencies": {
     "@google/adk": "2.3.0",
     "@langchain/core": "1.2.20",

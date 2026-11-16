@@ -1,7 +1,9 @@
 # @galaxie-ai/create
 
-Private, unpublished repository tooling for composing starter projects.
-Layers remain in the repository; this package is not ready for registry installation.
+CLI and dependency-free composer for starter projects, prepared for the 0.2.0
+lockstep release. Nothing is published by this preparation. Packed distributions
+include the templates and galaxie skill; the built CLI also runs from this checkout.
+Public APIs may change in a 0.x minor release.
 
 Build it from this checkout using the repository's Node 24 and pnpm 11 tooling:
 
@@ -30,9 +32,9 @@ The current kinds are `browser-only` and `gateway`:
 | Framework | Both kinds | Install path |
 | --- | --- | --- |
 | `langgraph-js` | Yes | Registry or npm tarballs |
-| `adk-js` | Yes | npm tarballs; adapter private and unpublished |
-| `adk-go` | Both | npm tarballs; adapter and starter artifacts private and unpublished |
-| `langgraph-python` | Yes | npm tarballs; adapter and starter wheels private and unpublished |
+| `adk-js` | Yes | npm tarballs; registry verification pending |
+| `adk-go` | Both | npm tarballs; registry verification pending |
+| `langgraph-python` | Yes | npm tarballs; registry verification pending |
 
 ADK asks the same scripted quiz through a long-running `question.ask@1` capability,
 then validates the answer and requests a text-only closing comment. Native
@@ -75,10 +77,9 @@ specifications. Third-party pins stay unchanged.
 
 Tarball mode supports npm only and refuses pnpm and yarn before writing, including
 with `--no-install`. Their real installs and the pnpm 11 override location are
-deferred. For ADK the harness additionally builds and packs `adapter-adk`; this package remains
-private and outside publication, launch and size-budget lists.
+deferred. For ADK the harness additionally builds and packs `adapter-adk`.
 
-The private `@galaxie-ai/adapter-adk` is unpublished. Until its release, ADK project
+`@galaxie-ai/adapter-adk` is prepared for the same lockstep release. Until its release, ADK project
 resolution requires npm tarball mode: set `GALAXIE_CREATE_PACKAGE_DIR` to a directory
 containing one tarball for each of the seven launch packages and one for
 `adapter-adk`. All eight overrides and the selected direct galaxie dependencies use
@@ -188,7 +189,7 @@ versions, commands and limits. Nothing in this workflow publishes a package.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-For the private Python starter, the standalone harness accepts only npm tarballs:
+For the Python starter, the standalone harness accepts only npm tarballs:
 
 ```sh
 node scripts/verify-standalone.ts --framework langgraph-python --mode tarball --tarballs <tarballs> --json /tmp/galaxie-python.json
