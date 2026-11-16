@@ -50,6 +50,8 @@ with `--no-install`, then installs and checks each generated project itself.
 Tarball mode supports npm only and refuses pnpm and yarn. Publishing the create
 package and packaging its layers require separate follow-up work.
 
+Add the clean-environment registry CI run and its schedule when the first release exists for that workflow.
+
 ## Size budgets
 
 CI and `pnpm check` measure every default JavaScript export of each public package

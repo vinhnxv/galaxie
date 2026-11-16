@@ -15,6 +15,8 @@ export interface Arguments {
   json?: string;
   exclude?: string;
   keep: boolean;
+  cleanPath: boolean;
+  budgetMinutes: number;
   help: boolean;
 }
 export const usage = `Usage: node scripts/verify-standalone.ts [options]
@@ -27,6 +29,8 @@ export const usage = `Usage: node scripts/verify-standalone.ts [options]
   --json <file>                            write the result array
   --min-release-age-exclude <pattern>       explicit, recorded npm exclusion
   --keep                                  retain and print the temporary root
+  --clean-path                            project PATH contains only node and sh
+  --budget-minutes <n>                     per-project budget, integer 1 to 60 (default 10)
   --help
 Node versions are never downloaded. Missing Node 22: nvm install 22.
 Packing needs pnpm on PATH and this workspace's installed build tooling.
@@ -39,6 +43,8 @@ export function parseArguments(args: readonly string[]): Arguments {
     nodes: [],
     mode: 'registry',
     keep: false,
+    cleanPath: false,
+    budgetMinutes: 10,
     help: false,
   };
   const invalid: () => never = () => {
@@ -52,6 +58,10 @@ export function parseArguments(args: readonly string[]): Arguments {
     }
     if (flag === '--keep') {
       options.keep = true;
+      continue;
+    }
+    if (flag === '--clean-path') {
+      options.cleanPath = true;
       continue;
     }
     const value = args[++index];
@@ -92,6 +102,13 @@ export function parseArguments(args: readonly string[]): Arguments {
       case '--min-release-age-exclude':
         options.exclude = value;
         break;
+      case '--budget-minutes': {
+        const minutes = Number(value);
+        if (!/^\d+$/.test(value) || !Number.isInteger(minutes) || minutes < 1 || minutes > 60)
+          invalid();
+        options.budgetMinutes = minutes;
+        break;
+      }
       default:
         invalid();
     }
@@ -297,7 +314,7 @@ export function renderResults(results: readonly Result[]): string {
   return results
     .map(
       (result) =>
-        `${result.template} | ${result.node} | npm ${result.npm} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
+        `${result.template} | ${result.node} | npm ${result.npm} | ${result.mode} | ${result.failures.some((failure) => failure.gating || failure.source === 'unclassified') ? 'FAIL' : 'PASS'} | ${result.durationMs} ms | release age ${result.releaseAgeDays}d${result.exclude === null ? '' : `; exclusion ${result.exclude}`}\n${result.failures.map((failure) => `  ${failure.phase} [${failure.source}]${failure.gating ? '' : ' (advisory)'}: ${failure.summary}\n${failure.excerpt}`).join('\n')}`,
     )
     .join('\n');
 }
@@ -330,6 +347,8 @@ if (import.meta.main) {
           ...(options.tarballs === undefined ? {} : { tarballs: options.tarballs }),
           ...(options.exclude === undefined ? {} : { exclude: options.exclude }),
           keep: options.keep,
+          cleanPath: options.cleanPath,
+          budgetMinutes: options.budgetMinutes,
         },
         {
           scaffold: async ({ spec, directory, tarballs, node, env, signal, runner }) => {

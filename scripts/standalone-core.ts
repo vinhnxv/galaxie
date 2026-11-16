@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawn } from 'node:child_process';
+import { constants } from 'node:fs';
 import {
+  access,
   cp,
   lstat,
   mkdir,
@@ -11,6 +13,8 @@ import {
   readFile,
   realpath,
   rm,
+  stat,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -39,7 +43,8 @@ export type Phase =
   | 'compile'
   | 'serve'
   | 'drive'
-  | 'probe';
+  | 'probe'
+  | 'budget';
 export interface Failure {
   readonly phase: Phase;
   readonly gating: boolean;
@@ -56,6 +61,7 @@ export interface Result {
   readonly releaseAgeDays: number;
   readonly exclude: string | null;
   browser: string | null;
+  durationMs: number;
   readonly failures: Failure[];
 }
 export interface Step {
@@ -120,6 +126,8 @@ export interface Options {
   readonly signal?: AbortSignal;
   readonly offline?: boolean;
   readonly verifyReleaseAge?: boolean;
+  readonly cleanPath?: boolean;
+  readonly budgetMinutes?: number;
 }
 export interface ScaffoldRequest {
   readonly spec: TemplateSpec;
@@ -277,7 +285,7 @@ export function classify(message: string): string {
   )
     return 'template';
   if (
-    /Single-copy|Workspace artifact|Scaffold symlinks|Negative control|Command is not allowed|Temporary projects/.test(
+    /Single-copy|Workspace artifact|Scaffold symlinks|Negative control|Clean PATH|Command is not allowed|Temporary projects/.test(
       message,
     )
   )
@@ -311,13 +319,42 @@ export function compareModes(
       : 'pass';
 }
 
-async function executableOnPath(name: string, path: string): Promise<string> {
+export async function findOnPath(name: string, path: string): Promise<string | undefined> {
   for (const directory of path.split(delimiter)) {
-    const candidate = join(directory, name);
-    if ((await lstat(candidate).catch(() => undefined)) !== undefined) return realpath(candidate);
+    const candidate = resolve(directory, name);
+    if (!(await stat(candidate).catch(() => undefined))?.isFile()) continue;
+    if (
+      await access(candidate, constants.X_OK).then(
+        () => true,
+        () => false,
+      )
+    )
+      return candidate;
   }
+  return undefined;
+}
+
+async function executableOnPath(name: string, path: string): Promise<string> {
+  const candidate = await findOnPath(name, path);
+  if (candidate !== undefined) return realpath(candidate);
   throw new Error(`Required executable unavailable: ${name}.`);
 }
+
+const forbiddenTools = ['go', 'python', 'python3', 'uv'];
+export async function assertCleanPath(path: string): Promise<void> {
+  for (const name of forbiddenTools) {
+    const found = await findOnPath(name, path);
+    if (found !== undefined)
+      throw new Error(`Clean PATH violated: ${name} found at ${dirname(found)}`);
+  }
+}
+
+const cleanPathProbe = `const { spawnSync } = require('node:child_process');
+for (const name of ${JSON.stringify(forbiddenTools)}) {
+  const result = spawnSync(name, ['--version'], { stdio: 'ignore', timeout: 1000 });
+  if (result.error?.code !== 'ENOENT')
+    throw new Error('Clean PATH violated: ' + name + ' did not fail with ENOENT.');
+}`;
 
 /** Spawn without a shell; terminate the entire child process group, including npm lifecycle children. */
 export function processRunner(allowed: readonly string[]): Runner {
@@ -496,6 +533,40 @@ async function assertBaselineRejections(
   }
 }
 
+async function assertGoSourceRejection(
+  project: string,
+  build: () => Promise<string>,
+  signal: AbortSignal,
+): Promise<void> {
+  const path = join(project, 'go/agent.go');
+  const original = await readFile(path);
+  const expected =
+    'The agent source in go/ was edited and Go 1.27.3 was not found on PATH. Install Go 1.27.3, or restore the original go/ source to use the prebuilt agent.';
+  signal.throwIfAborted();
+  try {
+    await writeFile(
+      path,
+      Buffer.concat([original, Buffer.from('\n// Standalone no-Go negative control.\n')]),
+    );
+    let rejected = false;
+    try {
+      await build();
+    } catch (error) {
+      signal.throwIfAborted();
+      if (!(error instanceof Error) || !error.message.includes(expected))
+        throw new Error(
+          `Negative control did not report ${expected}.\n${error instanceof Error ? error.message : 'Unknown build failure.'}`,
+        );
+      rejected = true;
+    }
+    if (!rejected) throw new Error('Negative control unexpectedly passed for edited Go source.');
+  } finally {
+    await writeFile(path, original);
+  }
+  signal.throwIfAborted();
+  await build();
+}
+
 /** One owned temporary root, one pipeline for registry and packed installations. */
 export async function runStandalone(
   options: Options,
@@ -529,17 +600,23 @@ export async function runStandalone(
         ? await executableOnPath('pnpm', environment['PATH'] ?? '')
         : undefined;
     const binaries = new Map<number, string | Error>();
+    const cleanPaths = new Map<number, string>();
     for (const request of options.nodes) {
       try {
-        binaries.set(
-          request.major,
-          await nodeBinary(
-            request,
-            { major: Number(process.versions.node.split('.')[0]), path: process.execPath },
-            environment['NVM_DIR'] ??
-              (environment['HOME'] === undefined ? undefined : join(environment['HOME'], '.nvm')),
-          ),
+        const binary = await nodeBinary(
+          request,
+          { major: Number(process.versions.node.split('.')[0]), path: process.execPath },
+          environment['NVM_DIR'] ??
+            (environment['HOME'] === undefined ? undefined : join(environment['HOME'], '.nvm')),
         );
+        if (options.cleanPath) {
+          const bin = join(root, `bin-${request.major}`);
+          await mkdir(bin);
+          await symlink(binary, join(bin, 'node'));
+          await symlink(await executableOnPath('sh', environment['PATH'] ?? ''), join(bin, 'sh'));
+          cleanPaths.set(request.major, bin);
+        }
+        binaries.set(request.major, binary);
       } catch (error) {
         binaries.set(
           request.major,
@@ -634,11 +711,16 @@ export async function runStandalone(
             releaseAgeDays: days,
             exclude: options.exclude ?? null,
             browser: null,
+            durationMs: 0,
             failures: [],
           };
           results.push(result);
           let phase: Phase = 'node';
+          let started: number | undefined;
+          let finished: number | undefined;
+          let excludedDurationMs = 0;
           const record = (error: unknown): void => {
+            if (started !== undefined) finished ??= clock.now();
             const message = error instanceof Error ? error.message : 'Unknown failure.';
             result.failures.push({
               phase,
@@ -654,7 +736,12 @@ export async function runStandalone(
             const binary = binaries.get(request.major);
             if (binary instanceof Error) throw binary;
             if (binary === undefined) throw new Error('Node unavailable.');
-            const childEnv = { ...env, PATH: `${dirname(binary)}${delimiter}${env['PATH'] ?? ''}` };
+            const childEnv = {
+              ...env,
+              PATH:
+                cleanPaths.get(request.major) ??
+                `${dirname(binary)}${delimiter}${env['PATH'] ?? ''}`,
+            };
             const run = (args: readonly string[]): Promise<string> =>
               runner.run(command(binary, args, project, childEnv));
             const project = join(root, `${spec.name}-${request.major}-${mode}`);
@@ -673,7 +760,13 @@ export async function runStandalone(
               phase = 'pack';
               if (packError !== undefined) throw packError;
             }
+            if (options.cleanPath) {
+              phase = 'probe';
+              await assertCleanPath(childEnv.PATH);
+              await runner.run(command(binary, ['-e', cleanPathProbe], root, childEnv));
+            }
             phase = 'scaffold';
+            started = clock.now();
             await dependencies.scaffold({
               spec,
               mode,
@@ -723,6 +816,15 @@ export async function runStandalone(
             }
             phase = 'build';
             await run(spec.build);
+            if (options.cleanPath && spec.framework === 'adk-go') {
+              phase = 'negative-control';
+              const controlStarted = clock.now();
+              try {
+                await assertGoSourceRejection(project, () => run(spec.build), signal);
+              } finally {
+                excludedDurationMs += clock.now() - controlStarted;
+              }
+            }
             phase = 'check';
             await run([npmCli, 'run', 'check']);
             phase = 'negative-control';
@@ -752,6 +854,7 @@ export async function runStandalone(
                 }
                 phase = 'drive';
                 result.browser = await dependencies.driver.drive(url, { ...spec, steps }, signal);
+                finished ??= clock.now();
               } catch (error) {
                 record(error);
               } finally {
@@ -781,6 +884,19 @@ export async function runStandalone(
             }
           } catch (error) {
             record(error);
+          } finally {
+            if (started !== undefined)
+              result.durationMs = (finished ?? clock.now()) - started - excludedDurationMs;
+            const allowedMs = (options.budgetMinutes ?? 10) * 60_000;
+            if (result.durationMs > allowedMs)
+              result.failures.push({
+                phase: 'budget',
+                gating: true,
+                source: 'harness',
+                suggested: true,
+                summary: `budget exceeded: ${result.durationMs} ms of ${allowedMs} ms`,
+                excerpt: '',
+              });
           }
         }
     return results;

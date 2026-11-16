@@ -29,8 +29,20 @@ export function pythonAffected(files: readonly string[]): boolean {
   );
 }
 
+/** True unless every known changed file is a document. */
+export function createAffected(files: readonly string[]): boolean {
+  const changed = files.map((file) => file.trim()).filter((file) => file !== '');
+  return (
+    changed.length === 0 ||
+    changed.some(
+      (file) => !file.endsWith('.md') && !file.startsWith('docs/') && file !== 'llms.txt',
+    )
+  );
+}
+
 if (import.meta.main) {
   const files: string[] = [];
   for await (const line of createInterface({ input: process.stdin })) files.push(line);
   console.log(`python=${pythonAffected(files)}`);
+  console.log(`create=${createAffected(files)}`);
 }

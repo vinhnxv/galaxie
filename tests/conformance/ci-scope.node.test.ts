@@ -7,7 +7,7 @@ import { createServer as createNetServer } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
-import { pythonAffected } from '../../scripts/ci-scope.js';
+import { createAffected, pythonAffected } from '../../scripts/ci-scope.js';
 
 test('a change confined to documents, Go and unrelated packages skips the Python jobs', () => {
   expect(
@@ -56,7 +56,23 @@ test('an empty or blank change list runs the Python jobs', () => {
   expect(pythonAffected(['', '  '])).toBe(true);
 });
 
-test('the command prints the GitHub output line', () => {
+test('only a non-empty documents-only change list skips the create jobs', () => {
+  expect(createAffected(['README.md', 'docs/x.md', 'docs/data.json', 'llms.txt'])).toBe(false);
+  expect(createAffected(['  docs/x.md  ', '', '  '])).toBe(false);
+  for (const file of [
+    'packages/core/src/index.ts',
+    '.github/workflows/ci.yml',
+    'scripts/standalone-core.ts',
+    'LICENSE',
+    'go/go.mod',
+    'llms.txt.bak',
+  ])
+    expect(createAffected(['docs/x.md', file]), file).toBe(true);
+  expect(createAffected([])).toBe(true);
+  expect(createAffected(['', '  '])).toBe(true);
+});
+
+test('the command prints both GitHub output lines in order', () => {
   const run = (input: string): string =>
     spawnSync(
       process.execPath,
@@ -66,9 +82,11 @@ test('the command prints the GitHub output line', () => {
         encoding: 'utf8',
       },
     ).stdout.trim();
-  expect(run('docs/a.md\nllms.txt\n')).toBe('python=false');
-  expect(run('docs/a.md\npackages/core/src/index.ts\n')).toBe('python=true');
-  expect(run('')).toBe('python=true');
+  expect(run('docs/a.md\nllms.txt\n')).toBe('python=false\ncreate=false');
+  expect(run('docs/a.md\npackages/core/src/index.ts\n')).toBe('python=true\ncreate=true');
+  expect(run('go/go.mod\n')).toBe('python=false\ncreate=true');
+  expect(run('')).toBe('python=true\ncreate=true');
+  expect(run('\n  \n')).toBe('python=true\ncreate=true');
 });
 
 test('Python shards partition the Node inventory and keep composed browser files out of Node', async () => {

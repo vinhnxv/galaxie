@@ -1,5 +1,18 @@
 # Project status
 
+On 2026-11-17, `create-clean` CI adds npm tarball verification for all eight
+private create kind/framework combinations on Ubuntu 24.04 with Node 24, plus
+both LangGraph JavaScript kinds on Node 22. Generated-project processes use an
+asserted clean PATH without Go, Python or uv; each project has a 10-minute
+scaffold-to-mock-answer budget. Offline tests cover PATH refusal, the budget
+breach, ADK Go edited-source refusal, scope selection and workflow structure.
+Local macOS browser-only runs reach the mock answer in 13,277 ms for LangGraph
+JavaScript and 13,108 ms for ADK Go; Linux CI timings are pending the first PR
+run. See the [clean-environment record](standalone-verification.md#clean-environment-ci).
+pnpm and yarn installs, registry mode and its scheduled run, Windows, macOS CI,
+Node versions other than 22 and 24, and real model providers remain unmeasured
+by this matrix. Nothing is published; ADR-0012 guarantees are unchanged.
+
 On 2026-11-16, all eight private create kind/framework combinations gain versioned
 coding-agent guidance from [one skill source](../skills/galaxie/README.md).
 Node tests verify eight rendered `AGENTS.md` goldens under 8192 bytes, the exact

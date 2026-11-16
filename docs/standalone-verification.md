@@ -9,6 +9,83 @@ production server still follows the correlated 503 unavailable flow. These check
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
 
+## Clean-environment CI
+
+The `create-clean` job in `.github/workflows/ci.yml` runs the existing harness
+with npm 12.2.2, locally packed tarballs, `--kind all`, `--clean-path` and
+`--budget-minutes 10` on Ubuntu 24.04. Four Node 24 legs cover `langgraph-js`,
+`adk-js`, `adk-go` and `langgraph-python`: all eight kind/framework combinations.
+A fifth leg repeats both LangGraph JavaScript kinds on Node 22. Preparation and
+packing use the full PATH, including Go or the prepared Python wheel cache where
+needed; generated projects are outside the checkout and use the requested Node.
+Nothing is published.
+
+Every generated-project process, including scaffold, install, build, check,
+negative controls, server compilation, preview and gateway servers, receives a
+PATH containing only an owned scratch directory with symlinks to `node` and `sh`.
+npm's resolved CLI is invoked explicitly through the requested Node binary.
+Before scaffolding, the harness checks that `go`, `python`, `python3` and `uv`
+cannot be found, then probes each through a child Node process and requires
+`ENOENT`. The Chromium driver runs in the harness process, outside this PATH
+restriction. `sh` is required by npm's script runner; no inherited system-tool
+directory is admitted.
+
+Each result records `durationMs` from the start of scaffold to the preview mock
+answer, including install, build, generated checks and CSP mutation controls.
+If that path fails before the answer, the duration ends at the failure point.
+Packing, cleanup and the gateway's later compiled-server 503 drive are outside
+that interval. The ADK Go edited-source control described below is also excluded.
+The default budget is 10 minutes per project; `--budget-minutes` accepts integers
+from 1 to 60. An overrun adds a gating `budget` failure with the summary
+`budget exceeded: <measured> ms of <allowed> ms`. The elapsed-time gate is
+evaluated after the project run. Each CI leg also has a 45-minute job timeout.
+JSON results are printed to the job log and
+per-project durations are written to the job summary.
+
+The scope output skips this job only for a non-empty documents-only change list
+(Markdown, paths under `docs/`, or `llms.txt`); other changes and unknown/empty
+lists run it. The final `ci` gate depends on `create-clean`. Acceptance of the
+first PR run requires all five legs to conclude `success`, not `skipped`.
+
+Local measurements on macOS (2026-11-17), with the clean PATH asserted, reached the
+mock answer within the budget:
+
+| Kind / framework | Scaffold to mock answer | Result |
+| --- | --- | --- |
+| browser-only / langgraph-js | 13,277 ms | PASS |
+| browser-only / adk-go | 13,108 ms | PASS |
+
+Linux CI (ubuntu-24.04, first run on PR #277, tarball mode, clean PATH asserted, 10-minute budget)
+reached the mock answer for every project. Scaffold to mock answer, from the job logs:
+
+| Framework | Node | browser-only | gateway |
+| --- | --- | ---: | ---: |
+| langgraph-js | 24.22.2 | 17,034 ms | 12,268 ms |
+| langgraph-js | 22.23.4 | 17,780 ms | 12,142 ms |
+| adk-js | 24.22.2 | 19,782 ms | 10,266 ms |
+| adk-go | 24.22.2 | 14,960 ms | 8,336 ms |
+| langgraph-python | 24.22.2 | 17,456 ms | 14,817 ms |
+
+These are one cold run each on GitHub-hosted runners. They exclude packing and starter
+artifact preparation, and for the gateway kind they stop at the preview mock answer,
+before the compiled server leg. They are a single observation, not a distribution.
+
+Unmeasured by this clean-environment matrix: pnpm and yarn installs, registry
+mode and the scheduled registry run, Windows, macOS CI, Node versions other than
+22 and 24, and real model providers. Tarball mode refuses pnpm and yarn before
+any write; registry CI and its schedule are deferred until the first release
+exists for this workflow. Earlier manual registry records below are separate
+evidence. The other limits in [Unmeasured](#unmeasured) still apply.
+
+With `--framework adk-go --mode tarball --clean-path`, the harness also checks
+the no-Go edited-source refusal. After the normal build, it appends a comment to
+`go/agent.go`, runs the same build and requires a failure containing
+`The agent source in go/ was edited and Go 1.27.3 was not found on PATH`.
+It restores the original bytes in `finally` and requires the restored build to
+pass. The edit and both extra builds are excluded from the per-project
+`durationMs` and time budget. This control runs only for ADK Go with `--clean-path`;
+the generated project's behavior and ADR-0012 guarantees are unchanged.
+
 ## LangGraph Python measurement (2026-11-16)
 
 Both kinds compose `langgraph-python` with private `adapter-pyodide` and
@@ -442,10 +519,10 @@ and wiring result, not a model-quality or device-performance measurement.
 
 The JSON output is an array of results: `template`, verified `node` (or the requested
 major if version resolution fails), exact `npm` (or `unknown` before its probe),
-`mode`, `releaseAgeDays`, `exclude`, `browser` and `failures`. Each failure contains
+`mode`, `releaseAgeDays`, `exclude`, `browser`, `durationMs` and `failures`. Each failure contains
 `phase`, `gating`, `source`, `suggested`, `summary` and `excerpt`; the parent result
 supplies the combination/node/mode identity. Current phases are node, pack,
-scaffold, install, build, check, negative-control, compile, serve, drive and probe.
+scaffold, install, build, check, negative-control, compile, serve, drive, probe and budget.
 All current failures are gating; the earlier advisory source check has been
 replaced by `npm run check`. Suggested sources are template, `package:<name>`, environment,
 harness or unclassified; triage must confirm them. Excerpts replace the temporary
@@ -479,8 +556,9 @@ core's main entry and its runtime Zod boundary are unchanged.
   manifests still lack the measured Node floor. Proposed fix: review and add their
   engines in the next coordinated release, with copied-consumer checks. This PR
   measures the starters and sets their engines only; no publication was performed.
-- CI wiring should later import this core. The registry matrix remains a manual
-  command; release verification should retain its JSON with each release.
+- The clean-environment CI job uses this core for tarball installs. The registry
+  matrix remains a manual command; release verification should retain its JSON
+  with each release.
 
 ## Unmeasured
 
