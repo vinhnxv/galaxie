@@ -2,6 +2,8 @@
 
 The current harness scaffolds projects through the private create CLI. The earlier
 2026-11-15 copied-starter characterization for `galaxie-wa5.1` is retained below.
+Scaffolding also adds `AGENTS.md`, `CLAUDE.md` and real-file galaxie skill copies
+in `.agents/skills/galaxie` and `.claude/skills/galaxie` for the selected kind and framework.
 The current gateway preview drive answers through an in-process mock; the compiled
 production server still follows the correlated 503 unavailable flow. These checks
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the

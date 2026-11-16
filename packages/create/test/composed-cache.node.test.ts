@@ -11,10 +11,11 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
 import { compose, type ProjectFile } from '../src/compose.js';
+import { loadGuidanceSource, renderGuidance } from '../src/guidance.js';
 import { loadLayers } from '../src/layers.js';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
@@ -111,7 +112,15 @@ test('cache validation detects missing, edited, extra and unexpected paths while
   const directory = await mkdtemp(join(cache, 'cache-controls/project-'));
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
   const files = new Map([['expected.ts', { bytes: Buffer.from('expected\n'), mode: 0o644 }]]);
-  await writeFile(join(directory, 'expected.ts'), 'expected\n');
+  for (const [path, bytes] of renderGuidance(
+    await loadGuidanceSource(join(repo, 'skills/galaxie')),
+    { kind: 'browser-only', framework: 'langgraph-js' },
+  ))
+    files.set(path, { bytes: Buffer.from(bytes), mode: 0o644 });
+  for (const [path, file] of files) {
+    await mkdir(dirname(join(directory, path)), { recursive: true });
+    await writeFile(join(directory, path), file.bytes);
+  }
   await assertCache(directory, files);
   await expect(assertCache(join(directory, 'missing'), files)).rejects.toThrow(instruction);
   for (const change of ['missing', 'edited', 'extra', 'empty-directory', 'unexpected-directory']) {

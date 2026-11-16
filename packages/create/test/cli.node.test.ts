@@ -128,7 +128,9 @@ test.each([
   expect(await readFile(join(root, 'my-app/main.txt'), 'utf8')).toBe('main\n');
   expect(await readFile(join(root, 'my-app/agent.txt'), 'utf8')).toBe('agent\n');
   expect(await readFile(join(root, 'my-app/.gitignore'), 'utf8')).toBe('node_modules/\n');
-  expect(await readFile(join(root, 'my-app/AGENTS.md'), 'utf8')).toBe(`<!-- galaxie:begin guidance=1 skill=0.1.0 -->
+  expect(
+    await readFile(join(root, 'my-app/AGENTS.md'), 'utf8'),
+  ).toBe(`<!-- galaxie:begin guidance=1 skill=0.1.0 -->
 # Coding with galaxie
 
 Read [the galaxie skill](.agents/skills/galaxie/SKILL.md) and the references present
@@ -155,6 +157,22 @@ Keep the generated CSP and Trusted Types assertions. Exercise changed flows with
 <!-- galaxie:end -->
 `);
   expect(await readFile(join(root, 'my-app/CLAUDE.md'), 'utf8')).toBe('@AGENTS.md\n');
+  for (const directory of ['.agents', '.claude']) {
+    const skill = join(root, 'my-app', directory, 'skills/galaxie');
+    expect(await readdir(skill)).toEqual(['SKILL.md', 'references']);
+    expect(await readdir(join(skill, 'references'))).toEqual([
+      'framework-langgraph-js.md',
+      'host-integration.md',
+      'kind-browser-only.md',
+    ]);
+    for (const path of [
+      'SKILL.md',
+      'references/framework-langgraph-js.md',
+      'references/host-integration.md',
+      'references/kind-browser-only.md',
+    ])
+      expect(await readFile(join(skill, path))).toEqual(await readFile(join(guidanceRoot, path)));
+  }
   expect(JSON.parse(await readFile(join(root, 'my-app/package.json'), 'utf8'))).toEqual({
     name: 'my-app',
     version: '0.0.0',
@@ -164,6 +182,7 @@ Keep the generated CSP and Trusted Types assertions. Exercise changed flows with
   });
   expect(streams.text()).toContain('Created 14 files');
   expect(streams.text()).toContain('npm install --ignore-scripts');
+  expect(streams.text()).not.toContain('Hint:');
   expect(streams.errors()).toBe('');
 });
 
@@ -348,6 +367,94 @@ test('existing instruction files are kept and an ordinary collision aborts every
   expect(await readdir(join(root, 'blocked-app'))).toEqual(['package.json']);
   expect(streams.errors()).toContain('Existing output paths: package.json');
 });
+
+test.each([[], ['agents.md'], ['claude.md'], ['agents.md', 'claude.md']])(
+  'the import hint appears only when one instruction file pre-exists: %j',
+  async (...existing) => {
+    const { root, templatesRoot, guidanceRoot } = await fixture();
+    const streams = output();
+    await mkdir(join(root, 'my-app'));
+    for (const name of existing) await writeFile(join(root, 'my-app', name), `Host ${name}.\n`);
+    expect(
+      await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+        cwd: root,
+        templatesRoot,
+        guidanceRoot,
+        ...streams,
+        env: {},
+      }),
+    ).toBe(0);
+    for (const name of existing)
+      expect(await readFile(join(root, 'my-app', name), 'utf8')).toBe(`Host ${name}.\n`);
+    expect(
+      streams
+        .text()
+        .split('\n')
+        .filter((line) => line.startsWith('Hint:')),
+    ).toEqual(
+      existing.length === 1 ? ['Hint: CLAUDE.md should import AGENTS.md with @AGENTS.md.'] : [],
+    );
+    expect(await readFile(join(root, 'my-app/.agents/skills/galaxie/SKILL.md'))).toEqual(
+      await readFile(join(guidanceRoot, 'SKILL.md')),
+    );
+  },
+);
+
+test('a guidance error names the missing file and writes nothing', async () => {
+  const { root, templatesRoot, guidanceRoot } = await fixture();
+  const streams = output();
+  await rm(join(guidanceRoot, 'references/kind-browser-only.md'));
+  expect(
+    await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+      cwd: root,
+      templatesRoot,
+      guidanceRoot,
+      ...streams,
+      env: {},
+    }),
+  ).toBe(1);
+  expect(streams.errors()).toBe('Missing guidance file: references/kind-browser-only.md.\n');
+  expect(await readdir(root)).toEqual(['guidance', 'layers']);
+});
+
+test.each(['browser-only', 'gateway'])(
+  'the %s CLI includes the selected guidance files',
+  async (kind) => {
+    const { root } = await fixture();
+    const streams = output();
+    const repo = fileURLToPath(new URL('../../../', import.meta.url));
+    expect(
+      await run(['my-app', kind, 'langgraph-js', '--no-install'], {
+        cwd: root,
+        templatesRoot: join(repo, 'templates'),
+        ...streams,
+        env: {},
+      }),
+    ).toBe(0);
+    for (const directory of ['.agents', '.claude']) {
+      const skill = join(root, 'my-app', directory, 'skills/galaxie');
+      expect(await readdir(skill)).toEqual(['SKILL.md', 'references']);
+      expect(await readdir(join(skill, 'references'))).toEqual([
+        'framework-langgraph-js.md',
+        'host-integration.md',
+        `kind-${kind}.md`,
+      ]);
+      for (const path of [
+        'SKILL.md',
+        'references/framework-langgraph-js.md',
+        'references/host-integration.md',
+        `references/kind-${kind}.md`,
+      ])
+        expect(await readFile(join(skill, path))).toEqual(
+          await readFile(join(repo, 'skills/galaxie', path)),
+        );
+    }
+    expect(await readFile(join(root, 'my-app/CLAUDE.md'), 'utf8')).toBe('@AGENTS.md\n');
+    expect(await readFile(join(root, 'my-app/AGENTS.md'), 'utf8')).toContain(
+      `## Project kind: ${kind}`,
+    );
+  },
+);
 
 test.each(['../escape', '/absolute-app', 'bad\0name', 'Uppercase', '.hidden', 'has spaces'])(
   'invalid project targets fail before writes: %j',
