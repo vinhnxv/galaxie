@@ -35,11 +35,11 @@ export async function verifyDist(
   if (pkg.version !== manifest.version || JSON.stringify(manifest) !== JSON.stringify(expected))
     throw new Error(invalidArtifact);
   if (!(await lstat(join(dist, 'wheels'))).isDirectory()) throw new Error(invalidArtifact);
+  for (const wheel of manifest.wheels)
+    await verifyArtifact(join(dist, 'wheels', wheel.file), wheel);
   const actual = (await readdir(join(dist, 'wheels'))).sort();
   if (JSON.stringify(actual) !== JSON.stringify(manifest.wheels.map((wheel) => wheel.file).sort()))
     throw new Error(invalidArtifact);
-  for (const wheel of manifest.wheels)
-    await verifyArtifact(join(dist, 'wheels', wheel.file), wheel);
   await verifyArtifact(join(dist, 'NOTICE.txt'), manifest.notices);
   return manifest;
 }

@@ -1,10 +1,15 @@
 # Project status
 
-On 2026-11-16, the private `@galaxie-ai/starter-python` package adds the LangGraph
-Python artifact package skeleton and repository registration. Its version and
-dependency boundaries have Node conformance coverage. Wheel packing and generated
-Python projects are not supplied by the skeleton. It stays unpublished and outside
-the launch inventory and size budgets; ADR-0012 guarantees are unchanged.
+On 2026-11-16, the private `@galaxie-ai/starter-python` package adds offline packing
+of the adapter's derived LangGraph wheel lane plus the two prepared local wheels.
+Node conformance covers version/dependency boundaries, exact wheel inventories,
+byte and SHA-256 refusals, runtime hashes, notices and distribution tampering.
+Notices flag certifi/orjson MPL-2.0 and the limited same-name ormsgpack stand-in,
+whose license is to be confirmed by the maintainer and whose serializer compatibility
+is unverified. Local-wheel reproducibility and bridge-version binding are not
+established. Generated Python projects and browser/standalone acceptance remain
+separate work. The package stays unpublished and outside the launch inventory and
+size budgets; ADR-0012 guarantees are unchanged. See the [package limits](../packages/starter-python/README.md).
 
 On 2026-11-16, the private `@galaxie-ai/starter-go` artifact package and the
 ADK Go overlays for both kinds add a prebuilt mock-backed agent. The pack step ships

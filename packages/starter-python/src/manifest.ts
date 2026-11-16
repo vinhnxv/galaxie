@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFile } from 'node:fs/promises';
+import { lstat, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { invalidArtifact } from './errors.js';
@@ -45,6 +45,8 @@ export async function readManifest(
   distDirectory: string = dirname(fileURLToPath(import.meta.url)),
 ): Promise<StarterManifest> {
   try {
+    if (!(await lstat(join(distDirectory, 'manifest.json'))).isFile())
+      throw new Error(invalidArtifact);
     const manifest = JSON.parse(
       await readFile(join(distDirectory, 'manifest.json'), 'utf8'),
     ) as StarterManifest;

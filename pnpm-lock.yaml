@@ -483,7 +483,11 @@ importers:
 
   packages/starter-go: {}
 
-  packages/starter-python: {}
+  packages/starter-python:
+    dependencies:
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
 
   packages/storage-indexeddb:
     devDependencies:

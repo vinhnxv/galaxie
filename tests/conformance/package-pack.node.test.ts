@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -11,7 +19,16 @@ import { build } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import * as runtimeInventory from '../../packages/adapter-pyodide/src/runtime-files.js';
 import { discoverEntries } from '../../scripts/check-size.js';
-import { hasStarterGo } from './support/starter-go.node.js';
+import {
+  buildStarterDistOnce as buildStarterGoDistOnce,
+  cleanStarterDist as cleanStarterGoDist,
+  hasStarterGo,
+} from './support/starter-go.node.js';
+import {
+  buildStarterDistOnce as buildStarterPythonDistOnce,
+  cleanStarterDist as cleanStarterPythonDist,
+  hasStarterPython,
+} from './support/starter-python.node.js';
 
 interface Manifest {
   readonly version: string;
@@ -48,6 +65,7 @@ const preparedPackages = [
   'starter-python',
 ];
 const starterAvailable = hasStarterGo();
+const pythonStarterAvailable = hasStarterPython();
 
 function readManifest(directory: string): Manifest {
   return JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) as Manifest;
@@ -56,6 +74,7 @@ function readManifest(directory: string): Manifest {
 const coreVersion = readManifest(join(root, 'packages/core')).version;
 const packages = [...launchPackages, ...preparedPackages]
   .filter((directory) => directory !== 'starter-go' || starterAvailable)
+  .filter((directory) => directory !== 'starter-python' || pythonStarterAvailable)
   .map((directory) => ({
     directory,
     group: launchPackages.includes(directory) ? 'launch' : 'prepared',
@@ -66,9 +85,10 @@ const packages = [...launchPackages, ...preparedPackages]
   }));
 let temporaryDirectory: string | undefined;
 
-beforeAll(() => {
+beforeAll(async () => {
   temporaryDirectory = mkdtempSync(join(tmpdir(), 'galaxie-package-pack-'));
   for (const { directory } of packages) {
+    if (directory === 'starter-go' || directory === 'starter-python') continue;
     execFileSync('pnpm', ['exec', 'tsc', '-p', `packages/${directory}/tsconfig.build.json`], {
       cwd: root,
       encoding: 'utf8',
@@ -83,11 +103,33 @@ beforeAll(() => {
   for (const pkg of packages) {
     const destination = join(temporaryDirectory, pkg.directory);
     mkdirSync(destination);
-    execFileSync('pnpm', ['pack', '--pack-destination', destination], {
-      cwd: join(root, 'packages', pkg.directory),
-      encoding: 'utf8',
-      timeout: 300_000,
-    });
+    // Composed tests read the shared starter dist during collection; pack owned copies.
+    const starterDist =
+      pkg.directory === 'starter-python'
+        ? await buildStarterPythonDistOnce()
+        : pkg.directory === 'starter-go'
+          ? await buildStarterGoDistOnce()
+          : undefined;
+    if (starterDist)
+      for (const name of ['README.md', 'LICENSE', 'NOTICE'])
+        copyFileSync(
+          join(root, 'packages', pkg.directory, name),
+          join(starterDist.directory, name),
+        );
+    execFileSync(
+      'pnpm',
+      [
+        'pack',
+        ...(starterDist ? ['--config.ignore-scripts=true'] : []),
+        '--pack-destination',
+        destination,
+      ],
+      {
+        cwd: starterDist?.directory ?? join(root, 'packages', pkg.directory),
+        encoding: 'utf8',
+        timeout: 300_000,
+      },
+    );
     const [filename] = readdirSync(destination).filter((name) => name.endsWith('.tgz'));
     if (filename === undefined) throw new Error(`No tarball produced for ${pkg.directory}.`);
     const tarball = join(destination, filename);
@@ -101,7 +143,9 @@ beforeAll(() => {
   }
 }, 600_000);
 
-afterAll(() => {
+afterAll(async () => {
+  await cleanStarterPythonDist();
+  await cleanStarterGoDist();
   if (temporaryDirectory !== undefined)
     rmSync(temporaryDirectory, { recursive: true, force: true });
 });
@@ -176,6 +220,17 @@ test.each(packages)('$directory has public metadata and the root license files',
   expect(packed.homepage).toBeTruthy();
   expect(packed.bugs?.url).toBeTruthy();
   for (const name of ['LICENSE', 'NOTICE']) {
+    if (pkg.directory === 'starter-python' && name === 'NOTICE') {
+      const expected = Buffer.concat([
+        readFileSync(join(root, 'NOTICE')),
+        Buffer.from(
+          '\nPython starter wheel notices and full license texts are in dist/NOTICE.txt.\ncertifi and orjson include MPL-2.0 material requiring maintainer review before redistribution.\normsgpack is a limited same-name stand-in, not upstream; license to be confirmed by the maintainer.\n',
+        ),
+      ]);
+      expect(readFileSync(join(root, 'packages', pkg.directory, name))).toEqual(expected);
+      expect(execFileSync('tar', ['-xzOf', pkg.tarball, `package/${name}`])).toEqual(expected);
+      continue;
+    }
     expect(readFileSync(join(root, 'packages', pkg.directory, name))).toEqual(
       readFileSync(join(root, name)),
     );
