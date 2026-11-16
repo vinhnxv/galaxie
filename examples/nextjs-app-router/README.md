@@ -6,6 +6,9 @@ Choose **4** and submit to see `Keep practicing one small step at a time.`
 No model download, provider credential or agent backend is needed. Reload starts
 again: this example has memory checkpoints, no persistence or tab ownership.
 
+See the [Next.js host guide](../../docs/guides/nextjs.md) for the tested client
+boundary, exact policy, Worker behavior and unverified public asset-copy path.
+
 From the repository root:
 
 ```sh

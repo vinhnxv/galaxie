@@ -50,6 +50,7 @@ test.each(combinations)(
     const paths = [
       'SKILL.md',
       'references/host-integration.md',
+      'references/nextjs.md',
       `references/kind-${choice.kind}.md`,
       `references/framework-${choice.framework}.md`,
     ].sort();

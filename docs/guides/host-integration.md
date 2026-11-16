@@ -12,6 +12,7 @@ to npm.
 The other packages remain private workspace packages.
 
 For host-authored wiring in a data file, see the [host configuration guide](host-configuration.md) and its worked host-remote example.
+For a Next.js App Router host, see the [Next.js guide](nextjs.md) and its client-only mock example.
 
 ## With a coding agent
 

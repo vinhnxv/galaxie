@@ -444,12 +444,14 @@ test.each(['browser-only', 'gateway'])(
         'framework-langgraph-js.md',
         'host-integration.md',
         `kind-${kind}.md`,
+        'nextjs.md',
       ]);
       for (const path of [
         'SKILL.md',
         'references/framework-langgraph-js.md',
         'references/host-integration.md',
         `references/kind-${kind}.md`,
+        'references/nextjs.md',
       ])
         expect(await readFile(join(skill, path))).toEqual(
           await readFile(join(repo, 'skills/galaxie', path)),
