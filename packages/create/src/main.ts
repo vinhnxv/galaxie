@@ -70,7 +70,9 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
     if (note !== undefined) output.write(`${note}\n`);
     const tarballDirectory = env['GALAXIE_CREATE_PACKAGE_DIR'];
     const tarballs =
-      tarballDirectory === undefined ? undefined : await resolveTarballs(tarballDirectory);
+      tarballDirectory === undefined
+        ? undefined
+        : await resolveTarballs(tarballDirectory, request.framework as string);
     const result = compose(layers, {
       kind: request.kind as string,
       framework: request.framework as string,

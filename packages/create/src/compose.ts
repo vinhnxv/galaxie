@@ -4,7 +4,7 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { Layer } from './layers.js';
 import { isObject, type JsonObject, mergeFragments } from './merge.js';
-import { knownPackages, type PackageManager, TarballError, type Tarballs } from './packages.js';
+import { type PackageManager, requiredPackages, TarballError, type Tarballs } from './packages.js';
 import { validateOutputPath, validateProjectName } from './paths.js';
 
 export interface ProjectFile {
@@ -162,7 +162,7 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
         'Tarball mode supports npm only; pnpm and yarn tarball installs are not proven.',
       );
     const overrides: JsonObject = {};
-    for (const name of knownPackages) {
+    for (const name of requiredPackages(options.framework)) {
       const path = options.tarballs.get(name);
       if (path === undefined || !isAbsolute(path))
         throw new TarballError(`Expected an absolute tarball path for ${name}.`);

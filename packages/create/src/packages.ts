@@ -17,7 +17,14 @@ export type Tarballs = ReadonlyMap<string, string>;
 export type PackageManager = 'npm' | 'pnpm' | 'yarn';
 export class TarballError extends Error {}
 
-export async function resolveTarballs(directory: string): Promise<Tarballs> {
+export function requiredPackages(framework: string): readonly string[] {
+  return framework === 'adk-js' ? [...knownPackages, '@galaxie-ai/adapter-adk'] : knownPackages;
+}
+
+export async function resolveTarballs(
+  directory: string,
+  framework = 'langgraph-js',
+): Promise<Tarballs> {
   if (!isAbsolute(directory)) throw new TarballError('The tarball directory must be absolute.');
   let entries: string[];
   try {
@@ -28,7 +35,7 @@ export async function resolveTarballs(directory: string): Promise<Tarballs> {
     throw new TarballError('The tarball directory must exist and be a real directory.');
   }
   const result = new Map<string, string>();
-  for (const name of knownPackages) {
+  for (const name of requiredPackages(framework)) {
     const prefix = name.replace('@galaxie-ai/', 'galaxie-ai-');
     const pattern = new RegExp(`^${prefix}-(\\d+\\.\\d+\\.\\d+(?:[-+][a-zA-Z0-9.-]+)?)\\.tgz$`);
     const matches = entries.filter((entry) => pattern.test(entry));

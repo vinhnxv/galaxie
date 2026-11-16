@@ -93,3 +93,12 @@ managers and the LangGraph layer emit no additional file. The ADK layer refuses
 scripts for `@google/genai`, `cpu-features`, `protobufjs` and `ssh2`, including the
 additional packages found by the plain-install probe. Automatic installs still use
 `--ignore-scripts`.
+
+
+The private `@galaxie-ai/adapter-adk` is unpublished. Until its release, ADK project
+resolution requires npm tarball mode: set `GALAXIE_CREATE_PACKAGE_DIR` to a directory
+containing one tarball for each of the seven launch packages and one for
+`adapter-adk`. All eight overrides and the selected direct galaxie dependencies use
+absolute `file:` specifications. LangGraph resolution still uses seven tarballs
+and ignores an extra ADK adapter tarball. Registry-mode ADK installs are unsupported.
+Tarball mode continues to refuse pnpm and yarn before any project write.
