@@ -1,0 +1,38 @@
+{
+  "name": "@galaxie-ai/starter-go",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Private prebuilt Go starter artifacts and deterministic local build helpers for galaxie.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinhnxv/galaxie.git",
+    "directory": "packages/starter-go"
+  },
+  "homepage": "https://github.com/vinhnxv/galaxie/tree/main/packages/starter-go#readme",
+  "bugs": {
+    "url": "https://github.com/vinhnxv/galaxie/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./build": {
+      "types": "./dist/build.d.ts",
+      "default": "./dist/build.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

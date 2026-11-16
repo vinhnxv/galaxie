@@ -498,8 +498,9 @@ function importsSyscallJs(source: string): boolean {
 
 // Only the bridge package and the first-run gate may call into JavaScript.
 const SYSCALL_JS_DIRECTORIES = ['go/galaxie/bridge', 'go/gate'];
-if (existsSync('go')) {
-  for (const entry of readdirSync('go', { recursive: true, withFileTypes: true })) {
+for (const root of ['go', 'templates/frameworks/adk-go/files/go']) {
+  if (!existsSync(root)) continue;
+  for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.go')) continue;
     const file = join(entry.parentPath, entry.name);
     if (!importsSyscallJs(readFileSync(file, 'utf8'))) continue;
@@ -989,6 +990,14 @@ for (const root of ['packages', 'examples', 'templates', 'tests', 'scripts']) {
     for (const { specifier } of imports(file, false)) {
       const target = resolve(dirname(file), specifier);
       if (
+        file.startsWith('packages/adapter-') &&
+        (specifier === '@galaxie-ai/starter-go' ||
+          specifier.startsWith('@galaxie-ai/starter-go/') ||
+          (specifier.startsWith('.') && target.startsWith(`${resolve('packages/starter-go')}/`)))
+      )
+        problems.push(`${file}: adapters must not import starter-go`);
+
+      if (
         specifier.startsWith('@galaxie-ai/ui-protocol/') ||
         (!file.startsWith('packages/ui-protocol/') &&
           (specifier.startsWith('.') || specifier.startsWith('/')) &&
@@ -999,6 +1008,17 @@ for (const root of ['packages', 'examples', 'templates', 'tests', 'scripts']) {
           `${file}: ui-protocol imports must use the public root @galaxie-ai/ui-protocol`,
         );
       }
+    }
+  }
+}
+
+for (const area of ['src', 'dist']) {
+  const directory = join('packages/starter-go', area);
+  if (!existsSync(directory)) continue;
+  for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
+    for (const { specifier } of imports(file)) {
+      if (specifier.startsWith('@galaxie-ai/'))
+        problems.push(`${file}: starter-go must not import galaxie packages`);
     }
   }
 }
