@@ -1,5 +1,34 @@
 # Project status
 
+On 2026-11-16, the private `@galaxie-ai/starter-python` package adds offline packing
+of the adapter's derived LangGraph wheel lane plus the two prepared local wheels.
+Node conformance covers version/dependency boundaries, exact wheel inventories,
+byte and SHA-256 refusals, runtime hashes, notices and distribution tampering.
+Notices flag certifi/orjson MPL-2.0 and the limited same-name ormsgpack stand-in,
+whose license is to be confirmed by the maintainer and whose serializer compatibility
+is unverified. Local-wheel reproducibility and bridge-version binding are not
+established. Both create kinds now compose the LangGraph Python overlay with
+raw agent sources, pinned Pyodide runtime assets and independently adapter-bound
+wheel checks. CLI, tarball, source-path and CSP/profile mutation tests cover the
+registration; existing generated outputs match main except the shared baseline
+dependency binding and two gateway static MIME entries for `.mjs` and `.wasm`.
+Browser-only Chromium acceptance answers from the mock with
+Python and uv absent from PATH, reflects a Python source edit after rebuild,
+rejects missing/corrupt wheels by filename, and retains the same pending question
+and session key across reload. Page and Worker headers retain the pinned CSP;
+the happy paths report no CSP/Trusted Types violations, external requests or
+errors. The Worker bootstrap surfaces a denied wasm compilation before Pyodide
+can leave startup pending. Gateway Chromium acceptance answers with the Python
+agent's system prompt set, checks the browser request has only the user message
+and retains `metadata.promptId`, and verifies production stays unavailable without
+an upstream. Both kinds pass the real-network npm tarball harness on Node 24.15.0,
+npm 12.2.2 and Chromium 156.0.8078.4 with Python and uv absent from PATH. Generated
+checks and both CSP mutation controls pass; gateway also passes its compiled-server
+503 drive and session probes. See the [measurement record](standalone-verification.md).
+Startup time and other browser engines are unmeasured.
+The package stays unpublished and outside the launch inventory and
+size budgets; ADR-0012 guarantees are unchanged. See the [package limits](../packages/starter-python/README.md).
+
 On 2026-11-16, the private `@galaxie-ai/starter-go` artifact package and the
 ADK Go overlays for both kinds add a prebuilt mock-backed agent. The pack step ships
 one template source tree's wasm, verified Go glue, module source, manifest and

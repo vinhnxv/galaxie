@@ -12,7 +12,7 @@ import { devGatewayOptions } from '../server/dev.js';
 import { gatewayPlugin } from '../server/plugin.js';
 import { createAppHandler } from '../server/serve.js';
 import { cspHeader } from '../src/csp.js';
-import { expectedResult, gatewayReply } from '../src/executor.js';
+import { expectedResult, gatewayReply, templateDefinition } from '../src/executor.js';
 import { frameworkProfile } from '../src/framework-profile.js';
 import { completion, harness, listen, post, token } from './support.node.js';
 
@@ -38,160 +38,179 @@ async function files(directory: string): Promise<string[]> {
   ).flat();
 }
 
-it('builds and completes the browser agent under CSP with same-origin traffic and no credential residue', async () => {
-  const server = await harness();
-  const directory = await mkdtemp(join(template, '.browser-check-'));
-  const workspace = JSON.parse(
-    await readFile(new URL('../tsconfig.workspace.json', import.meta.url), 'utf8'),
-  ) as { compilerOptions: { paths: Record<string, string[]> } };
-  const alias = Object.entries(workspace.compilerOptions.paths)
-    .filter(([name]) => name.startsWith('@galaxie-ai/'))
-    .sort(([a], [b]) => b.length - a.length)
-    .map(([find, paths]) => {
-      const path = paths[0];
-      if (path === undefined) throw new Error('Missing workspace source mapping.');
-      return { find, replacement: fileURLToPath(new URL(path, new URL('../', import.meta.url))) };
-    });
-  const previous = process.env['NODE_ENV'];
-  const previousKey = process.env['UPSTREAM_API_KEY'];
-  const previousBase = process.env['UPSTREAM_BASE_URL'];
-  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
-  try {
-    process.env['NODE_ENV'] = 'production';
-    process.env['UPSTREAM_API_KEY'] = server.apiKey;
-    process.env['UPSTREAM_BASE_URL'] = `${server.upstreamOrigin}/v1`;
-    await build({
-      configFile: fileURLToPath(new URL('../vite.config.ts', import.meta.url)),
-      logLevel: 'silent',
-      resolve: { alias },
-      build: { outDir: directory, emptyOutDir: true },
-    });
-    const origin = await listen(createServer(createAppHandler(server.gateway, directory)));
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ serviceWorkers: 'block' });
-    const urls: string[] = [];
-    const errors: string[] = [];
-    const apiBodies: string[] = [];
-    const issued: string[] = [];
-    const modelRoles: string[][] = [];
-    await context.route('**/*', async (route) => {
-      urls.push(route.request().url());
-      const target = new URL(route.request().url());
-      if (target.origin !== origin) await route.abort('blockedbyclient');
-      else if (target.pathname.startsWith('/api/')) {
-        // Read API bodies here: the browser cannot return a streamed body after the page consumed it.
-        if (target.pathname === '/api/v1/chat/completions') {
-          const request = route.request().postDataJSON() as { messages: { role: string }[] };
-          modelRoles.push(request.messages.map((message) => message.role));
-        }
-        const fetched = await route.fetch();
-        const text = await fetched.text();
-        // The session body delivers the token by design; every other body must not contain it.
-        if (target.pathname === '/api/session')
-          issued.push((JSON.parse(text) as { token: string }).token);
-        else apiBodies.push(text);
-        await route.fulfill({ response: fetched, body: text });
-      } else await route.continue();
-    });
-    const page = await context.newPage();
-    page.on('pageerror', (error) => errors.push(error.message));
-    page.on('console', (message) => {
-      if (message.type() === 'error') errors.push(message.text());
-    });
-    const response = await page.goto(origin);
-    expect(response?.headers()['content-security-policy']).toBe(cspHeader());
-    await page.getByRole('button', { name: 'Start with gateway', exact: true }).click();
-    await page.getByRole('radio', { name: '4', exact: true }).check();
-    await page.getByRole('button', { name: 'Submit answers', exact: true }).click();
-    await page.getByText(expectedResult('Keep practicing.'), { exact: true }).waitFor();
-    expect(await page.getByRole('list', { name: 'Model destinations' }).textContent()).toContain(
-      'Comment: Gateway (Host server)',
-    );
-    const storage = await page.evaluate(() => ({
-      local: { ...localStorage },
-      session: { ...sessionStorage },
-      dom: document.documentElement.outerHTML,
-    }));
-    const bodies = apiBodies;
-    expect(issued).toHaveLength(1);
-    const canaries = [server.apiKey, ...issued];
-    for (const canary of canaries) {
-      expect(JSON.stringify({ urls, errors, storage, bodies })).not.toContain(canary);
-      // Scan the actual build recursively, including binary assets as bytes.
-      for (const file of await files(directory)) {
-        expect((await readFile(file)).includes(Buffer.from(canary))).toBe(false);
-      }
-      // Runtime-generated canaries cannot be accidentally baked into source or configuration.
-      for (const file of await files(template)) {
-        expect((await readFile(file)).includes(Buffer.from(canary))).toBe(false);
-      }
-    }
-    expect(storage.local).toEqual({});
-    expect(storage.session).toEqual({});
-    expect(urls.length).toBeGreaterThan(0);
-    expect(urls.every((url) => new URL(url).origin === origin)).toBe(true);
-    if (frameworkProfile.workers) {
-      expect(urls.filter((url) => url.endsWith('/go/agent.wasm'))).toHaveLength(1);
-      expect(urls.filter((url) => /go-worker.*\.js/.test(url))).toHaveLength(1);
-    } else expect(urls.some((url) => /\.wasm|go-worker/.test(url))).toBe(false);
-    // Zod probes eval support once with `new Function('')`. The CSP blocks that caught probe, which
-    // logs this one message and falls back to schemas without code generation. Nothing else may log.
-    const evalProbe = "This document requires 'TrustedScript' assignment.";
-    expect(errors.filter((message) => !message.startsWith(evalProbe))).toEqual([]);
-    expect(errors.filter((message) => message.startsWith(evalProbe)).length).toBeLessThanOrEqual(1);
-    expect(server.records).toHaveLength(1);
-    expect(modelRoles).toHaveLength(1);
-    expect(modelRoles[0]?.every((role) => !['system', 'developer'].includes(role))).toBe(true);
-    await context.close();
-    delete process.env['UPSTREAM_BASE_URL'];
-    delete process.env['UPSTREAM_API_KEY'];
-    const mockPreview = await preview({
-      configFile: fileURLToPath(new URL('../vite.config.ts', import.meta.url)),
-      logLevel: 'silent',
-      build: { outDir: directory },
-      preview: { host: '127.0.0.1', port: 0, strictPort: true },
-    });
+it(
+  'builds and completes the browser agent under CSP with same-origin traffic and no credential residue',
+  async () => {
+    const server = await harness();
+    const directory = await mkdtemp(join(template, '.browser-check-'));
+    const workspace = JSON.parse(
+      await readFile(new URL('../tsconfig.workspace.json', import.meta.url), 'utf8'),
+    ) as { compilerOptions: { paths: Record<string, string[]> } };
+    const alias = Object.entries(workspace.compilerOptions.paths)
+      .filter(([name]) => name.startsWith('@galaxie-ai/'))
+      .sort(([a], [b]) => b.length - a.length)
+      .map(([find, paths]) => {
+        const path = paths[0];
+        if (path === undefined) throw new Error('Missing workspace source mapping.');
+        return { find, replacement: fileURLToPath(new URL(path, new URL('../', import.meta.url))) };
+      });
+    const previous = process.env['NODE_ENV'];
+    const previousKey = process.env['UPSTREAM_API_KEY'];
+    const previousBase = process.env['UPSTREAM_BASE_URL'];
+    let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
     try {
-      const address = mockPreview.httpServer.address();
-      if (address === null || typeof address === 'string') throw new Error('Missing Vite port.');
-      const origin = `http://127.0.0.1:${address.port}`;
+      process.env['NODE_ENV'] = 'production';
+      process.env['UPSTREAM_API_KEY'] = server.apiKey;
+      process.env['UPSTREAM_BASE_URL'] = `${server.upstreamOrigin}/v1`;
+      await build({
+        configFile: fileURLToPath(new URL('../vite.config.ts', import.meta.url)),
+        logLevel: 'silent',
+        resolve: { alias },
+        build: { outDir: directory, emptyOutDir: true },
+      });
+      const origin = await listen(createServer(createAppHandler(server.gateway, directory)));
+      browser = await chromium.launch({ headless: true });
       const context = await browser.newContext({ serviceWorkers: 'block' });
+      const urls: string[] = [];
+      const errors: string[] = [];
+      const apiBodies: string[] = [];
+      const issued: string[] = [];
+      const modelRoles: string[][] = [];
+      const promptIds: string[] = [];
+      await context.route('**/*', async (route) => {
+        urls.push(route.request().url());
+        const target = new URL(route.request().url());
+        if (target.origin !== origin) await route.abort('blockedbyclient');
+        else if (target.pathname.startsWith('/api/')) {
+          // Read API bodies here: the browser cannot return a streamed body after the page consumed it.
+          if (target.pathname === '/api/v1/chat/completions') {
+            const request = route.request().postDataJSON() as {
+              messages: { role: string }[];
+              metadata: { promptId: string };
+            };
+            modelRoles.push(request.messages.map((message) => message.role));
+            promptIds.push(request.metadata.promptId);
+          }
+          const fetched = await route.fetch();
+          const text = await fetched.text();
+          // The session body delivers the token by design; every other body must not contain it.
+          if (target.pathname === '/api/session')
+            issued.push((JSON.parse(text) as { token: string }).token);
+          else apiBodies.push(text);
+          await route.fulfill({ response: fetched, body: text });
+        } else await route.continue();
+      });
       const page = await context.newPage();
-      const failed: string[] = [];
-      page.on('requestfailed', (request) => failed.push(request.failure()?.errorText ?? 'failed'));
-      await page.goto(origin);
+      page.on('pageerror', (error) => errors.push(error.message));
+      page.on('console', (message) => {
+        if (message.type() === 'error') errors.push(message.text());
+      });
+      const response = await page.goto(origin);
+      expect(response?.headers()['content-security-policy']).toBe(cspHeader());
       await page.getByRole('button', { name: 'Start with gateway', exact: true }).click();
       await page.getByRole('radio', { name: '4', exact: true }).check();
       await page.getByRole('button', { name: 'Submit answers', exact: true }).click();
-      await page.getByText(expectedResult(gatewayReply), { exact: true }).waitFor();
-      await page
-        .getByText('Replies are fixed sample text from a mock upstream.', { exact: true })
-        .waitFor();
-      await page.evaluate(
-        'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+      await page.getByText(expectedResult('Keep practicing.'), { exact: true }).waitFor();
+      expect(await page.getByRole('list', { name: 'Model destinations' }).textContent()).toContain(
+        'Comment: Gateway (Host server)',
       );
-      expect(failed).toEqual([]);
+      const storage = await page.evaluate(() => ({
+        local: { ...localStorage },
+        session: { ...sessionStorage },
+        dom: document.documentElement.outerHTML,
+      }));
+      const bodies = apiBodies;
+      expect(issued).toHaveLength(1);
+      const canaries = [server.apiKey, ...issued];
+      for (const canary of canaries) {
+        expect(JSON.stringify({ urls, errors, storage, bodies })).not.toContain(canary);
+        // Scan the actual build recursively, including binary assets as bytes.
+        for (const file of await files(directory)) {
+          expect((await readFile(file)).includes(Buffer.from(canary))).toBe(false);
+        }
+        // Runtime-generated canaries cannot be accidentally baked into source or configuration.
+        for (const file of await files(template)) {
+          expect((await readFile(file)).includes(Buffer.from(canary))).toBe(false);
+        }
+      }
+      expect(storage.local).toEqual({});
+      expect(storage.session).toEqual({});
+      expect(urls.length).toBeGreaterThan(0);
+      expect(urls.every((url) => new URL(url).origin === origin)).toBe(true);
+      if (templateDefinition.executor === 'langgraph-python') {
+        expect(urls.filter((url) => url.endsWith('/python/runtime/pyodide.asm.wasm'))).toHaveLength(
+          1,
+        );
+        expect(urls.filter((url) => /pyodide-worker.*\.js/.test(url))).toHaveLength(1);
+      } else if (frameworkProfile.workers) {
+        expect(urls.filter((url) => url.endsWith('/go/agent.wasm'))).toHaveLength(1);
+        expect(urls.filter((url) => /go-worker.*\.js/.test(url))).toHaveLength(1);
+      } else expect(urls.some((url) => /\.wasm|go-worker/.test(url))).toBe(false);
+      // Zod probes eval support once with `new Function('')`. The CSP blocks that caught probe, which
+      // logs this one message and falls back to schemas without code generation. Nothing else may log.
+      const evalProbe = "This document requires 'TrustedScript' assignment.";
+      expect(errors.filter((message) => !message.startsWith(evalProbe))).toEqual([]);
+      expect(errors.filter((message) => message.startsWith(evalProbe)).length).toBeLessThanOrEqual(
+        1,
+      );
+      expect(server.records).toHaveLength(1);
+      expect(modelRoles).toHaveLength(1);
+      expect(promptIds).toEqual(['practice-comment']);
+      expect(modelRoles[0]?.every((role) => !['system', 'developer'].includes(role))).toBe(true);
       await context.close();
-    } finally {
-      await new Promise<void>((resolve, reject) => {
-        mockPreview.httpServer.close((error) => (error ? reject(error) : resolve()));
-        if ('closeAllConnections' in mockPreview.httpServer)
-          mockPreview.httpServer.closeAllConnections();
+      delete process.env['UPSTREAM_BASE_URL'];
+      delete process.env['UPSTREAM_API_KEY'];
+      const mockPreview = await preview({
+        configFile: fileURLToPath(new URL('../vite.config.ts', import.meta.url)),
+        logLevel: 'silent',
+        build: { outDir: directory },
+        preview: { host: '127.0.0.1', port: 0, strictPort: true },
       });
+      try {
+        const address = mockPreview.httpServer.address();
+        if (address === null || typeof address === 'string') throw new Error('Missing Vite port.');
+        const origin = `http://127.0.0.1:${address.port}`;
+        const context = await browser.newContext({ serviceWorkers: 'block' });
+        const page = await context.newPage();
+        const failed: string[] = [];
+        page.on('requestfailed', (request) =>
+          failed.push(request.failure()?.errorText ?? 'failed'),
+        );
+        await page.goto(origin);
+        await page.getByRole('button', { name: 'Start with gateway', exact: true }).click();
+        await page.getByRole('radio', { name: '4', exact: true }).check();
+        await page.getByRole('button', { name: 'Submit answers', exact: true }).click();
+        await page.getByText(expectedResult(gatewayReply), { exact: true }).waitFor();
+        await page
+          .getByText('Replies are fixed sample text from a mock upstream.', { exact: true })
+          .waitFor();
+        await page.evaluate(
+          'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+        );
+        expect(failed).toEqual([]);
+        await context.close();
+      } finally {
+        await new Promise<void>((resolve, reject) => {
+          mockPreview.httpServer.close((error) => (error ? reject(error) : resolve()));
+          if ('closeAllConnections' in mockPreview.httpServer)
+            mockPreview.httpServer.closeAllConnections();
+        });
+      }
+    } finally {
+      await browser?.close();
+      await rm(directory, { recursive: true, force: true });
+      for (const [name, value] of [
+        ['NODE_ENV', previous],
+        ['UPSTREAM_API_KEY', previousKey],
+        ['UPSTREAM_BASE_URL', previousBase],
+      ] as const) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
     }
-  } finally {
-    await browser?.close();
-    await rm(directory, { recursive: true, force: true });
-    for (const [name, value] of [
-      ['NODE_ENV', previous],
-      ['UPSTREAM_API_KEY', previousKey],
-      ['UPSTREAM_BASE_URL', previousBase],
-    ] as const) {
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
-  }
-}, 60_000);
+  },
+  templateDefinition.executor === 'langgraph-python' ? 180_000 : 60_000,
+);
 
 it('mounts the same gateway on Vite dev and preview', async () => {
   const previous = [process.env['UPSTREAM_BASE_URL'], process.env['UPSTREAM_API_KEY']];

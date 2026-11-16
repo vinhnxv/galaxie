@@ -145,10 +145,12 @@ async function project(
   }
 }
 
-for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
+for (const framework of ['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python']) {
   for (const kind of ['browser-only', 'gateway']) {
-    for (const workers of framework === 'adk-go' ? [true] : [false, true]) {
-      if (workers && framework !== 'adk-go') {
+    for (const workers of ['adk-go', 'langgraph-python'].includes(framework)
+      ? [true]
+      : [false, true]) {
+      if (workers && !['adk-go', 'langgraph-python'].includes(framework)) {
         it(`${kind}-${framework} generated baseline rejects a worker profile without the Go starter`, async () => {
           const directory = await project(kind, undefined, framework, true);
           try {
@@ -221,3 +223,35 @@ it.each(['browser-only', 'gateway'])(
     }
   },
 );
+
+for (const kind of ['browser-only', 'gateway']) {
+  for (const mutation of ['dependency', 'profile']) {
+    it(kind + ' Python baseline rejects a changed ' + mutation, async () => {
+      const directory = await project(kind, undefined, 'langgraph-python', true);
+      try {
+        if (mutation === 'dependency') {
+          const path = join(directory, 'package.json');
+          const manifest = JSON.parse(await readFile(path, 'utf8'));
+          delete manifest.dependencies['@galaxie-ai/starter-python'];
+          await writeFile(path, JSON.stringify(manifest));
+        } else {
+          const path = join(directory, 'src/framework-profile.ts');
+          await writeFile(
+            path,
+            (await readFile(path, 'utf8')).replace('workers: true', 'workers: false'),
+          );
+        }
+        const result = spawnSync(process.execPath, ['--test', 'check/baseline.check.ts'], {
+          cwd: directory,
+          encoding: 'utf8',
+          timeout: 30_000,
+        });
+        expect(result.error).toBeUndefined();
+        expect(result.status).not.toBe(0);
+        expect(result.stdout + result.stderr).toContain('framework profile changed');
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }, 60_000);
+  }
+}

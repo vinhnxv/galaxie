@@ -14,7 +14,7 @@ import { expect, it } from 'vitest';
 import { devGatewayOptions } from '../server/dev.js';
 import { createGateway } from '../server/gateway.js';
 import { createMockUpstream, mockReply } from '../server/mock-upstream.js';
-import { expectedOutput, gatewayReply } from '../src/executor.js';
+import { expectedOutput, gatewayReply, templateDefinition } from '../src/executor.js';
 import { createModelFetch } from '../src/model-fetch.js';
 import { createHybridHost } from '../src/runtime.js';
 import { createSession } from '../src/session.js';
@@ -392,51 +392,55 @@ it('shares and renews the in-memory demo session near expiry without persisting 
   expect(await session.token()).not.toBe(renewed);
 });
 
-it('runs the identical agent through the gateway and keeps credential canaries out of events, snapshots and browser responses', async () => {
-  const server = await harness();
-  const responses: string[] = [];
-  const urls: string[] = [];
-  let bearer = '';
-  const host = createHybridHost({
-    baseURL: server.origin,
-    fetch: async (input, init) => {
-      urls.push(String(input));
-      const response = await fetch(input, init);
-      if (new URL(String(input)).pathname === '/api/session') {
-        // Session issuance must return the bearer. It is exempt from the subsequent-response scan.
-        bearer = ((await response.clone().json()) as { token: string }).token;
-      } else responses.push(await response.clone().text());
-      return response;
-    },
-  });
-  try {
-    const instance = await host.createInstance();
-    const events = await answer(instance);
-    expect(events).toContainEqual(
-      expect.objectContaining({
-        type: 'output',
-        output: expectedOutput('Keep practicing.'),
-      }),
-    );
-    expect(instance.getSnapshot().routes?.['comment']).toMatchObject({
-      providerId: 'gateway',
-      destination: 'host-server',
+it(
+  'runs the identical agent through the gateway and keeps credential canaries out of events, snapshots and browser responses',
+  async () => {
+    const server = await harness();
+    const responses: string[] = [];
+    const urls: string[] = [];
+    let bearer = '';
+    const host = createHybridHost({
+      baseURL: server.origin,
+      fetch: async (input, init) => {
+        urls.push(String(input));
+        const response = await fetch(input, init);
+        if (new URL(String(input)).pathname === '/api/session') {
+          // Session issuance must return the bearer. It is exempt from the subsequent-response scan.
+          bearer = ((await response.clone().json()) as { token: string }).token;
+        } else responses.push(await response.clone().text());
+        return response;
+      },
     });
-    expect(bearer.length).toBeGreaterThan(0);
-    const visible = JSON.stringify({
-      events,
-      snapshot: instance.getSnapshot(),
-      responses,
-      urls,
-      status: host.getGatewayState(),
-    });
-    for (const canary of [bearer, server.apiKey]) expect(visible).not.toContain(canary);
-    expect(server.records[0]?.authorization).toBe(`Bearer ${server.apiKey}`);
-    expect(host.getGatewayState()).toBe('ready');
-  } finally {
-    await host.dispose();
-  }
-});
+    try {
+      const instance = await host.createInstance();
+      const events = await answer(instance);
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: 'output',
+          output: expectedOutput('Keep practicing.'),
+        }),
+      );
+      expect(instance.getSnapshot().routes?.['comment']).toMatchObject({
+        providerId: 'gateway',
+        destination: 'host-server',
+      });
+      expect(bearer.length).toBeGreaterThan(0);
+      const visible = JSON.stringify({
+        events,
+        snapshot: instance.getSnapshot(),
+        responses,
+        urls,
+        status: host.getGatewayState(),
+      });
+      for (const canary of [bearer, server.apiKey]) expect(visible).not.toContain(canary);
+      expect(server.records[0]?.authorization).toBe(`Bearer ${server.apiKey}`);
+      expect(host.getGatewayState()).toBe('ready');
+    } finally {
+      await host.dispose();
+    }
+  },
+  templateDefinition.executor === 'langgraph-python' ? 120_000 : 5_000,
+);
 
 it('keeps an unconfigured production gateway unavailable and refuses browser prompt roles', async () => {
   const gateway = createGateway();
@@ -660,38 +664,44 @@ it('drops agent system and developer roles while preserving conversational messa
   expect(await missing.json()).toEqual({ error: 'invalid_messages' });
 });
 
-it('answers SystemMessage requests through the real OpenAI-compatible client in JSON and SSE', async () => {
-  const gateway = createGateway({ mockUpstream: createMockUpstream() });
-  const origin = await listen(
-    createServer((request, response) => {
-      void gateway.handle(request, response);
-    }),
-  );
-  const model = openAICompatible({
-    baseURL: `${origin}/api/v1`,
-    model: 'gateway-comment',
-    destination: 'host-server',
-    fetch: createModelFetch(fetch, () => {}),
-  })({ credential: await token(origin) });
-  const messages = [new SystemMessage('Agent-authored prompt'), new HumanMessage('Practice.')];
-  expect((await model.invoke(messages)).text).toBe('This is a fixed reply from the mock upstream.');
-  let text = '';
-  for await (const chunk of await model.stream(messages)) text += chunk.text;
-  expect(text).toBe('This is a fixed reply from the mock upstream.');
-  const host = createHybridHost({ baseURL: origin });
-  try {
-    const events = await answer(await host.createInstance());
-    expect(events).toContainEqual(
-      expect.objectContaining({
-        type: 'output',
-        output: expectedOutput(gatewayReply),
+it(
+  'answers SystemMessage requests through the real OpenAI-compatible client in JSON and SSE',
+  async () => {
+    const gateway = createGateway({ mockUpstream: createMockUpstream() });
+    const origin = await listen(
+      createServer((request, response) => {
+        void gateway.handle(request, response);
       }),
     );
-    expect(host.getGatewayState()).toBe('mock');
-  } finally {
-    await host.dispose();
-  }
-});
+    const model = openAICompatible({
+      baseURL: `${origin}/api/v1`,
+      model: 'gateway-comment',
+      destination: 'host-server',
+      fetch: createModelFetch(fetch, () => {}),
+    })({ credential: await token(origin) });
+    const messages = [new SystemMessage('Agent-authored prompt'), new HumanMessage('Practice.')];
+    expect((await model.invoke(messages)).text).toBe(
+      'This is a fixed reply from the mock upstream.',
+    );
+    let text = '';
+    for await (const chunk of await model.stream(messages)) text += chunk.text;
+    expect(text).toBe('This is a fixed reply from the mock upstream.');
+    const host = createHybridHost({ baseURL: origin });
+    try {
+      const events = await answer(await host.createInstance());
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: 'output',
+          output: expectedOutput(gatewayReply),
+        }),
+      );
+      expect(host.getGatewayState()).toBe('mock');
+    } finally {
+      await host.dispose();
+    }
+  },
+  templateDefinition.executor === 'langgraph-python' ? 120_000 : 5_000,
+);
 
 it.each([200, 401, 429, 503])(
   'uses the mock label only on successful responses (%s)',

@@ -12,7 +12,7 @@
       "@mlc-ai/web-llm": "0.2.86"
     }
   },
-  "frameworks": ["langgraph-js", "adk-js", "adk-go"],
+  "frameworks": ["langgraph-js", "adk-js", "adk-go", "langgraph-python"],
   "workspace": {
     "paths": {
       "@galaxie-ai/adapter-kit": ["packages/adapter-kit/src/index.ts"],

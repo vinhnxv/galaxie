@@ -57,10 +57,17 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           go: "true"
+          python: "true"
       - run: pnpm run check:license
       - run: pnpm exec biome ci .
-      - name: Build the Go starter artifacts
-        run: pnpm --filter @galaxie-ai/starter-go run prepack
+      - name: Build the Go and Python starter artifacts
+        run: |
+          pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/ui-protocol/tsconfig.build.json
+          pnpm exec tsc -p packages/core/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-kit/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
+          pnpm --filter @galaxie-ai/starter-python run prepack
       - name: Type-check with TypeScript 7
         run: pnpm run typecheck
       - name: Type-check with TypeScript 6 (ADR-0013)
@@ -112,8 +119,15 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           go: "true"
+          python: "true"
           browser: "true"
-      - run: pnpm --filter @galaxie-ai/starter-go run prepack
+      - run: |
+          pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/ui-protocol/tsconfig.build.json
+          pnpm exec tsc -p packages/core/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-kit/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
+          pnpm --filter @galaxie-ai/starter-python run prepack
       - run: CI=true GALAXIE_TEST_GROUP=general pnpm test
 
   # Runs the browser cases that use scripted models on Firefox and WebKit. It gathers mock-model
@@ -134,10 +148,16 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           go: "true"
+          python: "true"
           engine: ${{ matrix.engine }}
       - name: Run the browser cases on ${{ matrix.engine }}
         run: |
           pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/ui-protocol/tsconfig.build.json
+          pnpm exec tsc -p packages/core/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-kit/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
+          pnpm --filter @galaxie-ai/starter-python run prepack
           pnpm run compose:create
           pnpm exec vitest run --project browser --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/report.json" || true
           node scripts/check-browser-engine.ts "$RUNNER_TEMP/report.json" "$ENGINE" tests/browser-engines-known-failures.json
@@ -166,7 +186,18 @@ jobs:
           python: "true"
           go: "true"
           browser: "true"
-      - run: pnpm --filter @galaxie-ai/starter-go run prepack
+      - run: |
+          pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/ui-protocol/tsconfig.build.json
+          pnpm exec tsc -p packages/core/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-kit/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
+          pnpm --filter @galaxie-ai/starter-python run prepack
+      - name: Test the Python starter artifacts and Chromium acceptance
+        if: matrix.group == 'python-rest'
+        run: |
+          pnpm run compose:create
+          pnpm exec vitest run --project node tests/conformance/starter-python-*.node.test.ts
       - run: CI=true pnpm test
         env:
           GALAXIE_TEST_GROUP: ${{ matrix.group }}
@@ -197,11 +228,18 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           go: "true"
+          python: "true"
           browser: "true"
-      - run: pnpm --filter @galaxie-ai/starter-go run prepack
+      - run: |
+          pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/ui-protocol/tsconfig.build.json
+          pnpm exec tsc -p packages/core/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-kit/tsconfig.build.json
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
+          pnpm --filter @galaxie-ai/starter-python run prepack
       - run: pnpm run compose:create
       - name: Test the Go starter artifacts and Chromium acceptance
-        run: pnpm exec vitest run --project node tests/conformance/starter-go-*.node.test.ts
+        run: pnpm exec vitest run --project node tests/conformance/starter-go-*.node.test.ts --no-file-parallelism
       - name: Test the Go module
         run: pnpm test:go
 

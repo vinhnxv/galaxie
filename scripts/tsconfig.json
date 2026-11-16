@@ -6,7 +6,11 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@galaxie-ai/starter-go/build": ["../packages/starter-go/src/build.ts"]
+      "@galaxie-ai/starter-go/build": ["../packages/starter-go/src/build.ts"],
+      "@galaxie-ai/starter-python/build": ["../packages/starter-python/src/build.ts"],
+      "@galaxie-ai/adapter-pyodide/runtime-files": [
+        "../packages/adapter-pyodide/src/runtime-files.ts"
+      ]
     }
   },
   "include": ["*.ts", "../vitest.config.ts"]

@@ -8,7 +8,7 @@ import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone
 
 export interface Arguments {
   kind: 'browser-only' | 'gateway' | 'all';
-  framework: 'langgraph-js' | 'adk-js' | 'adk-go';
+  framework: 'langgraph-js' | 'adk-js' | 'adk-go' | 'langgraph-python';
   nodes: NodeRequest[];
   mode: Mode | 'both';
   tarballs?: string;
@@ -19,7 +19,8 @@ export interface Arguments {
 }
 export const usage = `Usage: node scripts/verify-standalone.ts [options]
   --kind browser-only|gateway|all             (default all)
-  --framework langgraph-js|adk-js|adk-go          (default langgraph-js; ADK is tarball-only)
+  --framework langgraph-js|adk-js|adk-go|langgraph-python
+                                            (default langgraph-js; others are tarball-only)
   --node <major>[=/path/to/node]            (repeatable; default current)
   --mode registry|tarball|both              (default registry)
   --tarballs <directory>                   reuse seven packed launch packages
@@ -61,7 +62,13 @@ export function parseArguments(args: readonly string[]): Arguments {
         options.kind = value;
         break;
       case '--framework':
-        if (value !== 'langgraph-js' && value !== 'adk-js' && value !== 'adk-go') invalid();
+        if (
+          value !== 'langgraph-js' &&
+          value !== 'adk-js' &&
+          value !== 'adk-go' &&
+          value !== 'langgraph-python'
+        )
+          invalid();
         options.framework = value;
         break;
       case '--mode':
@@ -149,6 +156,13 @@ const langGraphSpecs: readonly TemplateSpec[] = [
 
 export const templateSpecs: readonly TemplateSpec[] = [
   ...langGraphSpecs,
+  ...langGraphSpecs.map(
+    (spec): TemplateSpec => ({
+      ...spec,
+      name: `${spec.kind}-langgraph-python`,
+      framework: 'langgraph-python',
+    }),
+  ),
   ...['adk-js', 'adk-go'].flatMap((framework) =>
     langGraphSpecs.map(
       (spec): TemplateSpec => ({

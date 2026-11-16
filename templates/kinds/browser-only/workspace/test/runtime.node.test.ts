@@ -3,27 +3,36 @@
 
 import { ModelError, type ModelUnavailableReason } from '@galaxie-ai/models/builtin-ai';
 import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
-import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
-import { expectedOutput, mockReply, starterInput } from '../src/executor.js';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { expectedOutput, mockReply, starterInput, templateDefinition } from '../src/executor.js';
 import { frameworkProfile } from '../src/framework-profile.js';
 import { createTemplateHost, type TemplateInstance } from '../src/runtime.js';
 
 interface WorkerHost {
-  readonly wasm: { readonly url: string };
+  readonly location: string;
+  readonly workerScript: RegExp;
+  readonly sources?: {
+    readonly paths: readonly string[];
+    readonly requests: readonly string[];
+    fetch: typeof fetch;
+  };
   createWorker(): object;
   close(): Promise<void>;
 }
-let goHost: WorkerHost | undefined;
+let workerHost: WorkerHost | undefined;
 beforeAll(async () => {
   if (frameworkProfile.workers) {
     const workerHostModule = './worker-host.node.js';
     const { createWorkerHost } = (await import(workerHostModule)) as {
       createWorkerHost(): Promise<WorkerHost>;
     };
-    goHost = await createWorkerHost();
+    workerHost = await createWorkerHost();
   }
 }, 60_000);
-afterAll(async () => goHost?.close());
+afterAll(async () => workerHost?.close());
+beforeEach(() => {
+  if (workerHost !== undefined) vi.stubGlobal('location', new URL(workerHost.location));
+});
 afterEach(() => vi.unstubAllGlobals());
 
 async function answer(instance: TemplateInstance): Promise<unknown> {
@@ -48,50 +57,58 @@ async function answer(instance: TemplateInstance): Promise<unknown> {
   return output;
 }
 
-it('finishes on the scripted model with only the framework worker and no network or WebLLM load', async () => {
-  const network = vi.fn(() => {
-    throw new Error('No network is allowed.');
-  });
-  vi.stubGlobal('fetch', network);
-  vi.stubGlobal('WebSocket', network);
-  vi.stubGlobal('XMLHttpRequest', network);
-  const worker = vi.fn(
-    class GoWorker {
-      constructor(url: URL, options: WorkerOptions) {
-        expect(url.pathname).toMatch(/go-worker\.ts$/);
-        expect(options).toEqual({ type: 'module' });
-        if (goHost === undefined) throw new Error('The Go Worker host is missing.');
-        Object.assign(this, goHost.createWorker());
-      }
-    },
-  );
-  if (frameworkProfile.workers) {
-    if (goHost === undefined) throw new Error('The Go Worker host is missing.');
-    vi.stubGlobal('location', new URL(goHost.wasm.url));
-    vi.stubGlobal('Worker', worker);
-  } else vi.stubGlobal('Worker', network);
-  const loader = vi.fn(async () => {
-    throw new Error('No WebLLM load is allowed.');
-  });
-  const host = await createTemplateHost({
-    builtInAIProbe: async () => 'unavailable',
-    webGPUProbe: () => false,
-    webLLMLoader: loader,
-  });
-  try {
-    expect(host.getModelSnapshot()).toMatchObject({
-      route: 'mock',
-      builtinReason: 'no_api',
-      webllm: 'no_webgpu',
+it(
+  'finishes on the scripted model with only the framework worker and no network or WebLLM load',
+  async () => {
+    const network = vi.fn(() => {
+      throw new Error('No network is allowed.');
     });
-    expect(await answer(await host.createInstance())).toEqual(expectedOutput(mockReply));
-    expect(network).not.toHaveBeenCalled();
-    if (frameworkProfile.workers) expect(worker).toHaveBeenCalledOnce();
-    expect(loader).not.toHaveBeenCalled();
-  } finally {
-    await host.dispose();
-  }
-});
+    vi.stubGlobal('fetch', workerHost?.sources?.fetch ?? network);
+    vi.stubGlobal('WebSocket', network);
+    vi.stubGlobal('XMLHttpRequest', network);
+    const worker = vi.fn(
+      class FrameworkWorker {
+        constructor(url: URL, options: WorkerOptions) {
+          if (workerHost === undefined) throw new Error('The framework Worker host is missing.');
+          expect(url.pathname).toMatch(workerHost.workerScript);
+          expect(options).toEqual({ type: 'module' });
+          Object.assign(this, workerHost.createWorker());
+        }
+      },
+    );
+    if (frameworkProfile.workers) {
+      if (workerHost === undefined) throw new Error('The framework Worker host is missing.');
+      vi.stubGlobal('location', new URL(workerHost.location));
+      vi.stubGlobal('Worker', worker);
+    } else vi.stubGlobal('Worker', network);
+    const loader = vi.fn(async () => {
+      throw new Error('No WebLLM load is allowed.');
+    });
+    const host = await createTemplateHost({
+      builtInAIProbe: async () => 'unavailable',
+      webGPUProbe: () => false,
+      webLLMLoader: loader,
+    });
+    try {
+      expect(host.getModelSnapshot()).toMatchObject({
+        route: 'mock',
+        builtinReason: 'no_api',
+        webllm: 'no_webgpu',
+      });
+      expect(await answer(await host.createInstance())).toEqual(expectedOutput(mockReply));
+      expect(network).not.toHaveBeenCalled();
+      if (frameworkProfile.workers) expect(worker).toHaveBeenCalledOnce();
+      if (workerHost?.sources !== undefined)
+        expect([...workerHost.sources.requests].sort()).toEqual(
+          [...workerHost.sources.paths].sort(),
+        );
+      expect(loader).not.toHaveBeenCalled();
+    } finally {
+      await host.dispose();
+    }
+  },
+  templateDefinition.executor === 'langgraph-python' ? 120_000 : 5_000,
+);
 
 it.each<ModelUnavailableReason>([
   'no_api',

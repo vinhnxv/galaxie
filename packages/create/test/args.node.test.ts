@@ -7,8 +7,8 @@ import { parseArguments, UsageError } from '../src/args.js';
 const choices = {
   kinds: ['browser-only', 'gateway'],
   frameworks: {
-    'browser-only': ['langgraph-js', 'adk-go'],
-    gateway: ['langgraph-js', 'adk-js', 'adk-go'],
+    'browser-only': ['langgraph-js', 'adk-go', 'langgraph-python'],
+    gateway: ['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python'],
   },
 };
 
@@ -61,4 +61,10 @@ test.each([
 
 test.each(['browser-only', 'gateway'])('ADK Go is accepted for %s', (kind) => {
   expect(parseArguments(['my-app', kind, 'adk-go'], choices).framework).toBe('adk-go');
+});
+
+test.each(['browser-only', 'gateway'])('LangGraph Python is accepted for %s', (kind) => {
+  expect(parseArguments(['my-app', kind, 'langgraph-python'], choices).framework).toBe(
+    'langgraph-python',
+  );
 });

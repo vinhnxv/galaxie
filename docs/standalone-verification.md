@@ -7,6 +7,74 @@ production server still follows the correlated 503 unavailable flow. These check
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
 
+## LangGraph Python measurement (2026-11-16)
+
+Both kinds compose `langgraph-python` with private `adapter-pyodide` and
+`starter-python` packages. Prepack selects the adapter's LangGraph wheel lane and
+the two local wheels from a prepared cache, verifies their bytes and SHA-256, and
+retains wheel metadata and license texts. Generated builds verify those artifacts
+against the installed adapter, copy the pinned npm Pyodide runtime and emit the
+project's raw Python sources. Neither package is published.
+
+`starter-python-browser.node.test.ts` answers from the mock with an empty PATH,
+reflects an edit to `graph.py` after rebuilding, names missing/corrupt wheels on
+build failure, and exercises the wasm CSP refusal. The composed reload test keeps
+the pending question and saved session. `starter-python-gateway.node.test.ts`
+answers through preview with the agent's system prompt set and Python/uv absent
+from PATH. Its captured browser request contains only a user message and keeps
+`metadata.promptId`; production still returns 503 without an upstream. Page and
+Worker responses retain the pinned CSP, with no external requests, page errors
+or CSP/Trusted Types violations on the acceptance happy paths.
+
+After preparing nine npm tarballs, this real-network run exits 0 with a PATH
+containing only Node, npm and `sh` (no `python`, `python3` or `uv`):
+
+```sh
+node scripts/verify-standalone.ts --framework langgraph-python --mode tarball --tarballs <tarballs> --json <result-file>
+```
+
+| Kind / framework | Target Node | npm | Mode | Chromium | Result |
+| --- | --- | --- | --- | --- | --- |
+| browser-only / langgraph-python | 24.15.0 | 12.2.2 | Tarball | 156.0.8078.4 | PASS |
+| gateway / langgraph-python | 24.15.0 | 12.2.2 | Tarball | 156.0.8078.4 | PASS |
+
+Both results have empty failure arrays. Installation, file-resolved single-copy
+checks, production builds, generated checks, both directive mutation controls and
+mock browser drives pass with the seven-day release age, no exclusion and no
+lifecycle-script fallback. Gateway also passes its compiled production-server
+503 drive and session probes. Temporary projects are removed; JSON and logs stay
+outside the checkout. An earlier restricted-PATH attempt failed before browser
+drives with `npm error enoent spawn sh ENOENT`; retaining `sh` resolves that
+environment failure without adding Python or uv.
+
+The gateway static server adds only `.mjs` JavaScript and `.wasm` WebAssembly MIME
+types required by browser modules and streaming WebAssembly compilation.
+All 18 existing kind/framework/package-manager outputs retain main's bytes after
+subtracting exactly these two lines and the shared baseline dependency binding.
+Their CSP sources and emitted headers are unchanged.
+
+The combined local Vitest suite caps workers at four to bound simultaneous
+Chromium/Pyodide startup. Earlier full runs had RAG browser interception failures
+that passed alone; the cap bounds contention, without establishing that it was
+the sole cause. Named Python shards now partition the Node inventory, including
+both Python composed projects, without admitting browser-project files into Node.
+
+The final `pnpm check`, with Go 1.27.3 first on PATH, exits 0: 568 Vitest files
+and 8,343 tests pass, with two expected failures and 165 skips; Python has 1,968
+passes and one skip. Go tests, Pyright, both TypeScript versions, builds,
+dependency/docs checks and all size budgets pass. The earlier RAG browser cases
+pass in this combined run; the interception timeout's original cause remains
+unproven.
+
+**Maintainer review before redistribution:** `ormsgpack` is a limited same-name
+stand-in, not upstream. Its NOTICE says **license to be confirmed by the
+maintainer**; checkpoint serializer compatibility is unverified, and replacing it
+may make saved checkpoints unreadable. `certifi` and `orjson` ship MPL-2.0 texts
+that also need maintainer review. Nothing publishes. Firefox/WebKit, real models,
+pnpm/yarn end to end, Node 22, CI cold start, Pyodide startup time, local-wheel
+reproducibility and adapter-bridge version binding remain unmeasured.
+ADR-0012 guarantees are unchanged.
+
 ## ADK Go measurement (2026-11-16)
 
 The private, unpublished `@galaxie-ai/starter-go` package supplies the browser-only
@@ -253,14 +321,14 @@ node scripts/verify-standalone.ts --help
 node scripts/verify-standalone.ts --node 22 --node 24 --mode both --json /tmp/galaxie-standalone-final.json
 ```
 
-`--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js|adk-go`
-selects the framework (default `langgraph-js`); ADK requires `--mode tarball`.
-ADK Go supports both kinds.
+`--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js|adk-go|langgraph-python`
+selects the framework (default `langgraph-js`); ADK and LangGraph Python require `--mode tarball`.
+ADK Go and LangGraph Python support both kinds.
 The old `--template` flag is rejected. `--node` is repeatable;
 `--node 22=/absolute/path/to/node` overrides discovery. Otherwise the current
 runtime wins for its major, then the newest matching nvm installation.
 `--mode registry|tarball|both` selects installs. `--tarballs /path/to/dir` reuses
-seven previously packed launch packages (plus `adapter-adk` for ADK JavaScript, or `adapter-go` and `starter-go` for ADK Go) by copying them into the owned temporary
+seven previously packed launch packages (plus `adapter-adk` for ADK JavaScript, or `adapter-go` and `starter-go` for ADK Go, or `adapter-pyodide` and `starter-python` for LangGraph Python) by copying them into the owned temporary
 root. `--keep` retains that root and prints its path for investigation; remove it
 afterward. `--min-release-age-exclude` is an explicit, recorded exception, not a
 change to user configuration. No exclusion was used for this measurement.
@@ -268,7 +336,11 @@ change to user configuration. No exclusion was used for this measurement.
 Tarball mode first runs `build:packages` in the workspace, writing its ordinary
 ignored build artifacts, then `pnpm pack` for the seven launch packages. ADK runs additionally compile and
 pack `adapter-adk` for JavaScript, or `adapter-go` and `starter-go` for Go,
-without adding them to the launch inventory. Go packing requires Go 1.27.3
+without adding them to the launch inventory. Python additionally compiles `adapter-pyodide`
+and packs it with `starter-python`. Prepare `.cache/python-wheels` with the repository
+fetch/build scripts before packing; prepack only verifies cached wheels and never
+downloads or invokes Python. Generated Python builds and previews need no Python
+or uv. Go packing requires Go 1.27.3
 on PATH and invokes starter-go prepack to produce its complete dist. It uses
 the harness Node 24 and pnpm for packing, independently of the target Node. Every
 generated project's scaffold, install, build, check, preview and server compile/run uses the requested

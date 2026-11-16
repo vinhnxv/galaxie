@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { type Browser, chromium } from 'playwright';
 import { build, type PreviewServer, preview } from 'vite';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { expectedResult, mockReply } from '../src/executor.js';
+import { expectedResult, mockReply, templateDefinition } from '../src/executor.js';
 import { frameworkProfile } from '../src/framework-profile.js';
 
 const template = fileURLToPath(new URL('..', import.meta.url));
@@ -72,55 +72,65 @@ afterAll(async () => {
   if (directory !== undefined) await rm(directory, { recursive: true, force: true });
 });
 
-it('reloads the built app under CSP with the same pending question and no model downloads', async () => {
-  if (browser === undefined) throw new Error('Chromium did not start.');
-  const context = await browser.newContext({ serviceWorkers: 'block' });
-  await context.addInitScript(() => {
-    Object.defineProperty(globalThis, 'LanguageModel', { configurable: true, value: undefined });
-    Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined });
-  });
-  const requests: string[] = [];
-  const errors: string[] = [];
-  await context.route('**/*', async (route) => {
-    requests.push(route.request().url());
-    if (new URL(route.request().url()).origin !== origin) await route.abort('blockedbyclient');
-    else await route.continue();
-  });
-  const page = await context.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
-  try {
-    const response = await page.goto(origin);
-    expect(response?.headers()['content-security-policy']).toContain(
-      "require-trusted-types-for 'script'",
-    );
-    await page.getByRole('radio', { name: '4', exact: true }).waitFor();
-    const question = await page.locator('form').textContent();
-    const saved = await page.evaluate(() =>
-      sessionStorage.getItem('local-only-template.local-demo-principal.session'),
-    );
-    expect(saved).not.toBeNull();
-    await page.reload();
-    await page.getByRole('radio', { name: '4', exact: true }).waitFor();
-    expect(await page.locator('form').textContent()).toBe(question);
-    expect(
-      await page.evaluate(() =>
+it(
+  'reloads the built app under CSP with the same pending question and no model downloads',
+  async () => {
+    if (browser === undefined) throw new Error('Chromium did not start.');
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    await context.addInitScript(() => {
+      Object.defineProperty(globalThis, 'LanguageModel', { configurable: true, value: undefined });
+      Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined });
+    });
+    const requests: string[] = [];
+    const errors: string[] = [];
+    await context.route('**/*', async (route) => {
+      requests.push(route.request().url());
+      if (new URL(route.request().url()).origin !== origin) await route.abort('blockedbyclient');
+      else await route.continue();
+    });
+    const page = await context.newPage();
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      const response = await page.goto(origin);
+      expect(response?.headers()['content-security-policy']).toContain(
+        "require-trusted-types-for 'script'",
+      );
+      await page.getByRole('radio', { name: '4', exact: true }).waitFor();
+      const question = await page.locator('form').textContent();
+      const saved = await page.evaluate(() =>
         sessionStorage.getItem('local-only-template.local-demo-principal.session'),
-      ),
-    ).toBe(saved);
-    await page.getByRole('radio', { name: '4', exact: true }).check();
-    await page.getByRole('button', { name: 'Submit answers' }).click();
-    await page.getByText(expectedResult(mockReply), { exact: true }).waitFor();
-    expect(requests.length).toBeGreaterThan(0);
-    expect(requests.every((url) => new URL(url).origin === origin)).toBe(true);
-    if (frameworkProfile.workers) {
-      expect(requests.filter((url) => url.endsWith('/go/agent.wasm'))).toHaveLength(2);
-      expect(requests.some((url) => /webllm|huggingface|\.hf\.co/.test(url))).toBe(false);
-      expect(requests.filter((url) => /go-worker.*\.js/.test(url))).toHaveLength(2);
-    } else {
-      expect(requests.some((url) => /webllm|\.wasm|huggingface|\.hf\.co/.test(url))).toBe(false);
+      );
+      expect(saved).not.toBeNull();
+      await page.reload();
+      await page.getByRole('radio', { name: '4', exact: true }).waitFor();
+      expect(await page.locator('form').textContent()).toBe(question);
+      expect(
+        await page.evaluate(() =>
+          sessionStorage.getItem('local-only-template.local-demo-principal.session'),
+        ),
+      ).toBe(saved);
+      await page.getByRole('radio', { name: '4', exact: true }).check();
+      await page.getByRole('button', { name: 'Submit answers' }).click();
+      await page.getByText(expectedResult(mockReply), { exact: true }).waitFor();
+      expect(requests.length).toBeGreaterThan(0);
+      expect(requests.every((url) => new URL(url).origin === origin)).toBe(true);
+      if (templateDefinition.executor === 'langgraph-python') {
+        expect(
+          requests.filter((url) => url.endsWith('/python/runtime/pyodide.asm.wasm')),
+        ).toHaveLength(2);
+        expect(requests.some((url) => /webllm|huggingface|\.hf\.co/.test(url))).toBe(false);
+        expect(requests.filter((url) => /pyodide-worker.*\.js/.test(url))).toHaveLength(2);
+      } else if (frameworkProfile.workers) {
+        expect(requests.filter((url) => url.endsWith('/go/agent.wasm'))).toHaveLength(2);
+        expect(requests.some((url) => /webllm|huggingface|\.hf\.co/.test(url))).toBe(false);
+        expect(requests.filter((url) => /go-worker.*\.js/.test(url))).toHaveLength(2);
+      } else {
+        expect(requests.some((url) => /webllm|\.wasm|huggingface|\.hf\.co/.test(url))).toBe(false);
+      }
+      expect(errors).toEqual([]);
+    } finally {
+      await context.close();
     }
-    expect(errors).toEqual([]);
-  } finally {
-    await context.close();
-  }
-});
+  },
+  templateDefinition.executor === 'langgraph-python' ? 120_000 : 5_000,
+);

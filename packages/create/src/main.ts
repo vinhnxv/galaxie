@@ -81,6 +81,10 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
       output.write(
         'Note: @galaxie-ai/adapter-go and @galaxie-ai/starter-go are not published yet, so installing from the registry fails. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
       );
+    if (request.framework === 'langgraph-python' && tarballDirectory === undefined)
+      output.write(
+        'Note: @galaxie-ai/adapter-pyodide and @galaxie-ai/starter-python are not published yet, so installing from the registry fails. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
+      );
     const result = compose(layers, {
       kind: request.kind as string,
       framework: request.framework as string,

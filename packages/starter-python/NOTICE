@@ -1,0 +1,10 @@
+galaxie
+Copyright 2026 Nguyễn Xuân Vĩnh
+
+This product includes software developed by Nguyễn Xuân Vĩnh.
+
+ADK recipe notices and provenance: examples/adk-recipes/ATTRIBUTION.md.
+
+Python starter wheel notices and full license texts are in dist/NOTICE.txt.
+certifi and orjson include MPL-2.0 material requiring maintainer review before redistribution.
+ormsgpack is a limited same-name stand-in, not upstream; license to be confirmed by the maintainer.

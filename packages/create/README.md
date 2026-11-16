@@ -32,6 +32,7 @@ The current kinds are `browser-only` and `gateway`:
 | `langgraph-js` | Yes | Registry or npm tarballs |
 | `adk-js` | Yes | npm tarballs; adapter private and unpublished |
 | `adk-go` | Both | npm tarballs; adapter and starter artifacts private and unpublished |
+| `langgraph-python` | Yes | npm tarballs; adapter and starter wheels private and unpublished |
 
 ADK asks the same scripted quiz through a long-running `question.ask@1` capability,
 then validates the answer and requests a text-only closing comment. Native
@@ -93,6 +94,16 @@ module layout and upgrade limits. A fresh project uses the prebuilt without Go;
 editing needs Go 1.27.3. Its `dev` command builds and previews under the strict CSP,
 with no HMR client. Both kinds support it; the standalone harness measurement is recorded in [docs/standalone-verification.md](../../docs/standalone-verification.md).
 
+For `langgraph-python`, additionally pack `adapter-pyodide` and `starter-python`.
+Prepare the wheel cache and run starter-python's complete prepack first, as its
+[README](../starter-python/README.md) describes. All nine npm overrides use the
+tarballs. The generated [Python workflow](../../templates/frameworks/langgraph-python/files/PYTHON.md)
+explains raw source edits, wheel/runtime verification and license limits. Building
+and previewing a generated project needs neither Python nor uv; its `dev` command
+builds and previews without HMR. Registry installs remain unsupported. Both kinds
+are covered by Chromium acceptance, and the standalone harness measurement is
+recorded in the standalone verification record.
+
 ## Layers and writes
 
 The composer combines `templates/base`, the selected `templates/kinds` layer and
@@ -117,6 +128,15 @@ project-mode output. Root compiler and
 test commands regenerate it, and a conformance test rejects missing, changed or
 unexpected cache output. Project-mode output omits those workspace artifacts.
 
+Before testing Python compositions, run
+`pnpm --filter @galaxie-ai/starter-python run prepack` and
+`pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json`. Their cache has
+repository-only links to starter-python, adapter-pyodide and the pinned pyodide
+npm package. Required wheels are independently bound to the installed adapter's
+inventory during each build. The generated baseline binds the worker profile to
+the presence of starter-go or starter-python; editing the profile cannot silently
+widen another framework's headers.
+
 Run `pnpm exec vitest run --project node packages/create/test` for focused tests
 after composing the cache, and `pnpm check` for repository validation.
 ADR-0031 stays Proposed; ADR-0012 guarantees are unchanged.
@@ -138,3 +158,15 @@ See the [verification record](../../docs/standalone-verification.md) for measure
 versions, commands and limits. Nothing in this workflow publishes a package.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+For the private Python starter, the standalone harness accepts only npm tarballs:
+
+```sh
+node scripts/verify-standalone.ts --framework langgraph-python --mode tarball --tarballs <tarballs> --json /tmp/galaxie-python.json
+```
+
+Prepare the wheel cache before packing; generated builds and preview need no
+Python or uv. See the [standalone record](../../docs/standalone-verification.md)
+for measured versions and limits. `ormsgpack` stand-in licensing and checkpoint
+compatibility are unconfirmed; certifi/orjson MPL-2.0 texts require maintainer
+review before redistribution. Nothing publishes; ADR-0012 guarantees are unchanged.

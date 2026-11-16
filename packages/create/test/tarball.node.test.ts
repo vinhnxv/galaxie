@@ -251,3 +251,66 @@ test.each(['adapter-go', 'starter-go'])(
     expect(existsSync(join(root, 'go-app'))).toBe(false);
   },
 );
+
+test.each(['browser-only', 'gateway'])(
+  'LangGraph Python %s rewrites both private packages and all nine overrides',
+  async (kind) => {
+    const { root, packed } = await fixture();
+    for (const name of ['adapter-pyodide', 'starter-python'])
+      await writeFile(join(packed, `galaxie-ai-${name}-0.0.0.tgz`), 'fixture');
+    expect((await resolveTarballs(packed)).size).toBe(7);
+    expect((await resolveTarballs(packed, 'langgraph-python')).size).toBe(9);
+    expect(
+      await run(['python-app', kind, 'langgraph-python', '--no-install'], {
+        cwd: root,
+        templatesRoot,
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: 'npm/12' },
+      }),
+    ).toBe(0);
+    const manifest = JSON.parse(await readFile(join(root, 'python-app/package.json'), 'utf8'));
+    expect(manifest.overrides).toEqual(
+      Object.fromEntries(
+        [...names, 'adapter-pyodide', 'starter-python'].map((name) => [
+          '@galaxie-ai/' + name,
+          `file:${packed}/galaxie-ai-${name}-${['adapter-pyodide', 'starter-python'].includes(name) ? '0.0.0' : '0.1.0'}.tgz`,
+        ]),
+      ),
+    );
+    for (const name of ['adapter-pyodide', 'starter-python'])
+      expect(manifest.dependencies['@galaxie-ai/' + name]).toBe(
+        `file:${packed}/galaxie-ai-${name}-0.0.0.tgz`,
+      );
+  },
+);
+
+test.each(['adapter-pyodide', 'starter-python'])(
+  'LangGraph Python requires exactly one %s tarball before writing',
+  async (name) => {
+    const { root, packed } = await fixture();
+    for (const other of ['adapter-pyodide', 'starter-python'])
+      await writeFile(join(packed, `galaxie-ai-${other}-0.0.0.tgz`), 'fixture');
+    const target = join(packed, `galaxie-ai-${name}-0.0.0.tgz`);
+    await rm(target);
+    await expect(resolveTarballs(packed, 'langgraph-python')).rejects.toThrow(
+      '@galaxie-ai/' + name,
+    );
+    await writeFile(target, 'fixture');
+    expect((await resolveTarballs(packed, 'langgraph-python')).size).toBe(9);
+    await writeFile(join(packed, `galaxie-ai-${name}-0.0.1.tgz`), 'fixture');
+    await expect(resolveTarballs(packed, 'langgraph-python')).rejects.toThrow(
+      '@galaxie-ai/' + name,
+    );
+    expect(
+      await run(['python-app', 'browser-only', 'langgraph-python', '--no-install'], {
+        cwd: root,
+        templatesRoot,
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        env: { GALAXIE_CREATE_PACKAGE_DIR: packed },
+      }),
+    ).toBe(1);
+    expect(existsSync(join(root, 'python-app'))).toBe(false);
+  },
+);

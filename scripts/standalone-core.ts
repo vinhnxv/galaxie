@@ -212,6 +212,10 @@ export function assertSingleCopies(
         !(
           framework === 'adk-go' &&
           ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'].includes(name)
+        ) &&
+        !(
+          framework === 'langgraph-python' &&
+          ['@galaxie-ai/adapter-pyodide', '@galaxie-ai/starter-python'].includes(name)
         )) ||
       !entry.resolved?.startsWith('file:')
     )
@@ -559,10 +563,12 @@ export async function runStandalone(
     ): Command => ({ executable, args, cwd, env: childEnv, signal });
     const needsAdk = options.specs.some((spec) => spec.framework === 'adk-js');
     const needsGo = options.specs.some((spec) => spec.framework === 'adk-go');
+    const needsPython = options.specs.some((spec) => spec.framework === 'langgraph-python');
     const packedPackages = [
       ...launchPackages,
       ...(needsAdk ? ['@galaxie-ai/adapter-adk'] : []),
       ...(needsGo ? ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'] : []),
+      ...(needsPython ? ['@galaxie-ai/adapter-pyodide', '@galaxie-ai/starter-python'] : []),
     ];
     let tarballs: string | undefined;
     let packError: unknown;
@@ -586,6 +592,14 @@ export async function runStandalone(
           if (needsGo)
             await runner.run(
               command(pnpm, ['exec', 'tsc', '-p', 'packages/adapter-go/tsconfig.build.json'], repo),
+            );
+          if (needsPython)
+            await runner.run(
+              command(
+                pnpm,
+                ['exec', 'tsc', '-p', 'packages/adapter-pyodide/tsconfig.build.json'],
+                repo,
+              ),
             );
           for (const name of packedPackages)
             await runner.run(

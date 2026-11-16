@@ -1248,6 +1248,16 @@ Firefox, WebKit and real-model input measurements remain unmeasured; see the
 
 ### Third-party licenses
 
+The private [Python starter](../starter-python/README.md) derives the LangGraph lane
+from `lockedWheels` and retains each wheel's metadata and license texts in its
+built `python/NOTICE.txt`. It excludes the vendored `cryptography` wheel.
+`certifi` declares MPL-2.0; `orjson` also ships an MPL-2.0 text beside Apache/MIT.
+Both need maintainer review before redistribution. The local `ormsgpack` wheel is
+a limited, independently written same-name stand-in with no copied upstream
+implementation. Repository metadata says Apache-2.0, but its **license is to be
+confirmed by the maintainer**. Checkpoint serializer compatibility is unverified;
+a later replacement may make saved checkpoints unreadable. Nothing publishes.
+
 The 29-wheel `adk` set carries the licenses its wheels declare in their dist-info metadata:
 
 - Apache-2.0: `google-adk` (declared by classifier), `google-genai`, `google-auth`, `tenacity`, `opentelemetry-api`, `opentelemetry-semantic-conventions` and `requests` (which ships a `NOTICE` file).

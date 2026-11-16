@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { readFile } from 'node:fs/promises';
+import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
 import { goFramework } from './templates/frameworks/adk-go/files/vite.framework.js';
+import { pythonFramework } from './templates/frameworks/langgraph-python/files/vite.framework.js';
 
 import {
   mcpAdminCommand,
@@ -28,6 +30,12 @@ const alias = {
   ),
   '@galaxie-ai/adapter-adk': fileURLToPath(
     new URL('./packages/adapter-adk/src/index.ts', import.meta.url),
+  ),
+  '@galaxie-ai/adapter-pyodide/worker': fileURLToPath(
+    new URL('./packages/adapter-pyodide/src/worker.ts', import.meta.url),
+  ),
+  '@galaxie-ai/adapter-pyodide/runtime-files': fileURLToPath(
+    new URL('./packages/adapter-pyodide/src/runtime-files.ts', import.meta.url),
   ),
   '@galaxie-ai/adapter-pyodide': fileURLToPath(
     new URL('./packages/adapter-pyodide/src/index.ts', import.meta.url),
@@ -149,13 +157,18 @@ if (groupName !== undefined && !groups.includes(groupName))
  */
 const forGroup = (
   include: string[],
-  exclude: string[],
+  exclusions: string[],
   prefix: string,
 ): { include: string[]; exclude: string[] } => {
+  const exclude = [...exclusions, `${prefix}packages/create/.cache/composed/.*/**`];
+  const starterDirectories = include
+    .filter((glob) => glob.includes('packages/create/.cache/composed/*/'))
+    .map((glob) => glob.replace('composed/*/', 'composed/*-langgraph-python/'));
   const named = (term: string): string[] =>
-    include.map((glob) => glob.replace('*.test.', `*${term}*.test.`));
+    include.map((glob) => glob.replace(/\/\*([^/]*)\.test\./, `/*${term}*$1.test.`));
   const python = [
     ...pythonTerms.flatMap(named),
+    ...starterDirectories,
     ...pythonDirectories.map((directory) => `${prefix}${directory}.test.{ts,tsx}`),
   ];
   if (groupName === 'general') return { include, exclude: [...exclude, ...python] };
@@ -168,6 +181,22 @@ const forGroup = (
   const term = groupName === undefined ? undefined : pythonShards[groupName];
   return term === undefined ? { include, exclude } : { include: named(term), exclude };
 };
+
+/**
+ * The Python starter browser project holds only the composed Python starters' app tests. They boot
+ * Pyodide, so they run with the Python groups and never in `general` or a named shard, and its
+ * files never depend on the group's name terms: those would re-select the main browser project's
+ * Pyodide tests a second time.
+ */
+const forPythonStarterGroup = (
+  include: string[],
+  exclusions: string[],
+  prefix: string,
+): { include: string[]; exclude: string[] } => ({
+  include:
+    groupName === undefined || groupName === 'python' || groupName === 'python-rest' ? include : [],
+  exclude: [...exclusions, `${prefix}packages/create/.cache/composed/.*/**`],
+});
 
 /**
  * The browser project drives Chromium unless `GALAXIE_BROWSER` names another engine. The Firefox
@@ -186,13 +215,21 @@ const starterGo = goFramework(
   fileURLToPath(new URL('./packages/create/.cache/composed/browser-only-adk-go/', import.meta.url)),
 );
 
+const starterPython = pythonFramework(
+  fileURLToPath(
+    new URL('./packages/create/.cache/composed/browser-only-langgraph-python/', import.meta.url),
+  ),
+);
+const starterFrameworks = { ...starterGo, plugins: [starterGo.plugins, starterPython.plugins] };
+
 const config: ViteUserConfig = defineConfig({
   server: { host: '127.0.0.1' },
   test: {
+    maxWorkers: Math.min(4, Math.max(availableParallelism() - 1, 1)),
     api: { host: '127.0.0.1' },
     projects: [
       {
-        ...starterGo,
+        ...starterFrameworks,
         resolve: { alias },
         test: {
           name: 'node',
@@ -215,105 +252,137 @@ const config: ViteUserConfig = defineConfig({
           setupFiles: ['tests/conformance/support/clean-env.node.ts'],
         },
       },
-      {
-        ...starterGo,
-        root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
-        resolve: { alias },
-        plugins: [
-          starterGo.plugins,
-          {
-            name: 'starter-go-test-wasm',
-            configureServer(server) {
-              server.middlewares.use('/go/agent.wasm', async (_request, response, next) => {
-                try {
-                  const file = new URL('./packages/starter-go/dist/agent.wasm', import.meta.url);
-                  response.setHeader('Content-Type', 'application/wasm');
-                  response.end(await readFile(file));
-                } catch (error) {
-                  next(error);
-                }
-              });
+      ...[false, true].map(
+        (pythonStarter): ViteUserConfig => ({
+          ...starterFrameworks,
+          root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
+          resolve: {
+            alias: {
+              ...alias,
+              pyodide: fileURLToPath(
+                new URL(
+                  './packages/adapter-pyodide/node_modules/pyodide/pyodide.mjs',
+                  import.meta.url,
+                ),
+              ),
             },
           },
-        ],
-        optimizeDeps: {
-          exclude: [
-            '@mlc-ai/web-llm',
-            '@huggingface/transformers',
-            '@huggingface/transformers-structured-output',
-            'onnxruntime-web',
-          ],
-          include: [
-            'react',
-            'react-dom/client',
-            'react/jsx-runtime',
-            'react/jsx-dev-runtime',
-            '@langchain/langgraph/web',
-            '@langchain/openai',
-            '@modelcontextprotocol/sdk/client/index.js',
-            '@modelcontextprotocol/sdk/client/streamableHttp.js',
-            '@modelcontextprotocol/sdk/types.js',
-            '@langchain/langgraph-checkpoint',
-            '@langchain/core/callbacks/base',
-            '@langchain/core/language_models/chat_models',
-            '@langchain/core/messages',
-            '@langchain/core/outputs',
-            '@langchain/core/utils/json_schema',
-            '@langchain/core/utils/function_calling',
-            '@langchain/core/language_models/structured_output',
-            '@langchain/core/output_parsers',
-            '@langchain/core/tools',
-            '@langchain/core/runnables',
-            '@opentelemetry/sdk-trace',
-            'zod',
-            '@orama/orama',
-            '@huggingface/jinja',
-          ],
-        },
-        test: {
-          name: 'browser',
-          api: { host: '127.0.0.1', port: 63315, strictPort: true },
-          globalSetup: ['support/mcp-global.node.ts'],
-          ...forGroup(
-            [
-              '**/*.test.ts',
-              '**/*.test.tsx',
-              '../../packages/react/test/**/*.test.tsx',
-              '../../packages/adapter-kit/test/**/*.test.ts',
-              '../../packages/ui-protocol/test/**/*.test.ts',
-              '../../packages/adapter-pyodide/test/**/*.test.ts',
-              '../../packages/adapter-adk/test/**/*.test.ts',
-              '../../packages/adapter-go/test/**/*.test.ts',
-              '../../packages/storage-indexeddb/test/**/*.test.ts',
-              '../../examples/*/test/**/*.test.ts',
-              '../../packages/create/.cache/composed/*/test/**/*.test.ts',
-            ],
-            [
-              ...configDefaults.exclude,
-              '**/*.node.test.ts',
-              '../../packages/adapter-kit/test/**/*.node.test.ts',
-              '../../packages/ui-protocol/test/**/*.node.test.ts',
-              '../../packages/adapter-pyodide/test/**/*.node.test.ts',
-              '../../packages/adapter-adk/test/**/*.node.test.ts',
-              '../../packages/adapter-go/test/**/*.node.test.ts',
-              '../../examples/*/test/**/*.node.test.ts',
-              '../../packages/create/.cache/composed/*/test/**/*.node.test.ts',
-            ],
-            '../../',
-          ),
-          browser: {
-            enabled: true,
-            commands: {
-              mcpAdmin: mcpAdminCommand,
-              mcpCorpusAdmin: mcpCorpusAdminCommand,
-              mcpTraceAdmin: mcpTraceAdminCommand,
+          plugins: [
+            starterFrameworks.plugins,
+            {
+              name: 'starter-go-test-wasm',
+              configureServer(server) {
+                server.middlewares.use('/go/agent.wasm', async (_request, response, next) => {
+                  try {
+                    const file = new URL('./packages/starter-go/dist/agent.wasm', import.meta.url);
+                    response.setHeader('Content-Type', 'application/wasm');
+                    response.end(await readFile(file));
+                  } catch (error) {
+                    next(error);
+                  }
+                });
+              },
             },
-            provider: playwright(),
-            headless: true,
-            instances: [{ browser: browserName, name: `browser (${browserName})` }],
+          ],
+          optimizeDeps: {
+            exclude: [
+              '@mlc-ai/web-llm',
+              '@huggingface/transformers',
+              '@huggingface/transformers-structured-output',
+              'onnxruntime-web',
+            ],
+            include: [
+              'pyodide',
+              'react',
+              'react-dom/client',
+              'react/jsx-runtime',
+              'react/jsx-dev-runtime',
+              '@langchain/langgraph/web',
+              '@langchain/openai',
+              '@modelcontextprotocol/sdk/client/index.js',
+              '@modelcontextprotocol/sdk/client/streamableHttp.js',
+              '@modelcontextprotocol/sdk/types.js',
+              '@langchain/langgraph-checkpoint',
+              '@langchain/core/callbacks/base',
+              '@langchain/core/language_models/chat_models',
+              '@langchain/core/messages',
+              '@langchain/core/outputs',
+              '@langchain/core/utils/json_schema',
+              '@langchain/core/utils/function_calling',
+              '@langchain/core/language_models/structured_output',
+              '@langchain/core/output_parsers',
+              '@langchain/core/tools',
+              '@langchain/core/runnables',
+              '@opentelemetry/sdk-trace',
+              'zod',
+              '@orama/orama',
+              '@huggingface/jinja',
+            ],
           },
-        },
-      },
+          test: {
+            name: pythonStarter ? 'python-starter-browser' : 'browser',
+            // Python app tests boot Pyodide; CI exceeded the inherited 15-second limit.
+            ...(pythonStarter ? { testTimeout: 120_000 } : {}),
+            api: {
+              host: '127.0.0.1',
+              // The inventory test lists this project beside a running suite, so its port is overridable.
+              port: pythonStarter
+                ? Number(process.env['GALAXIE_PYTHON_STARTER_API_PORT'] ?? 63316)
+                : 63315,
+              strictPort: true,
+            },
+            globalSetup: ['support/mcp-global.node.ts'],
+            ...(pythonStarter ? forPythonStarterGroup : forGroup)(
+              pythonStarter
+                ? ['../../packages/create/.cache/composed/*-langgraph-python/test/**/*.test.ts']
+                : [
+                    '**/*.test.ts',
+                    '**/*.test.tsx',
+                    '../../packages/react/test/**/*.test.tsx',
+                    '../../packages/adapter-kit/test/**/*.test.ts',
+                    '../../packages/ui-protocol/test/**/*.test.ts',
+                    '../../packages/adapter-pyodide/test/**/*.test.ts',
+                    '../../packages/adapter-adk/test/**/*.test.ts',
+                    '../../packages/adapter-go/test/**/*.test.ts',
+                    '../../packages/storage-indexeddb/test/**/*.test.ts',
+                    '../../examples/*/test/**/*.test.ts',
+                    '../../packages/create/.cache/composed/*/test/**/*.test.ts',
+                  ],
+              [
+                ...configDefaults.exclude,
+                ...(pythonStarter
+                  ? []
+                  : ['../../packages/create/.cache/composed/*-langgraph-python/test/**/*.test.ts']),
+                '**/*.node.test.ts',
+                '../../packages/adapter-kit/test/**/*.node.test.ts',
+                '../../packages/ui-protocol/test/**/*.node.test.ts',
+                '../../packages/adapter-pyodide/test/**/*.node.test.ts',
+                '../../packages/adapter-adk/test/**/*.node.test.ts',
+                '../../packages/adapter-go/test/**/*.node.test.ts',
+                '../../examples/*/test/**/*.node.test.ts',
+                '../../packages/create/.cache/composed/*/test/**/*.node.test.ts',
+              ],
+              '../../',
+            ),
+            browser: {
+              enabled: true,
+              commands: {
+                mcpAdmin: mcpAdminCommand,
+                mcpCorpusAdmin: mcpCorpusAdminCommand,
+                mcpTraceAdmin: mcpTraceAdminCommand,
+              },
+              provider: playwright(),
+              headless: true,
+              instances: [
+                {
+                  browser: browserName,
+                  name: `${pythonStarter ? 'python-starter-browser' : 'browser'} (${browserName})`,
+                },
+              ],
+            },
+          },
+        }),
+      ),
     ],
   },
 });
