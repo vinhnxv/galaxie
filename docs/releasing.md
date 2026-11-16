@@ -9,6 +9,8 @@ packages stay private and unpublished.
 
 ## Versioning
 
+Keep `skills/galaxie/SKILL.md` frontmatter `version` equal to `packages/core/package.json` when bumping a release; regenerate the create guidance goldens.
+
 Versions are `0.MINOR.PATCH`. While the major version is 0, a breaking change to a
 public API may land in a minor release and must be called out in the release
 notes. A patch release does not break a public API. The seven launch packages share
