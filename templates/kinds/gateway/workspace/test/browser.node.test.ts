@@ -183,55 +183,66 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
 }, 60_000);
 
 it('mounts the same gateway on Vite dev and preview', async () => {
-  const directory = await mkdtemp(join(template, '.browser-check-'));
-  const options = devGatewayOptions();
-  const dev = await createViteServer({
-    configFile: false,
-    plugins: [gatewayPlugin(options)],
-    logLevel: 'silent',
-    server: { host: '127.0.0.1', port: 0 },
-  });
-  let built: Awaited<ReturnType<typeof preview>> | undefined;
+  const previous = [process.env['UPSTREAM_BASE_URL'], process.env['UPSTREAM_API_KEY']];
   try {
-    built = await preview({
+    delete process.env['UPSTREAM_BASE_URL'];
+    delete process.env['UPSTREAM_API_KEY'];
+    const directory = await mkdtemp(join(template, '.browser-check-'));
+    const options = devGatewayOptions();
+    const dev = await createViteServer({
       configFile: false,
       plugins: [gatewayPlugin(options)],
       logLevel: 'silent',
-      build: { outDir: directory },
-      preview: { host: '127.0.0.1', port: 0, strictPort: true },
+      server: { host: '127.0.0.1', port: 0 },
     });
-    await dev.listen();
-    for (const listener of [dev.httpServer, built.httpServer]) {
-      const address = listener?.address();
-      if (address === undefined || address === null || typeof address === 'string') {
-        throw new Error('Missing Vite port.');
-      }
-      const origin = `http://127.0.0.1:${address.port}`;
-      expect((await fetch(`${origin}/api/notes`, { method: 'POST' })).status).toBe(401);
-      const session = await fetch(`${origin}/api/session`, {
-        method: 'POST',
-        body: JSON.stringify({ userId: 'demo-ada' }),
+    let built: Awaited<ReturnType<typeof preview>> | undefined;
+    try {
+      built = await preview({
+        configFile: false,
+        plugins: [gatewayPlugin(options)],
+        logLevel: 'silent',
+        build: { outDir: directory },
+        preview: { host: '127.0.0.1', port: 0, strictPort: true },
       });
-      expect(session.status).toBe(200);
-      expect(session.headers.get('cache-control')).toBe('no-store');
-      const response = await post(
-        origin,
-        '/api/v1/chat/completions',
-        await token(origin),
-        completion(),
-      );
-      expect(response.status).toBe(200);
-      expect(response.headers.get('x-galaxie-upstream')).toBe('mock');
+      await dev.listen();
+      for (const listener of [dev.httpServer, built.httpServer]) {
+        const address = listener?.address();
+        if (address === undefined || address === null || typeof address === 'string') {
+          throw new Error('Missing Vite port.');
+        }
+        const origin = `http://127.0.0.1:${address.port}`;
+        expect((await fetch(`${origin}/api/notes`, { method: 'POST' })).status).toBe(401);
+        const session = await fetch(`${origin}/api/session`, {
+          method: 'POST',
+          body: JSON.stringify({ userId: 'demo-ada' }),
+        });
+        expect(session.status).toBe(200);
+        expect(session.headers.get('cache-control')).toBe('no-store');
+        const response = await post(
+          origin,
+          '/api/v1/chat/completions',
+          await token(origin),
+          completion(),
+        );
+        expect(response.status).toBe(200);
+        expect(response.headers.get('x-galaxie-upstream')).toBe('mock');
+      }
+    } finally {
+      await dev.close();
+      if (built !== undefined) {
+        const current = built;
+        await new Promise<void>((resolve, reject) => {
+          current.httpServer.close((error) => (error ? reject(error) : resolve()));
+          if ('closeAllConnections' in current.httpServer) current.httpServer.closeAllConnections();
+        });
+      }
+      await rm(directory, { recursive: true, force: true });
     }
   } finally {
-    await dev.close();
-    if (built !== undefined) {
-      const current = built;
-      await new Promise<void>((resolve, reject) => {
-        current.httpServer.close((error) => (error ? reject(error) : resolve()));
-        if ('closeAllConnections' in current.httpServer) current.httpServer.closeAllConnections();
-      });
+    for (const [index, name] of ['UPSTREAM_BASE_URL', 'UPSTREAM_API_KEY'].entries()) {
+      const value = previous[index];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
     }
-    await rm(directory, { recursive: true, force: true });
   }
 });
