@@ -3,19 +3,37 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, delimiter, dirname, join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { Result, ScaffoldRequest, Step, TemplateSpec } from '../../scripts/standalone-core.js';
+import type {
+  Command,
+  Result,
+  ScaffoldRequest,
+  Step,
+  TemplateSpec,
+} from '../../scripts/standalone-core.js';
 import {
+  assertCleanPath,
   assertCommand,
   assertCopy,
   assertOutside,
   assertSingleCopies,
   classify,
   compareModes,
+  findOnPath,
   isolatedEnvironment,
   launchPackages,
   nodeBinary,
@@ -183,6 +201,30 @@ it('resolves explicit, current and newest nvm Nodes in that order with an action
 it('keeps the seven launch package inventory unchanged', () =>
   expect(launchPackages).toEqual(expectedLaunch));
 
+it.each(['go', 'python', 'python3', 'uv'])(
+  'rejects %s on a clean PATH and names its directory',
+  async (name) => {
+    const empty = await temporary();
+    const tools = await temporary();
+    await expect(assertCleanPath(empty)).resolves.toBeUndefined();
+    expect(await findOnPath(name, empty)).toBeUndefined();
+    await symlink(process.execPath, join(tools, name));
+    const path = `${empty}${delimiter}${tools}`;
+    expect(await findOnPath(name, path)).toBe(join(tools, name));
+    await expect(assertCleanPath(path)).rejects.toThrow(
+      `Clean PATH violated: ${name} found at ${tools}`,
+    );
+  },
+);
+
+it('PATH lookup skips non-executable files, directories and broken links', async () => {
+  const root = await temporary();
+  await writeFile(join(root, 'go'), '', { mode: 0o600 });
+  await mkdir(join(root, 'python'));
+  await symlink(join(root, 'missing'), join(root, 'uv'));
+  await expect(assertCleanPath(root)).resolves.toBeUndefined();
+});
+
 it('detects nested duplicates, registry resolutions, absent dependencies and unrecognized galaxie packages', () => {
   const packages = Object.fromEntries(
     expectedLaunch.map((name) => [
@@ -304,13 +346,19 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
       '--kind',
       'gateway',
       '--keep',
+      '--clean-path',
+      '--budget-minutes',
+      '1',
     ]),
   ).toMatchObject({
     nodes: [{ major: 22, path: '/p' }, { major: 24 }],
     mode: 'both',
     kind: 'gateway',
     keep: true,
+    cleanPath: true,
+    budgetMinutes: 1,
   });
+  expect(parseArguments([])).toMatchObject({ cleanPath: false, budgetMinutes: 10 });
   expect(parseArguments(['--help']).help).toBe(true);
   for (const args of [
     ['--wat'],
@@ -319,6 +367,8 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     ['--kind', 'missing'],
     ['--template', 'local-only'],
     ['--mode', 'missing'],
+    ['--budget-minutes'],
+    ...['0', '61', 'x', '1.5', '-1', 'Infinity'].map((value) => ['--budget-minutes', value]),
   ])
     expect(() => parseArguments(args)).toThrow('Usage');
   expect(templateSpecs.map(({ name, kind, framework }) => ({ name, kind, framework }))).toEqual([
@@ -351,6 +401,7 @@ it('renders every phase and source and preserves the JSON result shape', () => {
     releaseAgeDays: 7,
     exclude: null,
     browser: null,
+    durationMs: 1234,
     failures: [
       {
         phase: 'build' as const,
@@ -372,6 +423,7 @@ it('renders every phase and source and preserves the JSON result shape', () => {
   };
   expect(renderResults([result])).toContain('build [package:react]');
   expect(renderResults([result])).toContain('serve [environment]');
+  expect(renderResults([result])).toContain('1234 ms');
   expect(JSON.parse(JSON.stringify(result))).toEqual(result);
 });
 
@@ -412,6 +464,7 @@ it('runs a real offline npm file install, build and loopback server, then remove
       specs: [{ ...fixtureSpec, build: ['build.cjs'], preview: ['serve.cjs'] }],
       offline: true,
       verifyReleaseAge: false,
+      cleanPath: true,
     },
     {
       scaffold: scaffoldFixture(project),
@@ -440,6 +493,186 @@ it('runs a real offline npm file install, build and loopback server, then remove
   expect(copy).not.toBe('');
   expect(existsSync(copy)).toBe(false);
 }, 30000);
+
+it.each(['within', 'over', 'failed'] as const)(
+  'measures each project independently and gates its budget (%s)',
+  async (kind) => {
+    const root = await realpath(await temporary());
+    const repo = join(root, 'repo');
+    await mkdir(repo);
+    await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+    const commands: Command[] = [];
+    let offset = 0;
+    const elapsed = kind === 'within' ? 30_000 : 60_001;
+    const server = createServer((_request, response) => response.end('ready'));
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('No fixture port.');
+    try {
+      const results = await runStandalone(
+        {
+          repo,
+          tempBase: root,
+          nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
+          modes: ['tarball'],
+          specs: [fixtureSpec, { ...fixtureSpec, name: 'second-fixture' }].map((spec) => ({
+            ...spec,
+            build: ['build.cjs'],
+          })),
+          cleanPath: true,
+          budgetMinutes: 1,
+        },
+        {
+          clock: {
+            now: () => 1_000_000 + offset,
+            sleep: async (ms) => {
+              offset += ms;
+            },
+          },
+          scaffold: async ({ directory, env }) => {
+            offset += elapsed;
+            expect(await readdir(env['PATH'] ?? '')).toEqual(['node', 'sh']);
+            expect(env['PATH']).not.toContain(delimiter);
+            expect(env['PATH']).not.toBe(dirname(process.execPath));
+            await mkdir(directory);
+            await writeFile(join(directory, 'package.json'), '{}');
+            await writeBaseline(directory);
+          },
+          runner: {
+            run: async (command) => {
+              commands.push(command);
+              if (command.args[0] === '-e') return processRunner([process.execPath]).run(command);
+              if (command.args[0] === '--version') return process.version;
+              if (command.args.includes('--version')) return '12.2.2';
+              if (command.args.includes('config')) return '7';
+              if (command.args[0] === 'pack') {
+                const destination = command.args[2];
+                if (destination === undefined) throw new Error('No pack destination.');
+                await writeFile(
+                  join(destination, `galaxie-ai-${basename(command.cwd)}-0.1.0.tgz`),
+                  'fixture',
+                );
+              }
+              if (command.args.includes('install'))
+                await writeFile(
+                  join(command.cwd, 'package-lock.json'),
+                  JSON.stringify({
+                    packages: Object.fromEntries(
+                      expectedLaunch.map((name) => [
+                        `node_modules/${name}`,
+                        { resolved: 'file:/fixture/package.tgz' },
+                      ]),
+                    ),
+                  }),
+                );
+              if (command.args[0] === 'build.cjs' && kind === 'failed')
+                throw new Error('build-canary');
+              if (command.args.includes('check')) {
+                const source = await readFile(join(command.cwd, 'src/csp.ts'), 'utf8');
+                if (source.includes('unsafe-inline')) throw new Error('script-src changed');
+                if (source !== fixtureCsp) throw new Error('require-trusted-types-for changed');
+              }
+              return '';
+            },
+            start: async (command) => {
+              commands.push(command);
+              return {
+                stop: async () => {
+                  offset += 5000;
+                },
+                output: () => '',
+              };
+            },
+          },
+          ports: { find: async () => address.port },
+          driver: { drive: async () => 'fixture-browser' },
+        },
+      );
+      expect(results).toHaveLength(2);
+      for (const result of results) {
+        expect(result.durationMs).toBe(elapsed);
+        expect(JSON.parse(JSON.stringify(result)).durationMs).toBe(elapsed);
+        if (kind === 'within') expect(result.failures).toEqual([]);
+        else
+          expect(result.failures.filter(({ phase }) => phase === 'budget')).toEqual([
+            {
+              phase: 'budget',
+              gating: true,
+              source: 'harness',
+              suggested: true,
+              summary: 'budget exceeded: 60001 ms of 60000 ms',
+              excerpt: '',
+            },
+          ]);
+        if (kind === 'failed')
+          expect(result.failures[0]).toMatchObject({ phase: 'build', excerpt: 'build-canary' });
+      }
+      const pack = commands.filter(
+        ({ cwd }) => cwd === repo || cwd.startsWith(join(repo, 'packages')),
+      );
+      expect(pack).toHaveLength(8);
+      expect(pack.every(({ env }) => env['PATH'] === process.env['PATH'])).toBe(true);
+      const project = commands.filter((command) => !pack.includes(command));
+      expect(project.length).toBeGreaterThan(0);
+      expect(
+        project.every(({ env }) => env['PATH']?.startsWith(join(root, 'galaxie-standalone-'))),
+      ).toBe(true);
+      expect(project.filter(({ args }) => args[0] === '-e')).toHaveLength(2);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  },
+);
+
+it.each(['go', 'python', 'python3', 'uv'])(
+  'requires runtime ENOENT before scaffolding (%s)',
+  async (name) => {
+    const root = await temporary();
+    const repo = join(root, 'repo');
+    await mkdir(repo);
+    await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+    const scaffold = vi.fn(unexpectedScaffold);
+    const results = await runStandalone(
+      {
+        repo,
+        tempBase: root,
+        nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
+        modes: ['registry'],
+        specs: [fixtureSpec],
+        cleanPath: true,
+      },
+      {
+        scaffold,
+        driver: { drive: async () => 'stub' },
+        runner: {
+          run: async (command) => {
+            if (command.args[0] === '-e') {
+              await symlink(process.execPath, join(command.env['PATH'] ?? '', name));
+              return processRunner([process.execPath]).run(command);
+            }
+            if (command.args[0] === '--version') return process.version;
+            return '12.2.2';
+          },
+          start: async () => {
+            throw new Error('Unexpected server.');
+          },
+        },
+      },
+    );
+    expect(scaffold).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({
+      durationMs: 0,
+      failures: [
+        {
+          phase: 'probe',
+          gating: true,
+          excerpt: expect.stringContaining(`Clean PATH violated: ${name}`),
+        },
+      ],
+    });
+  },
+);
 
 it.each(['throw', 'abort'] as const)(
   'cleans up a failed or aborted pipeline (%s)',
