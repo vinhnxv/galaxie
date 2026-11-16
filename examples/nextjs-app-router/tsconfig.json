@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "declaration": false,
+    "isolatedDeclarations": false,
+    "allowJs": true,
+    "incremental": false,
+    "resolveJsonModule": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "types": ["node", "next"]
+  },
+  "include": ["app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx", "next.config.ts", "proxy.ts"],
+  "exclude": ["node_modules", ".next", ".next-test"]
+}

@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@galaxie-ai/adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
+      "@galaxie-ai/core": ["../../packages/core/src/index.ts"],
+      "@galaxie-ai/ui-protocol": ["../../packages/ui-protocol/src/index.ts"],
+      "@galaxie-ai/adapter-langgraph": ["../../packages/adapter-langgraph/src/index.ts"],
+      "@galaxie-ai/adapter-adk": ["../../packages/adapter-adk/src/index.ts"],
+      "@galaxie-ai/models/mock": ["../../packages/models/src/mock.ts"],
+      "@galaxie-ai/react": ["../../packages/react/src/index.ts"]
+    }
+  },
+  "include": [
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "next.config.ts",
+    "proxy.ts",
+    "vitest.config.ts"
+  ]
+}
