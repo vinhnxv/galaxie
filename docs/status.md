@@ -1,5 +1,18 @@
 # Project status
 
+On 2026-11-16, the private create CLI gains an ADK JavaScript framework overlay for
+both browser-only and gateway starters. Offline Node and Chromium tests cover the
+scripted long-running question, validated answer, text-only closing reply, custom
+agent refusal, built-app reload with IndexedDB, exact pins, tarball resolution and
+CSP/Trusted Types mutation controls. The seven-package launch inventory stays
+unchanged; ADK tarball runs additionally pack the private adapter. All four ADK
+tarball cases and eight LangGraph registry/tarball cases pass on Node 22.23.5 and
+24.15.0 with npm 12.2.2. Generated ADK pnpm projects deny the four measured
+dependency build scripts; a fresh plain pnpm 11.21.0 install passes, and an offline
+fixture control proves its script never runs. See the [measurement record](standalone-verification.md)
+for real install outcomes and the unmeasured cases. No adapter/core runtime source
+changed. ADR-0012 guarantees are unchanged.
+
 On 2026-11-16, the gateway starter gains an in-process dev/preview mock when both
 upstream variables are empty. Successful mock replies show a fixed status; partial
 configuration and the compiled production entry retain 503 without an upstream.

@@ -7,6 +7,79 @@ production server still follows the correlated 503 unavailable flow. These check
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
 
+## ADK overlay measurement (2026-11-16)
+
+Both starter kinds now support `--framework adk-js --mode tarball`. The adapter
+remains private and unpublished, so ADK registry mode and `--mode both` are
+refused. The default framework remains LangGraph; its seven launch packages and
+existing drive expectations are unchanged. ADK explicitly builds and packs one
+additional adapter. Each ADK lockfile must contain one file-resolved copy of every
+reachable galaxie package, with no unrecognized adapter allowed.
+
+The ADK question is scripted before model inference through an ordinary-name
+long-running capability. After a validated answer, its callback sends a text-only
+closing prompt, matching the existing gateway and local providers. The quiz grade
+stays in the tool response; the displayed closing reply has no grade prefix.
+Node and Chromium workspace tests cover pause/resume and custom-agent refusal;
+the built browser-only test reloads the same pending question and session key from
+IndexedDB with no model downloads under the unchanged CSP and Trusted Types.
+
+The public adapter root also loads ADK. To enable jitless Zod before that load,
+the overlay initializes Zod, dynamically loads the adapter and calls its environment
+shim, then loads the agent. The framework Vite config explicitly disables ADK span
+content capture. No CSP or Trusted Types allowance was added.
+
+After the final `pnpm check` passed, each real-network command ran once and exited 0:
+
+```sh
+node scripts/verify-standalone.ts --framework adk-js --kind all --node 22 --node 24 --mode tarball --json /tmp/galaxie-adk-network-final.json
+node scripts/verify-standalone.ts --kind all --node 22 --node 24 --mode both --json /tmp/galaxie-langgraph-network-final.json
+```
+
+| Kind / framework | Target Node | npm | Registry | Packed workspace |
+| --- | --- | --- | --- | --- |
+| browser-only / adk-js | 22.23.5 | 12.2.2 | Unsupported | PASS |
+| gateway / adk-js | 22.23.5 | 12.2.2 | Unsupported | PASS |
+| browser-only / adk-js | 24.15.0 | 12.2.2 | Unsupported | PASS |
+| gateway / adk-js | 24.15.0 | 12.2.2 | Unsupported | PASS |
+| browser-only / langgraph-js | 22.23.5 | 12.2.2 | PASS | PASS |
+| gateway / langgraph-js | 22.23.5 | 12.2.2 | PASS | PASS |
+| browser-only / langgraph-js | 24.15.0 | 12.2.2 | PASS | PASS |
+| gateway / langgraph-js | 24.15.0 | 12.2.2 | PASS | PASS |
+
+All 12 results have empty failure arrays. Each passes installation, production
+build, generated checks, directive mutation controls and the preview browser drive;
+tarball cases pass single-copy checks. Gateway cases also compile and drive the
+production server's 503 path and probe sessions. The host was macOS arm64 with
+harness Node 24.15.0, pnpm 11.21.0, Playwright 1.64.1 and Chromium 156.0.8078.4.
+Release age remained seven days with no exclusions or lifecycle-script fallback.
+JSON and logs stay outside the checkout; the harness removed its temporary projects.
+
+A fresh plain install with pnpm 11.21.0 and closed stdin first exited 1:
+
+```text
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @google/genai@1.52.0, @google/genai@2.32.0, cpu-features@0.0.10, protobufjs@7.6.6, ssh2@1.17.0
+```
+
+Explicit `false` decisions for `@google/genai`, `cpu-features`, `protobufjs` and
+`ssh2` let the plain install exit 0. The pnpm 11 offline acceptance test packs a
+local `protobufjs` fixture whose script writes a sentinel, runs with closed stdin,
+and requires failure without the generated policy, success with it, and no
+sentinel in either case. This check is offline and part of `pnpm check`; the
+real-network install and harness matrices remain manual.
+
+The end-of-unit repeat used a fresh generated browser-only ADK pnpm project with
+only its adapter dependency changed to the local `adapter-adk` tarball. A plain
+`corepack pnpm install` on Node 24.15.0, pnpm 11.21.0, with closed stdin and no
+`--ignore-scripts`, exited 0 in 4.1 seconds. It reported deprecation and peer
+dependency warnings, with no ignored-build error or dependency script execution.
+The owned probe project was removed after recording the result.
+
+ADK real-model closing replies (Built-in AI, WebLLM and a real upstream), ADK
+registry installs, full-tree LangGraph pnpm installs, yarn and bun, Windows,
+pnpm harness runs and ADK browsers beyond Chromium remain unmeasured.
+ADR-0012 guarantees are unchanged.
+
 ## Gateway mock measurement (2026-11-16)
 
 The gateway-only matrix ran three times with the same command:
@@ -121,18 +194,20 @@ node scripts/verify-standalone.ts --help
 node scripts/verify-standalone.ts --node 22 --node 24 --mode both --json /tmp/galaxie-standalone-final.json
 ```
 
-`--kind browser-only|gateway|all` selects kinds; the framework is `langgraph-js`.
+`--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js`
+selects the framework (default `langgraph-js`); ADK requires `--mode tarball`.
 The old `--template` flag is rejected. `--node` is repeatable;
 `--node 22=/absolute/path/to/node` overrides discovery. Otherwise the current
 runtime wins for its major, then the newest matching nvm installation.
 `--mode registry|tarball|both` selects installs. `--tarballs /path/to/dir` reuses
-seven previously packed launch packages by copying them into the owned temporary
+seven previously packed launch packages (plus `adapter-adk` for ADK) by copying them into the owned temporary
 root. `--keep` retains that root and prints its path for investigation; remove it
 afterward. `--min-release-age-exclude` is an explicit, recorded exception, not a
 change to user configuration. No exclusion was used for this measurement.
 
 Tarball mode first runs `build:packages` in the workspace, writing its ordinary
-ignored build artifacts, then `pnpm pack` for the seven launch packages. It uses
+ignored build artifacts, then `pnpm pack` for the seven launch packages. ADK runs additionally compile and
+pack `adapter-adk`, without adding it to the launch inventory. It uses
 the harness Node 24 and pnpm for packing, independently of the target Node. Every
 generated project's scaffold, install, build, check, preview and server compile/run uses the requested
 Node binary. npm's resolved `npm-cli.js` is invoked by that binary explicitly;
@@ -274,7 +349,7 @@ core's main entry and its runtime Zod boundary are unchanged.
 ## Unmeasured
 
 Real Built-in AI, real WebGPU devices, WebLLM/model downloads, real upstream
-inference, pnpm/yarn installs, the pnpm 11 override location, bundled npm 10 versus
+inference, pnpm/yarn harness installs, the pnpm 11 override location, bundled npm 10 versus
 npm 12, Windows automatic install and operation, answer
 quality, latency and memory are not covered. No live service, real user data,
 backend authorization audit, broad packaging/API compatibility claim or ADR
