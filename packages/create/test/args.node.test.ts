@@ -6,7 +6,10 @@ import { parseArguments, UsageError } from '../src/args.js';
 
 const choices = {
   kinds: ['browser-only', 'gateway'],
-  frameworks: { 'browser-only': ['langgraph-js', 'adk-go'], gateway: ['langgraph-js', 'adk-js'] },
+  frameworks: {
+    'browser-only': ['langgraph-js', 'adk-go'],
+    gateway: ['langgraph-js', 'adk-js', 'adk-go'],
+  },
 };
 
 test('positional and flag forms select the same request', () => {
@@ -56,9 +59,6 @@ test.each([
   expect(parseArguments(['my-app', 'gateway', 'adk-js'], choices).framework).toBe('adk-js');
 });
 
-test('ADK Go is accepted only for the browser-only kind', () => {
-  expect(parseArguments(['my-app', 'browser-only', 'adk-go'], choices).framework).toBe('adk-go');
-  expect(() => parseArguments(['my-app', 'gateway', 'adk-go'], choices)).toThrow(
-    'Valid frameworks',
-  );
+test.each(['browser-only', 'gateway'])('ADK Go is accepted for %s', (kind) => {
+  expect(parseArguments(['my-app', kind, 'adk-go'], choices).framework).toBe('adk-go');
 });

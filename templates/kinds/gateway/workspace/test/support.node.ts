@@ -4,14 +4,49 @@
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { type OpenAICompatibleChatModel, openAICompatible } from '@galaxie-ai/models/openai';
-import { afterEach, expect } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, vi } from 'vitest';
 import { createGateway, type Gateway, type GatewayOptions } from '../server/gateway.js';
 import { starterInput } from '../src/executor.js';
+import { frameworkProfile } from '../src/framework-profile.js';
 import type { HybridInstance } from '../src/runtime.js';
+
+interface WorkerHost {
+  readonly wasm: { readonly url: string };
+  createWorker(): object;
+  close(): Promise<void>;
+}
+let goHost: WorkerHost | undefined;
+beforeAll(async () => {
+  if (frameworkProfile.workers) {
+    const workerHostModule = './worker-host.node.js';
+    const { createWorkerHost } = (await import(workerHostModule)) as {
+      createWorkerHost(): Promise<WorkerHost>;
+    };
+    goHost = await createWorkerHost();
+  }
+}, 60_000);
+beforeEach(() => {
+  if (!frameworkProfile.workers) return;
+  if (goHost === undefined) throw new Error('The Go Worker host is missing.');
+  vi.stubGlobal('location', new URL(goHost.wasm.url));
+  vi.stubGlobal(
+    'Worker',
+    class GoWorker {
+      constructor(url: URL, options: WorkerOptions) {
+        expect(url.pathname).toMatch(/go-worker\.ts$/);
+        expect(options).toEqual({ type: 'module' });
+        if (goHost === undefined) throw new Error('The Go Worker host is missing.');
+        Object.assign(this, goHost.createWorker());
+      }
+    },
+  );
+});
+afterAll(async () => goHost?.close());
 
 const servers: Server[] = [];
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(closeServer));
+  vi.unstubAllGlobals();
 });
 
 export function closeServer(server: Server): Promise<void> {

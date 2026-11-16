@@ -241,7 +241,7 @@ node scripts/verify-standalone.ts --node 22 --node 24 --mode both --json /tmp/ga
 
 `--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js|adk-go`
 selects the framework (default `langgraph-js`); ADK requires `--mode tarball`.
-ADK Go currently selects the browser-only kind.
+ADK Go supports both kinds.
 The old `--template` flag is rejected. `--node` is repeatable;
 `--node 22=/absolute/path/to/node` overrides discovery. Otherwise the current
 runtime wins for its major, then the newest matching nvm installation.

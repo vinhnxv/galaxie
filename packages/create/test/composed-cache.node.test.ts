@@ -62,7 +62,7 @@ async function assertCache(
 
 test.each(
   ['browser-only', 'gateway'].flatMap((kind) =>
-    ['langgraph-js', 'adk-js', ...(kind === 'browser-only' ? ['adk-go'] : [])].map((framework) => ({
+    ['langgraph-js', 'adk-js', 'adk-go'].map((framework) => ({
       kind,
       framework,
     })),

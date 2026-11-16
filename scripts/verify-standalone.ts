@@ -150,20 +150,18 @@ const langGraphSpecs: readonly TemplateSpec[] = [
 export const templateSpecs: readonly TemplateSpec[] = [
   ...langGraphSpecs,
   ...['adk-js', 'adk-go'].flatMap((framework) =>
-    langGraphSpecs
-      .filter((spec) => framework !== 'adk-go' || spec.kind === 'browser-only')
-      .map(
-        (spec): TemplateSpec => ({
-          ...spec,
-          name: `${spec.kind}-${framework}`,
-          framework,
-          steps: spec.steps.map((step) =>
-            step.action === 'text' && step.name.startsWith('Correct. ')
-              ? { ...step, name: step.name.slice('Correct. '.length) }
-              : step,
-          ),
-        }),
-      ),
+    langGraphSpecs.map(
+      (spec): TemplateSpec => ({
+        ...spec,
+        name: `${spec.kind}-${framework}`,
+        framework,
+        steps: spec.steps.map((step) =>
+          step.action === 'text' && step.name.startsWith('Correct. ')
+            ? { ...step, name: step.name.slice('Correct. '.length) }
+            : step,
+        ),
+      }),
+    ),
   ),
 ];
 

@@ -34,6 +34,7 @@ const templates = [
   'browser-only-adk-js',
   'gateway-adk-js',
   'browser-only-adk-go',
+  'gateway-adk-go',
 ].map((directory) => ({
   directory,
   manifest: readManifest(`packages/create/.cache/composed/${directory}`),

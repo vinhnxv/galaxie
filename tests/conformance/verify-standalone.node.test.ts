@@ -327,6 +327,7 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     { name: 'browser-only-adk-js', kind: 'browser-only', framework: 'adk-js' },
     { name: 'gateway-adk-js', kind: 'gateway', framework: 'adk-js' },
     { name: 'browser-only-adk-go', kind: 'browser-only', framework: 'adk-go' },
+    { name: 'gateway-adk-go', kind: 'gateway', framework: 'adk-go' },
   ]);
   expect(templateSpecs[0]?.steps).toEqual([
     { action: 'check', role: 'radio', name: '4' },
@@ -1169,14 +1170,16 @@ it('selects the ADK tarball matrix and refuses registry or unknown frameworks', 
 });
 
 it('pins the ADK drive strings to each composed framework export', async () => {
-  for (const kind of ['browser-only', 'gateway']) {
+  for (const { kind, framework } of templateSpecs.filter(
+    (spec) => spec.framework !== 'langgraph-js',
+  )) {
     const executor = await import(
       new URL(
-        `../../packages/create/.cache/composed/${kind}-adk-js/src/executor.ts`,
+        `../../packages/create/.cache/composed/${kind}-${framework}/src/executor.ts`,
         import.meta.url,
       ).href
     );
-    const spec = templateSpecs.find((spec) => spec.kind === kind && spec.framework === 'adk-js');
+    const spec = templateSpecs.find((spec) => spec.kind === kind && spec.framework === framework);
     const original = templateSpecs.find(
       (spec) => spec.kind === kind && spec.framework === 'langgraph-js',
     );

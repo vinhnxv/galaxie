@@ -22,11 +22,7 @@ for (const part of ['.cache', 'composed']) {
 }
 const layers = await loadLayers(join(repo, 'templates'));
 for (const kind of ['browser-only', 'gateway']) {
-  for (const framework of [
-    'langgraph-js',
-    'adk-js',
-    ...(kind === 'browser-only' ? ['adk-go'] : []),
-  ]) {
+  for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
     const name = `${kind}-${framework}`;
     const { files } = compose(layers, {
       kind,

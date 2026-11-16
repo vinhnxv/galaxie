@@ -31,7 +31,7 @@ The current kinds are `browser-only` and `gateway`:
 | --- | --- | --- |
 | `langgraph-js` | Yes | Registry or npm tarballs |
 | `adk-js` | Yes | npm tarballs; adapter private and unpublished |
-| `adk-go` | Browser-only | npm tarballs; adapter and starter artifacts private and unpublished |
+| `adk-go` | Both | npm tarballs; adapter and starter artifacts private and unpublished |
 
 ADK asks the same scripted quiz through a long-running `question.ask@1` capability,
 then validates the answer and requests a text-only closing comment. Native

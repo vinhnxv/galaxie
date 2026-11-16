@@ -146,7 +146,7 @@ async function project(
 }
 
 for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
-  for (const kind of framework === 'adk-go' ? ['browser-only'] : ['browser-only', 'gateway']) {
+  for (const kind of ['browser-only', 'gateway']) {
     for (const workers of framework === 'adk-go' ? [true] : [false, true]) {
       it(`${kind}-${framework} workers=${workers} generated baseline accepts an unmodified project`, async () => {
         const directory = await project(kind, undefined, framework, workers);
@@ -184,19 +184,22 @@ for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
   }
 }
 
-it('the ADK Go mock header equals the existing Go recipe header without an installed starter package', async () => {
-  const directory = await project('browser-only', undefined, 'adk-go', true);
-  try {
-    const declared = await loadConfigFromFile(
-      { command: 'serve', mode: 'mock' },
-      join(directory, 'vite.config.ts'),
-      undefined,
-      'silent',
-    );
-    expect(declared?.config.preview?.headers?.['Content-Security-Policy']).toBe(
-      goRecipeCsp('mock'),
-    );
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-});
+it.each(['browser-only', 'gateway'])(
+  'the %s ADK Go mock header equals the existing Go recipe header without an installed starter package',
+  async (kind) => {
+    const directory = await project(kind, undefined, 'adk-go', true);
+    try {
+      const declared = await loadConfigFromFile(
+        { command: 'serve', mode: 'mock' },
+        join(directory, 'vite.config.ts'),
+        undefined,
+        'silent',
+      );
+      expect(declared?.config.preview?.headers?.['Content-Security-Policy']).toBe(
+        goRecipeCsp('mock'),
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);

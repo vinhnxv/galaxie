@@ -349,33 +349,37 @@ test('pnpm build decisions preserve numeric-looking package-name keys', () => {
   );
 });
 
-test('ADK Go composes identical Go source in both modes and owns its build-preview dev script', async () => {
-  const root = fileURLToPath(new URL('../../../', import.meta.url));
-  const layers = await loadLayers(join(root, 'templates'));
-  const project = compose(layers, { ...options, framework: 'adk-go' });
-  const workspace = compose(layers, {
-    ...options,
-    framework: 'adk-go',
-    mode: 'workspace-test',
-    workspaceRoot: root,
-  });
-  const goFiles = [...project.files.keys()].filter((path) => path.startsWith('go/'));
-  expect(goFiles).toEqual(['go/agent.go', 'go/go.mod', 'go/go.sum', 'go/main.go']);
-  for (const path of goFiles) {
-    expect(project.files.get(path)).toEqual(workspace.files.get(path));
-    expect(Buffer.from(project.files.get(path)!.bytes)).toEqual(
-      await readFile(join(root, 'templates/frameworks/adk-go/files', path)),
+test.each(['browser-only', 'gateway'])(
+  'ADK Go %s composes identical Go source in both modes and owns its build-preview dev script',
+  async (kind) => {
+    const root = fileURLToPath(new URL('../../../', import.meta.url));
+    const layers = await loadLayers(join(root, 'templates'));
+    const project = compose(layers, { ...options, kind, framework: 'adk-go' });
+    const workspace = compose(layers, {
+      ...options,
+      kind,
+      framework: 'adk-go',
+      mode: 'workspace-test',
+      workspaceRoot: root,
+    });
+    const goFiles = [...project.files.keys()].filter((path) => path.startsWith('go/'));
+    expect(goFiles).toEqual(['go/agent.go', 'go/go.mod', 'go/go.sum', 'go/main.go']);
+    for (const path of goFiles) {
+      expect(project.files.get(path)).toEqual(workspace.files.get(path));
+      expect(Buffer.from(project.files.get(path)!.bytes)).toEqual(
+        await readFile(join(root, 'templates/frameworks/adk-go/files', path)),
+      );
+    }
+    const manifest = JSON.parse(Buffer.from(project.files.get('package.json')!.bytes).toString());
+    expect(manifest.scripts.dev).toBe(
+      'vite build && vite preview --host 127.0.0.1 --port 4173 --strictPort',
     );
-  }
-  const manifest = JSON.parse(Buffer.from(project.files.get('package.json')!.bytes).toString());
-  expect(manifest.scripts.dev).toBe(
-    'vite build && vite preview --host 127.0.0.1 --port 4173 --strictPort',
-  );
-  expect(manifest.dependencies['@galaxie-ai/adapter-go']).toBe('^0.1.0');
-  expect(manifest.dependencies['@galaxie-ai/starter-go']).toBe('^0.1.0');
-  expect(manifest.dependencies['@langchain/core']).toBe('1.2.20');
-  expect(manifest.dependencies.zod).toBe('4.6.7');
-  expect(() => compose(layers, { ...options, kind: 'gateway', framework: 'adk-go' })).toThrow(
-    SelectionError,
-  );
-});
+    expect(manifest.dependencies['@galaxie-ai/adapter-go']).toBe('^0.1.0');
+    expect(manifest.dependencies['@galaxie-ai/starter-go']).toBe('^0.1.0');
+    expect(manifest.dependencies['@langchain/core']).toBe('1.2.20');
+    expect(manifest.dependencies.zod).toBe('4.6.7');
+    expect(() => compose(layers, { ...options, kind, framework: 'unknown' })).toThrow(
+      SelectionError,
+    );
+  },
+);

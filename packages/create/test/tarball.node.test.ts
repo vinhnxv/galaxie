@@ -193,35 +193,38 @@ test.each(['missing', 'duplicate'])(
   },
 );
 
-test('ADK Go rewrites both private packages and all nine overrides', async () => {
-  const { root, packed } = await fixture();
-  for (const name of ['adapter-go', 'starter-go'])
-    await writeFile(join(packed, `galaxie-ai-${name}-0.0.0.tgz`), 'fixture');
-  expect((await resolveTarballs(packed)).size).toBe(7);
-  expect((await resolveTarballs(packed, 'adk-go')).size).toBe(9);
-  expect(
-    await run(['go-app', 'browser-only', 'adk-go', '--no-install'], {
-      cwd: root,
-      templatesRoot,
-      stdout: new PassThrough(),
-      stderr: new PassThrough(),
-      env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: 'npm/12' },
-    }),
-  ).toBe(0);
-  const manifest = JSON.parse(await readFile(join(root, 'go-app/package.json'), 'utf8'));
-  expect(manifest.overrides).toEqual(
-    Object.fromEntries(
-      [...names, 'adapter-go', 'starter-go'].map((name) => [
-        '@galaxie-ai/' + name,
-        `file:${packed}/galaxie-ai-${name}-${name.endsWith('-go') ? '0.0.0' : '0.1.0'}.tgz`,
-      ]),
-    ),
-  );
-  for (const name of ['adapter-go', 'starter-go'])
-    expect(manifest.dependencies['@galaxie-ai/' + name]).toBe(
-      `file:${packed}/galaxie-ai-${name}-0.0.0.tgz`,
+test.each(['browser-only', 'gateway'])(
+  'ADK Go %s rewrites both private packages and all nine overrides',
+  async (kind) => {
+    const { root, packed } = await fixture();
+    for (const name of ['adapter-go', 'starter-go'])
+      await writeFile(join(packed, `galaxie-ai-${name}-0.0.0.tgz`), 'fixture');
+    expect((await resolveTarballs(packed)).size).toBe(7);
+    expect((await resolveTarballs(packed, 'adk-go')).size).toBe(9);
+    expect(
+      await run(['go-app', kind, 'adk-go', '--no-install'], {
+        cwd: root,
+        templatesRoot,
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: 'npm/12' },
+      }),
+    ).toBe(0);
+    const manifest = JSON.parse(await readFile(join(root, 'go-app/package.json'), 'utf8'));
+    expect(manifest.overrides).toEqual(
+      Object.fromEntries(
+        [...names, 'adapter-go', 'starter-go'].map((name) => [
+          '@galaxie-ai/' + name,
+          `file:${packed}/galaxie-ai-${name}-${name.endsWith('-go') ? '0.0.0' : '0.1.0'}.tgz`,
+        ]),
+      ),
     );
-});
+    for (const name of ['adapter-go', 'starter-go'])
+      expect(manifest.dependencies['@galaxie-ai/' + name]).toBe(
+        `file:${packed}/galaxie-ai-${name}-0.0.0.tgz`,
+      );
+  },
+);
 
 test.each(['adapter-go', 'starter-go'])(
   'ADK Go requires exactly one %s tarball before writing',

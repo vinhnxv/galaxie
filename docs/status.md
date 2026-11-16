@@ -1,7 +1,7 @@
 # Project status
 
 On 2026-11-16, the private `@galaxie-ai/starter-go` artifact package and the
-browser-only ADK Go overlay add a prebuilt mock-backed agent. The pack step ships
+ADK Go overlays for both kinds add a prebuilt mock-backed agent. The pack step ships
 one template source tree's wasm, verified Go glue, module source, manifest and
 license notices. Node conformance covers reproducible builds, shared source
 identity, integrity checks and cache/prebuilt/local-build precedence. Editing the
@@ -10,7 +10,10 @@ source matches. The overlay uses the existing ADK Go CSP form and a shared
 allowlisted Worker policy. Existing JavaScript headers and ADR-0012 guarantees
 are unchanged. The package stays private, unpublished and outside the seven
 launch packages and size budgets. See the [verification record](standalone-verification.md)
-for Chromium acceptance, real install measurements and remaining limits.
+for Chromium acceptance, real install measurements and remaining limits. Gateway
+workspace tests cover the same agent through a loopback upstream, unchanged
+server assertions and browser request projection without agent system/developer
+messages. Its Go header equals the existing recipe mock header exactly.
 
 On 2026-11-16, the private create CLI gains an ADK JavaScript framework overlay for
 both browser-only and gateway starters. Offline Node and Chromium tests cover the
