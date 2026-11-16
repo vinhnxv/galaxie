@@ -947,3 +947,25 @@ test('an adapter cannot depend on starter-go', () => {
   expect(result.status).toBe(1);
   expect(result.output).toContain('adapters must not import starter-go');
 });
+
+test.each(['src', 'dist'])(
+  'starter-python %s cannot depend on galaxie runtime packages',
+  (area) => {
+    const result = run({
+      [`packages/starter-python/${area}/a.${area === 'dist' ? 'js' : 'ts'}`]:
+        "import '@galaxie-ai/core';\n",
+    });
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('starter-python must not import galaxie packages');
+  },
+);
+
+test.each([
+  '@galaxie-ai/starter-python',
+  '@galaxie-ai/starter-python/build',
+  '../../starter-python/src/index.js',
+])('an adapter cannot depend on starter-python through %s', (specifier) => {
+  const result = run({ 'packages/adapter-pyodide/src/a.ts': `import '${specifier}';\n` });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('adapters must not import starter-python');
+});

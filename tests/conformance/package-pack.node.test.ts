@@ -40,7 +40,13 @@ const launchPackages = [
   'storage-indexeddb',
   'react',
 ];
-const preparedPackages = ['adapter-pyodide', 'adapter-adk', 'adapter-go', 'starter-go'];
+const preparedPackages = [
+  'adapter-pyodide',
+  'adapter-adk',
+  'adapter-go',
+  'starter-go',
+  'starter-python',
+];
 const starterAvailable = hasStarterGo();
 
 function readManifest(directory: string): Manifest {
@@ -216,6 +222,14 @@ test.each(packages.filter((pkg) => pkg.group === 'prepared'))(
       expect(
         pkg.entries.some((entry) => entry.endsWith('_test.go') || entry.includes('/.cache/')),
       ).toBe(false);
+    } else if (pkg.directory === 'starter-python') {
+      for (const entry of ['manifest.json', 'NOTICE.txt'])
+        expect(pkg.entries).toContain(`package/dist/${entry}`);
+      expect(
+        pkg.entries.some(
+          (entry) => entry.startsWith('package/dist/wheels/') && entry.endsWith('.whl'),
+        ),
+      ).toBe(true);
     } else if (pkg.directory !== 'adapter-adk') {
       expect(pkg.entries).toContain('package/dist/worker.js');
       expect(pkg.entries).toContain('package/dist/worker.d.ts');
@@ -258,6 +272,8 @@ test('size discovery detects prepared packages when a copy loses private status'
     '@galaxie-ai/adapter-pyodide/worker',
     '@galaxie-ai/starter-go/.',
     '@galaxie-ai/starter-go/build',
+    '@galaxie-ai/starter-python/.',
+    '@galaxie-ai/starter-python/build',
   ]);
 });
 

@@ -7,6 +7,7 @@ import { createAdkAdapter } from '../../packages/adapter-adk/src/index.js';
 import { createGoAdapter } from '../../packages/adapter-go/src/index.js';
 import { createPyodideAdapter } from '../../packages/adapter-pyodide/src/index.js';
 import { version as starterGoVersion } from '../../packages/starter-go/src/index.js';
+import { version as starterPythonVersion } from '../../packages/starter-python/src/index.js';
 import { launchPackages } from '../../scripts/standalone-core.js';
 
 interface Manifest {
@@ -22,12 +23,16 @@ function readManifest(directory: string): Manifest {
   ) as Manifest;
 }
 
-const prepared = ['adapter-pyodide', 'adapter-adk', 'adapter-go', 'starter-go'].map(
-  (directory) => ({
-    directory,
-    manifest: readManifest(`packages/${directory}`),
-  }),
-);
+const prepared = [
+  'adapter-pyodide',
+  'adapter-adk',
+  'adapter-go',
+  'starter-go',
+  'starter-python',
+].map((directory) => ({
+  directory,
+  manifest: readManifest(`packages/${directory}`),
+}));
 const templates = [
   'browser-only-langgraph-js',
   'gateway-langgraph-js',
@@ -50,6 +55,7 @@ const options = {
 };
 const versions: Readonly<Record<string, readonly string[]>> = {
   'starter-go': [starterGoVersion],
+  'starter-python': [starterPythonVersion],
   'adapter-adk': [createAdkAdapter().version],
   'adapter-go': [createGoAdapter({ createWorker }).version],
   'adapter-pyodide': [

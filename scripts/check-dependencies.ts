@@ -989,13 +989,15 @@ for (const root of ['packages', 'examples', 'templates', 'tests', 'scripts']) {
     // This inventory checks one public boundary, not unrelated host/tool import syntax.
     for (const { specifier } of imports(file, false)) {
       const target = resolve(dirname(file), specifier);
-      if (
-        file.startsWith('packages/adapter-') &&
-        (specifier === '@galaxie-ai/starter-go' ||
-          specifier.startsWith('@galaxie-ai/starter-go/') ||
-          (specifier.startsWith('.') && target.startsWith(`${resolve('packages/starter-go')}/`)))
-      )
-        problems.push(`${file}: adapters must not import starter-go`);
+      for (const starter of ['starter-go', 'starter-python']) {
+        if (
+          file.startsWith('packages/adapter-') &&
+          (specifier === `@galaxie-ai/${starter}` ||
+            specifier.startsWith(`@galaxie-ai/${starter}/`) ||
+            (specifier.startsWith('.') && target.startsWith(`${resolve('packages', starter)}/`)))
+        )
+          problems.push(`${file}: adapters must not import ${starter}`);
+      }
 
       if (
         specifier.startsWith('@galaxie-ai/ui-protocol/') ||
@@ -1012,13 +1014,15 @@ for (const root of ['packages', 'examples', 'templates', 'tests', 'scripts']) {
   }
 }
 
-for (const area of ['src', 'dist']) {
-  const directory = join('packages/starter-go', area);
+for (const [starter, area] of ['starter-go', 'starter-python'].flatMap((starter) =>
+  ['src', 'dist'].map((area) => [starter, area] as const),
+)) {
+  const directory = join('packages', starter, area);
   if (!existsSync(directory)) continue;
   for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
     for (const { specifier } of imports(file)) {
       if (specifier.startsWith('@galaxie-ai/'))
-        problems.push(`${file}: starter-go must not import galaxie packages`);
+        problems.push(`${file}: ${starter} must not import galaxie packages`);
     }
   }
 }
