@@ -91,7 +91,7 @@ The generated [Go workflow](../../templates/frameworks/adk-go/files/GO.md) expla
 the source hash, verified cache/prebuilt/local precedence, exact toolchain,
 module layout and upgrade limits. A fresh project uses the prebuilt without Go;
 editing needs Go 1.27.3. Its `dev` command builds and previews under the strict CSP,
-with no HMR client. Gateway support and real-network Go harness measurement are pending.
+with no HMR client. Both kinds support it; the standalone harness measurement is recorded in [docs/standalone-verification.md](../../docs/standalone-verification.md).
 
 ## Layers and writes
 

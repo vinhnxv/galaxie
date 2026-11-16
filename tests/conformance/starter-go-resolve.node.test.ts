@@ -246,6 +246,11 @@ test('corrupt cache is ignored, while matching-source wasm or glue corruption is
     await writeFile(path, previous);
   }
 });
+test('a tampered bundled Go module is an integrity error, not a source mismatch', async () => {
+  const f = await fixture();
+  await writeFile(join(f.packageDirectory, 'dist/go-module/go.mod'), 'module tampered\n');
+  await expect(resolveAgent(f)).rejects.toMatchObject({ message: invalidArtifact });
+});
 test('a corrupt edited cache is rebuilt locally and failed or killed compilers leave no cache entry', async () => {
   const f = await fixture();
   await edited(f);

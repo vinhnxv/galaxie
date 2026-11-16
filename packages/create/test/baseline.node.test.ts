@@ -148,6 +148,24 @@ async function project(
 for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
   for (const kind of ['browser-only', 'gateway']) {
     for (const workers of framework === 'adk-go' ? [true] : [false, true]) {
+      if (workers && framework !== 'adk-go') {
+        it(`${kind}-${framework} generated baseline rejects a worker profile without the Go starter`, async () => {
+          const directory = await project(kind, undefined, framework, true);
+          try {
+            const result = spawnSync(process.execPath, ['--test', 'check/baseline.check.ts'], {
+              cwd: directory,
+              encoding: 'utf8',
+              timeout: 30_000,
+            });
+            expect(result.error).toBeUndefined();
+            expect(result.status).not.toBe(0);
+            expect(`${result.stdout}\n${result.stderr}`).toContain('framework profile changed');
+          } finally {
+            await rm(directory, { recursive: true, force: true });
+          }
+        }, 60_000);
+        continue;
+      }
       it(`${kind}-${framework} workers=${workers} generated baseline accepts an unmodified project`, async () => {
         const directory = await project(kind, undefined, framework, workers);
         try {

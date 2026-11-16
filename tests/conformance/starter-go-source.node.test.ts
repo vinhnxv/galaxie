@@ -49,11 +49,23 @@ test('source identity includes bytes, paths, additions, version and module sourc
   await writeFile(join(dir, 'extra'), 'x');
   expect(await hash()).not.toBe(original);
   await rm(join(dir, 'extra'));
-  for (const name of ['.x', '_x']) {
+  for (const name of ['.git', 'node_modules']) {
     await mkdir(join(dir, name));
     await writeFile(join(dir, name, 'extra'), 'x');
   }
+  await writeFile(join(dir, '.DS_Store'), 'x');
   expect(await hash()).toBe(original);
+  for (const name of ['.x/lib.go', '_x/lib.go', 'go.sum', 'go.mod']) {
+    const path = join(dir, name);
+    await mkdir(join(path, '..'), { recursive: true });
+    await writeFile(path, 'first\n');
+    const before = await hash();
+    expect(before, name).not.toBe(original);
+    await writeFile(path, 'second\n');
+    expect(await hash(), name).not.toBe(before);
+    await rm(name.includes('/') ? join(path, '..') : path, { recursive: true, force: true });
+    expect(await hash(), name).toBe(original);
+  }
   await symlink(join(dir, 'main.go'), join(dir, 'link.go'));
   await expect(hash()).rejects.toThrow('symlink');
 });

@@ -20,11 +20,7 @@ Publish this package, download a toolchain automatically, or change the host's C
 
 Local builds can download modules through the developer's GOPROXY and verify them with go.sum; offline builds are not promised. The prebuilt agent covers the byte-identical template source only. A release that changes the template Go tree requires Go for older projects until their source is updated. npm directory layouts and pnpm symlink layouts are supported; Yarn requires `nodeLinker: node-modules`. Bun and Windows are unsupported.
 
-Source identity ignores every path segment beginning with `.` or `_`. Embedded
-inputs in those paths, including ones selected by `//go:embed all:`, are outside
-the supported cache contract: an asset-only edit can reuse stale wasm. The starter
-has no embeds. Keep authored embedded inputs in ordinary paths and avoid embedding
-ignored files; hidden embedded inputs are not detected or refused automatically.
+Source identity covers every regular file under `go/` except `.git`, `.DS_Store` and `node_modules`, so hidden and underscore-prefixed Go packages and embedded inputs invalidate the cache. Symlinks and non-regular files are refused.
 
 Edited source without the pinned toolchain fails with this exact message:
 

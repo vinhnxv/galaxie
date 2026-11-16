@@ -5,6 +5,9 @@ import { createHash, type Hash } from 'node:crypto';
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+/** Names that are never Go inputs. Hidden and underscore-prefixed paths stay in the hash. */
+const ignoredNames: ReadonlySet<string> = new Set(['.git', '.DS_Store', 'node_modules']);
+
 /** Hash regular files in relative POSIX order, preserving their exact bytes. */
 async function updateTree(directory: string, hash: Hash): Promise<void> {
   if ((await lstat(directory)).isSymbolicLink())
@@ -15,7 +18,7 @@ async function updateTree(directory: string, hash: Hash): Promise<void> {
       const path = prefix ? `${prefix}/${name}` : name;
       const info = await lstat(join(directory, path));
       if (info.isSymbolicLink()) throw new Error(`The Go source tree contains a symlink: ${path}`);
-      if (name.startsWith('.') || name.startsWith('_')) continue;
+      if (ignoredNames.has(name)) continue;
       if (info.isDirectory()) await walk(path);
       else if (info.isFile()) files.push(path);
       else throw new Error(`The Go source tree contains a non-regular file: ${path}`);

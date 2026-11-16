@@ -19,9 +19,8 @@ without the pinned toolchain fails with this exact message:
 
 > The agent source in go/ was edited and Go 1.27.3 was not found on PATH. Install Go 1.27.3, or restore the original go/ source to use the prebuilt agent.
 
-The source hash covers ordinary files in `go/`, the starter package version and
-its bundled Go module. Hidden or underscore-prefixed paths are ignored, including
-embedded inputs selected through `//go:embed all:`; do not embed ignored inputs.
+The source hash covers every regular file in `go/` except `.git`, `.DS_Store` and
+`node_modules`, the starter package version and its bundled Go module.
 Symlinks in the source tree are refused. Restore the original bytes to use the prebuilt.
 
 `go/go.mod` replaces `galaxie.invalid/galaxie` with the installed package's

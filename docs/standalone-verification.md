@@ -62,9 +62,8 @@ No header or server assertion was loosened.
 
 Firefox/WebKit for the Go starter, real models, pnpm/yarn installs end to end,
 a cold Go module cache, Node 22 and CI cold-start time remain unmeasured. The
-pnpm symlink shape has build-level evidence only. Hidden or underscore-prefixed
-embedded inputs remain outside the source-cache contract; the starter has no
-embeds. A release changing the template Go tree requires Go for older projects.
+pnpm symlink shape has build-level evidence only. A go.mod replace target
+outside go/ and node_modules is not part of the source hash. A release changing the template Go tree requires Go for older projects.
 ADR-0012 guarantees are unchanged.
 
 ## ADK overlay measurement (2026-11-16)

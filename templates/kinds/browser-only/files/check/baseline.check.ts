@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadConfigFromFile, resolveConfig } from 'vite';
@@ -9,6 +10,19 @@ import { loadConfigFromFile, resolveConfig } from 'vite';
 const { frameworkProfile } = (await import(
   new URL('../src/framework-profile.ts', import.meta.url).href
 )) as { frameworkProfile: { readonly workers: boolean } };
+
+const manifest = JSON.parse(
+  await readFile(new URL('../package.json', import.meta.url), 'utf8'),
+) as { dependencies?: Record<string, string> };
+
+test('the framework profile matches the installed framework', () => {
+  // The profile is editable source, so it must be bound to the dependency that needs workers.
+  assert.equal(
+    frameworkProfile.workers,
+    manifest.dependencies?.['@galaxie-ai/starter-go'] !== undefined,
+    'framework profile changed',
+  );
+});
 
 const headers: Readonly<Record<string, string>> = frameworkProfile.workers
   ? {
