@@ -108,7 +108,6 @@ export function pythonFramework(projectDirectory: string): UserConfig {
             if (!info.isFile())
               throw new Error(`The Python source path is not a regular file: ${relative}.`);
             const source = await readFile(path);
-            // Frame every authored input, including hidden and underscore-prefixed paths.
             hash.update(JSON.stringify([relative, source.byteLength]));
             hash.update(source);
             if (!/\.(?:py|json)$/.test(relative)) continue;

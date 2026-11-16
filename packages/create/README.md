@@ -157,3 +157,15 @@ See the [verification record](../../docs/standalone-verification.md) for measure
 versions, commands and limits. Nothing in this workflow publishes a package.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+For the private Python starter, the standalone harness accepts only npm tarballs:
+
+```sh
+node scripts/verify-standalone.ts --framework langgraph-python --mode tarball --tarballs <tarballs> --json /tmp/galaxie-python.json
+```
+
+Prepare the wheel cache before packing; generated builds and preview need no
+Python or uv. See the [standalone record](../../docs/standalone-verification.md)
+for measured versions and limits. `ormsgpack` stand-in licensing and checkpoint
+compatibility are unconfirmed; certifi/orjson MPL-2.0 texts require maintainer
+review before redistribution. Nothing publishes; ADR-0012 guarantees are unchanged.

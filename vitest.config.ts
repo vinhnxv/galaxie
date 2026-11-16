@@ -145,7 +145,6 @@ const pythonTerms = ['python', 'pyodide', 'dspy', 'pydantic'];
 const pythonDirectories = [
   'examples/rag-browser/test/**/!(*adk-go*|*go-gate*)',
   'packages/adapter-pyodide/test/**/*',
-  'packages/create/.cache/composed/*-langgraph-python/test/**/*',
 ];
 const groups = ['general', 'python', 'python-rest', ...Object.keys(pythonShards)];
 if (groupName !== undefined && !groups.includes(groupName))
@@ -160,10 +159,14 @@ const forGroup = (
   exclude: string[],
   prefix: string,
 ): { include: string[]; exclude: string[] } => {
+  const starterDirectories = include
+    .filter((glob) => glob.includes('packages/create/.cache/composed/*/'))
+    .map((glob) => glob.replace('composed/*/', 'composed/*-langgraph-python/'));
   const named = (term: string): string[] =>
-    include.map((glob) => glob.replace('*.test.', `*${term}*.test.`));
+    include.map((glob) => glob.replace(/\/\*([^/]*)\.test\./, `/*${term}*$1.test.`));
   const python = [
     ...pythonTerms.flatMap(named),
+    ...starterDirectories,
     ...pythonDirectories.map((directory) => `${prefix}${directory}.test.{ts,tsx}`),
   ];
   if (groupName === 'general') return { include, exclude: [...exclude, ...python] };
@@ -204,6 +207,7 @@ const starterFrameworks = { ...starterGo, plugins: [starterGo.plugins, starterPy
 const config: ViteUserConfig = defineConfig({
   server: { host: '127.0.0.1' },
   test: {
+    maxWorkers: 4,
     api: { host: '127.0.0.1' },
     projects: [
       {

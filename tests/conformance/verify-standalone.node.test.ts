@@ -324,6 +324,8 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
   expect(templateSpecs.map(({ name, kind, framework }) => ({ name, kind, framework }))).toEqual([
     { name: 'browser-only-langgraph-js', kind: 'browser-only', framework: 'langgraph-js' },
     { name: 'gateway-langgraph-js', kind: 'gateway', framework: 'langgraph-js' },
+    { name: 'browser-only-langgraph-python', kind: 'browser-only', framework: 'langgraph-python' },
+    { name: 'gateway-langgraph-python', kind: 'gateway', framework: 'langgraph-python' },
     { name: 'browser-only-adk-js', kind: 'browser-only', framework: 'adk-js' },
     { name: 'gateway-adk-js', kind: 'gateway', framework: 'adk-js' },
     { name: 'browser-only-adk-go', kind: 'browser-only', framework: 'adk-go' },
@@ -1262,6 +1264,72 @@ it('allows exactly the two Go artifact packages in Go single-copy checks', () =>
       },
       required,
       'adk-go',
+    ),
+  ).toThrow('Single-copy');
+});
+
+it('selects Python only in tarball mode and retains the LangGraph drive', () => {
+  expect(parseArguments(['--framework', 'langgraph-python', '--mode', 'tarball'])).toMatchObject({
+    framework: 'langgraph-python',
+    mode: 'tarball',
+  });
+  for (const mode of ['registry', 'both'])
+    expect(() => parseArguments(['--framework', 'langgraph-python', '--mode', mode])).toThrow(
+      'Usage',
+    );
+  for (const kind of ['browser-only', 'gateway'])
+    expect(
+      templateSpecs.find((spec) => spec.kind === kind && spec.framework === 'langgraph-python')
+        ?.steps,
+    ).toEqual(
+      templateSpecs.find((spec) => spec.kind === kind && spec.framework === 'langgraph-js')?.steps,
+    );
+});
+
+it('allows exactly the two Python packages as file-resolved single copies', () => {
+  const required = ['@galaxie-ai/adapter-pyodide', '@galaxie-ai/starter-python'];
+  const packages = Object.fromEntries(
+    required.map((name) => [`node_modules/${name}`, { resolved: 'file:/tmp/python.tgz' }]),
+  );
+  expect(() => assertSingleCopies({ packages }, required, 'langgraph-python')).not.toThrow();
+  for (const framework of ['langgraph-js', 'adk-js', 'adk-go'])
+    expect(() => assertSingleCopies({ packages }, required, framework)).toThrow('Single-copy');
+  for (const name of required) {
+    expect(() =>
+      assertSingleCopies(
+        {
+          packages: {
+            ...packages,
+            [`node_modules/${name}`]: { resolved: 'https://registry.npmjs.org/python.tgz' },
+          },
+        },
+        required,
+        'langgraph-python',
+      ),
+    ).toThrow('Single-copy');
+    expect(() =>
+      assertSingleCopies(
+        {
+          packages: {
+            ...packages,
+            [`node_modules/nested/node_modules/${name}`]: { resolved: 'file:/tmp/python.tgz' },
+          },
+        },
+        required,
+        'langgraph-python',
+      ),
+    ).toThrow('Single-copy');
+  }
+  expect(() =>
+    assertSingleCopies(
+      {
+        packages: {
+          ...packages,
+          'node_modules/@galaxie-ai/adapter-go': { resolved: 'file:/tmp/go.tgz' },
+        },
+      },
+      required,
+      'langgraph-python',
     ),
   ).toThrow('Single-copy');
 });

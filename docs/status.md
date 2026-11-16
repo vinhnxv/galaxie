@@ -11,14 +11,21 @@ established. Both create kinds now compose the LangGraph Python overlay with
 raw agent sources, pinned Pyodide runtime assets and independently adapter-bound
 wheel checks. CLI, tarball, source-path and CSP/profile mutation tests cover the
 registration; existing generated outputs match main except the shared baseline
-dependency binding. Browser-only Chromium acceptance answers from the mock with
+dependency binding and two gateway static MIME entries for `.mjs` and `.wasm`.
+Browser-only Chromium acceptance answers from the mock with
 Python and uv absent from PATH, reflects a Python source edit after rebuild,
 rejects missing/corrupt wheels by filename, and retains the same pending question
 and session key across reload. Page and Worker headers retain the pinned CSP;
 the happy paths report no CSP/Trusted Types violations, external requests or
 errors. The Worker bootstrap surfaces a denied wasm compilation before Pyodide
-can leave startup pending. Gateway acceptance and the standalone harness remain
-separate work; startup time and other browser engines are unmeasured.
+can leave startup pending. Gateway Chromium acceptance answers with the Python
+agent's system prompt set, checks the browser request has only the user message
+and retains `metadata.promptId`, and verifies production stays unavailable without
+an upstream. Both kinds pass the real-network npm tarball harness on Node 24.15.0,
+npm 12.2.2 and Chromium 156.0.8078.4 with Python and uv absent from PATH. Generated
+checks and both CSP mutation controls pass; gateway also passes its compiled-server
+503 drive and session probes. See the [measurement record](standalone-verification.md).
+Startup time and other browser engines are unmeasured.
 The package stays unpublished and outside the launch inventory and
 size budgets; ADR-0012 guarantees are unchanged. See the [package limits](../packages/starter-python/README.md).
 

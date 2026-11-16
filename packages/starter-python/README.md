@@ -48,8 +48,10 @@ written with no copied upstream implementation. Serializer compatibility is
 unverified, and replacing it may make saved checkpoints unreadable. Nothing in
 this private package resolves that license or checkpoint-format decision.
 
-The framework overlay, browser/gateway acceptance and standalone harness are
-separate work. Python is trusted author code; no new isolation boundary is claimed.
+The framework overlay supports both kinds. Chromium acceptance and the npm
+tarball standalone harness pass with Python and uv absent from PATH; see the
+[measurement record](../../docs/standalone-verification.md). Python is trusted
+author code; no new isolation boundary is claimed.
 ADR-0012 guarantees are unchanged. Real models, Firefox/WebKit, pnpm/yarn
 standalone installs, Node 22, CI cold start and Pyodide startup time are unmeasured.
 
