@@ -674,6 +674,139 @@ it.each(['go', 'python', 'python3', 'uv'])(
   },
 );
 
+it.each([
+  'pass',
+  'unexpected-pass',
+  'wrong-message',
+  'abort',
+  'restored-build-failure',
+  'without-clean-path',
+  'other-framework',
+] as const)(
+  'checks edited Go source without Go and restores its original bytes (%s)',
+  async (kind) => {
+    const root = await temporary();
+    const repo = join(root, 'repo');
+    await mkdir(repo);
+    await writeFile(join(repo, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 10080');
+    const original = Buffer.from('package main\r\n\r\nfunc main() {}\r\n');
+    const missingGo = 'The agent source in go/ was edited and Go 1.27.3 was not found on PATH';
+    const builds: Buffer[] = [];
+    let sourcePath = '';
+    let offset = 0;
+    const controller = new AbortController();
+    const server = createServer((_request, response) => response.end('ready'));
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('No fixture port.');
+    try {
+      const results = await runStandalone(
+        {
+          repo,
+          tempBase: root,
+          keep: true,
+          nodes: [{ major: Number(process.versions.node.split('.')[0]) }],
+          modes: ['registry'],
+          specs: [
+            {
+              ...fixtureSpec,
+              framework: kind === 'other-framework' ? 'langgraph-js' : 'adk-go',
+              build: ['fixture-vite.js', 'build'],
+            },
+          ],
+          cleanPath: kind !== 'without-clean-path',
+          budgetMinutes: 1,
+          signal: controller.signal,
+        },
+        {
+          clock: {
+            now: () => 1_000_000 + offset,
+            sleep: async (ms) => {
+              offset += ms;
+            },
+          },
+          scaffold: async ({ directory }) => {
+            offset += 30_000;
+            await mkdir(join(directory, 'go'), { recursive: true });
+            sourcePath = join(directory, 'go/agent.go');
+            await writeFile(sourcePath, original);
+            await writeFile(join(directory, 'package.json'), '{}');
+            await writeBaseline(directory);
+          },
+          runner: {
+            run: async (command) => {
+              if (command.args[0] === '-e') return processRunner([process.execPath]).run(command);
+              if (command.args[0] === '--version') return process.version;
+              if (command.args.includes('--version')) return '12.2.2';
+              if (command.args.includes('config')) return '7';
+              if (command.args[0] === 'fixture-vite.js') {
+                expect(command.args).toEqual(['fixture-vite.js', 'build']);
+                const source = await readFile(sourcePath);
+                builds.push(source);
+                if (builds.length > 1) offset += 90_000;
+                if (!source.equals(original)) {
+                  if (kind === 'unexpected-pass') return '';
+                  if (kind === 'wrong-message') throw new Error('Unrelated Go build failure.');
+                  if (kind === 'abort') controller.abort();
+                  throw new Error(
+                    `${missingGo}. Install Go 1.27.3, or restore the original go/ source to use the prebuilt agent.`,
+                  );
+                }
+                if (builds.length === 3 && kind === 'restored-build-failure')
+                  throw new Error('Restored Go build failed.');
+              }
+              if (command.args.includes('check')) {
+                const source = await readFile(join(command.cwd, 'src/csp.ts'), 'utf8');
+                if (source.includes('unsafe-inline')) throw new Error('script-src changed');
+                if (source !== fixtureCsp) throw new Error('require-trusted-types-for changed');
+              }
+              return '';
+            },
+            start: async () => ({ stop: async () => {}, output: () => '' }),
+          },
+          ports: { find: async () => address.port },
+          driver: {
+            drive: async () => {
+              offset += 2000;
+              return 'fixture-browser';
+            },
+          },
+        },
+      );
+      expect(await readFile(sourcePath)).toEqual(original);
+      expect(builds[0]).toEqual(original);
+      const skipped = kind === 'without-clean-path' || kind === 'other-framework';
+      const passed = kind === 'pass' || skipped;
+      expect(builds).toHaveLength(
+        skipped ? 1 : kind === 'pass' || kind === 'restored-build-failure' ? 3 : 2,
+      );
+      if (!skipped) {
+        expect(builds[1]?.subarray(0, original.length)).toEqual(original);
+        expect(builds[1]?.length).toBeGreaterThan(original.length);
+      }
+      if (builds.length === 3) expect(builds[2]).toEqual(original);
+      expect(results[0]?.durationMs).toBe(passed ? 32_000 : 30_000);
+      if (passed) expect(results[0]?.failures).toEqual([]);
+      else {
+        expect(results[0]?.failures).toMatchObject([{ phase: 'negative-control', gating: true }]);
+        if (kind === 'unexpected-pass')
+          expect(results[0]?.failures[0]?.excerpt).toContain(
+            'Negative control unexpectedly passed for edited Go source.',
+          );
+        if (kind === 'wrong-message') {
+          expect(results[0]?.failures[0]?.excerpt).toContain(missingGo);
+          expect(results[0]?.failures[0]?.excerpt).toContain('Unrelated Go build failure.');
+        }
+        if (kind === 'restored-build-failure')
+          expect(results[0]?.failures[0]?.excerpt).toContain('Restored Go build failed.');
+      }
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  },
+);
+
 it.each(['throw', 'abort'] as const)(
   'cleans up a failed or aborted pipeline (%s)',
   async (kind) => {

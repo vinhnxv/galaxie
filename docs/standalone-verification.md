@@ -9,6 +9,15 @@ production server still follows the correlated 503 unavailable flow. These check
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
 
+With `--framework adk-go --mode tarball --clean-path`, the harness also checks
+the no-Go edited-source refusal. After the normal build, it appends a comment to
+`go/agent.go`, runs the same build and requires a failure containing
+`The agent source in go/ was edited and Go 1.27.3 was not found on PATH`.
+It restores the original bytes in `finally` and requires the restored build to
+pass. The edit and both extra builds are excluded from the per-project
+`durationMs` and time budget. This control runs only for ADK Go with `--clean-path`;
+the generated project's behavior and ADR-0012 guarantees are unchanged.
+
 ## LangGraph Python measurement (2026-11-16)
 
 Both kinds compose `langgraph-python` with private `adapter-pyodide` and

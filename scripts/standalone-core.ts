@@ -533,6 +533,39 @@ async function assertBaselineRejections(
   }
 }
 
+async function assertGoSourceRejection(
+  project: string,
+  build: () => Promise<string>,
+  signal: AbortSignal,
+): Promise<void> {
+  const path = join(project, 'go/agent.go');
+  const original = await readFile(path);
+  const expected = 'The agent source in go/ was edited and Go 1.27.3 was not found on PATH';
+  signal.throwIfAborted();
+  try {
+    await writeFile(
+      path,
+      Buffer.concat([original, Buffer.from('\n// Standalone no-Go negative control.\n')]),
+    );
+    let rejected = false;
+    try {
+      await build();
+    } catch (error) {
+      signal.throwIfAborted();
+      if (!(error instanceof Error) || !error.message.includes(expected))
+        throw new Error(
+          `Negative control did not report ${expected}.\n${error instanceof Error ? error.message : 'Unknown build failure.'}`,
+        );
+      rejected = true;
+    }
+    if (!rejected) throw new Error('Negative control unexpectedly passed for edited Go source.');
+  } finally {
+    await writeFile(path, original);
+  }
+  signal.throwIfAborted();
+  await build();
+}
+
 /** One owned temporary root, one pipeline for registry and packed installations. */
 export async function runStandalone(
   options: Options,
@@ -684,6 +717,7 @@ export async function runStandalone(
           let phase: Phase = 'node';
           let started: number | undefined;
           let finished: number | undefined;
+          let excludedDurationMs = 0;
           const record = (error: unknown): void => {
             if (started !== undefined) finished ??= clock.now();
             const message = error instanceof Error ? error.message : 'Unknown failure.';
@@ -781,6 +815,15 @@ export async function runStandalone(
             }
             phase = 'build';
             await run(spec.build);
+            if (options.cleanPath && spec.framework === 'adk-go') {
+              phase = 'negative-control';
+              const controlStarted = clock.now();
+              try {
+                await assertGoSourceRejection(project, () => run(spec.build), signal);
+              } finally {
+                excludedDurationMs += clock.now() - controlStarted;
+              }
+            }
             phase = 'check';
             await run([npmCli, 'run', 'check']);
             phase = 'negative-control';
@@ -841,7 +884,8 @@ export async function runStandalone(
           } catch (error) {
             record(error);
           } finally {
-            if (started !== undefined) result.durationMs = (finished ?? clock.now()) - started;
+            if (started !== undefined)
+              result.durationMs = (finished ?? clock.now()) - started - excludedDurationMs;
             const allowedMs = (options.budgetMinutes ?? 10) * 60_000;
             if (result.durationMs > allowedMs)
               result.failures.push({
