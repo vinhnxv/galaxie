@@ -61,7 +61,7 @@ test('pnpm 11 installs offline with closed stdin and never runs a refused protob
       }),
     );
     const env = { ...process.env, COREPACK_ENABLE_NETWORK: '0' };
-    const version = spawnSync('corepack', ['pnpm', '--version'], {
+    const version = spawnSync('pnpm', ['--version'], {
       cwd,
       env,
       encoding: 'utf8',
@@ -71,8 +71,8 @@ test('pnpm 11 installs offline with closed stdin and never runs a refused protob
     expect(version.stdout.trim()).toMatch(/^11\./);
     if (policy) await writeFile(join(cwd, 'pnpm-workspace.yaml'), yaml!.bytes);
     const installed = spawnSync(
-      'corepack',
-      ['pnpm', 'install', '--offline', '--store-dir', join(root, 'store')],
+      'pnpm',
+      ['install', '--offline', '--store-dir', join(root, 'store')],
       { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 },
     );
     const output = installed.stdout + installed.stderr;
