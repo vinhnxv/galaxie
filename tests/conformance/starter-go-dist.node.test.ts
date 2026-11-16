@@ -6,8 +6,11 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
+import { compose } from '../../packages/create/src/compose.js';
+import { loadLayers } from '../../packages/create/src/layers.js';
 import { buildAgent, runGo } from '../../packages/starter-go/src/build-env.js';
 import { collectNotices } from '../../packages/starter-go/src/notices.js';
+import { sourceHash } from '../../packages/starter-go/src/source-hash.js';
 import { fileMetadata, verifyDist } from '../../packages/starter-go/src/verify.js';
 import { buildStarterDist } from '../../scripts/build-starter-go.js';
 import { classifyLicense } from '../../scripts/check-go-lock.js';
@@ -154,6 +157,47 @@ test.skipIf(!available)(
       'replacement directory',
     );
     expect(dist.manifest.toolchain).toBe('go1.27.3');
+  },
+  120_000,
+);
+
+// Admit the source-only layer in this fixture; no shipping kind supports it yet.
+test.skipIf(!available)(
+  'project and workspace composition preserve the packed Go source identity',
+  async () => {
+    const dist = await buildStarterDistOnce();
+    const layers = (await loadLayers(resolve('templates'))).map((layer) =>
+      layer.manifest.id === 'browser-only'
+        ? {
+            ...layer,
+            manifest: {
+              ...layer.manifest,
+              frameworks: [...(layer.manifest.frameworks ?? []), 'adk-go'],
+            },
+          }
+        : layer,
+    );
+    for (const mode of ['project', 'workspace-test'] as const) {
+      const { files } = compose(layers, {
+        kind: 'browser-only',
+        framework: 'adk-go',
+        name: 'source-proof',
+        mode,
+        packageManager: 'npm',
+        workspaceRoot: resolve('.'),
+      });
+      const directory = await temporaryDirectory();
+      await mkdir(join(directory, 'go'));
+      for (const [path, file] of files)
+        if (path.startsWith('go/')) await writeFile(join(directory, path), file.bytes);
+      expect(
+        await sourceHash(
+          join(directory, 'go'),
+          dist.manifest.version,
+          dist.manifest.goModule.sha256,
+        ),
+      ).toBe(dist.manifest.sourceSha256);
+    }
   },
   120_000,
 );
