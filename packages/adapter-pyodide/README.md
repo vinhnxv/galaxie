@@ -1,8 +1,10 @@
 # @galaxie-ai/adapter-pyodide
 
-> This package is experimental and is not published to a package registry. Its API can change in any commit without notice.
+Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release.
 
-An experimental executor adapter for trusted LangGraph Python graphs, pydantic-ai
+After the maintainer publishes, install with `npm install @galaxie-ai/adapter-pyodide@0.2.0`. Until then, use repository-built npm tarballs. Package contents and versions are covered by the thirteen-package pack test; standalone generated-project runs use mocks. Registry installs of 0.2.0, real models and device behavior remain unverified.
+
+An executor adapter for trusted LangGraph Python graphs, pydantic-ai
 agents and DSPy programs running in a dedicated Pyodide 314.0.7 module Worker. Agents use the Python `galaxie` proxies;
 the existing JavaScript router and broker own routing, consent, labels, budgets,
 credentials, output checks and capability authorization.
@@ -502,9 +504,13 @@ A mock-only hands-on Chrome check of pydantic-ai in the RAG example (2026-10-31)
 `@galaxie-ai/adapter-pyodide/runtime-files` exports `runtimeFiles` (runtime file
 names and byte lengths) and `lockedWheels` (the pinned third-party wheel inventory
 used by the Worker). Hosts serving the runtime and wheels can use this subpath
-without importing the Worker. The package remains private and unpublished.
-The `cryptography` wheel's inventory URL is repo-relative; registry consumers'
-wheel delivery must be resolved before publication. See the
+without importing the Worker. The vendored `cryptography` wheel inventory URL
+is repository-relative (`../python/wheels/...`); an installed registry adapter
+alone cannot resolve it. Direct registry consumers must arrange wheel hosting
+and URLs themselves. Generated LangGraph Python projects obtain their wheels
+from `starter-python`, which excludes this vendored wheel and other framework
+lanes. This release preparation leaves the direct-consumer distribution limit
+open. See the
 [promotion checklist](../../docs/releasing.md#prepared-adapters).
 
 ## DSPy programs
@@ -1248,7 +1254,7 @@ Firefox, WebKit and real-model input measurements remain unmeasured; see the
 
 ### Third-party licenses
 
-The private [Python starter](../starter-python/README.md) derives the LangGraph lane
+The [Python starter](../starter-python/README.md) derives the LangGraph lane
 from `lockedWheels` and retains each wheel's metadata and license texts in its
 built `python/NOTICE.txt`. It excludes the vendored `cryptography` wheel.
 `certifi` declares MPL-2.0; `orjson` also ships an MPL-2.0 text beside Apache/MIT.

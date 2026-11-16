@@ -1,5 +1,38 @@
 # Project status
 
+On 2026-11-17, thirteen public packages are prepared for the 0.2.0 lockstep
+release: `ui-protocol`, `core`, `adapter-kit`, `adapter-langgraph`, `models`,
+`storage-indexeddb`, `react`, `adapter-pyodide`, `adapter-adk`, `adapter-go`,
+`starter-go`, `starter-python` and `create`. The seven launch packages remain
+published at 0.1.0; 0.2.0 is not yet published. `eslint-plugin` and `tools-mcp`
+remain private. [Release guidance](releasing.md) defines dependency-first order,
+coordinated version locations and upgrading all galaxie pins together; generated
+projects retain `^0.2.0` caret ranges and APIs may change in a 0.x minor release.
+Create prepack now includes templates and the skill, resolves packaged assets
+before checkout sources and cleans copied assets after packing. The pack test
+inspects thirteen tarballs for matching versions, exact internal dependencies,
+exports, licenses and notices. The isolated packed-create test runs help and a
+byte-identical scaffold with only Node outside the checkout. Repository
+`create-clean` CI covers all eight npm tarball kind/framework combinations on
+Ubuntu Node 24 plus both LangGraph.js kinds on Node 22; local standalone runs
+cover mock answers, generated checks and CSP mutation rejections. See the
+[verification record](standalone-verification.md#release-preparation-2026-11-17).
+Size budgets grow from 16 to 27 JavaScript export entries. Six existing entries
+reset their 10 percent margins over growth already on main: `adapter-kit/.`,
+`adapter-langgraph/.`, `core/.`, `core/config`, `models/transformers/worker` and
+`storage-indexeddb/.`. Bundles exclude bare imports; these limits are own-code
+regression guards, not application download measurements. The dependency-license
+gate adds an explicit MPL-2.0 exception for unmodified registry `pyodide`, a
+file-level weak-copyleft dependency. It does not replace human review of its
+notices, certifi/orjson MPL-2.0 texts or the limited same-name ormsgpack stand-in's
+unconfirmed license and serializer compatibility. The whole release waits for
+the maintainer's recorded Python redistribution review. Direct registry users
+of adapter-pyodide still need to arrange vendored cryptography wheel delivery;
+generated LangGraph Python projects receive their wheels from starter-python.
+Registry installs of 0.2.0 await publication. Devices, real models, pnpm/yarn
+tarball mode and non-Linux CI remain unverified by this release preparation.
+Nothing is published; ADR-0012 guarantees are unchanged.
+
 On 2026-11-17, the private [Next.js App Router example](../examples/nextjs-app-router/README.md)
 and [guide](guides/nextjs.md) add client-only LangGraph.js and ADK JS mock agents
 on Next 16.4.6. Chromium tests cover webpack production and Turbopack development,
@@ -654,7 +687,7 @@ Core now has three JavaScript entry points: `@galaxie-ai/core` for runtime/contr
 
 A separate `demo` workflow builds the rag-browser example in mock mode with a demo flag (review checked by default, a one-line reload cue and a restored-review notice) and uploads the result as an artifact. A push to `main` also deploys a base-path build to GitHub Pages (chosen 2026-11-14). The built page carries its policy as a meta element so it is enforced without response headers, and a `_headers` file holds the full policy for header-capable hosts. A meta policy omits `frame-ancestors` and does not cover Worker responses, so a header-less host has those protections missing; the maintainer accepted that limit for the mock-only demo on 2026-11-14. A Chromium test serves the build from a header-less static server and checks enforcement, same-origin requests and paused-review restore after reload; it ran with the JavaScript executor only and uses mock models. Nothing is measured about the hosted page.
 
-A separate `size` CI job builds the seven launch packages and compares each default JavaScript export against `scripts/size-budget.json`: every entry is bundled and minified alone with bare imports external, and own-code minified and gzip bytes must stay within the recorded limit (measured size plus 10 percent, rounded up to 100 bytes). A failure names the entry and the limit; entries without a budget line and stale budget lines also fail. The limits were generated from one macOS build with the pinned Vite and are regression guards only, not download sizes or device measurements; output determinism across platforms and bundler versions is not verified, so a first CI run may need the budget regenerated. Dependencies are excluded, so growth in a dependency is not caught.
+A separate `size` CI job compiles all thirteen public packages through `build:packages` (starter artifact prepack is separate) and compares each default JavaScript export against `scripts/size-budget.json`: every entry is bundled and minified alone with bare imports external, and own-code minified and gzip bytes must stay within the recorded limit (measured size plus 10 percent, rounded up to 100 bytes). A failure names the entry and the limit; entries without a budget line and stale budget lines also fail. The limits were generated from one macOS build with the pinned Vite and are regression guards only, not download sizes or device measurements; output determinism across platforms and bundler versions is not verified, so a first CI run may need the budget regenerated. Dependencies are excluded, so growth in a dependency is not caught.
 
 Three framework feasibility notes record what was read, not what was run, at pinned versions: [Vercel AI SDK](notes/framework-vercel-ai-sdk.md) (go as a bounded spike), [OpenAI Agents SDK for JavaScript](notes/framework-openai-agents-js.md) (go as a bounded spike) and [Mastra](notes/framework-mastra.md) (no-go for now: server runtime, Node built-ins in the core bundle, default network calls and a mixed license). No adapter exists for any of them. Nothing was executed in a browser; each note lists the open items an adapter must close first, including a real-tab run of the tool loop, and a bundle size is measured only for the Vercel AI SDK, as a build.
 

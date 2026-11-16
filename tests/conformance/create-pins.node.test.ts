@@ -400,31 +400,31 @@ test.each(['browser-only', 'gateway'])(
   },
 );
 
-// Captured by composing main (061d1cd), before Python overlay registration.
+// Captured from main (061d1cd), with reviewed release documentation updates.
 const existingOutputHashes: Readonly<Record<string, string>> = {
   'browser-only/langgraph-js/npm':
-    '67fb47269b9196c3d06b3822bc1c7acecf0eb57473337fe56addf722f03b5fe6',
+    '4020ae24a92f26d6b2b15617ad44bcccac5803a3a158bd3d568b22ef406dd27a',
   'browser-only/langgraph-js/pnpm':
-    '67fb47269b9196c3d06b3822bc1c7acecf0eb57473337fe56addf722f03b5fe6',
+    '4020ae24a92f26d6b2b15617ad44bcccac5803a3a158bd3d568b22ef406dd27a',
   'browser-only/langgraph-js/yarn':
-    '67fb47269b9196c3d06b3822bc1c7acecf0eb57473337fe56addf722f03b5fe6',
-  'browser-only/adk-js/npm': 'd4dc1d8a5e2bba4da29b5ad1093b9f9bee2d3affa959522110e6b8399749b6c7',
-  'browser-only/adk-js/pnpm': '6a193369c2aa74f4f208841f496c6d0db58fabbf543726c60687145f470f1768',
-  'browser-only/adk-js/yarn': 'd4dc1d8a5e2bba4da29b5ad1093b9f9bee2d3affa959522110e6b8399749b6c7',
-  'browser-only/adk-go/npm': '15c7d3aa10baa9cbe248fce76d26aec3a8d82eaa566347ac7c0aa04976bde01e',
-  'browser-only/adk-go/pnpm': '15c7d3aa10baa9cbe248fce76d26aec3a8d82eaa566347ac7c0aa04976bde01e',
-  'browser-only/adk-go/yarn': '15c7d3aa10baa9cbe248fce76d26aec3a8d82eaa566347ac7c0aa04976bde01e',
-  'gateway/langgraph-js/npm': '619e451463f43b8c1160e71703843e81b81cddd8f1918633807830f51026a623',
-  'gateway/langgraph-js/pnpm': '619e451463f43b8c1160e71703843e81b81cddd8f1918633807830f51026a623',
-  'gateway/langgraph-js/yarn': '619e451463f43b8c1160e71703843e81b81cddd8f1918633807830f51026a623',
-  'gateway/adk-js/npm': 'c3c8677fe55d33034ca4f01b1028c7fc4dec2b5c929443530223da17f8d1ed7d',
-  'gateway/adk-js/pnpm': '2d48b455454558cccce6cddd754fd8530cc00650333d16ebf89097f931d0ee0d',
-  'gateway/adk-js/yarn': 'c3c8677fe55d33034ca4f01b1028c7fc4dec2b5c929443530223da17f8d1ed7d',
-  'gateway/adk-go/npm': '9f978e8aca2b38418fbaa0597e2d21167441d704164f6269a79f93eafbc1dbc6',
-  'gateway/adk-go/pnpm': '9f978e8aca2b38418fbaa0597e2d21167441d704164f6269a79f93eafbc1dbc6',
-  'gateway/adk-go/yarn': '9f978e8aca2b38418fbaa0597e2d21167441d704164f6269a79f93eafbc1dbc6',
+    '4020ae24a92f26d6b2b15617ad44bcccac5803a3a158bd3d568b22ef406dd27a',
+  'browser-only/adk-js/npm': '281c3a49c6bfbda0186d725133a24c569f1f3d8c922d9294b6d72c68a48f2eab',
+  'browser-only/adk-js/pnpm': 'd133cdc029c61682fc0c5c5d21889fd157f64f8e937b2eccfec60b45c86c42fc',
+  'browser-only/adk-js/yarn': '281c3a49c6bfbda0186d725133a24c569f1f3d8c922d9294b6d72c68a48f2eab',
+  'browser-only/adk-go/npm': 'cf108d9a3b6940ec5701910ad339840ddf0f92d9960431f4823e090d72484480',
+  'browser-only/adk-go/pnpm': 'cf108d9a3b6940ec5701910ad339840ddf0f92d9960431f4823e090d72484480',
+  'browser-only/adk-go/yarn': 'cf108d9a3b6940ec5701910ad339840ddf0f92d9960431f4823e090d72484480',
+  'gateway/langgraph-js/npm': '5f7cdf4f000e613220bb1b42a68c8d76d1a89f9f5c4ef05e8b2f889da5c7ebce',
+  'gateway/langgraph-js/pnpm': '5f7cdf4f000e613220bb1b42a68c8d76d1a89f9f5c4ef05e8b2f889da5c7ebce',
+  'gateway/langgraph-js/yarn': '5f7cdf4f000e613220bb1b42a68c8d76d1a89f9f5c4ef05e8b2f889da5c7ebce',
+  'gateway/adk-js/npm': '301f348568c750df3ba7bbaebf92a1b07ccb6d7d07e26f971b49a94b03d529d8',
+  'gateway/adk-js/pnpm': '60bbaaa48f6589461d70a01b00a1936ee21dd76b94956ec133501f610936c717',
+  'gateway/adk-js/yarn': '301f348568c750df3ba7bbaebf92a1b07ccb6d7d07e26f971b49a94b03d529d8',
+  'gateway/adk-go/npm': 'e39158e2f55a5b6b402380b584f6ac83ccd5ab37fe74993cea684246a2cc2260',
+  'gateway/adk-go/pnpm': 'e39158e2f55a5b6b402380b584f6ac83ccd5ab37fe74993cea684246a2cc2260',
+  'gateway/adk-go/yarn': 'e39158e2f55a5b6b402380b584f6ac83ccd5ab37fe74993cea684246a2cc2260',
 };
-test('all existing outputs retain main bytes except the baseline binding and two MIME entries', async () => {
+test('all existing outputs retain reviewed bytes except the baseline binding and two MIME entries', async () => {
   const layers = await loadLayers(templates);
   for (const [combination, expected] of Object.entries(existingOutputHashes)) {
     const [kind, framework, packageManager] = combination.split('/');

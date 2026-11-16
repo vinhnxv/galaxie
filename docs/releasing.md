@@ -3,7 +3,9 @@
 The next lockstep release is 0.2.0 across thirteen packages. This branch prepares
 it; nothing is published and no tag or release is created by the preparation.
 Publishing, tagging and release notes are manual maintainer steps.
-`eslint-plugin` and `tools-mcp` remain private.
+`eslint-plugin` and `tools-mcp` remain private. The registry currently has 0.1.0
+of the seven launch packages and none of the six promoted packages. Registry
+installs of 0.2.0 remain unverified until the maintainer publishes it.
 
 ## Versioning
 
@@ -66,6 +68,15 @@ interrupted pack. The CLI tries packaged assets first and falls back to checkout
 sources. The isolated packed-create test runs help and a `--no-install` scaffold
 with only Node on PATH and compares every generated file with checkout output.
 Tarball dependency resolution supports npm only; pnpm and yarn remain refused.
+
+## Verification evidence and limits
+
+Repository `create-clean` CI covers npm tarballs for all eight kind/framework
+combinations on Ubuntu Node 24 and both LangGraph.js kinds on Node 22. The pack
+test inspects thirteen packages, and the isolated packed-create test runs help
+and scaffolding outside the checkout. [Standalone runs](standalone-verification.md)
+record local mock-backed results. New-release registry installs, real models,
+devices, pnpm/yarn tarball mode and non-Linux CI remain unverified.
 
 ## Prepared adapters
 

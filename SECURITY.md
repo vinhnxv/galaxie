@@ -24,8 +24,11 @@ release branches yet.
 
 In scope are the packages `@galaxie-ai/ui-protocol`, `@galaxie-ai/core`, `@galaxie-ai/adapter-kit`,
 `@galaxie-ai/adapter-langgraph`, `@galaxie-ai/models`, `@galaxie-ai/storage-indexeddb` and
-`@galaxie-ai/react` in this repository, and their documented controls. They are published
-to npm as 0.1.0 releases.
+`@galaxie-ai/react` (the seven launch packages), plus `@galaxie-ai/adapter-pyodide`,
+`@galaxie-ai/adapter-adk`, `@galaxie-ai/adapter-go`, `@galaxie-ai/starter-go`,
+`@galaxie-ai/starter-python` and `@galaxie-ai/create` in this repository, and their
+documented controls. The seven launch packages are published to npm at 0.1.0.
+All thirteen are prepared for the 0.2.0 lockstep release; 0.2.0 is not yet published.
 
 Out of scope:
 

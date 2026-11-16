@@ -28,6 +28,21 @@ const order = [...section.matchAll(/^\d+\. `(@galaxie-ai\/[a-z-]+)`/gm)].map(
 );
 
 test('the release guide lists every public package once, with manifest dependencies first', () => {
+  expect(order).toEqual([
+    '@galaxie-ai/ui-protocol',
+    '@galaxie-ai/core',
+    '@galaxie-ai/adapter-kit',
+    '@galaxie-ai/adapter-langgraph',
+    '@galaxie-ai/models',
+    '@galaxie-ai/storage-indexeddb',
+    '@galaxie-ai/react',
+    '@galaxie-ai/adapter-pyodide',
+    '@galaxie-ai/adapter-adk',
+    '@galaxie-ai/adapter-go',
+    '@galaxie-ai/starter-go',
+    '@galaxie-ai/starter-python',
+    '@galaxie-ai/create',
+  ]);
   expect([...order].sort()).toEqual(packages.map(({ name }) => name).sort());
   for (const pkg of packages)
     for (const section of ['dependencies', 'optionalDependencies', 'peerDependencies'] as const)

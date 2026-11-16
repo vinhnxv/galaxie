@@ -8,7 +8,7 @@
 - [Project status](docs/status.md): implemented behavior, mock-only verification and unmeasured paths.
 - [System design](docs/system-design.md): implemented contracts and limits.
 - [Root coding guidance](AGENTS.md): repository rules.
-- [galaxie coding-agent skill](skills/galaxie/README.md): generated-project guidance and a version-gated installer for existing apps; no installer release tag exists yet.
+- [galaxie coding-agent skill](skills/galaxie/README.md): generated-project guidance and a version-gated installer for existing apps; prepared for 0.2.0; the installer tag `v0.2.0` does not exist until the maintainer creates it.
 - [License](LICENSE): Apache-2.0, with a [NOTICE](NOTICE) file.
 - [Framework overview](docs/framework-overview.md): audiences and direction; distinguish targets from implemented contracts.
 - [Architecture decisions](docs/adr/README.md): statuses and decision index; follow Accepted decisions.
@@ -30,14 +30,19 @@
 
 ## Package introductions
 
+Thirteen packages are prepared for the 0.2.0 lockstep release, not yet published at that version; the seven launch packages remain on npm at 0.1.0. See the [release guide](docs/releasing.md) for order, publishing prerequisites and limits.
+
 - [Core README](packages/core/README.md): framework-neutral contracts and host runtime setup.
-- [UI protocol README](packages/ui-protocol/README.md): pure A2UI parsing, catalog validation and surface reduction; no core/React integration yet.
+- [UI protocol README](packages/ui-protocol/README.md): pure A2UI parsing, catalog validation and surface reduction; core carries pending surfaces and React renders them.
 - [Adapter kit README](packages/adapter-kit/README.md): shared internal adapter helpers, public-root imports and no standalone API stability promise.
 - [LangGraph adapter README](packages/adapter-langgraph/README.md): a minimal graph and explicit config.
 - [Python adapter README](packages/adapter-pyodide/README.md): trusted LangGraph Python/pydantic-ai/DSPy Workers, checked bridge, durable interactions, deterministic DSPy replay and JavaScript policy.
 - [ADK adapter README](packages/adapter-adk/README.md): `adk-js` executor over the ADK 2.3.0 browser bundle: router-backed models, capability tools, checked streaming, confirmations and long-running tools as interactions, durable sessions and the supported agent shapes.
 - ADK Python: the `adk-python` executor lives in the [Python adapter README](packages/adapter-pyodide/README.md#google-adk-python-agents) ([ADR-0022](docs/adr/0022-google-adk-python-through-the-pyodide-adapter.md), Proposed): authoring surface, supported agent shapes and third-party licenses.
 - ADK Go: the `adk-go` executor lives in the [Go adapter README](packages/adapter-go/README.md) ([ADR-0023](docs/adr/0023-google-adk-go-through-a-wasm-worker.md), Proposed): authoring surface, supported agent shapes, build command and third-party licenses; the [Go module](go/README.md) holds the sources.
+- [Go starter README](packages/starter-go/README.md): prebuilt agent, verified module sources and build helpers.
+- [Python starter README](packages/starter-python/README.md): verified LangGraph wheel inventory and redistribution review limits.
+- [Create README](packages/create/README.md): starter CLI, bundled templates and guidance, four frameworks in both kinds, npm-only tarball verification.
 - [Models README](packages/models/README.md): provider subpaths, the deterministic mock and the ONNX (Transformers.js) provider's host wiring.
 - [React README](packages/react/README.md): surfaces and separate host confirmations.
 - [IndexedDB README](packages/storage-indexeddb/README.md): scoped checkpoints, recovery and storage lifecycle.
@@ -53,6 +58,9 @@
 - [Python adapter AGENTS](packages/adapter-pyodide/AGENTS.md): Worker lifecycle, compiled wheel hashes, CSP and Python trust limits.
 - [Go adapter AGENTS](packages/adapter-go/AGENTS.md): module verification before compile, the bridge, the stored record and the agent-shape rules.
 - [ADK adapter AGENTS](packages/adapter-adk/AGENTS.md): import rules, bundle pin, host ordering and limits of the ADK executor.
+- [Go starter AGENTS](packages/starter-go/AGENTS.md): artifact identity, toolchain and build ownership.
+- [Python starter AGENTS](packages/starter-python/AGENTS.md): wheel integrity, notices and cache rules.
+- [Create AGENTS](packages/create/AGENTS.md): composition, packaged assets and exclusive writes.
 - [Models AGENTS](packages/models/AGENTS.md): host registration and fake-only automated model tests.
 - [React AGENTS](packages/react/AGENTS.md): trusted registries, text rendering and host lifecycle.
 - [IndexedDB AGENTS](packages/storage-indexeddb/AGENTS.md): principal scope, fencing, recovery and deletion.

@@ -7,7 +7,7 @@ Both directories contain real files. Read [SKILL.md](SKILL.md) for the rules.
 
 ## Install into an existing app
 
-No release tag exists yet for this installer. Nothing here publishes a package or
+The installer is prepared for 0.2.0, but `v0.2.0` does not exist until the maintainer creates it. Nothing here publishes a package or
 creates a release. Once a matching release exists, check out its `v<version>` tag
 and run the local script with **Node >=22.18** (built-in TypeScript stripping):
 

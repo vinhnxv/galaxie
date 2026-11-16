@@ -1,9 +1,18 @@
 # @galaxie-ai/create
 
 CLI and dependency-free composer for starter projects, prepared for the 0.2.0
-lockstep release. Nothing is published by this preparation. Packed distributions
+lockstep release; not yet published. Nothing is published by this preparation. Packed distributions
 include the templates and galaxie skill; the built CLI also runs from this checkout.
 Public APIs may change in a 0.x minor release.
+
+After the maintainer publishes, create a project with:
+
+```sh
+npm create @galaxie-ai@0.2.0 -- my-app browser-only langgraph-js
+npm create @galaxie-ai@0.2.0 -- my-app --kind gateway --framework adk-go
+```
+
+`npm create @galaxie-ai` selects this CLI; the explicit `@0.2.0` selects the prepared release. Generated `@galaxie-ai/*` dependencies use `^0.2.0` caret ranges. Upgrade all galaxie pins together for a lockstep bump. These registry commands remain unverified until publication; use local npm tarballs now.
 
 Build it from this checkout using the repository's Node 24 and pnpm 11 tooling:
 
@@ -31,7 +40,7 @@ The current kinds are `browser-only` and `gateway`:
 
 | Framework | Both kinds | Install path |
 | --- | --- | --- |
-| `langgraph-js` | Yes | Registry or npm tarballs |
+| `langgraph-js` | Yes | npm tarballs; 0.2.0 registry verification pending |
 | `adk-js` | Yes | npm tarballs; registry verification pending |
 | `adk-go` | Both | npm tarballs; registry verification pending |
 | `langgraph-python` | Yes | npm tarballs; registry verification pending |
@@ -105,6 +114,10 @@ builds and previews without HMR. Registry installs remain unsupported. Both kind
 are covered by Chromium acceptance, and the standalone harness measurement is
 recorded in the standalone verification record.
 
+## Release evidence and limits
+
+The repository pack test inspects all thirteen public packages with matching versions and exact packed internal dependencies. The packed-create test extracts the CLI into a temporary directory with only Node, runs `--help` and scaffolds with `--no-install`, comparing all output with checkout output. `create-clean` CI covers four frameworks in both kinds on Ubuntu Node 24, plus both LangGraph.js kinds on Node 22; local standalone runs cover npm tarballs and mock answers. Registry installs of 0.2.0 await publication. Real models, devices, pnpm/yarn tarball mode and non-Linux CI remain unverified.
+
 ## Layers and writes
 
 The composer combines `templates/base`, the selected `templates/kinds` layer and
@@ -147,8 +160,8 @@ When only one instruction file exists, the CLI prints an import hint; it does no
 rewrite the existing file. Existing conflicting skill files abort ordinary create
 writes. For an existing app, use the separate version-gated
 [skill installer](../../skills/galaxie/README.md#install-into-an-existing-app).
-No agent has been measured consuming the skill, and no installer release tag
-exists yet. Guidance adds files only; ADR-0012 guarantees are unchanged.
+No agent has been measured consuming the skill; the installer tag `v0.2.0`
+does not exist until the maintainer creates it. Guidance adds files only; ADR-0012 guarantees are unchanged.
 
 Repository-only tests and source mappings are composed under the ignored
 `packages/create/.cache/composed` by `pnpm run compose:create`. Build the complete starter-go distribution before testing the Go composition:

@@ -1,6 +1,7 @@
 # Standalone project verification
 
-The current harness scaffolds projects through the private create CLI. The earlier
+The current harness scaffolds projects through the create CLI, prepared for the
+0.2.0 release and not yet published. The earlier
 2026-11-15 copied-starter characterization for `galaxie-wa5.1` is retained below.
 Scaffolding also adds `AGENTS.md`, `CLAUDE.md` and real-file galaxie skill copies
 in `.agents/skills/galaxie` and `.claude/skills/galaxie` for the selected kind and framework.
@@ -8,6 +9,34 @@ The current gateway preview drive answers through an in-process mock; the compil
 production server still follows the correlated 503 unavailable flow. These checks
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
+
+## Release preparation (2026-11-17)
+
+All thirteen public packages are prepared at 0.2.0; nothing is published by this
+preparation and `v0.2.0` does not exist yet. The seven launch packages remain on
+npm at 0.1.0. Historical registry measurements below used that older release and
+do not verify 0.2.0 registry installs. The [release guide](releasing.md#publish-order)
+lists all thirteen packages and the maintainer's publishing prerequisites.
+
+The thirteen-package pack test checks matching versions, exact internal
+workspace dependency rewrites, exports and distribution files. The isolated
+packed-create test extracts create outside the checkout, runs help and a
+`--no-install` scaffold with only Node on PATH, and compares every generated file
+with checkout output. Local clean-PATH npm tarball runs cover browser-only
+LangGraph.js and ADK Go with 0.2.0; generated checks, mock answers and CSP mutation
+controls pass, including ADK Go's no-toolchain edited-source refusal. The
+repository CI matrix below covers all eight combinations and the extra Node 22
+LangGraph.js leg; its dated timings predate this version bump. New PR CI outcomes
+must be checked separately before publishing.
+
+The base tarball inventory remains the seven launch packages, with adapters and
+starters added only for the selected framework; create itself is tested by the
+separate packed-create test. All thirteen public package JavaScript projects now
+compile through `build:packages`; artifact starter prepack remains separate.
+Registry installs of 0.2.0 await publication. Real models, devices, pnpm/yarn
+tarball mode and non-Linux CI remain unverified by this preparation. The whole
+release waits for the recorded Python redistribution review, including the
+Pyodide MPL-2.0 exception. Nothing is published; ADR-0012 guarantees are unchanged.
 
 ## Clean-environment CI
 
@@ -73,8 +102,8 @@ before the compiled server leg. They are a single observation, not a distributio
 Unmeasured by this clean-environment matrix: pnpm and yarn installs, registry
 mode and the scheduled registry run, Windows, macOS CI, Node versions other than
 22 and 24, and real model providers. Tarball mode refuses pnpm and yarn before
-any write; registry CI and its schedule are deferred until the first release
-exists for this workflow. Earlier manual registry records below are separate
+any write; registry CI and its schedule are deferred until 0.2.0 is published
+for this workflow. Earlier manual registry records below are separate
 evidence. The other limits in [Unmeasured](#unmeasured) still apply.
 
 With `--framework adk-go --mode tarball --clean-path`, the harness also checks
@@ -397,7 +426,7 @@ pnpm install --frozen-lockfile
 pnpm exec playwright install chromium
 pnpm exec tsc -p packages/create/tsconfig.build.json
 node scripts/verify-standalone.ts --help
-node scripts/verify-standalone.ts --node 22 --node 24 --mode both --json /tmp/galaxie-standalone-final.json
+node scripts/verify-standalone.ts --node 22 --node 24 --mode tarball --json /tmp/galaxie-standalone-final.json
 ```
 
 `--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js|adk-go|langgraph-python`
@@ -406,7 +435,7 @@ ADK Go and LangGraph Python support both kinds.
 The old `--template` flag is rejected. `--node` is repeatable;
 `--node 22=/absolute/path/to/node` overrides discovery. Otherwise the current
 runtime wins for its major, then the newest matching nvm installation.
-`--mode registry|tarball|both` selects installs. `--tarballs /path/to/dir` reuses
+`--mode registry|tarball|both` selects installs. Use tarball mode until 0.2.0 is published; current registry runs cannot resolve the new ranges. `--tarballs /path/to/dir` reuses
 seven previously packed launch packages (plus `adapter-adk` for ADK JavaScript, or `adapter-go` and `starter-go` for ADK Go, or `adapter-pyodide` and `starter-python` for LangGraph Python) by copying them into the owned temporary
 root. `--keep` retains that root and prints its path for investigation; remove it
 afterward. `--min-release-age-exclude` is an explicit, recorded exception, not a
@@ -471,8 +500,10 @@ source is restored in `finally` after each mutation. Installs use
 scripts was needed in the measured matrix.
 
 Tarball mode supports npm only. pnpm and yarn are refused by the create CLI until
-follow-up work proves their installs and override locations. The private create
-package is never packed as a launch package, published or tagged by this harness.
+follow-up work proves their installs and override locations. The create
+package is outside this harness's seven-package base inventory; its isolated
+packed-create conformance test verifies its tarball separately. This harness
+never publishes packages or creates tags.
 
 ## Previous copied-starter environment and final matrix
 
@@ -552,10 +583,10 @@ core's main entry and its runtime Zod boundary are unchanged.
 
 ## Findings for later
 
-- **FINDING-1 — Published-package Node engines.** The seven launch package
-  manifests still lack the measured Node floor. Proposed fix: review and add their
-  engines in the next coordinated release, with copied-consumer checks. This PR
-  measures the starters and sets their engines only; no publication was performed.
+- **FINDING-1 — Published-package Node engines, addressed in 0.2.0 preparation.**
+  All thirteen public manifests now declare Node `>=22.22.2`, including the original
+  seven. This is a consistent declaration; the standalone evidence covers only
+  the recorded Node 22/24 patches, not every version admitted by that range.
 - The clean-environment CI job uses this core for tarball installs. The registry
   matrix remains a manual command; release verification should retain its JSON
   with each release.

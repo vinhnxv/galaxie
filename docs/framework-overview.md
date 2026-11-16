@@ -5,6 +5,8 @@
 - **Date:** 2026-10-28
 - **Status:** direction document. Four M1 runtime slices implement lifecycle, the LangGraph adapter, capability brokerage, model routing with mock providers, in-memory interrupt dispatch and resume, finite budgets, and tracing. The M1 exit controls add interaction URL policy and development trace text filtered by labels and destination, with twelve parity cases and additional Node/Chromium guarantee tests. See the [M1 coverage map](system-design.md#9-security-baseline-map); the remaining components below describe the target.
 
+The next lockstep release prepares thirteen public packages at 0.2.0; none is yet published at that version. The seven launch packages remain on npm at 0.1.0. The [release guide](releasing.md) lists the package order and Python redistribution review that gates publishing. Create now composes both React starter kinds for LangGraph.js, ADK JavaScript, ADK Go and LangGraph Python, with packaged templates and skill guidance. Repository `create-clean` CI verifies npm tarballs with mocks; the pack test inspects all thirteen packages and the isolated packed-create test verifies help and scaffolding. [Standalone runs](standalone-verification.md) record additional local evidence. Registry installs of 0.2.0, real models, devices, pnpm/yarn tarball mode and non-Linux CI remain unverified. CLI `add` and `config` wait for developer demand in M4 feedback; non-React bindings wait for a stable headless contract through M4.
+
 ## 1. Role: what galaxie is
 
 Galaxie is a **browser-first agent runtime SDK**. It lets a web application host AI agents as first-class parts of the app. Each agent has an identity, state, a lifecycle, permissions, a UI region and a recovery story.

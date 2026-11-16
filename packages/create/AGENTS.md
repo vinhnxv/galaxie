@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Own the CLI and dependency-free composer for starter layers.
+Own the CLI and dependency-free composer for starter layers. Prepared for the 0.2.0 release; not yet published. APIs may change in a 0.x minor release.
 
 ## Entry points
 
