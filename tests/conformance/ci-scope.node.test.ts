@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from 'node:child_process';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect, onTestFinished, test } from 'vitest';
 import { pythonAffected } from '../../scripts/ci-scope.js';
 
 test('a change confined to documents, Go and unrelated packages skips the Python jobs', () => {
@@ -68,7 +70,11 @@ test('the command prints the GitHub output line', () => {
   expect(run('')).toBe('python=true');
 });
 
-test('Python shards partition the Node inventory and keep composed browser files out of Node', () => {
+test('Python shards partition the Node inventory and keep composed browser files out of Node', async () => {
+  const fixture = await mkdtemp('packages/create/.cache/composed/.starter-python-inventory-');
+  onTestFinished(() => rm(fixture, { recursive: true, force: true }));
+  await mkdir(join(fixture, 'test'));
+  await writeFile(join(fixture, 'test/inventory.node.test.ts'), 'export {};\n');
   const list = (group?: string): string[] => {
     const env = { ...process.env };
     if (group === undefined) delete env['GALAXIE_TEST_GROUP'];
@@ -84,6 +90,7 @@ test('Python shards partition the Node inventory and keep composed browser files
     );
   };
   const all = list();
+  for (const file of all) expect(file).not.toMatch(/\/composed\/\./);
   const groups = ['general', 'python-dspy', 'python-pydantic', 'python-adk', 'python-rest'];
   const inventories = groups.map((group) => list(group));
   const assigned = inventories.flat();

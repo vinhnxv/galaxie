@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { readFile } from 'node:fs/promises';
+import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
@@ -156,9 +157,10 @@ if (groupName !== undefined && !groups.includes(groupName))
  */
 const forGroup = (
   include: string[],
-  exclude: string[],
+  exclusions: string[],
   prefix: string,
 ): { include: string[]; exclude: string[] } => {
+  const exclude = [...exclusions, `${prefix}packages/create/.cache/composed/.*/**`];
   const starterDirectories = include
     .filter((glob) => glob.includes('packages/create/.cache/composed/*/'))
     .map((glob) => glob.replace('composed/*/', 'composed/*-langgraph-python/'));
@@ -207,7 +209,7 @@ const starterFrameworks = { ...starterGo, plugins: [starterGo.plugins, starterPy
 const config: ViteUserConfig = defineConfig({
   server: { host: '127.0.0.1' },
   test: {
-    maxWorkers: 4,
+    maxWorkers: Math.min(4, Math.max(availableParallelism() - 1, 1)),
     api: { host: '127.0.0.1' },
     projects: [
       {

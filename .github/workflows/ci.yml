@@ -63,6 +63,7 @@ jobs:
       - name: Build the Go and Python starter artifacts
         run: |
           pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
           pnpm --filter @galaxie-ai/starter-python run prepack
       - name: Type-check with TypeScript 7
         run: pnpm run typecheck
@@ -119,6 +120,7 @@ jobs:
           browser: "true"
       - run: |
           pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
           pnpm --filter @galaxie-ai/starter-python run prepack
       - run: CI=true GALAXIE_TEST_GROUP=general pnpm test
 
@@ -145,6 +147,7 @@ jobs:
       - name: Run the browser cases on ${{ matrix.engine }}
         run: |
           pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
           pnpm --filter @galaxie-ai/starter-python run prepack
           pnpm run compose:create
           pnpm exec vitest run --project browser --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/report.json" || true
@@ -176,6 +179,7 @@ jobs:
           browser: "true"
       - run: |
           pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
           pnpm --filter @galaxie-ai/starter-python run prepack
       - name: Test the Python starter artifacts and Chromium acceptance
         if: matrix.group == 'python-rest'
@@ -216,10 +220,11 @@ jobs:
           browser: "true"
       - run: |
           pnpm --filter @galaxie-ai/starter-go run prepack
+          pnpm exec tsc -p packages/adapter-pyodide/tsconfig.build.json
           pnpm --filter @galaxie-ai/starter-python run prepack
       - run: pnpm run compose:create
       - name: Test the Go starter artifacts and Chromium acceptance
-        run: pnpm exec vitest run --project node tests/conformance/starter-go-*.node.test.ts
+        run: pnpm exec vitest run --project node tests/conformance/starter-go-*.node.test.ts --no-file-parallelism
       - name: Test the Go module
         run: pnpm test:go
 
