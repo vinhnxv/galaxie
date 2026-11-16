@@ -8,10 +8,11 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { build, createServer as createViteServer, preview } from 'vite';
 import { expect, it } from 'vitest';
+import { devGatewayOptions } from '../server/dev.js';
 import { gatewayPlugin } from '../server/plugin.js';
 import { createAppHandler } from '../server/serve.js';
 import { cspHeader } from '../src/csp.js';
-import { harness, listen } from './support.node.js';
+import { completion, harness, listen, post, token } from './support.node.js';
 
 const template = fileURLToPath(new URL('..', import.meta.url));
 
@@ -144,11 +145,8 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
 }, 60_000);
 
 it('mounts the same gateway on Vite dev and preview', async () => {
-  const upstream = await harness();
   const directory = await mkdtemp(join(template, '.browser-check-'));
-  const options = {
-    upstream: { baseURL: `${upstream.upstreamOrigin}/v1`, apiKey: upstream.apiKey },
-  };
+  const options = devGatewayOptions();
   const dev = await createViteServer({
     configFile: false,
     plugins: [gatewayPlugin(options)],
@@ -178,6 +176,14 @@ it('mounts the same gateway on Vite dev and preview', async () => {
       });
       expect(session.status).toBe(200);
       expect(session.headers.get('cache-control')).toBe('no-store');
+      const response = await post(
+        origin,
+        '/api/v1/chat/completions',
+        await token(origin),
+        completion(),
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-galaxie-upstream')).toBe('mock');
     }
   } finally {
     await dev.close();

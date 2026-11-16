@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { request } from 'node:http';
+import { createServer, request } from 'node:http';
 import {
   type CapabilityContext,
   type EffectId,
@@ -9,9 +9,12 @@ import {
   type RunId,
 } from '@galaxie-ai/core';
 import { expect, it } from 'vitest';
+import { devGatewayOptions } from '../server/dev.js';
+import { createGateway } from '../server/gateway.js';
+import { createMockUpstream, mockReply } from '../server/mock-upstream.js';
 import { createHybridHost } from '../src/runtime.js';
 import { createSession } from '../src/session.js';
-import { answer, client, completion, harness, post, token } from './support.node.js';
+import { answer, client, completion, harness, listen, post, token } from './support.node.js';
 
 it('refuses missing, unknown and expired tokens before upstream dispatch, including the model client', async () => {
   const server = await harness();
@@ -425,5 +428,167 @@ it('runs the identical agent through the gateway and keeps credential canaries o
     expect(host.getGatewayState()).toBe('ready');
   } finally {
     await host.dispose();
+  }
+});
+
+it('keeps an unconfigured production gateway unavailable and refuses browser prompt roles', async () => {
+  const gateway = createGateway();
+  const origin = await listen(
+    createServer((request, response) => {
+      void gateway.handle(request, response);
+    }),
+  );
+  const credential = await token(origin);
+  for (const role of ['system', 'developer']) {
+    const response = await post(
+      origin,
+      '/api/v1/chat/completions',
+      credential,
+      completion({ messages: [{ role, content: 'Browser prompt' }] }),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_messages' });
+  }
+  const response = await post(origin, '/api/v1/chat/completions', credential, completion());
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: 'unavailable' });
+});
+
+it('dispatches JSON and SSE through the credential-free mock after validation and quota reservation', async () => {
+  const requests: { authorization: string | null; body: Record<string, unknown> }[] = [];
+  const mock = createMockUpstream();
+  const gateway = createGateway({
+    quota: { calls: 2, windowMs: 60_000 },
+    mockUpstream: async (request) => {
+      requests.push({
+        authorization: request.headers.get('authorization'),
+        body: (await request.clone().json()) as Record<string, unknown>,
+      });
+      return mock(request);
+    },
+  });
+  const origin = await listen(
+    createServer((request, response) => {
+      void gateway.handle(request, response);
+    }),
+  );
+  const credential = await token(origin);
+  for (const [overrides, status] of [
+    [{ model: 'unlisted' }, 403],
+    ...['system', 'developer'].map(
+      (role) => [{ messages: [{ role, content: 'Browser prompt' }] }, 400] as const,
+    ),
+  ] as const) {
+    expect(
+      (await post(origin, '/api/v1/chat/completions', credential, completion(overrides))).status,
+    ).toBe(status);
+  }
+  expect((await post(origin, '/api/v1/chat/completions', 'unknown', completion())).status).toBe(
+    401,
+  );
+  expect(requests).toEqual([]);
+  for (const stream of [false, true]) {
+    const response = await post(
+      origin,
+      '/api/v1/chat/completions',
+      credential,
+      completion({ stream }),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-galaxie-upstream')).toBe('mock');
+    if (stream) {
+      expect(response.headers.get('content-type')).toBe('text/event-stream');
+      const frames = (await response.text()).split('\n\n').filter(Boolean);
+      expect(frames.pop()).toBe('data: [DONE]');
+      expect(JSON.parse(frames.at(-1)?.slice(6) ?? '')).toMatchObject({
+        usage: { total_tokens: 15 },
+      });
+    } else
+      expect(await response.json()).toMatchObject({
+        choices: [{ message: { content: mockReply } }],
+        usage: { total_tokens: 15 },
+      });
+  }
+  expect(requests).toHaveLength(2);
+  for (const request of requests) {
+    expect(request.authorization).toBeNull();
+    expect(request.body['messages']).toEqual([
+      {
+        role: 'system',
+        content:
+          'You are a practice coach. Give one short encouraging sentence. Keep it under 20 words.',
+      },
+      { role: 'user', content: 'A practice comment, please.' },
+    ]);
+    expect(request.body).not.toHaveProperty('metadata');
+  }
+});
+
+it('reserves concurrent mock calls before dispatch', async () => {
+  let calls = 0;
+  const mock = createMockUpstream();
+  const gateway = createGateway({
+    quota: { calls: 1, windowMs: 60_000 },
+    mockUpstream: (request) => {
+      calls++;
+      return mock(request);
+    },
+  });
+  const origin = await listen(
+    createServer((request, response) => {
+      void gateway.handle(request, response);
+    }),
+  );
+  const credential = await token(origin);
+  const responses = await Promise.all(
+    [1, 2].map(() => post(origin, '/api/v1/chat/completions', credential, completion())),
+  );
+  expect(responses.map((response) => response.status).sort()).toEqual([200, 429]);
+  expect(calls).toBe(1);
+});
+
+it('selects the dev mock only for empty upstream configuration and prefers a configured upstream', async () => {
+  const previous = [process.env['UPSTREAM_BASE_URL'], process.env['UPSTREAM_API_KEY']];
+  const upstream = await harness();
+  try {
+    for (const [base, key, kind] of [
+      [undefined, undefined, 'mock'],
+      ['', '', 'mock'],
+      [upstream.upstreamOrigin + '/v1', undefined, 'unavailable'],
+      [undefined, upstream.apiKey, 'unavailable'],
+      [upstream.upstreamOrigin + '/v1', upstream.apiKey, 'real'],
+    ] as const) {
+      for (const [name, value] of [
+        ['UPSTREAM_BASE_URL', base],
+        ['UPSTREAM_API_KEY', key],
+      ] as const) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+      const options = devGatewayOptions();
+      expect(Boolean(options.mockUpstream)).toBe(kind === 'mock');
+      expect(Boolean(options.upstream)).toBe(kind === 'real');
+      const gateway = createGateway(options);
+      const origin = await listen(
+        createServer((request, response) => {
+          void gateway.handle(request, response);
+        }),
+      );
+      const response = await post(
+        origin,
+        '/api/v1/chat/completions',
+        await token(origin),
+        completion(),
+      );
+      expect(response.status).toBe(kind === 'unavailable' ? 503 : 200);
+      expect(response.headers.get('x-galaxie-upstream')).toBe(kind === 'mock' ? 'mock' : null);
+    }
+    expect(upstream.records).toHaveLength(1);
+  } finally {
+    for (const [index, name] of ['UPSTREAM_BASE_URL', 'UPSTREAM_API_KEY'].entries()) {
+      const value = previous[index];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   }
 });
