@@ -972,7 +972,7 @@ test.each([
 
 test.each([
   ['examples/nextjs-app-router/src/adk-js/agent.ts', '@google/adk', 0],
-  ['examples/nextjs-app-router/next.config.ts', '@google/adk', 0],
+  ['examples/nextjs-app-router/next.config.ts', '@google/adk', 1],
   ['examples/nextjs-app-router/src/host.tsx', '@google/adk', 1],
   ['examples/nextjs-app-router/src/adk-js/agent.ts', '@google/adk/tools/mcp', 1],
   ['examples/nextjs-app-router-other/src/adk-js/agent.ts', '@google/adk', 1],

@@ -60,7 +60,11 @@ Server Component. It calls `await connection()` from `next/server`, renders the
 heading and memory-only shell, and passes the framework name to
 [`ClientAgent`](../../examples/nextjs-app-router/src/client.tsx). The index also
 uses `connection()`. These pages render at request time so Next can put the
-request's nonce on its scripts; do not statically prerender them.
+request's nonce on its scripts; do not statically prerender them. The same holds
+for the [404 page](../../examples/nextjs-app-router/app/not-found.tsx): a
+prerendered `/_not-found` carries no nonce, so its inline scripts and styles are
+blocked by the policy and the page hits hydration errors. See the
+[limits](../unsupported.md#nextjs-example).
 
 The wrapper starts with `'use client'` and configures Zod with
 `z.config({ jitless: true })` before loading the agent modules. It uses

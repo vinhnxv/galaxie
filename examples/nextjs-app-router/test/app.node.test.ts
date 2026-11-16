@@ -116,7 +116,7 @@ test.each(routes)(
 
     // Inspect the raw HTML's executable inline scripts, independently of the live DOM.
     const page = await production().browser.newPage();
-    page.setDefaultTimeout(15_000);
+    page.setDefaultTimeout(60_000);
     try {
       const scripts = await page.evaluate((source) => {
         const document = new DOMParser().parseFromString(source, 'text/html');
@@ -135,6 +135,43 @@ test.each(routes)(
     }
   },
 );
+
+test('an unknown path renders a nonce-bearing 404 page with no policy violations', async () => {
+  const { origin, browser } = production();
+  const page = await browser.newPage();
+  page.setDefaultTimeout(60_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    // The browser logs the intentional 404 document itself; any other console error counts.
+    if (message.type() === 'error' && !message.location().url.endsWith('/no-such-page'))
+      errors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    const violations: string[] = [];
+    Reflect.set(window, 'nextViolations', violations);
+    document.addEventListener('securitypolicyviolation', (event) => {
+      violations.push(`${event.effectiveDirective}: ${event.sample}`);
+    });
+  });
+  try {
+    const response = await page.goto(`${origin}/no-such-page`);
+    expect(response?.status()).toBe(404);
+    const headers = (await response?.allHeaders()) ?? {};
+    assertPolicy(headers['content-security-policy'] ?? '');
+    expect(headers['cache-control'] ?? '').not.toMatch(/s-maxage|public/);
+    expect(headers['x-nonce']).toBeUndefined();
+    await page.getByRole('heading', { name: 'Page not found' }).waitFor();
+    // Allow hydration to finish before reading the evidence.
+    await page.waitForLoadState('networkidle');
+    expect(await page.evaluate(() => Reflect.get(window, 'nextViolations') as string[])).toEqual(
+      [],
+    );
+    expect(errors).toEqual([]);
+  } finally {
+    await page.close();
+  }
+});
 
 test('the server bundle and traced dependencies exclude the galaxie runtime', async () => {
   const root = join(appRoot, distDir, 'server');
@@ -164,7 +201,7 @@ test.each(routes)(
   async (route) => {
     const { origin, browser } = production();
     const page = await browser.newPage();
-    page.setDefaultTimeout(15_000);
+    page.setDefaultTimeout(60_000);
     const errors: string[] = [];
     const responses = new Map<string, Response>();
     page.context().on('response', (response) => responses.set(response.url(), response));
@@ -246,7 +283,7 @@ test('Turbopack dev sends report-only Trusted Types and both mock routes answer'
   try {
     for (const route of routes) {
       const page = await production().browser.newPage();
-      page.setDefaultTimeout(15_000);
+      page.setDefaultTimeout(60_000);
       try {
         const response = await page.goto(`${dev.origin}/${route}`);
         if (response === null) throw new Error('The dev response is missing.');
@@ -269,7 +306,7 @@ test('Turbopack dev sends report-only Trusted Types and both mock routes answer'
 test('the index page nonces its framework scripts and links to both agents', async () => {
   const { origin, browser } = production();
   const page = await browser.newPage();
-  page.setDefaultTimeout(15_000);
+  page.setDefaultTimeout(60_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {

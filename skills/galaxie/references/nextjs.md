@@ -12,7 +12,7 @@ Re-measure policy names when changing Next or features. Keep host authorization,
 reviewed code, credentials, lifecycle and the baseline obligations intact.
 <!-- galaxie:summary:end -->
 
-<!-- galaxie:cite path="docs/guides/nextjs.md" heading="Client-only boundary" sha256="71addd8b37d96342bf24095a3139c95120333c12c24b16cc033af7f831b48336" -->
+<!-- galaxie:cite path="docs/guides/nextjs.md" heading="Client-only boundary" sha256="e014920bd77392cae8c74022f0ea6f4dbad2946230e1e3d6d053d07d1bf48ea7" -->
 Follow the [client-only boundary](https://github.com/vinhnxv/galaxie/blob/main/docs/guides/nextjs.md#client-only-boundary):
 the Server Component renders a shell and calls `connection()`; a `'use client'`
 wrapper configures Zod jitless before dynamically importing the runtime/adapter
