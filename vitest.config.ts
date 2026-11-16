@@ -323,7 +323,14 @@ const config: ViteUserConfig = defineConfig({
             name: pythonStarter ? 'python-starter-browser' : 'browser',
             // Python app tests boot Pyodide; CI exceeded the inherited 15-second limit.
             ...(pythonStarter ? { testTimeout: 120_000 } : {}),
-            api: { host: '127.0.0.1', port: pythonStarter ? 63316 : 63315, strictPort: true },
+            api: {
+              host: '127.0.0.1',
+              // The inventory test lists this project beside a running suite, so its port is overridable.
+              port: pythonStarter
+                ? Number(process.env['GALAXIE_PYTHON_STARTER_API_PORT'] ?? 63316)
+                : 63315,
+              strictPort: true,
+            },
             globalSetup: ['support/mcp-global.node.ts'],
             ...(pythonStarter ? forPythonStarterGroup : forGroup)(
               pythonStarter

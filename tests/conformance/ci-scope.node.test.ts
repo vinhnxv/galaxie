@@ -3,6 +3,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createServer as createNetServer } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
@@ -112,9 +113,19 @@ test('Python shards partition the Node inventory and keep composed browser files
   for (const file of starter) expect(file).not.toMatch(/\/app\.test\.ts$/);
 }, 60_000);
 
-test('the Python starter browser project runs in the Python groups only and never repeats a main browser file', () => {
+test('the Python starter browser project lists only the composed app tests, in the Python groups only', async () => {
+  // Another run may hold the project's default API port, so list on a free one.
+  const probe = createNetServer();
+  await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
+  const address = probe.address();
+  if (address === null || typeof address === 'string') throw new Error('No free port.');
+  const port = address.port;
+  await new Promise<void>((done) => probe.close(() => done()));
   const list = (group?: string): string[] => {
-    const env = { ...process.env };
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      GALAXIE_PYTHON_STARTER_API_PORT: String(port),
+    };
     if (group === undefined) delete env['GALAXIE_TEST_GROUP'];
     else env['GALAXIE_TEST_GROUP'] = group;
     const result = spawnSync(
@@ -124,8 +135,6 @@ test('the Python starter browser project runs in the Python groups only and neve
         'list',
         '--project',
         'python-starter-browser',
-        '--project',
-        'browser',
         '--filesOnly',
         '--json',
       ],
@@ -136,16 +145,14 @@ test('the Python starter browser project runs in the Python groups only and neve
       file.replaceAll('\\', '/'),
     );
   };
-  const starterFiles = (files: string[]): string[] =>
-    files.filter(
-      (file) => file.includes('-langgraph-python/test/') && file.endsWith('app.test.ts'),
-    );
-  const everything = list();
-  expect(starterFiles(everything)).toHaveLength(2);
-  expect(everything.length).toBe(new Set(everything).size);
-  const rest = list('python-rest');
-  expect(starterFiles(rest)).toHaveLength(2);
-  expect(rest.length).toBe(new Set(rest).size);
+  const isStarterApp = (file: string): boolean =>
+    file.includes('-langgraph-python/test/') && file.endsWith('/app.test.ts');
+  // Every listed file is a composed starter app test, so none repeats a main browser file.
+  for (const group of [undefined, 'python', 'python-rest']) {
+    const files = list(group);
+    expect(files, String(group)).toHaveLength(2);
+    expect(files.every(isStarterApp), String(group)).toBe(true);
+  }
   for (const group of ['general', 'python-dspy', 'python-pydantic', 'python-adk'])
-    expect(starterFiles(list(group)), group).toEqual([]);
+    expect(list(group), group).toEqual([]);
 }, 120_000);
