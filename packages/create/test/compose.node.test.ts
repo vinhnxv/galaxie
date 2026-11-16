@@ -325,3 +325,14 @@ test.each([
   );
   await expect(loadLayers(root)).rejects.toBeInstanceOf(LayerManifestError);
 });
+
+test('pnpm build decisions preserve numeric-looking package-name keys', () => {
+  const layers = basic();
+  layers[2]!.manifest.pnpm = { allowBuilds: { '1.0': false, '1e3': true, '0xff': false } };
+  const yaml = compose(layers, { ...options, packageManager: 'pnpm' }).files.get(
+    'pnpm-workspace.yaml',
+  );
+  expect(Buffer.from(yaml!.bytes).toString()).toBe(
+    "allowBuilds:\n  '0xff': false\n  '1.0': false\n  '1e3': true\n",
+  );
+});

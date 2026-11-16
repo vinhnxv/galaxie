@@ -31,7 +31,6 @@ export const templateDefinition: TemplateDefinition = defineAgentDefinition({
 });
 export const commentPrompt = 'Give one short encouraging sentence about practicing.';
 
-/** The scripted question precedes inference and is saved in the ADK session. */
 export function createTemplateAgent(): AdkAgent {
   return (host) =>
     defineAdkEntry({

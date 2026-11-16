@@ -171,12 +171,13 @@ test('the ADK starter callback pauses before inference and resumes to the model 
       import.meta.url,
     ).href
   );
+  const model = createMockModel();
   const runtime = createRuntime({ appId: 'adk-starter-test', executors: [createExecutor()] });
   try {
     const instance = await runtime.create(templateDefinition, {
       principalScope: 'test',
       agent: createTemplateAgent(),
-      services: createServices({ mock: createMockModel() }),
+      services: createServices({ mock: model }),
       models: {
         providers: {
           mock: providerDescriptor({
@@ -196,6 +197,7 @@ test('the ADK starter callback pauses before inference and resumes to the model 
     await expect.poll(() => instance.getSnapshot().run?.status).toBe('waiting_input');
     const pending = instance.getSnapshot().run?.pending;
     expect(pending).toMatchObject({ surfaceId: 'question', viewRevision: 'question-v1' });
+    expect(model.calls).toBe(0);
     if (pending === undefined) throw new Error('The question did not pause.');
     expect(
       await instance.dispatch({
@@ -211,6 +213,7 @@ test('the ADK starter callback pauses before inference and resumes to the model 
     for await (const event of instance.events(runId))
       if (event.type === 'output') outputs.push(event.output);
     expect(outputs.map(readResult)).toEqual([mockReply]);
+    expect(model.calls).toBe(1);
   } finally {
     await runtime.dispose();
   }
@@ -290,5 +293,54 @@ test('the ADK overlay refuses a custom BaseAgent at preparation', async () => {
     await expect(instance.prepare()).rejects.toMatchObject({ code: 'unsupported' });
   } finally {
     await runtime.dispose();
+  }
+});
+
+test.each([
+  ['submit', {}, 'rejected'],
+  ['submit', { answers: { sum: 'six' } }, 'accepted'],
+  ['approve', { answers: { sum: 'four' } }, 'rejected'],
+])('the ADK starter rejects invalid answer or action %s %j', async (action, payload, status) => {
+  const { createTemplateHost } = await import(
+    new URL(
+      '../../packages/create/.cache/composed/browser-only-adk-js/src/runtime.ts',
+      import.meta.url,
+    ).href
+  );
+  const { starterInput } = await import(
+    new URL(
+      '../../packages/create/.cache/composed/browser-only-adk-js/src/executor.ts',
+      import.meta.url,
+    ).href
+  );
+  const host = await createTemplateHost({
+    builtInAIProbe: async () => 'unavailable',
+    webGPUProbe: () => false,
+  });
+  try {
+    const instance = await host.createInstance();
+    await instance.prepare();
+    const { runId } = await instance.start(starterInput);
+    await expect.poll(() => instance.getSnapshot().run?.status).toBe('waiting_input');
+    const pending = instance.getSnapshot().run?.pending;
+    expect(pending).toBeDefined();
+    const receipt = await instance.dispatch({
+      ...pending,
+      instanceId: instance.instanceId,
+      runId,
+      action,
+      payload,
+    });
+    expect(receipt).toMatchObject({ status });
+    if (status === 'rejected') {
+      expect(receipt).toMatchObject({ error: { code: 'invalid' } });
+      expect(instance.getSnapshot().run?.status).toBe('waiting_input');
+      expect(instance.getSnapshot().run?.pending).toEqual(pending);
+    } else {
+      await expect.poll(() => instance.getSnapshot().run?.status).toBe('failed');
+      expect(instance.getSnapshot().run?.error).toMatchObject({ code: 'invalid' });
+    }
+  } finally {
+    await host.dispose();
   }
 });

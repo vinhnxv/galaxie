@@ -202,7 +202,7 @@ export function compose(layers: readonly Layer[], options: ComposeOptions): Comp
     const rows = Object.keys(allowBuilds)
       .sort()
       .map(
-        (name) => `  ${name.startsWith('@') ? `'${name}'` : name}: ${String(allowBuilds[name])}`,
+        (name) => `  ${/^[@0-9]/.test(name) ? `'${name}'` : name}: ${String(allowBuilds[name])}`,
       );
     add('pnpm-workspace.yaml', Buffer.from(`allowBuilds:\n${rows.join('\n')}\n`), 'composer');
   }
