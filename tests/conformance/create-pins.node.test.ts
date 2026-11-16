@@ -359,3 +359,21 @@ test.each([
     await host.dispose();
   }
 });
+
+test('the Go overlay pins both private packages and keeps build plus preview', async () => {
+  const layers = await loadLayers(templates);
+  const framework = layers.find((layer) => layer.manifest.id === 'adk-go');
+  expect(framework?.manifest.package['dependencies']).toEqual({
+    '@galaxie-ai/adapter-go': '^0.1.0',
+    '@galaxie-ai/starter-go': '^0.1.0',
+    '@langchain/core': '1.2.20',
+    zod: '4.6.7',
+  });
+  const project = compose(layers, { ...options, kind: 'browser-only', framework: 'adk-go' });
+  const pkg = JSON.parse(Buffer.from(project.files.get('package.json')?.bytes ?? []).toString());
+  expect(pkg.scripts.dev).toBe(
+    'vite build && vite preview --host 127.0.0.1 --port 4173 --strictPort',
+  );
+  expect(project.files.has('GO.md')).toBe(true);
+  expect(project.files.has('go/go.mod')).toBe(true);
+});

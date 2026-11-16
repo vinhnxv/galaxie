@@ -326,6 +326,7 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     { name: 'gateway-langgraph-js', kind: 'gateway', framework: 'langgraph-js' },
     { name: 'browser-only-adk-js', kind: 'browser-only', framework: 'adk-js' },
     { name: 'gateway-adk-js', kind: 'gateway', framework: 'adk-js' },
+    { name: 'browser-only-adk-go', kind: 'browser-only', framework: 'adk-go' },
   ]);
   expect(templateSpecs[0]?.steps).toEqual([
     { action: 'check', role: 'radio', name: '4' },
@@ -1209,6 +1210,40 @@ it('allows only the ADK extra package in ADK single-copy checks', () => {
       },
       ['@galaxie-ai/adapter-adk'],
       'adk-js',
+    ),
+  ).toThrow('Single-copy');
+});
+
+it('selects Go only in tarball mode and uses the ADK browser drive', () => {
+  expect(parseArguments(['--framework', 'adk-go', '--mode', 'tarball'])).toMatchObject({
+    framework: 'adk-go',
+    mode: 'tarball',
+  });
+  for (const mode of ['registry', 'both'])
+    expect(() => parseArguments(['--framework', 'adk-go', '--mode', mode])).toThrow('Usage');
+  expect(templateSpecs.find((spec) => spec.framework === 'adk-go')?.steps).toEqual(
+    templateSpecs.find((spec) => spec.framework === 'adk-js' && spec.kind === 'browser-only')
+      ?.steps,
+  );
+});
+
+it('allows exactly the two Go artifact packages in Go single-copy checks', () => {
+  const required = ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'];
+  const packages = Object.fromEntries(
+    required.map((name) => [`node_modules/${name}`, { resolved: 'file:/tmp/package.tgz' }]),
+  );
+  expect(() => assertSingleCopies({ packages }, required, 'adk-go')).not.toThrow();
+  expect(() => assertSingleCopies({ packages }, required, 'adk-js')).toThrow('Single-copy');
+  expect(() =>
+    assertSingleCopies(
+      {
+        packages: {
+          ...packages,
+          'node_modules/@galaxie-ai/adapter-adk': { resolved: 'file:/tmp/adk.tgz' },
+        },
+      },
+      required,
+      'adk-go',
     ),
   ).toThrow('Single-copy');
 });

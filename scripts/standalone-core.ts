@@ -208,7 +208,11 @@ export function assertSingleCopies(
     if (name === undefined) continue;
     if (
       (!launchPackages.includes(name) &&
-        !(framework === 'adk-js' && name === '@galaxie-ai/adapter-adk')) ||
+        !(framework === 'adk-js' && name === '@galaxie-ai/adapter-adk') &&
+        !(
+          framework === 'adk-go' &&
+          ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'].includes(name)
+        )) ||
       !entry.resolved?.startsWith('file:')
     )
       throw new Error(`Single-copy tarball check failed for ${name}.`);
@@ -550,9 +554,12 @@ export async function runStandalone(
       childEnv = env,
     ): Command => ({ executable, args, cwd, env: childEnv, signal });
     const needsAdk = options.specs.some((spec) => spec.framework === 'adk-js');
-    const packedPackages = needsAdk
-      ? [...launchPackages, '@galaxie-ai/adapter-adk']
-      : launchPackages;
+    const needsGo = options.specs.some((spec) => spec.framework === 'adk-go');
+    const packedPackages = [
+      ...launchPackages,
+      ...(needsAdk ? ['@galaxie-ai/adapter-adk'] : []),
+      ...(needsGo ? ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'] : []),
+    ];
     let tarballs: string | undefined;
     let packError: unknown;
     if (options.modes.includes('tarball')) {
@@ -571,6 +578,10 @@ export async function runStandalone(
                 ['exec', 'tsc', '-p', 'packages/adapter-adk/tsconfig.build.json'],
                 repo,
               ),
+            );
+          if (needsGo)
+            await runner.run(
+              command(pnpm, ['exec', 'tsc', '-p', 'packages/adapter-go/tsconfig.build.json'], repo),
             );
           for (const name of packedPackages)
             await runner.run(

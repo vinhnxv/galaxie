@@ -8,7 +8,7 @@ import type { Mode, NodeRequest, Result, Step, TemplateSpec } from './standalone
 
 export interface Arguments {
   kind: 'browser-only' | 'gateway' | 'all';
-  framework: 'langgraph-js' | 'adk-js';
+  framework: 'langgraph-js' | 'adk-js' | 'adk-go';
   nodes: NodeRequest[];
   mode: Mode | 'both';
   tarballs?: string;
@@ -19,7 +19,7 @@ export interface Arguments {
 }
 export const usage = `Usage: node scripts/verify-standalone.ts [options]
   --kind browser-only|gateway|all             (default all)
-  --framework langgraph-js|adk-js          (default langgraph-js; ADK is tarball-only)
+  --framework langgraph-js|adk-js|adk-go          (default langgraph-js; ADK is tarball-only)
   --node <major>[=/path/to/node]            (repeatable; default current)
   --mode registry|tarball|both              (default registry)
   --tarballs <directory>                   reuse seven packed launch packages
@@ -61,7 +61,7 @@ export function parseArguments(args: readonly string[]): Arguments {
         options.kind = value;
         break;
       case '--framework':
-        if (value !== 'langgraph-js' && value !== 'adk-js') invalid();
+        if (value !== 'langgraph-js' && value !== 'adk-js' && value !== 'adk-go') invalid();
         options.framework = value;
         break;
       case '--mode':
@@ -89,7 +89,8 @@ export function parseArguments(args: readonly string[]): Arguments {
         invalid();
     }
   }
-  if (!options.help && options.framework === 'adk-js' && options.mode !== 'tarball') invalid();
+  if (!options.help && options.framework !== 'langgraph-js' && options.mode !== 'tarball')
+    invalid();
   if (options.nodes.length === 0)
     options.nodes.push({ major: Number(process.versions.node.split('.')[0]) });
   return options;
@@ -148,17 +149,21 @@ const langGraphSpecs: readonly TemplateSpec[] = [
 
 export const templateSpecs: readonly TemplateSpec[] = [
   ...langGraphSpecs,
-  ...langGraphSpecs.map(
-    (spec): TemplateSpec => ({
-      ...spec,
-      name: `${spec.kind}-adk-js`,
-      framework: 'adk-js',
-      steps: spec.steps.map((step) =>
-        step.action === 'text' && step.name.startsWith('Correct. ')
-          ? { ...step, name: step.name.slice('Correct. '.length) }
-          : step,
+  ...['adk-js', 'adk-go'].flatMap((framework) =>
+    langGraphSpecs
+      .filter((spec) => framework !== 'adk-go' || spec.kind === 'browser-only')
+      .map(
+        (spec): TemplateSpec => ({
+          ...spec,
+          name: `${spec.kind}-${framework}`,
+          framework,
+          steps: spec.steps.map((step) =>
+            step.action === 'text' && step.name.startsWith('Correct. ')
+              ? { ...step, name: step.name.slice('Correct. '.length) }
+              : step,
+          ),
+        }),
       ),
-    }),
   ),
 ];
 

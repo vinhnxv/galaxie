@@ -194,20 +194,23 @@ node scripts/verify-standalone.ts --help
 node scripts/verify-standalone.ts --node 22 --node 24 --mode both --json /tmp/galaxie-standalone-final.json
 ```
 
-`--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js`
+`--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js|adk-go`
 selects the framework (default `langgraph-js`); ADK requires `--mode tarball`.
+ADK Go currently selects the browser-only kind.
 The old `--template` flag is rejected. `--node` is repeatable;
 `--node 22=/absolute/path/to/node` overrides discovery. Otherwise the current
 runtime wins for its major, then the newest matching nvm installation.
 `--mode registry|tarball|both` selects installs. `--tarballs /path/to/dir` reuses
-seven previously packed launch packages (plus `adapter-adk` for ADK) by copying them into the owned temporary
+seven previously packed launch packages (plus `adapter-adk` for ADK JavaScript, or `adapter-go` and `starter-go` for ADK Go) by copying them into the owned temporary
 root. `--keep` retains that root and prints its path for investigation; remove it
 afterward. `--min-release-age-exclude` is an explicit, recorded exception, not a
 change to user configuration. No exclusion was used for this measurement.
 
 Tarball mode first runs `build:packages` in the workspace, writing its ordinary
 ignored build artifacts, then `pnpm pack` for the seven launch packages. ADK runs additionally compile and
-pack `adapter-adk`, without adding it to the launch inventory. It uses
+pack `adapter-adk` for JavaScript, or `adapter-go` and `starter-go` for Go,
+without adding them to the launch inventory. Go packing requires Go 1.27.3
+on PATH and invokes starter-go prepack to produce its complete dist. It uses
 the harness Node 24 and pnpm for packing, independently of the target Node. Every
 generated project's scaffold, install, build, check, preview and server compile/run uses the requested
 Node binary. npm's resolved `npm-cli.js` is invoked by that binary explicitly;

@@ -33,6 +33,7 @@ const templates = [
   'gateway-langgraph-js',
   'browser-only-adk-js',
   'gateway-adk-js',
+  'browser-only-adk-go',
 ].map((directory) => ({
   directory,
   manifest: readManifest(`packages/create/.cache/composed/${directory}`),

@@ -81,3 +81,20 @@ test('pnpm 11 installs offline with closed stdin and never runs a refused protob
     expect(existsSync(join(cwd, 'node_modules/protobufjs/built-sentinel'))).toBe(false);
   }
 }, 60_000);
+
+test('only the ADK JavaScript framework needs a dependency build policy', async () => {
+  const layers = await loadLayers(fileURLToPath(new URL('../../templates', import.meta.url)));
+  for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
+    const policy = compose(layers, {
+      name: 'policy',
+      kind: 'browser-only',
+      framework,
+      packageManager: 'pnpm',
+      mode: 'project',
+    }).files.get('pnpm-workspace.yaml');
+    if (framework === 'adk-js') {
+      expect(policy).toBeDefined();
+      expect(Buffer.from(policy!.bytes).toString()).toContain('protobufjs: false');
+    } else expect(policy).toBeUndefined();
+  }
+});

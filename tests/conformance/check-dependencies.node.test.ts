@@ -930,3 +930,20 @@ test.each([
 ])('scopes the ADK overlay allowance to %s', (path, status) => {
   expect(run({ [path]: adk('@google/adk') }).status).toBe(status);
 });
+
+test.each(['src', 'dist'])('starter-go %s cannot depend on galaxie runtime packages', (area) => {
+  const result = run({
+    [`packages/starter-go/${area}/a.${area === 'dist' ? 'js' : 'ts'}`]:
+      "import '@galaxie-ai/core';\n",
+  });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('starter-go must not import galaxie packages');
+});
+
+test('an adapter cannot depend on starter-go', () => {
+  const result = run({
+    'packages/adapter-go/src/a.ts': "import '@galaxie-ai/starter-go/build';\n",
+  });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('adapters must not import starter-go');
+});
