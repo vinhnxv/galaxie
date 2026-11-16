@@ -380,3 +380,28 @@ test('the ADK CLI warns that the adapter is unpublished unless packed tarballs a
   ).toBe(0);
   expect(streams.text()).toContain('@galaxie-ai/adapter-adk is not published yet');
 });
+
+test.each(['browser-only', 'gateway'])(
+  'the %s ADK Go CLI warns about both unpublished packages and emits the Go source',
+  async (kind) => {
+    const { root } = await fixture();
+    const streams = output();
+    expect(
+      await run(['go-app', kind, 'adk-go', '--no-install'], {
+        cwd: root,
+        templatesRoot: fileURLToPath(new URL('../../../templates', import.meta.url)),
+        ...streams,
+        env: {},
+      }),
+    ).toBe(0);
+    expect(streams.text()).toContain(
+      '@galaxie-ai/adapter-go and @galaxie-ai/starter-go are not published yet',
+    );
+    expect(await readdir(join(root, 'go-app/go'))).toEqual([
+      'agent.go',
+      'go.mod',
+      'go.sum',
+      'main.go',
+    ]);
+  },
+);

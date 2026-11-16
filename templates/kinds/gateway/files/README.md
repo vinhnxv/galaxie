@@ -137,3 +137,17 @@ npm run check
 Under the page's Trusted Types CSP, zod's one-time eval-support probe (`new Function('')`) is blocked, logs `This document requires 'TrustedScript' assignment.` once in the console and falls back to schema checks without code generation. This is expected; do not loosen the CSP to silence it. The browser test allows exactly that message and fails on any other console error.
 
 Tests use the in-process mock or a loopback stub upstream; no real credential or real model is required. In-memory spans are **not exercised**; event and snapshot scans do not establish a span-export result. The Node and Chromium suites run over loopback against that stub, so they establish gateway and page behavior only, not behavior against a real provider. Real upstream compatibility, provider billing, production authentication/storage, real-device behavior, latency and memory use remain unverified and unmeasured.
+
+
+## ADK Go agent
+
+Choose `--framework adk-go` for the same gateway flow with the prebuilt Go agent
+in a dedicated Worker. See `GO.md` for editing, cache precedence and the Go
+1.27.3 requirement. The private adapter and starter artifacts require local
+npm tarballs until a separate release publishes them. `dev` builds once and then
+runs Vite preview; rerun it after Go edits. The Go header matches the existing
+ADK Go recipe's mock header: same-origin scripts and Workers, `wasm-unsafe-eval`,
+required Trusted Types and an allowlisted `default` Worker URL policy. Existing
+JavaScript headers and server authorization checks are unchanged. Preview uses
+the fixed mock upstream; the production server still returns 503 without an
+upstream. Real models and browsers beyond Chromium are unmeasured for this overlay.

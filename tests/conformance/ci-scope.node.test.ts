@@ -12,6 +12,7 @@ test('a change confined to documents, Go and unrelated packages skips the Python
       'docs/adr/0023-google-adk-go-through-a-wasm-worker.md',
       'README.md',
       'packages/adapter-go/src/index.ts',
+      'packages/starter-go/src/resolve.ts',
       'go/galaxie/record.go',
       'tests/conformance/golden-adk-go/parallel.json',
       'tests/conformance/adk-go-restore.node.test.ts',

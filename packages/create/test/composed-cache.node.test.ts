@@ -1,7 +1,16 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { lstat, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
@@ -53,7 +62,10 @@ async function assertCache(
 
 test.each(
   ['browser-only', 'gateway'].flatMap((kind) =>
-    ['langgraph-js', 'adk-js'].map((framework) => ({ kind, framework })),
+    ['langgraph-js', 'adk-js', 'adk-go'].map((framework) => ({
+      kind,
+      framework,
+    })),
   ),
 )(
   '$kind-$framework composed cache exactly matches the current layers',
@@ -73,8 +85,13 @@ test.each(
       packageManager: 'npm',
       workspaceRoot: repo,
     });
-    expect([...files.keys()].filter((path) => /\.test\.ts$/.test(path))).toHaveLength(4);
+    expect([...files.keys()].filter((path) => /\.test\.ts$/.test(path))).toHaveLength(5);
     await assertCache(directory, files);
+    if (framework === 'adk-go') {
+      const installed = join(directory, 'node_modules/@galaxie-ai/starter-go');
+      expect((await lstat(installed)).isSymbolicLink()).toBe(true);
+      expect(await realpath(installed)).toBe(await realpath(join(repo, 'packages/starter-go')));
+    }
   },
 );
 

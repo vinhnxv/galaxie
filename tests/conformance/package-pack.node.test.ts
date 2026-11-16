@@ -11,6 +11,7 @@ import { build } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import * as runtimeInventory from '../../packages/adapter-pyodide/src/runtime-files.js';
 import { discoverEntries } from '../../scripts/check-size.js';
+import { hasStarterGo } from './support/starter-go.node.js';
 
 interface Manifest {
   readonly version: string;
@@ -39,21 +40,24 @@ const launchPackages = [
   'storage-indexeddb',
   'react',
 ];
-const preparedPackages = ['adapter-pyodide', 'adapter-adk', 'adapter-go'];
+const preparedPackages = ['adapter-pyodide', 'adapter-adk', 'adapter-go', 'starter-go'];
+const starterAvailable = hasStarterGo();
 
 function readManifest(directory: string): Manifest {
   return JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) as Manifest;
 }
 
 const coreVersion = readManifest(join(root, 'packages/core')).version;
-const packages = [...launchPackages, ...preparedPackages].map((directory) => ({
-  directory,
-  group: launchPackages.includes(directory) ? 'launch' : 'prepared',
-  source: readManifest(join(root, 'packages', directory)),
-  entries: [] as string[],
-  packedJson: '',
-  tarball: '',
-}));
+const packages = [...launchPackages, ...preparedPackages]
+  .filter((directory) => directory !== 'starter-go' || starterAvailable)
+  .map((directory) => ({
+    directory,
+    group: launchPackages.includes(directory) ? 'launch' : 'prepared',
+    source: readManifest(join(root, 'packages', directory)),
+    entries: [] as string[],
+    packedJson: '',
+    tarball: '',
+  }));
 let temporaryDirectory: string | undefined;
 
 beforeAll(() => {
@@ -198,7 +202,21 @@ test.each(packages.filter((pkg) => pkg.group === 'prepared'))(
         expect(targets['default']).toMatch(/^\.\/dist\/.+\.(?:js|mjs)$/);
       }
     }
-    if (pkg.directory !== 'adapter-adk') {
+    if (pkg.directory === 'starter-go') {
+      for (const entry of [
+        'agent.wasm',
+        'wasm_exec.js',
+        'manifest.json',
+        'NOTICE.txt',
+        'go-module/go.mod',
+        'go-module/go.sum',
+        'go-module/galaxie/agents.go',
+      ])
+        expect(pkg.entries).toContain(`package/dist/${entry}`);
+      expect(
+        pkg.entries.some((entry) => entry.endsWith('_test.go') || entry.includes('/.cache/')),
+      ).toBe(false);
+    } else if (pkg.directory !== 'adapter-adk') {
       expect(pkg.entries).toContain('package/dist/worker.js');
       expect(pkg.entries).toContain('package/dist/worker.d.ts');
     }
@@ -220,7 +238,10 @@ test('size discovery detects prepared packages when a copy loses private status'
   if (temporaryDirectory === undefined) throw new Error('Missing temporary directory.');
   const directory = join(temporaryDirectory, 'size-discovery');
   mkdirSync(directory);
-  for (const pkg of packages.filter((entry) => entry.group === 'prepared')) {
+  for (const pkg of preparedPackages.map((directory) => ({
+    directory,
+    source: readManifest(join(root, 'packages', directory)),
+  }))) {
     const destination = join(directory, pkg.directory);
     mkdirSync(destination);
     writeFileSync(
@@ -235,6 +256,8 @@ test('size discovery detects prepared packages when a copy loses private status'
     '@galaxie-ai/adapter-pyodide/.',
     '@galaxie-ai/adapter-pyodide/runtime-files',
     '@galaxie-ai/adapter-pyodide/worker',
+    '@galaxie-ai/starter-go/.',
+    '@galaxie-ai/starter-go/build',
   ]);
 });
 

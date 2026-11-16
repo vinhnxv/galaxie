@@ -7,6 +7,65 @@ production server still follows the correlated 503 unavailable flow. These check
 use no Built-in AI, WebGPU or upstream model. Earlier records below predate the
 gateway mock.
 
+## ADK Go measurement (2026-11-16)
+
+The private, unpublished `@galaxie-ai/starter-go` package supplies the browser-only
+ADK Go starter's prebuilt agent, verified glue, Go module source, manifest and
+notices. With Go 1.27.3 on PATH, its prepack produced 29,897,761 wasm bytes with
+SHA-256 `bff0abbb35389b1fbc3e2757f98574abcebfd758b843852da96cf1f5731c2c30`.
+Artifact conformance compares four clean/git/symlink-shaped builds, pack/plugin
+source identities, glue tampering and a broken module replacement.
+
+`tests/conformance/starter-go-browser.node.test.ts` passes all four Chromium
+cases: unedited prebuilt without Go; edited-source refusal with the exact documented
+message and no output; an edited local build followed by a no-Go cache hit; and an
+unedited version-only artifact upgrade without Go. Each successful browser drive
+answers the quiz from the mock and checks the logged origin and wasm digest,
+same-origin requests, zero CSP/Trusted Types violations and zero errors. The
+negative control without `wasm-unsafe-eval` cannot open the question or compile
+an empty wasm module. The Go overlay initializes Zod in jitless mode before page
+dependencies create schemas, preventing its caught eval probe without changing
+any CSP directive.
+
+The seven launch packages plus `adapter-go` and `starter-go` were packed locally
+with Go 1.27.3. Then, with a PATH containing Node and system tools but no Go,
+this real-network command exited 0:
+
+```sh
+node scripts/verify-standalone.ts --framework adk-go --mode tarball --tarballs <tarballs> --json /tmp/galaxie-adk-go-network-final.json
+```
+
+| Kind / framework | Target Node | npm | Mode | Chromium | Result |
+| --- | --- | --- | --- | --- | --- |
+| browser-only / adk-go | 24.15.0 | 12.2.2 | Tarball | 156.0.8078.4 | PASS |
+| gateway / adk-go | 24.15.0 | 12.2.2 | Tarball | 156.0.8078.4 | PASS |
+
+Each result has an empty failure array. Installation, single-copy checks,
+production build, generated checks, directive mutation controls and the mock
+browser drive pass with a seven-day release age, no exclusion and no lifecycle
+script fallback. The harness removed its temporary projects; JSON and logs stay
+outside the checkout. Gateway also passes its compiled production-server 503
+flow and session probes. Nothing was published.
+
+The first additional gateway run exited 1 after install/build/check passed:
+
+```text
+negative-control [harness]: negative-control failed.
+Negative control could not mutate script-src.
+```
+
+The harness's direct-array mutation did not match the framework-aware conditional
+in the gateway CSP source. Its mutation now inserts the forbidden directive in
+both branches; offline controls exercise each branch, still require the exact
+rejection and verify restoration. The rerun and the final two-kind run exit 0.
+No header or server assertion was loosened.
+
+Firefox/WebKit for the Go starter, real models, pnpm/yarn installs end to end,
+a cold Go module cache, Node 22 and CI cold-start time remain unmeasured. The
+pnpm symlink shape has build-level evidence only. A go.mod replace target
+outside go/ and node_modules is not part of the source hash. A release changing the template Go tree requires Go for older projects.
+ADR-0012 guarantees are unchanged.
+
 ## ADK overlay measurement (2026-11-16)
 
 Both starter kinds now support `--framework adk-js --mode tarball`. The adapter
@@ -194,20 +253,23 @@ node scripts/verify-standalone.ts --help
 node scripts/verify-standalone.ts --node 22 --node 24 --mode both --json /tmp/galaxie-standalone-final.json
 ```
 
-`--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js`
+`--kind browser-only|gateway|all` selects kinds. `--framework langgraph-js|adk-js|adk-go`
 selects the framework (default `langgraph-js`); ADK requires `--mode tarball`.
+ADK Go supports both kinds.
 The old `--template` flag is rejected. `--node` is repeatable;
 `--node 22=/absolute/path/to/node` overrides discovery. Otherwise the current
 runtime wins for its major, then the newest matching nvm installation.
 `--mode registry|tarball|both` selects installs. `--tarballs /path/to/dir` reuses
-seven previously packed launch packages (plus `adapter-adk` for ADK) by copying them into the owned temporary
+seven previously packed launch packages (plus `adapter-adk` for ADK JavaScript, or `adapter-go` and `starter-go` for ADK Go) by copying them into the owned temporary
 root. `--keep` retains that root and prints its path for investigation; remove it
 afterward. `--min-release-age-exclude` is an explicit, recorded exception, not a
 change to user configuration. No exclusion was used for this measurement.
 
 Tarball mode first runs `build:packages` in the workspace, writing its ordinary
 ignored build artifacts, then `pnpm pack` for the seven launch packages. ADK runs additionally compile and
-pack `adapter-adk`, without adding it to the launch inventory. It uses
+pack `adapter-adk` for JavaScript, or `adapter-go` and `starter-go` for Go,
+without adding them to the launch inventory. Go packing requires Go 1.27.3
+on PATH and invokes starter-go prepack to produce its complete dist. It uses
 the harness Node 24 and pnpm for packing, independently of the target Node. Every
 generated project's scaffold, install, build, check, preview and server compile/run uses the requested
 Node binary. npm's resolved `npm-cli.js` is invoked by that binary explicitly;

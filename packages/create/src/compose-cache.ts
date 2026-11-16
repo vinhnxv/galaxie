@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { lstat, mkdir, rm } from 'node:fs/promises';
+import { lstat, mkdir, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compose } from './compose.js';
@@ -22,7 +22,7 @@ for (const part of ['.cache', 'composed']) {
 }
 const layers = await loadLayers(join(repo, 'templates'));
 for (const kind of ['browser-only', 'gateway']) {
-  for (const framework of ['langgraph-js', 'adk-js']) {
+  for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
     const name = `${kind}-${framework}`;
     const { files } = compose(layers, {
       kind,
@@ -35,5 +35,10 @@ for (const kind of ['browser-only', 'gateway']) {
     const directory = join(cache, name);
     await rm(directory, { recursive: true, force: true });
     await writeProject(await planWrite(files, directory));
+    if (framework === 'adk-go') {
+      const scope = join(directory, 'node_modules/@galaxie-ai');
+      await mkdir(scope, { recursive: true });
+      await symlink(join(repo, 'packages/starter-go'), join(scope, 'starter-go'), 'dir');
+    }
   }
 }

@@ -13,6 +13,7 @@ import { gatewayPlugin } from '../server/plugin.js';
 import { createAppHandler } from '../server/serve.js';
 import { cspHeader } from '../src/csp.js';
 import { expectedResult, gatewayReply } from '../src/executor.js';
+import { frameworkProfile } from '../src/framework-profile.js';
 import { completion, harness, listen, post, token } from './support.node.js';
 
 const template = fileURLToPath(new URL('..', import.meta.url));
@@ -72,12 +73,17 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
     const errors: string[] = [];
     const apiBodies: string[] = [];
     const issued: string[] = [];
+    const modelRoles: string[][] = [];
     await context.route('**/*', async (route) => {
       urls.push(route.request().url());
       const target = new URL(route.request().url());
       if (target.origin !== origin) await route.abort('blockedbyclient');
       else if (target.pathname.startsWith('/api/')) {
         // Read API bodies here: the browser cannot return a streamed body after the page consumed it.
+        if (target.pathname === '/api/v1/chat/completions') {
+          const request = route.request().postDataJSON() as { messages: { role: string }[] };
+          modelRoles.push(request.messages.map((message) => message.role));
+        }
         const fetched = await route.fetch();
         const text = await fetched.text();
         // The session body delivers the token by design; every other body must not contain it.
@@ -124,12 +130,18 @@ it('builds and completes the browser agent under CSP with same-origin traffic an
     expect(storage.session).toEqual({});
     expect(urls.length).toBeGreaterThan(0);
     expect(urls.every((url) => new URL(url).origin === origin)).toBe(true);
+    if (frameworkProfile.workers) {
+      expect(urls.filter((url) => url.endsWith('/go/agent.wasm'))).toHaveLength(1);
+      expect(urls.filter((url) => /go-worker.*\.js/.test(url))).toHaveLength(1);
+    } else expect(urls.some((url) => /\.wasm|go-worker/.test(url))).toBe(false);
     // Zod probes eval support once with `new Function('')`. The CSP blocks that caught probe, which
     // logs this one message and falls back to schemas without code generation. Nothing else may log.
     const evalProbe = "This document requires 'TrustedScript' assignment.";
     expect(errors.filter((message) => !message.startsWith(evalProbe))).toEqual([]);
     expect(errors.filter((message) => message.startsWith(evalProbe)).length).toBeLessThanOrEqual(1);
     expect(server.records).toHaveLength(1);
+    expect(modelRoles).toHaveLength(1);
+    expect(modelRoles[0]?.every((role) => !['system', 'developer'].includes(role))).toBe(true);
     await context.close();
     delete process.env['UPSTREAM_BASE_URL'];
     delete process.env['UPSTREAM_API_KEY'];

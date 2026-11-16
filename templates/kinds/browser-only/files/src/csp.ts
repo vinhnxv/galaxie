@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-export function cspDirectives(mode: string): Readonly<Record<string, readonly string[]>> {
+import { frameworkProfile } from './framework-profile.js';
+
+export function cspDirectives(
+  mode: string,
+  workers: boolean = frameworkProfile.workers,
+): Readonly<Record<string, readonly string[]>> {
   return {
     'default-src': ["'none'"],
     'script-src': ["'self'", "'wasm-unsafe-eval'"],
@@ -26,12 +31,12 @@ export function cspDirectives(mode: string): Readonly<Record<string, readonly st
     'object-src': ["'none'"],
     'manifest-src': ["'self'"],
     'require-trusted-types-for': ["'script'"],
-    'trusted-types': mode === 'mock' ? ["'none'"] : ['default'],
+    'trusted-types': mode === 'mock' && !workers ? ["'none'"] : ['default'],
   };
 }
 
-export function cspHeader(mode: string): string {
-  return Object.entries(cspDirectives(mode))
+export function cspHeader(mode: string, workers: boolean = frameworkProfile.workers): string {
+  return Object.entries(cspDirectives(mode, workers))
     .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
     .join('; ');
 }

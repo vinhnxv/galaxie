@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config';
+import { goFramework } from './templates/frameworks/adk-go/files/vite.framework.js';
 
 import {
   mcpAdminCommand,
@@ -29,6 +31,9 @@ const alias = {
   ),
   '@galaxie-ai/adapter-pyodide': fileURLToPath(
     new URL('./packages/adapter-pyodide/src/index.ts', import.meta.url),
+  ),
+  '@galaxie-ai/adapter-go/worker': fileURLToPath(
+    new URL('./packages/adapter-go/src/worker.ts', import.meta.url),
   ),
   '@galaxie-ai/adapter-go': fileURLToPath(
     new URL('./packages/adapter-go/src/index.ts', import.meta.url),
@@ -177,12 +182,17 @@ if (browserName === undefined)
     `GALAXIE_BROWSER must be one of ${browsers.join(', ')}, not "${requestedBrowser}".`,
   );
 
+const starterGo = goFramework(
+  fileURLToPath(new URL('./packages/create/.cache/composed/browser-only-adk-go/', import.meta.url)),
+);
+
 const config: ViteUserConfig = defineConfig({
   server: { host: '127.0.0.1' },
   test: {
     api: { host: '127.0.0.1' },
     projects: [
       {
+        ...starterGo,
         resolve: { alias },
         test: {
           name: 'node',
@@ -206,8 +216,26 @@ const config: ViteUserConfig = defineConfig({
         },
       },
       {
+        ...starterGo,
         root: fileURLToPath(new URL('./tests/conformance', import.meta.url)),
         resolve: { alias },
+        plugins: [
+          starterGo.plugins,
+          {
+            name: 'starter-go-test-wasm',
+            configureServer(server) {
+              server.middlewares.use('/go/agent.wasm', async (_request, response, next) => {
+                try {
+                  const file = new URL('./packages/starter-go/dist/agent.wasm', import.meta.url);
+                  response.setHeader('Content-Type', 'application/wasm');
+                  response.end(await readFile(file));
+                } catch (error) {
+                  next(error);
+                }
+              });
+            },
+          },
+        ],
         optimizeDeps: {
           exclude: [
             '@mlc-ai/web-llm',

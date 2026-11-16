@@ -208,7 +208,11 @@ export function assertSingleCopies(
     if (name === undefined) continue;
     if (
       (!launchPackages.includes(name) &&
-        !(framework === 'adk-js' && name === '@galaxie-ai/adapter-adk')) ||
+        !(framework === 'adk-js' && name === '@galaxie-ai/adapter-adk') &&
+        !(
+          framework === 'adk-go' &&
+          ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'].includes(name)
+        )) ||
       !entry.resolved?.startsWith('file:')
     )
       throw new Error(`Single-copy tarball check failed for ${name}.`);
@@ -451,18 +455,22 @@ async function assertBaselineRejections(
   const mutations = [
     {
       directive: 'script-src',
-      pattern: /('script-src':\s*\[)/,
-      replacement: '$1"\'unsafe-inline\'", ',
+      change: (source: string): string =>
+        source.replace(
+          /('script-src':\s*)([^\n]+)/,
+          (_match, prefix: string, value: string) =>
+            prefix + value.replaceAll('[', '["\'unsafe-inline\'", '),
+        ),
     },
     {
       directive: 'require-trusted-types-for',
-      pattern: /('require-trusted-types-for':\s*)\[[^\]]*\]/,
-      replacement: '$1[]',
+      change: (source: string): string =>
+        source.replace(/('require-trusted-types-for':\s*)\[[^\]]*\]/, '$1[]'),
     },
   ];
-  for (const { directive, pattern, replacement } of mutations) {
+  for (const { directive, change } of mutations) {
     signal.throwIfAborted();
-    const changed = original.replace(pattern, replacement);
+    const changed = change(original);
     if (changed === original) throw new Error(`Negative control could not mutate ${directive}.`);
     try {
       await writeFile(path, changed);
@@ -550,9 +558,12 @@ export async function runStandalone(
       childEnv = env,
     ): Command => ({ executable, args, cwd, env: childEnv, signal });
     const needsAdk = options.specs.some((spec) => spec.framework === 'adk-js');
-    const packedPackages = needsAdk
-      ? [...launchPackages, '@galaxie-ai/adapter-adk']
-      : launchPackages;
+    const needsGo = options.specs.some((spec) => spec.framework === 'adk-go');
+    const packedPackages = [
+      ...launchPackages,
+      ...(needsAdk ? ['@galaxie-ai/adapter-adk'] : []),
+      ...(needsGo ? ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'] : []),
+    ];
     let tarballs: string | undefined;
     let packError: unknown;
     if (options.modes.includes('tarball')) {
@@ -571,6 +582,10 @@ export async function runStandalone(
                 ['exec', 'tsc', '-p', 'packages/adapter-adk/tsconfig.build.json'],
                 repo,
               ),
+            );
+          if (needsGo)
+            await runner.run(
+              command(pnpm, ['exec', 'tsc', '-p', 'packages/adapter-go/tsconfig.build.json'], repo),
             );
           for (const name of packedPackages)
             await runner.run(

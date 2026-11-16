@@ -2,15 +2,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadConfigFromFile, resolveConfig } from 'vite';
 
-const headers: Readonly<Record<string, string>> = {
-  production:
-    "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self' https://huggingface.co https://*.hf.co https://raw.githubusercontent.com; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types default",
-  mock: "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types 'none'",
-};
+const { frameworkProfile } = (await import(
+  new URL('../src/framework-profile.ts', import.meta.url).href
+)) as { frameworkProfile: { readonly workers: boolean } };
+
+const manifest = JSON.parse(
+  await readFile(new URL('../package.json', import.meta.url), 'utf8'),
+) as { dependencies?: Record<string, string> };
+
+test('the framework profile matches the installed framework', () => {
+  // The profile is editable source, so it must be bound to the dependency that needs workers.
+  assert.equal(
+    frameworkProfile.workers,
+    manifest.dependencies?.['@galaxie-ai/starter-go'] !== undefined,
+    'framework profile changed',
+  );
+});
+
+const headers: Readonly<Record<string, string>> = frameworkProfile.workers
+  ? {
+      production:
+        "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self' https://huggingface.co https://*.hf.co https://raw.githubusercontent.com; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types default",
+      mock: "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types default",
+    }
+  : {
+      production:
+        "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self' https://huggingface.co https://*.hf.co https://raw.githubusercontent.com; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types default",
+      mock: "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types 'none'",
+    };
 
 function assertHeader(actual: unknown, expected: string, location: string): void {
   assert.ok(typeof actual === 'string', `${location}: Content-Security-Policy header is missing`);

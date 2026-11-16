@@ -4,33 +4,11 @@
 import type { WebLLMEngineHandle } from '@galaxie-ai/models/webllm';
 import type { DownloadOptions } from './runtime.js';
 import workerUrl from './webllm-worker.ts?worker&url';
+import { createWorker } from './worker-policy.js';
 
-interface TrustedTypesFactory {
-  createPolicy(name: string, rules: { createScriptURL(value: string): string }): unknown;
-}
-
-let installed = false;
-
-/** Imported only after consent; the policy permits only this bundled worker. */
+/** Imported only after consent; the policy permits only host-selected bundled workers. */
 export async function downloadWebLLM(options: DownloadOptions): Promise<WebLLMEngineHandle> {
   const { loadWebLLMEngine } = await import('@galaxie-ai/models/webllm');
   options.signal.throwIfAborted();
-  const factory = (globalThis as typeof globalThis & { trustedTypes?: TrustedTypesFactory })
-    .trustedTypes;
-  if (factory !== undefined && !installed) {
-    const allowed = new URL(workerUrl, location.href);
-    factory.createPolicy('default', {
-      createScriptURL(value) {
-        const candidate = new URL(value, location.href);
-        if (candidate.origin !== location.origin || candidate.href !== allowed.href)
-          throw new TypeError('The worker script URL is not allowed.');
-        return candidate.href;
-      },
-    });
-    installed = true;
-  }
-  return loadWebLLMEngine({
-    worker: new Worker(new URL('./webllm-worker.ts', import.meta.url), { type: 'module' }),
-    ...options,
-  });
+  return loadWebLLMEngine({ worker: createWorker(workerUrl), ...options });
 }

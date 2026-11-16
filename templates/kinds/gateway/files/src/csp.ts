@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { frameworkProfile } from './framework-profile.js';
+
 export function cspDirectives(): Readonly<Record<string, readonly string[]>> {
   return {
     'default-src': ["'none'"],
-    'script-src': ["'self'"],
+    'script-src': frameworkProfile.workers ? ["'self'", "'wasm-unsafe-eval'"] : ["'self'"],
     'worker-src': ["'self'"],
     'connect-src': ["'self'"],
     'style-src': ["'self'"],
@@ -18,7 +20,7 @@ export function cspDirectives(): Readonly<Record<string, readonly string[]>> {
     'object-src': ["'none'"],
     'manifest-src': ["'self'"],
     'require-trusted-types-for': ["'script'"],
-    'trusted-types': ["'none'"],
+    'trusted-types': frameworkProfile.workers ? ['default'] : ["'none'"],
   };
 }
 

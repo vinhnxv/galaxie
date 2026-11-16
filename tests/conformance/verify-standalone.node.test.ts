@@ -326,6 +326,8 @@ it('parses the documented CLI forms and refuses malformed or unknown arguments',
     { name: 'gateway-langgraph-js', kind: 'gateway', framework: 'langgraph-js' },
     { name: 'browser-only-adk-js', kind: 'browser-only', framework: 'adk-js' },
     { name: 'gateway-adk-js', kind: 'gateway', framework: 'adk-js' },
+    { name: 'browser-only-adk-go', kind: 'browser-only', framework: 'adk-go' },
+    { name: 'gateway-adk-go', kind: 'gateway', framework: 'adk-go' },
   ]);
   expect(templateSpecs[0]?.steps).toEqual([
     { action: 'check', role: 'radio', name: '4' },
@@ -903,6 +905,8 @@ it('gives build and preview children only the allowlisted environment', async ()
 
 it.each([
   'pass',
+  'conditional-true',
+  'conditional-false',
   'both',
   'test-artifact',
   'workspace-artifact',
@@ -912,6 +916,12 @@ it.each([
   'negative-abort',
   'mutation-missing',
 ] as const)('gates scaffold/check/mutation phases and restores the source (%s)', async (kind) => {
+  const baseline = kind.startsWith('conditional-')
+    ? fixtureCsp.replace(
+        "'script-src': [\"'self'\"]",
+        "'script-src': frameworkProfile.workers ? [\"'self'\", \"'wasm-unsafe-eval'\"] : [\"'self'\"]",
+      )
+    : fixtureCsp;
   const root = await temporary();
   const repo = join(root, 'repo');
   await mkdir(repo);
@@ -950,7 +960,7 @@ it.each([
           );
           await writeFile(
             join(request.directory, 'src/csp.ts'),
-            kind === 'mutation-missing' ? 'not a CSP fixture' : fixtureCsp,
+            kind === 'mutation-missing' ? 'not a CSP fixture' : baseline,
           );
           if (kind === 'test-artifact') await mkdir(join(request.directory, 'test'));
           if (kind === 'workspace-artifact')
@@ -986,7 +996,14 @@ it.each([
               checks++;
               const source = await readFile(join(command.cwd, 'src/csp.ts'), 'utf8');
               if (kind === 'check-failure') throw new Error('src/csp.ts fixture check failed.');
-              if (source === fixtureCsp || kind === 'mutation-missing') return '';
+              if (source === baseline || kind === 'mutation-missing') return '';
+              if (kind.startsWith('conditional-') && source.includes('unsafe-inline')) {
+                const expression = /'script-src': (.*),/.exec(source)?.[1];
+                const active = new Function('frameworkProfile', `return (${expression});`)({
+                  workers: kind === 'conditional-true',
+                });
+                expect(active).toContain("'unsafe-inline'");
+              }
               if (kind === 'negative-pass') return '';
               if (kind === 'negative-wrong') throw new Error('Unrelated compiler failure.');
               if (kind === 'negative-abort') {
@@ -1042,10 +1059,10 @@ it.each([
     for (const request of requests) {
       expect(request.node).toBe(process.execPath);
       expect(await readFile(join(request.directory, 'src/csp.ts'), 'utf8')).toBe(
-        kind === 'mutation-missing' ? 'not a CSP fixture' : fixtureCsp,
+        kind === 'mutation-missing' ? 'not a CSP fixture' : baseline,
       );
     }
-    if (kind === 'pass' || kind === 'both') {
+    if (kind === 'pass' || kind === 'both' || kind.startsWith('conditional-')) {
       expect(results.every(({ failures }) => failures.length === 0)).toBe(true);
       expect(checks).toBe(kind === 'both' ? 6 : 3);
       expect(installs).toBe(kind === 'both' ? 2 : 1);
@@ -1168,14 +1185,16 @@ it('selects the ADK tarball matrix and refuses registry or unknown frameworks', 
 });
 
 it('pins the ADK drive strings to each composed framework export', async () => {
-  for (const kind of ['browser-only', 'gateway']) {
+  for (const { kind, framework } of templateSpecs.filter(
+    (spec) => spec.framework !== 'langgraph-js',
+  )) {
     const executor = await import(
       new URL(
-        `../../packages/create/.cache/composed/${kind}-adk-js/src/executor.ts`,
+        `../../packages/create/.cache/composed/${kind}-${framework}/src/executor.ts`,
         import.meta.url,
       ).href
     );
-    const spec = templateSpecs.find((spec) => spec.kind === kind && spec.framework === 'adk-js');
+    const spec = templateSpecs.find((spec) => spec.kind === kind && spec.framework === framework);
     const original = templateSpecs.find(
       (spec) => spec.kind === kind && spec.framework === 'langgraph-js',
     );
@@ -1209,6 +1228,40 @@ it('allows only the ADK extra package in ADK single-copy checks', () => {
       },
       ['@galaxie-ai/adapter-adk'],
       'adk-js',
+    ),
+  ).toThrow('Single-copy');
+});
+
+it('selects Go only in tarball mode and uses the ADK browser drive', () => {
+  expect(parseArguments(['--framework', 'adk-go', '--mode', 'tarball'])).toMatchObject({
+    framework: 'adk-go',
+    mode: 'tarball',
+  });
+  for (const mode of ['registry', 'both'])
+    expect(() => parseArguments(['--framework', 'adk-go', '--mode', mode])).toThrow('Usage');
+  expect(templateSpecs.find((spec) => spec.framework === 'adk-go')?.steps).toEqual(
+    templateSpecs.find((spec) => spec.framework === 'adk-js' && spec.kind === 'browser-only')
+      ?.steps,
+  );
+});
+
+it('allows exactly the two Go artifact packages in Go single-copy checks', () => {
+  const required = ['@galaxie-ai/adapter-go', '@galaxie-ai/starter-go'];
+  const packages = Object.fromEntries(
+    required.map((name) => [`node_modules/${name}`, { resolved: 'file:/tmp/package.tgz' }]),
+  );
+  expect(() => assertSingleCopies({ packages }, required, 'adk-go')).not.toThrow();
+  expect(() => assertSingleCopies({ packages }, required, 'adk-js')).toThrow('Single-copy');
+  expect(() =>
+    assertSingleCopies(
+      {
+        packages: {
+          ...packages,
+          'node_modules/@galaxie-ai/adapter-adk': { resolved: 'file:/tmp/adk.tgz' },
+        },
+      },
+      required,
+      'adk-go',
     ),
   ).toThrow('Single-copy');
 });

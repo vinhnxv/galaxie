@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 import { cspDirectives } from '../src/csp.js';
 import { templateDefinition } from '../src/executor.js';
+import { frameworkProfile } from '../src/framework-profile.js';
 import { gatewayStateForStatus, gatewayStates } from '../src/gateway-state.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -103,7 +104,9 @@ it('keeps executable imports within the copied template or launch packages', asy
       if (specifier.startsWith('.')) {
         const path = relative(root, resolve(dirname(file), specifier));
         expect(path.startsWith('..') || isAbsolute(path)).toBe(false);
-        expect(specifier).toMatch(/\.js$/);
+        if (frameworkProfile.workers && specifier === './go-worker.ts?worker&url')
+          expect(file).toBe(resolve(root, 'src/executor.ts'));
+        else expect(specifier).toMatch(/\.js$/);
       }
     }
   }
@@ -131,5 +134,10 @@ it('keeps fixed states and a same-origin CSP with required Trusted Types', () =>
   ]);
   expect(cspDirectives()['connect-src']).toEqual(["'self'"]);
   expect(cspDirectives()['require-trusted-types-for']).toEqual(["'script'"]);
-  expect(cspDirectives()['trusted-types']).toEqual(["'none'"]);
+  expect(cspDirectives()['trusted-types']).toEqual(
+    frameworkProfile.workers ? ['default'] : ["'none'"],
+  );
+  expect(cspDirectives()['script-src']).toEqual(
+    frameworkProfile.workers ? ["'self'", "'wasm-unsafe-eval'"] : ["'self'"],
+  );
 });

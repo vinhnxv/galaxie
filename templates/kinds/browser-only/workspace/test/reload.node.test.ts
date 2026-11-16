@@ -8,6 +8,7 @@ import { type Browser, chromium } from 'playwright';
 import { build, type PreviewServer, preview } from 'vite';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { expectedResult, mockReply } from '../src/executor.js';
+import { frameworkProfile } from '../src/framework-profile.js';
 
 const template = fileURLToPath(new URL('..', import.meta.url));
 const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url));
@@ -111,7 +112,13 @@ it('reloads the built app under CSP with the same pending question and no model 
     await page.getByText(expectedResult(mockReply), { exact: true }).waitFor();
     expect(requests.length).toBeGreaterThan(0);
     expect(requests.every((url) => new URL(url).origin === origin)).toBe(true);
-    expect(requests.some((url) => /webllm|\.wasm|huggingface|\.hf\.co/.test(url))).toBe(false);
+    if (frameworkProfile.workers) {
+      expect(requests.filter((url) => url.endsWith('/go/agent.wasm'))).toHaveLength(2);
+      expect(requests.some((url) => /webllm|huggingface|\.hf\.co/.test(url))).toBe(false);
+      expect(requests.filter((url) => /go-worker.*\.js/.test(url))).toHaveLength(2);
+    } else {
+      expect(requests.some((url) => /webllm|\.wasm|huggingface|\.hf\.co/.test(url))).toBe(false);
+    }
     expect(errors).toEqual([]);
   } finally {
     await context.close();
