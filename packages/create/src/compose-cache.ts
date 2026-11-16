@@ -22,7 +22,7 @@ for (const part of ['.cache', 'composed']) {
 }
 const layers = await loadLayers(join(repo, 'templates'));
 for (const kind of ['browser-only', 'gateway']) {
-  for (const framework of ['langgraph-js', 'adk-js', 'adk-go']) {
+  for (const framework of ['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python']) {
     const name = `${kind}-${framework}`;
     const { files } = compose(layers, {
       kind,
@@ -35,6 +35,17 @@ for (const kind of ['browser-only', 'gateway']) {
     const directory = join(cache, name);
     await rm(directory, { recursive: true, force: true });
     await writeProject(await planWrite(files, directory));
+    if (framework === 'langgraph-python') {
+      const scope = join(directory, 'node_modules/@galaxie-ai');
+      await mkdir(scope, { recursive: true });
+      for (const name of ['starter-python', 'adapter-pyodide'])
+        await symlink(join(repo, 'packages', name), join(scope, name), 'dir');
+      await symlink(
+        join(repo, 'packages/adapter-pyodide/node_modules/pyodide'),
+        join(directory, 'node_modules/pyodide'),
+        'dir',
+      );
+    }
     if (framework === 'adk-go') {
       const scope = join(directory, 'node_modules/@galaxie-ai');
       await mkdir(scope, { recursive: true });

@@ -12,7 +12,7 @@
       "@langchain/openai": "1.6.3"
     }
   },
-  "frameworks": ["langgraph-js", "adk-js", "adk-go"],
+  "frameworks": ["langgraph-js", "adk-js", "adk-go", "langgraph-python"],
   "workspace": {
     "paths": {
       "@galaxie-ai/adapter-kit": ["packages/adapter-kit/src/index.ts"],
