@@ -366,3 +366,17 @@ test.each(['pnpm', 'npm', 'yarn', 'bun'])(
       );
   },
 );
+
+test('the ADK CLI warns that the adapter is unpublished unless packed tarballs are supplied', async () => {
+  const { root } = await fixture();
+  const streams = output();
+  expect(
+    await run(['adk-app', 'browser-only', 'adk-js', '--no-install'], {
+      cwd: root,
+      templatesRoot: fileURLToPath(new URL('../../../templates', import.meta.url)),
+      ...streams,
+      env: { npm_config_user_agent: 'npm/11' },
+    }),
+  ).toBe(0);
+  expect(streams.text()).toContain('@galaxie-ai/adapter-adk is not published yet');
+});

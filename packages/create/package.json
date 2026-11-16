@@ -24,6 +24,7 @@
     "dist"
   ],
   "devDependencies": {
+    "@google/adk": "2.3.0",
     "@langchain/core": "1.2.20",
     "@langchain/langgraph": "1.5.1",
     "@langchain/openai": "1.6.3",
@@ -36,7 +37,6 @@
     "react-dom": "19.3.1",
     "typescript": "7.0.2",
     "vite": "8.3.4",
-    "zod": "4.6.7",
-    "@google/adk": "2.3.0"
+    "zod": "4.6.7"
   }
 }

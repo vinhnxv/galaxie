@@ -235,6 +235,18 @@ test('the ADK overlay preserves inventories, pins, initialization and kind neutr
     expect([...project.files.keys()]).toEqual([...original.files.keys(), 'src/adk-env.ts'].sort());
     expect(project.files.get('src/csp.ts')?.bytes).toEqual(original.files.get('src/csp.ts')?.bytes);
     agentBytes.push(project.files.get('src/agent.ts')?.bytes ?? new Uint8Array());
+    const env = Buffer.from(project.files.get('src/adk-env.ts')?.bytes ?? []).toString();
+    // The runtime environment guard and jitless zod must run before the adapter is imported.
+    expect(env).toMatch(
+      /z\.config\(\{ jitless: true \}\);\s*const \{ ensureAdkRuntimeEnv \} = await import\('@galaxie-ai\/adapter-adk'\);\s*ensureAdkRuntimeEnv\(\);/,
+    );
+    // The build-time control keeps prompts and replies out of ADK spans.
+    const viteFramework = Buffer.from(
+      project.files.get('vite.framework.ts')?.bytes ?? [],
+    ).toString();
+    expect(viteFramework).toContain(
+      "'process.env.ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS': '\"false\"'",
+    );
     const executor = Buffer.from(project.files.get('src/executor.ts')?.bytes ?? []).toString();
     expect(executor.replace(/^\/\/.*\n/gm, '').trimStart()).toMatch(/^import '\.\/adk-env\.js';/);
     expect(

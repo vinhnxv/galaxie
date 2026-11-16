@@ -73,6 +73,10 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
       tarballDirectory === undefined
         ? undefined
         : await resolveTarballs(tarballDirectory, request.framework as string);
+    if (request.framework === 'adk-js' && tarballDirectory === undefined)
+      output.write(
+        'Note: @galaxie-ai/adapter-adk is not published yet, so installing from the registry fails. Set GALAXIE_CREATE_PACKAGE_DIR to a directory of packed galaxie tarballs.\n',
+      );
     const result = compose(layers, {
       kind: request.kind as string,
       framework: request.framework as string,

@@ -292,6 +292,17 @@ test('npm tarball composition rewrites direct dependencies and overrides, and ot
     );
 });
 
+test('pnpm build decision keys that YAML would read as non-strings are quoted', () => {
+  const layers = basic();
+  layers[0]!.manifest.pnpm = {
+    allowBuilds: { yes: false, null: false, '1.x': false, plain: false },
+  };
+  const output = compose(layers, { ...options, packageManager: 'pnpm' });
+  expect(Buffer.from(output.files.get('pnpm-workspace.yaml')!.bytes).toString()).toBe(
+    "allowBuilds:\n  '1.x': false\n  'null': false\n  plain: false\n  'yes': false\n",
+  );
+});
+
 test('pnpm build decisions merge deterministically and only pnpm emits their file', () => {
   const layers = basic();
   layers[0]!.manifest.pnpm = { allowBuilds: { protobufjs: false } };
