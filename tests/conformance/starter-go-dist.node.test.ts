@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
@@ -198,6 +198,60 @@ test.skipIf(!available)(
         ),
       ).toBe(dist.manifest.sourceSha256);
     }
+  },
+  120_000,
+);
+
+test.skipIf(!available)(
+  'packing refuses a template edited after its source snapshot was compiled',
+  async () => {
+    const built = await buildStarterDistOnce();
+    const directory = await temporaryDirectory();
+    const fixture = join(directory, 'repo');
+    await mkdir(join(fixture, 'scripts'), { recursive: true });
+    for (const file of [
+      'build-starter-go.ts',
+      'go-wasm-lock.ts',
+      'fetch-go-glue.ts',
+      'check-go-lock.ts',
+    ])
+      await cp(join('scripts', file), join(fixture, 'scripts', file));
+    await cp(
+      'templates/frameworks/adk-go/files/go',
+      join(fixture, 'templates/frameworks/adk-go/files/go'),
+      { recursive: true },
+    );
+    await cp('go', join(fixture, 'go'), {
+      recursive: true,
+      filter: (path) => !path.includes('/.cache/') && !path.endsWith('_test.go'),
+    });
+    const pkg = join(fixture, 'packages/starter-go');
+    await cp(built.directory, pkg, { recursive: true });
+    const goroot = (await runGo(['env', 'GOROOT'], resolve('go'))).trim();
+    const bin = join(directory, 'bin');
+    await mkdir(bin);
+    const changed = join(fixture, 'templates/frameworks/adk-go/files/go/agent.go');
+    await writeFile(
+      join(bin, 'go'),
+      `#!${process.execPath}\nconst {spawnSync}=require('node:child_process');const fs=require('node:fs');const args=process.argv.slice(2);const result=spawnSync(${JSON.stringify(join(goroot, 'bin/go'))},args,{stdio:'inherit',env:process.env});if(args[0]==='build'&&result.status===0)fs.appendFileSync(${JSON.stringify(changed)},'// concurrent template edit\\n');process.exit(result.status??1);\n`,
+      { mode: 0o755 },
+    );
+    let failure: (Error & { stderr?: Buffer }) | undefined;
+    try {
+      execFileSync(
+        process.execPath,
+        [await realpath(join(fixture, 'scripts/build-starter-go.ts'))],
+        {
+          env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}` },
+          stdio: 'pipe',
+        },
+      );
+    } catch (error) {
+      failure = error as Error & { stderr?: Buffer };
+    }
+    expect(await readFile(changed, 'utf8')).toContain('concurrent template edit');
+    expect(failure).toBeDefined();
+    expect(failure?.stderr?.toString()).toContain('The Go starter artifact could not be verified.');
   },
   120_000,
 );

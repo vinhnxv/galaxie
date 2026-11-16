@@ -158,3 +158,13 @@ test('the temporary starter passes native go vet', async (context) => {
   expect(result.stderr).toBe('');
   expect(result.status).toBe(0);
 }, 120_000);
+
+test('a symlink at the source tree root is refused', async () => {
+  const parent = await fixture();
+  const source = join(parent, 'source');
+  await mkdir(source);
+  await writeFile(join(source, 'main.go'), 'package main\n');
+  const link = join(parent, 'linked-source');
+  await symlink(source, link, 'dir');
+  await expect(sourceHash(link, '0.0.0', 'module-a')).rejects.toThrow('symlink');
+});

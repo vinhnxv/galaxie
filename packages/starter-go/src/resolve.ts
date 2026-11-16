@@ -71,6 +71,13 @@ export async function resolveAgent(options: ResolveOptions): Promise<ResolvedAge
   try {
     const output = join(temporary, 'agent.wasm');
     await buildAgent(directory, output, environment);
+    const compiledSource = await sourceHash(
+      directory,
+      pkg.version,
+      await hashTree(join(dist, 'go-module')),
+    );
+    if (compiledSource !== sourceSha256)
+      throw new Error('The Go starter source changed during compilation; run the build again.');
     const wasm = await fileMetadata(output);
     await writeFile(join(temporary, 'agent.wasm.sha256'), `${wasm.sha256}\n`);
     // Each rename is atomic. Until both agree, readers ignore the incomplete entry.

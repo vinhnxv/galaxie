@@ -97,7 +97,7 @@ export async function buildStarterDist(
     const moduleSha256 = await hashTree(join(dist, 'go-module'));
     const manifest: StarterManifest = {
       version: pkg.version,
-      sourceSha256: await sourceHash(template, pkg.version, moduleSha256),
+      sourceSha256: await sourceHash(directory, pkg.version, moduleSha256),
       wasm: await fileMetadata(join(dist, 'agent.wasm')),
       glue: await fileMetadata(join(dist, 'wasm_exec.js')),
       goModule: { sha256: moduleSha256 },

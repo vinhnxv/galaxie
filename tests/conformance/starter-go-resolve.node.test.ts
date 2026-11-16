@@ -326,3 +326,22 @@ test.skipIf(!hasStarterGo())(
   },
   180_000,
 );
+
+test('a source edit during compilation cannot populate a cache under the previous hash', async () => {
+  const f = await fixture();
+  await edited(f);
+  const hash = await sourceHash(
+    join(f.projectDirectory, 'go'),
+    '0.0.0',
+    f.manifest.goModule.sha256,
+  );
+  await fakeGo(
+    f,
+    'go1.27.3',
+    `fs.writeFileSync(args[args.indexOf('-o')+1],'compiled after concurrent edit');fs.appendFileSync(${JSON.stringify(join(f.projectDirectory, 'go/main.go'))},'// concurrent edit\\n');`,
+  );
+  await expect(resolveAgent(f)).rejects.toThrow('source changed during compilation');
+  await expect(readFile(join(cacheDirectory(f, hash), 'agent.wasm'))).rejects.toMatchObject({
+    code: 'ENOENT',
+  });
+});

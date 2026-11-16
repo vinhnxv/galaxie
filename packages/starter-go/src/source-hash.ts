@@ -7,6 +7,8 @@ import { join } from 'node:path';
 
 /** Hash regular files in relative POSIX order, preserving their exact bytes. */
 async function updateTree(directory: string, hash: Hash): Promise<void> {
+  if ((await lstat(directory)).isSymbolicLink())
+    throw new Error('The Go source tree root is a symlink.');
   const files: string[] = [];
   async function walk(prefix: string): Promise<void> {
     for (const name of await readdir(join(directory, prefix))) {
