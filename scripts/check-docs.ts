@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, resolve } from 'node:path';
+import ts from '@typescript/typescript6';
 
 const args = process.argv.slice(2);
 if (args.length > 1 || (args.length === 1 && args[0] !== '--refresh-citations')) {
@@ -267,6 +268,96 @@ function checkLink(file: string, line: number, target: string): void {
 function reference(label: string): string {
   return label.trim().replace(/\s+/g, ' ').toLowerCase();
 }
+
+// Read the two key inventories, never arbitrary strings such as span names or Symbol descriptions.
+function tracingKeys(source: string): Set<string> {
+  const tree = ts.createSourceFile('tracing.ts', source, ts.ScriptTarget.Latest, true);
+  const declarations = new Map<string, ts.VariableDeclaration[]>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      const name = node.name.text;
+      if (name === 'ALLOWED' || name === 'text')
+        declarations.set(name, [...(declarations.get(name) ?? []), node]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  const keys = new Set<string>();
+  for (const name of ['ALLOWED', 'text']) {
+    const candidates = declarations.get(name) ?? [];
+    const initializer = candidates.length === 1 ? candidates[0]?.initializer : undefined;
+    let literals: readonly ts.Node[] = [];
+    if (
+      name === 'ALLOWED' &&
+      initializer !== undefined &&
+      ts.isNewExpression(initializer) &&
+      ts.isIdentifier(initializer.expression) &&
+      initializer.expression.text === 'Set' &&
+      initializer.arguments?.length === 1
+    ) {
+      const argument = initializer.arguments[0];
+      if (argument !== undefined && ts.isArrayLiteralExpression(argument))
+        literals = argument.elements;
+    } else if (name === 'text' && initializer !== undefined && ts.isArrowFunction(initializer)) {
+      const type = initializer.parameters.find(
+        (parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'key',
+      )?.type;
+      if (type !== undefined)
+        literals = (ts.isUnionTypeNode(type) ? type.types : [type]).map((item) =>
+          ts.isLiteralTypeNode(item) ? item.literal : item,
+        );
+    }
+    if (literals.length === 0 || !literals.every(ts.isStringLiteral))
+      throw new Error(
+        `cannot extract tracing attributes from ${name}: expected non-empty string literals`,
+      );
+    for (const literal of literals) {
+      if (!ts.isStringLiteral(literal) || literal.text === '')
+        throw new Error(`cannot extract tracing attributes from ${name}: empty key`);
+      keys.add(literal.text);
+    }
+  }
+  return keys;
+}
+
+function checkTracingTable(): void {
+  const source = 'packages/core/src/tracing.ts';
+  const guide = 'docs/guides/tracing.md';
+  const sourcePresent = required(source);
+  const guidePresent = required(guide);
+  if (!sourcePresent || !guidePresent) return;
+  let keys: Set<string>;
+  try {
+    keys = tracingKeys(readFileSync(source, 'utf8'));
+  } catch (error) {
+    problem(source, 1, error instanceof Error ? error.message : String(error));
+    return;
+  }
+  const lines = prose(readFileSync(guide, 'utf8'));
+  const header = lines.findIndex((line) => /^\| Span or outcome \|/.test(line));
+  if (header < 0) {
+    problem(guide, 1, 'missing tracing attribute table');
+    return;
+  }
+  const documented = new Set<string>();
+  for (let index = header + 2; index < lines.length; index++) {
+    const line = lines[index] ?? '';
+    if (!line.startsWith('|')) break;
+    const [, row, attributes] = line.split('|');
+    // Parenthesized examples describe values, not emitted keys.
+    for (const match of (attributes ?? '').replace(/\([^)]*\)/g, '').matchAll(/`([^`]+)`/g)) {
+      const key = match[1];
+      if (key === undefined) continue;
+      documented.add(key);
+      if (!keys.has(key))
+        problem(guide, index + 1, `unknown tracing attribute: ${key}; row: ${row?.trim()}`);
+    }
+  }
+  for (const key of keys)
+    if (!documented.has(key)) problem(guide, header + 1, `missing tracing attribute: ${key}`);
+}
+
+checkTracingTable();
 
 for (const file of files.filter((file) => /\.md$/i.test(file) || file === 'llms.txt')) {
   if (!existsSync(file)) {

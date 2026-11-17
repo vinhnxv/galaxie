@@ -34,7 +34,7 @@ schema URL `https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev`, with core
 semantic conventions `v1.44.0`. These are source comments, not an extra revision
 attribute or a schema URL supplied to `getTracer`. The conventions are Development.
 
-| Span or outcome | Allowlisted attributes |
+| Span or outcome | Emitted attributes |
 | --- | --- |
 | Root identity | `gen_ai.operation.name`, `gen_ai.agent.name`, `galaxie.app.id`, `galaxie.agent.version`, `galaxie.instance.id`, `galaxie.session.id`, `galaxie.run.id`, `galaxie.run.segment`, `galaxie.executor.id`, `galaxie.executor.version` |
 | Root settlement | `galaxie.run.status`, `galaxie.run.labels`, `galaxie.budget.name` when exhausted |
@@ -43,6 +43,7 @@ attribute or a schema URL supplied to `getTracer`. The conventions are Developme
 | Model | `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `galaxie.model.provider`, `galaxie.destination.class`, `galaxie.output_safety` when supplied |
 | Capability | `gen_ai.operation.name`, `gen_ai.tool.name`, `galaxie.capability.kind`, `galaxie.destination.class` |
 | Steps and failures | `galaxie.step.status`, `error.type`, `galaxie.error.code` where applicable |
+| Development text (opt-in, subject to live labels and destination) | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.tool.call.arguments` |
 
 Attributes are conditional: missing usage, route information or model names do
 not become invented values. `error.type` is a constrained type name, never the
@@ -56,6 +57,33 @@ paused segment's run span. A page renders a pause after that run span has closed
 a child may start after its parent ended, and no closed span is changed. A failed
 outcome carries `galaxie.render.error.code`. Render failures keep the run paused in
 `waiting_input`; resuming on a failed render is not supported yet.
+
+## Attribute cardinality
+
+Keep identifiers in traces, out of metric labels. `galaxie.instance.id`,
+`galaxie.session.id` and `galaxie.run.id` have an unbounded set of values across
+runs. Trace and span IDs have the same metric-cardinality problem. They are
+forgeable correlation values and carry no authorization; the backend must apply
+its own [authorization checks](#register-a-browser-exporter-in-the-host).
+
+Names and versions are also open-ended: `galaxie.app.id`, `gen_ai.agent.name`,
+`galaxie.agent.version`, `galaxie.executor.id`, `galaxie.executor.version`,
+`galaxie.node.name`, `gen_ai.tool.name`, `gen_ai.provider.name`,
+`gen_ai.request.model`, `gen_ai.response.model`, `galaxie.model.provider` and
+`error.type`. Their length/character checks do not establish a small vocabulary.
+Use a host-owned finite aggregation allowlist before treating any of these as
+metric labels; do not promote arbitrary observed values to labels.
+
+The runtime supplies bounded vocabularies for `gen_ai.operation.name`,
+`galaxie.capability.kind`, `galaxie.destination.class`, `galaxie.output_safety`,
+`galaxie.run.labels`, `galaxie.budget.name`, `galaxie.render.status`,
+`galaxie.render.error.code`, `galaxie.run.status`, `galaxie.error.code` and
+`galaxie.step.status`. These are candidates for aggregation dimensions, subject
+to the host's limit on combinations; labels are a set of data classes, never
+user identities. Numeric `galaxie.run.segment`, `galaxie.node.step`,
+`gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens` are measurements or
+counters, not categorical metric labels. The three development-text attributes
+contain arbitrary JSON text and must never become metric labels.
 
 ## Send trace context to your backend
 
@@ -589,5 +617,11 @@ the separate live collector/backend measurements are recorded in the
 Run `pnpm test tests/conformance/tracing.test.ts` for mock-provider span trees,
 failure hygiene and live-label text omission on Node and headless Chromium.
 [Core tracing unit tests](../../packages/core/test/tracing.test.ts) exercise
-the allowlist. `pnpm check` includes the offline documentation check; external
-links are never fetched by that checker.
+the allowlist. `pnpm check` includes the offline documentation check. It compares this table's
+attribute column with the `ALLOWED` metadata set and the `text()` helper's key
+type in core's `tracing.ts`, using the installed TypeScript 6 parser. Missing
+and unknown keys fail with their names; unknown keys also identify the table
+row. Span names, value examples and unrelated prose are excluded. The
+[documentation-check tests](../../tests/conformance/check-docs.node.test.ts)
+mutate temporary source and guide copies to prove both directions of drift.
+External links are never fetched by that checker.
