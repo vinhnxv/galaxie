@@ -12,7 +12,7 @@ import { invalidArtifact, missingGo } from '../../packages/starter-go/src/errors
 import type { StarterManifest } from '../../packages/starter-go/src/manifest.js';
 import { resolveAgent } from '../../packages/starter-go/src/resolve.js';
 import { hashTree, sourceHash } from '../../packages/starter-go/src/source-hash.js';
-import { fileMetadata } from '../../packages/starter-go/src/verify.js';
+import { fileMetadata, verifyDist } from '../../packages/starter-go/src/verify.js';
 import { buildStarterDistOnce, cleanStarterDist, hasStarterGo } from './support/starter-go.node.js';
 
 const temporary: string[] = [];
@@ -47,6 +47,7 @@ async function release(pkg: string, go: string, version = '0.0.0'): Promise<Star
     sourceSha256: await sourceHash(go, version, goModule),
     wasm: await fileMetadata(join(dist, 'agent.wasm')),
     glue: await fileMetadata(join(dist, 'wasm_exec.js')),
+    notices: await fileMetadata(join(dist, 'NOTICE.txt')),
     goModule: { sha256: goModule },
     toolchain: 'go1.27.3',
     flags: [...buildSettings.flags, `-ldflags=${buildSettings.ldflags}`],
@@ -73,6 +74,7 @@ async function fixture(): Promise<Fixture> {
     Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]),
   );
   await writeFile(join(packageDirectory, 'dist/wasm_exec.js'), 'verified glue');
+  await writeFile(join(packageDirectory, 'dist/NOTICE.txt'), 'original notices');
   const manifest = await release(packageDirectory, join(projectDirectory, 'go'));
   return {
     root,
@@ -234,11 +236,11 @@ test('concurrent local builds publish complete cache entries', async () => {
     cached.sourceSha256,
   ]);
 });
-test('corrupt cache is ignored, while matching-source wasm or glue corruption is an integrity error', async () => {
+test('corrupt cache is ignored, while matching-source artifact corruption is an integrity error', async () => {
   const f = await fixture();
   await seedCache(f, 'broken cache', true);
   expect((await resolveAgent(f)).origin).toBe('prebuilt');
-  for (const artifact of ['agent.wasm', 'wasm_exec.js']) {
+  for (const artifact of ['agent.wasm', 'wasm_exec.js', 'NOTICE.txt']) {
     const path = join(f.packageDirectory, 'dist', artifact);
     const previous = await readFile(path);
     await writeFile(path, 'tampered');
@@ -246,6 +248,98 @@ test('corrupt cache is ignored, while matching-source wasm or glue corruption is
     await writeFile(path, previous);
   }
 });
+
+test.each(['missing', 'digest', 'bytes'] as const)(
+  'NOTICE metadata is required and checked at resolution and release: %s',
+  async (mutation) => {
+    const f = await fixture();
+    const manifest = JSON.parse(
+      await readFile(join(f.packageDirectory, 'dist/manifest.json'), 'utf8'),
+    );
+    if (mutation === 'missing') delete manifest.notices;
+    else if (mutation === 'bytes') manifest.notices.bytes += 1;
+    else manifest.notices.sha256 = '0'.repeat(64);
+    await writeFile(join(f.packageDirectory, 'dist/manifest.json'), JSON.stringify(manifest));
+    await expect(resolveAgent(f)).rejects.toThrow(invalidArtifact);
+    await expect(verifyDist(f.packageDirectory, join(f.projectDirectory, 'go'))).rejects.toThrow(
+      invalidArtifact,
+    );
+  },
+);
+
+test.each(
+  ['agent.wasm', 'NOTICE.txt', 'wasm_exec.js'].flatMap((artifact) =>
+    ['after-read', 'digest', 'bytes'].map((mutation) => ({ artifact, mutation })),
+  ),
+)(
+  'the Go overlay binds verified buffers to output: $artifact $mutation',
+  async ({ artifact, mutation }) => {
+    const f = await fixture();
+    const dist = join(f.packageDirectory, 'dist');
+    const file = join(dist, artifact);
+    const original = await readFile(file);
+    const installed = join(f.projectDirectory, 'node_modules/@galaxie-ai/starter-go');
+    await mkdir(installed, { recursive: true });
+    await cp('templates/frameworks/adk-go/files/vite.framework.ts', join(f.root, 'framework.ts'));
+    await writeFile(
+      join(installed, 'package.json'),
+      JSON.stringify({ type: 'module', exports: { './build': './build.js' } }),
+    );
+    const entry = pathToFileURL(resolve('packages/starter-go/dist/build.js')).href;
+    await writeFile(
+      join(installed, 'build.js'),
+      `import * as actual from ${JSON.stringify(entry)};
+export const verifyArtifact = actual.verifyArtifact;
+export async function resolveAgent() {
+  const result = await actual.resolveAgent(${JSON.stringify(f)});
+  ${mutation === 'digest' ? `await (await import('node:fs/promises')).writeFile(${JSON.stringify(file)}, Buffer.alloc(${original.byteLength}, 120));` : ''}
+  ${mutation === 'bytes' ? `result.${artifact === 'agent.wasm' ? 'wasm' : artifact === 'NOTICE.txt' ? 'notices' : 'glue'}.bytes += 1;` : ''}
+  globalThis.armed = true;
+  return result;
+}`,
+    );
+    const script = join(f.root, 'emit.mjs');
+    await writeFile(
+      script,
+      `import fs from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
+const read = fs.readFile;
+let changed = false;
+fs.readFile = async (...args) => {
+  const bytes = await read(...args);
+  if (globalThis.armed && !changed && args[0] === ${JSON.stringify(file)}) {
+    changed = true;
+    await fs.writeFile(args[0], 'changed after read');
+  }
+  return bytes;
+};
+syncBuiltinESMExports();
+const { goFramework } = await import('./framework.ts');
+const config = goFramework(${JSON.stringify(f.projectDirectory)});
+const plugin = config.plugins.find((p) => p.name === 'galaxie-go-assets');
+plugin.configResolved({ command: 'build' });
+const emitted = [];
+await plugin.buildStart.call({ emitFile(asset) { emitted.push([asset.fileName, Buffer.from(asset.source).toString('base64')]); } });
+${artifact === 'wasm_exec.js' ? `const glue = config.plugins.find((p) => p.name === 'galaxie-go-glue'); emitted.push(['wasm_exec.js', Buffer.from(await glue.load('\\0galaxie-go-glue')).toString('base64')]);` : ''}
+process.stdout.write(JSON.stringify({ changed, emitted }));`,
+    );
+    const child = spawnSync(process.execPath, [script], { encoding: 'utf8' });
+    if (mutation !== 'after-read') {
+      expect(child.status).not.toBe(0);
+      expect(child.stderr).toContain('The Go starter file could not be verified:');
+      return;
+    }
+    expect(child.stderr).toBe('');
+    expect(child.status).toBe(0);
+    const result = JSON.parse(child.stdout);
+    expect(result.changed).toBe(true);
+    expect(result.emitted).toContainEqual([
+      artifact === 'wasm_exec.js' ? artifact : `go/${artifact}`,
+      original.toString('base64'),
+    ]);
+    expect(await readFile(file, 'utf8')).toBe('changed after read');
+  },
+);
 test('a tampered bundled Go module is an integrity error, not a source mismatch', async () => {
   const f = await fixture();
   await writeFile(join(f.packageDirectory, 'dist/go-module/go.mod'), 'module tampered\n');

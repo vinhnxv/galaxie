@@ -21,6 +21,7 @@ export interface ResolvedAgent {
   readonly sourceSha256: string;
   readonly wasm: ArtifactMetadata;
   readonly glue: ArtifactMetadata & { readonly file: string };
+  readonly notices: ArtifactMetadata & { readonly file: string };
 }
 
 async function cachedArtifact(directory: string): Promise<ArtifactMetadata | undefined> {
@@ -52,14 +53,23 @@ export async function resolveAgent(options: ResolveOptions): Promise<ResolvedAge
   const cacheRoot = join(project, 'node_modules/.cache/galaxie-go');
   const cache = join(cacheRoot, sourceSha256);
   const glue = { ...manifest.glue, file: join(dist, 'wasm_exec.js') };
+  const notices = { ...manifest.notices, file: join(dist, 'NOTICE.txt') };
   await verifyArtifact(glue.file, glue);
+  await verifyArtifact(notices.file, notices);
   const cached = await cachedArtifact(cache);
   if (cached)
-    return { origin: 'cache', file: join(cache, 'agent.wasm'), sourceSha256, wasm: cached, glue };
+    return {
+      origin: 'cache',
+      file: join(cache, 'agent.wasm'),
+      sourceSha256,
+      wasm: cached,
+      glue,
+      notices,
+    };
   if (sourceSha256 === manifest.sourceSha256) {
     const file = join(dist, 'agent.wasm');
     await verifyArtifact(file, manifest.wasm);
-    return { origin: 'prebuilt', file, sourceSha256, wasm: manifest.wasm, glue };
+    return { origin: 'prebuilt', file, sourceSha256, wasm: manifest.wasm, glue, notices };
   }
   const environment = options.environment ?? process.env;
   const toolchain = await runGo(['env', 'GOVERSION'], directory, environment).catch(
@@ -85,7 +95,7 @@ export async function resolveAgent(options: ResolveOptions): Promise<ResolvedAge
     await mkdir(cache, { recursive: true });
     await rename(output, join(cache, 'agent.wasm'));
     await rename(join(temporary, 'agent.wasm.sha256'), join(cache, 'agent.wasm.sha256'));
-    return { origin: 'local', file: join(cache, 'agent.wasm'), sourceSha256, wasm, glue };
+    return { origin: 'local', file: join(cache, 'agent.wasm'), sourceSha256, wasm, glue, notices };
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }

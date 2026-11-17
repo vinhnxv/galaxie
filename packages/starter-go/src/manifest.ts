@@ -20,6 +20,7 @@ export interface StarterManifest {
   readonly sourceSha256: string;
   readonly wasm: ArtifactMetadata;
   readonly glue: ArtifactMetadata;
+  readonly notices: ArtifactMetadata;
   readonly goModule: { readonly sha256: string };
   readonly toolchain: string;
   readonly flags: readonly string[];
@@ -45,6 +46,7 @@ export async function readManifest(
     !digest(manifest.goModule?.sha256) ||
     !artifact(manifest.wasm) ||
     !artifact(manifest.glue) ||
+    !artifact(manifest.notices) ||
     typeof manifest.toolchain !== 'string' ||
     !Array.isArray(manifest.flags) ||
     !manifest.flags.every((flag) => typeof flag === 'string') ||
