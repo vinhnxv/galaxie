@@ -173,6 +173,8 @@ const forGroup = (
   ];
   if (groupName === 'general') return { include, exclude: [...exclude, ...python] };
   if (groupName === 'python') return { include: python, exclude };
+  // GALAXIE_PYTHON_REST_SKIP_STARTERS=true removes the starter conformance files, which CI runs
+  // serially in their own invocation, from this group's parallel run.
   if (groupName === 'python-rest')
     return {
       include: python,

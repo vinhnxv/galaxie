@@ -718,7 +718,8 @@ it('returns to Start after eviction before a fresh page opens its saver', async 
       { key: sessionKey, sessionId: sessionId as string },
     );
     await fresh.goto(mockOrigin);
-    // The whole eviction case took 0.63 s with 60 CPU hogs; this poll leaves about 8x margin.
+    // The Start poll takes about 0.09 s locally and failed above the 1 s default on CI; 5 s leaves
+    // at least 5x margin over that failing threshold.
     await expect
       .poll(() => fresh.getByRole('button', { name: 'Start', exact: true }).isEnabled(), {
         timeout: 5_000,

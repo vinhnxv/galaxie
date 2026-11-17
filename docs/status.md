@@ -13,8 +13,10 @@ unchanged.
 CI now runs only the four Python starter conformance files serially, followed by
 the parallel `python-rest` remainder; Vitest inventory tests prove a disjoint,
 complete partition across projects. Three intermittent tests retain every
-assertion with explicit deadlines sized from repeated baseline and CPU-load
-measurements. The host eviction case overrides the polling deadline separately
+assertion with explicit deadlines sized from local baseline and CPU-load
+measurements and, for the rag-browser cases, the durations seen on the CI runner (about 68 s
+against a former 60 s limit). The serial starter files take under a minute; the parallel
+remainder still takes about 20 minutes, so the split is not shown to shorten the job. The host eviction case overrides the polling deadline separately
 from its outer test timeout. These are scripted-model checks, not live-stack
 evidence; product runtime behavior and ADR-0012 guarantees are unchanged.
 
