@@ -11,6 +11,15 @@ import { compose } from '../../packages/create/src/compose.js';
 import { loadLayers } from '../../packages/create/src/layers.js';
 import { createAffected, pythonAffected } from '../../scripts/ci-scope.js';
 
+async function unusedPort(): Promise<number> {
+  const probe = createNetServer();
+  await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
+  const address = probe.address();
+  if (address === null || typeof address === 'string') throw new Error('No free port.');
+  await new Promise<void>((done) => probe.close(() => done()));
+  return address.port;
+}
+
 test('a change confined to documents, Go and unrelated packages skips the Python jobs', () => {
   expect(
     pythonAffected([
@@ -136,12 +145,7 @@ test('Python shards partition the Node inventory and keep composed browser files
 
 test('the Python starter browser project lists only the composed app tests, in the Python groups only', async () => {
   // Another run may hold the project's default API port, so list on a free one.
-  const probe = createNetServer();
-  await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
-  const address = probe.address();
-  if (address === null || typeof address === 'string') throw new Error('No free port.');
-  const port = address.port;
-  await new Promise<void>((done) => probe.close(() => done()));
+  const port = await unusedPort();
   const list = (group?: string): string[] => {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -205,7 +209,12 @@ test('Vitest selects every composed ported test in its intended project exactly 
     }
   }
   expect(expected).toHaveLength(40);
-  const env = { ...process.env };
+  const [browserPort, pythonPort] = await Promise.all([unusedPort(), unusedPort()]);
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    GALAXIE_BROWSER_API_PORT: String(browserPort),
+    GALAXIE_PYTHON_STARTER_API_PORT: String(pythonPort),
+  };
   delete env['GALAXIE_TEST_GROUP'];
   const result = spawnSync(
     process.execPath,
