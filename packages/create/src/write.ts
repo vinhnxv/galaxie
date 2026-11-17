@@ -180,21 +180,44 @@ export async function writeProject(plan: WritePlan): Promise<void> {
       }
     }
   } catch (error) {
+    const rollbackErrors: unknown[] = [];
+    const leftovers: string[] = [];
+    const recordRollback = (path: string, failure: unknown): void => {
+      const code = (failure as NodeJS.ErrnoException | null)?.code;
+      if (code === 'ENOENT') return;
+      rollbackErrors.push(failure);
+      leftovers.push(
+        `${path}${typeof code === 'string' && /^[A-Z_]+$/.test(code) ? ` (${code})` : ''}`,
+      );
+    };
     for (const created of createdFiles.reverse()) {
       try {
         const stat = await lstat(created.path);
         if (stat.isFile() && same(stat, created.identity)) await unlink(created.path);
-      } catch {}
+      } catch (failure) {
+        recordRollback(created.path, failure);
+      }
     }
     for (const created of createdDirectories.reverse()) {
       try {
         const stat = await lstat(created.path);
         if (stat.isDirectory() && same(stat, created.identity)) await rmdir(created.path);
-      } catch {}
+      } catch (failure) {
+        recordRollback(created.path, failure);
+      }
     }
+    const message =
+      error instanceof ProjectWriteError
+        ? error.message
+        : 'The project could not be written without replacing an existing path.';
+    if (rollbackErrors.length > 0)
+      throw new ProjectWriteError(
+        `${message} Rollback could not remove: ${leftovers.join(', ')}.`,
+        {
+          cause: new AggregateError([error, ...rollbackErrors]),
+        },
+      );
     if (error instanceof ProjectWriteError) throw error;
-    throw new ProjectWriteError(
-      'The project could not be written without replacing an existing path.',
-    );
+    throw new ProjectWriteError(message, { cause: error });
   }
 }

@@ -3,6 +3,7 @@
 
 import { lstat, readdir } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
+import { readTarballManifest, TarballError } from './tarball.js';
 
 export const knownPackages: readonly string[] = [
   '@galaxie-ai/ui-protocol',
@@ -15,7 +16,7 @@ export const knownPackages: readonly string[] = [
 ];
 export type Tarballs = ReadonlyMap<string, string>;
 export type PackageManager = 'npm' | 'pnpm' | 'yarn';
-export class TarballError extends Error {}
+export { TarballError } from './tarball.js';
 
 export function requiredPackages(framework: string): readonly string[] {
   if (framework === 'langgraph-python')
@@ -48,6 +49,16 @@ export async function resolveTarballs(
     const stat = await lstat(full);
     if (!stat.isFile() || stat.isSymbolicLink())
       throw new TarballError(`Expected a regular tarball for ${name}.`);
+    const manifest = await readTarballManifest(full, name);
+    const version = pattern.exec(matches[0] as string)?.[1];
+    for (const [field, expected] of [
+      ['name', name],
+      ['version', version],
+    ] as const)
+      if (manifest[field] !== expected)
+        throw new TarballError(
+          `${name}: tarball package.json ${field} mismatch; expected ${expected}, received ${JSON.stringify(manifest[field]) ?? 'missing'}.`,
+        );
     result.set(name, full);
   }
   return result;

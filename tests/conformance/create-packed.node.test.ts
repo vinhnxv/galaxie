@@ -58,6 +58,9 @@ test('packed create runs help and scaffolds identical files with only Node on PA
         timeout: 30_000,
       });
     expect(readdirSync(bin)).toEqual(['node']);
+    expect(run(['--version'])).toBe(
+      `${JSON.parse(readFileSync(join(repo, 'packages/create/package.json'), 'utf8')).version}\n`,
+    );
     expect(run(['--help'])).toContain('langgraph-js');
     expect(run(['my-app', 'browser-only', 'langgraph-js', '--no-install'])).toContain('Created');
     for (const tree of ['templates', 'skills/galaxie']) {
