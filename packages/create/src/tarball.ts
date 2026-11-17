@@ -5,10 +5,11 @@ import { createReadStream } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 export class TarballError extends Error {}
 
-/** Read npm's manifest without extracting files or requiring a tar executable. */
+/** Read npm's manifest without extraction; path-overriding extended headers are refused. */
 export async function readTarballManifest(
   path: string,
   name: string,
+  maxBytes = 512 * 1024 * 1024,
 ): Promise<Record<string, unknown>> {
   const source = createReadStream(path);
   const decoded = source.pipe(createGunzip());
@@ -20,8 +21,11 @@ export async function readTarballManifest(
   const parts: Buffer[] = [];
   let found: Record<string, unknown> | undefined;
   let ended = false;
+  let decodedBytes = 0;
   try {
     for await (const chunk of decoded) {
+      decodedBytes += (chunk as Buffer).length;
+      if (decodedBytes > maxBytes) throw new Error();
       if (ended) {
         if ((chunk as Buffer).some((byte) => byte !== 0)) throw new Error();
         continue;
@@ -66,6 +70,7 @@ export async function readTarballManifest(
         if (!Number.isSafeInteger(remaining)) throw new Error();
         padding = (512 - (remaining % 512)) % 512;
         const prefix = text(345, 500);
+        if (['x', 'g', 'L', 'K'].includes(text(156, 157))) throw new Error();
         const entry = `${prefix === '' ? '' : `${prefix}/`}${text(0, 100)}`;
         manifest = entry === 'package/package.json';
         if (manifest && found !== undefined)
