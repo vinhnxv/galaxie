@@ -30,13 +30,16 @@ export function assetRoot(path: 'templates' | 'skills/galaxie'): string {
     existsSync(repository) &&
     !sameAssetTree(packed, repository)
   )
-    throw new ProjectPathError(
+    throw new StaleAssetsError(
       `Packaged ${path} assets differ from the repository. Run pnpm --filter @galaxie-ai/create run clean:pack, then retry.`,
     );
   return packed;
 }
 
 export class ProjectPathError extends Error {}
+
+/** A packed asset copy that differs from the repository layout; a development fault, not a usage error. */
+export class StaleAssetsError extends Error {}
 
 export function validateOutputPath(path: string): string {
   if (

@@ -57,7 +57,7 @@ export async function resolveTarballs(
     ] as const)
       if (manifest[field] !== expected)
         throw new TarballError(
-          `${name}: tarball package.json ${field} mismatch; expected ${expected}, received ${JSON.stringify(manifest[field]) ?? 'missing'}.`,
+          `${name}: tarball package.json ${field} mismatch; expected ${expected}, received ${(JSON.stringify(manifest[field]) ?? 'missing').slice(0, 80)}.`,
         );
     result.set(name, full);
   }

@@ -11,7 +11,13 @@ import { detectPackageManager, InstallError, type InstallRunner, install } from 
 import { LayerManifestError, loadLayers } from './layers.js';
 import { MergeConflictError } from './merge.js';
 import { resolveTarballs, TarballError } from './packages.js';
-import { assetRoot, ProjectPathError, projectName, validateTarget } from './paths.js';
+import {
+  assetRoot,
+  ProjectPathError,
+  projectName,
+  StaleAssetsError,
+  validateTarget,
+} from './paths.js';
 import { prompt } from './prompt.js';
 import { ProjectWriteError, planWrite, writeProject } from './write.js';
 
@@ -154,6 +160,7 @@ export async function run(argv: readonly string[], io: IO = {}): Promise<number>
     const known =
       error instanceof UsageError ||
       error instanceof ProjectPathError ||
+      error instanceof StaleAssetsError ||
       error instanceof SelectionError ||
       error instanceof LayerManifestError ||
       error instanceof GuidanceError ||
