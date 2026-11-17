@@ -12,7 +12,7 @@ import { invalidArtifact, missingGo } from '../../packages/starter-go/src/errors
 import type { StarterManifest } from '../../packages/starter-go/src/manifest.js';
 import { resolveAgent } from '../../packages/starter-go/src/resolve.js';
 import { hashTree, sourceHash } from '../../packages/starter-go/src/source-hash.js';
-import { fileMetadata } from '../../packages/starter-go/src/verify.js';
+import { fileMetadata, verifyDist } from '../../packages/starter-go/src/verify.js';
 import { buildStarterDistOnce, cleanStarterDist, hasStarterGo } from './support/starter-go.node.js';
 
 const temporary: string[] = [];
@@ -47,6 +47,7 @@ async function release(pkg: string, go: string, version = '0.0.0'): Promise<Star
     sourceSha256: await sourceHash(go, version, goModule),
     wasm: await fileMetadata(join(dist, 'agent.wasm')),
     glue: await fileMetadata(join(dist, 'wasm_exec.js')),
+    notices: await fileMetadata(join(dist, 'NOTICE.txt')),
     goModule: { sha256: goModule },
     toolchain: 'go1.27.3',
     flags: [...buildSettings.flags, `-ldflags=${buildSettings.ldflags}`],
@@ -73,6 +74,7 @@ async function fixture(): Promise<Fixture> {
     Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]),
   );
   await writeFile(join(packageDirectory, 'dist/wasm_exec.js'), 'verified glue');
+  await writeFile(join(packageDirectory, 'dist/NOTICE.txt'), 'original notices');
   const manifest = await release(packageDirectory, join(projectDirectory, 'go'));
   return {
     root,
@@ -94,7 +96,7 @@ async function fixture(): Promise<Fixture> {
 function cacheDirectory(f: Fixture, hash = f.manifest.sourceSha256): string {
   return join(f.projectDirectory, 'node_modules/.cache/galaxie-go', hash);
 }
-async function seedCache(f: Fixture, bytes: string, corrupt = false): Promise<void> {
+async function seedCache(f: Fixture, bytes: string | Buffer, corrupt = false): Promise<void> {
   const dir = cacheDirectory(f);
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, 'agent.wasm'), bytes);
@@ -121,11 +123,35 @@ async function fakeGo(f: Fixture, version: string, buildBody: string): Promise<s
 
 test('verified cache wins over a matching manifest, including a damaged prebuilt', async () => {
   const f = await fixture();
-  await seedCache(f, 'local cache bytes');
+  const original = await readFile(join(f.packageDirectory, 'dist/agent.wasm'));
+  await seedCache(f, original);
   await writeFile(join(f.packageDirectory, 'dist/agent.wasm'), 'damaged prebuilt');
   const result = await resolveAgent(f);
   expect(result.origin).toBe('cache');
-  expect(await readFile(result.file, 'utf8')).toBe('local cache bytes');
+  expect(await readFile(result.file)).toEqual(original);
+});
+
+test('matching source never trusts a forged cache and matching sidecar over the manifest', async () => {
+  const f = await fixture();
+  await seedCache(f, Buffer.alloc(f.manifest.wasm.bytes, 120));
+  const result = await resolveAgent(f);
+  expect(result.origin).toBe('prebuilt');
+  expect(result.wasm).toEqual(f.manifest.wasm);
+  await writeFile(join(f.packageDirectory, 'dist/agent.wasm'), 'damaged prebuilt');
+  await expect(resolveAgent(f)).rejects.toThrow(invalidArtifact);
+});
+
+test('matching-source cache checks the manifest length independently of its digest', async () => {
+  const f = await fixture();
+  await seedCache(f, await readFile(join(f.packageDirectory, 'dist/agent.wasm')));
+  await writeFile(
+    join(f.packageDirectory, 'dist/manifest.json'),
+    JSON.stringify({
+      ...f.manifest,
+      wasm: { ...f.manifest.wasm, bytes: f.manifest.wasm.bytes + 1 },
+    }),
+  );
+  await expect(resolveAgent(f)).rejects.toThrow(invalidArtifact);
 });
 test('matching source resolves prebuilt in a child with a PATH that records and rejects any Go call', async () => {
   const f = await fixture();
@@ -234,11 +260,11 @@ test('concurrent local builds publish complete cache entries', async () => {
     cached.sourceSha256,
   ]);
 });
-test('corrupt cache is ignored, while matching-source wasm or glue corruption is an integrity error', async () => {
+test('corrupt cache is ignored, while matching-source artifact corruption is an integrity error', async () => {
   const f = await fixture();
   await seedCache(f, 'broken cache', true);
   expect((await resolveAgent(f)).origin).toBe('prebuilt');
-  for (const artifact of ['agent.wasm', 'wasm_exec.js']) {
+  for (const artifact of ['agent.wasm', 'wasm_exec.js', 'NOTICE.txt']) {
     const path = join(f.packageDirectory, 'dist', artifact);
     const previous = await readFile(path);
     await writeFile(path, 'tampered');
@@ -246,11 +272,137 @@ test('corrupt cache is ignored, while matching-source wasm or glue corruption is
     await writeFile(path, previous);
   }
 });
+
+test.each(['missing', 'digest', 'bytes'] as const)(
+  'NOTICE metadata is required and checked at resolution and release: %s',
+  async (mutation) => {
+    const f = await fixture();
+    const manifest = JSON.parse(
+      await readFile(join(f.packageDirectory, 'dist/manifest.json'), 'utf8'),
+    );
+    if (mutation === 'missing') delete manifest.notices;
+    else if (mutation === 'bytes') manifest.notices.bytes += 1;
+    else manifest.notices.sha256 = '0'.repeat(64);
+    await writeFile(join(f.packageDirectory, 'dist/manifest.json'), JSON.stringify(manifest));
+    await expect(resolveAgent(f)).rejects.toThrow(invalidArtifact);
+    await expect(verifyDist(f.packageDirectory, join(f.projectDirectory, 'go'))).rejects.toThrow(
+      invalidArtifact,
+    );
+  },
+);
+
+test.each(
+  ['agent.wasm', 'NOTICE.txt', 'wasm_exec.js'].flatMap((artifact) =>
+    ['after-read', 'digest', 'bytes'].map((mutation) => ({ artifact, mutation })),
+  ),
+)(
+  'the Go overlay binds verified buffers to output: $artifact $mutation',
+  async ({ artifact, mutation }) => {
+    const f = await fixture();
+    const dist = join(f.packageDirectory, 'dist');
+    const file = join(dist, artifact);
+    const original = await readFile(file);
+    const installed = join(f.projectDirectory, 'node_modules/@galaxie-ai/starter-go');
+    await mkdir(installed, { recursive: true });
+    await cp('templates/frameworks/adk-go/files/vite.framework.ts', join(f.root, 'framework.ts'));
+    await writeFile(
+      join(installed, 'package.json'),
+      JSON.stringify({ type: 'module', exports: { './build': './build.js' } }),
+    );
+    const entry = pathToFileURL(resolve('packages/starter-go/dist/build.js')).href;
+    await writeFile(
+      join(installed, 'build.js'),
+      `import * as actual from ${JSON.stringify(entry)};
+export const verifyArtifact = actual.verifyArtifact;
+export async function resolveAgent() {
+  const result = await actual.resolveAgent(${JSON.stringify(f)});
+  ${mutation === 'digest' ? `await (await import('node:fs/promises')).writeFile(${JSON.stringify(file)}, Buffer.alloc(${original.byteLength}, 120));` : ''}
+  ${mutation === 'bytes' ? `result.${artifact === 'agent.wasm' ? 'wasm' : artifact === 'NOTICE.txt' ? 'notices' : 'glue'}.bytes += 1;` : ''}
+  globalThis.armed = true;
+  return result;
+}`,
+    );
+    const script = join(f.root, 'emit.mjs');
+    await writeFile(
+      script,
+      `import fs from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
+const read = fs.readFile;
+let changed = false;
+fs.readFile = async (...args) => {
+  const bytes = await read(...args);
+  if (globalThis.armed && !changed && args[0] === ${JSON.stringify(file)}) {
+    changed = true;
+    await fs.writeFile(args[0], 'changed after read');
+  }
+  return bytes;
+};
+syncBuiltinESMExports();
+const { goFramework } = await import('./framework.ts');
+const config = goFramework(${JSON.stringify(f.projectDirectory)});
+const plugin = config.plugins.find((p) => p.name === 'galaxie-go-assets');
+plugin.configResolved({ command: 'build' });
+const emitted = [];
+await plugin.buildStart.call({ emitFile(asset) { emitted.push([asset.fileName, Buffer.from(asset.source).toString('base64')]); } });
+${artifact === 'wasm_exec.js' ? `const glue = config.plugins.find((p) => p.name === 'galaxie-go-glue'); emitted.push(['wasm_exec.js', Buffer.from(await glue.load('\\0galaxie-go-glue')).toString('base64')]);` : ''}
+process.stdout.write(JSON.stringify({ changed, emitted }));`,
+    );
+    const child = spawnSync(process.execPath, [script], { encoding: 'utf8' });
+    if (mutation !== 'after-read') {
+      expect(child.status).not.toBe(0);
+      expect(child.stderr).toContain('The Go starter file could not be verified:');
+      return;
+    }
+    expect(child.stderr).toBe('');
+    expect(child.status).toBe(0);
+    const result = JSON.parse(child.stdout);
+    expect(result.changed).toBe(true);
+    expect(result.emitted).toContainEqual([
+      artifact === 'wasm_exec.js' ? artifact : `go/${artifact}`,
+      original.toString('base64'),
+    ]);
+    expect(await readFile(file, 'utf8')).toBe('changed after read');
+  },
+);
 test('a tampered bundled Go module is an integrity error, not a source mismatch', async () => {
   const f = await fixture();
   await writeFile(join(f.packageDirectory, 'dist/go-module/go.mod'), 'module tampered\n');
   await expect(resolveAgent(f)).rejects.toMatchObject({ message: invalidArtifact });
 });
+
+test.each(['before', 'during'])(
+  'the actual bundled replacement must match the package manifest %s compilation',
+  async (timing) => {
+    const f = await fixture();
+    await writeFile(
+      join(f.projectDirectory, 'go/go.mod'),
+      'module example.invalid/starter\nreplace galaxie.invalid/galaxie => ../node_modules/@galaxie-ai/starter-go/dist/go-module\n',
+    );
+    const manifest = await release(f.packageDirectory, join(f.projectDirectory, 'go'));
+    const replacement = join(
+      f.projectDirectory,
+      'node_modules/@galaxie-ai/starter-go/dist/go-module',
+    );
+    await mkdir(dirname(replacement), { recursive: true });
+    await cp(join(f.packageDirectory, 'dist/go-module'), replacement, { recursive: true });
+    expect((await resolveAgent(f)).origin).toBe('prebuilt');
+    if (timing === 'before') {
+      await seedCache(
+        { ...f, manifest },
+        await readFile(join(f.packageDirectory, 'dist/agent.wasm')),
+      );
+      await writeFile(join(replacement, 'go.mod'), 'module unchecked\n');
+    } else {
+      await edited(f);
+      await fakeGo(
+        f,
+        'go1.27.3',
+        `fs.writeFileSync(args[args.indexOf('-o')+1],'compiled wasm');fs.appendFileSync(${JSON.stringify(join(replacement, 'go.mod'))},'// concurrent replacement edit\\n');`,
+      );
+    }
+    await expect(resolveAgent(f)).rejects.toThrow(invalidArtifact);
+  },
+);
 test('a corrupt edited cache is rebuilt locally and failed or killed compilers leave no cache entry', async () => {
   const f = await fixture();
   await edited(f);

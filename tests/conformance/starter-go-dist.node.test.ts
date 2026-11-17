@@ -162,22 +162,11 @@ test.skipIf(!available)(
   120_000,
 );
 
-// Admit the source-only layer in this fixture; no shipping kind supports it yet.
 test.skipIf(!available)(
   'project and workspace composition preserve the packed Go source identity',
   async () => {
     const dist = await buildStarterDistOnce();
-    const layers = (await loadLayers(resolve('templates'))).map((layer) =>
-      layer.manifest.id === 'browser-only'
-        ? {
-            ...layer,
-            manifest: {
-              ...layer.manifest,
-              frameworks: [...(layer.manifest.frameworks ?? []), 'adk-go'],
-            },
-          }
-        : layer,
-    );
+    const layers = await loadLayers(resolve('templates'));
     for (const mode of ['project', 'workspace-test'] as const) {
       const { files } = compose(layers, {
         kind: 'browser-only',

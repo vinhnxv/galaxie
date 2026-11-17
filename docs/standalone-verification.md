@@ -38,6 +38,44 @@ tarball mode and non-Linux CI remain unverified by this preparation. The whole
 release waits for the recorded Python redistribution review, including the
 Pyodide MPL-2.0 exception. Nothing is published; ADR-0012 guarantees are unchanged.
 
+## Go starter hardening (2026-11-17)
+
+The Go starter manifest now includes NOTICE length and SHA-256 metadata. Resolution
+and release verification check it; Vite hashes the exact wasm, NOTICE and glue
+buffers it consumes. For unchanged source, cache hits must match the packaged
+wasm digest and length. Edited-source caches retain the documented trusted-writer
+limit. Local replacements outside the hashed source tree are refused, except for
+the manifest-checked bundled module. Its actual project replacement tree is
+checked before lookup and after compilation, including package-directory overrides;
+case aliases of ignored directories are refused. The native-vet test probes a failed download's
+failed HTTP endpoint and skips locally only when Go reports a transport failure
+and the independent probe also fails, or downloads are explicitly disabled; HTTP errors and CI failures remain failures.
+
+Twenty scratch-copy mutations remove individual verification, replacement and
+offline-skip guards or reintroduce a second read. Each fails the relevant tests.
+The built wasm (29,897,761 bytes), glue (16,992 bytes) and NOTICE (229,611 bytes)
+retain their previous SHA-256 digests:
+
+| Artifact | SHA-256 before and after |
+| --- | --- |
+| `agent.wasm` | `bff0abbb35389b1fbc3e2757f98574abcebfd758b843852da96cf1f5731c2c30` |
+| `wasm_exec.js` | `0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14` |
+| `NOTICE.txt` | `0e6ac7e18566aecd5f96378a6e0997a58411bf3c1de11397181207c8dfd7844f` |
+
+Both kinds pass the npm tarball harness on macOS, Node 24.15.0, npm 12.2.2 and
+Chromium 156.0.8078.4, with Go, Python and uv absent from generated-project PATH.
+Browser-only reaches the scripted answer in 10,399 ms and gateway in 5,498 ms;
+generated checks, CSP mutation rejections and the gateway compiled-server probes
+pass. Rebuilding those installed projects with the previous framework configuration
+produces identical paths and bytes for all 14 browser-only and six gateway output
+files. Only the six ADK Go scaffold hash rows change because `vite.framework.ts`
+now verifies the consumed buffers; other scaffold pins remain unchanged. Composed
+workspace caches match the current layers for all eight combinations.
+
+These are local scripted measurements. No live stack, real model, device or new
+Firefox/WebKit measurement was run. Nothing is published; the package stays at
+0.2.0 and ADR-0012 guarantees are unchanged.
+
 ## Clean-environment CI
 
 The `create-clean` job in `.github/workflows/ci.yml` runs the existing harness
@@ -238,8 +276,12 @@ No header or server assertion was loosened.
 
 Firefox/WebKit for the Go starter, real models, pnpm/yarn installs end to end,
 a cold Go module cache, Node 22 and CI cold-start time remain unmeasured. The
-pnpm symlink shape has build-level evidence only. A go.mod replace target
-outside go/ and node_modules is not part of the source hash. A release changing the template Go tree requires Go for older projects.
+pnpm symlink shape has build-level evidence only. Local `go.mod` replacement
+targets are now rejected outside the hashed `go/` tree, except for the bundled
+starter-go module checked against its manifest digest. Edited-source cache
+sidecars provide consistency checks only; their directory must remain under
+trusted writers' control, as described in the [package limits](../packages/starter-go/README.md#limits).
+A release changing the template Go tree requires Go for older projects.
 ADR-0012 guarantees are unchanged.
 
 ## ADK overlay measurement (2026-11-16)

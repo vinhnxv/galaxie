@@ -95,17 +95,18 @@ export async function buildStarterDist(
       version: string;
     };
     const moduleSha256 = await hashTree(join(dist, 'go-module'));
+    await writeFile(join(dist, 'NOTICE.txt'), notices.text);
     const manifest: StarterManifest = {
       version: pkg.version,
       sourceSha256: await sourceHash(directory, pkg.version, moduleSha256),
       wasm: await fileMetadata(join(dist, 'agent.wasm')),
       glue: await fileMetadata(join(dist, 'wasm_exec.js')),
+      notices: await fileMetadata(join(dist, 'NOTICE.txt')),
       goModule: { sha256: moduleSha256 },
       toolchain,
       flags: [...buildSettings.flags, `-ldflags=${buildSettings.ldflags}`],
       modules: notices.modules,
     };
-    await writeFile(join(dist, 'NOTICE.txt'), notices.text);
     await writeFile(join(dist, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     return await verifyDist(packageDirectory, template, repositoryGo);
   } finally {

@@ -1,18 +1,31 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type { ResolvedAgent } from '@galaxie-ai/starter-go/build';
+import type { ArtifactMetadata, ResolvedAgent } from '@galaxie-ai/starter-go/build';
 import type { Plugin, UserConfig } from 'vite';
 
 export function goFramework(projectDirectory: string): UserConfig {
   let resolved: Promise<ResolvedAgent> | undefined;
 
+  async function readVerified(file: string, expected: ArtifactMetadata): Promise<Buffer> {
+    // Hash the exact bytes that are emitted, as in the Python starter's asset helper.
+    const source = await readFile(file).catch(() => undefined);
+    if (
+      source === undefined ||
+      source.byteLength !== expected.bytes ||
+      createHash('sha256').update(source).digest('hex') !== expected.sha256
+    )
+      throw new Error(`The Go starter file could not be verified: ${file}.`);
+    return source;
+  }
+
   async function resolveBuild(): Promise<ResolvedAgent> {
-    // Configuration and baseline checks load without the private artifact package installed.
+    // Configuration and baseline checks load without the artifact package installed.
     if (resolved !== undefined) return resolved;
     const entry = createRequire(join(projectDirectory, 'package.json')).resolve(
       '@galaxie-ai/starter-go/build',
@@ -33,7 +46,7 @@ export function goFramework(projectDirectory: string): UserConfig {
       async load(id) {
         if (id !== '\0galaxie-go-glue') return undefined;
         const built = await resolveBuild();
-        return readFile(built.glue.file, 'utf8');
+        return (await readVerified(built.glue.file, built.glue)).toString('utf8');
       },
     };
   }
@@ -49,23 +62,15 @@ export function goFramework(projectDirectory: string): UserConfig {
         if (!building) return;
         resolved = undefined;
         const built = await resolveBuild();
-        const entry = createRequire(join(projectDirectory, 'package.json')).resolve(
-          '@galaxie-ai/starter-go/build',
-        );
-        const { verifyArtifact } = (await import(
-          pathToFileURL(entry).href
-        )) as typeof import('@galaxie-ai/starter-go/build');
-        await verifyArtifact(built.file, built.wasm);
-        await verifyArtifact(built.glue.file, built.glue);
         this.emitFile({
           type: 'asset',
           fileName: 'go/agent.wasm',
-          source: await readFile(built.file),
+          source: await readVerified(built.file, built.wasm),
         });
         this.emitFile({
           type: 'asset',
           fileName: 'go/NOTICE.txt',
-          source: await readFile(join(dirname(built.glue.file), 'NOTICE.txt')),
+          source: await readVerified(built.notices.file, built.notices),
         });
       },
       transform(code, id) {

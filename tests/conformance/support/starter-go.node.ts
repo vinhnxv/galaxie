@@ -39,7 +39,8 @@ export function buildStarterDistOnce(): Promise<StarterDist> {
       await mkdir(join(directory, 'dist'));
       await cp('packages/starter-go/dist', join(directory, 'dist'), {
         recursive: true,
-        filter: (p) => !p.endsWith('agent.wasm') && !p.endsWith('go-module'),
+        filter: (p) =>
+          !p.endsWith('agent.wasm') && !p.endsWith('go-module') && !p.endsWith('NOTICE.txt'),
       });
       try {
         return { directory, manifest: await buildStarterDist(directory) };

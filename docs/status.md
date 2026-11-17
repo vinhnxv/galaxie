@@ -1,5 +1,16 @@
 # Project status
 
+On 2026-11-17, the Go starter binds wasm, glue and NOTICE consumption to the exact
+verified buffers, includes NOTICE metadata in its manifest, checks unchanged-source
+cache hits against the manifest and rejects local replacements outside its hashed
+inputs. Edited-source cache sidecars remain consistency checks in a trusted local
+workspace. Node tests cover tampering, changed files during reads, replacement paths
+and offline-vet skip boundaries; twenty scratch mutations are detected. Both
+clean-PATH npm tarball kinds pass with scripted models, and their emitted build
+files are byte-identical to builds using the prior framework configuration. See
+the [hardening record](standalone-verification.md#go-starter-hardening-2026-11-17).
+No live stack or real model was run; ADR-0012 guarantees are unchanged.
+
 On 2026-11-17, thirteen public packages are prepared for the 0.2.0 lockstep
 release: `ui-protocol`, `core`, `adapter-kit`, `adapter-langgraph`, `models`,
 `storage-indexeddb`, `react`, `adapter-pyodide`, `adapter-adk`, `adapter-go`,

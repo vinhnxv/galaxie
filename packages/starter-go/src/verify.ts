@@ -50,5 +50,6 @@ export async function verifyDist(
   }
   await verifyArtifact(join(dist, 'agent.wasm'), manifest.wasm);
   await verifyArtifact(join(dist, 'wasm_exec.js'), manifest.glue);
+  await verifyArtifact(join(dist, 'NOTICE.txt'), manifest.notices);
   return manifest;
 }
