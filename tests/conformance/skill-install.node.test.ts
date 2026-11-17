@@ -212,7 +212,7 @@ test('skill version follows core, instructs comparison and documents the absent 
   expect(skill).toContain("compare this skill's `version`");
   expect(skill).toContain('Stop on a mismatch');
   const readme = await readFile(join(source, 'README.md'), 'utf8');
-  expect(readme).toContain('No release tag exists yet');
+  expect(readme).toContain(`\`v${core.version}\` does not exist until the maintainer creates it.`);
   expect(readme).toContain('22.18');
 });
 
