@@ -329,7 +329,7 @@ const config: ViteUserConfig = defineConfig({
               // The inventory test lists this project beside a running suite, so its port is overridable.
               port: pythonStarter
                 ? Number(process.env['GALAXIE_PYTHON_STARTER_API_PORT'] ?? 63316)
-                : 63315,
+                : Number(process.env['GALAXIE_BROWSER_API_PORT'] ?? 63315),
               strictPort: true,
             },
             globalSetup: ['support/mcp-global.node.ts'],

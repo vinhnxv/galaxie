@@ -1,16 +1,45 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, isAbsolute, parse, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+function sameAssetTree(left: string, right: string): boolean {
+  const first = lstatSync(left);
+  const second = lstatSync(right);
+  if (first.isFile() && second.isFile()) return readFileSync(left).equals(readFileSync(right));
+  if (!first.isDirectory() || !second.isDirectory()) return false;
+  const names = readdirSync(left).sort();
+  const other = readdirSync(right).sort();
+  return (
+    names.length === other.length &&
+    names.every(
+      (name, index) =>
+        name === other[index] && sameAssetTree(resolve(left, name), resolve(right, name)),
+    )
+  );
+}
+
 export function assetRoot(path: 'templates' | 'skills/galaxie'): string {
   const packed = fileURLToPath(new URL(`../${path}`, import.meta.url));
-  return existsSync(packed) ? packed : fileURLToPath(new URL(`../../../${path}`, import.meta.url));
+  const repository = fileURLToPath(new URL(`../../../${path}`, import.meta.url));
+  if (!existsSync(packed)) return repository;
+  if (
+    existsSync(new URL('../../../packages/create/package.json', import.meta.url)) &&
+    existsSync(repository) &&
+    !sameAssetTree(packed, repository)
+  )
+    throw new StaleAssetsError(
+      `Packaged ${path} assets differ from the repository. Run pnpm --filter @galaxie-ai/create run clean:pack, then retry.`,
+    );
+  return packed;
 }
 
 export class ProjectPathError extends Error {}
+
+/** A packed asset copy that differs from the repository layout; a development fault, not a usage error. */
+export class StaleAssetsError extends Error {}
 
 export function validateOutputPath(path: string): string {
   if (

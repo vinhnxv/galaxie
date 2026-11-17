@@ -65,9 +65,13 @@ plus npm's included README and manifest. Prepack copies repository templates and
 the galaxie skill into ignored package directories; postpack removes the copies.
 `pnpm --filter @galaxie-ai/create run clean:pack` also removes them after an
 interrupted pack. The CLI tries packaged assets first and falls back to checkout
-sources. The isolated packed-create test runs help and a `--no-install` scaffold
-with only Node on PATH and compares every generated file with checkout output.
+sources. In a checkout, it refuses copied templates or skill assets that differ
+from the repository sources and names the cleanup command. `--version` reads
+the create package manifest in either layout. The isolated packed-create test runs
+help and a `--no-install` scaffold with only Node on PATH and compares every generated file with checkout output.
 Tarball dependency resolution supports npm only; pnpm and yarn remain refused.
+Local tarball mode prints a notice and checks each archive manifest name and
+version against its expected package name and filename version before writing.
 
 ## Verification evidence and limits
 

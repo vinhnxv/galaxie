@@ -75,6 +75,8 @@ scripts for `@google/genai`, `cpu-features`, `protobufjs` and `ssh2`, including 
 additional packages found by the plain-install probe. Automatic installs still use
 `--ignore-scripts`.
 
+`create --version` prints the package version and exits 0.
+
 ## Local tarballs
 
 Set `GALAXIE_CREATE_PACKAGE_DIR` to an absolute, existing directory containing
@@ -82,7 +84,9 @@ exactly one `galaxie-ai-<name>-<version>.tgz` for each of the seven launch packa
 `ui-protocol`, `core`, `adapter-kit`, `adapter-langgraph`, `models`,
 `storage-indexeddb` and `react`. Missing or duplicate matches fail before writing.
 Every direct galaxie dependency and all seven npm overrides use absolute `file:`
-specifications. Third-party pins stay unchanged.
+specifications. Third-party pins stay unchanged. Tarball mode prints a one-line notice
+and checks the name and version in each tarball's `package.json` against its file name
+before writing; a mismatch fails with the field and expected value.
 
 Tarball mode supports npm only and refuses pnpm and yarn before writing, including
 with `--no-install`. Their real installs and the pnpm 11 override location are

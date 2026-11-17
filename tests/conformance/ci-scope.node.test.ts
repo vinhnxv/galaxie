@@ -7,7 +7,18 @@ import { createServer as createNetServer } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
+import { compose } from '../../packages/create/src/compose.js';
+import { loadLayers } from '../../packages/create/src/layers.js';
 import { createAffected, pythonAffected } from '../../scripts/ci-scope.js';
+
+async function unusedPort(): Promise<number> {
+  const probe = createNetServer();
+  await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
+  const address = probe.address();
+  if (address === null || typeof address === 'string') throw new Error('No free port.');
+  await new Promise<void>((done) => probe.close(() => done()));
+  return address.port;
+}
 
 test('a change confined to documents, Go and unrelated packages skips the Python jobs', () => {
   expect(
@@ -134,12 +145,7 @@ test('Python shards partition the Node inventory and keep composed browser files
 
 test('the Python starter browser project lists only the composed app tests, in the Python groups only', async () => {
   // Another run may hold the project's default API port, so list on a free one.
-  const probe = createNetServer();
-  await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
-  const address = probe.address();
-  if (address === null || typeof address === 'string') throw new Error('No free port.');
-  const port = address.port;
-  await new Promise<void>((done) => probe.close(() => done()));
+  const port = await unusedPort();
   const list = (group?: string): string[] => {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -175,3 +181,62 @@ test('the Python starter browser project lists only the composed app tests, in t
   for (const group of ['general', 'python-dspy', 'python-pydantic', 'python-adk'])
     expect(list(group), group).toEqual([]);
 }, 120_000);
+
+test('Vitest selects every composed ported test in its intended project exactly once', async () => {
+  const repo = fileURLToPath(new URL('../../', import.meta.url));
+  const layers = await loadLayers(join(repo, 'templates'));
+  const expected: string[] = [];
+  for (const kind of layers.filter(({ manifest }) => manifest.type === 'kind')) {
+    for (const framework of kind.manifest.frameworks ?? []) {
+      const name = `${kind.manifest.id}-${framework}`;
+      const { files } = compose(layers, {
+        kind: kind.manifest.id,
+        framework,
+        name,
+        mode: 'workspace-test',
+        packageManager: 'npm',
+        workspaceRoot: repo,
+      });
+      for (const path of files.keys()) {
+        if (!path.endsWith('.test.ts')) continue;
+        const project = path.endsWith('.node.test.ts')
+          ? 'node'
+          : framework === 'langgraph-python'
+            ? 'python-starter-browser'
+            : 'browser';
+        expected.push(`${join(repo, 'packages/create/.cache/composed', name, path)}|${project}`);
+      }
+    }
+  }
+  expect(expected).toHaveLength(40);
+  const [browserPort, pythonPort] = await Promise.all([unusedPort(), unusedPort()]);
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    GALAXIE_BROWSER_API_PORT: String(browserPort),
+    GALAXIE_PYTHON_STARTER_API_PORT: String(pythonPort),
+  };
+  delete env['GALAXIE_TEST_GROUP'];
+  const result = spawnSync(
+    process.execPath,
+    [
+      'node_modules/vitest/vitest.mjs',
+      'list',
+      '--project',
+      'node',
+      '--project',
+      'browser',
+      '--project',
+      'python-starter-browser',
+      '--filesOnly',
+      '--json',
+      '--api.port=0',
+    ],
+    { cwd: repo, encoding: 'utf8', env, timeout: 60_000 },
+  );
+  expect(result.status, result.stderr).toBe(0);
+  const listed = JSON.parse(result.stdout) as { file: string; projectName: string }[];
+  const actual = listed
+    .filter(({ file }) => file.replaceAll('\\', '/').includes('/composed/'))
+    .map(({ file, projectName }) => `${file}|${projectName.replace(/ \(.*\)$/, '')}`);
+  expect(actual.sort()).toEqual(expected.sort());
+}, 90_000);

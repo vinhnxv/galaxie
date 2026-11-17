@@ -614,3 +614,28 @@ test.each(['browser-only', 'gateway'])(
     ]);
   },
 );
+
+test('version comes from the create manifest without loading templates or writing', async () => {
+  const { root } = await fixture();
+  const streams = output();
+  const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  expect(
+    await run(['--version'], { cwd: root, templatesRoot: join(root, 'absent'), ...streams }),
+  ).toBe(0);
+  expect(streams.text()).toBe(`${manifest.version}\n`);
+  expect(streams.errors()).toBe('');
+  expect(await readdir(root)).toEqual(['guidance', 'layers']);
+});
+
+test('unexpected errors name the failing step without exposing error contents', async () => {
+  const { root } = await fixture();
+  const streams = output();
+  expect(
+    await run(['my-app', 'browser-only', 'langgraph-js'], {
+      cwd: root,
+      templatesRoot: join(root, 'absent'),
+      ...streams,
+    }),
+  ).toBe(1);
+  expect(streams.errors()).toBe('Failed to load template layers.\n');
+});

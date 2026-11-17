@@ -51,7 +51,35 @@ const lockfile = (onnxRuntime: string): string =>
     '',
   ].join('\n');
 
+const templateManifest = (id: string, type: string, packageFragment = {}): string =>
+  JSON.stringify({
+    schema: 1,
+    id,
+    type,
+    package: packageFragment,
+    ...(type === 'kind'
+      ? { frameworks: ['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python'] }
+      : {}),
+  });
+
 const FILES: Record<string, string> = {
+  'templates/base/layer.json': templateManifest('base', 'base'),
+  ...Object.fromEntries(
+    ['browser-only', 'gateway'].map((id) => [
+      `templates/kinds/${id}/layer.json`,
+      templateManifest(id, 'kind'),
+    ]),
+  ),
+  ...Object.fromEntries(
+    ['langgraph-js', 'adk-js', 'adk-go', 'langgraph-python'].map((id) => [
+      `templates/frameworks/${id}/layer.json`,
+      templateManifest(
+        id,
+        'framework',
+        id === 'adk-js' ? { dependencies: { '@google/adk': '2.3.0' } } : {},
+      ),
+    ]),
+  ),
   'packages/core/package.json': JSON.stringify({
     dependencies: { '@galaxie-ai/ui-protocol': 'workspace:*' },
     peerDependencies: { '@opentelemetry/api': '1', zod: '4' },
@@ -979,4 +1007,63 @@ test.each([
   ['examples/nextjs-app-router/.next-test/a/chunk.js', '@google/adk', 0],
 ])('scopes the Next example ADK scan allowance to %s (%s)', (path, specifier, status) => {
   expect(run({ [path]: adk(specifier) }).status).toBe(status);
+});
+
+test.each([
+  "import { value } from 'undeclared/subpath';",
+  "export { value } from 'undeclared/subpath';",
+  "export type Value = import('undeclared/subpath').Value;",
+  "export const load = () => import('undeclared/subpath');",
+])('template imports must be declared by selected layer manifests: %s', (source) => {
+  const path = 'templates/frameworks/langgraph-js/files/src/extra.ts';
+  const result = run({ [path]: source });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(
+    `${path}: template import undeclared/subpath is not declared by the selected layer manifests (browser-only/langgraph-js)`,
+  );
+});
+
+test('template dependency checking combines base, kind and framework declarations and package subpaths', () => {
+  expect(
+    run({
+      'templates/base/layer.json': templateManifest('base', 'base', {
+        dependencies: { react: '1' },
+      }),
+      'templates/kinds/browser-only/layer.json': templateManifest('browser-only', 'kind', {
+        devDependencies: { vite: '1' },
+      }),
+      'templates/frameworks/langgraph-js/layer.json': templateManifest(
+        'langgraph-js',
+        'framework',
+        { dependencies: { '@scope/library': '1' } },
+      ),
+      'templates/frameworks/langgraph-js/files/src/extra.ts':
+        "import 'react/jsx-runtime'; import '@scope/library/subpath'; import 'node:fs'; import './local.js';",
+      'templates/kinds/browser-only/files/vite.config.ts':
+        "import type { UserConfig } from 'vite';",
+      'templates/frameworks/langgraph-js/workspace/test/extra.node.test.ts':
+        "import { test } from 'vitest';",
+    }),
+  ).toEqual({ status: 0, output: '' });
+});
+
+test('a dependency in another framework cannot satisfy a template import', () => {
+  const path = 'templates/frameworks/langgraph-js/files/src/extra.ts';
+  const result = run({
+    'templates/frameworks/adk-go/layer.json': templateManifest('adk-go', 'framework', {
+      dependencies: { '@scope/library': '1' },
+    }),
+    [path]: "import '@scope/library/subpath';",
+  });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(
+    `${path}: template import @scope/library/subpath is not declared`,
+  );
+});
+
+test('workspace test tooling is not an exemption for generated source', () => {
+  const path = 'templates/base/files/src/extra.ts';
+  const result = run({ [path]: "import 'vitest';" });
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`${path}: template import vitest is not declared`);
 });

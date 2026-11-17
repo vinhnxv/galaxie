@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import * as fs from 'node:fs/promises';
 import {
   lstat,
   mkdir,
@@ -16,10 +17,15 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, onTestFinished, test } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import type { ProjectFile } from '../src/compose.js';
 import { loadGuidanceSource, renderGuidance } from '../src/guidance.js';
 import { ProjectWriteError, planWrite, writeProject } from '../src/write.js';
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...actual, unlink: vi.fn(actual.unlink), rmdir: vi.fn(actual.rmdir) };
+});
 
 const files = (values: Record<string, string>): Map<string, ProjectFile> =>
   new Map(
@@ -148,3 +154,29 @@ test('a symlink in the middle of an existing target path is refused (base-relati
   expect(await readFile(join(root, 'real/sub/proj/a.ts'), 'utf8')).toBe('new');
   await expect(lstat(join(outside, 'sub', 'proj'))).rejects.toThrow();
 });
+
+test.each(['unlink', 'rmdir'] as const)(
+  'rollback %s failures retain the original error and name leftover paths',
+  async (operation) => {
+    const root = await scratch();
+    const plan = await planWrite(files({ 'child/a.ts': 'created', 'z.ts': 'new' }), root);
+    await writeFile(join(root, 'z.ts'), 'concurrent');
+    const failure = Object.assign(new Error('private-error-canary'), { code: 'EACCES' });
+    const remove = vi.mocked(fs[operation]).mockRejectedValueOnce(failure);
+    onTestFinished(() => {
+      remove.mockReset();
+    });
+    const error = await writeProject(plan).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(ProjectWriteError);
+    expect((error as Error).message).toContain(
+      `Rollback could not remove: ${join(await realpath(root), operation === 'unlink' ? 'child/a.ts' : 'child')} (EACCES)`,
+    );
+    expect((error as Error).message).toContain('without replacing an existing path');
+    expect((error as Error).message).not.toContain('private-error-canary');
+    expect((error as Error).cause).toBeInstanceOf(AggregateError);
+    if (operation === 'unlink')
+      expect(await readFile(join(root, 'child/a.ts'), 'utf8')).toBe('created');
+    else expect(await readdir(join(root, 'child'))).toEqual([]);
+    expect(await readFile(join(root, 'z.ts'), 'utf8')).toBe('concurrent');
+  },
+);
