@@ -173,7 +173,8 @@ test('MCP requests share their call parent and queued list_changed refresh has n
         await release.promise;
       }
       const response = await fetch(url, { ...init, headers });
-      if (method === 'tools/list' && !recordedHeaders.has('traceparent')) refreshed.resolve();
+      // Resolve on any refresh so a leaked header fails the assertion, not a timeout.
+      if (method === 'tools/list') refreshed.resolve();
       if (method !== 'GET' || response.body === null) return response;
       const decoder = new TextDecoder();
       let observed = '';

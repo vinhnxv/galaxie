@@ -729,8 +729,8 @@ test('the standalone SSE stream keeps its opening call parent while a later run 
         }
       }
       const response = await originFetch(url, init);
-      if (method === 'tools/list' && !new Headers(init?.headers).has('traceparent'))
-        refreshed.resolve();
+      // Resolve on any refresh so a leaked header fails the assertion, not a timeout.
+      if (method === 'tools/list') refreshed.resolve();
       if (method !== 'GET' || response.body === null) return response;
       const stream = { headers: new Headers(init?.headers), notifications: 0 };
       streams.push(stream);

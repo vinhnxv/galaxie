@@ -11,6 +11,10 @@ sharing a session and trace context across a 404 reconnect within one invocation
 then its removal after settlement. The Node/Chromium trace conformance case groups
 requests by method and controlled boundaries instead of SDK request positions.
 Six MCP scratch mutations are detected; an extra-listing control still passes.
+The 404 test relies on core's suppression after the span ends; the queued-refresh
+tests pin the session layer. The ADK case covers Node and Pyodide with one fixed
+write arrival order and the prebuilt galaxie wheel, and it does not cover a sibling
+tool call that is emitted but not yet dispatched.
 Product behavior and ADR-0012 guarantees are unchanged. No live stack or real
 model was run; the CI-only ADK `invalid` root cause remains unproven.
 

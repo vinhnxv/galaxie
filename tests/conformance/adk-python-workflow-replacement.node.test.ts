@@ -165,7 +165,8 @@ class StageModel extends BaseChatModel {
       if (!sibling.held) {
         sibling.held = true;
         sibling.started.resolve();
-        // Keep the first sibling's tool request out of the bridge until the retry reaches it.
+        // Hold the sibling's model reply, so its tool call is never emitted before the failure.
+        // A sibling call that is emitted but not yet dispatched is not covered here.
         await sibling.release.promise;
       } else sibling.release.resolve();
     }
@@ -470,7 +471,7 @@ test.skipIf(!pythonWheelsAvailable)(
 );
 
 test.skipIf(!pythonWheelsAvailable)(
-  'Workflow replacement retries a sibling cancelled before its write is dispatched',
+  'Workflow replacement retries while a sibling model reply is still pending at the failure',
   async () => {
     await runWorkflowReplacement({ parallel: true, retry: true, cancelSibling: true });
   },
