@@ -24,9 +24,17 @@ export interface ResolvedAgent {
   readonly notices: ArtifactMetadata & { readonly file: string };
 }
 
-async function cachedArtifact(directory: string): Promise<ArtifactMetadata | undefined> {
+async function cachedArtifact(
+  directory: string,
+  expected?: ArtifactMetadata,
+): Promise<ArtifactMetadata | undefined> {
   try {
     const metadata = await fileMetadata(join(directory, 'agent.wasm'));
+    if (expected)
+      return metadata.sha256 === expected.sha256 && metadata.bytes === expected.bytes
+        ? metadata
+        : undefined;
+    // Edited builds have no release digest; their sidecar checks consistency only.
     const sidecar = await readFile(join(directory, 'agent.wasm.sha256'), 'utf8');
     return metadata.sha256 === sidecar.trim() ? metadata : undefined;
   } catch {
@@ -56,7 +64,10 @@ export async function resolveAgent(options: ResolveOptions): Promise<ResolvedAge
   const notices = { ...manifest.notices, file: join(dist, 'NOTICE.txt') };
   await verifyArtifact(glue.file, glue);
   await verifyArtifact(notices.file, notices);
-  const cached = await cachedArtifact(cache);
+  const cached = await cachedArtifact(
+    cache,
+    sourceSha256 === manifest.sourceSha256 ? manifest.wasm : undefined,
+  );
   if (cached)
     return {
       origin: 'cache',

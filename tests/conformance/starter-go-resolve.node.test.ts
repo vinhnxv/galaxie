@@ -96,7 +96,7 @@ async function fixture(): Promise<Fixture> {
 function cacheDirectory(f: Fixture, hash = f.manifest.sourceSha256): string {
   return join(f.projectDirectory, 'node_modules/.cache/galaxie-go', hash);
 }
-async function seedCache(f: Fixture, bytes: string, corrupt = false): Promise<void> {
+async function seedCache(f: Fixture, bytes: string | Buffer, corrupt = false): Promise<void> {
   const dir = cacheDirectory(f);
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, 'agent.wasm'), bytes);
@@ -123,11 +123,35 @@ async function fakeGo(f: Fixture, version: string, buildBody: string): Promise<s
 
 test('verified cache wins over a matching manifest, including a damaged prebuilt', async () => {
   const f = await fixture();
-  await seedCache(f, 'local cache bytes');
+  const original = await readFile(join(f.packageDirectory, 'dist/agent.wasm'));
+  await seedCache(f, original);
   await writeFile(join(f.packageDirectory, 'dist/agent.wasm'), 'damaged prebuilt');
   const result = await resolveAgent(f);
   expect(result.origin).toBe('cache');
-  expect(await readFile(result.file, 'utf8')).toBe('local cache bytes');
+  expect(await readFile(result.file)).toEqual(original);
+});
+
+test('matching source never trusts a forged cache and matching sidecar over the manifest', async () => {
+  const f = await fixture();
+  await seedCache(f, Buffer.alloc(f.manifest.wasm.bytes, 120));
+  const result = await resolveAgent(f);
+  expect(result.origin).toBe('prebuilt');
+  expect(result.wasm).toEqual(f.manifest.wasm);
+  await writeFile(join(f.packageDirectory, 'dist/agent.wasm'), 'damaged prebuilt');
+  await expect(resolveAgent(f)).rejects.toThrow(invalidArtifact);
+});
+
+test('matching-source cache checks the manifest length independently of its digest', async () => {
+  const f = await fixture();
+  await seedCache(f, await readFile(join(f.packageDirectory, 'dist/agent.wasm')));
+  await writeFile(
+    join(f.packageDirectory, 'dist/manifest.json'),
+    JSON.stringify({
+      ...f.manifest,
+      wasm: { ...f.manifest.wasm, bytes: f.manifest.wasm.bytes + 1 },
+    }),
+  );
+  await expect(resolveAgent(f)).rejects.toThrow(invalidArtifact);
 });
 test('matching source resolves prebuilt in a child with a PATH that records and rejects any Go call', async () => {
   const f = await fixture();

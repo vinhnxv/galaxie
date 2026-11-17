@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import {
+  buildAgent,
   buildEnvironment,
   buildSettings,
   checkBuildSettings,
@@ -183,4 +184,47 @@ test('a symlink at the source tree root is refused', async () => {
   const link = join(parent, 'linked-source');
   await symlink(source, link, 'dir');
   await expect(sourceHash(link, '0.0.0', 'module-a')).rejects.toThrow('symlink');
+});
+
+test.each([
+  '../external',
+  '/tmp/external-go-module',
+  '../node_modules/unhashed-module',
+  './node_modules/unhashed-module',
+  './.git/unhashed-module',
+  './nested/../../external',
+])('local replacement outside the source identity is refused before Go: %s', async (target) => {
+  const dir = await fixture();
+  for (const declaration of [
+    `replace example.invalid/module => ${target}`,
+    `replace (\nexample.invalid/module v1.0.0 => "${target}" // local module\n)`,
+    `replace (\nexample.invalid/module => \`${target}\`\n)`,
+  ]) {
+    await writeFile(join(dir, 'go.mod'), `module example.invalid/starter\n${declaration}\n`);
+    await expect(sourceHash(dir, '0.2.0', 'module')).rejects.toThrow('local replace target');
+    await expect(buildAgent(dir, join(dir, 'agent.wasm'), { PATH: '' })).rejects.toThrow(
+      'local replace target',
+    );
+  }
+});
+
+test('hashed local modules and the bundled module replacement stay usable without Go', async () => {
+  const dir = await fixture();
+  await mkdir(join(dir, 'local'));
+  const local = join(dir, 'local/lib.go');
+  await writeFile(local, 'package local\n');
+  await writeFile(
+    join(dir, 'go.mod'),
+    `module example.invalid/starter
+// replace ignored.invalid/module => ../ignored
+replace (
+  example.invalid/local => "./local"
+  galaxie.invalid/galaxie => ../node_modules/@galaxie-ai/starter-go/dist/go-module
+  example.invalid/remote => example.invalid/replacement v1.0.0
+)
+`,
+  );
+  const original = await sourceHash(dir, '0.2.0', 'module');
+  await writeFile(local, 'package local\n// changed\n');
+  expect(await sourceHash(dir, '0.2.0', 'module')).not.toBe(original);
 });

@@ -3,6 +3,7 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { checkReplacements } from './source-hash.js';
 
 export const buildSettings: {
   readonly toolchain: string;
@@ -91,6 +92,7 @@ export async function buildAgent(
   output: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
+  await checkReplacements(directory);
   await runGo(
     ['build', `-ldflags=${buildSettings.ldflags}`, '-o', output, '.'],
     directory,

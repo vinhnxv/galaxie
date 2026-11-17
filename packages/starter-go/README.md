@@ -28,6 +28,10 @@ Local builds can download modules through the developer's GOPROXY and verify the
 
 Source identity covers every regular file under `go/` except `.git`, `.DS_Store` and `node_modules`, so hidden and underscore-prefixed Go packages and embedded inputs invalidate the cache. Symlinks and non-regular files are refused.
 
+Local `go.mod` replacement targets must stay inside that hashed `go/` tree, outside its ignored directories. The one external exception is `../node_modules/@galaxie-ai/starter-go/dist/go-module`, whose digest is checked against the package manifest. Other local targets, including other modules under `node_modules`, are rejected before cache lookup or compilation. Move a local module into `go/`, or use a versioned module dependency with `go.sum`. Quoted paths are supported; double-quoted paths must use JSON-compatible escapes.
+
+For unchanged template source, every cache hit is rehashed against the packaged manifest's wasm digest and length; the sidecar cannot authorize different bytes. Edited-source cache entries have no release digest: their sidecars detect incomplete writes or accidental corruption only. Protect the project and its `node_modules/.cache/galaxie-go` directory from other writers. Someone who can replace both an edited wasm and its sidecar can replace that cached build; delete the cache and rebuild with the pinned Go toolchain if its provenance is in doubt. Owner checks and signed local-build manifests are not provided. Package manifests must themselves come from trusted build output; replacing both a package artifact and its manifest is outside these digest checks.
+
 Edited source without the pinned toolchain fails with this exact message:
 
 > The agent source in go/ was edited and Go 1.27.3 was not found on PATH. Install Go 1.27.3, or restore the original go/ source to use the prebuilt agent.

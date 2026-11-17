@@ -90,8 +90,8 @@
       "gzip": 700
     },
     "@galaxie-ai/starter-go/build": {
-      "minified": 7900,
-      "gzip": 3300
+      "minified": 9300,
+      "gzip": 3800
     },
     "@galaxie-ai/starter-python/.": {
       "minified": 1800,

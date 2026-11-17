@@ -3,10 +3,49 @@
 
 import { createHash, type Hash } from 'node:crypto';
 import { lstat, readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 /** Names that are never Go inputs. Hidden and underscore-prefixed paths stay in the hash. */
 const ignoredNames: ReadonlySet<string> = new Set(['.git', '.DS_Store', 'node_modules']);
+
+/** Local replacements must refer to inputs covered by the source identity. */
+export async function checkReplacements(directory: string): Promise<void> {
+  const text = await readFile(join(directory, 'go.mod'), 'utf8').catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return '';
+      throw error;
+    },
+  );
+  // Keep quoted paths whole and discard only Go module line comments.
+  const tokens = (text.match(/\/\/[^\r\n]*|"(?:\\.|[^"\\])*"|`[^`]*`|[^\s()]+/g) ?? []).filter(
+    (token) => !token.startsWith('//'),
+  );
+  for (let index = 0; index < tokens.length; index++) {
+    if (tokens[index] !== '=>') continue;
+    let target = tokens[index + 1] ?? '';
+    if (target.startsWith('"')) {
+      try {
+        target = JSON.parse(target) as string;
+      } catch {
+        throw new Error(`The Go starter replace target uses unsupported quoting: ${target}.`);
+      }
+    } else if (target.startsWith('`')) target = target.slice(1, -1);
+    // Versioned module replacements are checked by Go and go.sum.
+    if (!target.startsWith('.') && !isAbsolute(target) && !target.includes('\\')) continue;
+    const path = resolve(directory, target);
+    if (path === resolve(directory, '../node_modules/@galaxie-ai/starter-go/dist/go-module'))
+      continue;
+    const local = relative(resolve(directory), path);
+    if (
+      target.includes('\\') ||
+      isAbsolute(local) ||
+      local.split(sep).some((part) => part === '..' || ignoredNames.has(part))
+    )
+      throw new Error(
+        `The Go starter local replace target must be inside go/ or the bundled starter-go module: ${target}.`,
+      );
+  }
+}
 
 /** Hash regular files in relative POSIX order, preserving their exact bytes. */
 async function updateTree(directory: string, hash: Hash): Promise<void> {
@@ -44,6 +83,7 @@ export async function sourceHash(
   version: string,
   moduleSha256: string,
 ): Promise<string> {
+  await checkReplacements(directory);
   const hash = createHash('sha256');
   await updateTree(directory, hash);
   return hash.update(`${version}\0${moduleSha256}`).digest('hex');
