@@ -718,8 +718,11 @@ it('returns to Start after eviction before a fresh page opens its saver', async 
       { key: sessionKey, sessionId: sessionId as string },
     );
     await fresh.goto(mockOrigin);
+    // The whole eviction case took 0.63 s with 60 CPU hogs; this poll leaves about 8x margin.
     await expect
-      .poll(() => fresh.getByRole('button', { name: 'Start', exact: true }).isEnabled())
+      .poll(() => fresh.getByRole('button', { name: 'Start', exact: true }).isEnabled(), {
+        timeout: 5_000,
+      })
       .toBe(true);
     expect(await fresh.evaluate((key) => sessionStorage.getItem(key), sessionKey)).toBeNull();
     expect(await fresh.getByRole('radio').count()).toBe(0);

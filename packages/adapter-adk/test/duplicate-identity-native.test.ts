@@ -145,6 +145,7 @@ test('native duplicate Parallel branches survive reversed arrival', async () => 
   ]);
 });
 
+// The 500 native routing turns took 2.8 s with 60 CPU hogs; 15 s leaves over 5x margin.
 test('native transfer through Sequential wrappers never reaches either specialist', async () => {
   const calls: string[] = [];
   const root = tree('transfer', calls);
@@ -154,7 +155,7 @@ test('native transfer through Sequential wrappers never reaches either specialis
   expect(new Set(events.map((event) => event.author))).toEqual(new Set(['root']));
   expect(events.every((event) => !isFinalResponse(event))).toBe(true);
   expect(root.findAgent('specialist')).toBe(root.subAgents[0]?.subAgents[0]);
-});
+}, 15_000);
 
 test('native root-name reuse and exact distinct names are accepted', async () => {
   const same = new SequentialAgent({

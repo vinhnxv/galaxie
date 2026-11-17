@@ -693,7 +693,8 @@ pythonTest.each(answerExecutors)(
       await page.context().close();
     }
   },
-  60000,
+  // This case boots Python three times: 18.1 s with 60 CPU hogs; 120 s leaves over 6x margin.
+  120_000,
 );
 
 pythonTest.each(answerExecutors)(

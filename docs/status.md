@@ -10,6 +10,14 @@ wheel cache, all 41 artifact files and 61 published distribution files retain th
 prior implementation's bytes. No live stack was run; ADR-0012 guarantees are
 unchanged.
 
+CI now runs only the four Python starter conformance files serially, followed by
+the parallel `python-rest` remainder; Vitest inventory tests prove a disjoint,
+complete partition across projects. Three intermittent tests retain every
+assertion with explicit deadlines sized from repeated baseline and CPU-load
+measurements. The host eviction case overrides the polling deadline separately
+from its outer test timeout. These are scripted-model checks, not live-stack
+evidence; product runtime behavior and ADR-0012 guarantees are unchanged.
+
 On 2026-11-17, the offline documentation check compares the tracing attribute
 table with core's metadata allowlist and development-text key type through the
 installed TypeScript 6 parser. It rejects missing and unknown keys, names the
