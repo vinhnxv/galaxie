@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import {
+  type CapabilityContext,
   createRuntime,
   type DiagnosticEvent,
   defineAgentDefinition,
@@ -266,6 +267,8 @@ async function runWorkflowReplacement({
   };
   const model = new StageModel(script);
   const invoked: number[] = [];
+  const invocationRuns: string[] = [];
+  const attemptRuns: string[] = [];
   const checkpoints = new MemoryByteCheckpoints();
   const diagnostics: DiagnosticEvent[] = [];
   const timeline: { attempt: number; events: unknown[]; invoked: number[]; statuses: string[] }[] =
@@ -320,8 +323,9 @@ async function runWorkflowReplacement({
             grantScope: 'instance',
             approval: 'confirm',
             retry: 'none',
-            async invoke(input: { value: number }) {
+            async invoke(input: { value: number }, context: CapabilityContext) {
               invoked.push(input.value);
+              invocationRuns.push(context.runId);
               if (holdWrite && input.value === 2) {
                 writeStarted.resolve();
                 await heldWrite.promise;
@@ -338,6 +342,7 @@ async function runWorkflowReplacement({
       errors: string[] = [];
     for (let attempt = 0; attempt < (retry ? 2 : 1); attempt++) {
       const { runId } = await instance.start({ prompt: 'run the stages' });
+      attemptRuns.push(runId);
       const events: RunEvent[] = [];
       for await (const event of instance.events(runId)) events.push(event);
       for (const event of events) {
@@ -363,6 +368,7 @@ async function runWorkflowReplacement({
           // failure implies write 1 succeeded; c's held model has requested no write.
           expect(errors).toEqual(['unavailable']);
           expect(invoked).toEqual([1]);
+          expect(invocationRuns).toEqual([runId]);
           expect([...recovery.journal.values()].map((record) => record.status)).toEqual([
             'succeeded',
           ]);
@@ -390,6 +396,7 @@ async function runWorkflowReplacement({
     if (cancelSibling) {
       expect(errors, message).toEqual(['unavailable']);
       expect(invoked).toEqual([1, 2]);
+      expect(invocationRuns).toEqual(attemptRuns);
       expect([...recovery.journal.values()].map((record) => record.status)).toEqual([
         'succeeded',
         'succeeded',
