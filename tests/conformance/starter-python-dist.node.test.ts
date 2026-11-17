@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import { lockedWheels, runtimeFiles } from '../../packages/adapter-pyodide/src/runtime-files.js';
 import { collectNotices } from '../../packages/starter-python/src/notices.js';
+import { verifyWheelSources } from '../../packages/starter-python/src/sources.js';
 import {
   fileMetadata,
   verifyArtifact,
@@ -65,6 +66,8 @@ test.skipIf(!available)(
       packages: { file: string; bytes: number; sha256: string }[];
     };
     const expected = [...selected, ...local.packages];
+    for (const wheel of local.packages)
+      expect(Object.keys(wheel).sort()).toEqual(['bytes', 'file', 'name', 'sha256', 'version']);
     expect(built.manifest.wheels.map((wheel) => wheel.file).sort()).toEqual(
       expected.map((wheel) => wheel.file).sort(),
     );
@@ -203,7 +206,7 @@ test.skipIf(!available).each(['missing', 'changed', 'bytes-claim', 'license'] as
     }
     await writeFile(
       join(wheelCache, 'local-wheels.json'),
-      JSON.stringify({ v: 'galaxie.python-build/v1', packages: local.packages }),
+      JSON.stringify({ ...local, v: 'galaxie.python-build/v1' }),
     );
     await expect(buildStarterDist(pkg, { wheelCache })).rejects.toThrow(
       mutation === 'license'
@@ -216,43 +219,86 @@ test.skipIf(!available).each(['missing', 'changed', 'bytes-claim', 'license'] as
   },
 );
 
-test.skipIf(!available).each(['changed', 'missing', 'extra'] as const)(
-  'pack refuses a cached galaxie wheel with %s Python sources even when its inventory agrees',
-  async (mutation) => {
-    const built = await buildStarterDistOnce();
+test.skipIf(!available).each(
+  ['galaxie', 'ormsgpack'].flatMap((name) =>
+    ['changed', 'missing', 'extra', 'metadata-changed', 'metadata-missing'].map((mutation) => ({
+      name,
+      mutation,
+    })),
+  ),
+)('pack refuses cached $name inputs: $mutation', async ({ name, mutation }) => {
+  const built = await buildStarterDistOnce();
+  const directory = await temporaryDirectory();
+  const pkg = join(directory, 'package');
+  await cp(built.directory, pkg, { recursive: true, dereference: false });
+  const wheelCache = join(directory, 'cache');
+  await mkdir(wheelCache);
+  const local = JSON.parse(await readFile(join(cache, 'local-wheels.json'), 'utf8')) as {
+    packages: {
+      name: string;
+      file: string;
+      bytes: number;
+      sha256: string;
+    }[];
+    pyprojectSha256: Record<string, string>;
+  };
+  for (const wheel of [...selected, ...local.packages])
+    await cp(join(cache, wheel.file), join(wheelCache, wheel.file));
+  const wheel = local.packages.find((item) => item.name === name);
+  if (!wheel) throw new Error(`The ${name} wheel is missing.`);
+  const path = join(wheelCache, wheel.file);
+  const entries = unzipSync(await readFile(path));
+  const source = name === 'galaxie' ? 'galaxie/_bridge.py' : 'ormsgpack/__init__.py';
+  if (mutation === 'missing') delete entries[source];
+  else if (mutation === 'extra') entries[`${name}/removed.py`] = Buffer.from('# Stale module.\n');
+  else if (mutation === 'changed') entries[source] = Buffer.from('# Stale source.\n');
+  else if (mutation === 'metadata-changed') local.pyprojectSha256[name] = '0'.repeat(64);
+  else delete local.pyprojectSha256[name];
+  const bytes = zipSync(entries);
+  await writeFile(path, bytes);
+  wheel.bytes = bytes.byteLength;
+  wheel.sha256 = createHash('sha256').update(bytes).digest('hex');
+  await writeFile(
+    join(wheelCache, 'local-wheels.json'),
+    JSON.stringify({ ...local, v: 'galaxie.python-build/v1' }),
+  );
+  const input = mutation.startsWith('metadata-') ? 'pyproject.toml' : 'src';
+  await expect(buildStarterDist(pkg, { wheelCache })).rejects.toThrow(
+    `The Python starter wheel does not match python/${name === 'galaxie' ? 'galaxie' : 'standins/ormsgpack'}/${input}: ${wheel.file}. Rebuild with: node scripts/build-python-wheels.ts`,
+  );
+  await expect(readFile(join(pkg, 'dist/manifest.json'))).rejects.toMatchObject({
+    code: 'ENOENT',
+  });
+  expect(await readFile(path)).toEqual(Buffer.from(bytes));
+});
+
+test.skipIf(!available).each(['galaxie', 'ormsgpack'])(
+  '%s metadata freshness checks the repository input without rebuilding the wheel',
+  async (name) => {
     const directory = await temporaryDirectory();
-    const pkg = join(directory, 'package');
-    await cp(built.directory, pkg, { recursive: true, dereference: false });
-    const wheelCache = join(directory, 'cache');
-    await mkdir(wheelCache);
-    const local = JSON.parse(await readFile(join(cache, 'local-wheels.json'), 'utf8')) as {
-      packages: { name: string; file: string; bytes: number; sha256: string }[];
-    };
-    for (const wheel of [...selected, ...local.packages])
-      await cp(join(cache, wheel.file), join(wheelCache, wheel.file));
-    const wheel = local.packages.find((item) => item.name === 'galaxie');
-    if (!wheel) throw new Error('The galaxie wheel is missing.');
-    const path = join(wheelCache, wheel.file);
-    const entries = unzipSync(await readFile(path));
-    const source = 'galaxie/_bridge.py';
-    if (mutation === 'missing') delete entries[source];
-    else if (mutation === 'extra') entries['galaxie/removed.py'] = Buffer.from('# Stale module.\n');
-    else entries[source] = Buffer.from('# Stale source.\n');
-    const bytes = zipSync(entries);
-    await writeFile(path, bytes);
-    wheel.bytes = bytes.byteLength;
-    wheel.sha256 = createHash('sha256').update(bytes).digest('hex');
-    await writeFile(
-      join(wheelCache, 'local-wheels.json'),
-      JSON.stringify({ v: 'galaxie.python-build/v1', packages: local.packages }),
-    );
-    await expect(buildStarterDist(pkg, { wheelCache })).rejects.toThrow(
-      `The Python starter wheel does not match python/galaxie/src: ${wheel.file}. Rebuild with: node scripts/build-python-wheels.ts`,
-    );
-    await expect(readFile(join(pkg, 'dist/manifest.json'))).rejects.toMatchObject({
-      code: 'ENOENT',
+    const packagePath = `python/${name === 'galaxie' ? 'galaxie' : 'standins/ormsgpack'}`;
+    await cp(packagePath, join(directory, packagePath), {
+      recursive: true,
+      filter: (path) => !['build', '__pycache__'].includes(path.split('/').at(-1) ?? ''),
     });
-    expect(await readFile(path)).toEqual(Buffer.from(bytes));
+    const file = `${name}-${name === 'galaxie' ? '0.0.0' : '1.13.0'}-py3-none-any.whl`;
+    const metadata = join(directory, packagePath, 'pyproject.toml');
+    const wheel = {
+      file,
+      bytes: await readFile(join(cache, file)),
+      pyprojectSha256: createHash('sha256')
+        .update(await readFile(metadata))
+        .digest('hex'),
+    };
+    await expect(verifyWheelSources(wheel, directory, packagePath)).resolves.toBeUndefined();
+    const original = await readFile(metadata, 'utf8');
+    await writeFile(metadata, `${original}\n# Changed metadata input.\n`);
+    const message = `The Python starter wheel does not match ${packagePath}/pyproject.toml: ${file}. Rebuild with: node scripts/build-python-wheels.ts`;
+    await expect(verifyWheelSources(wheel, directory, packagePath)).rejects.toThrow(message);
+    await writeFile(metadata, original);
+    await expect(
+      verifyWheelSources({ ...wheel, pyprojectSha256: undefined }, directory, packagePath),
+    ).rejects.toThrow(message);
   },
 );
 

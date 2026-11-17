@@ -173,10 +173,18 @@ const forGroup = (
   ];
   if (groupName === 'general') return { include, exclude: [...exclude, ...python] };
   if (groupName === 'python') return { include: python, exclude };
+  // GALAXIE_PYTHON_REST_SKIP_STARTERS=true removes the starter conformance files, which CI runs
+  // serially in their own invocation, from this group's parallel run.
   if (groupName === 'python-rest')
     return {
       include: python,
-      exclude: [...exclude, ...Object.values(pythonShards).flatMap(named)],
+      exclude: [
+        ...exclude,
+        ...Object.values(pythonShards).flatMap(named),
+        ...(process.env['GALAXIE_PYTHON_REST_SKIP_STARTERS'] === 'true'
+          ? [`${prefix}tests/conformance/starter-python-*.node.test.ts`]
+          : []),
+      ],
     };
   const term = groupName === undefined ? undefined : pythonShards[groupName];
   return term === undefined ? { include, exclude } : { include: named(term), exclude };

@@ -1,15 +1,22 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { unzipSync } from 'fflate';
 
 export async function verifyWheelSources(
-  wheel: { readonly file: string; readonly bytes: Uint8Array },
-  sourceDirectory: string,
+  wheel: {
+    readonly file: string;
+    readonly bytes: Uint8Array;
+    readonly pyprojectSha256: string | undefined;
+  },
+  repositoryRoot: string,
+  packagePath: string,
 ): Promise<void> {
-  const message = `The Python starter wheel does not match python/galaxie/src: ${wheel.file}. Rebuild with: node scripts/build-python-wheels.ts`;
+  const sourceDirectory = join(repositoryRoot, packagePath, 'src');
+  const message = `The Python starter wheel does not match ${packagePath}/src: ${wheel.file}. Rebuild with: node scripts/build-python-wheels.ts`;
   try {
     const entries = unzipSync(wheel.bytes, { filter: ({ name }) => name.endsWith('.py') });
     const files = (await readdir(sourceDirectory, { recursive: true, withFileTypes: true }))
@@ -17,8 +24,7 @@ export async function verifyWheelSources(
       .map((entry) => ({
         entry,
         path: relative(sourceDirectory, join(entry.parentPath, entry.name)).split(sep).join('/'),
-      }))
-      .filter(({ path }) => !path.split('/').includes('__pycache__'));
+      }));
     if (
       JSON.stringify(Object.keys(entries).sort()) !==
       JSON.stringify(files.map(({ path }) => path).sort())
@@ -31,5 +37,13 @@ export async function verifyWheelSources(
     }
   } catch (cause) {
     throw new Error(message, { cause });
+  }
+  const metadataMessage = `The Python starter wheel does not match ${packagePath}/pyproject.toml: ${wheel.file}. Rebuild with: node scripts/build-python-wheels.ts`;
+  try {
+    const metadata = await readFile(join(repositoryRoot, packagePath, 'pyproject.toml'));
+    if (createHash('sha256').update(metadata).digest('hex') !== wheel.pyprojectSha256)
+      throw new Error(metadataMessage);
+  } catch (cause) {
+    throw new Error(metadataMessage, { cause });
   }
 }

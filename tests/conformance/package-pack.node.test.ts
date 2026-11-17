@@ -216,7 +216,9 @@ test.each(packages)('$directory has public metadata and the root license files',
       expect(manifest.files).toEqual(
         pkg.directory === 'create'
           ? ['dist', 'templates', 'skills', 'LICENSE', 'NOTICE']
-          : ['dist', 'LICENSE', 'NOTICE'],
+          : pkg.directory === 'starter-python'
+            ? ['dist', '!dist/notices.*', '!dist/sources.*', 'LICENSE', 'NOTICE']
+            : ['dist', 'LICENSE', 'NOTICE'],
       );
   }
   expect(packed.version).toMatch(/^0\.\d+\.\d+$/);
@@ -283,6 +285,9 @@ test.each(packages.filter((pkg) => promotedPackages.includes(pkg.directory)))(
         pkg.entries.some((entry) => entry.endsWith('_test.go') || entry.includes('/.cache/')),
       ).toBe(false);
     } else if (pkg.directory === 'starter-python') {
+      expect(
+        pkg.entries.filter((entry) => /^package\/dist\/(?:notices|sources)\./.test(entry)),
+      ).toEqual([]);
       for (const entry of ['manifest.json', 'NOTICE.txt'])
         expect(pkg.entries).toContain(`package/dist/${entry}`);
       expect(

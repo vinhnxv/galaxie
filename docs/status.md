@@ -1,5 +1,25 @@
 # Project status
 
+On 2026-11-17, Python starter prepack compares both local wheels' Python modules
+with their repository sources and checks metadata-input hashes recorded by the
+trusted wheel build. Older cache inventories require rebuilding; these hashes
+establish input consistency, not independent metadata reproduction or authenticity.
+The tarball excludes the build-only notices and sources modules. Distribution and
+packing tests pass, and seven scratch mutations are detected. With one unchanged
+wheel cache, all 41 artifact files and 61 published distribution files retain the
+prior implementation's bytes. No live stack was run; ADR-0012 guarantees are
+unchanged.
+
+CI now runs only the four Python starter conformance files serially, followed by
+the parallel `python-rest` remainder; Vitest inventory tests prove a disjoint,
+complete partition across projects. Three intermittent tests retain every
+assertion with explicit deadlines sized from local baseline and CPU-load
+measurements and, for the rag-browser cases, the durations seen on the CI runner (about 68 s
+against a former 60 s limit). The serial starter files take under a minute; the parallel
+remainder still takes about 20 minutes, so the split is not shown to shorten the job. The host eviction case overrides the polling deadline separately
+from its outer test timeout. These are scripted-model checks, not live-stack
+evidence; product runtime behavior and ADR-0012 guarantees are unchanged.
+
 On 2026-11-17, the offline documentation check compares the tracing attribute
 table with core's metadata allowlist and development-text key type through the
 installed TypeScript 6 parser. It rejects missing and unknown keys, names the

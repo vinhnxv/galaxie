@@ -693,7 +693,9 @@ pythonTest.each(answerExecutors)(
       await page.context().close();
     }
   },
-  60000,
+  // This case boots Python three times: about 13 s locally and 68 s on the CI python-rest runner
+  // (it failed above 60 s there); 180 s leaves about 2.6x margin over the CI figure.
+  180_000,
 );
 
 pythonTest.each(answerExecutors)(
@@ -790,7 +792,8 @@ pythonTest.each(answerExecutors)(
       await page.context().close();
     }
   },
-  60000,
+  // About 50 s on the CI python-rest runner, close to the former 60 s limit.
+  120_000,
 );
 
 pythonTest.each(answerExecutors)(

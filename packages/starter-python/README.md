@@ -43,16 +43,22 @@ LangGraph lane from the adapter's `runtime-files` export and adds exactly the
 truncated or changed wheel fails with its filename and leaves no complete manifest.
 It never repairs the cache. Output is ordinary ignored build output under `dist/`.
 
-Prepack compares the cached `galaxie` wheel's complete `.py` inventory and bytes
-with `python/galaxie/src`, refusing changed, missing or extra modules with the
-wheel filename and rebuild command. It does not check package metadata or the
-stand-in's source freshness. Bit-for-bit local-wheel reproducibility and
-compatibility with a newer adapter bridge are not established.
+Prepack compares both local wheels' complete `.py` inventories and bytes with
+`python/galaxie/src` and `python/standins/ormsgpack/src`, refusing changed, missing
+or extra modules with the wheel filename and rebuild command. The trusted local
+build inventory also records each package's `pyproject.toml` SHA-256, so edited
+metadata inputs or an older inventory without those hashes require a wheel
+rebuild. This checks build-input freshness; it does not independently reproduce
+setuptools' metadata or establish authenticity when the trusted inventory is
+replaced. Bit-for-bit local-wheel reproducibility and compatibility with a newer
+adapter bridge are not established.
 
 Plain `vite dev` watches `python/agent` and invalidates both the served assets
 and virtual source identity after edits, additions and removals. The generated
 `dev` script still builds and previews; rerun it after editing sources.
 `fflate` is a development dependency used only when preparing the distribution.
+The tarball excludes the build-only `notices` and `sources` modules and their
+declarations and maps; prepack still compiles and uses them in the checkout.
 
 ## Notices and limits
 

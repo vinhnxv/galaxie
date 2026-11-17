@@ -90,19 +90,24 @@ test('create-clean always logs JSON and writes per-project durations without ano
   expect(summary).not.toContain('uses:');
 });
 
-test('python-rest runs the starter files once with the Go step file-parallelism limit', () => {
+test('python-rest runs only the four starter conformance files serially and the remainder in parallel', () => {
   const block = job('test-python');
-  expect(block).not.toContain('tests/conformance/starter-python-*.node.test.ts');
   expect(block).toContain(`      - name: Test the Python group once
         run: |
-          args=()
           if [ "$GALAXIE_TEST_GROUP" = "python-rest" ]; then
-            args+=(--no-file-parallelism)
+            pnpm run compose:create
+            status=0
+            CI=true pnpm exec vitest run --project node tests/conformance/starter-python-*.node.test.ts --no-file-parallelism || status=$?
+            CI=true GALAXIE_PYTHON_REST_SKIP_STARTERS=true pnpm exec vitest run || status=$?
+            exit "$status"
+          else
+            CI=true pnpm test
           fi
-          CI=true pnpm test "\${args[@]}"
         env:
           GALAXIE_TEST_GROUP: \${{ matrix.group }}`);
   expect([...block.matchAll(/pnpm test/g)]).toHaveLength(1);
+  expect([...block.matchAll(/--no-file-parallelism/g)]).toHaveLength(1);
+  expect([...block.matchAll(/pnpm exec vitest run/g)]).toHaveLength(2);
   expect(job('go')).toContain(
     'pnpm exec vitest run --project node tests/conformance/starter-go-*.node.test.ts --no-file-parallelism',
   );
