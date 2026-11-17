@@ -3,17 +3,19 @@
 
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { once } from 'node:events';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { createGunzip, createGzip, gzipSync } from 'node:zlib';
 import { expect, onTestFinished, test } from 'vitest';
 import { run } from '../src/main.js';
 import { resolveTarballs } from '../src/packages.js';
-import { readTarballManifest } from '../src/tarball.js';
+import { defaultMaxDecodedBytes, readTarballManifest } from '../src/tarball.js';
 
 const names = [
   'ui-protocol',
@@ -127,9 +129,85 @@ test.each([
       metadata.name,
       problem === 'decompressed size' ? valid.length - 1 : undefined,
     ),
-  ).rejects.toThrow('@galaxie-ai/core: could not read tarball package/package.json.');
+  ).rejects.toThrow(
+    ['x', 'g', 'L', 'K'].includes(problem)
+      ? '@galaxie-ai/core: tarball contains an extended (pax or GNU) header, which this reader refuses.'
+      : '@galaxie-ai/core: could not read tarball package/package.json.',
+  );
   if (problem === 'decompressed size')
     expect(await readTarballManifest(path, metadata.name, valid.length)).toEqual(metadata);
+});
+
+async function tarballFile(entries: readonly Buffer[]): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'galaxie-tar-reader-'));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'fixture.tgz');
+  await writeFile(path, gzipSync(Buffer.concat([...entries, Buffer.alloc(1024)])));
+  return path;
+}
+
+test('the default decompressed cap is 512 MiB', () => {
+  expect(defaultMaxDecodedBytes).toBe(512 * 1024 * 1024);
+});
+
+test.each([
+  ['1', 'hard link'],
+  ['5', 'directory'],
+  ['7', 'contiguous file'],
+] as const)('the manifest entry cannot have typeflag %s (%s)', async (type, _description) => {
+  const metadata = { name: '@galaxie-ai/core', version: '0.1.0' };
+  const path = await tarballFile([
+    tarEntry('package/package.json', Buffer.from(JSON.stringify(metadata)), type),
+  ]);
+  await expect(readTarballManifest(path, metadata.name)).rejects.toThrow(
+    '@galaxie-ai/core: could not read tarball package/package.json.',
+  );
+});
+
+test('a legacy NUL typeflag still names a regular file', async () => {
+  const metadata = { name: '@galaxie-ai/core', version: '0.1.0' };
+  const path = await tarballFile([
+    tarEntry('package/package.json', Buffer.from(JSON.stringify(metadata)), '\0'),
+  ]);
+  expect(await readTarballManifest(path, metadata.name)).toEqual(metadata);
+});
+
+test('the manifest limit is exactly 1 MiB', async () => {
+  const sized = (size: number): Buffer => {
+    const filler = size - Buffer.byteLength(JSON.stringify({ data: '' }));
+    return Buffer.from(JSON.stringify({ data: 'a'.repeat(filler) }));
+  };
+  const accepted = await tarballFile([tarEntry('package/package.json', sized(1_048_576))]);
+  expect((await readTarballManifest(accepted, 'x'))['data']).toHaveLength(1_048_576 - 11);
+  const refused = await tarballFile([tarEntry('package/package.json', sized(1_048_577))]);
+  await expect(readTarballManifest(refused, 'x')).rejects.toThrow(
+    'x: could not read tarball package/package.json.',
+  );
+});
+
+test('the size cap stops reading instead of decoding the whole archive', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'galaxie-tar-bomb-'));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'bomb.tgz');
+  const gzip = createGzip({ level: 1 });
+  const written = pipeline(gzip, createWriteStream(path));
+  const zeros = Buffer.alloc(1024 * 1024);
+  for (let index = 0; index < 512; index++) if (!gzip.write(zeros)) await once(gzip, 'drain');
+  gzip.end();
+  await written;
+  const full = performance.now();
+  await pipeline(
+    createReadStream(path),
+    createGunzip(),
+    new Writable({ write: (_, __, done) => done() }),
+  );
+  const decodeTime = performance.now() - full;
+  const started = performance.now();
+  await expect(readTarballManifest(path, 'x', 1024 * 1024)).rejects.toThrow(
+    'x: could not read tarball package/package.json.',
+  );
+  // Aborting at 1 MiB takes a small fraction of decoding all 512 MiB.
+  expect(performance.now() - started).toBeLessThan(decodeTime / 4);
 });
 
 test('the npm CLI emits fixed file dependency specs and all seven overrides', async () => {

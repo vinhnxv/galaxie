@@ -182,12 +182,17 @@ export async function writeProject(plan: WritePlan): Promise<void> {
   } catch (error) {
     const rollbackErrors: unknown[] = [];
     const leftovers: string[] = [];
+    // An ancestor created above the target is named by role, never by an absolute or ../ path.
+    const shown = (target: string, path: string): string => {
+      const location = relative(target, path);
+      return location === '' ? '.' : location.startsWith('..') ? '<parent directory>' : location;
+    };
     const recordRollback = (path: string, failure: unknown): void => {
       const code = (failure as NodeJS.ErrnoException | null)?.code;
       if (code === 'ENOENT') return;
       rollbackErrors.push(failure);
       leftovers.push(
-        `${relative(plan.target, path) || '.'}${typeof code === 'string' && /^[A-Z_]+$/.test(code) ? ` (${code})` : ''}`,
+        `${shown(plan.target, path)}${typeof code === 'string' && /^[A-Z_]+$/.test(code) ? ` (${code})` : ''}`,
       );
     };
     for (const created of createdFiles.reverse()) {

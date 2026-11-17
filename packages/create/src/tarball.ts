@@ -5,11 +5,18 @@ import { createReadStream } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 export class TarballError extends Error {}
 
-/** Read npm's manifest without extraction; path-overriding extended headers are refused. */
+/** The most decompressed bytes the reader accepts before it stops reading. */
+export const defaultMaxDecodedBytes: number = 512 * 1024 * 1024;
+
+/**
+ * Read npm's manifest without extraction. This is a consistency check, not a security boundary:
+ * it refuses every pax and GNU extended header, so no header can rename the entry it validated,
+ * and it stops reading once the decompressed size passes the cap.
+ */
 export async function readTarballManifest(
   path: string,
   name: string,
-  maxBytes: number = 512 * 1024 * 1024,
+  maxBytes: number = defaultMaxDecodedBytes,
 ): Promise<Record<string, unknown>> {
   const source = createReadStream(path);
   const decoded = source.pipe(createGunzip());
@@ -70,7 +77,10 @@ export async function readTarballManifest(
         if (!Number.isSafeInteger(remaining)) throw new Error();
         padding = (512 - (remaining % 512)) % 512;
         const prefix = text(345, 500);
-        if (['x', 'g', 'L', 'K'].includes(text(156, 157))) throw new Error();
+        if (['x', 'g', 'L', 'K'].includes(text(156, 157)))
+          throw new TarballError(
+            `${name}: tarball contains an extended (pax or GNU) header, which this reader refuses.`,
+          );
         const entry = `${prefix === '' ? '' : `${prefix}/`}${text(0, 100)}`;
         manifest = entry === 'package/package.json';
         if (manifest && found !== undefined)

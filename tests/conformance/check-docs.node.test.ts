@@ -300,22 +300,29 @@ test('a stray setext underline changes the extent instead of becoming an ordinar
   expect(run(root).output).toContain('citation hash mismatch');
 });
 
-test.each(['- Rule.', '* Rule.', '+ Rule.', '1. Rule.', '1) Rule.'])(
-  'a thematic break after list item %s cannot shorten a cited extent',
-  (item) => {
-    const body = `Introduction.\n\n${item}\n---\n\nKeep this too.`;
-    const hash = createHash('sha256').update(body).digest('hex');
-    const source = citedSource.replace(sectionBody, body);
-    const root = citationFixture(source, citation.replace(sectionHash, hash));
-    expect(run(root)).toEqual({ status: 0, output: '' });
-    writeFileSync(join(root, 'rules.md'), source.replace('Keep this too.', 'Changed rule.'));
-    expect(run(root).output).toContain('citation hash mismatch');
-    const shortened = createHash('sha256').update('Introduction.').digest('hex');
-    const forged = run(citationFixture(source, citation.replace(sectionHash, shortened)));
-    expect(forged.status).toBe(1);
-    expect(forged.output).toContain('citation hash mismatch');
-  },
-);
+test.each([
+  '- Rule.',
+  '* Rule.',
+  '+ Rule.',
+  '1. Rule.',
+  '1) Rule.',
+  '- Rule.\n  continued line.',
+  '- Rule.\ncontinued lazily.',
+  '> Quote.\nlazy line.',
+  '| a | b |',
+])('a thematic break after list item %s cannot shorten a cited extent', (item) => {
+  const body = `Introduction.\n\n${item}\n---\n\nKeep this too.`;
+  const hash = createHash('sha256').update(body).digest('hex');
+  const source = citedSource.replace(sectionBody, body);
+  const root = citationFixture(source, citation.replace(sectionHash, hash));
+  expect(run(root)).toEqual({ status: 0, output: '' });
+  writeFileSync(join(root, 'rules.md'), source.replace('Keep this too.', 'Changed rule.'));
+  expect(run(root).output).toContain('citation hash mismatch');
+  const shortened = createHash('sha256').update('Introduction.').digest('hex');
+  const forged = run(citationFixture(source, citation.replace(sectionHash, shortened)));
+  expect(forged.status).toBe(1);
+  expect(forged.output).toContain('citation hash mismatch');
+});
 
 test('can cite a setext heading without hashing its underline', () => {
   expect(run(citationFixture(citedSource.replace('## Never', 'Never\n-----')))).toEqual({

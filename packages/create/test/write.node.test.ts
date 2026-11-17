@@ -24,7 +24,12 @@ import { ProjectWriteError, planWrite, writeProject } from '../src/write.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
-  return { ...actual, unlink: vi.fn(actual.unlink), rmdir: vi.fn(actual.rmdir) };
+  return {
+    ...actual,
+    open: vi.fn(actual.open),
+    unlink: vi.fn(actual.unlink),
+    rmdir: vi.fn(actual.rmdir),
+  };
 });
 
 const files = (values: Record<string, string>): Map<string, ProjectFile> =>
@@ -153,6 +158,31 @@ test('a symlink in the middle of an existing target path is refused (base-relati
   );
   expect(await readFile(join(root, 'real/sub/proj/a.ts'), 'utf8')).toBe('new');
   await expect(lstat(join(outside, 'sub', 'proj'))).rejects.toThrow();
+});
+
+test('rollback names directories created above the target by role, not by path', async () => {
+  const root = await scratch();
+  const plan = await planWrite(files({ 'x.ts': 'x', 'y.ts': 'y' }), join(root, 'a', 'b', 'proj'));
+  const failure = Object.assign(new Error('private-error-canary'), { code: 'EACCES' });
+  const open = vi.mocked(fs.open);
+  const real = open.getMockImplementation();
+  let calls = 0;
+  open.mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+    calls += 1;
+    if (calls === 2) throw new Error('second file cannot be created');
+    return (real as typeof fs.open)(...args);
+  });
+  const remove = vi.mocked(fs.rmdir).mockRejectedValue(failure);
+  onTestFinished(() => {
+    open.mockImplementation(real as typeof fs.open);
+    remove.mockReset();
+  });
+  const message = ((await writeProject(plan).catch((error: unknown) => error)) as Error).message;
+  expect(message).toContain(
+    'Rollback could not remove: . (EACCES), <parent directory> (EACCES), <parent directory> (EACCES)',
+  );
+  expect(message).not.toContain('..');
+  expect(message).not.toContain(await realpath(root));
 });
 
 test.each(['unlink', 'rmdir'] as const)(

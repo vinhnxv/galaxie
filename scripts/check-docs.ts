@@ -87,7 +87,17 @@ function headings(lines: readonly string[]): Heading[] {
       result.push({ level: heading[1].length, text: heading[2], line: index });
     } else if (index > 0 && /^ {0,3}(?:=+|-+)\s*$/.test(line)) {
       const previous = lines[index - 1] ?? '';
+      // A lazy or indented continuation of a list item, quote or table is not a root paragraph,
+      // so its underline is a thematic break, not a heading underline.
+      let start = index - 1;
+      while (
+        start > 0 &&
+        (lines[start - 1] ?? '').trim() !== '' &&
+        !/^ {0,3}#{1,6}(?:\s|$)/.test(lines[start - 1] ?? '')
+      )
+        start--;
       if (
+        !/^ {0,3}(?:[-+*]\s|\d+[.)]\s|>|\||<)/.test(lines[start] ?? '') &&
         /^ {0,3}\S/.test(previous) &&
         !/^ {0,3}(?:[-+*]\s|\d+[.)]\s|#{1,6}(?:\s|$)|>|<|[-=]+\s*$|(?:[*_]\s*){3,}$)/.test(previous)
       )

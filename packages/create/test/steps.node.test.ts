@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+import { readFileSync } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -102,4 +103,12 @@ test.each([
     ),
   ).toBe(1);
   expect(errors).toBe(`Failed to ${step}.\n`);
+});
+
+test('every step label in main.ts has a failure case above', () => {
+  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const labels = [...source.matchAll(/step = '([^']+)'/g)].map((match) => match[1]);
+  const pinned = readFileSync(new URL(import.meta.url), 'utf8');
+  for (const label of labels) expect(pinned).toContain(`step: '${label}'`);
+  expect(labels).toHaveLength(11);
 });
