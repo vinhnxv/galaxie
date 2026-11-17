@@ -109,7 +109,7 @@ export async function probeGoVersion(actualVersion?: string): Promise<Ready | Un
       probes.push('go env GOVERSION: exit 0');
     } catch (error) {
       const reason = `go env GOVERSION: ${sanitizedFailure(error)}`;
-      return { measurement: 'unmeasured', reason, probes: [reason] };
+      throw new Error(reason, { cause: error });
     }
   } else probes.push('go env GOVERSION: injected version');
   if (version !== lock.toolchain) {
@@ -198,7 +198,7 @@ export async function runGo(): Promise<Measured | Unmeasured> {
         probes.push(`${label}: exit 0`);
       } catch (error) {
         const reason = `${label}: ${sanitizedFailure(error, directory)}`;
-        return { measurement: 'unmeasured', reason, probes: [...probes, reason] };
+        throw new Error(reason, { cause: error });
       }
     }
     const workerEntry = new URL('./worker.js', import.meta.resolve('@galaxie-ai/adapter-go'));

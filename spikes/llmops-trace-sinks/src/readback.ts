@@ -80,6 +80,11 @@ export async function readBack(
     throw new Error('Invalid local MLflow port');
   const mlflow = `http://127.0.0.1:${env['MLFLOW_PORT']}`;
   const observations = await observationsQuery({ traceId }, inspect);
+  const langfuseTrace = await json<unknown>(
+    `http://127.0.0.1:3000/api/public/traces/${encodeURIComponent(traceId)}`,
+    { headers: { Authorization: env['LANGFUSE_AUTH_HEADER'] ?? '' } },
+  );
+  inspect?.(langfuseTrace);
   const search = await json<{ traces?: { trace_id: string }[] }>(
     `${mlflow}/api/3.0/mlflow/traces/search`,
     {

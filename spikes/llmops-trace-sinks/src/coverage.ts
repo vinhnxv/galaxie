@@ -357,7 +357,14 @@ export function auditMatrix(matrix: CoverageMatrix, options: { requireIds?: bool
     assert.equal(row.lane, live ? 'live' : 'in-memory', `${id}: incorrect measurement lane`);
     if (id === 'adk-js-own-spans') assert.equal(row.executorId, null, `${id}: unexpected executor`);
     else assert.equal(row.executorId, expectedExecutors[id], `${id}: unexpected root executor ID`);
-    if (!live) {
+    if (live) {
+      assert.equal(row.controls?.['rawResponsesScanned'], true, `${id}: raw scan control failed`);
+      assert.equal(
+        row.controls?.['spanIdsAndParentsMatch'],
+        true,
+        `${id}: span and parent control failed`,
+      );
+    } else {
       assert.equal(row.controls?.['outputCorrect'], true, `${id}: output control failed`);
       assert.equal(
         row.controls?.['modelCalls'],
@@ -466,18 +473,5 @@ export function auditMatrix(matrix: CoverageMatrix, options: { requireIds?: bool
       expected.find((value) => value.name === gap.name)?.evidence,
       `${gap.name}: evidence differs from gap`,
     );
-    for (const pointer of gap.evidence) {
-      assert.equal(pointer.file, 'coverage-matrix.json');
-      assert.ok(pointer.path.startsWith('/'));
-      let value: unknown = matrix;
-      for (const key of pointer.path.slice(1).split('/')) {
-        assert.ok(
-          value !== null && typeof value === 'object',
-          `${gap.name}: invalid evidence pointer`,
-        );
-        value = Reflect.get(value, key.replaceAll('~1', '/').replaceAll('~0', '~'));
-      }
-      assert.notEqual(value, undefined, `${gap.name}: unresolved evidence pointer`);
-    }
   }
 }

@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2023-2026 ClickHouse, Inc.
+# SPDX-License-Identifier: Apache-2.0 AND MIT
 # Langfuse service wiring adapted from v4.80.0 docker-compose.yml (MIT).
 # See LICENSE-UPSTREAM for the upstream notice.
 name: galaxie-llmops-trace-sinks

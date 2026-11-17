@@ -212,11 +212,22 @@ The maintainer toolchain is under
 put that directory on PATH before the root build or validation if the default Go
 version differs. Python needs the already populated `.cache/python-wheels/`
 cache, its `local-wheels.json`, all locked wheels and the installed Pyodide runtime.
-Neither family downloads assets. Missing prerequisites produce an `unmeasured`
-row with the exact reason and repo-relative probes, but the matrix writer refuses to
-replace the committed matrix with an unmeasured Python or Go row (and so drop its
-derived gap) unless `LLMOPS_ALLOW_UNMEASURED=1` is set. Runtime assertion failures
-fail the lane and leave the previous matrix intact.
+Neither family downloads assets. Only a Go toolchain version mismatch produces an
+`unmeasured` row; accepting that row requires `LLMOPS_ALLOW_UNMEASURED=1`.
+Missing Python assets, Go probe/glue/build failures and runtime failures reject the
+lane and leave the previous matrix intact, even with that escape hatch enabled.
+Python measurements have an internal 180-second timeout that aborts the run,
+terminates workers, closes the loopback asset server, disposes the runtime and
+removes temporary files.
+
+Offline fixture provenance tests pin nine upstream source/golden SHA-256 digests.
+A changed digest requires reviewing the copied coverage fixture before refreshing
+the recorded value in `test/coverage-provenance.test.ts`. The backend controls now
+record observed `rawResponseCount` and `matchedSpanCount`. The readback fails before
+the scan and identity/parent booleans can be false, so they record that the readback
+run completed; the matrix audit rejects a live row whose recorded value is false.
+The counts are whole-run values shared by the live ADK rows, not per-row counts. Historical result artifacts have not been
+regenerated: this hardening run used offline tests and did not run the live stack.
 
 | Family | Scripted model / capability calls | Emitted root / node / model / capability spans | Measurement |
 | --- | --- | --- | --- |
@@ -351,8 +362,15 @@ projections. IDs are relabelled in parent-first oracle order. Timestamps become
 `<timestamp>`; timing, project fields, service resource paths and unrelated API
 fields are omitted. Typed attributes, token counts, status, model names, I/O and
 parenting are retained. Raw API bodies and credentials are never written to
-results. The live writer uses the root's installed Biome formatter so reruns
-preserve the committed JSON format as well as values.
+results. The Node live writer uses a local JSON serializer without a Biome subprocess.
+Offline tests compare its bytes against all four committed Node scenario files. It
+matches Biome for the current result shapes (objects, scalar arrays, empty
+containers); long numeric arrays that Biome fills across lines are not modelled.
+The score, browser and coverage live writers still format with the root Biome binary.
+The shared readback scanner also inspects the complete Langfuse trace-detail
+response (`/api/public/traces/{traceId}`), alongside observation pages and MLflow
+envelopes, before projecting stored spans. These changes have offline coverage;
+the recorded live results above predate this hardening run.
 
 To repeat the stability check while the stack is up:
 
@@ -395,6 +413,13 @@ packages, API, LangChain and LangGraph resolve through the same single-copy help
 as the Node runner. The production build independently counts one resolved copy
 of each shared package. No vendor SDK or backend dependency enters a galaxie
 package.
+
+Before Vite starts, the helper rejects multiple matching package directories
+(including peer-context variants) for API, LangChain core and LangGraph in this
+spike's `node_modules/.pnpm`. Offline tests also require exactly one locked version
+of each. This inventory guard does not inspect the root or linked packages'
+virtual stores, vendored or bundled copies, or code loaded outside Vite's resolver.
+Resolver tests separately check canonical paths through linked built exports.
 
 Vite preview binds only loopback on a free port. Its single proxy route rewrites
 `/otel/v1/traces` to the collector's `/v1/traces` receiver path. Preview serves the

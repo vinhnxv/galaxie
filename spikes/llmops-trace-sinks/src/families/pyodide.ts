@@ -20,6 +20,7 @@ import { createRuntime, defineAgentDefinition, type RunEvent } from '@galaxie-ai
 import { MockChatModel } from '@galaxie-ai/models/mock';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace';
 import { z } from 'zod';
+import { withCoverageTimeout } from '../coverage-timeout.js';
 import { createProvider } from './provider.js';
 
 const repository = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -31,12 +32,6 @@ const runtime = join(built, '../node_modules/pyodide');
 interface Inventory {
   lockedWheels: PyodideAdapterOptions['localWheels'];
   runtimeFiles: readonly { file: string }[];
-}
-
-export interface PyodideUnmeasured {
-  measurement: 'unmeasured';
-  reason: string;
-  probes: string[];
 }
 
 export interface PyodideMeasured {
@@ -54,7 +49,7 @@ async function inventory(): Promise<Inventory> {
 
 export async function probePyodide(
   cacheRoot = defaultCache,
-): Promise<{ measurement: 'available'; probes: string[] } | PyodideUnmeasured> {
+): Promise<{ measurement: 'available'; probes: string[] }> {
   const probes: string[] = [];
   const check = (path: string, label: string): boolean => {
     const found = existsSync(path);
@@ -64,17 +59,12 @@ export async function probePyodide(
   const missing: string[] = [];
   const manifest = '.cache/python-wheels/local-wheels.json';
   if (!check(join(cacheRoot, 'local-wheels.json'), manifest))
-    return { measurement: 'unmeasured', reason: `${manifest} is missing`, probes };
+    throw new Error(`${manifest} is missing`);
   for (const name of ['worker.js', 'runtime-files.js']) {
     const label = `packages/adapter-pyodide/dist/${name}`;
     if (!check(join(built, name), label)) missing.push(label);
   }
-  if (missing.length)
-    return {
-      measurement: 'unmeasured',
-      reason: `Missing built files: ${missing.join(', ')}`,
-      probes,
-    };
+  if (missing.length) throw new Error(`Missing built files: ${missing.join(', ')}`);
   const files = await inventory();
   const local = JSON.parse(await readFile(join(cacheRoot, 'local-wheels.json'), 'utf8')) as {
     packages: PyodideAdapterOptions['localWheels'];
@@ -87,9 +77,8 @@ export async function probePyodide(
     const label = `packages/adapter-pyodide/node_modules/pyodide/${file.file}`;
     if (!check(join(runtime, file.file), label)) missing.push(label);
   }
-  return missing.length
-    ? { measurement: 'unmeasured', reason: `Missing local assets: ${missing.join(', ')}`, probes }
-    : { measurement: 'available', probes };
+  if (missing.length) throw new Error(`Missing local assets: ${missing.join(', ')}`);
+  return { measurement: 'available', probes };
 }
 
 const source = `# SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
@@ -109,9 +98,8 @@ def create_agent():
     return StateGraph(dict).add_node('respond', respond).add_node('lookup', lookup).add_edge(START, 'respond').add_edge('respond', 'lookup').add_edge('lookup', END).compile(checkpointer=checkpointer())
 `;
 
-export async function runPyodide(): Promise<PyodideMeasured | PyodideUnmeasured> {
-  const probe = await probePyodide();
-  if (probe.measurement === 'unmeasured') return probe;
+export async function runPyodide(): Promise<PyodideMeasured> {
+  await probePyodide();
   const files = await inventory();
   const local = JSON.parse(await readFile(join(defaultCache, 'local-wheels.json'), 'utf8')) as {
     packages: PyodideAdapterOptions['localWheels'];
@@ -132,18 +120,20 @@ export async function runPyodide(): Promise<PyodideMeasured | PyodideUnmeasured>
   const directory = await mkdtemp(join(tmpdir(), 'galaxie-coverage-python-'));
   const tracing = createProvider({ live: false });
   let runtimeInstance: ReturnType<typeof createRuntime> | undefined;
-  try {
-    await new Promise<void>((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(0, '127.0.0.1', resolve);
-    });
-    const address = server.address();
-    assert.ok(address && typeof address !== 'string');
-    const origin = `http://127.0.0.1:${address.port}`;
-    const bootstrap = join(directory, 'bootstrap.mjs');
-    await writeFile(
-      bootstrap,
-      `// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
+  return withCoverageTimeout(
+    async (signal) => {
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', resolve);
+      });
+      signal.throwIfAborted();
+      const address = server.address();
+      assert.ok(address && typeof address !== 'string');
+      const origin = `http://127.0.0.1:${address.port}`;
+      const bootstrap = join(directory, 'bootstrap.mjs');
+      await writeFile(
+        bootstrap,
+        `// SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 import { parentPort } from 'node:worker_threads';
 globalThis.postMessage = (message) => parentPort.postMessage(message);
@@ -158,156 +148,178 @@ globalThis.fetch = (input, init) => {
 };
 await import(${JSON.stringify(pathToFileURL(join(built, 'worker.js')).href)});
 `,
-    );
-    const options: PyodideAdapterOptions = {
-      framework: 'langgraph',
-      runtimeUrl: `${runtime}/`,
-      wheelsUrl: `${origin}/python/wheels/`,
-      localWheels: local.packages,
-      createWorker(): PyodideWorkerPort {
-        const worker = new Worker(bootstrap);
-        workers.add(worker);
-        const messages = new Set<(event: { readonly data: unknown }) => void>();
-        const errors = new Set<() => void>();
-        worker.on('message', (data: unknown) => {
-          if (typeof data === 'object' && data !== null && 'coverageExternalRequest' in data) {
-            workerErrors.push('External request attempted');
-            return;
-          }
-          for (const listener of messages) listener({ data });
-        });
-        worker.on('error', (error) => {
-          workerErrors.push(error.message);
-          for (const listener of errors) listener();
-        });
-        return {
-          postMessage: (message) => worker.postMessage(message),
-          addEventListener(type, listener) {
-            if (type === 'message')
-              messages.add(listener as (event: { readonly data: unknown }) => void);
-            else errors.add(listener as () => void);
-          },
-          removeEventListener(type, listener) {
-            if (type === 'message')
-              messages.delete(listener as (event: { readonly data: unknown }) => void);
-            else errors.delete(listener as () => void);
-          },
-          terminate() {
-            if (workers.delete(worker)) terminations.push(worker.terminate());
-          },
-        };
-      },
-    };
-    const model = new MockChatModel({
-      'synthetic python prompt': {
-        id: 'python-coverage-reply',
-        text: 'synthetic python reply',
-        usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
-      },
-    });
-    let capabilityCalls = 0;
-    runtimeInstance = createRuntime({
-      appId: 'span-coverage-python',
-      executors: [createPyodideAdapter(options)],
-      tracerProvider: tracing.provider,
-      outputSafety: () => 'allow',
-    });
-    const value = z.object({ value: z.string() });
-    const instance = await runtimeInstance.create(
-      defineAgentDefinition({
-        id: 'coverage/python',
-        version: '1.0.0',
-        executor: 'langgraph-python',
-        input: z.object({}),
-        models: { answer: { modality: 'text', defaultPolicy: 'local-only' } },
-        capabilities: {
-          required: { 'lookup@1': { kind: 'read', input: value, output: z.string() } },
+      );
+      signal.throwIfAborted();
+      const options: PyodideAdapterOptions = {
+        framework: 'langgraph',
+        runtimeUrl: `${runtime}/`,
+        wheelsUrl: `${origin}/python/wheels/`,
+        localWheels: local.packages,
+        createWorker(): PyodideWorkerPort {
+          signal.throwIfAborted();
+          const worker = new Worker(bootstrap);
+          workers.add(worker);
+          const messages = new Set<(event: { readonly data: unknown }) => void>();
+          const errors = new Set<() => void>();
+          worker.on('message', (data: unknown) => {
+            if (typeof data === 'object' && data !== null && 'coverageExternalRequest' in data) {
+              workerErrors.push('External request attempted');
+              return;
+            }
+            for (const listener of messages) listener({ data });
+          });
+          worker.on('error', (error) => {
+            workerErrors.push(error.message);
+            for (const listener of errors) listener();
+          });
+          return {
+            postMessage: (message) => worker.postMessage(message),
+            addEventListener(type, listener) {
+              if (type === 'message')
+                messages.add(listener as (event: { readonly data: unknown }) => void);
+              else errors.add(listener as () => void);
+            },
+            removeEventListener(type, listener) {
+              if (type === 'message')
+                messages.delete(listener as (event: { readonly data: unknown }) => void);
+              else errors.delete(listener as () => void);
+            },
+            terminate() {
+              if (workers.delete(worker)) terminations.push(worker.terminate());
+            },
+          };
         },
-      }),
-      {
-        principalScope: 'coverage',
-        agent: {
-          baseUrl: `${origin}/python/agent/`,
-          files: ['coverage.py'],
-          module: 'coverage',
-          entry: 'create_agent',
+      };
+      const model = new MockChatModel({
+        'synthetic python prompt': {
+          id: 'python-coverage-reply',
+          text: 'synthetic python reply',
+          usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
         },
-        services: { chatModels: { mock: model } },
-        models: {
-          providers: {
-            mock: {
+      });
+      let capabilityCalls = 0;
+      runtimeInstance = createRuntime({
+        appId: 'span-coverage-python',
+        executors: [createPyodideAdapter(options)],
+        tracerProvider: tracing.provider,
+        outputSafety: () => 'allow',
+      });
+      const value = z.object({ value: z.string() });
+      const instance = await runtimeInstance.create(
+        defineAgentDefinition({
+          id: 'coverage/python',
+          version: '1.0.0',
+          executor: 'langgraph-python',
+          input: z.object({}),
+          models: { answer: { modality: 'text', defaultPolicy: 'local-only' } },
+          capabilities: {
+            required: { 'lookup@1': { kind: 'read', input: value, output: z.string() } },
+          },
+        }),
+        {
+          principalScope: 'coverage',
+          agent: {
+            baseUrl: `${origin}/python/agent/`,
+            files: ['coverage.py'],
+            module: 'coverage',
+            entry: 'create_agent',
+          },
+          services: { chatModels: { mock: model } },
+          models: {
+            providers: {
+              mock: {
+                destination: 'in-browser',
+                modality: 'text',
+                features: ['streaming'],
+                pricing: { inputPerToken: 0, outputPerToken: 0 },
+              },
+            },
+            roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
+            consent: () => true,
+          },
+          bindings: {
+            'lookup@1': {
+              kind: 'read',
               destination: 'in-browser',
-              modality: 'text',
-              features: ['streaming'],
-              pricing: { inputPerToken: 0, outputPerToken: 0 },
-            },
-          },
-          roles: { answer: { providers: ['mock'], allow: ['in-browser'], maxTokens: 100 } },
-          consent: () => true,
-        },
-        bindings: {
-          'lookup@1': {
-            kind: 'read',
-            destination: 'in-browser',
-            approval: 'none',
-            timeoutMs: 1000,
-            concurrency: 1,
-            grantScope: 'instance',
-            retry: 'none',
-            async invoke(input) {
-              assert.deepEqual(input, { value: 'synthetic python reply' });
-              capabilityCalls++;
-              return 'synthetic capability result';
+              approval: 'none',
+              timeoutMs: 1000,
+              concurrency: 1,
+              grantScope: 'instance',
+              retry: 'none',
+              async invoke(input) {
+                assert.deepEqual(input, { value: 'synthetic python reply' });
+                capabilityCalls++;
+                return 'synthetic capability result';
+              },
             },
           },
         },
-      },
-    );
-    await instance.prepare();
-    const { runId } = await instance.start({});
-    const events: RunEvent[] = [];
-    for await (const event of instance.events(runId)) events.push(event);
-    assert.equal(instance.getSnapshot().run?.status, 'succeeded', JSON.stringify(events));
-    assert.deepEqual(events.find((event) => event.type === 'output')?.output, {
-      answer: 'synthetic python reply',
-      lookup: 'synthetic capability result',
-    });
-    assert.equal(model.calls, 1, 'Python model positive control');
-    assert.equal(capabilityCalls, 1, 'Python capability positive control');
-    assert.deepEqual(workerErrors, []);
-    await runtimeInstance.dispose();
-    await tracing.flush();
-    const spans = [...tracing.oracle.getFinishedSpans()];
-    const roots = spans.filter(
-      (span) => span.attributes['gen_ai.operation.name'] === 'invoke_agent',
-    );
-    assert.equal(roots.length, 1, 'Python root span positive control');
-    assert.equal(roots[0]?.attributes['galaxie.executor.id'], 'langgraph-python');
-    assert.equal(
-      spans.filter((span) => span.attributes['gen_ai.operation.name'] === 'execute_tool').length,
-      1,
-      'Python capability span positive control',
-    );
-    const manifest = JSON.parse(await readFile(join(built, '../package.json'), 'utf8')) as {
-      dependencies: { pyodide: string };
-    };
-    return {
-      measurement: 'measured',
-      spans,
-      modelCalls: model.calls,
-      capabilityCalls,
-      outputCorrect: true,
-      versions: { pyodide: manifest.dependencies.pyodide },
-    };
-  } finally {
-    await runtimeInstance?.dispose();
-    for (const worker of workers) terminations.push(worker.terminate());
-    await Promise.all(terminations);
-    await tracing.shutdown();
-    await new Promise<void>((resolve) => {
-      server.close(() => resolve());
-      server.closeAllConnections();
-    });
-    await rm(directory, { recursive: true, force: true });
-  }
+      );
+      signal.throwIfAborted();
+      await instance.prepare();
+      signal.throwIfAborted();
+      const { runId } = await instance.start({});
+      signal.throwIfAborted();
+      const events: RunEvent[] = [];
+      for await (const event of instance.events(runId)) {
+        signal.throwIfAborted();
+        events.push(event);
+      }
+      assert.equal(instance.getSnapshot().run?.status, 'succeeded', JSON.stringify(events));
+      assert.deepEqual(events.find((event) => event.type === 'output')?.output, {
+        answer: 'synthetic python reply',
+        lookup: 'synthetic capability result',
+      });
+      assert.equal(model.calls, 1, 'Python model positive control');
+      assert.equal(capabilityCalls, 1, 'Python capability positive control');
+      assert.deepEqual(workerErrors, []);
+      await runtimeInstance.dispose();
+      await tracing.flush();
+      const spans = [...tracing.oracle.getFinishedSpans()];
+      const roots = spans.filter(
+        (span) => span.attributes['gen_ai.operation.name'] === 'invoke_agent',
+      );
+      assert.equal(roots.length, 1, 'Python root span positive control');
+      assert.equal(roots[0]?.attributes['galaxie.executor.id'], 'langgraph-python');
+      assert.equal(
+        spans.filter((span) => span.attributes['gen_ai.operation.name'] === 'execute_tool').length,
+        1,
+        'Python capability span positive control',
+      );
+      const manifest = JSON.parse(await readFile(join(built, '../package.json'), 'utf8')) as {
+        dependencies: { pyodide: string };
+      };
+      return {
+        measurement: 'measured',
+        spans,
+        modelCalls: model.calls,
+        capabilityCalls,
+        outputCorrect: true,
+        versions: { pyodide: manifest.dependencies.pyodide },
+      };
+    },
+    async () => {
+      try {
+        for (const worker of workers) terminations.push(worker.terminate());
+        await Promise.all(terminations);
+      } finally {
+        try {
+          await new Promise<void>((resolve) => {
+            server.close(() => resolve());
+            server.closeAllConnections();
+          });
+        } finally {
+          try {
+            await runtimeInstance?.dispose();
+          } finally {
+            try {
+              await tracing.shutdown();
+            } finally {
+              await rm(directory, { recursive: true, force: true });
+            }
+          }
+        }
+      }
+    },
+  );
 }

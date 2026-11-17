@@ -12,22 +12,39 @@ export function scanMarkers(value: unknown, markers: readonly string[]): void {
     assert.ok(!text.includes(marker), `Trace content marker detected: ${marker}`);
 }
 
+interface CoverageReadback {
+  backends: { langfuse: StoredSpan[]; mlflow: StoredSpan[] };
+  controls: {
+    rawResponsesScanned: boolean;
+    rawResponseCount: number;
+    spanIdsAndParentsMatch: boolean;
+    matchedSpanCount: number;
+  };
+}
+
 export async function coverageReadback(
   oracle: readonly ReadableSpan[],
   markers: readonly string[],
-): Promise<{ langfuse: StoredSpan[]; mlflow: StoredSpan[] }> {
+): Promise<CoverageReadback> {
   assert.ok(oracle.length > 0, 'Cannot read back an empty oracle');
   const raw = [];
-  for (const traceId of new Set(oracle.map((span) => span.spanContext().traceId)))
+  let rawResponseCount = 0;
+  for (const traceId of new Set(oracle.map((span) => span.spanContext().traceId))) {
+    const before = rawResponseCount;
     raw.push(
       await waitForReadback(
         traceId,
         oracle
           .filter((span) => span.spanContext().traceId === traceId)
           .map((span) => span.spanContext().spanId),
-        (value) => scanMarkers(value, markers),
+        (value) => {
+          scanMarkers(value, markers);
+          rawResponseCount++;
+        },
       ),
     );
+    assert.ok(rawResponseCount > before, 'No raw responses scanned for trace');
+  }
   const observations = raw.flatMap((result) => result.observations);
   const spans = raw.flatMap((result) => result.spans);
   const hex = (id: string): string => Buffer.from(id, 'base64').toString('hex');
@@ -43,6 +60,7 @@ export async function coverageReadback(
     'MLflow span set differs from oracle',
   );
   const result: { langfuse: StoredSpan[]; mlflow: StoredSpan[] } = { langfuse: [], mlflow: [] };
+  let matchedSpanCount = 0;
   for (const source of oracle) {
     const { spanId: id, traceId } = source.spanContext();
     const parentId = source.parentSpanContext?.spanId ?? null;
@@ -57,6 +75,7 @@ export async function coverageReadback(
       parentId,
       'MLflow parent differs from oracle',
     );
+    matchedSpanCount++;
     const lfAttributes = Object.fromEntries(
       Object.entries(lf.metadata)
         .filter(([key]) => key.startsWith('attributes.'))
@@ -91,7 +110,7 @@ export async function coverageReadback(
           ? mfAttributes['mlflow.spanType']
           : null,
       kind: mf.kind ?? null,
-      status: mf.status?.code ?? 'UNSET',
+      status: mf.status?.code ?? 'STATUS_CODE_UNSET',
       attributes: mfAttributes,
       model:
         typeof mfAttributes['mlflow.llm.model'] === 'string'
@@ -104,5 +123,13 @@ export async function coverageReadback(
       endTime: '<timestamp>',
     });
   }
-  return result;
+  return {
+    backends: result,
+    controls: {
+      rawResponsesScanned: rawResponseCount > 0,
+      rawResponseCount,
+      spanIdsAndParentsMatch: matchedSpanCount === oracle.length,
+      matchedSpanCount,
+    },
+  };
 }
