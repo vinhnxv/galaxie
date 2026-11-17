@@ -9,7 +9,11 @@ import { dirname, join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import { lockedWheels, runtimeFiles } from '../../packages/adapter-pyodide/src/runtime-files.js';
 import { collectNotices } from '../../packages/starter-python/src/notices.js';
-import { fileMetadata, verifyDist } from '../../packages/starter-python/src/verify.js';
+import {
+  fileMetadata,
+  verifyArtifact,
+  verifyDist,
+} from '../../packages/starter-python/src/verify.js';
 import { buildStarterDist } from '../../scripts/build-starter-python.js';
 import {
   buildStarterDistOnce,
@@ -37,6 +41,21 @@ afterAll(async () => {
   await cleanStarterDist();
   await Promise.all(temporary.map((directory) => rm(directory, { recursive: true, force: true })));
 });
+
+test.each(['bytes', 'sha256'] as const)(
+  'artifact verification independently checks %s',
+  async (field) => {
+    const directory = await temporaryDirectory();
+    const file = join(directory, 'sample.whl');
+    await writeFile(file, 'original');
+    const expected = { ...(await fileMetadata(file)) };
+    if (field === 'bytes') expected.bytes += 1;
+    else await writeFile(file, 'tampered');
+    await expect(verifyArtifact(file, expected)).rejects.toThrow(
+      'The Python starter wheel could not be verified: sample.whl.',
+    );
+  },
+);
 
 test.skipIf(!available)(
   'packs exactly the adapter LangGraph lane plus both local wheels',
