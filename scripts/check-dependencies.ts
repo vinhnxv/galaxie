@@ -113,7 +113,6 @@ function imports(file: string, strict = true): ImportReference[] {
   return references;
 }
 
-// Check each supported composition so an unrelated layer cannot hide a missing dependency.
 const templateLayers = files('templates', /^layer\.json$/).map((path) => ({
   directory: dirname(path),
   manifest: JSON.parse(readFileSync(path, 'utf8')) as LayerManifest,
@@ -141,7 +140,6 @@ for (const kind of templateLayers.filter(({ manifest }) => manifest.type === 'ki
         const directory = join(layer.directory, area);
         if (!existsSync(directory)) continue;
         for (const file of files(directory, /\.[cm]?[jt]sx?$/)) {
-          // Computed URLs are checked by the generated typecheck; inspect every literal reference.
           for (const { specifier } of imports(file, false)) {
             if (specifier.startsWith('.') || specifier.startsWith('/') || isBuiltin(specifier))
               continue;

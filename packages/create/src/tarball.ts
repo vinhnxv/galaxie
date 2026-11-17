@@ -13,14 +13,20 @@ export async function readTarballManifest(
   const source = createReadStream(path);
   const decoded = source.pipe(createGunzip());
   source.on('error', (error) => decoded.destroy(error));
-  let buffer = Buffer.alloc(0);
+  let buffer: Buffer = Buffer.alloc(0);
   let remaining = 0;
   let padding = 0;
   let manifest = false;
   const parts: Buffer[] = [];
+  let found: Record<string, unknown> | undefined;
+  let ended = false;
   try {
     for await (const chunk of decoded) {
-      buffer = Buffer.concat([buffer, chunk as Buffer]);
+      if (ended) {
+        if ((chunk as Buffer).some((byte) => byte !== 0)) throw new Error();
+        continue;
+      }
+      buffer = buffer.length === 0 ? (chunk as Buffer) : Buffer.concat([buffer, chunk as Buffer]);
       while (buffer.length > 0) {
         if (remaining > 0) {
           const count = Math.min(remaining, buffer.length);
@@ -32,7 +38,9 @@ export async function readTarballManifest(
             const value: unknown = JSON.parse(Buffer.concat(parts).toString('utf8'));
             if (value === null || typeof value !== 'object' || Array.isArray(value))
               throw new Error();
-            return value as Record<string, unknown>;
+            found = value as Record<string, unknown>;
+            manifest = false;
+            parts.length = 0;
           }
         }
         if (padding > 0) {
@@ -44,6 +52,12 @@ export async function readTarballManifest(
         if (buffer.length < 512) break;
         const header = buffer.subarray(0, 512);
         buffer = buffer.subarray(512);
+        if (header.every((byte) => byte === 0)) {
+          if (buffer.some((byte) => byte !== 0)) throw new Error();
+          buffer = Buffer.alloc(0);
+          ended = true;
+          break;
+        }
         const text = (start: number, end: number): string =>
           header.subarray(start, end).toString('utf8').replace(/\0.*$/s, '');
         const size = text(124, 136).trim();
@@ -54,6 +68,8 @@ export async function readTarballManifest(
         const prefix = text(345, 500);
         const entry = `${prefix === '' ? '' : `${prefix}/`}${text(0, 100)}`;
         manifest = entry === 'package/package.json';
+        if (manifest && found !== undefined)
+          throw new TarballError(`${name}: tarball contains more than one package/package.json.`);
         if (
           manifest &&
           (remaining === 0 ||
@@ -63,8 +79,11 @@ export async function readTarballManifest(
           throw new Error();
       }
     }
-    throw new Error();
-  } catch {
+    if (found === undefined || !ended || remaining > 0 || padding > 0 || buffer.length > 0)
+      throw new Error();
+    return found;
+  } catch (error) {
+    if (error instanceof TarballError) throw error;
     throw new TarballError(`${name}: could not read tarball package/package.json.`);
   } finally {
     source.destroy();

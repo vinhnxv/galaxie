@@ -46,8 +46,8 @@
       "gzip": 8800
     },
     "@galaxie-ai/create/.": {
-      "minified": 23800,
-      "gzip": 7600
+      "minified": 26600,
+      "gzip": 8500
     },
     "@galaxie-ai/models/builtin-ai": {
       "minified": 8400,

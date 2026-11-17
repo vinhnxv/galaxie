@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { expect, onTestFinished, test } from 'vitest';
 import { run } from '../src/main.js';
 import { resolveTarballs } from '../src/packages.js';
@@ -348,9 +350,21 @@ test.each([
 ])('tarball metadata %s mismatch is named before writing', async (field, metadata) => {
   const { root, packed } = await fixture();
   await archive(packed, 'core', '0.1.0', metadata);
-  await expect(resolveTarballs(packed)).rejects.toThrow(
-    `@galaxie-ai/core: tarball package.json ${field} mismatch`,
-  );
+  const stderr = new PassThrough();
+  let errors = '';
+  stderr.on('data', (bytes: Buffer) => {
+    errors += bytes.toString();
+  });
+  expect(
+    await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+      cwd: root,
+      templatesRoot,
+      stdout: new PassThrough(),
+      stderr,
+      env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: 'npm/12' },
+    }),
+  ).toBe(1);
+  expect(errors).toContain(`@galaxie-ai/core: tarball package.json ${field} mismatch`);
   expect(existsSync(join(root, 'my-app'))).toBe(false);
 });
 
@@ -370,5 +384,48 @@ test.each([null, [], 'not an object'])(
     await expect(resolveTarballs(packed)).rejects.toThrow(
       '@galaxie-ai/core: could not read tarball package/package.json',
     );
+  },
+);
+
+test.each(['duplicate', 'truncated'] as const)(
+  'a %s archive cannot replace checked metadata or hide a broken payload',
+  async (problem) => {
+    const { root, packed } = await fixture();
+    const source = join(root, 'archive-source');
+    await mkdir(join(source, 'package'), { recursive: true });
+    const manifest = join(source, 'package/package.json');
+    const tar = join(root, 'core.tar');
+    await writeFile(manifest, JSON.stringify({ name: '@galaxie-ai/core', version: '0.1.0' }));
+    await writeFile(join(source, 'package/payload.bin'), randomBytes(256 * 1024));
+    execFileSync('tar', ['-cf', tar, '-C', source, 'package/package.json', 'package/payload.bin']);
+    if (problem === 'duplicate') {
+      await writeFile(manifest, JSON.stringify({ name: '@galaxie-ai/core', version: '9.9.9' }));
+      execFileSync('tar', ['-rf', tar, '-C', source, 'package/package.json']);
+    }
+    const compressed = gzipSync(await readFile(tar));
+    await writeFile(
+      join(packed, 'galaxie-ai-core-0.1.0.tgz'),
+      problem === 'truncated' ? compressed.subarray(0, compressed.length - 16) : compressed,
+    );
+    const stderr = new PassThrough();
+    let errors = '';
+    stderr.on('data', (bytes: Buffer) => {
+      errors += bytes.toString();
+    });
+    expect(
+      await run(['my-app', 'browser-only', 'langgraph-js', '--no-install'], {
+        cwd: root,
+        templatesRoot,
+        stdout: new PassThrough(),
+        stderr,
+        env: { GALAXIE_CREATE_PACKAGE_DIR: packed, npm_config_user_agent: 'npm/12' },
+      }),
+    ).toBe(1);
+    expect(errors).toContain(
+      problem === 'duplicate'
+        ? '@galaxie-ai/core: tarball contains more than one package/package.json'
+        : '@galaxie-ai/core: could not read tarball package/package.json',
+    );
+    expect(existsSync(join(root, 'my-app'))).toBe(false);
   },
 );

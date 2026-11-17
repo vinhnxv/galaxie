@@ -400,31 +400,31 @@ test.each(['browser-only', 'gateway'])(
   },
 );
 
-// Captured from main (061d1cd), with reviewed release documentation updates.
+// Reconstructed from pre-release main (fa936e9e, before PR #279), excluding documentation.
 const existingOutputHashes: Readonly<Record<string, string>> = {
   'browser-only/langgraph-js/npm':
-    '4020ae24a92f26d6b2b15617ad44bcccac5803a3a158bd3d568b22ef406dd27a',
+    '0a877aa9100bf044cbf54c02efd7db1399e43f6478fe9f62dc403de9886b37e8',
   'browser-only/langgraph-js/pnpm':
-    '4020ae24a92f26d6b2b15617ad44bcccac5803a3a158bd3d568b22ef406dd27a',
+    '0a877aa9100bf044cbf54c02efd7db1399e43f6478fe9f62dc403de9886b37e8',
   'browser-only/langgraph-js/yarn':
-    '4020ae24a92f26d6b2b15617ad44bcccac5803a3a158bd3d568b22ef406dd27a',
-  'browser-only/adk-js/npm': '281c3a49c6bfbda0186d725133a24c569f1f3d8c922d9294b6d72c68a48f2eab',
-  'browser-only/adk-js/pnpm': 'd133cdc029c61682fc0c5c5d21889fd157f64f8e937b2eccfec60b45c86c42fc',
-  'browser-only/adk-js/yarn': '281c3a49c6bfbda0186d725133a24c569f1f3d8c922d9294b6d72c68a48f2eab',
-  'browser-only/adk-go/npm': 'cf108d9a3b6940ec5701910ad339840ddf0f92d9960431f4823e090d72484480',
-  'browser-only/adk-go/pnpm': 'cf108d9a3b6940ec5701910ad339840ddf0f92d9960431f4823e090d72484480',
-  'browser-only/adk-go/yarn': 'cf108d9a3b6940ec5701910ad339840ddf0f92d9960431f4823e090d72484480',
-  'gateway/langgraph-js/npm': '5f7cdf4f000e613220bb1b42a68c8d76d1a89f9f5c4ef05e8b2f889da5c7ebce',
-  'gateway/langgraph-js/pnpm': '5f7cdf4f000e613220bb1b42a68c8d76d1a89f9f5c4ef05e8b2f889da5c7ebce',
-  'gateway/langgraph-js/yarn': '5f7cdf4f000e613220bb1b42a68c8d76d1a89f9f5c4ef05e8b2f889da5c7ebce',
-  'gateway/adk-js/npm': '301f348568c750df3ba7bbaebf92a1b07ccb6d7d07e26f971b49a94b03d529d8',
-  'gateway/adk-js/pnpm': '60bbaaa48f6589461d70a01b00a1936ee21dd76b94956ec133501f610936c717',
-  'gateway/adk-js/yarn': '301f348568c750df3ba7bbaebf92a1b07ccb6d7d07e26f971b49a94b03d529d8',
-  'gateway/adk-go/npm': 'e39158e2f55a5b6b402380b584f6ac83ccd5ab37fe74993cea684246a2cc2260',
-  'gateway/adk-go/pnpm': 'e39158e2f55a5b6b402380b584f6ac83ccd5ab37fe74993cea684246a2cc2260',
-  'gateway/adk-go/yarn': 'e39158e2f55a5b6b402380b584f6ac83ccd5ab37fe74993cea684246a2cc2260',
+    '0a877aa9100bf044cbf54c02efd7db1399e43f6478fe9f62dc403de9886b37e8',
+  'browser-only/adk-js/npm': '0c76d17e9d79183065ebcfe110537c4325d07ede88fee3104fa2906bf8bac584',
+  'browser-only/adk-js/pnpm': '257f14ab732f9c93b12faef76691713d6f45f4f69ad9376f0bf7aba9043b98cd',
+  'browser-only/adk-js/yarn': '0c76d17e9d79183065ebcfe110537c4325d07ede88fee3104fa2906bf8bac584',
+  'browser-only/adk-go/npm': '5c3ffd9e469fb18e7085f44d9b4391666d0082a4b0e62a58a35c0d2b79e7ef6d',
+  'browser-only/adk-go/pnpm': '5c3ffd9e469fb18e7085f44d9b4391666d0082a4b0e62a58a35c0d2b79e7ef6d',
+  'browser-only/adk-go/yarn': '5c3ffd9e469fb18e7085f44d9b4391666d0082a4b0e62a58a35c0d2b79e7ef6d',
+  'gateway/langgraph-js/npm': '9d2fc4a02702c62283555bd63f53cc6b12eddb67887029ec020e008d848b56fc',
+  'gateway/langgraph-js/pnpm': '9d2fc4a02702c62283555bd63f53cc6b12eddb67887029ec020e008d848b56fc',
+  'gateway/langgraph-js/yarn': '9d2fc4a02702c62283555bd63f53cc6b12eddb67887029ec020e008d848b56fc',
+  'gateway/adk-js/npm': '729d706896dcbe526f4a7561c7bd9e9cad7508dc6ce3ffba34702f830ff4dc68',
+  'gateway/adk-js/pnpm': 'ddae922701ac885be0eb7fe53e0e54e53e406c637c41b5f74860cd7f09f71a1e',
+  'gateway/adk-js/yarn': '729d706896dcbe526f4a7561c7bd9e9cad7508dc6ce3ffba34702f830ff4dc68',
+  'gateway/adk-go/npm': '71e5797b223da42ab2dc793fe757dcc23d53d6a75aa2ef0380da91da0d12ab3d',
+  'gateway/adk-go/pnpm': '71e5797b223da42ab2dc793fe757dcc23d53d6a75aa2ef0380da91da0d12ab3d',
+  'gateway/adk-go/yarn': '71e5797b223da42ab2dc793fe757dcc23d53d6a75aa2ef0380da91da0d12ab3d',
 };
-test('all existing outputs retain reviewed bytes except the baseline binding and two MIME entries', async () => {
+test('existing code and manifest outputs retain pre-release bytes except the baseline binding and two MIME entries', async () => {
   const layers = await loadLayers(templates);
   for (const [combination, expected] of Object.entries(existingOutputHashes)) {
     const [kind, framework, packageManager] = combination.split('/');
@@ -436,10 +436,13 @@ test('all existing outputs retain reviewed bytes except the baseline binding and
     });
     const hash = createHash('sha256');
     for (const [path, file] of files) {
-      if (path === 'check/baseline.check.ts') continue;
+      if (
+        ['README.md', 'GO.md', 'PYTHON.md', 'AGENTS.md', 'check/baseline.check.ts'].includes(path)
+      )
+        continue;
       // Keep the captured hashes sensitive to every change except the lockstep range.
       let bytes = file.bytes;
-      if (path === 'package.json' || path === 'README.md')
+      if (path === 'package.json')
         bytes = Buffer.from(Buffer.from(bytes).toString().replaceAll(`^${coreVersion}`, '^0.1.0'));
       if (path === 'server/serve.ts') {
         let source = Buffer.from(bytes).toString();
