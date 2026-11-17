@@ -3,7 +3,6 @@
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
-// Result objects expand; short scalar arrays stay on one line, as in the committed evidence.
 function format(value: JsonValue, depth: number, column: number): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   const indent = '  '.repeat(depth);
@@ -27,7 +26,6 @@ function format(value: JsonValue, depth: number, column: number): string {
 }
 
 export function resultJson(value: unknown): string {
-  // Normalize through JSON first so omitted properties and escaping retain JSON semantics.
   const normalized = JSON.parse(JSON.stringify(value)) as JsonValue;
   return `${format(normalized, 0, 0)}\n`;
 }

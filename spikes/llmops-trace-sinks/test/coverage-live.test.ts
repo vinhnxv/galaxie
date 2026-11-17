@@ -99,7 +99,7 @@ live(
       { root: 1, node: 2, model: 1, capability: 1 },
       { input: 2, output: 3, total: 5 },
     );
-    const backends = await coverageReadback(result.spans, [
+    const { backends, controls } = await coverageReadback(result.spans, [
       canary,
       prompt,
       reply,
@@ -137,8 +137,7 @@ live(
       backends,
       controls: {
         credentialCalls: result.credentialCalls,
-        spanIdsAndParentsMatch: true,
-        rawResponsesScanned: true,
+        ...controls,
       },
     });
     expect(row.executorId).toBe('langgraph-js');
@@ -209,7 +208,7 @@ live(
       [canary, ...adkMarkers],
     );
     const all = [...result.spans, ...ownSpans];
-    const stored = await coverageReadback(all, [canary, ...adkMarkers]);
+    const { backends: stored, controls } = await coverageReadback(all, [canary, ...adkMarkers]);
     const subset = (spans: readonly ReadableSpan[]): typeof stored => {
       const ids = new Set(spans.map((span) => span.spanContext().spanId));
       return {
@@ -235,8 +234,7 @@ live(
         modelCalls: result.modelCalls,
         capabilityCalls: result.capabilityCalls,
         outputCorrect: result.outputCorrect,
-        spanIdsAndParentsMatch: true,
-        rawResponsesScanned: true,
+        ...controls,
         captureMessageContent: false,
       },
       versions: {
@@ -266,8 +264,7 @@ live(
         measuredAttributeKeyCount: ownAttributeKeyCount,
         caveat:
           'The measured run has no context manager, so its empty attributes alone do not show the flag effect; the flag-false control with a context manager isolates it.',
-        spanIdsAndParentsMatch: true,
-        rawResponsesScanned: true,
+        ...controls,
         sharesGalaxieTrace: ownSpans.some((span) => span.spanContext().traceId === rootTrace),
         traceCount: new Set(ownSpans.map((span) => span.spanContext().traceId)).size,
       },
@@ -287,19 +284,16 @@ live(
       fixture: fixture['pyodide-langgraph-python'],
       scriptedCalls: { model: 1, capability: 1 },
     };
-    rows['pyodide-langgraph-python'] =
-      result.measurement === 'unmeasured'
-        ? buildUnmeasuredRow({ ...common, reason: result.reason, probes: result.probes })
-        : buildRow({
-            ...common,
-            spans: result.spans,
-            versions: result.versions,
-            controls: {
-              modelCalls: result.modelCalls,
-              capabilityCalls: result.capabilityCalls,
-              outputCorrect: result.outputCorrect,
-            },
-          });
+    rows['pyodide-langgraph-python'] = buildRow({
+      ...common,
+      spans: result.spans,
+      versions: result.versions,
+      controls: {
+        modelCalls: result.modelCalls,
+        capabilityCalls: result.capabilityCalls,
+        outputCorrect: result.outputCorrect,
+      },
+    });
   },
   240_000,
 );
@@ -335,9 +329,9 @@ live(
 live('assemble and atomically format a complete matrix only after all families ran', () => {
   for (const id of Object.keys(fixture)) assert.ok(rows[id as RowId], `Missing coverage row ${id}`);
   // An unmeasured in-memory family would silently drop its derived gap, so refuse to replace a
-  // complete matrix unless the run explicitly accepts a missing toolchain or wheel cache.
+  // complete matrix unless the run explicitly accepts a Go toolchain version mismatch.
   if (process.env['LLMOPS_ALLOW_UNMEASURED'] !== '1')
-    for (const id of ['pyodide-langgraph-python', 'adk-go'] as const)
+    for (const id of ['adk-go'] as const)
       assert.equal(
         rows[id]?.measurement,
         'measured',

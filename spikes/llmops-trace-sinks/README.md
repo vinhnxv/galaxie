@@ -212,11 +212,20 @@ The maintainer toolchain is under
 put that directory on PATH before the root build or validation if the default Go
 version differs. Python needs the already populated `.cache/python-wheels/`
 cache, its `local-wheels.json`, all locked wheels and the installed Pyodide runtime.
-Neither family downloads assets. Missing prerequisites produce an `unmeasured`
-row with the exact reason and repo-relative probes, but the matrix writer refuses to
-replace the committed matrix with an unmeasured Python or Go row (and so drop its
-derived gap) unless `LLMOPS_ALLOW_UNMEASURED=1` is set. Runtime assertion failures
-fail the lane and leave the previous matrix intact.
+Neither family downloads assets. Only a Go toolchain version mismatch produces an
+`unmeasured` row; accepting that row requires `LLMOPS_ALLOW_UNMEASURED=1`.
+Missing Python assets, Go probe/glue/build failures and runtime failures reject the
+lane and leave the previous matrix intact, even with that escape hatch enabled.
+Python measurements have an internal 180-second timeout that aborts the run,
+terminates workers, closes the loopback asset server, disposes the runtime and
+removes temporary files.
+
+Offline fixture provenance tests pin nine upstream source/golden SHA-256 digests.
+A changed digest requires reviewing the copied coverage fixture before refreshing
+the recorded value in `test/coverage-provenance.test.ts`. The backend controls now
+record observed `rawResponseCount` and `matchedSpanCount`; scan and identity/parent
+booleans derive from those observations. Historical result artifacts have not been
+regenerated: this hardening run used offline tests and did not run the live stack.
 
 | Family | Scripted model / capability calls | Emitted root / node / model / capability spans | Measurement |
 | --- | --- | --- | --- |

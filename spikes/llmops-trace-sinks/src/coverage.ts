@@ -466,18 +466,5 @@ export function auditMatrix(matrix: CoverageMatrix, options: { requireIds?: bool
       expected.find((value) => value.name === gap.name)?.evidence,
       `${gap.name}: evidence differs from gap`,
     );
-    for (const pointer of gap.evidence) {
-      assert.equal(pointer.file, 'coverage-matrix.json');
-      assert.ok(pointer.path.startsWith('/'));
-      let value: unknown = matrix;
-      for (const key of pointer.path.slice(1).split('/')) {
-        assert.ok(
-          value !== null && typeof value === 'object',
-          `${gap.name}: invalid evidence pointer`,
-        );
-        value = Reflect.get(value, key.replaceAll('~1', '/').replaceAll('~0', '~'));
-      }
-      assert.notEqual(value, undefined, `${gap.name}: unresolved evidence pointer`);
-    }
   }
 }

@@ -38,14 +38,10 @@ test('ADK resolves to the adapter copy', () => {
   );
 });
 
-test('missing wheels produce a reasoned unmeasured probe without booting Python', async () => {
+test('missing wheels fail the Python lane without booting Python', async () => {
   const cache = mkdtempSync(join(tmpdir(), 'llmops-empty-wheels-'));
   try {
-    expect(await probePyodide(cache)).toMatchObject({
-      measurement: 'unmeasured',
-      reason: expect.stringContaining('local-wheels.json'),
-      probes: expect.any(Array),
-    });
+    await expect(probePyodide(cache)).rejects.toThrow('local-wheels.json is missing');
   } finally {
     rmSync(cache, { recursive: true, force: true });
   }
