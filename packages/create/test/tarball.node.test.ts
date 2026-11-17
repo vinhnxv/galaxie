@@ -423,7 +423,9 @@ test.each(['adapter-pyodide', 'starter-python'])(
 test.each([
   ['name', { name: '@galaxie-ai/react', version: '0.1.0' }],
   ['version', { name: '@galaxie-ai/core', version: '9.9.9' }],
-])('tarball metadata %s mismatch is named before writing', async (field, metadata) => {
+  ['name', { name: 'n'.repeat(200), version: '0.1.0' }],
+  ['version', { name: '@galaxie-ai/core', version: 'v'.repeat(200) }],
+] as const)('tarball metadata %s mismatch is named before writing', async (field, metadata) => {
   const { root, packed } = await fixture();
   await archive(packed, 'core', '0.1.0', metadata);
   const stderr = new PassThrough();
@@ -441,6 +443,7 @@ test.each([
     }),
   ).toBe(1);
   expect(errors).toContain(`@galaxie-ai/core: tarball package.json ${field} mismatch`);
+  expect(errors).toContain(`received ${JSON.stringify(metadata[field]).slice(0, 80)}.\n`);
   expect(existsSync(join(root, 'my-app'))).toBe(false);
 });
 

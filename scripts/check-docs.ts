@@ -86,11 +86,14 @@ function headings(lines: readonly string[]): Heading[] {
     if (heading?.[1] && heading[2]) {
       result.push({ level: heading[1].length, text: heading[2], line: index });
     } else if (index > 0 && /^ {0,3}(?:=+|-+)\s*$/.test(line)) {
-      const previous = lines[index - 1]?.trim();
-      if (previous)
+      const previous = lines[index - 1] ?? '';
+      if (
+        /^ {0,3}\S/.test(previous) &&
+        !/^ {0,3}(?:[-+*]\s|\d+[.)]\s|#{1,6}(?:\s|$)|>|<|[-=]+\s*$|(?:[*_]\s*){3,}$)/.test(previous)
+      )
         result.push({
           level: line.trim().startsWith('=') ? 1 : 2,
-          text: previous,
+          text: previous.trim(),
           line: index - 1,
         });
     }
@@ -188,7 +191,19 @@ function checkCitations(file: string, source: string, content: string): void {
 
 function checkClaims(file: string, content: string): void {
   if (!/^(?:skills\/galaxie\/|templates\/).*\.md$/i.test(file)) return;
-  for (const [index, line] of content.split('\n').entries()) {
+  const label = '`(?:secure|secured|compliant|certified)`';
+  const prohibition = new RegExp(
+    '\\bNever\\s+call\\s+galaxie\\s+or\\s+generated\\s+apps\\s+' +
+      `${label}(?:(?:,\\s*(?:(?:or|and)\\s+)?|\\s+(?:or|and)\\s+)${label})*`,
+    'gi',
+  );
+  const checked = content
+    .split(/(\n[ \t]*\n)/)
+    .map((paragraph) =>
+      paragraph.replace(prohibition, (rule) => rule.replace(new RegExp(label, 'gi'), mask)),
+    )
+    .join('');
+  for (const [index, line] of checked.split('\n').entries()) {
     for (const match of line.matchAll(/\b(?:secure|secured|compliant|certified)\b/gi)) {
       problem(
         file,
@@ -366,7 +381,7 @@ for (const file of files.filter((file) => /\.md$/i.test(file) || file === 'llms.
   const lines = prose(source);
   const text = withoutCode(lines.join('\n'));
   checkCitations(file, source, text);
-  checkClaims(file, text);
+  checkClaims(file, lines.join('\n'));
   const refs = new Map<string, string>();
   const content = text.replace(
     /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:\n[ \t]*)?(.+)$/gm,
