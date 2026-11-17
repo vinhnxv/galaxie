@@ -92,7 +92,7 @@ test.each([
   const valid = Buffer.concat([entry, Buffer.alloc(1024)]);
   await writeFile(path, gzipSync(valid));
   expect(await readTarballManifest(path, metadata.name)).toEqual(metadata);
-  let invalid = valid;
+  let invalid: Buffer = valid;
   if (problem === 'manifest size')
     invalid = Buffer.concat([
       tarEntry(

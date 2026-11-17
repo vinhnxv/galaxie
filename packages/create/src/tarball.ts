@@ -9,7 +9,7 @@ export class TarballError extends Error {}
 export async function readTarballManifest(
   path: string,
   name: string,
-  maxBytes = 512 * 1024 * 1024,
+  maxBytes: number = 512 * 1024 * 1024,
 ): Promise<Record<string, unknown>> {
   const source = createReadStream(path);
   const decoded = source.pipe(createGunzip());
