@@ -148,10 +148,8 @@ export function createScoreEndpoint(options: {
           body.name,
           body.value,
         );
-        reply(
-          result.status === 'posted' ? 200 : 502,
-          result.status === 'posted' ? 'posted' : 'upstream-error',
-        );
+        const accepted = result.status === 'posted' || result.status === 'unchanged';
+        reply(accepted ? 200 : 502, accepted ? result.status : 'upstream-error');
       } catch {
         reply(502, 'upstream-error');
       }

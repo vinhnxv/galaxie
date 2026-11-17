@@ -10,6 +10,11 @@ export interface CapturedRequest {
   body: Uint8Array | null;
 }
 
+export interface CapturedResponse {
+  headers: readonly { name: string; value: string }[];
+  body: string | Uint8Array;
+}
+
 export interface RequestSummary {
   count: number;
   method: string;
@@ -39,9 +44,16 @@ function forms(value: string): string[] {
 function payloadForms(key: string, value: string): string[] {
   if (key !== 'LANGFUSE_AUTH_HEADER') return [];
   const payload = value.replace(/^Basic\s+/i, '');
-  return payload && payload !== value
-    ? [payload, payload.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')]
-    : [];
+  if (!payload || payload === value) return [];
+  const urlPayload = payload.replace(/\+/g, '-').replace(/\//g, '_');
+  return [
+    ...new Set(
+      [payload, urlPayload, urlPayload.replace(/=+$/, '')].flatMap((form) => [
+        form,
+        encodeURIComponent(form),
+      ]),
+    ),
+  ];
 }
 
 function text(value: string | Uint8Array): string {
@@ -124,14 +136,19 @@ export function scanRequests(
 }
 
 export function scanResponses(
-  bodies: readonly (string | Uint8Array)[],
+  responses: readonly CapturedResponse[],
   env: Record<string, string>,
   canary: string,
 ): string[] {
-  return bodies.flatMap((body, index) => {
-    const value = text(body);
-    const hits = scanSecrets([value], env);
-    if (forms(canary).some((form) => value.includes(form))) hits.push('credential-canary');
+  return responses.flatMap((response, index) => {
+    // headersArray includes Set-Cookie, including HttpOnly cookies hidden from page JavaScript.
+    const chunks = [
+      text(response.body),
+      ...response.headers.flatMap(({ name, value }) => [name, value]),
+    ];
+    const hits = scanSecrets(chunks, env);
+    if (forms(canary).some((form) => chunks.some((chunk) => chunk.includes(form))))
+      hits.push('credential-canary');
     return hits.map((hit) => `response[${index}]:${hit}`);
   });
 }

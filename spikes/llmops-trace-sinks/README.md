@@ -621,6 +621,12 @@ environment. `LLMOPS_STACK=1` enables only the explicitly invoked live files.
 | MLflow evaluation | Six traces per text mode, six rows and six values per scorer. Usage is five per trace; chat text presence follows opt-in. Root request/response are absent in both modes. |
 | Browser feedback | Own reports return 200; wrong trace or segment 404; a confirmed association already owned by another user 403; missing cookie 401. Bundle, full requests, receiver wire requests and response bodies pass the credential scans and their positive controls. |
 
+The hardening harness also scans every page response's complete headers, including
+all Set-Cookie entries, and score-response bodies. Bare Basic payload controls cover
+base64, base64url and URL-encoded forms offline; the live harness adds bare payload
+controls for the bundle, request body, response body and Set-Cookie scanner.
+These new live capture checks have not been run in this offline cycle.
+
 [feedback-scores.json](results/feedback-scores.json),
 [sessions.json](results/sessions.json),
 [mlflow-evaluation.json](results/mlflow-evaluation.json) and
@@ -642,6 +648,13 @@ The host score client sends an array to `/api/public/scores`, with an ID formed
 from trace ID and score name and an explicit timestamp. It stores the entire
 first payload and resends its bytes, including the original value, name and
 timestamp. Only transport errors and 5xx get bounded retries; 207 and 4xx do not.
+The three-attempt retry budget waits 100 ms and then 200 ms between attempts;
+tests inject the delay. Fetch TypeError and abort/timeout DOMException failures
+are retried; other wrapper errors and response-cleanup errors escape. A final
+5xx returns `rejected` with its HTTP status, while exhausted fetch failures return
+`transport-error`. A different value for a stored ID still resends the original
+bytes but returns `unchanged` after acceptance, including HTTP 200 with reason
+`unchanged` at the host endpoint. It does not claim the new value was stored.
 The running Langfuse reference's description specifies 202/207, while its
 generated response schema lists 200; live accepted posts return 202. Readback
 uses `/api/public/v3/scores?fields=subject` with a five-minute polling window.

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
-import { AssertionError } from 'node:assert/strict';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { RunTrace, RunTraceMap } from './run-trace.js';
 
 export interface ScorePayload {
@@ -13,7 +13,7 @@ export interface ScorePayload {
   timestamp: string;
 }
 export type ScoreOutcome =
-  | { status: 'posted'; id: string; httpStatus: number }
+  | { status: 'posted' | 'unchanged'; id: string; httpStatus: number }
   | { status: 'unmapped'; reason: 'run-not-seen' | 'segment-not-seen' }
   | { status: 'rejected'; httpStatus: number }
   | { status: 'transport-error' };
@@ -28,6 +28,7 @@ export function createScoreClient(options: {
   authorization: string;
   fetch?: typeof globalThis.fetch;
   clock?: () => Date;
+  delay?: (milliseconds: number) => Promise<void>;
 }): {
   post(entry: Pick<RunTrace, 'traceId'>, name: string, value: number): Promise<ScoreOutcome>;
   scoreRun(
@@ -41,7 +42,7 @@ export function createScoreClient(options: {
   const base = options.baseUrl ?? 'http://127.0.0.1:3000';
   if (new URL(base).origin !== 'http://127.0.0.1:3000')
     throw new Error('Score endpoint must be the local Langfuse backend');
-  const stored = new Map<string, string>();
+  const stored = new Map<string, { value: number; body: string }>();
   const post = async (
     entry: Pick<RunTrace, 'traceId'>,
     name: string,
@@ -58,25 +59,46 @@ export function createScoreClient(options: {
         dataType: 'NUMERIC',
         timestamp: (options.clock?.() ?? new Date()).toISOString(),
       };
-      stored.set(id, JSON.stringify([payload]));
+      stored.set(id, { value, body: JSON.stringify([payload]) });
     }
+    const payload = stored.get(id);
+    if (!payload) throw new Error('Missing stored score payload');
+    let outcome: ScoreOutcome = { status: 'transport-error' };
     for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await (options.delay ?? delay)(100 * attempt);
+      let response: Response;
       try {
-        const response = await (options.fetch ?? globalThis.fetch)(`${base}/api/public/scores`, {
+        response = await (options.fetch ?? globalThis.fetch)(`${base}/api/public/scores`, {
           method: 'POST',
           headers: { Authorization: options.authorization, 'Content-Type': 'application/json' },
-          body: stored.get(id) ?? '',
+          body: payload.body,
           signal: AbortSignal.timeout(5000),
           redirect: 'error',
         });
-        await response.body?.cancel();
-        if (response.status === 202) return { status: 'posted', id, httpStatus: response.status };
-        if (response.status < 500) return { status: 'rejected', httpStatus: response.status };
       } catch (error) {
-        if (error instanceof AssertionError) throw error;
+        // Fetch rejects with TypeError or an abort/timeout DOMException. Other wrapper errors escape.
+        if (
+          !(
+            error instanceof TypeError ||
+            (error instanceof DOMException &&
+              (error.name === 'AbortError' || error.name === 'TimeoutError'))
+          )
+        )
+          throw error;
+        outcome = { status: 'transport-error' };
+        continue;
       }
+      await response.body?.cancel();
+      if (response.status === 202)
+        return {
+          status: payload.value === value ? 'posted' : 'unchanged',
+          id,
+          httpStatus: response.status,
+        };
+      outcome = { status: 'rejected', httpStatus: response.status };
+      if (response.status < 500) return outcome;
     }
-    return { status: 'transport-error' };
+    return outcome;
   };
   return {
     post,

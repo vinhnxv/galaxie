@@ -20,6 +20,7 @@ import {
 } from '../src/readback.js';
 import {
   type CapturedRequest,
+  type CapturedResponse,
   captureRequest,
   scanBundle,
   scanRequests,
@@ -67,7 +68,7 @@ test.skipIf(!enabled)(
     const origin: string = resolvedOrigin;
     const pendingRequests: Promise<CapturedRequest>[] = [];
     const wireRequests: Promise<CapturedRequest>[] = [];
-    const responses: Promise<{ status: number; body: string }>[] = [];
+    const responses: Promise<CapturedResponse & { status: number; scoreReply: boolean }>[] = [];
     preview.httpServer.prependListener('request', (request: IncomingMessage) => {
       const url = new URL(request.url ?? '/', origin).href;
       const headers = Object.fromEntries(
@@ -97,8 +98,15 @@ test.skipIf(!enabled)(
       contexts.push(context);
       context.on('request', (request) => pendingRequests.push(captureRequest(request)));
       context.on('response', (response) => {
-        if (new URL(response.url()).pathname === '/feedback/scores')
-          responses.push(response.text().then((body) => ({ status: response.status(), body })));
+        const scoreReply = new URL(response.url()).pathname === '/feedback/scores';
+        responses.push(
+          (async () => ({
+            status: response.status(),
+            scoreReply,
+            headers: await response.headersArray(),
+            body: scoreReply ? await response.text() : '',
+          }))(),
+        );
       });
       if (user !== undefined) {
         const cookie = endpoint.issueSession(user);
@@ -197,7 +205,7 @@ test.skipIf(!enabled)(
         bobScores,
       );
       const repeat = await report(alice, a, 0);
-      expect(repeat).toEqual({ status: 200, reason: 'posted' });
+      expect(repeat).toEqual({ status: 200, reason: 'unchanged' });
       expect(upstreamPosts).toBe(3);
       expect(await scoresQuery({ traceId: a.traceId, name: 'feedback' }, inspectFeedback)).toEqual(
         aliceScores,
@@ -209,7 +217,8 @@ test.skipIf(!enabled)(
       for (const context of contexts) await context.close();
       const requests = await Promise.all(pendingRequests);
       const wire = await Promise.all(wireRequests);
-      const replies = await Promise.all(responses);
+      const capturedResponses = await Promise.all(responses);
+      const replies = capturedResponses.filter((response) => response.scoreReply);
       expect(replies).toHaveLength(7);
       expect(
         requests.every((request) => new URL(request.url).origin === new URL(origin).origin),
@@ -239,16 +248,11 @@ test.skipIf(!enabled)(
         expect(scores.every((request) => (request.body?.length ?? 0) > 0)).toBe(true);
         expect(scanRequests(set, env, canary)).toEqual([]);
       }
-      expect(
-        scanResponses(
-          replies.map((response) => response.body),
-          env,
-          canary,
-        ),
-      ).toEqual([]);
+      expect(scanResponses(capturedResponses, env, canary)).toEqual([]);
       const basic = env['LANGFUSE_AUTH_HEADER'];
       assert.ok(basic);
-      expect(scanBundle([basic], env).length).toBeGreaterThan(0);
+      const barePayload = basic.replace(/^Basic\s+/i, '');
+      expect(scanBundle([barePayload], env)).toContain('bundle[0]:secret:LANGFUSE_AUTH_HEADER');
       expect(
         scanRequests(
           [
@@ -256,14 +260,23 @@ test.skipIf(!enabled)(
               url: new URL('/feedback/scores', origin).href,
               method: 'POST',
               headers: {},
-              body: Buffer.from(basic),
+              body: Buffer.from(barePayload),
             },
           ],
           env,
           canary,
         ).length,
       ).toBeGreaterThan(0);
-      expect(scanResponses([basic], env, canary).length).toBeGreaterThan(0);
+      expect(scanResponses([{ body: barePayload, headers: [] }], env, canary)).toContain(
+        'response[0]:secret:LANGFUSE_AUTH_HEADER',
+      );
+      expect(
+        scanResponses(
+          [{ body: '', headers: [{ name: 'set-cookie', value: barePayload }] }],
+          env,
+          canary,
+        ),
+      ).toContain('response[0]:secret:LANGFUSE_AUTH_HEADER');
       writeFeedback(
         'browser-feedback.json',
         normalize(
@@ -304,6 +317,7 @@ test.skipIf(!enabled)(
               bundlePositiveControlDetected: true,
               requestBodyPositiveControlDetected: true,
               responsePositiveControlDetected: true,
+              responseHeaderPositiveControlDetected: true,
               requests: summarizeRequests(requests).map((summary) => ({
                 ...summary,
                 path: summary.path.replace(

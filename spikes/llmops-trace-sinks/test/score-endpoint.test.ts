@@ -132,7 +132,10 @@ test.each([
 test('first report binds, repeats preserve score bytes, and other users cannot reuse the association', async () => {
   const f = await fixture();
   expect(await f.report(alice, f.aliceCookie)).toEqual({ status: 200, body: { reason: 'posted' } });
-  expect((await f.report({ ...alice, value: 0 }, f.aliceCookie)).status).toBe(200);
+  expect(await f.report({ ...alice, value: 0 }, f.aliceCookie)).toEqual({
+    status: 200,
+    body: { reason: 'unchanged' },
+  });
   expect(new Set(f.calls.posts).size).toBe(1);
   const before = f.calls.posts.length;
   expect(await f.report(alice, f.bobCookie)).toEqual({

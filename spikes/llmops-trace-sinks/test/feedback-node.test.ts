@@ -244,10 +244,10 @@ test.skipIf(!enabled)(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 1),
       ).toMatchObject({ status: 'posted' });
       // The client retains the first payload; later calls resend it unchanged whatever the
-      // clock or the new value say. The test pins that behaviour, not Langfuse's date handling.
+      // clock or the new value say, and report unchanged for a different requested value.
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 0),
-      ).toMatchObject({ status: 'posted' });
+      ).toMatchObject({ status: 'unchanged' });
       const repeated = await waitForScores({ traceId: entry.traceId, name }, 1, inspectFeedback);
       expect(repeated).toHaveLength(1);
       expect(repeated[0]?.timestamp).toBe(initial[0]?.timestamp);

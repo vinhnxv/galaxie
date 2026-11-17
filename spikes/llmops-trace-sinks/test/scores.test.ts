@@ -64,21 +64,114 @@ test('unknown run and segment do not post', async () => {
 
 test('transport and 5xx retry byte-identically, including two days later', async () => {
   const bodies: string[] = [];
+  const events: (string | number)[] = [];
   let now = new Date('2026-11-13T12:00:00Z');
   const client = createScoreClient({
     authorization: 'fixture',
     clock: () => now,
+    delay: async (milliseconds) => {
+      events.push(milliseconds);
+    },
     fetch: async (_url, init) => {
+      events.push('fetch');
       bodies.push(String(init?.body));
-      if (bodies.length === 1) throw new Error('transport');
+      if (bodies.length === 1) throw new TypeError('fetch failed');
       return new Response(null, { status: bodies.length === 2 ? 503 : 202 });
     },
   });
   expect(await client.post(entry, 'quality', 1)).toMatchObject({ status: 'posted' });
+  expect(events).toEqual(['fetch', 100, 'fetch', 200, 'fetch']);
   now = new Date('2026-11-15T12:00:00Z');
-  expect(await client.post(entry, 'quality', 0)).toMatchObject({ status: 'posted' });
+  expect(await client.post(entry, 'quality', 0)).toMatchObject({ status: 'unchanged' });
   expect(new Set(bodies).size).toBe(1);
   expect(bodies[0]).toContain('2026-11-13T12:00:00.000Z');
+  expect(JSON.parse(bodies[0] ?? '[]')).toEqual([
+    {
+      id: `${entry.traceId}-quality`,
+      traceId: entry.traceId,
+      name: 'quality',
+      value: 1,
+      dataType: 'NUMERIC',
+      timestamp: '2026-11-13T12:00:00.000Z',
+    },
+  ]);
+});
+
+test.each([new Error('programming error'), new SyntaxError('invalid response JSON')])(
+  'unexpected fetch-wrapper errors escape without retry: %s',
+  async (error) => {
+    let calls = 0;
+    const client = createScoreClient({
+      authorization: 'fixture',
+      fetch: async () => {
+        calls++;
+        throw error;
+      },
+    });
+    await expect(client.post(entry, 'quality', 1)).rejects.toBe(error);
+    expect(calls).toBe(1);
+  },
+);
+
+test.each([
+  new TypeError('fetch failed'),
+  new DOMException('aborted', 'AbortError'),
+  new DOMException('timed out', 'TimeoutError'),
+])('fetch and abort failures exhaust three attempts with bounded backoff: %s', async (error) => {
+  let calls = 0;
+  const waits: number[] = [];
+  const client = createScoreClient({
+    authorization: 'fixture',
+    delay: async (milliseconds) => {
+      waits.push(milliseconds);
+    },
+    fetch: async () => {
+      calls++;
+      throw error;
+    },
+  });
+  expect(await client.post(entry, 'quality', 1)).toEqual({ status: 'transport-error' });
+  expect(calls).toBe(3);
+  expect(waits).toEqual([100, 200]);
+});
+
+test('a final 5xx is rejected with its HTTP status after bounded retries', async () => {
+  let calls = 0;
+  const waits: number[] = [];
+  const client = createScoreClient({
+    authorization: 'fixture',
+    delay: async (milliseconds) => {
+      waits.push(milliseconds);
+    },
+    fetch: async () => {
+      calls++;
+      return new Response(null, { status: 503 });
+    },
+  });
+  expect(await client.post(entry, 'quality', 1)).toEqual({ status: 'rejected', httpStatus: 503 });
+  expect(calls).toBe(3);
+  expect(waits).toEqual([100, 200]);
+});
+
+test('response cleanup errors escape without being classified as fetch failures', async () => {
+  let calls = 0;
+  const failure = new TypeError('cleanup failed');
+  const client = createScoreClient({
+    authorization: 'fixture',
+    fetch: async () => {
+      calls++;
+      return new Response(
+        new ReadableStream({
+          cancel() {
+            throw failure;
+          },
+        }),
+        { status: 202 },
+      );
+    },
+  });
+  await expect(client.post(entry, 'quality', 1)).rejects.toBe(failure);
+  expect(calls).toBe(1);
 });
 
 test.each([207, 400, 401])('HTTP %s is not retried', async (status) => {
