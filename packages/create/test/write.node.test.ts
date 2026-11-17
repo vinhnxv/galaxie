@@ -169,14 +169,40 @@ test.each(['unlink', 'rmdir'] as const)(
     const error = await writeProject(plan).catch((error: unknown) => error);
     expect(error).toBeInstanceOf(ProjectWriteError);
     expect((error as Error).message).toContain(
-      `Rollback could not remove: ${join(await realpath(root), operation === 'unlink' ? 'child/a.ts' : 'child')} (EACCES)`,
+      `Rollback could not remove: ${operation === 'unlink' ? 'child/a.ts' : 'child'} (EACCES)`,
     );
     expect((error as Error).message).toContain('without replacing an existing path');
     expect((error as Error).message).not.toContain('private-error-canary');
+    expect((error as Error).message).not.toContain(await realpath(root));
     expect((error as Error).cause).toBeInstanceOf(AggregateError);
     if (operation === 'unlink')
       expect(await readFile(join(root, 'child/a.ts'), 'utf8')).toBe('created');
     else expect(await readdir(join(root, 'child'))).toEqual([]);
+    expect(await readFile(join(root, 'z.ts'), 'utf8')).toBe('concurrent');
+  },
+);
+
+test.each(['unlink', 'rmdir'] as const)(
+  'rollback ignores an already removed path during %s',
+  async (operation) => {
+    const root = await scratch();
+    const plan = await planWrite(files({ 'child/a.ts': 'created', 'z.ts': 'new' }), root);
+    await writeFile(join(root, 'z.ts'), 'concurrent');
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const remove = vi.mocked(fs[operation]).mockImplementationOnce(async (path) => {
+      await actual[operation](path);
+      throw Object.assign(new Error('already removed'), { code: 'ENOENT' });
+    });
+    onTestFinished(() => {
+      remove.mockReset();
+    });
+    const error = await writeProject(plan).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(ProjectWriteError);
+    expect((error as Error).message).toBe(
+      'The project could not be written without replacing an existing path.',
+    );
+    expect((error as Error).cause).not.toBeInstanceOf(AggregateError);
+    expect(await readdir(root)).toEqual(['z.ts']);
     expect(await readFile(join(root, 'z.ts'), 'utf8')).toBe('concurrent');
   },
 );

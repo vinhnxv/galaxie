@@ -187,7 +187,7 @@ export async function writeProject(plan: WritePlan): Promise<void> {
       if (code === 'ENOENT') return;
       rollbackErrors.push(failure);
       leftovers.push(
-        `${path}${typeof code === 'string' && /^[A-Z_]+$/.test(code) ? ` (${code})` : ''}`,
+        `${relative(plan.target, path) || '.'}${typeof code === 'string' && /^[A-Z_]+$/.test(code) ? ` (${code})` : ''}`,
       );
     };
     for (const created of createdFiles.reverse()) {
