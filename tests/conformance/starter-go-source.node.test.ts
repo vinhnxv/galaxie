@@ -339,6 +339,31 @@ else {
   },
 );
 
+test('an unquoted replace target is cut at an attached comment marker like Go does', async () => {
+  // The unquoted token normalizes to a path inside go/, but Go reads it as ../external.
+  const root = await fixture();
+  const dir = join(root, 'go');
+  await mkdir(dir);
+  await writeFile(join(dir, 'main.go'), 'package main\n');
+  await writeFile(
+    join(dir, 'go.mod'),
+    'module example.invalid/starter\nreplace example.invalid/module => ../external//../go/x\n',
+  );
+  await expect(sourceHash(dir, '0.2.0', 'module')).rejects.toThrow('local replace target');
+});
+
+test.each(['"\\u002e\\u002e/external"', '"\\x2e./external"'])(
+  'a quoted replace target with escapes is decoded or refused, never trusted: %s',
+  async (target) => {
+    const dir = await fixture();
+    await writeFile(
+      join(dir, 'go.mod'),
+      `module example.invalid/starter\nreplace example.invalid/module => ${target}\n`,
+    );
+    await expect(sourceHash(dir, '0.2.0', 'module')).rejects.toThrow();
+  },
+);
+
 test.each([
   '../external',
   '/tmp/external-go-module',

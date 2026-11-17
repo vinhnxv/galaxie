@@ -17,9 +17,10 @@ export async function checkReplacements(directory: string): Promise<boolean> {
       throw error;
     },
   );
-  const tokens = (text.match(/\/\/[^\r\n]*|"(?:\\.|[^"\\])*"|`[^`]*`|[^\s()]+/g) ?? []).filter(
-    (token) => !token.startsWith('//'),
-  );
+  // Go ends an unquoted token at an attached `//`, so `../ext//../go/x` targets `../ext`.
+  const tokens = (text.match(/\/\/[^\r\n]*|"(?:\\.|[^"\\])*"|`[^`]*`|[^\s()]+/g) ?? [])
+    .map((token) => (/^["`]/.test(token) ? token : (token.split('//')[0] ?? '')))
+    .filter((token) => token !== '');
   let bundled = false;
   for (let index = 0; index < tokens.length; index++) {
     if (tokens[index] !== '=>') continue;
