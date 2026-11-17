@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
 import { join } from 'node:path';
@@ -181,6 +182,50 @@ test('the Python starter browser project lists only the composed app tests, in t
   for (const group of ['general', 'python-dspy', 'python-pydantic', 'python-adk'])
     expect(list(group), group).toEqual([]);
 }, 120_000);
+
+test('python-rest serial starters and parallel remainder partition the complete project inventory', async () => {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    GALAXIE_TEST_GROUP: 'python-rest',
+    GALAXIE_BROWSER_API_PORT: String(await unusedPort()),
+    GALAXIE_PYTHON_STARTER_API_PORT: String(await unusedPort()),
+  };
+  delete env['GALAXIE_PYTHON_REST_SKIP_STARTERS'];
+  const list = (args: string[] = [], skipStarters = false): string[] => {
+    const result = spawnSync(
+      process.execPath,
+      ['node_modules/vitest/vitest.mjs', 'list', '--filesOnly', '--json', ...args],
+      {
+        encoding: 'utf8',
+        env: { ...env, ...(skipStarters ? { GALAXIE_PYTHON_REST_SKIP_STARTERS: 'true' } : {}) },
+      },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    return (JSON.parse(result.stdout) as { projectName: string; file: string }[]).map(
+      ({ projectName, file }) => `${projectName}:${file.replaceAll('\\', '/')}`,
+    );
+  };
+  const all = list();
+  // Match the workflow shell's expansion before passing the explicit paths to Vitest.
+  const starterFiles = readdirSync('tests/conformance')
+    .filter((file) => /^starter-python-.*\.node\.test\.ts$/.test(file))
+    .map((file) => `tests/conformance/${file}`);
+  const serial = list(['--project', 'node', ...starterFiles]);
+  const parallel = list([], true);
+  expect(serial.map((file) => file.slice(file.lastIndexOf('/') + 1)).sort()).toEqual([
+    'starter-python-browser.node.test.ts',
+    'starter-python-dist.node.test.ts',
+    'starter-python-gateway.node.test.ts',
+    'starter-python-source.node.test.ts',
+  ]);
+  expect(serial.every((file) => file.startsWith('node:'))).toBe(true);
+  expect(
+    parallel.some((file) => /\/tests\/conformance\/starter-python-.*\.node\.test\.ts$/.test(file)),
+  ).toBe(false);
+  const executed = [...serial, ...parallel];
+  expect(executed.length).toBe(new Set(executed).size);
+  expect(executed.sort()).toEqual(all.sort());
+}, 60_000);
 
 test('Vitest selects every composed ported test in its intended project exactly once', async () => {
   const repo = fileURLToPath(new URL('../../', import.meta.url));

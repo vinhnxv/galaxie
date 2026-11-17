@@ -176,7 +176,13 @@ const forGroup = (
   if (groupName === 'python-rest')
     return {
       include: python,
-      exclude: [...exclude, ...Object.values(pythonShards).flatMap(named)],
+      exclude: [
+        ...exclude,
+        ...Object.values(pythonShards).flatMap(named),
+        ...(process.env['GALAXIE_PYTHON_REST_SKIP_STARTERS'] === 'true'
+          ? [`${prefix}tests/conformance/starter-python-*.node.test.ts`]
+          : []),
+      ],
     };
   const term = groupName === undefined ? undefined : pythonShards[groupName];
   return term === undefined ? { include, exclude } : { include: named(term), exclude };
