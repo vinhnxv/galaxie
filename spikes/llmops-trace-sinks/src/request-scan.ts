@@ -116,7 +116,6 @@ export function scanRequests(
       if (
         Object.entries(request.headers).some(
           ([name, value]) =>
-            // Short numeric IDs are common in unrelated metadata; only long IDs match substrings.
             (value === id || (id.length >= 8 && value.includes(id))) &&
             !(navigation && name.toLowerCase() === 'upgrade-insecure-requests' && value === '1'),
         ) ||

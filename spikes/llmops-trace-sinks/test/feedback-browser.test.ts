@@ -120,6 +120,12 @@ test.skipIf(!enabled)(
       const response = await page.goto(origin);
       expect(response?.headers()['content-security-policy']).toBe(csp);
       await page.waitForFunction(() => window.llmops !== undefined);
+      if (user !== undefined) {
+        expect((await context.cookies()).some((cookie) => cookie.name === 'llmops-session')).toBe(
+          true,
+        );
+        expect(await page.evaluate(() => document.cookie)).not.toContain('llmops-session=');
+      }
       return page;
     }
     const report = async (

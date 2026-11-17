@@ -610,6 +610,11 @@ pnpm run stack:down
 Always run `stack:down`, including after a failed measurement; it removes volumes.
 The default offline tests need neither the stack, Chromium nor the Python
 environment. `LLMOPS_STACK=1` enables only the explicitly invoked live files.
+Run `test/feedback-node.test.ts` as a whole in declaration order: session-filter
+measurements populate the runs consumed by evaluation, and the score measurements
+share the run, host, client and evidence established by `beforeAll`. `afterAll`
+writes their accumulated evidence. Individual test-name filters are not independent
+measurement commands.
 
 | Workflow | Measured outcome |
 | --- | --- |
@@ -694,11 +699,23 @@ HttpOnly, SameSite=Strict cookie selects the user. The endpoint confirms the
 reported trace's own run metadata and segment, then binds run/segment/trace to
 that user. A flush only hands spans to the collector: pages must retry
 `404 not-confirmed` after backend ingestion, and the live harness waits for roots
-before reporting. No user comes from the body.
+before reporting. No user comes from the body or client-supplied identity headers;
+offline endpoint tests exercise forged `x-user-id` and `x-user` headers. The live
+Chromium harness now asserts that an installed session cookie is absent from
+`document.cookie`; that assertion has not been run in this offline cycle. The
+offline cookie test checks the issued HttpOnly and SameSite=Strict attributes.
 
-First-report-wins is only as strong as the secrecy of run and trace IDs: someone
-who learns them first can bind them. Host-side hardening would bind at run start
-through a host-issued grant. Browser telemetry is client-controlled; backend
+The confirmed binding is committed before the upstream score post. An upstream
+failure leaves it in place so the same user can retry while another user remains
+unable to claim it. The 403 versus 404 split lets an authenticated user confirm an
+already bound association; this disclosure is an accepted limit of the local
+fixture, rather than a uniform nonexistence response.
+
+First-report-wins is only as strong as the secrecy of run and trace IDs: an
+authenticated user who learns them first can squat on the binding before the
+intended owner reports. Hosts should bind ownership at run start through a
+host-issued grant (the `galaxie-d53.6` follow-up); this spike does not build the grant
+because it needs the host's real identity and run-start integration. Browser telemetry is client-controlled; backend
 confirmation establishes consistency, not authenticity. Cookies and bindings are
 an in-memory fixture, not a real authentication design.
 

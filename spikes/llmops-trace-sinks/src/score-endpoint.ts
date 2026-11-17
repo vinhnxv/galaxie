@@ -138,6 +138,8 @@ export function createScoreEndpoint(options: {
           reply(403, 'forbidden');
           return;
         }
+        // Commit the confirmed binding before the upstream post. A failed post leaves ownership
+        // intact, so the same user can retry without another user taking the association.
         const segments = runs.get(body.runId) ?? new Map<number, string>();
         segments.set(body.segment, body.traceId);
         runs.set(body.runId, segments);

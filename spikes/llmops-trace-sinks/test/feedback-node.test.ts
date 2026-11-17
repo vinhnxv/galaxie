@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Nguyễn Xuân Vĩnh
 // SPDX-License-Identifier: Apache-2.0
 
+// This live measurement file intentionally shares state and runs in declaration order:
+// session filtering populates sessionRuns for evaluation; beforeAll creates the common run,
+// host and score client; afterAll writes accumulated evidence. Run the whole file, not test filters.
+
 import assert from 'node:assert/strict';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { evaluateSessions } from '../src/evaluate.js';
@@ -243,8 +247,6 @@ test.skipIf(!enabled)(
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 1),
       ).toMatchObject({ status: 'posted' });
-      // The client retains the first payload; later calls resend it unchanged whatever the
-      // clock or the new value say, and report unchanged for a different requested value.
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 0),
       ).toMatchObject({ status: 'unchanged' });
