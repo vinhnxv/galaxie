@@ -247,6 +247,8 @@ test.skipIf(!enabled)(
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 1),
       ).toMatchObject({ status: 'posted' });
+      // A repost with another value resends the stored bytes and reports `unchanged`; the test
+      // pins that behaviour, not Langfuse's date handling.
       expect(
         await client.scoreRun(host.runTrace, entry.runId, entry.segment, name, 0),
       ).toMatchObject({ status: 'unchanged' });

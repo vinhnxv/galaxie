@@ -113,7 +113,14 @@ test.skipIf(!enabled)(
         const value = cookie.split(';')[0]?.slice('llmops-session='.length);
         assert.ok(value);
         await context.addCookies([
-          { name: 'llmops-session', value, url: origin, httpOnly: true, sameSite: 'Strict' },
+          {
+            name: 'llmops-session',
+            value,
+            url: origin,
+            // Derived from the issued cookie so the check follows the endpoint's flags.
+            httpOnly: /;\s*HttpOnly\b/i.test(cookie),
+            sameSite: /;\s*SameSite=Strict\b/i.test(cookie) ? 'Strict' : 'Lax',
+          },
         ]);
       }
       const page = await context.newPage();

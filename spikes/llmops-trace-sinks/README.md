@@ -467,7 +467,9 @@ segments, query values and header values, excluding Chromium's standardized
 and canary checks. Bodies and bundle numbers are not interpreted as experiment
 identifiers. Header values also match embedded experiment identifiers of at least
 eight characters; shorter identifiers require equality to avoid unrelated numeric
-metadata matches. Synthetic positive controls exercise both scanners. No generated
+metadata matches. URL-encoded forms use `encodeURIComponent`, so uppercase hex only;
+lowercase or double encoding is not detected. URL path and query values still need
+equality. Synthetic positive controls exercise both scanners. No generated
 credential appeared in the bundle or either request capture. No page request or
 complete backend response contained the routed canary. Generated credentials in
 complete backend responses were not scanned; the separate static guard checks
@@ -630,7 +632,10 @@ The hardening harness also scans every page response's complete headers, includi
 all Set-Cookie entries, and score-response bodies. Bare Basic payload controls cover
 base64, base64url and URL-encoded forms offline; the live harness adds bare payload
 controls for the bundle, request body, response body and Set-Cookie scanner.
-These new live capture checks have not been run in this offline cycle.
+These new live capture checks have not been run in this offline cycle. The recorded
+`reports.repeat.reason` in `results/browser-feedback.json` (`posted`) predates the
+`unchanged` outcome; the code and the live assertion now expect `unchanged`, and the
+recorded result has not been regenerated.
 
 [feedback-scores.json](results/feedback-scores.json),
 [sessions.json](results/sessions.json),
@@ -654,8 +659,8 @@ from trace ID and score name and an explicit timestamp. It stores the entire
 first payload and resends its bytes, including the original value, name and
 timestamp. Only transport errors and 5xx get bounded retries; 207 and 4xx do not.
 The three-attempt retry budget waits 100 ms and then 200 ms between attempts;
-tests inject the delay. Fetch TypeError and abort/timeout DOMException failures
-are retried; other wrapper errors and response-cleanup errors escape. A final
+tests inject the delay. Any `TypeError` thrown by the `fetch` call itself and abort/timeout `DOMException`
+failures are retried; other wrapper errors and response-cleanup errors escape. A final
 5xx returns `rejected` with its HTTP status, while exhausted fetch failures return
 `transport-error`. A different value for a stored ID still resends the original
 bytes but returns `unchanged` after acceptance, including HTTP 200 with reason
@@ -715,7 +720,9 @@ First-report-wins is only as strong as the secrecy of run and trace IDs: an
 authenticated user who learns them first can squat on the binding before the
 intended owner reports. Hosts should bind ownership at run start through a
 host-issued grant (the `galaxie-d53.6` follow-up); this spike does not build the grant
-because it needs the host's real identity and run-start integration. Browser telemetry is client-controlled; backend
+because it needs the host's real identity and run-start integration.
+
+Browser telemetry is client-controlled; backend
 confirmation establishes consistency, not authenticity. Cookies and bindings are
 an in-memory fixture, not a real authentication design.
 
