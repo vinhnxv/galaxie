@@ -60,6 +60,14 @@ test('packed create runs help and scaffolds identical files with only Node on PA
     expect(readdirSync(bin)).toEqual(['node']);
     expect(run(['--help'])).toContain('langgraph-js');
     expect(run(['my-app', 'browser-only', 'langgraph-js', '--no-install'])).toContain('Created');
+    for (const tree of ['templates', 'skills/galaxie']) {
+      const list = (base: string): string[] =>
+        readdirSync(base, { recursive: true, withFileTypes: true })
+          .filter((entry) => entry.isFile())
+          .map((entry) => join(entry.parentPath, entry.name).slice(base.length + 1))
+          .sort();
+      expect(list(join(extracted, 'package', tree)), tree).toEqual(list(join(repo, tree)));
+    }
     const project = join(root, 'my-app');
     expect(existsSync(join(project, 'node_modules'))).toBe(false);
     const expected = compose(await loadLayers(join(repo, 'templates')), {

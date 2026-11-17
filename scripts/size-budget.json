@@ -14,12 +14,12 @@
       "gzip": 2900
     },
     "@galaxie-ai/adapter-kit/.": {
-      "minified": 7000,
-      "gzip": 2500
+      "minified": 6700,
+      "gzip": 2300
     },
     "@galaxie-ai/adapter-langgraph/.": {
-      "minified": 35300,
-      "gzip": 10100
+      "minified": 32100,
+      "gzip": 9300
     },
     "@galaxie-ai/adapter-pyodide/.": {
       "minified": 34900,
@@ -34,16 +34,16 @@
       "gzip": 18400
     },
     "@galaxie-ai/core/.": {
-      "minified": 120700,
-      "gzip": 32300
+      "minified": 116700,
+      "gzip": 31300
     },
     "@galaxie-ai/core/browser": {
       "minified": 6700,
       "gzip": 2500
     },
     "@galaxie-ai/core/config": {
-      "minified": 28300,
-      "gzip": 8900
+      "minified": 27800,
+      "gzip": 8800
     },
     "@galaxie-ai/create/.": {
       "minified": 23800,
@@ -70,8 +70,8 @@
       "gzip": 9100
     },
     "@galaxie-ai/models/transformers/worker": {
-      "minified": 22200,
-      "gzip": 7400
+      "minified": 21300,
+      "gzip": 7100
     },
     "@galaxie-ai/models/webllm": {
       "minified": 15900,
@@ -102,8 +102,8 @@
       "gzip": 1200
     },
     "@galaxie-ai/storage-indexeddb/.": {
-      "minified": 42600,
-      "gzip": 11200
+      "minified": 42100,
+      "gzip": 11100
     },
     "@galaxie-ai/ui-protocol/.": {
       "minified": 23700,

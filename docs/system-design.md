@@ -255,8 +255,8 @@ Spike code is throwaway. Keep it out of `packages/` and never promote it to pack
 
 ### Starter composition
 
-The private, unpublished [`@galaxie-ai/create`](../packages/create/README.md) package
-loads repository layers from `templates/base`, `templates/kinds` and
+The [`@galaxie-ai/create`](../packages/create/README.md) package, prepared for the
+lockstep release and not yet published, loads layers from `templates/base`, `templates/kinds` and
 `templates/frameworks`. A layer has `layer.json`, verbatim `files/`, and optional
 repository-only `workspace/` files. `_gitignore` becomes `.gitignore`. Kind manifests
 declare supported frameworks; current kinds support only `langgraph-js` and keep
@@ -274,9 +274,9 @@ rolls back only its own creations after a failure.
 projects under the ignored `packages/create/.cache/composed`. Compiler and test
 commands invoke it explicitly; a cache-equality test rejects missing, changed or
 unexpected output. Generated projects omit workspace tests and mappings, and carry
-a `check` command that pins the emitted CSP and Trusted Types baseline. Layers stay
-in this checkout rather than the private package's `dist`; packaging and publishing
-them remain later work.
+a `check` command that pins the emitted CSP and Trusted Types baseline. The packed
+package carries copies of `templates/` and `skills/galaxie/` and falls back to the
+checkout layout when run from the repository.
 
 The CLI accepts a relative directory, kind and framework, with native terminal
 prompts for missing choices. It detects npm, pnpm or yarn and installs with

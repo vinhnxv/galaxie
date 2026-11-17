@@ -12,3 +12,4 @@ for (const path of ['templates', 'skills/galaxie']) {
   await rm(target, { recursive: true, force: true });
   if (!clean) await cp(new URL(path, root), target, { recursive: true });
 }
+if (clean) await rm(new URL('packages/create/skills', root), { recursive: true, force: true });

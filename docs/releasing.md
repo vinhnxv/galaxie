@@ -145,8 +145,9 @@ with two-factor authentication enabled. The repository is already public.
    `--framework langgraph-python`. Review every gating failure and the limits in
    the [standalone verification record](standalone-verification.md). Generated
    checks and both CSP mutation controls must pass. The harness never publishes.
-4. Run `pnpm pack` in each of the thirteen package directories and inspect the
-   tarballs. Require `dist`, `LICENSE`, `NOTICE`, `README.md` and `package.json`,
+4. Run `pnpm pack --pack-destination "$(mktemp -d)"` in each of the thirteen
+   package directories (never leave tarballs in the working tree, because
+   `pnpm publish` requires a clean tree) and inspect the tarballs. Require `dist`, `LICENSE`, `NOTICE`, `README.md` and `package.json`,
    with no top-level `src`, tests or internal files. Create additionally ships
    its templates and skill trees, including source and tests used to generate
    projects. Require matching versions, exact internal dependencies and no
@@ -154,16 +155,32 @@ with two-factor authentication enabled. The repository is already public.
    packed-create conformance tests. Record the kit and LangGraph consumer's
    minified/gzip bundle measurements; these include the kit and differ from the
    own-code size budgets, so they do not establish a size saving.
-5. Publish each package in the exact order above, running
+5. Make the release commit. Several files that ship in the tarballs, and the
+   generated-project READMEs, describe the release as prepared and not yet
+   published: the six promoted package READMEs, `packages/create/README.md`,
+   `templates/kinds/browser-only/files/README.md`,
+   `templates/kinds/gateway/files/README.md`,
+   `templates/frameworks/adk-go/files/GO.md`,
+   `templates/frameworks/langgraph-python/files/PYTHON.md` and
+   `skills/galaxie/README.md`. Reword each to state that 0.2.0 is published
+   (registry installs replace the maintainer-provided tarball instructions),
+   update the sentence the installer test asserts in
+   `tests/conformance/skill-install.node.test.ts`, regenerate the create
+   guidance goldens and the composed-output hashes if their text changed, and
+   merge that commit through a pull request. Publish only from the merged commit,
+   and rerun step 2 on it.
+6. Publish each package in the exact order above, running
    `pnpm publish --access public` in its package directory. This is a maintainer
    action, never part of the preparation scripts. Publishing before dependencies
    makes installations fail until those dependencies exist in the registry.
-6. Perform the post-publish checks below before tagging. Record any failures.
-7. The maintainer tags the same release commit `v0.2.0` and pushes that tag only
+7. Perform the post-publish checks below before tagging. Record any failures.
+   If a publish fails part-way, do not unpublish: fix the cause and continue the
+   remaining packages in order at the same version.
+8. The maintainer tags the same release commit `v0.2.0` and pushes that tag only
    after all thirteen packages and post-publish checks are verified.
-8. The maintainer writes English release notes and creates the release, naming
-   all thirteen packages, breaking public API changes, coordinated upgrade
-   ranges, tarball evidence, license review and documented verification limits.
+9. The maintainer writes English release notes and creates the release, naming
+   all thirteen packages, breaking public API changes, the new `engines.node`
+   floor on the seven launch packages, coordinated upgrade ranges, tarball evidence, license review and documented verification limits.
 
 ## Post-publish checks
 
