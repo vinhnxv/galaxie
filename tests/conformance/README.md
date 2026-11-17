@@ -1,5 +1,8 @@
 # Conformance suite
 
+The [executor adapter author guide](../../docs/guides/executor-adapters.md) maps
+contract obligations to these tests and their governing ADRs.
+
 The suite compares twelve deterministic graph cases in three lanes:
 
 | Lane | Runtime and context | Test |

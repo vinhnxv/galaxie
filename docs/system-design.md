@@ -320,7 +320,7 @@ Modules in `packages/core/src`:
 | `effects.ts` | Effect states and transitions | brief §12.3 |
 | `recovery.ts` | `RecoveryStore`, JSON submission receipts and write-effect records, with returned-record validation | brief §12.2, §12.3; ADR-0004, ADR-0005 |
 | `events.ts` | Executor-native stream events and runtime envelopes, including cancellation and host render outcomes; currently in memory only | brief §7.5, §12.1 |
-| `executor.ts` | Executor adapter contract and feature flags | brief §7.5; ADR-0001 |
+| `executor.ts` | Executor adapter contract and feature flags; [adapter author guide](guides/executor-adapters.md) | brief §7.5; ADR-0001 |
 | `definition.ts` | `AgentDefinition`, `defineAgentDefinition`, `BindingsFor`, `InputOf` | brief §13.2; ADR-0008 |
 | `instance.ts` | `AgentInstance`, snapshots, cancel receipt and content-free `RenderOutcome` | brief §14.1 |
 | `browser.ts` | `@galaxie-ai/core/browser` entry for `acquireOwnership`, `watchInvalidation` and their public types | ADR-0009, ADR-0012 A10 |

@@ -116,6 +116,7 @@ The thirteen public packages below are prepared for 0.2.0, not yet published at 
 - [Host integration guide](docs/guides/host-integration.md): CSP, model hosting, storage, ownership, logout, confirmations and proxies.
 - [Host configuration guide](docs/guides/host-configuration.md): trusted wiring documents, named hooks, validation and runtime builders.
 - [Development tracing guide](docs/guides/tracing.md): spans and exporting through a collector.
+- [Executor adapter author guide](docs/guides/executor-adapters.md): contract obligations, conformance coverage and governing decisions.
 - [ADK request-input guide](docs/guides/adk-request-input.md): a tested city-question example and per-executor input limits.
 - [ADK models and tools guide](docs/guides/adk-models-and-tools.md): model roles, fixed toolsets and measured refusal paths.
 - [System design](docs/system-design.md): components, contracts and runtime flows.

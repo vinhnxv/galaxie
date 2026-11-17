@@ -23,6 +23,15 @@ function fixture(extra: Record<string, string> = {}): string {
     'packages/demo/README.md': '# Demo\n',
     'packages/demo/AGENTS.md': agents,
     'llms.txt': index,
+    'packages/core/src/tracing.ts': `const ALLOWED = new Set(['galaxie.fixture']);
+const text = (span: Span, key: 'gen_ai.input.messages', value: unknown): void => {};
+`,
+    'docs/guides/tracing.md': `# Tracing
+
+| Span or outcome | Emitted attributes |
+| --- | --- |
+| Fixture | \`galaxie.fixture\`, \`gen_ai.input.messages\` |
+`,
     ...extra,
   };
   for (const [path, content] of Object.entries(files)) {
@@ -427,4 +436,113 @@ test('accepts a heading containing inline code in the citation attribute', () =>
     citation.replace('heading="Never"', 'heading="Never `eval`"'),
   );
   expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+const tracingSourceFile = 'packages/core/src/tracing.ts';
+const tracingGuideFile = 'docs/guides/tracing.md';
+const repo = fileURLToPath(new URL('../..', import.meta.url));
+
+function tracingFixture(): string {
+  const guide = readFileSync(join(repo, tracingGuideFile), 'utf8');
+  const table = guide.slice(guide.indexOf('| Span or outcome |')).split('\n\n')[0];
+  return fixture({
+    [tracingSourceFile]: readFileSync(join(repo, tracingSourceFile), 'utf8'),
+    [tracingGuideFile]: `# Tracing\n\n${table}\n`,
+  });
+}
+
+test('rejects an emitted tracing key without a table entry in a temporary source copy', () => {
+  const root = tracingFixture();
+  const source = readFileSync(join(root, tracingSourceFile), 'utf8');
+  writeFileSync(
+    join(root, tracingSourceFile),
+    source.replace('const ALLOWED = new Set([', "const ALLOWED = new Set(['galaxie.mutation',"),
+  );
+  const result = run(root);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('missing tracing attribute: galaxie.mutation');
+});
+
+test('rejects a new development-text key without a table entry', () => {
+  const root = tracingFixture();
+  const source = readFileSync(join(root, tracingSourceFile), 'utf8');
+  writeFileSync(
+    join(root, tracingSourceFile),
+    source.replace(
+      "key: 'gen_ai.input.messages'",
+      "key: 'gen_ai.mutation' | 'gen_ai.input.messages'",
+    ),
+  );
+  const result = run(root);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('missing tracing attribute: gen_ai.mutation');
+});
+
+test('rejects a removed tracing table row in a temporary guide copy', () => {
+  const root = tracingFixture();
+  const guide = readFileSync(join(root, tracingGuideFile), 'utf8');
+  writeFileSync(join(root, tracingGuideFile), guide.replace(/^\| Node \|.*\n/m, ''));
+  const result = run(root);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('missing tracing attribute: galaxie.node.name');
+  expect(result.output).toContain('missing tracing attribute: galaxie.node.step');
+});
+
+test('names an unknown attribute and its table row', () => {
+  const root = tracingFixture();
+  const guide = readFileSync(join(root, tracingGuideFile), 'utf8');
+  writeFileSync(join(root, tracingGuideFile), `${guide}| Invented | \`galaxie.not_emitted\` |\n`);
+  const result = run(root);
+  expect(result.status).toBe(1);
+  expect(result.output).toMatch(
+    /docs\/guides\/tracing\.md:\d+: unknown tracing attribute: galaxie.not_emitted; row: Invented/,
+  );
+});
+
+test('reads attribute columns only, ignoring span names, values, symbols and fenced examples', () => {
+  const root = fixture({
+    [tracingSourceFile]: `// A misleading 'galaxie.comment' key.
+const ALLOWED = new Set<string>([
+  'galaxie.fixture', // Only this Set supplies metadata keys.
+]);
+const marker = Symbol('galaxie.symbol');
+const span = tracer.startSpan('galaxie.span');
+const text = (span: Span, key: 'gen_ai.input.messages' | 'gen_ai.output.messages', value: unknown): void => {};
+`,
+    [tracingGuideFile]: `# Tracing
+
+| Span or outcome | Emitted attributes |
+| --- | --- |
+| \`galaxie.span\` | \`galaxie.fixture\` (\`bounded-value\`), \`gen_ai.input.messages\`, \`gen_ai.output.messages\` |
+
+\`galaxie.prose\` is not an attribute row.
+
+\`\`\`md
+| Span or outcome | Emitted attributes |
+| --- | --- |
+| Example | \`galaxie.fenced\` |
+\`\`\`
+`,
+  });
+  expect(run(root)).toEqual({ status: 0, output: '' });
+});
+
+test.each([
+  ['const ALLOWED = new Set([]);', 'ALLOWED'],
+  ["const ALLOWED = new Set(['galaxie.fixture']);", 'text'],
+  ['const ALLOWED = new Set(keys);', 'ALLOWED'],
+  [
+    "const ALLOWED = new Set(['galaxie.fixture']); const text = (span: Span, key: string) => {};",
+    'text',
+  ],
+])('fails loudly if tracing source extraction is empty or unsupported: %s', (source, member) => {
+  const result = run(fixture({ [tracingSourceFile]: source }));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain(`cannot extract tracing attributes from ${member}`);
+});
+
+test('rejects a missing tracing attribute table instead of silently comparing no rows', () => {
+  const result = run(fixture({ [tracingGuideFile]: '# Tracing\n' }));
+  expect(result.status).toBe(1);
+  expect(result.output).toContain('missing tracing attribute table');
 });
